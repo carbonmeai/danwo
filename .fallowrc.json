@@ -1,8 +1,19 @@
 {
   "$schema": "./node_modules/fallow/schema.json",
   "entry": ["src/index.{ts,tsx,js,jsx}", "src/main.{ts,tsx,js,jsx}"],
-  "workspaces": { "patterns": ["packages/*", "examples/*"] },
-  "health": { "maxCyclomatic": 10, "maxCognitive": 15 },
-  "duplicates": { "minOccurrences": 3 },
-  "rules": { "unused-dependencies": "warn" }
+  "workspaces": {
+    "patterns": ["packages/*", "examples/*"]
+  },
+  "health": {
+    "maxCyclomatic": 10,
+    "maxCognitive": 15
+  },
+  "duplicates": {
+    "minOccurrences": 2
+  },
+  "rules": {
+    "unused-dependencies": "warn"
+  },
+  "dynamicallyLoaded": ["**/danwo.config.ts", "**/*.danwo.ts", "packages/*/test/fixtures/**"],
+  "ignoreDependencies": ["@danwo/example-shop"]
 }

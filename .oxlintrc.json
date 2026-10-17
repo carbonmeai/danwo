@@ -12,12 +12,7 @@
     "typescript/no-misused-promises": "error",
     "import/no-cycle": "error",
     "unicorn/prefer-node-protocol": "error",
-    "vitest/no-standalone-expect": [
-      "error",
-      {
-        "additionalTestBlockFunctions": ["it.effect", "it.scoped", "it.live", "it.scopedLive"]
-      }
-    ],
+    "vitest/no-standalone-expect": "error",
     "unicorn/no-empty-file": "off",
     "vitest/valid-expect": [
       "error",

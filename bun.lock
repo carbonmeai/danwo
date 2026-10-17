@@ -5,7 +5,6 @@
     "": {
       "name": "danwo",
       "devDependencies": {
-        "@effect/vitest": "4.0.5",
         "@stylistic/eslint-plugin": "5.10.0",
         "@types/node": "^24",
         "fallow": "3.33.1",
@@ -209,8 +208,6 @@
     "@danwo/runner": ["@danwo/runner@workspace:packages/runner"],
 
     "@danwo/sdk": ["@danwo/sdk@workspace:packages/sdk"],
-
-    "@effect/vitest": ["@effect/vitest@4.0.5", "", { "peerDependencies": { "effect": "^4.0.5", "vitest": ">=5.0.0 <6.0.0" } }, "sha512-q64paZ/i4V2NiRhTyqCmT2KiDbFjlxc2EZrZca8GGt+Nf8844946HyJM5bPk/q+YeRkFSxIrlCs+J+LSfky/wA=="],
 
     "@eslint-community/eslint-utils": ["@eslint-community/eslint-utils@4.10.1", "", { "dependencies": { "eslint-visitor-keys": "^3.4.3" }, "peerDependencies": { "eslint": "^6.0.0 || ^7.0.0 || >=8.0.0" } }, "sha512-cuadcxVFE8sDK6iWJbs8Sn0av2Nrh2QSGQhVlBW9AaAHqHwjWsZHT8LJ4hFGPh7ASBV2deFdM7H/DPjulmh8rg=="],
 

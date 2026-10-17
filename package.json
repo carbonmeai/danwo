@@ -16,12 +16,9 @@
     "check": "bun run format:check && bun run lint && bun run fallow && bun run typecheck && bun run test",
     "test:slow": "vitest run --project slow",
     "test:all": "vitest run",
-    "fallow": "fallow --baseline fallow-baselines/dead-code.json --health-baseline fallow-baselines/health.json --dupes-baseline fallow-baselines/dupes.json",
-    "fallow:report": "fallow",
-    "fallow:baseline": "fallow dead-code --save-baseline fallow-baselines/dead-code.json && fallow health --save-baseline fallow-baselines/health.json && fallow dupes --save-baseline fallow-baselines/dupes.json"
+    "fallow": "fallow"
   },
   "devDependencies": {
-    "@effect/vitest": "4.0.5",
     "@stylistic/eslint-plugin": "5.10.0",
     "@types/node": "^24",
     "fallow": "3.33.1",
