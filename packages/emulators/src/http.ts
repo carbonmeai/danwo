@@ -107,7 +107,6 @@ class IncomingRequest {
 export class Context {
   readonly req: IncomingRequest
   private readonly extraHeaders = new Headers()
-  private readonly values = new Map<string, unknown>()
 
   constructor(req: IncomingRequest) {
     this.req = req
@@ -116,15 +115,6 @@ export class Context {
   /** Adds a header to whatever response this request ends with. */
   header(name: string, value: string): void {
     this.extraHeaders.set(name, value)
-  }
-
-  /** A value a middleware left for later handlers. */
-  get<T>(key: string): T | undefined {
-    return this.values.get(key) as T | undefined
-  }
-
-  set(key: string, value: unknown): void {
-    this.values.set(key, value)
   }
 
   body(data: BodyInit | null, status = 200, headers: HeaderRecord = {}): Response {
@@ -220,10 +210,12 @@ export class App {
     this.add("POST", path, handler)
   }
 
+  // fallow-ignore-next-line unused-class-member -- registered by route modules through a destructured context
   patch(path: string, handler: Handler): void {
     this.add("PATCH", path, handler)
   }
 
+  // fallow-ignore-next-line unused-class-member -- registered by route modules through a destructured context
   delete(path: string, handler: Handler): void {
     this.add("DELETE", path, handler)
   }

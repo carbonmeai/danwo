@@ -28,7 +28,7 @@ describe("Collection", () => {
 
     expect([first.id, second.id]).toEqual([1, 2])
     expect(first.created_at).toBe("2026-01-01T00:00:00.000Z")
-    expect(pets.get(2)).toEqual(second)
+    expect(pets.findOneBy("id", 2)).toEqual(second)
   })
 
   it("keeps an explicit id and continues after it", () => {
@@ -137,6 +137,6 @@ describe("Store", () => {
     pets.update(rex.id, { name: "Changed" })
     store.restore(snapshot)
 
-    expect(pets.get(rex.id)).toMatchObject({ name: "Rex", tags: ["a"] })
+    expect(pets.findOneBy("id", rex.id)).toMatchObject({ name: "Rex", tags: ["a"] })
   })
 })

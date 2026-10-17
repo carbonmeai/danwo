@@ -40,25 +40,41 @@ const SESSION_TEXTS = {
   configuration: "payment_method_configuration",
 } as const
 
+type PriceRow = NonNullable<ReturnType<StripeRouteContext["objects"]["prices"]["get"]>>
+
 /** A line item's price: an existing price id, or a new price from `price_data`. */
+function priceFor(
+  context: StripeRouteContext,
+  item: Params,
+): PriceRow | { readonly fault: string } {
+  const priceId = text(item.price)
+
+  if (priceId) return context.objects.prices.get(priceId) ?? { fault: `price:${priceId}` }
+
+  const data = asRecord(item.price_data)
+
+  if (!data) return { fault: "line_items[price]" }
+
+  const price = createPrice(context, data)
+
+  return "missing" in price ? { fault: `line_items[price_data][${price.missing}]` } : price
+}
+
+/** A session line for one requested line item. */
 function lineFor(
   context: StripeRouteContext,
   item: Params,
 ): SessionLine | { readonly fault: string } {
-  const quantity = integer(item.quantity) ?? 1
-  const priceId = text(item.price)
-  const data = asRecord(item.price_data)
-  const price = priceId ? context.objects.prices.get(priceId) : data && createPrice(context, data)
+  const price = priceFor(context, item)
 
-  if (!price) return { fault: priceId ? `price:${priceId}` : "line_items[price]" }
-  if ("missing" in price) return { fault: `line_items[price_data][${price.missing}]` }
+  if ("fault" in price) return price
 
   const product =
     typeof price.product === "string" ? context.objects.products.get(price.product) : undefined
 
   return {
     price: price.id,
-    quantity,
+    quantity: integer(item.quantity) ?? 1,
     description: product?.name ?? price.nickname ?? price.id,
     unitAmount: price.unit_amount ?? 0,
     currency: price.currency,
@@ -342,6 +358,25 @@ function settleExpiry(context: StripeRouteContext, session: CheckoutSession): Ch
   return expired ?? session
 }
 
+/** The checkout a page link names, with expiry applied, or the page to show when it can't be paid. */
+function payableCheckout(
+  context: StripeRouteContext,
+  c: Context,
+  id: string,
+): CheckoutSession | Response {
+  const found = context.objects.checkoutSessions.get(id)
+
+  if (!found)
+    return c.html(messagePage("Checkout not found", "This checkout link is not valid."), 404)
+
+  const session = settleExpiry(context, found)
+
+  if (session.status === "expired")
+    return c.html(messagePage("Checkout expired", "This checkout link has expired."), 410)
+
+  return session
+}
+
 /** Checkout Sessions over the API, plus the hosted payment page they send customers to. */
 export function checkoutSessionRoutes(context: StripeRouteContext): void {
   const { app, objects, events } = context
@@ -390,17 +425,11 @@ export function checkoutSessionRoutes(context: StripeRouteContext): void {
   })
 
   app.get("/checkout/:id", (c) => {
-    const found = sessions.get(c.req.param("id"))
+    const session = payableCheckout(context, c, c.req.param("id"))
 
-    if (!found)
-      return c.html(messagePage("Checkout not found", "This checkout link is not valid."), 404)
-
-    const session = settleExpiry(context, found)
-
+    if (session instanceof Response) return session
     if (session.status === "complete")
       return c.html(messagePage("Already paid", "This checkout is complete."))
-    if (session.status === "expired")
-      return c.html(messagePage("Checkout expired", "This checkout link has expired."), 410)
 
     const lines = sessions.extra(session.id)?.lines ?? []
 
@@ -421,15 +450,9 @@ export function checkoutSessionRoutes(context: StripeRouteContext): void {
   })
 
   app.post("/checkout/:id/complete", async (c) => {
-    const found = sessions.get(c.req.param("id"))
+    const session = payableCheckout(context, c, c.req.param("id"))
 
-    if (!found)
-      return c.html(messagePage("Checkout not found", "This checkout link is not valid."), 404)
-
-    const session = settleExpiry(context, found)
-
-    if (session.status === "expired")
-      return c.html(messagePage("Checkout expired", "This checkout link has expired."), 410)
+    if (session instanceof Response) return session
     if (session.status === "complete") return successRedirect(c, session)
 
     const form = await c.req.parseBody()

@@ -80,10 +80,6 @@ export class Collection<T extends Entity> {
     } as T)
   }
 
-  get(id: number): T | undefined {
-    return this.rows.get(id)
-  }
-
   /** Every record whose `field` equals `value`, in insertion order. */
   findBy<K extends keyof T>(field: K, value: T[K]): T[] {
     const ids = this.indexes.get(field)?.get(value)
@@ -120,6 +116,7 @@ export class Collection<T extends Entity> {
     return [...this.rows.values()]
   }
 
+  // fallow-ignore-next-line unused-class-member -- called on collections that Store.collection() returns
   count(where?: (row: T) => boolean): number {
     return where ? this.all().filter(where).length : this.rows.size
   }
@@ -134,6 +131,7 @@ export class Collection<T extends Entity> {
     return { rows: structuredClone(this.all()), nextId: this.nextId }
   }
 
+  // fallow-ignore-next-line unused-class-member -- called on collections that Store.collection() returns
   load(dump: CollectionDump): void {
     this.clear()
 

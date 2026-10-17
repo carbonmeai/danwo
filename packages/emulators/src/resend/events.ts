@@ -44,6 +44,7 @@ export class ResendEvents {
     this.outbox.push(type, event)
   }
 
+  // fallow-ignore-next-line unused-class-member -- called through a destructured route context
   domain(type: DomainEvent["type"], domain: Domain): void {
     const event: DomainEvent = {
       type,

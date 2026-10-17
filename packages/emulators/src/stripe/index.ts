@@ -34,8 +34,7 @@ import { stripeStore } from "./store.ts"
 export type * from "./entities.ts"
 export { STRIPE_API_VERSION, type StripeEvent } from "./events.ts"
 export { stripeOutboundFaults } from "./faults.ts"
-export { STRIPE_SANDBOX_DELIVERY, stripeSignature, stripeWebhookHeaders } from "./signature.ts"
-export type { StripeStore } from "./store.ts"
+export { stripeSignature } from "./signature.ts"
 
 export type SeedCustomer = Partial<Record<"id" | "email" | "name" | "description", string>>
 
@@ -65,10 +64,44 @@ export type StripeSeedConfig = Partial<{
   readonly paymentMethodConfigurations: readonly SeedPaymentMethodConfiguration[]
 }>
 
-function seedPrices(store: Store, prices: readonly SeedPrice[]): void {
-  const objects = stripeStore(store)
-  const created = unix(store.clock())
+type StripeObjects = ReturnType<typeof stripeStore>
 
+function seedCustomers(
+  objects: StripeObjects,
+  created: number,
+  customers: readonly SeedCustomer[],
+) {
+  for (const customer of customers)
+    objects.customers.add(
+      customerObject({
+        id: customer.id ?? newId("cus"),
+        created,
+        email: customer.email ?? null,
+        name: customer.name ?? null,
+        description: customer.description ?? null,
+        phone: null,
+        metadata: {},
+      }),
+      null,
+    )
+}
+
+function seedProducts(objects: StripeObjects, created: number, products: readonly SeedProduct[]) {
+  for (const product of products)
+    objects.products.add(
+      productObject({
+        id: product.id ?? newId("prod"),
+        created,
+        name: product.name,
+        description: product.description ?? null,
+        active: true,
+        metadata: product.metadata ?? {},
+      }),
+      null,
+    )
+}
+
+function seedPrices(objects: StripeObjects, created: number, prices: readonly SeedPrice[]): void {
   for (const price of prices) {
     const product = objects.products.where((p) => p.name === price.product_name)[0]
 
@@ -93,41 +126,12 @@ function seedPrices(store: Store, prices: readonly SeedPrice[]): void {
   }
 }
 
-/** Loads `config` into a Stripe emulator's store. No events are emitted for seeded data. */
-export function seedStripe(store: Store, config: StripeSeedConfig): void {
-  const objects = stripeStore(store)
-  const created = unix(store.clock())
-
-  for (const customer of config.customers ?? [])
-    objects.customers.add(
-      customerObject({
-        id: customer.id ?? newId("cus"),
-        created,
-        email: customer.email ?? null,
-        name: customer.name ?? null,
-        description: customer.description ?? null,
-        phone: null,
-        metadata: {},
-      }),
-      null,
-    )
-
-  for (const product of config.products ?? [])
-    objects.products.add(
-      productObject({
-        id: product.id ?? newId("prod"),
-        created,
-        name: product.name,
-        description: product.description ?? null,
-        active: true,
-        metadata: product.metadata ?? {},
-      }),
-      null,
-    )
-
-  seedPrices(store, config.prices ?? [])
-
-  for (const endpoint of config.webhookEndpoints ?? [])
+function seedWebhookEndpoints(
+  objects: StripeObjects,
+  created: number,
+  endpoints: readonly SeedWebhookEndpoint[],
+): void {
+  for (const endpoint of endpoints)
     objects.webhookEndpoints.add(
       webhookEndpointObject({
         id: newId("we"),
@@ -140,8 +144,13 @@ export function seedStripe(store: Store, config: StripeSeedConfig): void {
       }),
       { secret: endpoint.secret ?? `whsec_${newId("x", 32).slice(2)}` },
     )
+}
 
-  for (const configuration of config.paymentMethodConfigurations ?? [])
+function seedConfigurations(
+  objects: StripeObjects,
+  configurations: readonly SeedPaymentMethodConfiguration[],
+): void {
+  for (const configuration of configurations)
     objects.paymentMethodConfigurations.add(
       paymentMethodConfigurationObject({
         id: configuration.id ?? newId("pmc"),
@@ -152,6 +161,18 @@ export function seedStripe(store: Store, config: StripeSeedConfig): void {
       }),
       null,
     )
+}
+
+/** Loads `config` into a Stripe emulator's store. No events are emitted for seeded data. */
+export function seedStripe(store: Store, config: StripeSeedConfig): void {
+  const objects = stripeStore(store)
+  const created = unix(store.clock())
+
+  seedCustomers(objects, created, config.customers ?? [])
+  seedProducts(objects, created, config.products ?? [])
+  seedPrices(objects, created, config.prices ?? [])
+  seedWebhookEndpoints(objects, created, config.webhookEndpoints ?? [])
+  seedConfigurations(objects, config.paymentMethodConfigurations ?? [])
 }
 
 /** What every fresh test account has: one customer and the default payment method configuration. */

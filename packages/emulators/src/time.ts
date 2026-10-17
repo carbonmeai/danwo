@@ -63,11 +63,6 @@ export class ManualClock {
     this.nowMs = target
   }
 
-  /** How many callbacks are scheduled. */
-  get pending(): number {
-    return this.queue.length
-  }
-
   /** Milliseconds until the next scheduled callback, or undefined if none. */
   nextIn(): number | undefined {
     const next = this.queue.reduce<number | undefined>(
@@ -76,10 +71,5 @@ export class ManualClock {
     )
 
     return next === undefined ? undefined : Math.max(0, next - this.nowMs)
-  }
-
-  /** Runs callbacks due now (zero-delay timers) without moving time. */
-  flush(): void {
-    this.advance(0)
   }
 }

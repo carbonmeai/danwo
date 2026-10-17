@@ -24,31 +24,44 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
+/** The value at `key` with an id string replaced by its object; undefined if the id is unknown. */
+function expandedValue(target: Record<string, unknown>, key: string, resolve: Resolve): unknown {
+  const value = target[key]
+
+  if (typeof value !== "string") return value
+
+  const expanded = resolve(value)
+
+  if (!expanded) return undefined
+  target[key] = { ...expanded }
+
+  return target[key]
+}
+
 /** Expands one dotted path in place. Returns false if the path does not name an expandable id. */
 function expandPath(target: unknown, segments: string[], resolve: Resolve): boolean {
   const [head, ...rest] = segments
 
   if (head === undefined || !isRecord(target)) return false
-
-  if (head === "data" && Array.isArray(target.data)) {
+  if (head === "data" && Array.isArray(target.data))
     return target.data.every((item) => expandPath(item, rest, resolve))
-  }
 
-  if (!(head in target)) return false
-  let value = target[head]
+  return head in target && expandField(target, head, rest, resolve)
+}
 
-  if (typeof value === "string") {
-    const expanded = resolve(value)
+/** Expands `key` of `target`, then the rest of the path inside it. */
+function expandField(
+  target: Record<string, unknown>,
+  key: string,
+  rest: string[],
+  resolve: Resolve,
+): boolean {
+  const value = expandedValue(target, key, resolve)
 
-    if (!expanded) return false
-    value = { ...expanded }
-    target[head] = value
-  }
-
+  if (value === undefined) return false
   if (rest.length === 0) return isRecord(value) || value === null
-  if (value === null) return true
 
-  return expandPath(value, rest, resolve)
+  return value === null || expandPath(value, rest, resolve)
 }
 
 /**

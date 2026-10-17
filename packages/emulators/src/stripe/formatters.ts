@@ -330,7 +330,8 @@ export function cardDetails(card: {
   }
 }
 
-export function checkoutSessionObject(fields: {
+/** What a session's creator chose; the rest of a fresh session is fixed. */
+type SessionFields = {
   id: string
   created: number
   url: string
@@ -345,10 +346,47 @@ export function checkoutSessionObject(fields: {
   metadata: Metadata
   configuration: string | null
   invoiceCreation: { description: string | null; metadata: Metadata } | null
-}): CheckoutSession {
-  const total = fields.lines.reduce((sum, line) => sum + line.unitAmount * line.quantity, 0)
-  const priced = fields.mode !== "setup"
+}
 
+/** Fields that depend on whether the session takes a payment (every mode but `setup`). */
+function sessionPricing(
+  fields: SessionFields,
+): Pick<
+  CheckoutSession,
+  "amount_subtotal" | "amount_total" | "invoice_creation" | "payment_status" | "total_details"
+> {
+  if (fields.mode === "setup")
+    return {
+      amount_subtotal: null,
+      amount_total: null,
+      invoice_creation: null,
+      payment_status: "no_payment_required",
+      total_details: null,
+    }
+
+  const total = fields.lines.reduce((sum, line) => sum + line.unitAmount * line.quantity, 0)
+
+  return {
+    amount_subtotal: total,
+    amount_total: total,
+    invoice_creation: {
+      enabled: fields.invoiceCreation !== null,
+      invoice_data: {
+        account_tax_ids: null,
+        custom_fields: null,
+        description: fields.invoiceCreation?.description ?? null,
+        footer: null,
+        issuer: null,
+        metadata: fields.invoiceCreation?.metadata ?? {},
+        rendering_options: null,
+      },
+    },
+    payment_status: "unpaid",
+    total_details: { amount_discount: 0, amount_shipping: 0, amount_tax: 0 },
+  }
+}
+
+export function checkoutSessionObject(fields: SessionFields): CheckoutSession {
   return {
     id: fields.id,
     object: "checkout.session",
@@ -356,8 +394,7 @@ export function checkoutSessionObject(fields: {
     after_expiration: null,
     allow_promotion_codes: null,
     allowed_payment_method_types: null,
-    amount_subtotal: priced ? total : null,
-    amount_total: priced ? total : null,
+    ...sessionPricing(fields),
     automatic_tax: { enabled: false, liability: null, provider: null, status: null },
     billing_address_collection: null,
     cancel_url: fields.cancelUrl,
@@ -385,20 +422,6 @@ export function checkoutSessionObject(fields: {
     expires_at: fields.expiresAt,
     integration_identifier: null,
     invoice: null,
-    invoice_creation: priced
-      ? {
-          enabled: fields.invoiceCreation !== null,
-          invoice_data: {
-            account_tax_ids: null,
-            custom_fields: null,
-            description: fields.invoiceCreation?.description ?? null,
-            footer: null,
-            issuer: null,
-            metadata: fields.invoiceCreation?.metadata ?? {},
-            rendering_options: null,
-          },
-        }
-      : null,
     livemode: false,
     locale: null,
     managed_payments: null,
@@ -413,7 +436,6 @@ export function checkoutSessionObject(fields: {
       : null,
     payment_method_options: {},
     payment_method_types: ["card"],
-    payment_status: priced ? "unpaid" : "no_payment_required",
     permissions: null,
     recovered_from: null,
     saved_payment_method_options: null,
@@ -425,7 +447,6 @@ export function checkoutSessionObject(fields: {
     submit_type: null,
     subscription: null,
     success_url: fields.successUrl,
-    total_details: priced ? { amount_discount: 0, amount_shipping: 0, amount_tax: 0 } : null,
     ui_mode: "hosted",
     url: fields.url,
     wallet_options: null,

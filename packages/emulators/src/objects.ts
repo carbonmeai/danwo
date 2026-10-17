@@ -1,3 +1,4 @@
+// fallow-ignore-file unused-class-member -- tables are reached through typed object maps fallow cannot follow
 import type { Collection, Entity, Store } from "./store.ts"
 
 /**
