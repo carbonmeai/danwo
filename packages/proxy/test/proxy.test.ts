@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process"
+import { execFile, spawn } from "node:child_process"
 import { once } from "node:events"
 import { createServer, type Server } from "node:http"
 import { fileURLToPath } from "node:url"
@@ -7,6 +7,7 @@ import { promisify } from "node:util"
 import {
   createEmulator,
   GOOGLE_HOSTS,
+  gmailMailbox,
   google,
   googleOutboundFaults,
   MICROSOFT_HOSTS,
@@ -37,6 +38,7 @@ const OAUTH_APP = fileURLToPath(new URL("./fixtures/oauth-app.ts", import.meta.u
 const FETCH_APP = fileURLToPath(new URL("./fixtures/fetch-app.ts", import.meta.url))
 const GOOGLE_SYNC_APP = fileURLToPath(new URL("./fixtures/google-sync-app.ts", import.meta.url))
 const GRAPH_SYNC_APP = fileURLToPath(new URL("./fixtures/graph-sync-app.ts", import.meta.url))
+const PUBSUB_VERIFY_APP = fileURLToPath(new URL("./fixtures/pubsub-verify-app.ts", import.meta.url))
 
 let other: Server
 let otherUrl: string
@@ -490,6 +492,107 @@ describe("routing an unmodified Google integration", () => {
         expect.arrayContaining(["gmail.googleapis.com", "www.googleapis.com"]),
       )
     } finally {
+      await proxy.stop()
+      await emulator.close()
+    }
+  })
+})
+
+describe("verifying Google's signed pushes in an unmodified app", () => {
+  it("trusts real pushes and rejects a forged and an expired token, with google-auth-library", async () => {
+    const port = await freePort()
+    const endpoint = `http://127.0.0.1:${port}/push`
+    const pusher = "gmail-push@app.iam.gserviceaccount.com"
+    const emulator = createEmulator(google)
+
+    seedGoogle(emulator.store, {
+      users: [{ email: "ada@danwo.test", name: "Ada Lovelace" }],
+      oauth_clients: [
+        {
+          client_id: "123-sync.apps.googleusercontent.com",
+          client_secret: "GOCSPX-sync",
+          name: "Sync",
+          redirect_uris: ["https://app.danwo.test/oauth/callback"],
+        },
+      ],
+      pubsub: [
+        {
+          subscription: "projects/app/subscriptions/gmail-push",
+          topic: "projects/app/topics/gmail",
+          endpoint,
+          oidcToken: { serviceAccountEmail: pusher },
+        },
+      ],
+    })
+
+    const proxy = await startProxy({
+      routes: [{ hosts: [...GOOGLE_HOSTS], handler: emulator.fetch }],
+      unmatched: "block",
+    })
+    const app = spawn(process.execPath, [PUBSUB_VERIFY_APP], {
+      env: {
+        ...proxy.env(),
+        PUSH_PORT: String(port),
+        PUSH_AUDIENCE: endpoint,
+        PUSHER: pusher,
+        EXPECTED: "5",
+      },
+      cwd: fileURLToPath(new URL("..", import.meta.url)),
+    })
+    let stdout = ""
+    const exited = once(app, "exit")
+
+    app.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()))
+
+    try {
+      while (!stdout.includes("ready")) await new Promise((resolve) => setTimeout(resolve, 20))
+
+      const token = await googleAccessToken(
+        emulator,
+        "https://www.googleapis.com/auth/gmail.modify",
+      )
+
+      await emulator.fetch(
+        new Request("https://gmail.googleapis.com/gmail/v1/users/me/watch", {
+          method: "POST",
+          headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+          body: JSON.stringify({ topicName: "projects/app/topics/gmail", labelIds: ["INBOX"] }),
+        }),
+      )
+
+      const inbox = gmailMailbox(emulator, "ada@danwo.test")
+      const pushes: readonly (
+        | undefined
+        | { kind: "forged" }
+        | { kind: "stale"; seconds: number }
+      )[] = [undefined, { kind: "forged" }, { kind: "stale", seconds: 3600 }]
+
+      for (const fault of pushes) {
+        emulator.webhooks?.setFault(fault && (() => fault))
+        inbox.deliver({ from: "x@vendor.test", subject: "Ping" })
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        await emulator.webhooks?.idle()
+      }
+
+      emulator.webhooks?.setFault(undefined)
+      await exited
+
+      const verdicts = z
+        .array(z.object({ trusted: z.boolean(), reason: z.string() }))
+        .parse(JSON.parse(stdout.slice(stdout.indexOf("["))))
+      const rejected = verdicts.filter((verdict) => !verdict.trusted).map((v) => v.reason)
+
+      expect(verdicts.filter((verdict) => verdict.trusted)).toHaveLength(3)
+      expect(rejected).toHaveLength(2)
+      expect(rejected).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(/signature/i),
+          expect.stringMatching(/too late/i),
+        ]),
+      )
+      expect(proxy.exchanges().every((exchange) => exchange.disposition === "routed")).toBe(true)
+    } finally {
+      app.kill()
       await proxy.stop()
       await emulator.close()
     }
