@@ -40,12 +40,19 @@ export {
 } from "./config.ts"
 export { defaultOutboundFaults } from "./faults.ts"
 export type { EnvironmentContext, WorkerEnvironment } from "./environment.ts"
-export { type FlightRecord, type RecordedStep, type RecordMode, runsDir } from "./record.ts"
+export {
+  environmentState,
+  type FlightRecord,
+  type RecordedStep,
+  type RecordMode,
+  runsDir,
+} from "./record.ts"
 export { findRun } from "./report.ts"
 export { runMatrix, type RunMatrixOptions } from "./matrix-command.ts"
 export type { MatrixRunReport, Reporter, RunContext, RunKind, TestRunReport } from "./reporting.ts"
 export type { AttemptReport, TestReport } from "./tasks.ts"
 export { redactCredentials } from "../secrets/credentials.ts"
+export { createRedactor, type Redactor } from "./redact.ts"
 export { runTests, type RunTestsOptions } from "./test-command.ts"
 export { showRun, type ShowRunOptions } from "./show.ts"
 export {

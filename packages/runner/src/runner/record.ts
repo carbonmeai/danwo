@@ -203,7 +203,7 @@ function isSnapshotting(value: unknown): value is Snapshotting {
 }
 
 /** The environment's `state()`, else a snapshot of every emulator among its fixtures. */
-function environmentState(
+export function environmentState(
   env: WorkerEnvironment | undefined,
   redactor: Redactor,
 ): Record<string, unknown> {
