@@ -42,7 +42,10 @@ export interface AwsFixtures {
 
 /** Fixtures a `googleEnvironment()` or `googleService()` contributes. */
 export interface GoogleFixtures {
-  /** The Google sign-in emulator; read who signed in with `googleSignIns(google)`. */
+  /**
+   * The Google emulator: read who signed in with `googleSignIns(google)`, and mail, events and
+   * files with `gmailMailbox`, `googleCalendar` and `googleDrive`.
+   */
   readonly google: Emulator
   readonly proxy: Proxy
   readonly settle: () => Promise<void>
@@ -50,7 +53,11 @@ export interface GoogleFixtures {
 
 /** Fixtures a `microsoftEnvironment()` or `microsoftService()` contributes. */
 export interface MicrosoftFixtures {
-  /** The Microsoft sign-in emulator; read who signed in with `microsoftSignIns(microsoft)`. */
+  /**
+   * The Microsoft emulator: read who signed in with `microsoftSignIns(microsoft)`, and mail,
+   * events, files and subscriptions with `outlookMailbox`, `outlookCalendar`, `oneDrive` and
+   * `graphSubscriptions`.
+   */
   readonly microsoft: Emulator
   readonly proxy: Proxy
   readonly settle: () => Promise<void>
@@ -90,6 +97,7 @@ export {
   s3Environment,
   type S3Options,
   s3Service,
+  type Seed,
   type Service,
   type Services,
   startServices,
@@ -117,11 +125,39 @@ export type {
 /** zod, for the schemas `agent.extract` checks its result against. */
 export { z } from "@danwo/runner/runner"
 export {
+  type CalendarEntry,
+  type CalendarSeedEvent,
+  type DriveEntry,
+  type DriveSeedFile,
+  type GmailMailbox,
+  type GmailMessage,
+  type GmailSeedMessage,
+  gmailMailbox,
+  type GoogleCalendar,
+  type GoogleDrive,
   type GoogleSeedConfig,
+  googleCalendar,
+  googleDrive,
   googleSignIns,
+  type GraphSubscriptionEntry,
+  graphSubscriptions,
   type InboxEmail,
+  type IncomingMail,
   type MicrosoftSeedConfig,
+  type MicrosoftSeedEvent,
+  type MicrosoftSeedFile,
+  type MicrosoftSeedMessage,
   microsoftSignIns,
+  type OneDrive,
+  oneDrive,
+  type OutlookCalendar,
+  type OutlookMailbox,
+  type OutlookMessage,
+  outlookCalendar,
+  outlookMailbox,
+  type PubSubSeedSubscription,
+  revokeGoogleAccess,
+  revokeMicrosoftSessions,
   type ResendInbox,
   resendInbox,
   type S3Objects,

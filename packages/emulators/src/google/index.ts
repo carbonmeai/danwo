@@ -47,7 +47,7 @@ export {
   type GoogleDrive,
   googleDrive,
   type IncomingMail,
-  type MailboxMessage,
+  type GmailMessage,
   revokeGoogleAccess,
 } from "./inbox.ts"
 export type {

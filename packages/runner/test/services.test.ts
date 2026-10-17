@@ -1,8 +1,8 @@
-import { type Emulator, googleSignIns, s3Objects } from "@danwo/emulators"
+import { type Emulator, googleSignIns, outlookMailbox, s3Objects } from "@danwo/emulators"
 import { describe, expect, it } from "vitest"
 
 import { defaultOutboundFaults } from "../src/runner/faults.ts"
-import { googleService } from "../src/runner/oauth.ts"
+import { googleService, microsoftService } from "../src/runner/oauth.ts"
 import { s3Service } from "../src/runner/s3.ts"
 import { startServices } from "../src/runner/services.ts"
 import { stripeService } from "../src/runner/stripe.ts"
@@ -84,7 +84,7 @@ async function signInAsAda(google: Emulator): Promise<number> {
 }
 
 describe("googleService", () => {
-  it("joins Stripe behind one proxy, records who signed in, and reseeds on reset", async () => {
+  it("joins Stripe behind one proxy with its own pushes, records who signed in, and reseeds on reset", async () => {
     const stripe = stripeService()
     const google = googleService({
       seed: { users: [{ email: "ada@danwo.test", name: "Ada Lovelace" }], oauth_clients: [CLIENT] },
@@ -98,8 +98,11 @@ describe("googleService", () => {
         "settle",
         "stripe",
       ])
-      // Sign-in sends no webhooks: only Stripe's dispatcher reaches the matrix.
-      expect(services.webhooks).toEqual({ stripe: stripe.emulator.webhooks })
+      // Google's push notifications reach the matrix next to Stripe's webhooks.
+      expect(services.webhooks).toEqual({
+        stripe: stripe.emulator.webhooks,
+        google: google.emulator.webhooks,
+      })
       expect(await signInAsAda(google.emulator)).toBe(200)
       expect(googleSignIns(google.emulator).latest(CLIENT.client_id)).toMatchObject({
         email: "ada@danwo.test",
@@ -147,5 +150,33 @@ describe("googleService", () => {
     // The browser's account chooser is not faulted.
     expect(chooser).toEqual([])
     expect(microsoftToken.length).toBeGreaterThan(0)
+  })
+})
+
+describe("microsoftService", () => {
+  it("seeds from a function on every reset and hands its notifications to the matrix", async () => {
+    let subject = "first"
+    const microsoft = microsoftService({
+      seed: () => ({
+        users: [{ email: "grace@danwo.test", name: "Grace Hopper" }],
+        mail: [{ user: "grace@danwo.test", subject }],
+      }),
+    })
+    const services = await startServices([microsoft])
+
+    try {
+      expect(services.webhooks).toEqual({ microsoft: microsoft.emulator.webhooks })
+      expect(outlookMailbox(microsoft.emulator, "grace@danwo.test").latest("inbox")?.subject).toBe(
+        "first",
+      )
+
+      subject = "after reset"
+      await services.reset()
+      expect(outlookMailbox(microsoft.emulator, "grace@danwo.test").latest("inbox")?.subject).toBe(
+        "after reset",
+      )
+    } finally {
+      await services.close()
+    }
   })
 })

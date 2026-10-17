@@ -120,6 +120,44 @@ describe("flight recorder redaction", () => {
     )
   })
 
+  it("redacts push channel tokens, Graph clientState and URLs that grant access on their own", () => {
+    expect(
+      redactor.headers({ "x-goog-channel-token": "tok-123", "x-goog-channel-id": "ch-1" }),
+    ).toEqual({ "x-goog-channel-token": "[redacted]", "x-goog-channel-id": "ch-1" })
+    expect(
+      JSON.parse(
+        redactor.body(
+          JSON.stringify({
+            value: [
+              { subscriptionId: "s1", clientState: "app-secret-state", changeType: "created" },
+            ],
+          }),
+          "application/json",
+        ),
+      ),
+    ).toEqual({
+      value: [{ subscriptionId: "s1", clientState: "[redacted]", changeType: "created" }],
+    })
+    expect(redactor.value({ downloadToken: "d0wnl0ad", channel: { token: "tok-123" } })).toEqual({
+      downloadToken: "[redacted]",
+      channel: { token: "[redacted]" },
+    })
+    expect(
+      redactor.text(
+        "uploadUrl https://graph.microsoft.com/up/AbC123 and https://graph.microsoft.com/download/XyZ789?x=1",
+      ),
+    ).toBe(
+      "uploadUrl https://graph.microsoft.com/up/[redacted] and https://graph.microsoft.com/download/[redacted]?x=1",
+    )
+    expect(
+      redactor.text(
+        "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=ADPycd123",
+      ),
+    ).toBe(
+      "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=[redacted]",
+    )
+  })
+
   it("clips long strings and long lists in recorded state", () => {
     const value = redactor.value({
       blob: "x".repeat(2_000),
@@ -246,6 +284,15 @@ describe("flight records", () => {
     expect(record.steps[0]?.screenshot).toBe("screenshots/001-step-0.png")
     expect(text).not.toContain(PASSWORD)
     expect(text).not.toContain("sk_test_123456")
+  })
+
+  it("redacts a Graph download link in an exchange path, which only names it with its host", () => {
+    const env = environment([
+      exchange({ host: "graph.microsoft.com", path: "/download/Gr4ntT0ken?alt=1" }),
+    ])
+    const record = buildRecord(input(env, { exchanges: 0, deliveries: 0 }))
+
+    expect(record.exchanges[0]?.path).toBe("/download/[redacted]?alt=1")
   })
 
   it("deletes a passing run's directory under on-failure and keeps it under always", async () => {

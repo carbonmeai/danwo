@@ -8,7 +8,7 @@ import {
 } from "@danwo/emulators"
 import type { Proxy } from "@danwo/proxy"
 
-import { type Service, startServices } from "./services.ts"
+import { type Service, settleWebhooks, startServices } from "./services.ts"
 
 export interface StripeOptions {
   /** Runs on start and after every reset; a function, so it can use values only known later (the app's webhook URL). */
@@ -35,23 +35,6 @@ export interface StripeEnvironment {
     readonly settle: () => Promise<void>
   }
   close(): Promise<void>
-}
-
-/** Plays every pending webhook delivery and retry to the end on `clock`. */
-async function settleWebhooks(emulator: Emulator, clock: ManualClock): Promise<void> {
-  for (let i = 0; i < 100; i++) {
-    await emulator.webhooks?.idle()
-
-    const next = clock.nextIn()
-
-    if (next === undefined) {
-      return
-    }
-
-    clock.advance(next)
-  }
-
-  throw new Error("webhook deliveries did not settle")
 }
 
 /**

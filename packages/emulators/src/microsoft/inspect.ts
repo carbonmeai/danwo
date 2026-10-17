@@ -26,7 +26,7 @@ function graphState(emulator: Pick<Emulator, "store" | "outbox">): GraphState {
 }
 
 /** A message as a test reads it. */
-export interface MailboxMessage {
+export interface OutlookMessage {
   readonly id: string
   /** The folder's display name: `Inbox`, `Sent Items`, … */
   readonly folder: string
@@ -42,13 +42,13 @@ export interface MailboxMessage {
 
 export interface OutlookMailbox {
   /** Messages newest first; only those in `folder` (a well-known name or id) when given. */
-  messages(folder?: string): MailboxMessage[]
-  latest(folder?: string): MailboxMessage | undefined
+  messages(folder?: string): OutlookMessage[]
+  latest(folder?: string): OutlookMessage | undefined
   /** Delivers a new message to this mailbox, as if it had just arrived; returns its id. */
   receive(message: Omit<MicrosoftSeedMessage, "user">): string
 }
 
-function asMailboxMessage(state: GraphState, message: MessageRecord): MailboxMessage {
+function asOutlookMessage(state: GraphState, message: MessageRecord): OutlookMessage {
   const folder = state.microsoft().folders.findOneBy("graphId", message.folderId)
 
   return {
@@ -83,7 +83,7 @@ export function outlookMailbox(
       .messages.findBy("owner", user.oid)
       .filter((m) => folder === undefined || m.folderId === wanted)
       .toSorted((a, b) => b.receivedAt.localeCompare(a.receivedAt) || b.id - a.id)
-      .map((m) => asMailboxMessage(state, m))
+      .map((m) => asOutlookMessage(state, m))
   }
 
   return {

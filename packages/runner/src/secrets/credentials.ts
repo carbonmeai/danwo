@@ -1,7 +1,8 @@
 /**
  * Credentials recognisable by their shape alone, wherever they appear in text: provider API keys
  * and signing secrets, bearer and basic credentials, AWS keys and signatures, OAuth codes and
- * tokens. Values a session was given are redacted by its vault; these catch the ones it never was.
+ * tokens, and URLs that work as bearer tokens (upload sessions, pre-authenticated downloads).
+ * Values a session was given are redacted by its vault; these catch the ones it never was.
  */
 
 /** What a redacted credential becomes. */
@@ -29,6 +30,12 @@ const TOKEN_PATTERNS: readonly [RegExp, string][] = [
   [/\b(ya29\.)[A-Za-z0-9._-]+/g, `$1${REDACTED}`],
   [/(^|[^A-Za-z0-9])(1\/\/)[A-Za-z0-9._-]+/g, `$1$2${REDACTED}`],
   [/\b(EwA|1\.A)[A-Za-z0-9_-]{20,}/g, `$1${REDACTED}`],
+  /*
+   * URLs whose path or query alone grants access: Graph upload sessions and download links,
+   * Google resumable upload sessions.
+   */
+  [/(graph\.microsoft\.com\/(?:up|download)\/)[^\s"'?#/]+/g, `$1${REDACTED}`],
+  [/([?&]upload_id=)[^&#\s"']+/g, `$1${REDACTED}`],
 ]
 
 /** `text` with every credential-shaped value replaced. */

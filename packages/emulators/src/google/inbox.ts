@@ -13,7 +13,7 @@ import { googleStore } from "./store.ts"
  * One message in a Gmail mailbox, as a test reads it: ids and labels, the From, To and Subject
  * headers, the plain and HTML bodies, when Gmail received it, and any other header by name.
  */
-export type MailboxMessage = Readonly<
+export type GmailMessage = Readonly<
   Record<"id" | "threadId" | "from" | "to" | "subject", string> &
     Record<"text" | "html", string | undefined> & { labelIds: readonly string[]; date: Date }
 > & { header(name: string): string | undefined }
@@ -28,18 +28,18 @@ export type IncomingMail = Omit<Composition, "bcc" | "messageIdHeader" | "refere
 
 export interface GmailMailbox {
   /** Messages, newest first; only those with `labelId` when given. */
-  messages(labelId?: string): MailboxMessage[]
+  messages(labelId?: string): GmailMessage[]
   /** What the user sent, newest first. */
-  sent(): MailboxMessage[]
+  sent(): GmailMessage[]
   /** What is in the inbox, newest first. */
-  inbox(): MailboxMessage[]
+  inbox(): GmailMessage[]
   /** Delivers a message to this mailbox; it shows up in history and on the watch. */
-  deliver(mail: IncomingMail): MailboxMessage
+  deliver(mail: IncomingMail): GmailMessage
   /** Forgets history so far, so syncing from an older history id gets Gmail's 404. */
   expireHistory(): void
 }
 
-function asMailboxMessage(record: GmailMessageRecord): MailboxMessage {
+function asGmailMessage(record: GmailMessageRecord): GmailMessage {
   const mime = parseMime(record.raw)
 
   const header = (name: string) => {
@@ -102,14 +102,14 @@ export function gmailMailbox(
       .messages.findBy("owner", user.uid)
       .filter((message) => labelId === undefined || message.labelIds.includes(labelId))
       .toSorted((a, b) => b.internalDate - a.internalDate)
-      .map(asMailboxMessage)
+      .map(asGmailMessage)
   }
 
   return {
     messages,
     sent: () => messages("SENT"),
     inbox: () => messages("INBOX"),
-    deliver: (mail) => asMailboxMessage(deliverMessage(push, user, mail)),
+    deliver: (mail) => asGmailMessage(deliverMessage(push, user, mail)),
     expireHistory: () => expireHistory(push, user.uid),
   }
 }

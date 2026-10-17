@@ -165,12 +165,22 @@ function redactMessage(message: CapturedMessage, redactor: Redactor): CapturedMe
   }
 }
 
+/**
+ * A path redacted together with its host, so rules that need both (a Graph download link is
+ * `graph.microsoft.com/download/<grant>`) apply to it.
+ */
+function redactedPath(host: string, path: string, redactor: Redactor): string {
+  const whole = redactor.text(`${host}${path}`)
+
+  return whole.startsWith(host) ? whole.slice(host.length) : redactor.text(path)
+}
+
 function redactExchange(exchange: Exchange, redactor: Redactor): RecordedExchange {
   const { request, response, ...rest } = exchange
 
   return {
     ...rest,
-    path: redactor.text(rest.path),
+    path: redactedPath(rest.host, rest.path, redactor),
     ...(request && { request: redactMessage(request, redactor) }),
     ...(response && { response: redactMessage(response, redactor) }),
   }

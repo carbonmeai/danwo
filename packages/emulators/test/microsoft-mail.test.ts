@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import type { Emulator } from "../src/define.ts"
 import {
-  type MailboxMessage,
+  type OutlookMessage,
   type OutlookMailbox,
   microsoftOutboundFaults,
   outlookMailbox,
@@ -160,7 +160,7 @@ describe("writing and sending mail", () => {
     await client.api(`/me/messages/${draft.id}/send`).post({})
 
     const graceMailbox: OutlookMailbox = outlookMailbox(emulator, GRACE)
-    const received: MailboxMessage | undefined = graceMailbox.latest("inbox")
+    const received: OutlookMessage | undefined = graceMailbox.latest("inbox")
 
     expect(received).toMatchObject({
       subject: "Q3 report",

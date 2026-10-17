@@ -42,7 +42,7 @@ export {
   type DriveEntry,
   type GraphSubscriptionEntry,
   graphSubscriptions,
-  type MailboxMessage,
+  type OutlookMessage,
   type OneDrive,
   oneDrive,
   type OutlookCalendar,

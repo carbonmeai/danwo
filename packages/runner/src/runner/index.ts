@@ -51,6 +51,7 @@ export {
   microsoftService,
   type OAuthEnvironment,
   type OAuthService,
+  type Seed,
 } from "./oauth.ts"
 export {
   type S3Environment,

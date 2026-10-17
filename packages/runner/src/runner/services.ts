@@ -1,5 +1,5 @@
 import { clearWebhookFaults } from "@danwo/core"
-import type { WebhookDispatcher } from "@danwo/emulators"
+import type { Emulator, ManualClock, WebhookDispatcher } from "@danwo/emulators"
 import { type Proxy, type Route, startProxy } from "@danwo/proxy"
 
 /**
@@ -85,4 +85,21 @@ function webhooksByService(
   const entries = services.flatMap((s) => (s.webhooks ? [[s.name, s.webhooks] as const] : []))
 
   return entries.length > 0 ? Object.fromEntries(entries) : undefined
+}
+
+/** Plays every pending webhook delivery and retry of `emulator` to the end on `clock`. */
+export async function settleWebhooks(emulator: Emulator, clock: ManualClock): Promise<void> {
+  for (let i = 0; i < 100; i++) {
+    await emulator.webhooks?.idle()
+
+    const next = clock.nextIn()
+
+    if (next === undefined) {
+      return
+    }
+
+    clock.advance(next)
+  }
+
+  throw new Error("webhook deliveries did not settle")
 }

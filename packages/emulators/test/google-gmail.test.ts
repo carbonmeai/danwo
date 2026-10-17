@@ -6,7 +6,7 @@ import {
   type GmailMailbox,
   gmailMailbox,
   type IncomingMail,
-  type MailboxMessage,
+  type GmailMessage,
   revokeGoogleAccess,
 } from "../src/google/index.ts"
 import { AUTH, authFor, consent, failure, fetchVia, googleWith, only } from "./google-api.ts"
@@ -87,7 +87,7 @@ describe("Gmail messages", () => {
       format: "metadata",
       metadataHeaders: ["Subject"],
     })
-    const message: MailboxMessage = only(gmailMailbox(emulator, "ada@danwo.test").inbox()[0])
+    const message: GmailMessage = only(gmailMailbox(emulator, "ada@danwo.test").inbox()[0])
 
     expect(Buffer.from(only(raw.data.raw), "base64url").toString()).toContain("Subject: Lunch?")
     expect(metadata.data.payload?.headers).toEqual([{ name: "Subject", value: "Lunch?" }])
