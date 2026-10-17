@@ -135,10 +135,31 @@ program
   .command("mcp")
   .description("serve this project to coding agents over MCP (stdio)")
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
-  .action(async (options: { config?: string }) => {
+  .option("--max-sessions <n>", "live sessions open at once", integerAtLeast(1), 4)
+  .action(async (options: { config?: string; maxSessions: number }) => {
     const { serveStdio } = await import("@danwo/mcp")
 
-    await serveStdio({ cwd: process.cwd(), config: options.config })
+    await serveStdio({
+      cwd: process.cwd(),
+      config: options.config,
+      sessions: { max: options.maxSessions },
+    })
+  })
+
+program
+  .command("init")
+  .description(
+    "register danwo's MCP server with Claude Code, Cursor and Codex in this project (.mcp.json, .cursor/mcp.json, .codex/config.toml)",
+  )
+  .option("--starter-config", "also write a starter danwo.config.ts when there is none")
+  .action(async (options: { starterConfig?: boolean }) => {
+    const { initProject, initReport } = await import("@danwo/mcp")
+    const changes = await initProject({
+      cwd: process.cwd(),
+      starterConfig: options.starterConfig ?? false,
+    })
+
+    console.log(initReport(changes))
   })
 
 program

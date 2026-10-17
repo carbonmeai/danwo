@@ -18,16 +18,16 @@ It drives the app through its UI like a user, while third-party services the app
 
 ## Packages
 
-| Package            | What it is                                                           |
-| ------------------ | -------------------------------------------------------------------- |
-| `@danwo/sdk`       | The public test API                                                  |
-| `@danwo/cli`       | `danwo test`, `danwo matrix`, `danwo show`                           |
-| `@danwo/runner`    | Browser sessions, the agent, replay, workers and the flight recorder |
-| `@danwo/core`      | The fault matrix                                                     |
-| `@danwo/proxy`     | The egress proxy                                                     |
-| `@danwo/emulators` | Provider emulators                                                   |
-| `@danwo/github`    | Reports runs to GitHub from Actions: a check run and job summary     |
-| `@danwo/mcp`       | An MCP server for coding agents: run, explain and write danwo tests  |
+| Package            | What it is                                                            |
+| ------------------ | --------------------------------------------------------------------- |
+| `@danwo/sdk`       | The public test API                                                   |
+| `@danwo/cli`       | `danwo test`, `danwo matrix`, `danwo show`, `danwo mcp`, `danwo init` |
+| `@danwo/runner`    | Browser sessions, the agent, replay, workers and the flight recorder  |
+| `@danwo/core`      | The fault matrix                                                      |
+| `@danwo/proxy`     | The egress proxy                                                      |
+| `@danwo/emulators` | Provider emulators                                                    |
+| `@danwo/github`    | Reports runs to GitHub from Actions: a check run and job summary      |
+| `@danwo/mcp`       | An MCP server for coding agents: run, explain and write danwo tests   |
 
 See `examples/shop` for a small app tested with `danwo test` and `danwo matrix`.
 
@@ -96,14 +96,38 @@ config, add `reporters: [github({ artifact: "my-runs" })]` with `github` from `@
 
 ## Coding agents (MCP)
 
-`danwo mcp` serves the project in the current folder to a coding agent over MCP (stdio). With
-Claude Code, from the project's folder:
+`danwo mcp` serves the project in the current folder to a coding agent over MCP (stdio).
+`npx danwo init` registers it for Claude Code (`.mcp.json`), Cursor (`.cursor/mcp.json`) and
+Codex (`.codex/config.toml`), merging into files that exist; `--starter-config` also writes a
+`danwo.config.ts` when there is none. By hand, with Claude Code:
 
 ```bash
 claude mcp add danwo -- npx danwo mcp
 ```
 
-The agent gets these tools:
+### Live sessions
+
+`open_session` opens the app in danwo's browser behind the project's environment (its app,
+emulators and proxy, as a test worker would) and answers with the page's accessibility tree. The
+agent then drives it step by step, with no model on danwo's side:
+
+| Tool                                                                            | What it does                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `click`, `fill`, `fill_secret`, `press`, `select`, `check`, `hover`, `navigate` | Act on a ref from the latest snapshot (`e12`) or a locator (`getByRole("button", { name: "Pay" })`); answers with what changed on the page and the console errors, failed requests and dialogs since the last call |
+| `snapshot`                                                                      | The whole page now, with refs                                                                                                                                                                                      |
+| `check_locator`                                                                 | Whether a locator matches exactly one element: the line to paste, or why a test using it would fail and the nearest elements                                                                                       |
+| `screenshot`                                                                    | The page or an element as an image, with password fields, filled secrets and secret text masked                                                                                                                    |
+| `exchanges`                                                                     | What the app sent through the proxy and got back since the last look, with each call's route                                                                                                                       |
+| `deliver_webhooks`                                                              | Delivers the webhooks the emulators queued and lists them                                                                                                                                                          |
+| `emulator_state`                                                                | What each emulator holds now (Stripe objects, mail, Slack messages, S3 objects, sign-ins), redacted                                                                                                                |
+| `inject_fault`, `clear_faults`                                                  | Arm a fault named as `danwo matrix` names them (`duplicate on webhook checkout.session.completed`); it fires once on the next match                                                                                |
+| `start_recording`, `stop_recording`                                             | A screenshot after every action into `.danwo/sessions/<id>/`, and optionally a video (refused once a secret was filled: video can't mask)                                                                          |
+| `close_session`                                                                 | Stops the session's browser, app and emulators                                                                                                                                                                     |
+
+Each session has its own environment; up to four can be open at once (`danwo mcp --max-sessions`),
+and a session with no calls for ten minutes, or whose client went away, closes by itself.
+
+### Tests and runs
 
 | Tool              | What it does                                                                                            |
 | ----------------- | ------------------------------------------------------------------------------------------------------- |
