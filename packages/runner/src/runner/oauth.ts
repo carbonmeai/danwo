@@ -2,6 +2,9 @@ import {
   createEmulator,
   type Emulator,
   type EmulatorDefinition,
+  GITHUB_HOSTS,
+  github,
+  type GithubSeedConfig,
   GOOGLE_HOSTS,
   google,
   type GoogleSeedConfig,
@@ -9,8 +12,13 @@ import {
   MICROSOFT_HOSTS,
   microsoft,
   type MicrosoftSeedConfig,
+  seedGithub,
   seedGoogle,
   seedMicrosoft,
+  seedSlack,
+  SLACK_HOSTS,
+  slack,
+  type SlackSeedConfig,
 } from "@danwo/emulators"
 import type { Proxy } from "@danwo/proxy"
 
@@ -32,13 +40,23 @@ export interface MicrosoftOptions {
   readonly seed?: Seed<MicrosoftSeedConfig>
 }
 
+export interface SlackOptions {
+  /** The team, users, channels, apps and installs; app URLs for events, commands and interactivity. */
+  readonly seed?: Seed<SlackSeedConfig>
+}
+
+export interface GithubOptions {
+  /** Users, orgs, repos, OAuth and GitHub Apps, installations and repository webhooks. */
+  readonly seed?: Seed<GithubSeedConfig>
+}
+
 export interface OAuthService extends Service {
   readonly emulator: Emulator
   /** The emulator's clock; push deliveries and their retries run on it. */
   readonly clock: ManualClock
 }
 
-/** A Google or Microsoft emulator behind its own danwo proxy. */
+/** A Google, Microsoft, Slack or GitHub emulator behind its own danwo proxy. */
 export interface OAuthEnvironment<Name extends string> {
   readonly emulator: Emulator
   readonly proxy: Proxy
@@ -57,6 +75,8 @@ export interface OAuthEnvironment<Name extends string> {
 
 export type GoogleEnvironment = OAuthEnvironment<"google">
 export type MicrosoftEnvironment = OAuthEnvironment<"microsoft">
+export type SlackEnvironment = OAuthEnvironment<"slack">
+export type GithubEnvironment = OAuthEnvironment<"github">
 
 interface Provider<Config> {
   readonly name: string
@@ -78,10 +98,10 @@ function seedNow<Config>(seed: Seed<Config> | undefined): Config | undefined {
 }
 
 /**
- * A Google or Microsoft emulator for `startServices`. It answers the provider's real hosts for
- * the app's server calls and the browser's account chooser alike (the browser goes through the
- * same proxy). Its push notifications go out as webhooks on a manual clock, so `settle` plays
- * them to the end and `danwo matrix` can fault them.
+ * A provider's emulator for `startServices`. It answers the provider's real hosts for the app's
+ * server calls and the browser's sign-in or consent page alike (the browser goes through the same
+ * proxy). Its pushes, events and webhooks go out on a manual clock, so `settle` plays them to the
+ * end and `danwo matrix` can fault them.
  */
 function oauthService<Config>(
   provider: Provider<Config>,
@@ -151,6 +171,20 @@ const MICROSOFT: Provider<MicrosoftSeedConfig> = {
   apply: (emulator, config) => seedMicrosoft(emulator, config),
 }
 
+const SLACK: Provider<SlackSeedConfig> = {
+  name: "slack",
+  definition: slack,
+  hosts: SLACK_HOSTS,
+  apply: (emulator, config) => seedSlack(emulator.store, config),
+}
+
+const GITHUB: Provider<GithubSeedConfig> = {
+  name: "github",
+  definition: github,
+  hosts: GITHUB_HOSTS,
+  apply: (emulator, config) => seedGithub(emulator.store, config),
+}
+
 /** Google for `startServices`: sign-in, Gmail, Calendar and Drive on Google's real hosts; gives tests the `google` fixture. */
 export function googleService(options: GoogleOptions = {}): OAuthService {
   return oauthService(GOOGLE, options.seed)
@@ -173,4 +207,28 @@ export function microsoftEnvironment(
   options: MicrosoftOptions & { readonly unmatched?: "passthrough" | "block" } = {},
 ): Promise<MicrosoftEnvironment> {
   return oauthEnvironment("microsoft", microsoftService(options), options)
+}
+
+/** Slack for `startServices`: OAuth installs, the Web API, incoming webhooks and signed events; gives tests the `slack` fixture. */
+export function slackService(options: SlackOptions = {}): OAuthService {
+  return oauthService(SLACK, options.seed)
+}
+
+/** GitHub for `startServices`: sign-in, GitHub Apps, the REST API and signed webhooks; gives tests the `github` fixture. */
+export function githubService(options: GithubOptions = {}): OAuthService {
+  return oauthService(GITHUB, options.seed)
+}
+
+/** A worker-scoped Slack emulator behind its own proxy; combine services with `startServices`. */
+export function slackEnvironment(
+  options: SlackOptions & { readonly unmatched?: "passthrough" | "block" } = {},
+): Promise<SlackEnvironment> {
+  return oauthEnvironment("slack", slackService(options), options)
+}
+
+/** A worker-scoped GitHub emulator behind its own proxy; combine services with `startServices`. */
+export function githubEnvironment(
+  options: GithubOptions & { readonly unmatched?: "passthrough" | "block" } = {},
+): Promise<GithubEnvironment> {
+  return oauthEnvironment("github", githubService(options), options)
 }

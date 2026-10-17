@@ -63,6 +63,25 @@ export interface MicrosoftFixtures {
   readonly settle: () => Promise<void>
 }
 
+/** Fixtures a `slackEnvironment()` or `slackService()` contributes. */
+export interface SlackFixtures {
+  /** The Slack emulator: post as users and read what the app sent with `slackWorkspace(slack)`. */
+  readonly slack: Emulator
+  readonly proxy: Proxy
+  readonly settle: () => Promise<void>
+}
+
+/** Fixtures a `githubEnvironment()` or `githubService()` contributes. */
+export interface GithubFixtures {
+  /**
+   * The GitHub emulator: read issues, comments and check runs with `githubRepo(github, "o/r")`,
+   * who signed in with `githubSignIns(github)`, and an app's key with `githubAppKey`.
+   */
+  readonly github: Emulator
+  readonly proxy: Proxy
+  readonly settle: () => Promise<void>
+}
+
 /** `test` typed with danwo's fixtures; the same runtime function as the runner's. */
 export const test: TestAPI<DanwoFixtures> =
   baseTest.extend<Omit<DanwoFixtures, keyof TestFixtures>>()
@@ -84,6 +103,10 @@ export {
   defineConfig,
   type EnvironmentContext,
   expect,
+  type GithubEnvironment,
+  githubEnvironment,
+  type GithubOptions,
+  githubService,
   type GoogleEnvironment,
   googleEnvironment,
   type GoogleOptions,
@@ -100,6 +123,10 @@ export {
   type Seed,
   type Service,
   type Services,
+  type SlackEnvironment,
+  slackEnvironment,
+  type SlackOptions,
+  slackService,
   startServices,
   type StripeEnvironment,
   stripeEnvironment,
@@ -135,6 +162,14 @@ export {
   type Emulator,
   type DriveEntry,
   type DriveSeedFile,
+  type GithubCheckRunView,
+  type GithubCommentView,
+  type GithubIssueView,
+  type GithubRepoView,
+  type GithubSeedConfig,
+  githubAppKey,
+  githubRepo,
+  githubSignIns,
   type GmailMailbox,
   type GmailMessage,
   type GmailSeedMessage,
@@ -149,6 +184,7 @@ export {
   graphSubscriptions,
   type InboxEmail,
   type IncomingMail,
+  installGithubApp,
   listeningPort,
   type MicrosoftSeedConfig,
   type MicrosoftSeedEvent,
@@ -171,5 +207,12 @@ export {
   s3Objects,
   type SignIn,
   type SignIns,
+  type SlackAction,
+  type SlackEphemeral,
+  type SlackMessage,
+  type SlackSeedConfig,
+  type SlackWorkspace,
+  slackWorkspace,
   type StoredObject,
+  uninstallGithubApp,
 } from "@danwo/emulators"

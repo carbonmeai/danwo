@@ -1,8 +1,24 @@
-import { type Emulator, googleSignIns, outlookMailbox, s3Objects } from "@danwo/emulators"
+import { once } from "node:events"
+import { createServer, type IncomingHttpHeaders } from "node:http"
+
+import {
+  type Emulator,
+  githubRepo,
+  googleSignIns,
+  listeningPort,
+  outlookMailbox,
+  s3Objects,
+  slackWorkspace,
+} from "@danwo/emulators"
 import { describe, expect, it } from "vitest"
 
 import { defaultOutboundFaults } from "../src/runner/faults.ts"
-import { googleService, microsoftService } from "../src/runner/oauth.ts"
+import {
+  githubService,
+  googleService,
+  microsoftService,
+  slackService,
+} from "../src/runner/oauth.ts"
 import { s3Service } from "../src/runner/s3.ts"
 import { startServices } from "../src/runner/services.ts"
 import { stripeService } from "../src/runner/stripe.ts"
@@ -178,5 +194,133 @@ describe("microsoftService", () => {
     } finally {
       await services.close()
     }
+  })
+})
+
+interface Received {
+  readonly path: string
+  readonly headers: IncomingHttpHeaders
+  readonly body: string
+}
+
+/** A local receiver for the deliveries an emulator sends, answering 200 to each. */
+async function receiver(): Promise<{ url: string; received: Received[]; close(): void }> {
+  const received: Received[] = []
+  const server = createServer((req, res) => {
+    let body = ""
+
+    req.on("data", (chunk: Buffer) => (body += chunk.toString()))
+    req.on("end", () => {
+      received.push({ path: req.url ?? "", headers: req.headers, body })
+      res.end()
+    })
+  })
+
+  server.listen(0, "127.0.0.1")
+  await once(server, "listening")
+
+  return {
+    url: `http://127.0.0.1:${listeningPort(server)}`,
+    received,
+    close: () => server.close(),
+  }
+}
+
+describe("slackService and githubService", () => {
+  it("join Stripe behind one proxy, deliver signed events on settle, and reseed on reset", async () => {
+    const app = await receiver()
+    const stripe = stripeService()
+    const slack = slackService({
+      seed: () => ({
+        users: [{ name: "ada" }],
+        apps: [
+          {
+            name: "Echo",
+            client_id: "1.2",
+            client_secret: "echo-secret",
+            signing_secret: "echo-signing",
+            bot_scopes: ["channels:history", "chat:write"],
+            events: { url: `${app.url}/slack/events`, bot_events: ["message.channels"] },
+          },
+        ],
+        installations: [{ app: "Echo", bot_token: "xoxb-echo", channels: ["general"] }],
+      }),
+    })
+    const github = githubService({
+      seed: () => ({
+        users: [{ login: "ada" }],
+        repos: [{ repo: "ada/widgets" }],
+        tokens: [{ token: "REDACTED-TEST-VALUE", login: "ada" }],
+        hooks: [
+          {
+            repo: "ada/widgets",
+            url: `${app.url}/github`,
+            secret: "hook-secret",
+            events: ["issues"],
+          },
+        ],
+      }),
+    })
+    const services = await startServices([stripe, slack, github])
+
+    try {
+      expect(Object.keys(services.fixtures).toSorted()).toEqual([
+        "github",
+        "proxy",
+        "settle",
+        "slack",
+        "stripe",
+      ])
+      expect(services.webhooks).toEqual({
+        stripe: stripe.emulator.webhooks,
+        slack: slack.emulator.webhooks,
+        github: github.emulator.webhooks,
+      })
+
+      slackWorkspace(slack.emulator).post("ada", "general", "hi")
+
+      const opened = await github.emulator.fetch(
+        new Request("https://api.github.com/repos/ada/widgets/issues", {
+          method: "POST",
+          headers: { authorization: "token REDACTED-TEST-VALUE" },
+          body: JSON.stringify({ title: "It broke" }),
+        }),
+      )
+
+      expect(opened.status).toBe(201)
+      await services.settle()
+
+      const slackEvent = app.received.find((r) => r.path === "/slack/events")
+      const githubEvent = app.received.find((r) => r.path === "/github")
+
+      expect(slackEvent?.headers["x-slack-signature"]).toMatch(/^v0=/)
+      expect(githubEvent?.headers["x-github-event"]).toBe("issues")
+      expect(githubEvent?.headers["x-hub-signature-256"]).toMatch(/^sha256=/)
+
+      await services.reset()
+      expect(slackWorkspace(slack.emulator).messages("general")).toEqual([])
+      expect(githubRepo(github.emulator, "ada/widgets").issues()).toEqual([])
+    } finally {
+      await services.close()
+      app.close()
+    }
+  })
+
+  it("gives Slack and GitHub hosts their own faults in the default catalogue", () => {
+    const slackFaults = defaultOutboundFaults({
+      method: "POST",
+      host: "slack.com",
+      path: "/api/chat.postMessage",
+      index: 0,
+    })
+    const githubFaults = defaultOutboundFaults({
+      method: "POST",
+      host: "api.github.com",
+      path: "/repos/ada/widgets/issues",
+      index: 0,
+    })
+
+    expect(slackFaults.some((f) => f.kind === "status" && f.status === 429)).toBe(true)
+    expect(githubFaults.some((f) => f.kind === "status" && f.status === 403)).toBe(true)
   })
 })

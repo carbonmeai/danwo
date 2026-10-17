@@ -57,6 +57,10 @@ export {
   MINISTACK_IMAGE,
 } from "./aws.ts"
 export {
+  type GithubEnvironment,
+  githubEnvironment,
+  type GithubOptions,
+  githubService,
   type GoogleEnvironment,
   googleEnvironment,
   type GoogleOptions,
@@ -68,6 +72,10 @@ export {
   type OAuthEnvironment,
   type OAuthService,
   type Seed,
+  type SlackEnvironment,
+  slackEnvironment,
+  type SlackOptions,
+  slackService,
 } from "./oauth.ts"
 export {
   type S3Environment,

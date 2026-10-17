@@ -1,4 +1,6 @@
 import {
+  GITHUB_HOSTS,
+  githubOutboundFaults,
   GOOGLE_HOSTS,
   googleOutboundFaults,
   isS3Host,
@@ -6,13 +8,28 @@ import {
   microsoftOutboundFaults,
   resendOutboundFaults,
   s3OutboundFaults,
+  SLACK_HOSTS,
+  slackOutboundFaults,
   stripeOutboundFaults,
 } from "@danwo/emulators"
 import type { OutboundCall, OutboundFault } from "@danwo/proxy"
 
-const STRIPE_HOSTS = new Set(["api.stripe.com", "checkout.stripe.com"])
-const GOOGLE = new Set<string>(GOOGLE_HOSTS)
-const MICROSOFT = new Set<string>(MICROSOFT_HOSTS)
+type Catalogue = (call: OutboundCall) => readonly OutboundFault[]
+
+/** Each provider's own fault catalogue, by the hosts it answers. */
+const BY_HOST = new Map<string, Catalogue>([
+  ...hostsOf(["api.stripe.com", "checkout.stripe.com"], stripeOutboundFaults),
+  ...hostsOf(["api.resend.com"], resendOutboundFaults),
+  ...hostsOf(GOOGLE_HOSTS, googleOutboundFaults),
+  ...hostsOf(MICROSOFT_HOSTS, microsoftOutboundFaults),
+  ...hostsOf(SLACK_HOSTS, slackOutboundFaults),
+  ...hostsOf(GITHUB_HOSTS, githubOutboundFaults),
+])
+
+/** Pairs every host with the catalogue that serves it. */
+function hostsOf(hosts: readonly string[], catalogue: Catalogue): Array<[string, Catalogue]> {
+  return hosts.map((host) => [host, catalogue])
+}
 
 /** Failures any HTTP API can meet, for hosts danwo has no provider-shaped catalogue for. */
 function genericOutboundFaults(call: OutboundCall): readonly OutboundFault[] {
@@ -29,15 +46,11 @@ function genericOutboundFaults(call: OutboundCall): readonly OutboundFault[] {
 
 /**
  * `danwo matrix`'s default fault catalogue: each call gets its provider's faults by host (Stripe,
- * Resend, S3 and Tigris, Google and Microsoft sign-in, with error bodies their SDKs parse), and any other routed host (an
- * outside endpoint such as MiniStack) gets plain HTTP failures.
+ * Resend, S3 and Tigris, Google, Microsoft, Slack and GitHub, with error bodies their SDKs parse),
+ * and any other routed host (an outside endpoint such as MiniStack) gets plain HTTP failures.
  */
 export function defaultOutboundFaults(call: OutboundCall): readonly OutboundFault[] {
-  if (STRIPE_HOSTS.has(call.host)) return stripeOutboundFaults(call)
-  if (call.host === "api.resend.com") return resendOutboundFaults(call)
-  if (isS3Host(call.host)) return s3OutboundFaults(call)
-  if (GOOGLE.has(call.host)) return googleOutboundFaults(call)
-  if (MICROSOFT.has(call.host)) return microsoftOutboundFaults(call)
+  const catalogue = BY_HOST.get(call.host) ?? (isS3Host(call.host) ? s3OutboundFaults : undefined)
 
-  return genericOutboundFaults(call)
+  return catalogue ? catalogue(call) : genericOutboundFaults(call)
 }
