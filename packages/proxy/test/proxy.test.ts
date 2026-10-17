@@ -605,6 +605,12 @@ describe("verifying Google's signed pushes in an unmodified app", () => {
       expect(proxy.exchanges().every((exchange) => exchange.disposition === "routed")).toBe(true)
     } finally {
       app.kill()
+      await proxy.stop()
+      await emulator.close()
+    }
+  })
+})
+
 /** Starts the GitHub bot app and resolves once it listens; `output` resolves with its report. */
 async function startBot(env: NodeJS.ProcessEnv): Promise<{ output: Promise<string> }> {
   const child = spawn(process.execPath, [GITHUB_BOT_APP], {
