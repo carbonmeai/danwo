@@ -13,6 +13,7 @@
         "oxlint-tsgolint": "7.0.2004",
         "typescript": "^7.0.2",
         "vitest": "^5.0.5",
+        "zod": "4.6.1",
       },
     },
     "examples/shop": {
@@ -54,6 +55,7 @@
       },
       "devDependencies": {
         "@danwo/example-shop": "workspace:*",
+        "zod": "4.6.1",
       },
     },
     "packages/emulators": {
@@ -71,6 +73,7 @@
         "openid-client": "6.8.8",
         "resend": "6.34.1",
         "stripe": "23.0.0",
+        "zod": "4.6.1",
       },
     },
     "packages/github": {
@@ -82,6 +85,7 @@
       },
       "devDependencies": {
         "@danwo/emulators": "workspace:*",
+        "zod": "4.6.1",
       },
     },
     "packages/mcp": {

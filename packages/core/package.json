@@ -16,6 +16,7 @@
     "effect": "4.0.5"
   },
   "devDependencies": {
-    "@danwo/example-shop": "workspace:*"
+    "@danwo/example-shop": "workspace:*",
+    "zod": "4.6.1"
   }
 }

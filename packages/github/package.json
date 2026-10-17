@@ -15,6 +15,7 @@
     "@danwo/runner": "workspace:*"
   },
   "devDependencies": {
-    "@danwo/emulators": "workspace:*"
+    "@danwo/emulators": "workspace:*",
+    "zod": "4.6.1"
   }
 }
