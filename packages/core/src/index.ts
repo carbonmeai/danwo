@@ -1,0 +1,20 @@
+// Effect engine: runs, environments, fidelity tiers, oracles, verdicts.
+export {
+  applyFault,
+  checkFaultFired,
+  clearWebhookFaults,
+  deliveriesOf,
+  faultFired,
+  type FaultMatrixOptions,
+  type FaultMatrixResult,
+  formatMatrix,
+  type PlannedFault,
+  planFaults,
+  type RunEnvironment,
+  type RunOutcome,
+  type RunWebhooks,
+  routeOf,
+  runFaultMatrix,
+  type ServiceDelivery,
+  webhookSources,
+} from "./fault-matrix.ts"
