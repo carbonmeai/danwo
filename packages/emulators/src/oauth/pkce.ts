@@ -20,6 +20,8 @@ export interface AuthorizeParams {
   offline: boolean
   /** The tenant path the request came in on; providers without tenants leave it empty. */
   tenant: string
+  /** Whether scopes granted to the client before are added to these (`include_granted_scopes`). */
+  incremental?: boolean
 }
 
 /** An authorization request waiting for the user to pick an account. */

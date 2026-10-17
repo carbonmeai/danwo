@@ -5,12 +5,13 @@ import type { Context } from "../http.ts"
 /** The issuer in Google's ID tokens and discovery document. */
 export const GOOGLE_ISSUER = "https://accounts.google.com"
 
-/** The hosts Google sign-in uses; route them to the emulator. */
+/** The hosts Google sign-in, Gmail, Calendar and Drive use; route them to the emulator. */
 export const GOOGLE_HOSTS = [
   "accounts.google.com",
   "oauth2.googleapis.com",
   "openidconnect.googleapis.com",
   "www.googleapis.com",
+  "gmail.googleapis.com",
 ] as const
 
 /** Google's real endpoint URLs; the emulator serves them all, through the proxy. */

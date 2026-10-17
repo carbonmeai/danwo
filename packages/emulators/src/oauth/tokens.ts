@@ -117,3 +117,24 @@ export function sameSecret(given: string, expected: string): boolean {
 export function bearerToken(c: Context): string | undefined {
   return /^Bearer\s+(\S+)$/i.exec(c.req.header("authorization") ?? "")?.[1]
 }
+
+/** Every scope `user` has granted `clientId` and not revoked, from the tokens still live. */
+export function grantedBefore(
+  tokens: Collection<IssuedToken>,
+  clientId: string,
+  user: string,
+  clock: Clock,
+): string[] {
+  const now = clock().getTime()
+  const live = tokens
+    .all()
+    .filter(
+      (token) =>
+        token.clientId === clientId &&
+        token.user === user &&
+        !token.revoked &&
+        (token.expiresAt === null || Date.parse(token.expiresAt) > now),
+    )
+
+  return live.flatMap((token) => token.scope.split(/\s+/)).filter(Boolean)
+}

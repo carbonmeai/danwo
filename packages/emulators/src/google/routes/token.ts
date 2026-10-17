@@ -3,6 +3,7 @@ import { type RedeemFailure, redeemCode } from "../../oauth/pkce.ts"
 import {
   clientCredentials,
   formFields,
+  grantedBefore,
   issueAccessToken,
   issueRefreshToken,
   liveToken,
@@ -63,7 +64,9 @@ export function tokenRoutes(context: GoogleRouteContext): void {
     }
 
     const { params, user } = outcome.issued
-    const grant = { clientId, user, scope: grantedScope(params.scope) }
+    const earlier = params.incremental ? grantedBefore(google.tokens, clientId, user, clock) : []
+    const scope = [...new Set([...earlier, ...grantedScope(params.scope).split(" ")])].join(" ")
+    const grant = { clientId, user, scope }
     const refresh = params.offline
       ? issueRefreshToken(google.tokens, grant, REFRESH_PREFIX)
       : undefined

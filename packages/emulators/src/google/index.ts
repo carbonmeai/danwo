@@ -1,23 +1,61 @@
 import type { Emulator } from "../define.ts"
 import { defineEmulator } from "../define.ts"
-import { providerErrors } from "../errors.ts"
 import { type PersonName, personName } from "../oauth/account.ts"
 import { createSigningKey } from "../oauth/jwt.ts"
 import { type SignIns, signIns } from "../oauth/sign-ins.ts"
 import type { Store } from "../store.ts"
+import { googleErrors } from "./api.ts"
 import type { GoogleRouteContext } from "./context.ts"
-import { googleError, newUid } from "./helpers.ts"
+import { newUid } from "./helpers.ts"
+import { PUSH_DELIVERY, pushEndpoints, pushHeaders } from "./push.ts"
 import { authorizeRoutes } from "./routes/authorize.ts"
+import { calendarEventRoutes } from "./routes/calendar-events.ts"
+import { calendarListRoutes } from "./routes/calendar-lists.ts"
 import { discoveryRoutes } from "./routes/discovery.ts"
+import { driveFileRoutes } from "./routes/drive-files.ts"
+import { driveSharingRoutes } from "./routes/drive-sharing.ts"
+import { driveUploadRoutes } from "./routes/drive-uploads.ts"
+import { gmailDraftRoutes } from "./routes/gmail-drafts.ts"
+import { gmailHistoryRoutes } from "./routes/gmail-history.ts"
+import { gmailLabelRoutes } from "./routes/gmail-labels.ts"
+import { gmailMessageRoutes } from "./routes/gmail-messages.ts"
+import { gmailThreadRoutes } from "./routes/gmail-threads.ts"
 import { revokeRoutes } from "./routes/revoke.ts"
 import { tokenRoutes } from "./routes/token.ts"
 import { userinfoRoutes } from "./routes/userinfo.ts"
+import {
+  type CalendarSeedEvent,
+  type DriveSeedFile,
+  type GmailSeedMessage,
+  type PubSubSeedSubscription,
+  seedCalendar,
+  seedDrive,
+  seedGmail,
+  seedPubSub,
+} from "./seed.ts"
 import { googleStore } from "./store.ts"
 
 export type * from "./entities.ts"
 export { googleOutboundFaults } from "./faults.ts"
 export { GOOGLE_ENDPOINTS, GOOGLE_HOSTS, GOOGLE_ISSUER } from "./helpers.ts"
 export type { SignIn, SignIns } from "../oauth/sign-ins.ts"
+export {
+  type GmailMailbox,
+  gmailMailbox,
+  type GoogleCalendar,
+  googleCalendar,
+  type GoogleDrive,
+  googleDrive,
+  type IncomingMail,
+  type MailboxMessage,
+  revokeGoogleAccess,
+} from "./inbox.ts"
+export type {
+  CalendarSeedEvent,
+  DriveSeedFile,
+  GmailSeedMessage,
+  PubSubSeedSubscription,
+} from "./seed.ts"
 
 /** A seeded Google account; names are split from `name` unless given. */
 export type GoogleSeedUser = { readonly email: string } & Partial<
@@ -31,10 +69,18 @@ export type GoogleSeedClient = {
   readonly redirect_uris: readonly string[]
 }
 
-/** Accounts and OAuth clients to load into a Google emulator. */
+/** Accounts, OAuth clients and API data to load into a Google emulator. */
 export type GoogleSeedConfig = Partial<{
   readonly users: readonly GoogleSeedUser[]
   readonly oauth_clients: readonly GoogleSeedClient[]
+  /** Mailbox contents by account email. */
+  readonly gmail: Readonly<Record<string, readonly GmailSeedMessage[]>>
+  /** Where Gmail's Pub/Sub notifications are pushed. */
+  readonly pubsub: readonly PubSubSeedSubscription[]
+  /** Primary calendar events by account email. */
+  readonly calendar: Readonly<Record<string, readonly CalendarSeedEvent[]>>
+  /** Drive files by account email. */
+  readonly drive: Readonly<Record<string, readonly DriveSeedFile[]>>
 }>
 
 function addUser(store: Store, seed: GoogleSeedUser): void {
@@ -55,6 +101,11 @@ export function seedGoogle(store: Store, config: GoogleSeedConfig): void {
 
   for (const client of config.oauth_clients ?? [])
     googleStore(store).clients.insert({ ...client, redirect_uris: [...client.redirect_uris] })
+
+  seedPubSub(store, config.pubsub ?? [])
+  seedGmail(store, config.gmail ?? {})
+  seedCalendar(store, config.calendar ?? {})
+  seedDrive(store, config.drive ?? {})
 }
 
 /** Who signed in to which client, for tests. */
@@ -72,20 +123,35 @@ function routes(context: GoogleRouteContext): void {
     tokenRoutes,
     userinfoRoutes,
     revokeRoutes,
+    gmailMessageRoutes,
+    gmailThreadRoutes,
+    gmailLabelRoutes,
+    gmailDraftRoutes,
+    gmailHistoryRoutes,
+    calendarListRoutes,
+    calendarEventRoutes,
+    driveFileRoutes,
+    driveUploadRoutes,
+    driveSharingRoutes,
   ])
     register(context)
 }
 
 /**
- * Sign in with Google: the account chooser, OpenID Connect discovery, the token endpoint with
- * PKCE and refresh, userinfo, signing keys and revocation, on Google's real hostnames.
+ * Google on its real hostnames: sign-in (the account chooser, OpenID Connect discovery, the token
+ * endpoint with PKCE and refresh, userinfo, signing keys and revocation), Gmail, Calendar and Drive, each
+ * call checked against the scopes the user granted. Gmail's Pub/Sub pushes and the
+ * Calendar and Drive watch channels go through the webhook dispatcher.
  */
 export const google = defineEmulator({
   name: "google",
-  setup({ app, store, clock }) {
-    app.onError(
-      providerErrors((c, status, message) => googleError(c, status, "internal_failure", message)),
-    )
-    routes({ app, clock, google: () => googleStore(store), key: createSigningKey() })
+  setup({ app, store, clock, outbox }) {
+    app.onError(googleErrors())
+    routes({ app, clock, store, outbox, google: () => googleStore(store), key: createSigningKey() })
   },
+  webhooks: ({ store, outbox, clock }) => ({
+    endpoints: () => pushEndpoints({ store, outbox, clock }),
+    sign: ({ endpoint, body }) => pushHeaders(endpoint, body),
+    policy: PUSH_DELIVERY,
+  }),
 })

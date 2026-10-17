@@ -43,10 +43,10 @@ export function authorizeRoutes(context: GoogleRouteContext): void {
 
   const authorize = (c: Context) => {
     const query = new URL(c.req.url).searchParams
-    const params = authorizeParams(query, {
-      offline: query.get("access_type") === "offline",
-      tenant: "",
-    })
+    const params = {
+      ...authorizeParams(query, { offline: query.get("access_type") === "offline", tenant: "" }),
+      incremental: query.get("include_granted_scopes") === "true",
+    }
     const refused = checkClient(c, context, params)
 
     if (refused) return refused
