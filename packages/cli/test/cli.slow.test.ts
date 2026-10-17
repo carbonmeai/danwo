@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process"
-import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -30,6 +30,7 @@ afterAll(async () => {
     fixture("uploads"),
     fixture("signin"),
     fixture("integration"),
+    fixture("sessions"),
     fixture("visual"),
     SHOP,
   ])
@@ -162,6 +163,66 @@ describe("danwo test", () => {
     expect(out).toContain("2 passed")
     expect(code).toBe(0)
   }, 120_000)
+})
+
+/** Every `record.json` under `dir`'s flight records, as text. */
+async function recordsUnder(dir: string): Promise<string[]> {
+  const runs = join(dir, ".danwo", "runs")
+  const files = (await readdir(runs, { recursive: true })).filter((path) =>
+    path.endsWith("record.json"),
+  )
+
+  return Promise.all(files.map((path) => readFile(join(runs, path), "utf8")))
+}
+
+describe("danwo test with saved sessions", () => {
+  it("signs in once, reuses it, sets it up again when the app ends it, and never records it", async () => {
+    const { code, out } = await danwo(fixture("sessions"), [
+      "test",
+      "tests/notes.danwo.ts",
+      "--record",
+      "always",
+    ])
+
+    expect(out).toContain("4 passed")
+    expect(code).toBe(0)
+
+    const records = (await recordsUnder(fixture("sessions"))).join("\n")
+
+    expect(records).toMatch(/session ada: created \(\d+ steps\)/)
+    expect(records).toContain("session ada: reused")
+    expect(records).toMatch(/session ada: renewed \(\d+ steps\)/)
+
+    // Neither a session id the app issued nor the password ever reaches a record.
+    const sids = (await readFile(join(state, "sids.txt"), "utf8")).split("\n").filter(Boolean)
+
+    expect(sids.length).toBe(2)
+    for (const sid of sids) expect(records).not.toContain(sid)
+    expect(records).not.toContain("pw-ada-fixture")
+  }, 120_000)
+
+  it("fails every test whose session cannot be set up, naming the session", async () => {
+    const { code, out } = await danwo(fixture("sessions"), ["test", "tests/broken.danwo.ts"])
+
+    expect(out.match(/session "intruder" could not be set up/g)).toHaveLength(2)
+    expect(out).toContain("2 failed")
+    expect(code).toBe(1)
+  }, 120_000)
+
+  it("signs in again in every matrix trial, since each starts a fresh app", async () => {
+    const { code, out } = await danwo(fixture("sessions"), [
+      "matrix",
+      "tests/notes.danwo.ts",
+      "--grep",
+      "saves a note",
+    ])
+
+    // The invariant also checks the trial's fresh app was signed into exactly once.
+    expect(out).toContain("PASS  clean run")
+    expect(out).toContain("PASS  status 503 on PUT danwo-notes.t3.storage.dev/notes/:id")
+    expect(out).toContain("faults: 4 passed")
+    expect(code).toBe(0)
+  }, 180_000)
 })
 
 describe("danwo test with screenshots", () => {
