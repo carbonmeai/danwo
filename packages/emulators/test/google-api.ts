@@ -1,5 +1,6 @@
 import { google as googleapis } from "googleapis"
 import { expect } from "vitest"
+import { z } from "zod"
 
 import { createEmulator, type Emulator, type EmulatorOptions } from "../src/define.ts"
 import { google, type GoogleSeedConfig, seedGoogle } from "../src/google/index.ts"
@@ -42,11 +43,29 @@ export function fetchVia(emulator: Emulator): typeof fetch {
 }
 
 /** What the token endpoint answered for a consent. */
-export interface Tokens {
-  readonly access_token: string
-  readonly refresh_token?: string
-  readonly scope: string
-}
+const Tokens = z.object({
+  access_token: z.string(),
+  refresh_token: z.string().nullable().default(null),
+  scope: z.string(),
+})
+
+export type Tokens = z.infer<typeof Tokens>
+
+/** What a failed googleapis call carries: the status and Google's error body. */
+const ClientFailure = z.object({
+  status: z.number().optional(),
+  response: z
+    .object({
+      data: z
+        .object({
+          error: z
+            .object({ errors: z.array(z.object({ reason: z.string().optional() })).optional() })
+            .optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+})
 
 /**
  * Plays the user consenting to `scopes` for the app (the account chooser and the redirect), then
@@ -98,7 +117,7 @@ export async function consent(
 
   expect(token.status).toBe(200)
 
-  return (await token.json()) as Tokens
+  return Tokens.parse(await token.json())
 }
 
 /** An OAuth2 client holding `tokens`, whose own calls (refresh) also reach the emulator. */
@@ -120,10 +139,7 @@ export async function failure(call: Promise<unknown>): Promise<{ status: number;
   try {
     await call
   } catch (error) {
-    const { status, response } = error as {
-      status?: number
-      response?: { data?: { error?: { errors?: { reason?: string }[] } } }
-    }
+    const { status, response } = ClientFailure.parse(error)
 
     return { status: status ?? 0, reason: response?.data?.error?.errors?.[0]?.reason ?? "" }
   }

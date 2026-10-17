@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto"
 import type { ErrorResponse } from "resend"
 
 import type { Context } from "../http.ts"
+import { asRecord } from "../json.ts"
 
 /** Resend's ids are UUIDs. */
 export const newUuid = (): string => randomUUID()
@@ -26,9 +27,7 @@ export async function jsonBody(c: Context): Promise<Record<string, unknown>> {
   try {
     const parsed: unknown = JSON.parse((await c.req.text()) || "{}")
 
-    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : {}
+    return asRecord(parsed) ?? {}
   } catch {
     return {}
   }
@@ -50,7 +49,7 @@ export function tagsOf(value: unknown): { name: string; value: string }[] {
   if (!Array.isArray(value)) return []
 
   return value.flatMap((tag: unknown) => {
-    const { name, value: tagValue } = (tag ?? {}) as Record<string, unknown>
+    const { name, value: tagValue } = asRecord(tag) ?? {}
 
     return typeof name === "string" && typeof tagValue === "string"
       ? [{ name, value: tagValue }]
@@ -59,6 +58,6 @@ export function tagsOf(value: unknown): { name: string; value: string }[] {
 }
 
 /** A list response, newest first. */
-export function listOf<T>(c: Context, items: readonly T[]): Response {
-  return c.json({ object: "list", has_more: false, data: [...items].reverse() })
+export function listOf(c: Context, items: readonly unknown[]): Response {
+  return c.json({ object: "list", has_more: false, data: items.toReversed() })
 }

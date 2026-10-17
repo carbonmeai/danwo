@@ -1,4 +1,5 @@
 import type { Context } from "../../http.ts"
+import { isOneOf } from "../../json.ts"
 import { CHECKOUT_TEST_CARD, paymentMethodFor } from "../cards.ts"
 import { messagePage, renderPayPage } from "../checkout-page.ts"
 import type { StripeRouteContext } from "../context.ts"
@@ -18,7 +19,6 @@ import {
   stripeError,
   text,
   textOrNull,
-  textsOf,
   unix,
 } from "../helpers.ts"
 import { createIntent, payIntent } from "../payments.ts"
@@ -28,17 +28,9 @@ type Mode = "payment" | "setup" | "subscription"
 type Params = Record<string, unknown>
 
 const DAY_SECONDS = 24 * 60 * 60
-const MODES: readonly string[] = ["payment", "setup", "subscription"]
+const MODES: readonly Mode[] = ["payment", "setup", "subscription"]
 
 /** Session fields taken as given from the create request, by parameter name. */
-const SESSION_TEXTS = {
-  customer: "customer",
-  customerEmail: "customer_email",
-  clientReferenceId: "client_reference_id",
-  successUrl: "success_url",
-  cancelUrl: "cancel_url",
-  configuration: "payment_method_configuration",
-} as const
 
 type PriceRow = NonNullable<ReturnType<StripeRouteContext["objects"]["prices"]["get"]>>
 
@@ -161,7 +153,12 @@ function newSession(
     url: `${context.baseUrl}/checkout/${id}`,
     mode,
     lines: plan.lines,
-    ...textsOf(params, SESSION_TEXTS),
+    customer: textOrNull(params.customer),
+    customerEmail: textOrNull(params.customer_email),
+    clientReferenceId: textOrNull(params.client_reference_id),
+    successUrl: textOrNull(params.success_url),
+    cancelUrl: textOrNull(params.cancel_url),
+    configuration: textOrNull(params.payment_method_configuration),
     expiresAt: integer(params.expires_at) ?? created + DAY_SECONDS,
     metadata: metadataOf(params.metadata) ?? {},
     invoiceCreation: plan.invoice,
@@ -171,9 +168,9 @@ function newSession(
 /** Creates a Checkout Session from the request's parameters. */
 async function createSession(c: Context, context: StripeRouteContext): Promise<Response> {
   const params = await readParams(c)
-  const mode = text(params.mode)
+  const mode = params.mode
 
-  if (!mode || !MODES.includes(mode)) return badParam(c, "mode")
+  if (!isOneOf(MODES, mode)) return badParam(c, "mode")
 
   const refused = checkReferences(c, context, params)
 
@@ -186,9 +183,7 @@ async function createSession(c: Context, context: StripeRouteContext): Promise<R
 
   const plan: SessionPlan = { lines, intent: intentPlan(params), invoice: invoicePlan(params) }
 
-  return c.json(
-    context.objects.checkoutSessions.add(newSession(context, params, mode as Mode, plan), plan),
-  )
+  return c.json(context.objects.checkoutSessions.add(newSession(context, params, mode, plan), plan))
 }
 
 /** The paid invoice Checkout's `invoice_creation` produces, through its lifecycle events. */

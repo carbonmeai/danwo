@@ -45,7 +45,7 @@ export function signIns(
     return all.codes
       .all()
       .filter((code) => clientId === undefined || code.params.client_id === clientId)
-      .reverse()
+      .toReversed()
       .map((code) => describe(code, all))
   }
 

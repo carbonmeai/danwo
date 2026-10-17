@@ -23,7 +23,7 @@ import {
   PutObjectAclCommand,
   PutObjectCommand,
   S3Client,
-  type S3ServiceException,
+  S3ServiceException,
   UploadPartCommand,
 } from "@aws-sdk/client-s3"
 import { Upload } from "@aws-sdk/lib-storage"
@@ -77,7 +77,9 @@ async function rejection(promise: Promise<unknown>): Promise<S3ServiceException>
   try {
     await promise
   } catch (error) {
-    return error as S3ServiceException
+    if (error instanceof S3ServiceException) return error
+
+    throw error
   }
 
   throw new Error("expected the call to fail")
@@ -85,7 +87,7 @@ async function rejection(promise: Promise<unknown>): Promise<S3ServiceException>
 
 async function put(
   key: string,
-  body: string | Uint8Array,
+  body: NonNullable<ConstructorParameters<typeof PutObjectCommand>[0]["Body"]>,
   extra: Partial<ConstructorParameters<typeof PutObjectCommand>[0]> = {},
 ) {
   return client.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: body, ...extra }))
@@ -201,13 +203,9 @@ describe("objects", () => {
   })
 
   it("decodes a streamed (aws-chunked) body", async () => {
-    await put(
-      "stream.txt",
-      Readable.from([Buffer.from("hello "), Buffer.from("stream")]) as unknown as Uint8Array,
-      {
-        ContentLength: 12,
-      },
-    )
+    await put("stream.txt", Readable.from([Buffer.from("hello "), Buffer.from("stream")]), {
+      ContentLength: 12,
+    })
 
     expect(await getText("stream.txt")).toBe("hello stream")
   })

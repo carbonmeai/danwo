@@ -6,9 +6,29 @@ export interface Timer {
   clearTimeout(handle: unknown): void
 }
 
+/** What `systemTimer` hands out: a way to cancel the timeout it started. */
+interface SystemHandle {
+  readonly cancel: () => void
+}
+
+function isSystemHandle(handle: unknown): handle is SystemHandle {
+  return (
+    typeof handle === "object" &&
+    handle !== null &&
+    "cancel" in handle &&
+    typeof handle.cancel === "function"
+  )
+}
+
 export const systemTimer: Timer = {
-  setTimeout: (callback, ms) => setTimeout(callback, ms),
-  clearTimeout: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+  setTimeout: (callback, ms): SystemHandle => {
+    const timeout = setTimeout(callback, ms)
+
+    return { cancel: () => clearTimeout(timeout) }
+  },
+  clearTimeout: (handle) => {
+    if (isSystemHandle(handle)) handle.cancel()
+  },
 }
 
 interface Pending {

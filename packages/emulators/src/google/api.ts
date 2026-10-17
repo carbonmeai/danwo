@@ -1,9 +1,12 @@
 import { HttpError } from "../errors.ts"
 import type { Context, ErrorHandler } from "../http.ts"
+import { isRecord } from "../json.ts"
 import { bearerToken, liveToken } from "../oauth/tokens.ts"
 import type { GoogleRouteContext } from "./context.ts"
 import type { GoogleUser } from "./entities.ts"
 import { googleError } from "./helpers.ts"
+
+export { isRecord }
 
 /** The canonical status Google's JSON errors name for each HTTP status. */
 const STATUS_NAMES: Readonly<Record<number, string>> = {
@@ -113,11 +116,6 @@ export function requireAccess(
     )
 
   return { user, clientId: token.clientId, scope }
-}
-
-/** Whether `value` is a plain JSON object. */
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
 /** JSON text as a record; empty, invalid or non-object JSON is a 400. */

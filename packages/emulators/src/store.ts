@@ -46,15 +46,17 @@ function fromJson(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(fromJson)
   if (value === null || typeof value !== "object") return value
 
-  const record = value as Record<string, unknown>
+  if ("$map" in value && Array.isArray(value.$map)) return new Map(value.$map.map(entryFromJson))
+  if ("$set" in value && Array.isArray(value.$set)) return new Set(value.$set.map(fromJson))
 
-  if (Array.isArray(record.$map))
-    return new Map(
-      (record.$map as unknown[][]).map(([k, v]) => [fromJson(k), fromJson(v)] as const),
-    )
-  if (Array.isArray(record.$set)) return new Set((record.$set as unknown[]).map(fromJson))
+  return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fromJson(v)]))
+}
 
-  return Object.fromEntries(Object.entries(record).map(([k, v]) => [k, fromJson(v)]))
+/** One `[key, value]` pair of a tagged map. */
+function entryFromJson(entry: unknown): [unknown, unknown] {
+  const [key, value]: unknown[] = Array.isArray(entry) ? entry : []
+
+  return [fromJson(key), fromJson(value)]
 }
 
 /** A set of records of one kind, with optional lookup indexes on chosen fields. */
@@ -72,6 +74,7 @@ export class Collection<T extends Entity> {
   insert(fields: NewRecord<T>): T {
     const at = this.now()
 
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the new fields plus id and timestamps are a T; TypeScript can't prove that for a generic T
     return this.put({
       ...fields,
       id: fields.id ?? this.nextId,
@@ -127,6 +130,7 @@ export class Collection<T extends Entity> {
     for (const index of this.indexes.values()) index.clear()
   }
 
+  // fallow-ignore-next-line unused-class-member -- called through the store's StoredCollection view
   dump(): CollectionDump {
     return { rows: structuredClone(this.all()), nextId: this.nextId }
   }
@@ -135,6 +139,7 @@ export class Collection<T extends Entity> {
   load(dump: CollectionDump): void {
     this.clear()
 
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a dump only holds rows this collection wrote
     for (const row of structuredClone(dump.rows) as T[]) {
       this.rows.set(row.id, row)
       this.index(row)
@@ -182,10 +187,27 @@ export class Collection<T extends Entity> {
   }
 }
 
+/** What the store needs of a collection whatever its record type: to empty, dump and load it. */
+interface StoredCollection {
+  clear(): void
+  dump(): CollectionDump
+  load(dump: CollectionDump): void
+}
+
+/**
+ * The name of a free-form value, typed by what is stored under it. Declare each key once, e.g.
+ * `const COUNTER: DataKey<number> = { name: "calendar.counter" }`, and read and write through it.
+ */
+export interface DataKey<V> {
+  readonly name: string
+  /** Never set: carries the value's type. */
+  readonly type?: V
+}
+
 /** All of one emulator's state. */
 export class Store {
   readonly clock: Clock
-  private readonly collections = new Map<string, Collection<Entity>>()
+  private readonly collections = new Map<string, StoredCollection>()
   private values = new Map<string, unknown>()
 
   constructor(clock: Clock = systemClock) {
@@ -194,22 +216,25 @@ export class Store {
 
   /** The collection called `name`, created on first use with the given indexed fields. */
   collection<T extends Entity>(name: string, indexed: readonly (keyof T)[] = []): Collection<T> {
-    let found = this.collections.get(name)
+    const found = this.collections.get(name)
 
-    if (!found) {
-      found = new Collection<T>(this.clock, indexed) as unknown as Collection<Entity>
-      this.collections.set(name, found)
-    }
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a name always holds the record type it was first created with
+    if (found) return found as Collection<T>
 
-    return found as unknown as Collection<T>
+    const created = new Collection<T>(this.clock, indexed)
+
+    this.collections.set(name, created)
+
+    return created
   }
 
-  getData<V>(key: string): V | undefined {
-    return this.values.get(key) as V | undefined
+  getData<V>(key: DataKey<V>): V | undefined {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- values are only written through setData with the same typed key
+    return this.values.get(key.name) as V | undefined
   }
 
-  setData(key: string, value: unknown): void {
-    this.values.set(key, value)
+  setData<V>(key: DataKey<V>, value: V): void {
+    this.values.set(key.name, value)
   }
 
   /** Empties every collection and value; collections keep their indexes. */

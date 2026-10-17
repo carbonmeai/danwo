@@ -1,3 +1,4 @@
+import { isOneOf } from "../../json.ts"
 import type { StripeRouteContext } from "../context.ts"
 import type { Price } from "../entities.ts"
 import { priceObject, productObject } from "../formatters.ts"
@@ -22,17 +23,17 @@ type Prices = Pick<StripeRouteContext, "objects" | "events" | "clock">
 type Interval = "day" | "week" | "month" | "year"
 type TaxBehavior = "exclusive" | "inclusive" | "unspecified"
 
-const INTERVALS: readonly string[] = ["day", "week", "month", "year"]
-const TAX_BEHAVIORS: readonly string[] = ["exclusive", "inclusive", "unspecified"]
+const INTERVALS: readonly Interval[] = ["day", "week", "month", "year"]
+const TAX_BEHAVIORS: readonly TaxBehavior[] = ["exclusive", "inclusive", "unspecified"]
 
 /** `recurring[interval]=month&recurring[interval_count]=3`, or `null` for a one-time price. */
 function recurringOf(value: unknown): { interval: Interval; interval_count: number } | null {
   const recurring = asRecord(value)
-  const interval = text(recurring?.interval)
+  const interval = recurring?.interval
 
-  if (!interval || !INTERVALS.includes(interval)) return null
+  if (!isOneOf(INTERVALS, interval)) return null
 
-  return { interval: interval as Interval, interval_count: integer(recurring?.interval_count) ?? 1 }
+  return { interval, interval_count: integer(recurring?.interval_count) ?? 1 }
 }
 
 /** `unit_amount`, or a whole-cent `unit_amount_decimal`. */
@@ -44,7 +45,7 @@ function amountOf(params: Record<string, unknown>): number | undefined {
 }
 
 function taxBehaviorOf(value: unknown): TaxBehavior | null {
-  return typeof value === "string" && TAX_BEHAVIORS.includes(value) ? (value as TaxBehavior) : null
+  return isOneOf(TAX_BEHAVIORS, value) ? value : null
 }
 
 /** The product a price belongs to: an existing id, or a new one from `product_data`. */

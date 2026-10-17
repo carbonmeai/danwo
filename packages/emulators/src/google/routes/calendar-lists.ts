@@ -38,13 +38,16 @@ function busyIn(context: GoogleRouteContext, calendarId: string, from: number, t
     }))
 }
 
+/** A text field, or an empty string. */
+function textOf(value: unknown): string {
+  return typeof value === "string" ? value : ""
+}
+
 /** The window and calendars a free/busy query asks about. */
 function freeBusyRequest(body: Record<string, unknown>) {
-  const text = (value: unknown) => (typeof value === "string" ? value : "")
-
   return {
-    timeMin: text(body.timeMin),
-    timeMax: text(body.timeMax),
+    timeMin: textOf(body.timeMin),
+    timeMax: textOf(body.timeMax),
     items: Array.isArray(body.items) ? body.items.filter(isRecord) : [],
   }
 }
@@ -53,6 +56,7 @@ function freeBusyRequest(body: Record<string, unknown>) {
 export function calendarListRoutes(context: GoogleRouteContext): void {
   const { app } = context
   const calendars = () => googleStore(context.store).calendars
+  const known = (id: string) => calendars().findOneBy("calendarId", id)
 
   app.get(`${V3}/users/me/calendarList`, (c) => {
     const caller = requireAccess(c, context, SCOPES.calendarRead)
@@ -118,7 +122,6 @@ export function calendarListRoutes(context: GoogleRouteContext): void {
 
     primaryCalendar(context, caller.user)
 
-    const known = (id: string) => calendars().findOneBy("calendarId", id)
     const entries = items.map((item) => {
       const id = item.id === "primary" ? caller.user.email : String(item.id)
 

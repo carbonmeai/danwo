@@ -74,5 +74,9 @@ export function testCard(token: string): CardDetails | undefined {
 
 /** The default test card, for a payment method created without card details. */
 export function defaultCard(): CardDetails {
-  return TEST_CARDS.pm_card_visa as CardDetails
+  const card = TEST_CARDS["pm_card_visa"]
+
+  if (!card) throw new Error("the Visa test card is missing")
+
+  return card
 }

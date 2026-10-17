@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto"
 
 import type { Context } from "../http.ts"
+import { asRecord } from "../json.ts"
 import type { Outbox } from "../outbox.ts"
 import type { Clock, Store } from "../store.ts"
 import type { WebhookEndpoint } from "../webhooks.ts"
@@ -186,6 +187,30 @@ export function pushEndpoints(push: PushContext): WebhookEndpoint[] {
   return [...subscriptions, ...channels]
 }
 
+/** A channel notice back from the JSON body it was queued as. */
+function noticeOf(body: string): ChannelNotice {
+  const fields = new Map<string, unknown>(Object.entries(asRecord(JSON.parse(body)) ?? {}))
+
+  const textOrNull = (name: string): string | null => {
+    const value = fields.get(name)
+
+    return typeof value === "string" ? value : null
+  }
+
+  const text = (name: string): string => textOrNull(name) ?? ""
+
+  return {
+    channelId: text("channelId"),
+    resourceId: text("resourceId"),
+    resourceUri: text("resourceUri"),
+    state: text("state"),
+    messageNumber: Number(fields.get("messageNumber")),
+    expiration: Number(fields.get("expiration")),
+    token: textOrNull("token"),
+    changed: textOrNull("changed"),
+  }
+}
+
 /** The `X-Goog-*` headers of one channel notification. */
 function channelHeaders(notice: ChannelNotice): Record<string, string> {
   return {
@@ -208,5 +233,5 @@ export const PUSH_DELIVERY = { retryDelaysMs: [1000, 10_000, 60_000], timeoutMs:
 export function pushHeaders(endpoint: WebhookEndpoint, body: string): Record<string, string> {
   if (!endpoint.id.startsWith(CHANNEL)) return { "content-type": "application/json" }
 
-  return channelHeaders(JSON.parse(body) as ChannelNotice)
+  return channelHeaders(noticeOf(body))
 }

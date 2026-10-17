@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest"
 
 import { HttpError, providerErrors } from "../src/errors.ts"
 import { App, serve } from "../src/http.ts"
+import { isRecord } from "../src/json.ts"
 import { listeningPort } from "../src/net.ts"
 
 const request = (path: string, init?: RequestInit) =>
@@ -104,10 +105,10 @@ describe("request bodies", () => {
 
     app.post("/echo", async (c) => {
       const text = await c.req.text()
-      const json = await c.req.json<{ n: number }>()
+      const json = await c.req.json()
       const bytes = await c.req.arrayBuffer()
 
-      return c.json({ text, n: json.n, size: bytes.byteLength })
+      return c.json({ text, n: isRecord(json) ? json.n : undefined, size: bytes.byteLength })
     })
 
     const response = await app.fetch(request("/echo", { method: "POST", body: '{"n":7}' }))

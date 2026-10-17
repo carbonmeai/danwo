@@ -32,7 +32,7 @@ import { STRIPE_SANDBOX_DELIVERY, stripeWebhookHeaders } from "./signature.ts"
 import { stripeStore } from "./store.ts"
 
 export type * from "./entities.ts"
-export { STRIPE_API_VERSION, type StripeEvent } from "./events.ts"
+export { STRIPE_API_VERSION } from "./events.ts"
 export { stripeOutboundFaults } from "./faults.ts"
 export { stripeSignature } from "./signature.ts"
 

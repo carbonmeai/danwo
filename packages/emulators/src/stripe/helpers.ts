@@ -1,6 +1,9 @@
 import { randomInt } from "node:crypto"
 
 import type { Context } from "../http.ts"
+import { asRecord } from "../json.ts"
+
+export { asRecord }
 
 const BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
@@ -82,31 +85,60 @@ function keyPath(key: string): string[] {
   return [head, ...rest]
 }
 
-/** An empty container for the key after this one: a list for `[]` or an index, else an object. */
-function containerFor(next: string): Tree {
-  return (next === "" || /^\d+$/.test(next) ? [] : {}) as Tree
+/** Form pairs while they are nested: every level is an object until lists are recognised. */
+interface Branch {
+  [key: string]: Branch | string
 }
 
-/** Puts `value` at `path`, creating lists and objects along the way. */
-function place(root: Tree, path: readonly string[], value: string): void {
+const INDEX = /^\d+$/
+
+/** Whether a branch holds a list: it is empty or every key is an index. */
+function isList(branch: Branch): boolean {
+  return Object.keys(branch).every((key) => INDEX.test(key))
+}
+
+/** Puts `value` at `path`, creating branches along the way; `[]` appends to a list. */
+function place(root: Branch, path: readonly string[], value: string): void {
   let node = root
 
   for (const [index, key] of path.entries()) {
-    const slot = Array.isArray(node) && key === "" ? String(node.length) : key
-    const next = path[index + 1]
+    const slot = key === "" && isList(node) ? String(Object.keys(node).length) : key
 
-    if (next === undefined) node[slot] = value
-    else node = (node[slot] ??= containerFor(next)) as Tree
+    if (index === path.length - 1) {
+      node[slot] = value
+
+      return
+    }
+
+    const child = node[slot]
+
+    node = typeof child === "object" ? child : (node[slot] = {})
   }
+}
+
+/** A branch as plain values: branches whose keys are all indexes become arrays. */
+function settle(branch: Branch | string): unknown {
+  if (typeof branch === "string") return branch
+
+  const entries = Object.entries(branch)
+
+  if (entries.length === 0 || !isList(branch))
+    return Object.fromEntries(entries.map(([key, value]) => [key, settle(value)]))
+
+  const list: unknown[] = []
+
+  for (const [key, value] of entries) list[Number(key)] = settle(value)
+
+  return list
 }
 
 /** Form pairs (`metadata[plan]=pro`, `expand[]=x`) as a nested object. */
 function nestPairs(pairs: Iterable<[string, string]>): Tree {
-  const root: Tree = {}
+  const root: Branch = {}
 
   for (const [key, value] of pairs) place(root, keyPath(key), value)
 
-  return root
+  return Object.fromEntries(Object.entries(root).map(([key, value]) => [key, settle(value)]))
 }
 
 /**
@@ -128,12 +160,6 @@ export async function readParams(c: Context): Promise<Tree> {
   return nestPairs(new URLSearchParams(await c.req.text()))
 }
 
-export function asRecord(value: unknown): Tree | undefined {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? (value as Tree)
-    : undefined
-}
-
 /** A text parameter; an empty string counts as given. */
 export function text(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined
@@ -142,19 +168,6 @@ export function text(value: unknown): string | undefined {
 /** A text parameter, or `null` when it is absent. */
 export function textOrNull(value: unknown): string | null {
   return typeof value === "string" ? value : null
-}
-
-/** Several optional text parameters at once, renamed: `{ successUrl: "success_url" }`. */
-export function textsOf<K extends string>(
-  params: Tree,
-  names: Readonly<Record<K, string>>,
-): Record<K, string | null> {
-  const entries = Object.entries<string>(names).map(([key, name]) => [
-    key,
-    textOrNull(params[name]),
-  ])
-
-  return Object.fromEntries(entries) as Record<K, string | null>
 }
 
 /** For each of `keys` sent in `params`, its new text; an empty string clears it to `null`. */
@@ -222,12 +235,8 @@ const DEFAULT_LIMIT = 10
 const MAX_LIMIT = 100
 
 /** One page of `objects` (oldest first) as Stripe lists them: newest first, by cursor. */
-export function listPage<T extends { id: string }>(
-  c: Context,
-  objects: readonly T[],
-  url: string,
-): Response {
-  const newest = [...objects].reverse()
+export function listPage(c: Context, objects: readonly { id: string }[], url: string): Response {
+  const newest = objects.toReversed()
   const limit = Math.min(Math.max(integer(c.req.query("limit")) ?? DEFAULT_LIMIT, 1), MAX_LIMIT)
   const page = pageOf(newest, limit, c.req.query("starting_after"), c.req.query("ending_before"))
 

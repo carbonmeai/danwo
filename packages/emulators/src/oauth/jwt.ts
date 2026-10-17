@@ -22,7 +22,7 @@ export interface SigningKey {
 const base64url = (value: string | Buffer) => Buffer.from(value).toString("base64url")
 
 function publicJwk(key: KeyObject, kid: string): PublicJwk {
-  const { n, e, kty } = key.export({ format: "jwk" }) as { n: string; e: string; kty: string }
+  const { n = "", e = "", kty = "RSA" } = key.export({ format: "jwk" })
 
   return { kty, n, e, kid, use: "sig", alg: "RS256" }
 }

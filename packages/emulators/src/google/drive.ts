@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomInt } from "node:crypto"
 
 import type { drive_v3 } from "googleapis"
 
+import type { DataKey } from "../store.ts"
 import { type Caller, GoogleApiError, notFound } from "./api.ts"
 import type { DriveFileRecord, GoogleUser } from "./entities.ts"
 import { notifyChannels, type PushContext } from "./push.ts"
@@ -39,11 +40,16 @@ export function driveUser(user: GoogleUser, me: boolean): drive_v3.Schema$User {
   }
 }
 
+/** Where the file id of a user's "My Drive" root folder is kept. */
+function rootKey(uid: string): DataKey<string> {
+  return { name: `drive.root.${uid}` }
+}
+
 /** The user's "My Drive" root folder, created on first use. */
 export function rootOf(push: PushContext, user: GoogleUser): DriveFileRecord {
   const files = googleStore(push.store).files
-  const key = `drive.root.${user.uid}`
-  const existing = push.store.getData<string>(key)
+  const key = rootKey(user.uid)
+  const existing = push.store.getData(key)
   const found = existing === undefined ? undefined : files.findOneBy("fileId", existing)
 
   if (found) return found
@@ -73,7 +79,7 @@ export function rootOf(push: PushContext, user: GoogleUser): DriveFileRecord {
 
 /** Whether a file is some user's "My Drive" root folder. */
 export function isRoot(push: PushContext, record: DriveFileRecord): boolean {
-  return push.store.getData<string>(`drive.root.${record.owner}`) === record.fileId
+  return push.store.getData(rootKey(record.owner)) === record.fileId
 }
 
 /** The `uid`s of everyone a file is shared with by email. */

@@ -1,8 +1,10 @@
 import { once } from "node:events"
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http"
+import { text as readText } from "node:stream/consumers"
 
 import { Resend, type WebhookEventPayload } from "resend"
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
+import { z } from "zod"
 
 import { createEmulator, type Emulator } from "../src/define.ts"
 import { serve } from "../src/http.ts"
@@ -278,14 +280,12 @@ class Receiver {
   }
 
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const chunks: Buffer[] = []
-
-    for await (const chunk of req) chunks.push(chunk as Buffer)
+    const body = await readText(req)
     const header = (name: string) => String(req.headers[name] ?? "")
 
     try {
       const event = new Resend("re_receiver").webhooks.verify({
-        payload: Buffer.concat(chunks).toString("utf8"),
+        payload: body,
         headers: {
           id: header("webhook-id"),
           timestamp: header("webhook-timestamp"),
@@ -339,7 +339,7 @@ describe("webhooks", () => {
         }),
       }),
     )
-    const { id } = (await sent.json()) as { id: string }
+    const { id } = z.object({ id: z.string() }).parse(await sent.json())
 
     await vi.waitFor(() => expect(receiver.received).toHaveLength(2))
 

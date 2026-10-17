@@ -160,7 +160,7 @@ export function paymentIntentObject(fields: {
     canceled_at: null,
     cancellation_reason: null,
     capture_method: "automatic",
-    client_secret: `${fields.id}_secret_${fields.id.slice(3, 27).split("").reverse().join("")}`,
+    client_secret: `${fields.id}_secret_${fields.id.slice(3, 27).split("").toReversed().join("")}`,
     confirmation_method: "automatic",
     created: fields.created,
     currency: fields.currency,

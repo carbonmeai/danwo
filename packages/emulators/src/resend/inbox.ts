@@ -74,7 +74,7 @@ export function resendInbox(emulator: Pick<Emulator, "store">): ResendInbox {
     resendStore(emulator.store)
       .emails.all()
       .filter((email) => to === undefined || sentTo(email, to))
-      .reverse()
+      .toReversed()
       .map(asInboxEmail)
 
   const waitFor: ResendInbox["waitFor"] = async (to, options = {}) => {

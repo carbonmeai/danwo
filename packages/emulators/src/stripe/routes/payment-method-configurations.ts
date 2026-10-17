@@ -1,18 +1,19 @@
+import { isOneOf } from "../../json.ts"
 import type { StripeRouteContext } from "../context.ts"
 import type { DisplayPreference, PaymentMethodConfiguration } from "../entities.ts"
 import { CONFIGURABLE_METHODS, paymentMethodConfigurationObject } from "../formatters.ts"
 import { asRecord, badParam, flag, listPage, newId, noSuch, readParams, text } from "../helpers.ts"
 
-const PREFERENCES: readonly string[] = ["on", "off", "none"]
+const PREFERENCES: readonly DisplayPreference[] = ["on", "off", "none"]
 
 /** The `<method>[display_preference][preference]` values a request sets. */
 function requestedPreferences(params: Record<string, unknown>): Record<string, DisplayPreference> {
   const wanted: Record<string, DisplayPreference> = {}
 
   for (const method of Object.keys(CONFIGURABLE_METHODS)) {
-    const value = text(asRecord(asRecord(params[method])?.display_preference)?.preference)
+    const value = asRecord(asRecord(params[method])?.display_preference)?.preference
 
-    if (value && PREFERENCES.includes(value)) wanted[method] = value as DisplayPreference
+    if (isOneOf(PREFERENCES, value)) wanted[method] = value
   }
 
   return wanted
@@ -23,12 +24,12 @@ function preferencesOf(
   configuration: PaymentMethodConfiguration,
 ): Record<string, DisplayPreference> {
   const current: Record<string, DisplayPreference> = {}
-  const fields = configuration as unknown as Record<string, unknown>
+  const fields = new Map<string, unknown>(Object.entries(configuration))
 
   for (const method of Object.keys(CONFIGURABLE_METHODS)) {
-    const value = text(asRecord(asRecord(fields[method])?.display_preference)?.preference)
+    const value = asRecord(asRecord(fields.get(method))?.display_preference)?.preference
 
-    if (value && PREFERENCES.includes(value)) current[method] = value as DisplayPreference
+    if (isOneOf(PREFERENCES, value)) current[method] = value
   }
 
   return current

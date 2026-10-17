@@ -4,8 +4,9 @@ import type {
   VerifyDomainsResponseSuccess,
 } from "resend"
 
+import { isOneOf } from "../../json.ts"
 import type { ResendRouteContext } from "../context.ts"
-import { REGIONS, type Region } from "../entities.ts"
+import { REGIONS } from "../entities.ts"
 import { domainObject, verified } from "../formatters.ts"
 import { jsonBody, listOf, newUuid, notFound, resendError, textOf } from "../helpers.ts"
 
@@ -16,17 +17,17 @@ export function domainRoutes({ app, objects, events, clock }: ResendRouteContext
   app.post("/domains", async (c) => {
     const body = await jsonBody(c)
     const name = textOf(body.name)
-    const region = textOf(body.region) ?? "us-east-1"
+    const region = body.region ?? "us-east-1"
 
     if (!name) return resendError(c, 422, "missing_required_field", "Missing `name` field.")
-    if (!REGIONS.includes(region as Region))
+    if (!isOneOf(REGIONS, region))
       return resendError(c, 422, "invalid_region", `Region must be one of ${REGIONS.join(", ")}.`)
 
     const domain = domains.add(
       domainObject({
         id: newUuid(),
         name,
-        region: region as Region,
+        region,
         createdAt: clock().toISOString(),
       }),
       null,

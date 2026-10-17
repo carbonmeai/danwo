@@ -4,7 +4,7 @@ import type { Store } from "../store.ts"
 import type { WebhookEndpoint } from "../webhooks.ts"
 import { resendApiKey } from "./auth.ts"
 import type { ResendRouteContext } from "./context.ts"
-import type { EventType, Region } from "./entities.ts"
+import { isEventType, type Region } from "./entities.ts"
 import { ResendEvents } from "./events.ts"
 import { domainObject } from "./formatters.ts"
 import { newUuid, resendError } from "./helpers.ts"
@@ -57,7 +57,7 @@ export function seedResend(store: Store, config: ResendSeedConfig): void {
         created_at: createdAt,
         status: "enabled",
         endpoint: webhook.endpoint,
-        events: [...webhook.events] as EventType[],
+        events: webhook.events.filter(isEventType),
         signing_secret: webhook.secret ?? resendSigningSecret(),
       },
       null,

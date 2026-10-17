@@ -1,6 +1,24 @@
 import { describe, expect, it } from "vitest"
+import { z } from "zod"
 
-import { type Entity, Store } from "../src/store.ts"
+import { type DataKey, type Entity, Store } from "../src/store.ts"
+
+const COUNTER: DataKey<number> = { name: "counter" }
+const SEEN: DataKey<Map<string, { at: number; ids: Set<number> }>> = { name: "seen" }
+
+/** A snapshot read back from JSON, as a stored snapshot would be. */
+const Snapshot = z.object({
+  collections: z.record(
+    z.string(),
+    z.object({
+      rows: z.array(
+        z.looseObject({ id: z.number(), created_at: z.string(), updated_at: z.string() }),
+      ),
+      nextId: z.number(),
+    }),
+  ),
+  values: z.record(z.string(), z.unknown()),
+})
 
 interface Pet extends Entity {
   name: string
@@ -100,11 +118,11 @@ describe("Store", () => {
     const store = new Store()
 
     store.collection<Pet>("pets").insert({ name: "Rex", kind: "dog" })
-    store.setData("counter", 3)
+    store.setData(COUNTER, 3)
     store.reset()
 
     expect(store.collection("pets").count()).toBe(0)
-    expect(store.getData("counter")).toBeUndefined()
+    expect(store.getData(COUNTER)).toBeUndefined()
   })
 
   it("snapshots to plain JSON and restores rows, ids, indexes and values", () => {
@@ -112,19 +130,19 @@ describe("Store", () => {
     const pets = store.collection<Pet>("pets", ["kind"])
 
     pets.insert({ name: "Rex", kind: "dog", tags: ["good"] })
-    store.setData("seen", new Map([["key", { at: 1, ids: new Set([1, 2]) }]]))
+    store.setData(SEEN, new Map([["key", { at: 1, ids: new Set([1, 2]) }]]))
 
     const snapshot = store.snapshot()
-    const json = JSON.parse(JSON.stringify(snapshot)) as typeof snapshot
+    const json = Snapshot.parse(JSON.parse(JSON.stringify(snapshot)))
 
     pets.insert({ name: "Tom", kind: "cat" })
-    store.setData("seen", new Map())
+    store.setData(SEEN, new Map())
     store.restore(json)
 
     expect(pets.all().map((p) => p.name)).toEqual(["Rex"])
     expect(pets.findBy("kind", "dog")).toHaveLength(1)
     expect(pets.insert({ name: "Next", kind: "cat" }).id).toBe(2)
-    expect(store.getData("seen")).toEqual(new Map([["key", { at: 1, ids: new Set([1, 2]) }]]))
+    expect(store.getData(SEEN)).toEqual(new Map([["key", { at: 1, ids: new Set([1, 2]) }]]))
   })
 
   it("keeps snapshots independent of later changes", () => {

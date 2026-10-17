@@ -1,4 +1,5 @@
 import type { Middleware } from "../http.ts"
+import { isRecord } from "../json.ts"
 import { readParams, stripeError } from "./helpers.ts"
 
 /** Finds a formatted object by its Stripe id, or `undefined` if the id is unknown. */
@@ -18,10 +19,6 @@ async function expandPaths(
   const listed = Array.isArray(fromBody) ? fromBody : typeof fromBody === "string" ? [fromBody] : []
 
   return [...fromQuery, ...listed.filter((p): p is string => typeof p === "string")]
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
 /** The value at `key` with an id string replaced by its object; undefined if the id is unknown. */

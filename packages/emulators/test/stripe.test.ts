@@ -3,16 +3,12 @@ import type { Server } from "node:http"
 
 import { Stripe } from "stripe"
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
+import { z } from "zod"
 
 import { createEmulator, type Emulator } from "../src/define.ts"
 import { serve } from "../src/http.ts"
 import { listeningPort } from "../src/net.ts"
-import {
-  STRIPE_API_VERSION,
-  type StripeEvent,
-  stripe,
-  stripeSignature,
-} from "../src/stripe/index.ts"
+import { STRIPE_API_VERSION, stripe, stripeSignature } from "../src/stripe/index.ts"
 
 const fixedNow = new Date("2026-10-16T12:00:00Z")
 
@@ -26,8 +22,22 @@ function client(key = "sk_test_emulated"): Stripe {
   return new Stripe(key, { host: "127.0.0.1", port, protocol: "http", maxNetworkRetries: 0 })
 }
 
-function outboxEvents(): StripeEvent[] {
-  return emulator.outbox.all().map((m) => m.body as StripeEvent)
+/** An event the emulator queued, read back from its outbox. */
+const QueuedEvent = z.looseObject({
+  id: z.string(),
+  type: z.string(),
+  data: z.looseObject({ object: z.looseObject({}) }),
+})
+
+function outboxEvents(): z.infer<typeof QueuedEvent>[] {
+  return emulator.outbox.all().map((m) => QueuedEvent.parse(m.body))
+}
+
+/** An expandable field's object; fails the test when only an id came back. */
+function expandedObject<T extends object>(value: string | T | null | undefined): T {
+  if (typeof value !== "object" || value === null) throw new Error("expected an expanded object")
+
+  return value
 }
 
 beforeAll(async () => {
@@ -445,7 +455,7 @@ describe("one-off payment through Checkout", () => {
       amount_subtotal: 1500,
     })
 
-    const intent = paid.payment_intent as Stripe.PaymentIntent
+    const intent = expandedObject(paid.payment_intent)
 
     expect(intent).toMatchObject({
       status: "succeeded",
@@ -456,7 +466,7 @@ describe("one-off payment through Checkout", () => {
       setup_future_usage: "off_session",
     })
 
-    const invoice = paid.invoice as Stripe.Invoice
+    const invoice = expandedObject(paid.invoice)
 
     expect(invoice).toMatchObject({
       status: "paid",

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto"
 
 import type { calendar_v3 } from "googleapis"
 
+import type { DataKey } from "../store.ts"
 import { badRequest, type Caller, GoogleApiError, notFound } from "./api.ts"
 import type { CalendarEventRecord, CalendarRecord, GoogleUser } from "./entities.ts"
 import { notifyChannels, type PushContext } from "./push.ts"
@@ -15,11 +16,11 @@ import { googleStore } from "./store.ts"
 
 type Event = calendar_v3.Schema$Event
 
-const COUNTER = "calendar.changes"
+const COUNTER: DataKey<number> = { name: "calendar.changes" }
 
 /** The next change number, shared by all calendars. */
 function nextChange(push: PushContext): number {
-  const next = (push.store.getData<number>(COUNTER) ?? 0) + 1
+  const next = (push.store.getData(COUNTER) ?? 0) + 1
 
   push.store.setData(COUNTER, next)
 
@@ -246,7 +247,7 @@ export function cancelEvent(
 
 /** The token for syncing `calendar` from now on. */
 export function syncTokenOf(push: PushContext, calendar: CalendarRecord): string {
-  const change = push.store.getData<number>(COUNTER) ?? 0
+  const change = push.store.getData(COUNTER) ?? 0
 
   return Buffer.from(JSON.stringify([calendar.calendarId, calendar.generation, change])).toString(
     "base64url",

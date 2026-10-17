@@ -2,6 +2,7 @@ import { Readable } from "node:stream"
 
 import { google as googleapis } from "googleapis"
 import { afterEach, describe, expect, it } from "vitest"
+import { z } from "zod"
 
 import type { Emulator } from "../src/define.ts"
 import { type GoogleDrive, googleDrive } from "../src/google/index.ts"
@@ -176,7 +177,7 @@ describe("Drive files", () => {
     expect(first.headers.get("range")).toBe("bytes=0-5")
 
     const last = await put("world", "bytes 6-10/11")
-    const file = (await last.json()) as { id: string }
+    const file = z.object({ id: z.string() }).parse(await last.json())
 
     expect(last.status).toBe(200)
     expect(googleDrive(emulator, "ada@danwo.test").read(file.id)?.toString()).toBe("hello world")

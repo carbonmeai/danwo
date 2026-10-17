@@ -1,5 +1,6 @@
 import { google as googleapis } from "googleapis"
 import { afterEach, describe, expect, it } from "vitest"
+import { z } from "zod"
 
 import type { Emulator } from "../src/define.ts"
 import {
@@ -361,7 +362,9 @@ describe("Gmail history and push", () => {
     await emulator.webhooks?.idle()
 
     expect(deliveries).toHaveLength(1)
-    const envelope = deliveries[0]?.body as { message: { data: string }; subscription: string }
+    const envelope = z
+      .object({ message: z.object({ data: z.string() }), subscription: z.string() })
+      .parse(deliveries[0]?.body)
 
     expect(deliveries[0]?.url).toBe("https://app.danwo.test/push/gmail")
     expect(envelope.subscription).toBe("projects/app/subscriptions/gmail-push")
@@ -408,9 +411,9 @@ describe("Gmail access grants", () => {
     )
 
     expect(direct.status).toBe(401)
-    expect(((await direct.json()) as { error: { status: string } }).error.status).toBe(
-      "UNAUTHENTICATED",
-    )
+    expect(
+      z.object({ error: z.object({ status: z.string() }) }).parse(await direct.json()).error.status,
+    ).toBe("UNAUTHENTICATED")
     // The client answers a 401 by refreshing, which the revoked grant refuses.
     await expect(gmail.users.getProfile({ userId: "me" })).rejects.toThrow(/invalid_grant/)
   })

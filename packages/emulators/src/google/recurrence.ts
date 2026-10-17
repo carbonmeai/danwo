@@ -98,7 +98,11 @@ function ruleOf(lines: readonly string[]): Rule | undefined {
     line
       .slice(6)
       .split(";")
-      .map((part) => part.split("=") as [string, string]),
+      .map((part): [string, string] => {
+        const [name = "", value = ""] = part.split("=")
+
+        return [name, value]
+      }),
   )
   const count = parts.get("COUNT")
 
@@ -109,7 +113,7 @@ function ruleOf(lines: readonly string[]): Rule | undefined {
     until: untilOf(parts.get("UNTIL")),
     byDay: (parts.get("BYDAY") ?? "")
       .split(",")
-      .map((day) => WEEKDAYS.indexOf(day.slice(-2) as (typeof WEEKDAYS)[number]))
+      .map((day) => WEEKDAYS.findIndex((weekday) => weekday === day.slice(-2)))
       .filter((day) => day >= 0),
   }
 }

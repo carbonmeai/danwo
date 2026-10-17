@@ -113,18 +113,21 @@ export function messageRef(message: GmailMessageRecord): gmail_v1.Schema$Message
   return { id: message.messageId, threadId: message.threadId }
 }
 
+/** How many threads the messages belong to. */
+function threadCount(list: readonly GmailMessageRecord[]): number {
+  return new Set(list.map((message) => message.threadId)).size
+}
+
 /** Message and thread counts for one label. */
 function countsOf(labelId: string, messages: readonly GmailMessageRecord[]) {
   const labelled = messages.filter((message) => message.labelIds.includes(labelId))
   const unread = labelled.filter((message) => message.labelIds.includes("UNREAD"))
-  const threads = (list: readonly GmailMessageRecord[]) =>
-    new Set(list.map((message) => message.threadId)).size
 
   return {
     messagesTotal: labelled.length,
     messagesUnread: unread.length,
-    threadsTotal: threads(labelled),
-    threadsUnread: threads(unread),
+    threadsTotal: threadCount(labelled),
+    threadsUnread: threadCount(unread),
   }
 }
 

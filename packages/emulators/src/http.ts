@@ -1,5 +1,4 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http"
-import { Readable } from "node:stream"
 
 /**
  * The small HTTP layer every emulator is built on: an `App` that takes a fetch `Request` and
@@ -79,8 +78,8 @@ class IncomingRequest {
     return new TextDecoder().decode(await this.arrayBuffer())
   }
 
-  async json<T = unknown>(): Promise<T> {
-    return JSON.parse(await this.text()) as T
+  async json(): Promise<unknown> {
+    return JSON.parse(await this.text())
   }
 
   /**
@@ -287,6 +286,23 @@ export interface ServeOptions {
   readonly hostname?: string
 }
 
+/** The body of an incoming request as a web stream, read as the handler consumes it. */
+function bodyStream(incoming: IncomingMessage): ReadableStream<Uint8Array> {
+  const chunks = incoming[Symbol.asyncIterator]()
+
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const { done, value } = await chunks.next()
+
+      if (done) controller.close()
+      else controller.enqueue(value)
+    },
+    async cancel() {
+      await chunks.return?.()
+    },
+  })
+}
+
 function toRequest(incoming: IncomingMessage, origin: string): Request {
   const headers = new Headers()
 
@@ -302,7 +318,7 @@ function toRequest(incoming: IncomingMessage, origin: string): Request {
     method,
     headers,
     ...(hasBody && {
-      body: Readable.toWeb(incoming) as ReadableStream<Uint8Array>,
+      body: bodyStream(incoming),
       duplex: "half",
     }),
   })

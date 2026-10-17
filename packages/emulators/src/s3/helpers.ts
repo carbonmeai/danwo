@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto"
 
 import { HttpError } from "../errors.ts"
 import type { Context } from "../http.ts"
+import { oneOf } from "../json.ts"
 import type { Acl, ObjectHeaders } from "./entities.ts"
 
 /** An S3 failure, answered with S3's error document: its code (`NoSuchKey`) names it. */
@@ -152,13 +153,11 @@ export function headersFrom(c: Context): ObjectHeaders {
   return kept
 }
 
-const ACLS: readonly string[] = ["private", "public-read", "public-read-write"]
+export const ACLS: readonly Acl[] = ["private", "public-read", "public-read-write"]
 
 /** The canned ACL in `x-amz-acl`, or `fallback`. */
 export function aclFrom(c: Context, fallback: Acl = "private"): Acl {
-  const wanted = c.req.header("x-amz-acl")
-
-  return wanted && ACLS.includes(wanted) ? (wanted as Acl) : fallback
+  return oneOf(ACLS, c.req.header("x-amz-acl"), fallback)
 }
 
 export function contentTypeFrom(c: Context): string {

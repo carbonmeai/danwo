@@ -1,5 +1,6 @@
 import { once } from "node:events"
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http"
+import { text as readText } from "node:stream/consumers"
 
 import { Stripe } from "stripe"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
@@ -31,10 +32,7 @@ class Receiver {
   }
 
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const chunks: Buffer[] = []
-
-    for await (const chunk of req) chunks.push(chunk as Buffer)
-    const body = Buffer.concat(chunks).toString("utf8")
+    const body = await readText(req)
     const signature = String(req.headers["stripe-signature"] ?? "")
     const status = this.statuses.shift() ?? 200
 
@@ -86,11 +84,10 @@ afterEach(async () => {
   receiver.server.close()
 })
 
-function addEndpoint(events: string[] = ["*"]): Promise<Stripe.WebhookEndpoint> {
-  return client().webhookEndpoints.create({
-    url: receiver.url,
-    enabled_events: events as Stripe.WebhookEndpointCreateParams.EnabledEvent[],
-  })
+function addEndpoint(
+  events: Stripe.WebhookEndpointCreateParams.EnabledEvent[] = ["*"],
+): Promise<Stripe.WebhookEndpoint> {
+  return client().webhookEndpoints.create({ url: receiver.url, enabled_events: events })
 }
 
 describe("webhook endpoints API", () => {
@@ -124,7 +121,7 @@ describe("delivery", () => {
 
     await deliver()
     expect(receiver.received).toHaveLength(1)
-    const [{ event }] = receiver.received as [Received]
+    const event = receiver.received[0]?.event
 
     expect(event).toMatchObject({
       type: "customer.created",
@@ -217,7 +214,12 @@ describe("delivery", () => {
     await deliver()
 
     expect(receiver.received.map((r) => r.event.type)).toEqual(["checkout.session.completed"])
-    const completed = receiver.received[0]?.event.data.object as Stripe.Checkout.Session
+    const event = receiver.received[0]?.event
+
+    if (event?.type !== "checkout.session.completed")
+      throw new Error("expected a completed session")
+
+    const completed = event.data.object
 
     expect(completed).toMatchObject({ id: session.id, payment_status: "paid" })
     expect(completed.payment_intent).toMatch(/^pi_/)

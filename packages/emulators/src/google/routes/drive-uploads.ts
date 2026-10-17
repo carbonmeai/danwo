@@ -115,13 +115,13 @@ export function driveUploadRoutes(context: GoogleRouteContext): void {
 
     if (!session || session.owner !== caller.user.uid) throw notFound("Upload session not found.")
 
-    const chunk = chunkOf(c.req.header("content-range"))
+    const part = chunkOf(c.req.header("content-range"))
     const received = bytesAfter(
       Buffer.from(session.received, "base64"),
-      chunk,
+      part,
       Buffer.from(await c.req.arrayBuffer()),
     )
-    const complete = !chunk || (chunk.total !== undefined && received.length >= chunk.total)
+    const complete = !part || (part.total !== undefined && received.length >= part.total)
 
     if (!complete) {
       uploads().update(session.id, { received: received.toString("base64") })

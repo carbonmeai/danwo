@@ -1,5 +1,5 @@
 import type { Context, Middleware, Next } from "../http.ts"
-import type { Clock, Store } from "../store.ts"
+import type { Clock, DataKey, Store } from "../store.ts"
 import { stripeError } from "./helpers.ts"
 
 const KEY_TTL_SECONDS = 24 * 60 * 60
@@ -12,15 +12,17 @@ interface SavedResult {
   savedAt: number
 }
 
+const SAVED: DataKey<Map<string, SavedResult>> = { name: "stripe.idempotency" }
+
 /** The saved results by key, created on first use. */
 function savedResults(store: Store): Map<string, SavedResult> {
-  const existing = store.getData<Map<string, SavedResult>>("stripe.idempotency")
+  const existing = store.getData(SAVED)
 
   if (existing) return existing
 
   const created = new Map<string, SavedResult>()
 
-  store.setData("stripe.idempotency", created)
+  store.setData(SAVED, created)
 
   return created
 }

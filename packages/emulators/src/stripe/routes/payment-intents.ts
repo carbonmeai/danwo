@@ -1,4 +1,5 @@
 import type { Context } from "../../http.ts"
+import { isOneOf } from "../../json.ts"
 import { paymentMethodFor } from "../cards.ts"
 import type { StripeRouteContext } from "../context.ts"
 import type { PaymentIntent } from "../entities.ts"
@@ -22,7 +23,7 @@ import { createIntent, type IntentFields, payIntent } from "../payments.ts"
 type FutureUsage = "off_session" | "on_session" | null
 type CancelReason = "duplicate" | "fraudulent" | "requested_by_customer" | "abandoned"
 
-const CANCEL_REASONS: readonly string[] = [
+const CANCEL_REASONS: readonly CancelReason[] = [
   "duplicate",
   "fraudulent",
   "requested_by_customer",
@@ -169,12 +170,11 @@ export function paymentIntentRoutes(context: StripeRouteContext): void {
     if (intent.status === "succeeded" || intent.status === "canceled")
       return wrongState(c, intent, "cancel")
 
-    const reason = text((await readParams(c)).cancellation_reason)
+    const reason = (await readParams(c)).cancellation_reason
     const canceled = intents.change(id, {
       status: "canceled",
       canceled_at: unix(clock()),
-      cancellation_reason:
-        reason && CANCEL_REASONS.includes(reason) ? (reason as CancelReason) : null,
+      cancellation_reason: isOneOf(CANCEL_REASONS, reason) ? reason : null,
     })
 
     if (canceled) events.emit("payment_intent.canceled", canceled)

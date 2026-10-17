@@ -62,6 +62,7 @@ export { Outbox, type OutboxMessage } from "./outbox.ts"
 export {
   type Clock,
   Collection,
+  type DataKey,
   type Entity,
   Store,
   type StoreSnapshot,

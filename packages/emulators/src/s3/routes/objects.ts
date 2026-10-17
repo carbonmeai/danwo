@@ -1,9 +1,11 @@
 import type { Context } from "../../http.ts"
+import { asRecord, oneOf } from "../../json.ts"
 import type { Clock } from "../../store.ts"
 import type { S3RouteContext, S3ObjectCall } from "../context.ts"
-import type { Acl, ObjectContent, ObjectRecord } from "../entities.ts"
+import type { ObjectContent, ObjectRecord } from "../entities.ts"
 import { copyResult, formPosted, objectHeaders } from "../formatters.ts"
 import {
+  ACLS,
   aclFrom,
   badRequest,
   contentTypeFrom,
@@ -173,11 +175,10 @@ function policyConditions(fields: Record<string, string | File>): unknown[] {
 
   if (typeof policy !== "string") return []
 
-  const parsed = JSON.parse(Buffer.from(policy, "base64").toString("utf8")) as {
-    conditions?: unknown[]
-  }
+  const parsed: unknown = JSON.parse(Buffer.from(policy, "base64").toString("utf8"))
+  const conditions = asRecord(parsed)?.conditions
 
-  return parsed.conditions ?? []
+  return Array.isArray(conditions) ? conditions : []
 }
 
 type Condition = readonly [string, unknown, unknown]
@@ -243,7 +244,7 @@ async function postForm(c: Context, bucket: string, s3: S3Store, clock: Clock): 
     typeof fields["Content-Type"] === "string"
       ? fields["Content-Type"]
       : file.type || "binary/octet-stream"
-  const acl = typeof fields.acl === "string" ? (fields.acl as Acl) : "private"
+  const acl = oneOf(ACLS, fields.acl, "private")
   const object = storeObject(
     s3,
     bucket,

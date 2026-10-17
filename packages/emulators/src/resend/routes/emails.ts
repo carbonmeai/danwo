@@ -1,6 +1,8 @@
 import type { CancelEmailResponseSuccess, CreateEmailResponseSuccess } from "resend"
 
 import type { Context } from "../../http.ts"
+import { asRecord } from "../../json.ts"
+import type { DataKey } from "../../store.ts"
 import type { ResendRouteContext } from "../context.ts"
 import type { Email } from "../entities.ts"
 import { listedEmail } from "../formatters.ts"
@@ -17,8 +19,6 @@ import {
 
 const KEY_LIMIT = 256
 const KEY_LIFETIME_MS = 24 * 60 * 60 * 1000
-const ALLOWLIST = "resend.allowlist"
-const IDEMPOTENCY = "resend.idempotency"
 
 /** A send the request asked for, before it is stored. */
 type Draft = Omit<Email, "id" | "message_id" | "created_at" | "last_event" | "object">
@@ -29,6 +29,9 @@ interface Remembered {
   readonly answer: unknown
   readonly at: number
 }
+
+const ALLOWLIST: DataKey<string[]> = { name: "resend.allowlist" }
+const IDEMPOTENCY: DataKey<Map<string, Remembered>> = { name: "resend.idempotency" }
 
 /** The email a send request describes, or why it cannot be sent. */
 function draftOf(body: Record<string, unknown>): Draft | { readonly problem: string } {
@@ -56,7 +59,7 @@ function draftOf(body: Record<string, unknown>): Draft | { readonly problem: str
 
 /** Every recipient is on the allowlist, when one is set (as on a sandboxed Resend account). */
 function allowed(context: ResendRouteContext, draft: Draft): boolean {
-  const allowlist = context.store.getData<string[]>(ALLOWLIST)
+  const allowlist = context.store.getData(ALLOWLIST)
 
   if (!allowlist) return true
 
@@ -114,7 +117,7 @@ async function once(
       `The idempotency key must be 1-${KEY_LIMIT} characters.`,
     )
 
-  const memory = context.store.getData<Map<string, Remembered>>(IDEMPOTENCY) ?? new Map()
+  const memory = context.store.getData(IDEMPOTENCY) ?? new Map<string, Remembered>()
   const request = `${scope} ${await c.req.text()}`
   const now = context.clock().getTime()
   const earlier = memory.get(key)
@@ -157,15 +160,14 @@ function sendOne(c: Context, context: ResendRouteContext, body: Record<string, u
 
 /** Sends every email in a batch, or none if one is invalid. */
 function sendBatch(c: Context, context: ResendRouteContext, list: unknown): Response {
-  const drafts = (Array.isArray(list) ? list : []).map((item) =>
-    draftOf((item ?? {}) as Record<string, unknown>),
+  const drafts = (Array.isArray(list) ? list : []).map((item: unknown) =>
+    draftOf(asRecord(item) ?? {}),
   )
+  const ready = drafts.filter((draft): draft is Draft => !("problem" in draft))
   const bad = drafts.find((draft) => "problem" in draft)
 
   if (drafts.length === 0) return resendError(c, 422, "validation_error", "The batch is empty.")
   if (bad && "problem" in bad) return resendError(c, 422, "missing_required_field", bad.problem)
-
-  const ready = drafts as Draft[]
 
   if (!ready.every((draft) => allowed(context, draft)))
     return resendError(
