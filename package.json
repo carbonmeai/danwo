@@ -13,10 +13,11 @@
     "lint:fix": "oxlint --type-aware --fix",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "check": "bun run format:check && bun run lint && bun run fallow && bun run typecheck && bun run test",
+    "check": "bun run format:check && bun run plain-js && bun run lint && bun run fallow && bun run typecheck && bun run test",
     "test:slow": "vitest run --project slow",
     "test:all": "vitest run",
-    "fallow": "fallow"
+    "fallow": "fallow",
+    "plain-js": "node scripts/plain-js.ts"
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "5.10.0",
