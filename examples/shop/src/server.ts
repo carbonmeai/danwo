@@ -7,7 +7,7 @@
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
 
-import Stripe from "stripe"
+import { Stripe } from "stripe"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "")
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET ?? ""

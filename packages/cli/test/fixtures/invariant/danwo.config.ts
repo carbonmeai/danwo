@@ -1,8 +1,7 @@
 import { once } from "node:events"
 import { createServer } from "node:http"
-import type { AddressInfo } from "node:net"
 
-import { defineConfig, stripeEnvironment } from "@danwo/sdk"
+import { defineConfig, listeningPort, stripeEnvironment } from "@danwo/sdk"
 
 import { pageEnvironment } from "../page-server.ts"
 
@@ -18,7 +17,7 @@ export default defineConfig({
     receiver.listen(0, "127.0.0.1")
     await once(receiver, "listening")
 
-    const url = `http://127.0.0.1:${(receiver.address() as AddressInfo).port}/webhooks`
+    const url = `http://127.0.0.1:${listeningPort(receiver)}/webhooks`
     const stripe = await stripeEnvironment({
       seed: () => ({
         webhookEndpoints: [{ url, events: ["customer.created"], secret: "whsec_fixture" }],

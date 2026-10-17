@@ -1,10 +1,10 @@
 import { once } from "node:events"
-import type { AddressInfo } from "node:net"
 
 import { describe, expect, it } from "vitest"
 
 import { HttpError, providerErrors } from "../src/errors.ts"
 import { App, serve } from "../src/http.ts"
+import { listeningPort } from "../src/net.ts"
 
 const request = (path: string, init?: RequestInit) =>
   new Request(`http://emulator.test${path}`, init)
@@ -180,7 +180,7 @@ describe("serve", () => {
     await once(server, "listening")
 
     try {
-      const { port } = server.address() as AddressInfo
+      const port = listeningPort(server)
       const response = await fetch(`http://127.0.0.1:${port}/upper`, {
         method: "POST",
         body: "quiet",

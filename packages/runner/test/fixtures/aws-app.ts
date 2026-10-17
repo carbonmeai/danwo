@@ -16,13 +16,22 @@ import {
   SQSClient,
 } from "@aws-sdk/client-sqs"
 
-const bucket = process.env.APP_BUCKET ?? "danwo-app"
-const out = {}
+/** What the app saw, printed as JSON for the test to read. */
+interface Seen {
+  object?: string | undefined
+  keys?: (string | undefined)[]
+  s3Error?: string
+  message?: string | undefined
+  sqsError?: string
+}
+
+const bucket = process.env["APP_BUCKET"] ?? "danwo-app"
+const out: Seen = {}
 const s3 = new S3Client({ region: "us-east-1", maxAttempts: 1 })
 const sqs = new SQSClient({ region: "us-east-1", maxAttempts: 1 })
 
 try {
-  if (process.env.APP_CREATE_BUCKET === "1")
+  if (process.env["APP_CREATE_BUCKET"] === "1")
     await s3.send(new CreateBucketCommand({ Bucket: bucket }))
   await s3.send(
     new PutObjectCommand({

@@ -1,9 +1,8 @@
 // A one-page app per worker for the CLI's integration tests.
 import { once } from "node:events"
 import { createServer } from "node:http"
-import type { AddressInfo } from "node:net"
 
-import type { WorkerEnvironment } from "@danwo/sdk"
+import { listeningPort, type WorkerEnvironment } from "@danwo/sdk"
 
 export async function pageEnvironment(workerIndex: number): Promise<WorkerEnvironment> {
   let hits = 0
@@ -17,7 +16,7 @@ export async function pageEnvironment(workerIndex: number): Promise<WorkerEnviro
   await once(server, "listening")
 
   return {
-    baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+    baseUrl: `http://127.0.0.1:${listeningPort(server)}`,
     fixtures: { hits: () => hits },
     async close() {
       server.close()

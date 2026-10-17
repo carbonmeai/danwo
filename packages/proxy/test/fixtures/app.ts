@@ -2,9 +2,19 @@
  * An app under test that knows nothing about the proxy: the official Stripe client with its
  * default transport, plain fetch, and a call to another service. Prints what it saw as JSON.
  */
-import Stripe from "stripe"
+import { Stripe } from "stripe"
 
-const out = {}
+/** What the app saw, printed as JSON for the test to read. */
+interface Seen {
+  customer?: string
+  checkoutUrl?: string | null
+  checkoutPage?: number
+  stripeError?: string
+  other?: number
+  otherError?: string
+}
+
+const out: Seen = {}
 const stripe = new Stripe("sk_test_from_app", { maxNetworkRetries: 0 })
 
 try {
@@ -21,7 +31,7 @@ try {
   })
 
   out.checkoutUrl = session.url
-  const page = await fetch(session.url)
+  const page = await fetch(session.url ?? "")
 
   out.checkoutPage = page.status
 } catch (error) {
@@ -29,7 +39,7 @@ try {
 }
 
 try {
-  const res = await fetch(process.env.OTHER_SERVICE_URL)
+  const res = await fetch(process.env["OTHER_SERVICE_URL"] ?? "")
 
   out.other = res.status
 } catch (error) {

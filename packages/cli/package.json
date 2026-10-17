@@ -19,6 +19,7 @@
   "devDependencies": {
     "@aws-sdk/client-s3": "3.1152.0",
     "@danwo/sdk": "workspace:*",
-    "openid-client": "6.8.8"
+    "openid-client": "6.8.8",
+    "zod": "4.6.1"
   }
 }

@@ -1,10 +1,10 @@
 import { once } from "node:events"
 import { createServer, type Server } from "node:http"
-import type { AddressInfo } from "node:net"
 
 import {
   createEmulator,
   type Emulator,
+  listeningPort,
   ManualClock,
   resend,
   seedResend,
@@ -32,7 +32,7 @@ beforeAll(async () => {
   receiver = createServer((_req, res) => res.writeHead(200).end())
   receiver.listen(0, "127.0.0.1")
   await once(receiver, "listening")
-  receiverUrl = `http://127.0.0.1:${(receiver.address() as AddressInfo).port}`
+  receiverUrl = `http://127.0.0.1:${listeningPort(receiver)}`
 })
 
 afterAll(() => {

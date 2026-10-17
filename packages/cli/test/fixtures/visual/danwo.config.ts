@@ -1,8 +1,7 @@
 import { once } from "node:events"
 import { createServer } from "node:http"
-import type { AddressInfo } from "node:net"
 
-import { defineConfig } from "@danwo/sdk"
+import { defineConfig, listeningPort } from "@danwo/sdk"
 
 export default defineConfig({
   testDir: "tests",
@@ -20,7 +19,7 @@ export default defineConfig({
     await once(server, "listening")
 
     return {
-      baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+      baseUrl: `http://127.0.0.1:${listeningPort(server)}`,
       async close() {
         server.close()
       },

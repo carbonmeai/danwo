@@ -13,5 +13,8 @@
   "dependencies": {
     "@danwo/core": "workspace:*",
     "@danwo/runner": "workspace:*"
+  },
+  "devDependencies": {
+    "@danwo/emulators": "workspace:*"
   }
 }

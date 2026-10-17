@@ -1,6 +1,5 @@
 import { once } from "node:events"
 import { createServer, type IncomingMessage, type Server } from "node:http"
-import type { AddressInfo } from "node:net"
 
 import type { ChangeNotificationCollection } from "@microsoft/microsoft-graph-types"
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest"
@@ -12,6 +11,7 @@ import {
   oneDrive,
   outlookMailbox,
 } from "../src/microsoft/index.ts"
+import { listeningPort } from "../src/net.ts"
 import { ADA, graphClient, graphEmulator, WORK_TENANT } from "./microsoft-graph.ts"
 
 const SCOPES = "Mail.Read Files.Read Calendars.Read"
@@ -51,7 +51,7 @@ beforeAll(async () => {
   })
   app.listen(0, "127.0.0.1")
   await once(app, "listening")
-  appUrl = `http://127.0.0.1:${(app.address() as AddressInfo).port}/notifications`
+  appUrl = `http://127.0.0.1:${listeningPort(app)}/notifications`
 })
 
 afterAll(() => {

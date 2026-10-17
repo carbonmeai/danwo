@@ -1,12 +1,12 @@
 import { once } from "node:events"
 import type { Server } from "node:http"
-import type { AddressInfo } from "node:net"
 
-import Stripe from "stripe"
+import { Stripe } from "stripe"
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 
 import { createEmulator, type Emulator } from "../src/define.ts"
 import { serve } from "../src/http.ts"
+import { listeningPort } from "../src/net.ts"
 import {
   STRIPE_API_VERSION,
   type StripeEvent,
@@ -21,7 +21,7 @@ let server: Server
 let baseUrl: string
 
 function client(key = "sk_test_emulated"): Stripe {
-  const { port } = server.address() as AddressInfo
+  const port = listeningPort(server)
 
   return new Stripe(key, { host: "127.0.0.1", port, protocol: "http", maxNetworkRetries: 0 })
 }
@@ -33,7 +33,7 @@ function outboxEvents(): StripeEvent[] {
 beforeAll(async () => {
   server = serve({ fetch: (request) => emulator.fetch(request), port: 0 })
   await once(server, "listening")
-  baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+  baseUrl = `http://127.0.0.1:${listeningPort(server)}`
   emulator = createEmulator(stripe, { clock: () => fixedNow, baseUrl })
 })
 

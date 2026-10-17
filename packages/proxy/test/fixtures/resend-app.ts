@@ -4,7 +4,8 @@
  */
 import { Resend } from "resend"
 
-const out = {}
+/** What the app saw, printed as JSON for the test to read. */
+const out: { id?: string | undefined; error?: string | undefined } = {}
 const resend = new Resend("re_from_app")
 const { data, error } = await resend.emails.send({
   from: "App <app@danwo.test>",

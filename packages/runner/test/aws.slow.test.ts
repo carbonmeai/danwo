@@ -12,7 +12,7 @@ import { startServices } from "../src/runner/services.ts"
 import { stripeService } from "../src/runner/stripe.ts"
 
 const run = promisify(execFile)
-const APP = fileURLToPath(new URL("./fixtures/aws-app.mjs", import.meta.url))
+const APP = fileURLToPath(new URL("./fixtures/aws-app.ts", import.meta.url))
 
 function dockerAvailable(): boolean {
   try {

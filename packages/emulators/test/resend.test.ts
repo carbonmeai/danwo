@@ -1,12 +1,12 @@
 import { once } from "node:events"
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http"
-import type { AddressInfo } from "node:net"
 
 import { Resend, type WebhookEventPayload } from "resend"
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { createEmulator, type Emulator } from "../src/define.ts"
 import { serve } from "../src/http.ts"
+import { listeningPort } from "../src/net.ts"
 import { resend, resendInbox, resendOutboundFaults, seedResend } from "../src/resend/index.ts"
 
 const SECRET = "REDACTED-TEST-VALUE"
@@ -22,7 +22,7 @@ function client(key = "re_test_emulated"): Resend {
 beforeAll(async () => {
   server = serve({ fetch: (request) => emulator.fetch(request), port: 0 })
   await once(server, "listening")
-  baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+  baseUrl = `http://127.0.0.1:${listeningPort(server)}`
   emulator = createEmulator(resend, { baseUrl })
 })
 
@@ -274,7 +274,7 @@ class Receiver {
   async start(): Promise<void> {
     this.server.listen(0, "127.0.0.1")
     await once(this.server, "listening")
-    this.url = `http://127.0.0.1:${(this.server.address() as AddressInfo).port}/webhooks/resend`
+    this.url = `http://127.0.0.1:${listeningPort(this.server)}/webhooks/resend`
   }
 
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -395,7 +395,7 @@ describe("outbound faults", () => {
 
     try {
       const r = new Resend("re_test_emulated", {
-        baseUrl: `http://127.0.0.1:${(faulty.address() as AddressInfo).port}`,
+        baseUrl: `http://127.0.0.1:${listeningPort(faulty)}`,
       })
       const send = () =>
         r.emails.send({ from: "qa@danwo.test", to: "user@example.com", subject: "Code", text: "1" })

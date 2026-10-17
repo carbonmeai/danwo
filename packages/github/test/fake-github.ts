@@ -4,7 +4,8 @@
  */
 import { once } from "node:events"
 import { createServer, type Server } from "node:http"
-import type { AddressInfo } from "node:net"
+
+import { listeningPort } from "@danwo/emulators"
 
 export interface RecordedRequest {
   readonly method: string
@@ -52,7 +53,7 @@ export async function startFakeGitHub(mode: "allow" | "deny" = "allow"): Promise
   await once(server, "listening")
 
   return {
-    url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+    url: `http://127.0.0.1:${listeningPort(server)}`,
     requests,
     close: () => new Promise((resolve) => server.close(() => resolve())),
   }

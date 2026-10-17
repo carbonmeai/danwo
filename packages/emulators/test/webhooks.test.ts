@@ -1,11 +1,11 @@
 import { once } from "node:events"
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http"
-import type { AddressInfo } from "node:net"
 
-import Stripe from "stripe"
+import { Stripe } from "stripe"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { createEmulator, type Emulator } from "../src/define.ts"
+import { listeningPort } from "../src/net.ts"
 import { seedStripe, stripe } from "../src/stripe/index.ts"
 import { ManualClock } from "../src/time.ts"
 
@@ -27,7 +27,7 @@ class Receiver {
   async start(): Promise<void> {
     this.server.listen(0, "127.0.0.1")
     await once(this.server, "listening")
-    this.url = `http://127.0.0.1:${(this.server.address() as AddressInfo).port}/webhooks/stripe`
+    this.url = `http://127.0.0.1:${listeningPort(this.server)}/webhooks/stripe`
   }
 
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {

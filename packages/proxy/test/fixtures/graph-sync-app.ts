@@ -6,19 +6,35 @@
  */
 import { createServer } from "node:http"
 
+import { z } from "zod"
+
 const headers = {
-  authorization: `Bearer ${process.env.ACCESS_TOKEN ?? ""}`,
+  authorization: `Bearer ${process.env["ACCESS_TOKEN"] ?? ""}`,
   "content-type": "application/json",
 }
 const graph = "https://graph.microsoft.com/v1.0"
-const port = Number(process.env.NOTIFY_PORT)
-const notifications = []
+const port = Number(process.env["NOTIFY_PORT"])
+
+const Notification = z.object({
+  changeType: z.string(),
+  clientState: z.string().optional(),
+  subscriptionId: z.string(),
+})
+const Notifications = z.object({ value: z.array(Notification) })
+const DeltaPage = z.object({
+  value: z.array(z.object({ subject: z.string().optional() })),
+  "@odata.nextLink": z.string().optional(),
+  "@odata.deltaLink": z.string().optional(),
+})
+const Subscription = z.object({ id: z.string() })
+
+const notifications: z.infer<typeof Notification>[] = []
 
 const server = createServer((req, res) => {
   const token = new URL(req.url ?? "/", "http://app").searchParams.get("validationToken")
   let body = ""
 
-  req.on("data", (chunk) => (body += chunk))
+  req.on("data", (chunk: Buffer) => (body += chunk.toString()))
   req.on("end", () => {
     if (token !== null) {
       res.writeHead(200, { "content-type": "text/plain" })
@@ -27,36 +43,45 @@ const server = createServer((req, res) => {
       return
     }
 
-    notifications.push(...JSON.parse(body).value)
+    notifications.push(...Notifications.parse(JSON.parse(body)).value)
     res.writeHead(202)
     res.end()
   })
 })
 
-await new Promise((resolve) => server.listen(port, "127.0.0.1", resolve))
+await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", resolve))
 
-async function call(url, init = {}) {
+/** Calls Graph and returns the status with the parsed JSON body (null when empty). */
+async function call(
+  url: string,
+  init: RequestInit = {},
+): Promise<{ status: number; body: unknown }> {
   const response = await fetch(url, { ...init, headers })
   const text = await response.text()
 
   return { status: response.status, body: text ? JSON.parse(text) : null }
 }
 
-/** Pages through a delta round to its end; returns the items and the link for the next round. */
-async function delta(url) {
-  const items = []
+/** Pages through a delta round to its end; returns the subjects and the link for the next round. */
+async function delta(
+  url: string,
+): Promise<{ subjects: (string | undefined)[]; deltaLink: string }> {
+  const subjects: (string | undefined)[] = []
   let next = url
 
   for (;;) {
-    const page = await call(next)
+    const page = DeltaPage.parse((await call(next)).body)
 
-    items.push(...page.body.value)
-    if (page.body["@odata.nextLink"]) next = page.body["@odata.nextLink"]
-    else return { items, deltaLink: page.body["@odata.deltaLink"] }
+    subjects.push(...page.value.map((m) => m.subject))
+
+    const nextLink = page["@odata.nextLink"]
+
+    if (nextLink) next = nextLink
+    else return { subjects, deltaLink: page["@odata.deltaLink"] ?? "" }
   }
 }
 
-async function waitForNotification() {
+async function waitForNotification(): Promise<z.infer<typeof Notification> | undefined> {
   for (let tries = 0; tries < 100 && notifications.length === 0; tries++)
     await new Promise((resolve) => setTimeout(resolve, 50))
 
@@ -73,6 +98,7 @@ const subscription = await call(`${graph}/subscriptions`, {
     clientState: "graph-sync-state",
   }),
 })
+const subscriptionId = Subscription.safeParse(subscription.body).data?.id
 const first = await delta(`${graph}/me/mailFolders/inbox/messages/delta?$select=subject`)
 
 await call(`${graph}/me/sendMail`, {
@@ -81,7 +107,7 @@ await call(`${graph}/me/sendMail`, {
     message: {
       subject: "Weekly report",
       body: { contentType: "Text", content: "Numbers attached." },
-      toRecipients: [{ emailAddress: { address: process.env.USER_EMAIL } }],
+      toRecipients: [{ emailAddress: { address: process.env["USER_EMAIL"] } }],
     },
   }),
 })
@@ -92,13 +118,13 @@ const since = await delta(first.deltaLink)
 console.log(
   JSON.stringify({
     subscribed: subscription.status,
-    firstRound: first.items.map((m) => m.subject),
+    firstRound: first.subjects,
     notification: notification && {
       changeType: notification.changeType,
       clientState: notification.clientState,
-      subscription: notification.subscriptionId === subscription.body.id,
+      subscription: notification.subscriptionId === subscriptionId,
     },
-    changed: since.items.map((m) => m.subject),
+    changed: since.subjects,
   }),
 )
 server.close()

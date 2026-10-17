@@ -4,7 +4,7 @@ import { defineConfig, type Emulator, googleEnvironment } from "@danwo/sdk"
 
 import { freePort, launchApp } from "../app-process.ts"
 
-const APP = fileURLToPath(new URL("./app.mjs", import.meta.url))
+const APP = fileURLToPath(new URL("./app.ts", import.meta.url))
 const REDIRECT = "https://app.danwo.test/oauth/callback"
 const CLIENT = {
   client_id: "123-integration.apps.googleusercontent.com",

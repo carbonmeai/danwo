@@ -1,7 +1,6 @@
 import { execFile } from "node:child_process"
 import { once } from "node:events"
 import { createServer, type Server } from "node:http"
-import type { AddressInfo } from "node:net"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
@@ -22,6 +21,7 @@ import {
   seedMicrosoft,
   seedS3,
   stripe,
+  listeningPort,
 } from "@danwo/emulators"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
@@ -29,13 +29,13 @@ import { MAX_CAPTURED_BODY_BYTES } from "../src/capture.ts"
 import { startProxy } from "../src/proxy.ts"
 
 const run = promisify(execFile)
-const APP = fileURLToPath(new URL("./fixtures/app.mjs", import.meta.url))
-const RESEND_APP = fileURLToPath(new URL("./fixtures/resend-app.mjs", import.meta.url))
-const S3_APP = fileURLToPath(new URL("./fixtures/s3-app.mjs", import.meta.url))
-const OAUTH_APP = fileURLToPath(new URL("./fixtures/oauth-app.mjs", import.meta.url))
-const FETCH_APP = fileURLToPath(new URL("./fixtures/fetch-app.mjs", import.meta.url))
-const GOOGLE_SYNC_APP = fileURLToPath(new URL("./fixtures/google-sync-app.mjs", import.meta.url))
-const GRAPH_SYNC_APP = fileURLToPath(new URL("./fixtures/graph-sync-app.mjs", import.meta.url))
+const APP = fileURLToPath(new URL("./fixtures/app.ts", import.meta.url))
+const RESEND_APP = fileURLToPath(new URL("./fixtures/resend-app.ts", import.meta.url))
+const S3_APP = fileURLToPath(new URL("./fixtures/s3-app.ts", import.meta.url))
+const OAUTH_APP = fileURLToPath(new URL("./fixtures/oauth-app.ts", import.meta.url))
+const FETCH_APP = fileURLToPath(new URL("./fixtures/fetch-app.ts", import.meta.url))
+const GOOGLE_SYNC_APP = fileURLToPath(new URL("./fixtures/google-sync-app.ts", import.meta.url))
+const GRAPH_SYNC_APP = fileURLToPath(new URL("./fixtures/graph-sync-app.ts", import.meta.url))
 
 let other: Server
 let otherUrl: string
@@ -47,7 +47,7 @@ beforeAll(async () => {
   })
   other.listen(0, "127.0.0.1")
   await once(other, "listening")
-  otherUrl = `http://127.0.0.1:${(other.address() as AddressInfo).port}/ping`
+  otherUrl = `http://127.0.0.1:${listeningPort(other)}/ping`
 })
 
 afterAll(() => {
@@ -275,7 +275,7 @@ async function startUpstream(): Promise<{ url: string; received: Received[]; clo
   await once(server, "listening")
 
   return {
-    url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+    url: `http://127.0.0.1:${listeningPort(server)}`,
     received,
     close: () => server.close(),
   }
@@ -365,7 +365,7 @@ async function freePort(): Promise<number> {
   server.listen(0, "127.0.0.1")
   await once(server, "listening")
 
-  const { port } = server.address() as AddressInfo
+  const port = listeningPort(server)
 
   server.close()
 

@@ -30,7 +30,7 @@
       "name": "@danwo/cli",
       "version": "0.0.0",
       "bin": {
-        "danwo": "./src/bin.ts",
+        "danwo": "./bin/danwo.mjs",
       },
       "dependencies": {
         "@danwo/github": "workspace:*",
@@ -41,6 +41,7 @@
         "@aws-sdk/client-s3": "3.1152.0",
         "@danwo/sdk": "workspace:*",
         "openid-client": "6.8.8",
+        "zod": "4.6.1",
       },
     },
     "packages/core": {
@@ -79,6 +80,9 @@
         "@danwo/core": "workspace:*",
         "@danwo/runner": "workspace:*",
       },
+      "devDependencies": {
+        "@danwo/emulators": "workspace:*",
+      },
     },
     "packages/mcp": {
       "name": "@danwo/mcp",
@@ -98,6 +102,7 @@
         "google-auth-library": "11.3.1",
         "resend": "6.34.1",
         "stripe": "23.0.0",
+        "zod": "4.6.1",
       },
     },
     "packages/recorder": {

@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url"
 
 import { defineConfig, s3Environment } from "@danwo/sdk"
 
-const APP = fileURLToPath(new URL("./app.mjs", import.meta.url))
+const APP = fileURLToPath(new URL("./app.ts", import.meta.url))
 
 /** Starts the uploads app on a free port with `env`; resolves to its URL and process. */
 async function launch(env: NodeJS.ProcessEnv): Promise<{ url: string; child: ChildProcess }> {

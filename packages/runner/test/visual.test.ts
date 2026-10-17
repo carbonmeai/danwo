@@ -6,10 +6,10 @@
 import { once } from "node:events"
 import { mkdtemp, readdir, rm, stat } from "node:fs/promises"
 import { createServer, type Server } from "node:http"
-import type { AddressInfo } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { listeningPort } from "@danwo/emulators"
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest"
 
 import { openWebSession, type WebSession, type WebSessionOptions } from "../src/index.ts"
@@ -32,7 +32,7 @@ beforeAll(async () => {
   })
   server.listen(0, "127.0.0.1")
   await once(server, "listening")
-  baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+  baseUrl = `http://127.0.0.1:${listeningPort(server)}`
 })
 
 afterAll(() => {

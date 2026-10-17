@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto"
 import { once } from "node:events"
 import type { Server } from "node:http"
-import type { AddressInfo } from "node:net"
 import { Readable } from "node:stream"
 
 import {
@@ -34,6 +33,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 
 import { createEmulator, type Emulator } from "../src/define.ts"
 import { serve } from "../src/http.ts"
+import { listeningPort } from "../src/net.ts"
 import { s3, s3Hosts, s3Objects, s3OutboundFaults, seedS3 } from "../src/s3/index.ts"
 
 const BUCKET = "media"
@@ -50,7 +50,7 @@ let clockOffset = 0
 beforeAll(async () => {
   server = serve({ fetch: (request) => emulator.fetch(request), port: 0 })
   await once(server, "listening")
-  baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+  baseUrl = `http://127.0.0.1:${listeningPort(server)}`
   emulator = createEmulator(s3, { baseUrl, clock: () => new Date(Date.now() + clockOffset) })
   // Like Tigris's SDK: any key works; region "auto". An IP endpoint makes the SDK use path style.
   client = new S3Client({

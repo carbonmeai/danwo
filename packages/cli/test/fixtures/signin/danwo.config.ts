@@ -4,7 +4,7 @@ import { defineConfig, googleEnvironment } from "@danwo/sdk"
 
 import { freePort, launchApp } from "../app-process.ts"
 
-const APP = fileURLToPath(new URL("./app.mjs", import.meta.url))
+const APP = fileURLToPath(new URL("./app.ts", import.meta.url))
 
 export default defineConfig({
   testDir: "tests",

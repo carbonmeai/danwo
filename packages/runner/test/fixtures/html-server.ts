@@ -1,6 +1,7 @@
 import { once } from "node:events"
 import { createServer } from "node:http"
-import type { AddressInfo } from "node:net"
+
+import { listeningPort } from "@danwo/emulators"
 
 /** A local HTML server on a free port. */
 export interface HtmlServer {
@@ -24,7 +25,7 @@ export async function serveHtml(pageFor: (url: URL) => string | undefined): Prom
   await once(server, "listening")
 
   return {
-    url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+    url: `http://127.0.0.1:${listeningPort(server)}`,
     close: async () => {
       server.close()
       await once(server, "close")

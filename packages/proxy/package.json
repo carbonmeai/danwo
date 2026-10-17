@@ -21,6 +21,7 @@
     "@danwo/emulators": "workspace:*",
     "google-auth-library": "11.3.1",
     "resend": "6.34.1",
-    "stripe": "23.0.0"
+    "stripe": "23.0.0",
+    "zod": "4.6.1"
   }
 }
