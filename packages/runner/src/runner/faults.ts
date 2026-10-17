@@ -11,6 +11,7 @@ import {
   SLACK_HOSTS,
   slackOutboundFaults,
   stripeOutboundFaults,
+  type WebhookFault,
 } from "@danwo/emulators"
 import type { OutboundCall, OutboundFault } from "@danwo/proxy"
 
@@ -54,3 +55,11 @@ export function defaultOutboundFaults(call: OutboundCall): readonly OutboundFaul
 
   return catalogue ? catalogue(call) : genericOutboundFaults(call)
 }
+
+/** Webhook faults when the config names none: a repeat, a late one, a forgery, an old one. */
+export const DEFAULT_WEBHOOK_FAULTS: readonly WebhookFault[] = [
+  { kind: "duplicate" },
+  { kind: "delay", ms: 10 * 60_000 },
+  { kind: "forged" },
+  { kind: "stale", seconds: 3600 },
+]

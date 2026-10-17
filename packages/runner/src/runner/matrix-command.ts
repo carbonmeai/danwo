@@ -16,14 +16,13 @@ import {
   planFaults,
   type RunOutcome,
 } from "@danwo/core"
-import type { WebhookFault } from "@danwo/emulators"
 
 import { addUsage, cacheLine, modelLine, type Usage } from "../record/usage.ts"
 import { type ErrorClass, exitCodeOf, notJudged } from "../support/codes.ts"
 import { type CatalogEntry, catalogOf } from "./catalog.ts"
 import { type DanwoConfig, type LoadedConfig, loadConfig } from "./config.ts"
 import { Crew } from "./crew.ts"
-import { defaultOutboundFaults } from "./faults.ts"
+import { DEFAULT_WEBHOOK_FAULTS, defaultOutboundFaults } from "./faults.ts"
 import type { RecordMode } from "./record.ts"
 import { closeRecording, openRecording } from "./recording.ts"
 import { type Reporter, type RunContext, tellReporters } from "./reporting.ts"
@@ -46,14 +45,6 @@ export interface RunMatrixOptions {
   readonly reporters?: readonly Reporter[]
   readonly write?: (line: string) => void
 }
-
-/** Webhook faults when the config names none: a repeat, a late one, a forgery, an old one. */
-const WEBHOOK_FAULTS: readonly WebhookFault[] = [
-  { kind: "duplicate" },
-  { kind: "delay", ms: 10 * 60_000 },
-  { kind: "forged" },
-  { kind: "stale", seconds: 3600 },
-]
 
 const printLine = (line: string) => process.stdout.write(`${line}\n`)
 
@@ -195,7 +186,7 @@ async function runTrials(
   const planned = planFaults(
     clean,
     matrix?.outboundFaults ?? defaultOutboundFaults,
-    matrix?.webhookFaults ?? WEBHOOK_FAULTS,
+    matrix?.webhookFaults ?? DEFAULT_WEBHOOK_FAULTS,
   )
   const plan = selectFaults(planned, filter)
 

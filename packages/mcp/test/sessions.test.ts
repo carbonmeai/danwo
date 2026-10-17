@@ -2,12 +2,12 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { parseFault } from "@danwo/runner/runner"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { initProject, initReport } from "../src/init.ts"
 import { locatorCode, parseLocator } from "../src/locators.ts"
 import { snapshotChange } from "../src/sessions/diff.ts"
-import { parseFault } from "../src/sessions/faults.ts"
 
 describe("locator expressions", () => {
   it("reads the screen's queries as a test writes them", () => {

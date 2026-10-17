@@ -3,12 +3,12 @@
  * at a time by the agent with no model on danwo's side. Actions answer with what changed on the
  * page; the emulator tools show and fault the services behind the app.
  */
+import { FAULT_FORMS } from "@danwo/runner/runner"
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
 import { z, type ZodRawShape } from "zod"
 
 import { answer, progressOf } from "../reply.ts"
-import { FAULT_FORMS } from "../sessions/faults.ts"
 import type { SessionManager } from "../sessions/manager.ts"
 import type { SessionAnswer, SessionCall } from "../sessions/protocol.ts"
 

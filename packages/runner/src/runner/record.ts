@@ -175,7 +175,8 @@ function redactedPath(host: string, path: string, redactor: Redactor): string {
   return whole.startsWith(host) ? whole.slice(host.length) : redactor.text(path)
 }
 
-function redactExchange(exchange: Exchange, redactor: Redactor): RecordedExchange {
+/** An exchange as a flight record keeps it: path, headers and bodies redacted. */
+export function redactExchange(exchange: Exchange, redactor: Redactor): RecordedExchange {
   const { request, response, ...rest } = exchange
 
   return {

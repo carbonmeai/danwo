@@ -6,11 +6,15 @@
 import { join } from "node:path"
 
 import { launchBrowser, SecretVault } from "@danwo/runner"
-import { createRedactor, loadConfig, type WorkerEnvironment } from "@danwo/runner/runner"
+import {
+  createRedactor,
+  FaultBench,
+  loadConfig,
+  type WorkerEnvironment,
+} from "@danwo/runner/runner"
 import type { Browser } from "playwright-core"
 
 import { EmulatorDesk } from "./emulators.ts"
-import { FaultBench } from "./faults.ts"
 import { type ActionCall, PageDesk } from "./page.ts"
 import {
   isSessionRequest,

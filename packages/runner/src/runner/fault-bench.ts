@@ -1,5 +1,6 @@
 /**
- * Faults a live session arms by name, in the words `danwo matrix` reports them:
+ * Faults armed by name (from a live session, a test, or a matrix trial), in the words `danwo
+ * matrix` reports them:
  * `status 500 on POST api.stripe.com/v1/checkout/sessions`, `reset-after on POST …`,
  * `duplicate on webhook checkout.session.completed`, `stale 3600s on google webhook …`. An armed
  * fault fires once, on the next matching call or delivery (or the n-th, with a ` #n` suffix).
@@ -7,7 +8,8 @@
 import { routeOf, type RunWebhooks, webhookSources } from "@danwo/core"
 import type { WebhookFault } from "@danwo/emulators"
 import type { OutboundCall, OutboundFault, Proxy } from "@danwo/proxy"
-import { defaultOutboundFaults } from "@danwo/runner/runner"
+
+import { defaultOutboundFaults } from "./faults.ts"
 
 /** An outbound fault as it is named; a status gets its provider's error body when it fires. */
 type NamedOutboundFault =

@@ -56,13 +56,16 @@ export {
   loadConfig,
   nearestConfig,
 } from "./config.ts"
-export { defaultOutboundFaults } from "./faults.ts"
+export { DEFAULT_WEBHOOK_FAULTS, defaultOutboundFaults } from "./faults.ts"
+export { FAULT_FORMS, FaultBench, type NamedFault, parseFault } from "./fault-bench.ts"
 export type { EnvironmentContext, WorkerEnvironment } from "./environment.ts"
 export {
   environmentState,
   type FlightRecord,
+  type RecordedExchange,
   type RecordedStep,
   type RecordMode,
+  redactExchange,
   runsDir,
 } from "./record.ts"
 export { findRun } from "./report.ts"
