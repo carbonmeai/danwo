@@ -1,4 +1,4 @@
-import { gmailMailbox, type GoogleFixtures, test as base } from "@danwo/sdk"
+import { gmailMailbox, type GoogleFixtures, test as base, z } from "@danwo/sdk"
 
 const test = base.extend<GoogleFixtures>()
 
@@ -20,7 +20,9 @@ test("syncs a new message after Gmail's push", async ({ app, screen, settle, exp
    * once: a push delivered twice must not list its messages twice.
    */
   const res = await fetch(`${app.baseUrl}/synced`)
-  const { synced } = (await res.json()) as { synced: { id: string }[] }
+  const { synced } = z
+    .object({ synced: z.array(z.object({ id: z.string() })) })
+    .parse(await res.json())
   const ids = synced.map((message) => message.id)
   const inbox = new Set(
     gmailMailbox(google, "ada@danwo.test")

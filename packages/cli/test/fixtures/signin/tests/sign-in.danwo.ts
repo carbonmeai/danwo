@@ -1,4 +1,4 @@
-import { type GoogleFixtures, googleSignIns, test as base } from "@danwo/sdk"
+import { type GoogleFixtures, googleSignIns, test as base, z } from "@danwo/sdk"
 
 const test = base.extend<GoogleFixtures>()
 
@@ -14,7 +14,7 @@ test("signs in with Google", async ({ app, screen, expect }) => {
    * actually exchanged: no session without a token, none for anyone else.
    */
   const res = await fetch(`${app.baseUrl}/sessions`)
-  const { sessions } = (await res.json()) as { sessions: string[] }
+  const { sessions } = z.object({ sessions: z.array(z.string()) }).parse(await res.json())
   const exchanged = googleSignIns(google)
     .list("123-danwo.apps.googleusercontent.com")
     .filter((signIn) => signIn.redeemed && signIn.accessTokens > 0)

@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url"
 
-import { defineConfig, type Emulator, googleEnvironment } from "@danwo/sdk"
+import { defineConfig, type Emulator, googleEnvironment, z } from "@danwo/sdk"
 
 import { freePort, launchApp } from "../app-process.ts"
 
@@ -55,7 +55,9 @@ async function grantGmail(google: Emulator): Promise<string> {
       }),
     }),
   )
-  const { access_token: accessToken } = (await token.json()) as { access_token: string }
+  const { access_token: accessToken } = z
+    .object({ access_token: z.string() })
+    .parse(await token.json())
 
   return accessToken
 }
