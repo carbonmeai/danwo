@@ -1,0 +1,16 @@
+{
+  "name": "@danwo/example-shop-playwright",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The shop's purchase test written for Playwright Test, with danwo's emulators, invariant and fault matrix.",
+  "type": "module",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "matrix": "danwo-playwright matrix tests/buy-credits.spec.ts"
+  },
+  "devDependencies": {
+    "@danwo/playwright": "workspace:*",
+    "@danwo/sdk": "workspace:*",
+    "@playwright/test": "1.64.0"
+  }
+}
