@@ -1,7 +1,8 @@
 /**
  * Credentials recognisable by their shape alone, wherever they appear in text: provider API keys
  * and signing secrets, bearer and basic credentials, AWS keys and signatures, OAuth codes and
- * tokens, and URLs that work as bearer tokens (upload sessions, pre-authenticated downloads).
+ * tokens, Slack and GitHub tokens, PEM private keys, and URLs that work as bearer tokens (upload
+ * sessions, pre-authenticated downloads, Slack webhook and response URLs).
  * Values a session was given are redacted by its vault; these catch the ones it never was.
  */
 
@@ -35,6 +36,13 @@ const TOKEN_PATTERNS: readonly [RegExp, string][] = [
    * Google resumable upload sessions.
    */
   [/(graph\.microsoft\.com\/(?:up|download)\/)[^\s"'?#/]+/g, `$1${REDACTED}`],
+  [/(hooks\.slack\.com\/)[^\s"'?#]+/g, `$1${REDACTED}`],
+  /* Slack bot, user, refresh and app tokens; GitHub's OAuth, App, refresh and personal tokens. */
+  [/\b(xox[abpe]-|xoxe\.xox[bp]-|xapp-)[A-Za-z0-9-]+/g, `$1${REDACTED}`],
+  [/\b(gh[opusr]_)[A-Za-z0-9]{16,}/g, `$1${REDACTED}`],
+  [/\b(github_pat_)[A-Za-z0-9_]{16,}/g, `$1${REDACTED}`],
+  /* PEM private keys, raw or with their line breaks escaped inside JSON. */
+  [/-----BEGIN ([A-Z ]*)PRIVATE KEY-----[\s\S]*?-----END \1PRIVATE KEY-----/g, REDACTED],
   [/([?&]upload_id=)[^&#\s"']+/g, `$1${REDACTED}`],
 ]
 

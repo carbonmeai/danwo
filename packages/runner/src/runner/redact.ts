@@ -20,7 +20,7 @@ const SENSITIVE_HEADER_WORDS = /token|secret|signature|api[-_]?key|password|cred
 
 /** Body and state fields whose values are credentials, whatever they hold. */
 const SENSITIVE_KEYS =
-  /^(pass(word|wd)?|secret|client_secret|.*_secret|token|.*_token|api[-_]?key|authorization|signature|cookie|otp|one_time_code|private_key|secret_access_key|code_verifier|client_?state|download_?token)$/i
+  /^(pass(word|wd)?|secret|.*_?secret|token|.*_token|(access|refresh|bot|user|app)_?token|api[-_]?key|authorization|signature|cookie|otp|one_time_code|private_?key|.*_?pem|secret_access_key|code_verifier|client_?state|download_?token)$/i
 
 export interface Redactor {
   text(text: string): string

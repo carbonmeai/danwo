@@ -159,6 +159,63 @@ describe("flight recorder redaction", () => {
     )
   })
 
+  it("redacts Slack and GitHub tokens, signatures, webhook URLs and private keys", () => {
+    expect(
+      redactor.headers({
+        "x-slack-signature": "v0=abc",
+        "x-hub-signature-256": "sha256=def",
+        "x-hub-signature": "sha1=ghi",
+      }),
+    ).toEqual({
+      "x-slack-signature": "[redacted]",
+      "x-hub-signature-256": "[redacted]",
+      "x-hub-signature": "[redacted]",
+    })
+    expect(
+      redactor.text(
+        "bot REDACTED-TEST-VALUE user REDACTED-TEST-VALUE refresh xoxe.xoxp-1-ghi app xapp-1-A0-jkl",
+      ),
+    ).toBe(
+      "bot xoxb-[redacted] user xoxp-[redacted] refresh xoxe.xoxp-[redacted] app xapp-[redacted]",
+    )
+    expect(
+      redactor.text(
+        "gho_aaaaaaaaaaaaaaaaaaaa ghs_bbbbbbbbbbbbbbbbbbbb ghu_cccccccccccccccccccc ghr_dddddddddddddddddddd REDACTED-TEST-VALUE github_pat_11AAAAAAAAAAAAAAAAAAAA_ffff",
+      ),
+    ).toBe(
+      "gho_[redacted] ghs_[redacted] ghu_[redacted] ghr_[redacted] ghp_[redacted] github_pat_[redacted]",
+    )
+    expect(
+      redactor.text(
+        "post to https://REDACTED-TEST-VALUE or https://hooks.slack.com/actions/T1/9/abc",
+      ),
+    ).toBe("post to https://hooks.slack.com/[redacted] or https://hooks.slack.com/[redacted]")
+    expect(
+      redactor.text(
+        'key "REDACTED-TEST-VALUE\\nMIIEow\\nIBAAK\\n-----END RSA PRIVATE KEY-----\\n" end',
+      ),
+    ).toBe('key "[redacted]\\n" end')
+    expect(
+      redactor.value({
+        signingSecret: "s3cret",
+        clientSecret: "c1ient",
+        webhookSecret: "w3bhook",
+        privateKey: "pem",
+        token: "verification",
+        botToken: "bot",
+        name: "kept",
+      }),
+    ).toEqual({
+      signingSecret: "[redacted]",
+      clientSecret: "[redacted]",
+      webhookSecret: "[redacted]",
+      privateKey: "[redacted]",
+      token: "[redacted]",
+      botToken: "[redacted]",
+      name: "kept",
+    })
+  })
+
   it("clips long strings and long lists in recorded state", () => {
     const value = z.object({ blob: z.string(), items: z.array(z.unknown()) }).parse(
       redactor.value({
