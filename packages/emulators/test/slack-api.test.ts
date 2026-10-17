@@ -310,19 +310,20 @@ describe("files", () => {
   })
 })
 
+/** The app id a fresh emulator assigns to an app seeded without one. */
+function seededAppId(): string | undefined {
+  const fresh = createEmulator(slack)
+
+  seedSlack(fresh.store, {
+    apps: [{ name: "Bot", client_id: "1.2", client_secret: "s", signing_secret: "x" }],
+  })
+
+  return slackStore(fresh.store).apps.all()[0]?.appId
+}
+
 describe("seeded app ids", () => {
   it("derives the same app id on every seed when the seed names none", () => {
-    const idOf = () => {
-      const emulator = createEmulator(slack)
-
-      seedSlack(emulator.store, {
-        apps: [{ name: "Bot", client_id: "1.2", client_secret: "s", signing_secret: "x" }],
-      })
-
-      return slackStore(emulator.store).apps.all()[0]?.appId
-    }
-
-    expect(idOf()).toMatch(/^A[0-9A-Z]{10}$/)
-    expect(idOf()).toBe(idOf())
+    expect(seededAppId()).toMatch(/^A[0-9A-Z]{10}$/)
+    expect(seededAppId()).toBe(seededAppId())
   })
 })
