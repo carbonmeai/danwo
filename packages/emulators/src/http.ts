@@ -211,6 +211,11 @@ export class App {
   }
 
   // fallow-ignore-next-line unused-class-member -- registered by route modules through a destructured context
+  put(path: string, handler: Handler): void {
+    this.add("PUT", path, handler)
+  }
+
+  // fallow-ignore-next-line unused-class-member -- registered by route modules through a destructured context
   patch(path: string, handler: Handler): void {
     this.add("PATCH", path, handler)
   }
