@@ -1,0 +1,20 @@
+{
+  "name": "@danwo/emulators",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Provider emulators: defineEmulator, state, webhooks, OAuth, providers.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-s3": "3.1152.0",
+    "@aws-sdk/lib-storage": "3.1152.0",
+    "@aws-sdk/s3-presigned-post": "3.1152.0",
+    "@aws-sdk/s3-request-presigner": "3.1152.0",
+    "@azure/msal-node": "7.1.0",
+    "openid-client": "6.8.8",
+    "resend": "6.34.1",
+    "stripe": "23.0.0"
+  }
+}

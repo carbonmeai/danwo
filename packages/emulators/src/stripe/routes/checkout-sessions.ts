@@ -1,0 +1,440 @@
+import type { Context } from "../../http.ts"
+import { CHECKOUT_TEST_CARD, paymentMethodFor } from "../cards.ts"
+import { messagePage, renderPayPage } from "../checkout-page.ts"
+import type { StripeRouteContext } from "../context.ts"
+import type { CheckoutSession, Invoice, SessionLine, SessionPlan } from "../entities.ts"
+import { checkoutSessionObject, invoiceObject } from "../formatters.ts"
+import {
+  asRecord,
+  badParam,
+  flag,
+  integer,
+  items,
+  listPage,
+  metadataOf,
+  newId,
+  noSuch,
+  readParams,
+  stripeError,
+  text,
+  textOrNull,
+  textsOf,
+  unix,
+} from "../helpers.ts"
+import { createIntent, payIntent } from "../payments.ts"
+import { createPrice } from "./prices.ts"
+
+type Mode = "payment" | "setup" | "subscription"
+type Params = Record<string, unknown>
+
+const DAY_SECONDS = 24 * 60 * 60
+const MODES: readonly string[] = ["payment", "setup", "subscription"]
+
+/** Session fields taken as given from the create request, by parameter name. */
+const SESSION_TEXTS = {
+  customer: "customer",
+  customerEmail: "customer_email",
+  clientReferenceId: "client_reference_id",
+  successUrl: "success_url",
+  cancelUrl: "cancel_url",
+  configuration: "payment_method_configuration",
+} as const
+
+/** A line item's price: an existing price id, or a new price from `price_data`. */
+function lineFor(
+  context: StripeRouteContext,
+  item: Params,
+): SessionLine | { readonly fault: string } {
+  const quantity = integer(item.quantity) ?? 1
+  const priceId = text(item.price)
+  const data = asRecord(item.price_data)
+  const price = priceId ? context.objects.prices.get(priceId) : data && createPrice(context, data)
+
+  if (!price) return { fault: priceId ? `price:${priceId}` : "line_items[price]" }
+  if ("missing" in price) return { fault: `line_items[price_data][${price.missing}]` }
+
+  const product =
+    typeof price.product === "string" ? context.objects.products.get(price.product) : undefined
+
+  return {
+    price: price.id,
+    quantity,
+    description: product?.name ?? price.nickname ?? price.id,
+    unitAmount: price.unit_amount ?? 0,
+    currency: price.currency,
+  }
+}
+
+/** The answer for a parameter a session cannot be created with. */
+function refuse(c: Context, fault: string): Response {
+  if (fault.startsWith("price:")) return noSuch(c, "price", fault.slice(6), "line_items[0][price]")
+
+  return badParam(c, fault)
+}
+
+/** What the PaymentIntent created on payment carries over from `payment_intent_data`. */
+function intentPlan(params: Params): SessionPlan["intent"] {
+  const data = asRecord(params.payment_intent_data) ?? {}
+  const usage = data.setup_future_usage
+
+  return {
+    description: textOrNull(data.description),
+    metadata: metadataOf(data.metadata) ?? {},
+    setupFutureUsage: usage === "off_session" || usage === "on_session" ? usage : null,
+  }
+}
+
+/** The invoice `invoice_creation[enabled]` asks for, or `null`. */
+function invoicePlan(params: Params): SessionPlan["invoice"] {
+  const invoicing = asRecord(params.invoice_creation)
+
+  if (!flag(invoicing?.enabled)) return null
+
+  const data = asRecord(invoicing?.invoice_data) ?? {}
+
+  return { description: textOrNull(data.description), metadata: metadataOf(data.metadata) ?? {} }
+}
+
+/** Checks the references a create request makes; returns the refusal, if any. */
+function checkReferences(
+  c: Context,
+  context: StripeRouteContext,
+  params: Params,
+): Response | undefined {
+  const customer = text(params.customer)
+  const configuration = text(params.payment_method_configuration)
+
+  if (customer && !context.objects.customers.get(customer))
+    return noSuch(c, "customer", customer, "customer")
+  if (configuration && !context.objects.paymentMethodConfigurations.get(configuration))
+    return noSuch(c, "payment method configuration", configuration, "payment_method_configuration")
+
+  return undefined
+}
+
+/** Every line item resolved to a price, or the fault of the first that cannot be. */
+function linesOf(
+  context: StripeRouteContext,
+  params: Params,
+): SessionLine[] | { readonly fault: string } {
+  const lines: SessionLine[] = []
+
+  for (const item of items(params.line_items)) {
+    const line = lineFor(context, asRecord(item) ?? {})
+
+    if ("fault" in line) return line
+    lines.push(line)
+  }
+
+  return lines
+}
+
+/** A new session object from validated parameters. */
+function newSession(
+  context: StripeRouteContext,
+  params: Params,
+  mode: Mode,
+  plan: SessionPlan,
+): CheckoutSession {
+  const id = newId("cs")
+  const created = unix(context.clock())
+
+  return checkoutSessionObject({
+    id,
+    created,
+    url: `${context.baseUrl}/checkout/${id}`,
+    mode,
+    lines: plan.lines,
+    ...textsOf(params, SESSION_TEXTS),
+    expiresAt: integer(params.expires_at) ?? created + DAY_SECONDS,
+    metadata: metadataOf(params.metadata) ?? {},
+    invoiceCreation: plan.invoice,
+  })
+}
+
+/** Creates a Checkout Session from the request's parameters. */
+async function createSession(c: Context, context: StripeRouteContext): Promise<Response> {
+  const params = await readParams(c)
+  const mode = text(params.mode)
+
+  if (!mode || !MODES.includes(mode)) return badParam(c, "mode")
+
+  const refused = checkReferences(c, context, params)
+
+  if (refused) return refused
+
+  const lines = linesOf(context, params)
+
+  if ("fault" in lines) return refuse(c, lines.fault)
+  if (mode !== "setup" && lines.length === 0) return badParam(c, "line_items")
+
+  const plan: SessionPlan = { lines, intent: intentPlan(params), invoice: invoicePlan(params) }
+
+  return c.json(
+    context.objects.checkoutSessions.add(newSession(context, params, mode as Mode, plan), plan),
+  )
+}
+
+/** The paid invoice Checkout's `invoice_creation` produces, through its lifecycle events. */
+function invoiceFor(
+  context: StripeRouteContext,
+  session: CheckoutSession,
+  plan: SessionPlan,
+  intent: string,
+): Invoice | undefined {
+  if (!plan.invoice) return undefined
+
+  const { objects, events, clock } = context
+  const id = newId("in")
+  const now = unix(clock())
+  const customer = typeof session.customer === "string" ? session.customer : null
+  const draft = objects.invoices.add(
+    invoiceObject({
+      id,
+      number: `DANWO-${String(objects.invoices.all().length + 1).padStart(4, "0")}`,
+      created: now,
+      customer,
+      customerEmail: session.customer_details?.email ?? session.customer_email,
+      currency: session.currency ?? "usd",
+      lines: plan.lines,
+      description: plan.invoice.description,
+      metadata: plan.invoice.metadata,
+      hostedUrl: `${context.baseUrl}/invoices/${id}`,
+    }),
+    null,
+  )
+
+  events.emit("invoice.created", draft)
+
+  const open = objects.invoices.change(id, {
+    status: "open",
+    effective_at: now,
+    status_transitions: { ...draft.status_transitions, finalized_at: now },
+  })
+
+  if (open) events.emit("invoice.finalized", open)
+
+  const paid = objects.invoices.change(id, {
+    status: "paid",
+    amount_paid: draft.amount_due,
+    amount_remaining: 0,
+    attempted: true,
+    attempt_count: 1,
+    status_transitions: { ...draft.status_transitions, finalized_at: now, paid_at: now },
+    payments: {
+      object: "list",
+      data: [],
+      has_more: false,
+      url: `/v1/invoice_payments?invoice=${id}&payment_intent=${intent}`,
+    },
+  })
+
+  if (paid) {
+    events.emit("invoice.paid", paid)
+    events.emit("invoice.payment_succeeded", paid)
+  }
+
+  return paid
+}
+
+/** The email the payer gave, else the one the session or its customer has. */
+function payerEmail(
+  context: StripeRouteContext,
+  session: CheckoutSession,
+  typed: string | null,
+): string | null {
+  const customer =
+    typeof session.customer === "string"
+      ? context.objects.customers.get(session.customer)
+      : undefined
+
+  return typed || session.customer_email || customer?.email || null
+}
+
+/** Charges the test card for the session's total; returns the intent and invoice it made. */
+function chargeSession(
+  context: StripeRouteContext,
+  session: CheckoutSession,
+  plan: SessionPlan,
+  email: string | null,
+): Partial<CheckoutSession> {
+  const intent = createIntent(context, {
+    amount: session.amount_total ?? 0,
+    currency: session.currency ?? "usd",
+    customer: typeof session.customer === "string" ? session.customer : null,
+    description: plan.intent.description,
+    metadata: plan.intent.metadata,
+    paymentMethod: null,
+    setupFutureUsage: plan.intent.setupFutureUsage,
+    receiptEmail: null,
+  })
+  const paid = payIntent(
+    context,
+    intent,
+    paymentMethodFor(context.objects, CHECKOUT_TEST_CARD, context.clock()) ?? orThrow(),
+  )
+  const invoice = invoiceFor(
+    context,
+    { ...session, customer_details: { ...emptyDetails(), email } },
+    plan,
+    paid.id,
+  )
+
+  return { payment_status: "paid", payment_intent: paid.id, invoice: invoice?.id ?? null }
+}
+
+function orThrow(): never {
+  throw new Error("the Checkout test card is missing")
+}
+
+/** Takes the payment for an open session, as the hosted page's Pay button does. */
+function paySession(
+  context: StripeRouteContext,
+  session: CheckoutSession,
+  typed: string | null,
+): CheckoutSession {
+  const plan = context.objects.checkoutSessions.extra(session.id)
+  const email = payerEmail(context, session, typed)
+  const payment =
+    plan && session.mode !== "setup"
+      ? chargeSession(context, session, plan, email)
+      : { payment_status: "no_payment_required" as const }
+  const completed = context.objects.checkoutSessions.change(session.id, {
+    ...payment,
+    status: "complete",
+    customer_details: { ...emptyDetails(), email },
+  })
+
+  if (completed) context.events.emit("checkout.session.completed", completed)
+
+  return completed ?? session
+}
+
+function emptyDetails(): NonNullable<CheckoutSession["customer_details"]> {
+  return {
+    address: null,
+    business_name: null,
+    email: null,
+    individual_name: null,
+    name: null,
+    phone: null,
+    tax_exempt: "none",
+    tax_ids: [],
+  }
+}
+
+/** Where the browser goes after paying, with `{CHECKOUT_SESSION_ID}` filled in. */
+function successRedirect(c: Context, session: CheckoutSession): Response {
+  if (!session.success_url)
+    return c.html(messagePage("Payment complete", "You can close this window."))
+
+  return c.redirect(session.success_url.replaceAll("{CHECKOUT_SESSION_ID}", session.id), 303)
+}
+
+/** Marks an open session past its `expires_at` as expired. Returns the session as it is now. */
+function settleExpiry(context: StripeRouteContext, session: CheckoutSession): CheckoutSession {
+  if (session.status !== "open" || unix(context.clock()) < session.expires_at) return session
+
+  const expired = context.objects.checkoutSessions.change(session.id, { status: "expired" })
+
+  if (expired) context.events.emit("checkout.session.expired", expired)
+
+  return expired ?? session
+}
+
+/** Checkout Sessions over the API, plus the hosted payment page they send customers to. */
+export function checkoutSessionRoutes(context: StripeRouteContext): void {
+  const { app, objects, events } = context
+  const sessions = objects.checkoutSessions
+
+  app.post("/v1/checkout/sessions", (c) => createSession(c, context))
+
+  app.get("/v1/checkout/sessions/:id", (c) => {
+    const id = c.req.param("id")
+    const session = sessions.get(id)
+
+    return session ? c.json(settleExpiry(context, session)) : noSuch(c, "checkout.session", id)
+  })
+
+  app.post("/v1/checkout/sessions/:id/expire", (c) => {
+    const id = c.req.param("id")
+    const session = sessions.get(id)
+
+    if (!session) return noSuch(c, "checkout.session", id)
+    if (session.status !== "open")
+      return stripeError(
+        c,
+        400,
+        "invalid_request_error",
+        `Only Checkout Sessions with a status of open can be expired. This Checkout Session has a status of ${session.status}.`,
+      )
+
+    const expired = sessions.change(id, { status: "expired" })
+
+    if (expired) events.emit("checkout.session.expired", expired)
+
+    return c.json(expired)
+  })
+
+  app.get("/v1/checkout/sessions", (c) => {
+    const filters = ["payment_intent", "customer", "status", "payment_status"] as const
+    const wanted = filters.map((name) => [name, c.req.query(name)] as const)
+
+    return listPage(
+      c,
+      sessions.where((session) =>
+        wanted.every(([name, value]) => value === undefined || session[name] === value),
+      ),
+      "/v1/checkout/sessions",
+    )
+  })
+
+  app.get("/checkout/:id", (c) => {
+    const found = sessions.get(c.req.param("id"))
+
+    if (!found)
+      return c.html(messagePage("Checkout not found", "This checkout link is not valid."), 404)
+
+    const session = settleExpiry(context, found)
+
+    if (session.status === "complete")
+      return c.html(messagePage("Already paid", "This checkout is complete."))
+    if (session.status === "expired")
+      return c.html(messagePage("Checkout expired", "This checkout link has expired."), 410)
+
+    const lines = sessions.extra(session.id)?.lines ?? []
+
+    return c.html(
+      renderPayPage({
+        sessionId: session.id,
+        lines: lines.map((line) => ({
+          description: line.description,
+          quantity: line.quantity,
+          amount: line.unitAmount * line.quantity,
+        })),
+        total: session.amount_total ?? 0,
+        currency: session.currency ?? "usd",
+        email: session.customer_email,
+        cancelUrl: session.cancel_url,
+      }),
+    )
+  })
+
+  app.post("/checkout/:id/complete", async (c) => {
+    const found = sessions.get(c.req.param("id"))
+
+    if (!found)
+      return c.html(messagePage("Checkout not found", "This checkout link is not valid."), 404)
+
+    const session = settleExpiry(context, found)
+
+    if (session.status === "expired")
+      return c.html(messagePage("Checkout expired", "This checkout link has expired."), 410)
+    if (session.status === "complete") return successRedirect(c, session)
+
+    const form = await c.req.parseBody()
+    const email = typeof form.email === "string" ? form.email : null
+
+    return successRedirect(c, paySession(context, session, email))
+  })
+}
