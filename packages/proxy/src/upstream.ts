@@ -1,5 +1,6 @@
 import { type IncomingMessage, request as httpRequest } from "node:http"
 import { request as httpsRequest } from "node:https"
+import { buffer } from "node:stream/consumers"
 
 import type { Handler } from "./proxy.ts"
 
@@ -22,11 +23,9 @@ function hasNullBody(status: number): boolean {
 }
 
 async function toResponse(res: IncomingMessage): Promise<Response> {
-  const chunks: Buffer[] = []
-
-  for await (const chunk of res) chunks.push(chunk as Buffer)
+  const received = await buffer(res)
   const status = res.statusCode ?? 502
-  const body = hasNullBody(status) ? null : new Uint8Array(Buffer.concat(chunks))
+  const body = hasNullBody(status) ? null : new Uint8Array(received)
 
   return new Response(body, { status, headers: responseHeaders(res) })
 }

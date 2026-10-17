@@ -24,6 +24,7 @@ import {
   listeningPort,
 } from "@danwo/emulators"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { z } from "zod"
 
 import { MAX_CAPTURED_BODY_BYTES } from "../src/capture.ts"
 import { startProxy } from "../src/proxy.ts"
@@ -54,23 +55,26 @@ afterAll(() => {
   other.close()
 })
 
-interface AppOutput {
-  customer?: string
-  checkoutUrl?: string
-  checkoutPage?: number
-  stripeError?: string
-  other?: number
-  otherError?: string
-}
+const AppOutput = z.object({
+  customer: z.string().optional(),
+  checkoutUrl: z.string().optional(),
+  checkoutPage: z.number().optional(),
+  stripeError: z.string().optional(),
+  other: z.number().optional(),
+  otherError: z.string().optional(),
+})
 
-async function runApp(env: NodeJS.ProcessEnv): Promise<AppOutput> {
+/** The access token in a token endpoint's answer. */
+const AccessToken = z.object({ access_token: z.string() })
+
+async function runApp(env: NodeJS.ProcessEnv): Promise<z.infer<typeof AppOutput>> {
   const { stdout } = await run(process.execPath, [APP], {
     env: { ...env, OTHER_SERVICE_URL: otherUrl },
     cwd: fileURLToPath(new URL("..", import.meta.url)),
     timeout: 30_000,
   })
 
-  return JSON.parse(stdout) as AppOutput
+  return AppOutput.parse(JSON.parse(stdout))
 }
 
 describe("routing an unmodified app", () => {
@@ -154,7 +158,9 @@ describe("routing an unmodified Resend client", () => {
         cwd: fileURLToPath(new URL("..", import.meta.url)),
         timeout: 30_000,
       })
-      const out = JSON.parse(stdout) as { id?: string; error?: string }
+      const out = z
+        .object({ id: z.string().optional(), error: z.string().optional() })
+        .parse(JSON.parse(stdout))
 
       expect(out.error).toBeUndefined()
 
@@ -227,22 +233,22 @@ describe("routing an unmodified S3 client", () => {
   })
 })
 
-interface Fetched {
-  status?: number
-  body?: string
-  error?: string
-}
+const Fetched = z.object({
+  status: z.number().optional(),
+  body: z.string().optional(),
+  error: z.string().optional(),
+})
 
 async function fetchThrough(
   env: NodeJS.ProcessEnv,
   requests: ReadonlyArray<{ url: string; method?: string; body?: string }>,
-): Promise<Fetched[]> {
+): Promise<z.infer<typeof Fetched>[]> {
   const { stdout } = await run(process.execPath, [FETCH_APP, JSON.stringify(requests)], {
     env,
     timeout: 30_000,
   })
 
-  return JSON.parse(stdout) as Fetched[]
+  return z.array(Fetched).parse(JSON.parse(stdout))
 }
 
 interface Received {
@@ -409,7 +415,7 @@ async function googleAccessToken(
     }),
   )
 
-  return ((await token.json()) as { access_token: string }).access_token
+  return AccessToken.parse(await token.json()).access_token
 }
 
 describe("routing an unmodified Google integration", () => {
@@ -738,5 +744,5 @@ async function graphAccessToken(
     }),
   )
 
-  return ((await token.json()) as { access_token: string }).access_token
+  return AccessToken.parse(await token.json()).access_token
 }
