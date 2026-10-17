@@ -1,0 +1,196 @@
+/**
+ * The steps of one attempt as the flight recorder keeps them: every locator action, check, page
+ * open and agent step, with the test line that called it, how long it took, how it ended, and
+ * what happened inside it (model calls, the agent's actions, replay outcome). Labels and errors are
+ * redacted as they are recorded.
+ */
+import { randomUUID } from "node:crypto"
+
+import type { ScreenshotEvent } from "../assert/screenshot.ts"
+import type { StepLog } from "../locate/locator.ts"
+import { callerLine, type SourceLine } from "./source.ts"
+
+export type StepKind = "locator" | "assertion" | "app" | "agent"
+
+/** Something that happened inside a step. */
+export type StepEvent =
+  | {
+      readonly kind: "model"
+      readonly at: string
+      readonly inputTokens: number
+      readonly outputTokens: number
+      readonly costUsd?: number
+    }
+  | { readonly kind: "action"; readonly at: string; readonly label: string }
+  | ScreenshotEvent
+  /** A recorded element was found somewhere else: where it was, and where it is now. */
+  | { readonly kind: "relocated"; readonly at: string; readonly from: string; readonly to: string }
+
+/** How an agent step used the replay cache. */
+export type CacheOutcome =
+  | "off"
+  | "recorded"
+  | "replayed"
+  | "relocated"
+  | "healed"
+  | "diverged"
+  | "unrecorded"
+
+export interface StepRecord {
+  readonly id: string
+  readonly index: number
+  readonly kind: StepKind
+  /** The API that ran, e.g. `locator.click` or `agent.act`. */
+  readonly api: string
+  /** The call as written, e.g. `getByRole("button", name: "Save").click()`. */
+  readonly label: string
+  readonly status: "running" | "passed" | "failed"
+  readonly startedAt: string
+  readonly durationMs: number
+  /** The test file line that called the step, relative to the project root. */
+  readonly source?: SourceLine
+  readonly error?: { readonly code: string; readonly message: string }
+  readonly events: readonly StepEvent[]
+  readonly cache?: { readonly mode: CacheOutcome }
+}
+
+/** One line the app wrote to its console, an uncaught page error, or a navigation. */
+export interface AppLogRecord {
+  readonly at: string
+  readonly level: "debug" | "info" | "warn" | "error"
+  readonly source: "console" | "page-error" | "navigation"
+  readonly text: string
+  /** The step that was running (or last ran) when it was logged. */
+  readonly step: number
+}
+
+interface Running {
+  record: StepRecord
+  readonly events: StepEvent[]
+}
+
+export interface StepRecorderOptions {
+  readonly projectRoot: string
+  readonly redact: (text: string) => string
+  /** Called when a step ends, passed or failed. */
+  readonly onEnd?: (step: StepRecord) => void
+}
+
+/** Records the steps of one attempt in the order they started. */
+export class StepRecorder implements StepLog {
+  private readonly steps: Running[] = []
+  private readonly log: AppLogRecord[] = []
+  /** Indexes of checks that passed and verify what came before them. */
+  private readonly verified: number[] = []
+  private readonly options: StepRecorderOptions
+
+  constructor(options: StepRecorderOptions) {
+    this.options = options
+  }
+
+  /** Runs `body` as a step; a failure is recorded with its error and rethrown. */
+  async run<T>(
+    kind: StepKind,
+    api: string,
+    label: string,
+    body: () => Promise<T>,
+    options: { readonly verifies?: boolean } = {},
+  ): Promise<T> {
+    const source = callerLine(this.options.projectRoot)
+    const running: Running = {
+      record: {
+        id: randomUUID(),
+        index: this.steps.length,
+        kind,
+        api,
+        label: this.options.redact(label),
+        status: "running",
+        startedAt: new Date().toISOString(),
+        durationMs: 0,
+        ...(source && { source }),
+        events: [],
+      },
+      events: [],
+    }
+    const started = Date.now()
+
+    this.steps.push(running)
+
+    try {
+      const result = await body()
+
+      this.finish(running, started, { status: "passed" }, options.verifies === true)
+
+      return result
+    } catch (error) {
+      this.finish(running, started, { status: "failed", error: this.errorOf(error) }, false)
+      throw error
+    }
+  }
+
+  /** Adds an event to the step running now (the latest one started). */
+  event(event: StepEvent): void {
+    const running = this.steps.at(-1)
+
+    if (running === undefined) return
+    running.events.push(
+      event.kind === "action" ? { ...event, label: this.options.redact(event.label) } : event,
+    )
+  }
+
+  /** Notes how the running agent step used the replay cache. */
+  cache(mode: CacheOutcome): void {
+    const running = this.steps.at(-1)
+
+    if (running !== undefined) running.record = { ...running.record, cache: { mode } }
+  }
+
+  /** The index the next step will get, which is also the index of a step about to run. */
+  get next(): number {
+    return this.steps.length
+  }
+
+  /** Whether a check that verifies passed after step `index`, confirming what it did. */
+  verifiedAfter(index: number): boolean {
+    return this.verified.some((verified) => verified > index)
+  }
+
+  /** Every step so far, with its events. */
+  all(): readonly StepRecord[] {
+    return this.steps.map(({ record, events }) => ({ ...record, events: [...events] }))
+  }
+
+  /** Records a line of the app's log against the step running or last run. */
+  appLog(entry: Omit<AppLogRecord, "step" | "text"> & { readonly text: string }): void {
+    this.log.push({
+      ...entry,
+      text: this.options.redact(entry.text),
+      step: Math.max(0, this.steps.length - 1),
+    })
+  }
+
+  /** The app's log so far. */
+  appLogs(): readonly AppLogRecord[] {
+    return [...this.log]
+  }
+
+  private finish(
+    running: Running,
+    started: number,
+    outcome: Pick<StepRecord, "status" | "error">,
+    verifies: boolean,
+  ): void {
+    running.record = { ...running.record, ...outcome, durationMs: Date.now() - started }
+    if (verifies) this.verified.push(running.record.index)
+    this.options.onEnd?.({ ...running.record, events: [...running.events] })
+  }
+
+  private errorOf(error: unknown): NonNullable<StepRecord["error"]> {
+    if (!(error instanceof Error))
+      return { code: "NonError", message: this.options.redact(String(error)) }
+
+    const code = "code" in error && typeof error.code === "string" ? error.code : error.name
+
+    return { code, message: this.options.redact(error.message) }
+  }
+}

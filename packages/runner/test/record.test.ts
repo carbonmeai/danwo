@@ -1,0 +1,290 @@
+import { existsSync } from "node:fs"
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
+import type { Exchange, Proxy } from "@danwo/proxy"
+import { afterEach, beforeEach, describe, expect, it } from "vitest"
+
+import type { SessionFlight } from "../src/flight.ts"
+import type { WorkerEnvironment } from "../src/runner/environment.ts"
+import {
+  attemptDir,
+  buildRecord,
+  finishRecord,
+  type FlightRecord,
+  type RecordInput,
+} from "../src/runner/record.ts"
+import { createRedactor } from "../src/runner/redact.ts"
+import { finishRun, findRun } from "../src/runner/report.ts"
+import { SecretVault } from "../src/secrets/index.ts"
+
+const PASSWORD = "correct-horse-battery-staple-7"
+
+describe("flight recorder redaction", () => {
+  const ledger = new SecretVault({ password: PASSWORD })
+  const redactor = createRedactor(ledger.redact)
+
+  it("blanks credential headers by name and by a telling word", () => {
+    expect(
+      redactor.headers({
+        authorization: "Bearer REDACTED-TEST-VALUE",
+        "stripe-signature": "t=1,v1=abc",
+        cookie: "session=xyz",
+        "x-custom-api-key": "k-123",
+        "content-type": "application/json",
+      }),
+    ).toEqual({
+      authorization: "[redacted]",
+      "stripe-signature": "[redacted]",
+      cookie: "[redacted]",
+      "x-custom-api-key": "[redacted]",
+      "content-type": "application/json",
+    })
+  })
+
+  it("blanks credential fields of JSON and form bodies, card details included", () => {
+    expect(
+      JSON.parse(
+        redactor.body(
+          JSON.stringify({
+            email: "qa@danwo.test",
+            password: "hunter22",
+            nested: { api_key: "x" },
+          }),
+          "application/json; charset=utf-8",
+        ),
+      ),
+    ).toEqual({ email: "qa@danwo.test", password: "[redacted]", nested: { api_key: "[redacted]" } })
+    expect(
+      redactor.body(
+        "amount=500&payment_method_data[card][number]=4242424242424242&card[cvc]=123&client_secret=pi_1_secret_2",
+        "application/x-www-form-urlencoded",
+      ),
+    ).toBe(
+      "amount=500&payment_method_data[card][number]=[redacted]&card[cvc]=[redacted]&client_secret=[redacted]",
+    )
+  })
+
+  it("redacts known secret values and provider key shapes anywhere in text", () => {
+    const text = redactor.text(
+      `pw ${PASSWORD} key REDACTED-TEST-VALUE REDACTED-TEST-VALUE re_123456789abc Basic dXNlcjpwYXNz pi_3Mtw_secret_YrKJUK REDACTED-TEST-VALUE`,
+    )
+
+    expect(text).not.toContain(PASSWORD)
+    expect(text).toBe(
+      "pw [secret password] key sk_live_[redacted] whsec_[redacted] re_[redacted] Basic [redacted] pi_3Mtw_secret_[redacted] AKIA[redacted]",
+    )
+  })
+
+  it("redacts OAuth codes, tokens, verifiers and client secrets in URLs, forms and JSON", () => {
+    const idToken = "REDACTED-TEST-VALUE"
+
+    expect(
+      redactor.text(
+        "https://app.danwo.test/auth/google/callback?state=s1&code=4%2F0AbCdE&scope=openid",
+      ),
+    ).toBe("https://app.danwo.test/auth/google/callback?state=s1&code=[redacted]&scope=openid")
+    expect(
+      redactor.body(
+        "grant_type=authorization_code&code=abc123&code_verifier=v3r1f1er&client_secret=GOCSPX-x&redirect_uri=https://app.danwo.test/cb",
+        "application/x-www-form-urlencoded",
+      ),
+    ).toBe(
+      "grant_type=authorization_code&code=[redacted]&code_verifier=[redacted]&client_secret=[redacted]&redirect_uri=https://app.danwo.test/cb",
+    )
+    expect(
+      JSON.parse(
+        redactor.body(
+          JSON.stringify({
+            access_token: "ya29.a0AfH6",
+            refresh_token: "1//0gAbc",
+            id_token: idToken,
+            token_type: "Bearer",
+          }),
+          "application/json",
+        ),
+      ),
+    ).toEqual({
+      access_token: "[redacted]",
+      refresh_token: "[redacted]",
+      id_token: "[redacted]",
+      token_type: "Bearer",
+    })
+    expect(
+      redactor.text(`id ${idToken} at ya29.a0AfH6xyz rt 1//0gAbcDef ms EwA4Aa1b2c3d4e5f6g7h8i9j0k`),
+    ).toBe("id [redacted] at ya29.[redacted] rt 1//[redacted] ms EwA[redacted]")
+    // An error code in JSON stays readable.
+    expect(redactor.body(JSON.stringify({ code: "card_declined" }), "application/json")).toBe(
+      JSON.stringify({ code: "card_declined" }),
+    )
+  })
+
+  it("clips long strings and long lists in recorded state", () => {
+    const value = redactor.value({
+      blob: "x".repeat(2_000),
+      items: Array.from({ length: 150 }, (_, i) => i),
+    }) as {
+      blob: string
+      items: unknown[]
+    }
+
+    expect(value.blob).toMatch(/^x{500}… \(2000 chars\)$/)
+    expect(value.items).toHaveLength(101)
+    expect(value.items.at(-1)).toBe("… 50 more")
+  })
+})
+
+let root: string
+
+beforeEach(async () => {
+  root = await mkdtemp(join(tmpdir(), "danwo-record-"))
+})
+
+afterEach(async () => {
+  await rm(root, { recursive: true, force: true })
+})
+
+/** A session's flight with one failed step, as `runAttempt` hands it over. */
+function flight(): SessionFlight {
+  const ledger = new SecretVault({ password: PASSWORD })
+
+  return {
+    steps: () => [
+      {
+        id: "s0",
+        index: 0,
+        kind: "locator",
+        api: "locator.fill",
+        label: `getByLabel("Password") ${PASSWORD}`,
+        status: "failed",
+        startedAt: "2026-10-17T00:00:00.000Z",
+        durationMs: 10,
+        events: [],
+      },
+    ],
+    appLog: () => [],
+    screenshots: () => new Map([[0, "screenshots/001-step-0.png"]]),
+    redact: ledger.redact,
+    captureFailure: () => Promise.resolve(undefined),
+    settle: () => Promise.resolve(),
+  }
+}
+
+function exchange(over: Partial<Exchange>): Exchange {
+  return {
+    id: "e1",
+    host: "api.stripe.com",
+    method: "POST",
+    path: "/v1/customers",
+    disposition: "routed",
+    startedAt: "2026-10-17T00:00:00.000Z",
+    status: 200,
+    durationMs: 3,
+    aborted: false,
+    fault: null,
+    ...over,
+  }
+}
+
+function environment(exchanges: Exchange[]): WorkerEnvironment {
+  // Only what the recorder reads: the exchange log.
+  const proxy = { exchanges: () => exchanges } as unknown as Proxy
+
+  return {
+    proxy,
+    state: () => ({ stripe: { customers: [{ email: "qa@danwo.test", secret: PASSWORD }] } }),
+    close: () => Promise.resolve(),
+  }
+}
+
+function input(env: WorkerEnvironment, mark = { exchanges: 0, deliveries: 0 }): RecordInput {
+  return {
+    test: "tests/sign-in.danwo.ts › signs in",
+    run: { kind: "test", attempt: 1 },
+    status: "failed",
+    error: { code: "AssertionError", message: "nope" },
+    stopped: undefined,
+    divergence: undefined,
+    notes: [`saw ${PASSWORD}`],
+    durationMs: 10,
+    flight: { session: flight(), failure: undefined, startedAt: "2026-10-17T00:00:00.000Z" },
+    env,
+    mark,
+  }
+}
+
+describe("flight records", () => {
+  it("keeps a run's own calls, redacted in headers, bodies, paths, notes and state", () => {
+    const env = environment([
+      exchange({ id: "before", path: "/v1/earlier" }),
+      exchange({
+        path: `/v1/customers?token=${PASSWORD}`,
+        request: {
+          headers: {
+            authorization: "Bearer sk_test_123456",
+            "content-type": "application/x-www-form-urlencoded",
+          },
+          body: `email=qa%40danwo.test&password=${PASSWORD}`,
+          bytes: 60,
+          truncated: false,
+        },
+        response: {
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ id: "cus_1", note: `pw ${PASSWORD}` }),
+          bytes: 40,
+          truncated: false,
+        },
+      }),
+    ])
+    const record = buildRecord(input(env, { exchanges: 1, deliveries: 0 }))
+    const text = JSON.stringify(record)
+
+    expect(record.exchanges.map((e) => e.id)).toEqual(["e1"])
+    expect(record.exchanges[0]?.request?.headers.authorization).toBe("[redacted]")
+    expect(record.exchanges[0]?.request?.body).toBe("email=qa@danwo.test&password=[redacted]")
+    expect(record.steps[0]?.screenshot).toBe("screenshots/001-step-0.png")
+    expect(text).not.toContain(PASSWORD)
+    expect(text).not.toContain("sk_test_123456")
+  })
+
+  it("deletes a passing run's directory under on-failure and keeps it under always", async () => {
+    const settings = { runDir: join(root, "run-1"), mode: "on-failure" as const }
+    const dir = attemptDir(settings, "tests/a.danwo.ts › passes", "attempt-1")
+    const build = () => buildRecord(input(environment([])))
+
+    await mkdir(join(dir, "screenshots"), { recursive: true })
+    await writeFile(join(dir, "screenshots", "001-step-0.png"), "")
+
+    expect(await finishRecord(dir, "on-failure", false, build)).toBeUndefined()
+    expect(existsSync(dir)).toBe(false)
+
+    expect(await finishRecord(dir, "always", false, build)).toBeDefined()
+    expect(await readdir(dir)).toEqual(expect.arrayContaining(["record.json", "timeline.jsonl"]))
+
+    const timeline = (await readFile(join(dir, "timeline.jsonl"), "utf8")).trim().split("\n")
+
+    expect(JSON.parse(timeline[0] ?? "{}")).toMatchObject({ type: "step", api: "locator.fill" })
+  })
+
+  it("writes a run's HTML report over its records, and removes a run that kept nothing", async () => {
+    const runs = join(root, ".danwo", "runs")
+    const kept = join(runs, "20261017-000001-aaaa")
+    const empty = join(runs, "20261017-000002-bbbb")
+    const record: FlightRecord = buildRecord(input(environment([exchange({})])))
+
+    await finishRecord(join(kept, "test", "attempt-1"), "on-failure", true, () => record)
+    await mkdir(empty, { recursive: true })
+
+    const report = await finishRun(kept)
+    const html = await readFile(report ?? "", "utf8")
+
+    expect(html).toContain("tests/sign-in.danwo.ts › signs in")
+    expect(html).toContain("POST api.stripe.com/v1/customers")
+    expect(html).toContain('src="test/attempt-1/screenshots/001-step-0.png"')
+    expect(html).not.toContain(PASSWORD)
+    expect(await finishRun(empty)).toBeUndefined()
+    expect(existsSync(empty)).toBe(false)
+    expect(await findRun(runs)).toBe(kept)
+  })
+})

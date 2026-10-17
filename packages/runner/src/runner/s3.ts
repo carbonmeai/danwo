@@ -1,0 +1,93 @@
+import {
+  createEmulator,
+  type Emulator,
+  s3,
+  type S3SeedConfig,
+  seedS3,
+  TIGRIS_ENDPOINTS,
+} from "@danwo/emulators"
+import type { Proxy } from "@danwo/proxy"
+
+import { type Service, startServices } from "./services.ts"
+
+const DEFAULT_ENDPOINTS = [...TIGRIS_ENDPOINTS, "s3.amazonaws.com", "s3.us-east-1.amazonaws.com"]
+
+export interface S3Options {
+  /** Buckets (and objects) to create on start and after every reset. */
+  readonly seed?: S3SeedConfig
+  /**
+   * S3 endpoints the emulator answers, path-style and virtual-hosted (`<bucket>.<endpoint>`).
+   * Default: Tigris (`t3.storage.dev`, `fly.storage.tigris.dev`), `s3.amazonaws.com` and
+   * `s3.us-east-1.amazonaws.com`; add `s3.<region>.amazonaws.com` for other regions.
+   */
+  readonly endpoints?: readonly string[]
+}
+
+export interface S3Service extends Service {
+  readonly emulator: Emulator
+}
+
+export interface S3Environment {
+  readonly emulator: Emulator
+  readonly proxy: Proxy
+  /** Emulator back to its seed, proxy log and fault rules cleared. */
+  reset(): Promise<void>
+  /** Fixtures for tests: `s3` (the emulator), `proxy`, `settle`. */
+  readonly fixtures: {
+    readonly s3: Emulator
+    readonly proxy: Proxy
+    readonly settle: () => Promise<void>
+  }
+  close(): Promise<void>
+}
+
+/** An S3 emulator for `startServices`, for apps on AWS S3 or Tigris; gives tests the `s3` fixture. */
+export function s3Service(options: S3Options = {}): S3Service {
+  const emulator = createEmulator(s3)
+  const endpoints = options.endpoints ?? DEFAULT_ENDPOINTS
+
+  const seed = () => {
+    if (options.seed) seedS3(emulator.store, options.seed)
+  }
+
+  seed()
+
+  return {
+    name: "s3",
+    emulator,
+    routes: [
+      {
+        hosts: endpoints.flatMap((endpoint) => [endpoint, `*.${endpoint}`]),
+        handler: emulator.fetch,
+      },
+    ],
+    fixtures: { s3: emulator },
+    state: () => emulator.snapshot(),
+    async reset() {
+      emulator.reset()
+      seed()
+    },
+    close: () => emulator.close(),
+  }
+}
+
+/**
+ * A worker-scoped S3 emulator behind its own danwo proxy. To combine it with other services
+ * behind one proxy, use `s3Service` with `startServices`.
+ */
+export async function s3Environment(
+  options: S3Options & { readonly unmatched?: "passthrough" | "block" } = {},
+): Promise<S3Environment> {
+  const service = s3Service(options)
+  const services = await startServices([service], options)
+  const { proxy } = services
+  const settle = () => services.settle()
+
+  return {
+    emulator: service.emulator,
+    proxy,
+    reset: () => services.reset(),
+    fixtures: { s3: service.emulator, proxy, settle },
+    close: () => services.close(),
+  }
+}

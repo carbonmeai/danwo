@@ -1,0 +1,118 @@
+import {
+  createEmulator,
+  type Emulator,
+  ManualClock,
+  seedStripe,
+  stripe,
+  type StripeSeedConfig,
+} from "@danwo/emulators"
+import type { Proxy } from "@danwo/proxy"
+
+import { type Service, startServices } from "./services.ts"
+
+export interface StripeOptions {
+  /** Runs on start and after every reset; a function, so it can use values only known later (the app's webhook URL). */
+  readonly seed?: () => StripeSeedConfig | undefined
+}
+
+export interface StripeService extends Service {
+  readonly emulator: Emulator
+  readonly clock: ManualClock
+}
+
+export interface StripeEnvironment {
+  readonly emulator: Emulator
+  readonly proxy: Proxy
+  readonly clock: ManualClock
+  /** Plays every pending webhook delivery and retry to the end on the manual clock. */
+  readonly settle: () => Promise<void>
+  /** Emulator back to its seed, proxy log and fault rules cleared. */
+  reset(): Promise<void>
+  /** Fixtures for tests: `stripe` (the emulator), `proxy`, `settle`. */
+  readonly fixtures: {
+    readonly stripe: Emulator
+    readonly proxy: Proxy
+    readonly settle: () => Promise<void>
+  }
+  close(): Promise<void>
+}
+
+/** Plays every pending webhook delivery and retry to the end on `clock`. */
+async function settleWebhooks(emulator: Emulator, clock: ManualClock): Promise<void> {
+  for (let i = 0; i < 100; i++) {
+    await emulator.webhooks?.idle()
+
+    const next = clock.nextIn()
+
+    if (next === undefined) {
+      return
+    }
+
+    clock.advance(next)
+  }
+
+  throw new Error("webhook deliveries did not settle")
+}
+
+/**
+ * A Stripe emulator for `startServices`: answers `api.stripe.com` and `checkout.stripe.com`,
+ * delivers webhooks on a manual clock, and gives tests the `stripe` fixture.
+ */
+export function stripeService(options: StripeOptions = {}): StripeService {
+  const clock = new ManualClock(new Date())
+  const emulator = createEmulator(stripe, {
+    clock: clock.clock,
+    timer: clock.timer,
+    baseUrl: "https://checkout.stripe.com",
+  })
+
+  const seed = () => {
+    const config = options.seed?.()
+
+    if (config) {
+      seedStripe(emulator.store, config)
+    }
+  }
+
+  seed()
+
+  return {
+    name: "stripe",
+    emulator,
+    clock,
+    routes: [{ hosts: ["api.stripe.com", "checkout.stripe.com"], handler: emulator.fetch }],
+    fixtures: { stripe: emulator },
+    webhooks: emulator.webhooks,
+    state: () => emulator.snapshot(),
+    settle: () => settleWebhooks(emulator, clock),
+    async reset() {
+      emulator.reset()
+      seed()
+    },
+    close: () => emulator.close(),
+  }
+}
+
+/**
+ * A worker-scoped Stripe emulator behind its own danwo proxy: `api.stripe.com` and
+ * `checkout.stripe.com` route to it, other hosts pass through. To combine it with other services
+ * behind one proxy, use `stripeService` with `startServices`.
+ */
+export async function stripeEnvironment(
+  options: StripeOptions & { readonly unmatched?: "passthrough" | "block" } = {},
+): Promise<StripeEnvironment> {
+  const service = stripeService(options)
+  const services = await startServices([service], options)
+  const { proxy } = services
+  const settle = () => services.settle()
+
+  return {
+    emulator: service.emulator,
+    proxy,
+    clock: service.clock,
+    settle,
+    reset: () => services.reset(),
+    fixtures: { stripe: service.emulator, proxy, settle },
+    close: () => services.close(),
+  }
+}
