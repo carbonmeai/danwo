@@ -1,0 +1,19 @@
+{
+  "name": "@danwo/example-shop",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A small app that sells credits through Stripe Checkout; danwo tests itself against it.",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.ts",
+    "test:e2e": "danwo test",
+    "matrix": "danwo matrix tests/buy-credits.danwo.ts"
+  },
+  "dependencies": {
+    "stripe": "23.0.0"
+  },
+  "devDependencies": {
+    "@danwo/cli": "workspace:*",
+    "@danwo/sdk": "workspace:*"
+  }
+}
