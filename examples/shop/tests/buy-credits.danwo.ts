@@ -26,16 +26,15 @@ async function paidCredits(stripe: StripeFixtures["stripe"], user: string): Prom
     .reduce((sum, session) => sum + Number(session.metadata?.credits ?? 0), 0)
 }
 
-test("buys 500 credits through Stripe Checkout", async ({ app, screen, expect, settle }) => {
+test("buys 500 credits through Stripe Checkout", async ({ app, screen, expect }) => {
   await app.open("/")
   await screen.getByRole("button", { name: "Buy 500 credits" }).click()
 
   await expect(screen.getByTestId("checkout-total")).toContainText("$5.00")
+  /* Paying calls Stripe; readiness waits for the call and plays the webhook it causes. */
   await screen.getByTestId("checkout-pay").click()
 
   await expect(screen.getByRole("heading", { name: "Thank you for your purchase" })).toBeVisible()
-  // Credits arrive by webhook; play the deliveries on the emulator's clock.
-  await settle()
   await expect(screen.getByText(/^Credits: /)).toHaveText("Credits: 500")
 }).invariant(async ({ app, stripe, expect }) => {
   // Whichever way the purchase went, the shop grants exactly the credits Stripe was paid for.

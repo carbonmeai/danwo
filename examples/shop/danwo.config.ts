@@ -8,6 +8,11 @@ export default defineConfig({
   testDir: "tests",
   workers: 2,
   timeout: 60_000,
+  /*
+   * After every action, wait until the shop's calls to Stripe have finished and play the webhooks
+   * they caused on the emulator's clock, so tests never wait or settle by hand.
+   */
+  readiness: { mode: "page+backend", settle: true },
   // One Stripe emulator, proxy and shop per worker; `danwo matrix` resets them between runs.
   async environment() {
     let shop: Shop | undefined
