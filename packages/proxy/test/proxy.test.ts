@@ -1,11 +1,17 @@
 import { execFile, spawn } from "node:child_process"
 import { once } from "node:events"
 import { createServer, type Server } from "node:http"
+import { createInterface } from "node:readline"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
 import {
   createEmulator,
+  GITHUB_HOSTS,
+  github,
+  githubAppKey,
+  githubRepo,
+  seedGithub,
   GOOGLE_HOSTS,
   gmailMailbox,
   google,
@@ -44,6 +50,7 @@ const GOOGLE_SYNC_APP = fileURLToPath(new URL("./fixtures/google-sync-app.ts", i
 const GRAPH_SYNC_APP = fileURLToPath(new URL("./fixtures/graph-sync-app.ts", import.meta.url))
 const PUBSUB_VERIFY_APP = fileURLToPath(new URL("./fixtures/pubsub-verify-app.ts", import.meta.url))
 const SLACK_APP = fileURLToPath(new URL("./fixtures/slack-app.ts", import.meta.url))
+const GITHUB_BOT_APP = fileURLToPath(new URL("./fixtures/github-bot-app.ts", import.meta.url))
 
 let other: Server
 let otherUrl: string
@@ -598,6 +605,99 @@ describe("verifying Google's signed pushes in an unmodified app", () => {
       expect(proxy.exchanges().every((exchange) => exchange.disposition === "routed")).toBe(true)
     } finally {
       app.kill()
+/** Starts the GitHub bot app and resolves once it listens; `output` resolves with its report. */
+async function startBot(env: NodeJS.ProcessEnv): Promise<{ output: Promise<string> }> {
+  const child = spawn(process.execPath, [GITHUB_BOT_APP], {
+    env,
+    cwd: fileURLToPath(new URL("..", import.meta.url)),
+    stdio: ["ignore", "pipe", "inherit"],
+  })
+  const lines = createInterface({ input: child.stdout })
+  const iterator = lines[Symbol.asyncIterator]()
+
+  expect((await iterator.next()).value).toBe("ready")
+
+  return {
+    output: (async () => {
+      const report = await iterator.next()
+
+      child.kill()
+
+      return String(report.value)
+    })(),
+  }
+}
+
+describe("routing an unmodified GitHub App", () => {
+  it("gets a signed webhook, rejects a forged copy and comments back with an installation token", async () => {
+    const port = await freePort()
+    const emulator = createEmulator(github)
+    const pat = "REDACTED-TEST-VALUE"
+
+    seedGithub(emulator.store, {
+      users: [{ login: "ada", name: "Ada Lovelace" }],
+      orgs: [{ login: "acme", members: ["ada"] }],
+      repos: [{ repo: "acme/widgets", files: { "README.md": "# widgets\n" } }],
+      apps: [
+        {
+          id: 5150,
+          slug: "thanks-bot",
+          name: "Thanks Bot",
+          owner: "acme",
+          clientId: "Iv23liThanksBot",
+          clientSecret: "thanks-secret",
+          webhookUrl: `http://127.0.0.1:${port}/webhooks`,
+          webhookSecret: "bot-secret",
+          permissions: { issues: "write" },
+          events: ["issues"],
+        },
+      ],
+      installations: [{ id: 9001, app: "thanks-bot", account: "acme" }],
+      tokens: [{ token: pat, login: "ada" }],
+    })
+
+    const proxy = await startProxy({
+      routes: [{ hosts: [...GITHUB_HOSTS], handler: emulator.fetch }],
+      unmatched: "block",
+    })
+
+    try {
+      const bot = await startBot({
+        ...proxy.env(),
+        APP_ID: "5150",
+        PRIVATE_KEY: githubAppKey(emulator, "thanks-bot"),
+        WEBHOOK_SECRET: "bot-secret",
+        PORT: String(port),
+      })
+
+      emulator.webhooks?.setFault(() => ({ kind: "forged" }))
+
+      const opened = await emulator.fetch(
+        new Request("https://api.github.com/repos/acme/widgets/issues", {
+          method: "POST",
+          headers: { authorization: `token ${pat}` },
+          body: JSON.stringify({ title: "It broke" }),
+        }),
+      )
+
+      expect(opened.status).toBe(201)
+      expect(JSON.parse(await bot.output)).toEqual({
+        rejected: 1,
+        events: ["issues"],
+        comments: [expect.any(Number)],
+      })
+      expect(githubRepo(emulator, "acme/widgets").comments(1)).toEqual([
+        expect.objectContaining({ body: "Thanks for the report!", author: "thanks-bot[bot]" }),
+      ])
+
+      await proxy.settled()
+      expect(
+        proxy.exchanges().map((e) => `${e.disposition} ${e.method} ${e.host}${e.path}`),
+      ).toEqual([
+        "routed POST api.github.com/app/installations/9001/access_tokens",
+        "routed POST api.github.com/repos/acme/widgets/issues/1/comments",
+      ])
+    } finally {
       await proxy.stop()
       await emulator.close()
     }
