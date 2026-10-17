@@ -25,8 +25,40 @@ It drives the app through its UI like a user, while third-party services the app
 | `@danwo/core`      | The fault matrix                                                     |
 | `@danwo/proxy`     | The egress proxy                                                     |
 | `@danwo/emulators` | Provider emulators                                                   |
+| `@danwo/github`    | Reports runs to GitHub from Actions: a check run and job summary     |
 
 See `examples/shop` for a small app tested with `danwo test` and `danwo matrix`.
+
+## GitHub Checks
+
+In GitHub Actions, `--reporter github` turns a run into a check run on the commit (the pull
+request's head on `pull_request` events). The check carries pass/fail counts, a row per failing
+test or fault, and an annotation on the test file line each failure went through. The same summary
+goes to the job summary. Outside Actions, or when the token may not write checks, the reporter says
+so and the run's exit code is unchanged.
+
+```yaml
+permissions:
+  checks: write
+  contents: read
+
+steps:
+  # checkout, Node 24, install, `npx playwright install --with-deps chromium`
+  - run: npx danwo test --reporter github
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+  - run: npx danwo matrix tests/buy-credits.danwo.ts --reporter github
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+  - uses: actions/upload-artifact@v4
+    if: ${{ !cancelled() }}
+    with:
+      name: danwo-runs
+      path: .danwo/runs
+```
+
+The summary links to the `danwo-runs` artifact and names each failure's flight record in it. In a
+config, add `reporters: [github({ artifact: "my-runs" })]` with `github` from `@danwo/github`.
 
 ## Development
 

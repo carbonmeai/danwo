@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url"
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest"
 
+import { type FakeGitHub, startFakeGitHub } from "../../github/test/fake-github.ts"
+
 const BIN = fileURLToPath(new URL("../src/bin.ts", import.meta.url))
 const fixture = (name: string) => fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url))
 const SHOP = fileURLToPath(new URL("../../../examples/shop", import.meta.url))
@@ -55,6 +57,29 @@ function danwo(
   })
 }
 
+/** An Actions job's environment for the GitHub reporter, against `fake`, checked out at `workspace`. */
+function actionsEnv(fake: FakeGitHub, workspace: string): NodeJS.ProcessEnv {
+  return {
+    GITHUB_ACTIONS: "true",
+    GITHUB_API_URL: fake.url,
+    GITHUB_SERVER_URL: "https://github.example",
+    GITHUB_REPOSITORY: "acme/app",
+    GITHUB_SHA: "abc123",
+    GITHUB_RUN_ID: "9",
+    GITHUB_TOKEN: "ghs_cli_test",
+    GITHUB_WORKSPACE: workspace,
+    GITHUB_STEP_SUMMARY: join(state, "step-summary.md"),
+  }
+}
+
+type CheckBody = {
+  name?: string
+  conclusion?: string
+  output?: { title: string; summary: string; annotations: { path: string; title: string }[] }
+}
+
+const bodyOf = (fake: FakeGitHub, at: number) => fake.requests.at(at)?.body as CheckBody | undefined
+
 describe("danwo test", () => {
   it("runs files across two workers, retries, reports, and exits 1 on a failure", async () => {
     const { code, out } = await danwo(fixture("basic"), [
@@ -74,6 +99,35 @@ describe("danwo test", () => {
     expect(out).toContain("worker 0")
     expect(out).toContain("worker 1")
     expect(code).toBe(1)
+  }, 120_000)
+
+  it("reports to GitHub as a check run with an annotation per failing or flaky test", async () => {
+    const fake = await startFakeGitHub()
+
+    try {
+      const { code } = await danwo(
+        fixture("basic"),
+        ["test", "--retries", "1", "--reporter", "github"],
+        actionsEnv(fake, fixture("basic")),
+      )
+
+      expect(code).toBe(1)
+      expect(fake.requests.map((r) => r.method)).toEqual(["POST", "PATCH"])
+      expect(bodyOf(fake, 0)?.name).toBe("danwo")
+      expect(bodyOf(fake, -1)?.conclusion).toBe("failure")
+      expect(bodyOf(fake, -1)?.output?.title).toBe("2 passed · 1 failed · 1 flaky · 0 skipped")
+      expect(bodyOf(fake, -1)?.output?.annotations.map((a) => [a.path, a.title])).toEqual(
+        expect.arrayContaining([
+          ["tests/fail.danwo.ts", "tests/fail.danwo.ts › fails its assertion"],
+          ["tests/flaky.danwo.ts", "flaky: tests/flaky.danwo.ts › passes on its retry"],
+        ]),
+      )
+      expect(await readFile(join(state, "step-summary.md"), "utf8")).toContain(
+        "### danwo test: 2 passed · 1 failed · 1 flaky · 0 skipped",
+      )
+    } finally {
+      await fake.close()
+    }
   }, 120_000)
 
   it("narrows with --grep and exits 0 when everything passes", async () => {
@@ -169,9 +223,14 @@ describe("danwo matrix", () => {
   }, 300_000)
 
   it("catches a shop that grants credits twice for a duplicated webhook", async () => {
-    const { code, out } = await danwo(SHOP, ["matrix", "tests/buy-credits.danwo.ts"], {
-      SHOP_BUG: "no-dedupe",
-    })
+    const fake = await startFakeGitHub()
+    const { code, out } = await danwo(
+      SHOP,
+      ["matrix", "tests/buy-credits.danwo.ts", "--reporter", "github"],
+      { SHOP_BUG: "no-dedupe", ...actionsEnv(fake, join(SHOP, "..", "..")) },
+    )
+
+    await fake.close()
 
     expect(out).toContain("FAIL  duplicate on webhook checkout.session.completed")
     expect(out).toContain("invariant: expected 1000 to be 500")
@@ -191,6 +250,21 @@ describe("danwo matrix", () => {
     )
     expect(html).toContain("POST api.stripe.com/v1/checkout/sessions")
     expect(html).not.toMatch(/sk_test_danwo_example|whsec_danwo_example/)
+
+    // The GitHub check: failed, with the duplicate annotated in the test file, and no secrets.
+    expect(bodyOf(fake, 0)?.name).toBe("danwo matrix")
+    expect(bodyOf(fake, -1)?.conclusion).toBe("failure")
+    expect(bodyOf(fake, -1)?.output?.title).toBe("faults: 14 passed · 1 failed")
+    expect(bodyOf(fake, -1)?.output?.annotations).toEqual([
+      expect.objectContaining({
+        path: "examples/shop/tests/buy-credits.danwo.ts",
+        title: "failed: duplicate on webhook checkout.session.completed",
+      }),
+    ])
+    expect(bodyOf(fake, -1)?.output?.summary).toContain(
+      "| ❌ | duplicate on webhook checkout.session.completed |",
+    )
+    expect(JSON.stringify(fake.requests)).not.toMatch(/sk_test_danwo_example|whsec_danwo_example/)
   }, 300_000)
 
   it("runs on an app with no webhook services, planning outbound faults only", async () => {

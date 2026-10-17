@@ -1,0 +1,14 @@
+{
+  "name": "@danwo/github",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reports danwo runs to GitHub from Actions: a Check Run with annotations and a job summary.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@danwo/core": "workspace:*",
+    "@danwo/runner": "workspace:*"
+  }
+}

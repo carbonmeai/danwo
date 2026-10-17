@@ -4,8 +4,29 @@
  * forks its workers with its own resolve hook.
  */
 import "@danwo/runner/register"
-import { type RecordMode, runMatrix, runTests, showRun } from "@danwo/runner/runner"
+import { github } from "@danwo/github"
+import { type RecordMode, type Reporter, runMatrix, runTests, showRun } from "@danwo/runner/runner"
 import { Command, InvalidArgumentError, Option } from "commander"
+
+/** Reporters by the names `--reporter` takes; the console's list output always runs. */
+const REPORTERS: Readonly<Record<string, () => Reporter>> = { github: () => github() }
+
+/** The reporters named by `--reporter`, comma-separated or repeated. */
+function reportersOf(names: readonly string[] | undefined): Reporter[] {
+  return (names ?? [])
+    .flatMap((name) => name.split(","))
+    .map((name) => name.trim())
+    .filter((name) => name !== "" && name !== "list")
+    .map((name) => {
+      const make = REPORTERS[name]
+
+      if (make === undefined) {
+        throw new InvalidArgumentError(`unknown reporter "${name}" (known: list, github)`)
+      }
+
+      return make()
+    })
+}
 
 function integerAtLeast(min: number): (value: string) => number {
   return (value) => {
@@ -28,6 +49,12 @@ const recordOption = () =>
 const updateOption = () =>
   new Option("-u, --update-snapshots", "rewrite every toHaveScreenshot baseline")
 
+const reporterOption = () =>
+  new Option(
+    "--reporter <names...>",
+    "reporters besides the console's list: github (a check run and job summary in GitHub Actions)",
+  )
+
 const program = new Command()
   .name("danwo")
   .description("Drive your app like a user, judge the layers below, and run the fault matrix.")
@@ -42,11 +69,13 @@ program
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .addOption(recordOption())
   .addOption(updateOption())
+  .addOption(reporterOption())
   .action(
     async (
       patterns: string[],
       {
         updateSnapshots,
+        reporter,
         ...options
       }: {
         workers?: number
@@ -55,11 +84,13 @@ program
         config?: string
         record?: RecordMode
         updateSnapshots?: boolean
+        reporter?: string[]
       },
     ) => {
       process.exitCode = await runTests({
         patterns,
         ...options,
+        reporters: reportersOf(reporter),
         ...(updateSnapshots && { updateScreenshots: true }),
       })
     },
@@ -74,11 +105,13 @@ program
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .addOption(recordOption())
   .addOption(updateOption())
+  .addOption(reporterOption())
   .action(
     async (
       file: string,
       {
         updateSnapshots,
+        reporter,
         ...options
       }: {
         grep?: string
@@ -86,11 +119,13 @@ program
         config?: string
         record?: RecordMode
         updateSnapshots?: boolean
+        reporter?: string[]
       },
     ) => {
       const update = updateSnapshots ? { updateScreenshots: true } : {}
+      const reporters = reportersOf(reporter)
 
-      process.exitCode = (await runMatrix({ file, ...options, ...update })).code
+      process.exitCode = (await runMatrix({ file, ...options, reporters, ...update })).code
     },
   )
 

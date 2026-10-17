@@ -8,6 +8,7 @@
   },
   "type": "module",
   "dependencies": {
+    "@danwo/github": "workspace:*",
     "@danwo/runner": "workspace:*",
     "commander": "15.0.0"
   },

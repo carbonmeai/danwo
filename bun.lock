@@ -33,6 +33,7 @@
         "danwo": "./src/bin.ts",
       },
       "dependencies": {
+        "@danwo/github": "workspace:*",
         "@danwo/runner": "workspace:*",
         "commander": "15.0.0",
       },
@@ -69,6 +70,14 @@
         "openid-client": "6.8.8",
         "resend": "6.34.1",
         "stripe": "23.0.0",
+      },
+    },
+    "packages/github": {
+      "name": "@danwo/github",
+      "version": "0.0.0",
+      "dependencies": {
+        "@danwo/core": "workspace:*",
+        "@danwo/runner": "workspace:*",
       },
     },
     "packages/github-app": {
@@ -201,6 +210,8 @@
     "@danwo/emulators": ["@danwo/emulators@workspace:packages/emulators"],
 
     "@danwo/example-shop": ["@danwo/example-shop@workspace:examples/shop"],
+
+    "@danwo/github": ["@danwo/github@workspace:packages/github"],
 
     "@danwo/github-app": ["@danwo/github-app@workspace:packages/github-app"],
 
