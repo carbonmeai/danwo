@@ -51,6 +51,7 @@ async function redeem(url: URL): Promise<string | undefined> {
     pkceCodeVerifier: verifier,
     expectedState: state,
   })
+
   return emailOf(tokens.claims())
 }
 
