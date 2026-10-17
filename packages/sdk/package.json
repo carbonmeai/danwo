@@ -1,0 +1,15 @@
+{
+  "name": "@danwo/sdk",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Public test API (plain async/await).",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@danwo/emulators": "workspace:*",
+    "@danwo/proxy": "workspace:*",
+    "@danwo/runner": "workspace:*"
+  }
+}
