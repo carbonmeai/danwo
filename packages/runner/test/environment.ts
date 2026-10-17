@@ -1,6 +1,3 @@
-import { type ChildProcess, spawn } from "node:child_process"
-import { fileURLToPath } from "node:url"
-
 import {
   createEmulator,
   type Emulator,
@@ -10,7 +7,8 @@ import {
 } from "@danwo/emulators"
 import { type Proxy, startProxy } from "@danwo/proxy"
 
-const SHOP = fileURLToPath(new URL("../../../examples/shop/src/server.ts", import.meta.url))
+import { launchShop } from "../../../examples/shop/src/launch.ts"
+
 const WEBHOOK_SECRET = "whsec_runner_tests"
 
 export interface ShopEnvironment {
@@ -19,24 +17,6 @@ export interface ShopEnvironment {
   /** The shop's base URL, `http://127.0.0.1:<port>`. */
   readonly shopUrl: string
   close(): Promise<void>
-}
-
-/** Starts the shop as its own process, routed through the proxy like any unmodified app. */
-async function startShop(env: NodeJS.ProcessEnv): Promise<{ url: string; child: ChildProcess }> {
-  const child = spawn(process.execPath, [SHOP], { env, stdio: ["ignore", "pipe", "pipe"] })
-  const port = await new Promise<string>((resolve, reject) => {
-    let out = ""
-
-    child.stdout?.on("data", (chunk: Buffer) => {
-      out += chunk.toString()
-      const match = /listening (\d+)/.exec(out)
-
-      if (match?.[1]) resolve(match[1])
-    })
-    child.once("exit", (code) => reject(new Error(`shop exited with ${code}`)))
-  })
-
-  return { url: `http://127.0.0.1:${port}`, child }
 }
 
 /**
@@ -58,12 +38,11 @@ export async function startShopEnvironment(
   const proxy = await startProxy({
     routes: [{ hosts: ["api.stripe.com", "checkout.stripe.com"], handler: emulator.fetch }],
   })
-  const shop = await startShop(
+  const shop = await launchShop(
     proxy.env({
       ...process.env,
       STRIPE_SECRET_KEY: "sk_test_runner",
       STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET,
-      PORT: "0",
       ...options.shopEnv,
     }),
   )
@@ -83,7 +62,7 @@ export async function startShopEnvironment(
     proxy,
     shopUrl: shop.url,
     async close() {
-      shop.child.kill()
+      await shop.stop()
       await proxy.stop()
       await emulator.close()
     },

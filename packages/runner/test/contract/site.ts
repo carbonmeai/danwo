@@ -1,10 +1,8 @@
 /*
  * A small local site for the runner's contract tests: plain pages, no proxy, no emulators.
- * The tests that use it go through the public API only, so they keep passing across the rewrite.
+ * The tests that use it go through the public API only.
  */
-import { once } from "node:events"
-import { createServer, type Server } from "node:http"
-import type { AddressInfo } from "node:net"
+import { serveHtml } from "../fixtures/html-server.ts"
 
 const FORM = `<!doctype html><title>Sign up</title>
 <h1>Sign up</h1>
@@ -97,24 +95,12 @@ function page(path: string, variant: "a" | "b"): string | undefined {
 
 export async function startSite(): Promise<Site> {
   let variant: "a" | "b" = "a"
-  const server: Server = createServer((req, res) => {
-    const html = page(new URL(req.url ?? "/", "http://site").pathname, variant)
-
-    res.writeHead(html === undefined ? 404 : 200, { "content-type": "text/html" })
-    res.end(html ?? "<!doctype html><title>Not found</title><h1>Not found</h1>")
-  })
-
-  server.listen(0, "127.0.0.1")
-  await once(server, "listening")
+  const server = await serveHtml((url) => page(url.pathname, variant))
 
   return {
-    url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+    ...server,
     setCounterVariant: (next) => {
       variant = next
-    },
-    close: async () => {
-      server.close()
-      await once(server, "close")
     },
   }
 }

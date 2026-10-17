@@ -6,9 +6,7 @@
  * is renamed in `?v=2` and has a look-alike in `?v=3`. Every page writes what happened to a status line, so a test can check the
  * outcome with a locator.
  */
-import { once } from "node:events"
-import { createServer } from "node:http"
-import type { AddressInfo } from "node:net"
+import { serveHtml } from "./html-server.ts"
 
 const TOOLS = `<!doctype html><title>Toolbox</title>
 <h1>Toolbox</h1>
@@ -82,27 +80,10 @@ export interface ToolboxSite {
 }
 
 export async function startToolboxSite(): Promise<ToolboxSite> {
-  const server = createServer((req, res) => {
-    const url = new URL(req.url ?? "/", "http://site")
-    const version = url.searchParams.get("v")
-    const built: Record<string, (v: string | null) => string> = {
-      "/account": account,
-      "/billing": billing,
-    }
-    const html = built[url.pathname]?.(version) ?? PAGES[url.pathname]
-
-    res.writeHead(html === undefined ? 404 : 200, { "content-type": "text/html" })
-    res.end(html ?? "<!doctype html><title>Not found</title><h1>Not found</h1>")
-  })
-
-  server.listen(0, "127.0.0.1")
-  await once(server, "listening")
-
-  return {
-    url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
-    close: async () => {
-      server.close()
-      await once(server, "close")
-    },
+  const built: Record<string, (v: string | null) => string> = {
+    "/account": account,
+    "/billing": billing,
   }
+
+  return serveHtml((url) => built[url.pathname]?.(url.searchParams.get("v")) ?? PAGES[url.pathname])
 }

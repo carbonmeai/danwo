@@ -1,0 +1,224 @@
+/*
+ * The flight report's HTML: what failed and where, the screen at failure, the step timeline with
+ * a screenshot per step, the app's console, calls through the proxy, webhook deliveries and the
+ * emulators' state at the end. Screenshots are files beside the report; nothing loads from the
+ * network.
+ */
+import type { ScreenshotEvent } from "../assert/screenshot.ts"
+import type { FlightRecord, RecordedExchange, RecordedStep } from "./record.ts"
+
+/** One kept record, as the report reads it. */
+export interface Loaded {
+  readonly record: FlightRecord
+  /** The record's directory relative to the run directory, with `/` separators. */
+  readonly dir: string
+  /** The redacted screen at failure, when one was captured. */
+  readonly screen: string | undefined
+}
+
+const escape = (text: string) =>
+  text.replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c,
+  )
+
+function runTitle(record: FlightRecord): string {
+  if (record.run.kind === "test") return `attempt ${record.run.attempt}`
+
+  return record.run.fault?.label ?? "clean run"
+}
+
+const offset = (at: string, start: string) =>
+  `+${((Date.parse(at) - Date.parse(start)) / 1000).toFixed(2)}s`
+
+function errorBlock(record: FlightRecord): string {
+  const source = record.error?.source
+  const where = source
+    ? ` <span class="dim">at ${escape(`${source.file}:${source.line}`)}</span>`
+    : ""
+  const lines = [
+    record.error && `<p class="error">${escape(record.error.message)}${where}</p>`,
+    record.stopped && `<p>${escape(record.stopped)}</p>`,
+    ...record.notes
+      .filter((note) => note !== record.stopped)
+      .map((note) => `<p class="dim">${escape(note)}</p>`),
+  ]
+
+  return lines.filter(Boolean).join("")
+}
+
+function failureBlock(loaded: Loaded): string {
+  const failure = loaded.record.failure
+
+  if (failure === undefined) return ""
+
+  const shot = failure.screenshot
+    ? `<a href="${escape(`${loaded.dir}/${failure.screenshot}`)}"><img class="failure" src="${escape(`${loaded.dir}/${failure.screenshot}`)}" alt="screen at failure"></a>`
+    : ""
+  const candidates = failure.candidates?.length
+    ? `<p>Closest on screen:</p><pre>${escape(failure.candidates.join("\n"))}</pre>`
+    : ""
+
+  return `<h4>Screen at failure${failure.url ? ` <span class="dim">${escape(failure.url)}</span>` : ""}</h4>${shot}${candidates}${loaded.screen ? `<details><summary>Screen text</summary><pre>${escape(loaded.screen)}</pre></details>` : ""}`
+}
+
+/** An image of the attempt, linked to itself at full size. */
+function picture(loaded: Loaded, path: string, alt: string, kind: string): string {
+  const src = escape(`${loaded.dir}/${path}`)
+
+  return `<figure><a href="${src}"><img class="${kind}" loading="lazy" src="${src}" alt="${escape(alt)}"></a><figcaption>${escape(alt)}</figcaption></figure>`
+}
+
+/** What screenshot checks did: a written baseline as a note, a difference as its three images. */
+function screenshotNotes(step: RecordedStep, loaded: Loaded): { facts: string[]; images: string } {
+  const checks = step.events.flatMap((event) => (event.kind === "screenshot" ? [event] : []))
+  const facts: string[] = []
+  let images = ""
+
+  for (const check of checks) {
+    if (check.outcome === "written") facts.push(`baseline written: ${check.name}`)
+    if (check.outcome === "differs") images += comparison(loaded, check)
+  }
+
+  return { facts, images }
+}
+
+/** The baseline, the new picture and the diff of a screenshot check that failed, side by side. */
+function comparison(loaded: Loaded, check: ScreenshotEvent): string {
+  let row = picture(loaded, check.baseline, "baseline", "compare")
+
+  if (check.actual !== undefined) row += picture(loaded, check.actual, "actual", "compare")
+  if (check.diff !== undefined) row += picture(loaded, check.diff, "diff", "compare")
+
+  return `<div class="compare">${row}</div>`
+}
+
+function stepRow(step: RecordedStep, loaded: Loaded): string {
+  const models = step.events.filter((e) => e.kind === "model").length
+  const moves = step.events.flatMap((e) =>
+    e.kind === "relocated" ? [`relocated ${e.from} → ${e.to}`] : [],
+  )
+  const shots = screenshotNotes(step, loaded)
+  const facts = [
+    step.cache && `cache ${step.cache.mode}`,
+    models > 0 && `${models} model call${models === 1 ? "" : "s"}`,
+    ...moves,
+    ...shots.facts,
+    step.source && `${step.source.file}:${step.source.line}`,
+  ].filter(Boolean)
+  const shot = step.screenshot
+    ? `<a href="${escape(`${loaded.dir}/${step.screenshot}`)}"><img class="thumb" loading="lazy" src="${escape(`${loaded.dir}/${step.screenshot}`)}" alt="after step ${step.index}"></a>`
+    : ""
+
+  return `<tr class="${step.status}"><td class="dim">${offset(step.startedAt, loaded.record.startedAt)}</td><td><code>${escape(step.api)}</code> ${escape(step.label)}${step.error ? `<div class="error">${escape(step.error.message)}</div>` : ""}<div class="dim">${escape(facts.join(" · "))}</div>${shots.images}</td><td>${escape(step.status)}</td><td class="dim">${step.durationMs} ms</td><td>${shot}</td></tr>`
+}
+
+function stepsBlock(loaded: Loaded): string {
+  const { steps } = loaded.record
+
+  if (steps.length === 0) return ""
+
+  return `<h4>Steps</h4><table><tbody>${steps.map((s) => stepRow(s, loaded)).join("")}</tbody></table>`
+}
+
+function appLogBlock(loaded: Loaded): string {
+  const log = loaded.record.appLog
+
+  if (log.length === 0) return ""
+
+  const rows = log
+    .map(
+      (l) =>
+        `<tr class="${l.level}"><td class="dim">${offset(l.at, loaded.record.startedAt)}</td><td>${escape(l.level)}</td><td>${escape(l.source)}</td><td><pre>${escape(l.text)}</pre></td></tr>`,
+    )
+    .join("")
+
+  return `<h4>Console and page errors</h4><table><tbody>${rows}</tbody></table>`
+}
+
+function message(title: string, m: RecordedExchange["request"]): string {
+  if (m === undefined) return ""
+
+  const headers = Object.entries(m.headers)
+    .map(([name, value]) => `${name}: ${value}`)
+    .join("\n")
+  const body = m.body === null ? (m.bytes > 0 ? `(${m.bytes} bytes, not text)` : "") : m.body
+
+  return `<p class="dim">${title}</p><pre>${escape(headers)}${body ? `\n\n${escape(body)}${m.truncated ? `\n… (${m.bytes} bytes in all)` : ""}` : ""}</pre>`
+}
+
+function exchangeItem(e: RecordedExchange, start: string): string {
+  const status = e.aborted ? "aborted" : String(e.status ?? "…")
+  const fault = e.fault ? ` <span class="fault">${escape(e.fault)}</span>` : ""
+
+  return `<details><summary><span class="dim">${offset(e.startedAt, start)}</span> <code>${escape(e.method)} ${escape(e.host)}${escape(e.path)}</code> → ${escape(status)}${fault} <span class="dim">${escape(e.disposition)}</span></summary>${message("Request", e.request)}${message("Response", e.response)}</details>`
+}
+
+function exchangesBlock(loaded: Loaded): string {
+  const { exchanges, startedAt } = loaded.record
+
+  if (exchanges.length === 0) return ""
+
+  return `<h4>Calls through the proxy</h4>${exchanges.map((e) => exchangeItem(e, startedAt)).join("")}`
+}
+
+function deliveriesBlock(loaded: Loaded): string {
+  const { deliveries, startedAt } = loaded.record
+
+  if (deliveries.length === 0) return ""
+
+  const rows = deliveries
+    .map(
+      (d) =>
+        `<tr><td class="dim">${offset(d.at, startedAt)}</td><td>${escape(d.service ? `${d.service} ` : "")}<code>${escape(d.topic)}</code> #${d.messageId}</td><td>attempt ${d.attempt}</td><td>${escape(String(d.status ?? d.error ?? "…"))}</td><td>${d.fault ? `<span class="fault">${escape(d.fault)}</span>` : ""}</td></tr>`,
+    )
+    .join("")
+
+  return `<h4>Webhook deliveries</h4><table><tbody>${rows}</tbody></table>`
+}
+
+function stateBlock(record: FlightRecord): string {
+  const services = Object.entries(record.state)
+
+  if (services.length === 0) return ""
+
+  return `<h4>State at the end</h4>${services.map(([name, state]) => `<details><summary>${escape(name)}</summary><pre>${escape(JSON.stringify(state, null, 2))}</pre></details>`).join("")}`
+}
+
+function section(loaded: Loaded): string {
+  const { record } = loaded
+  const failed = record.status !== "passed"
+
+  return `<section id="${escape(loaded.dir)}" class="${failed ? "failed" : "passed"}"><h3><span class="badge">${escape(record.status)}</span> ${escape(record.test)} <span class="dim">— ${escape(runTitle(record))}</span></h3><p class="dim">${escape(record.startedAt)} · ${record.durationMs} ms · <code>${escape(loaded.dir)}</code></p>${errorBlock(record)}${failureBlock(loaded)}${stepsBlock(loaded)}${appLogBlock(loaded)}${exchangesBlock(loaded)}${deliveriesBlock(loaded)}${stateBlock(record)}</section>`
+}
+
+const STYLE = `
+:root{--bg:#fff;--fg:#1a1a1a;--dim:#6b6b6b;--line:#e3e3e3;--bad:#b42318;--ok:#067647;--warn:#b54708;--code:#f5f5f5}
+@media (prefers-color-scheme:dark){:root{--bg:#141414;--fg:#e8e8e8;--dim:#9a9a9a;--line:#2e2e2e;--bad:#f97066;--ok:#47cd89;--warn:#fdb022;--code:#1f1f1f}}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,sans-serif;margin:0 auto;max-width:1100px;padding:16px}
+h1{font-size:20px}h3{font-size:16px;margin:0 0 4px}h4{margin:16px 0 6px}
+section{border:1px solid var(--line);border-radius:8px;padding:16px;margin:16px 0}
+section.failed{border-left:4px solid var(--bad)}section.passed{border-left:4px solid var(--ok)}
+.badge{text-transform:uppercase;font-size:12px;padding:1px 6px;border-radius:4px;border:1px solid currentColor}
+.failed .badge{color:var(--bad)}.passed .badge{color:var(--ok)}
+.dim{color:var(--dim)}.error{color:var(--bad);white-space:pre-wrap}.fault{color:var(--warn)}
+table{border-collapse:collapse;width:100%}td{border-top:1px solid var(--line);padding:4px 6px;vertical-align:top}
+tr.failed td,tr.error td{color:var(--bad)}
+pre{background:var(--code);padding:8px;border-radius:4px;overflow-x:auto;white-space:pre-wrap;word-break:break-word;margin:4px 0}
+code{background:var(--code);padding:0 3px;border-radius:3px}
+img.thumb{max-width:160px;max-height:100px;border:1px solid var(--line)}img.failure{max-width:100%;max-height:420px;border:1px solid var(--line)}.compare{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.compare figure{margin:0}img.compare{max-width:240px;max-height:180px;border:1px solid var(--line)}
+summary{cursor:pointer;padding:2px 0}
+`
+
+/** The report's HTML for `records` of the run `runId`. */
+export function renderReport(runId: string, records: readonly Loaded[]): string {
+  const failed = records.filter((l) => l.record.status !== "passed").length
+  const index = records
+    .map(
+      (l) =>
+        `<li><a href="#${escape(l.dir)}">${escape(l.record.status)} · ${escape(l.record.test)} — ${escape(runTitle(l.record))}</a></li>`,
+    )
+    .join("")
+
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>danwo run ${escape(runId)}</title><style>${STYLE}</style></head><body><h1>danwo run ${escape(runId)}</h1><p class="dim">${records.length} recorded run${records.length === 1 ? "" : "s"}, ${failed} not passing. Secrets and credentials are redacted.</p><ul>${index}</ul>${records.map(section).join("")}</body></html>\n`
+}
