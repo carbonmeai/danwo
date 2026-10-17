@@ -90,6 +90,24 @@ export {
   seedS3,
   TIGRIS_ENDPOINTS,
 } from "./s3/index.ts"
+export {
+  SLACK_HOSTS,
+  type SlackAction,
+  type SlackEphemeral,
+  type SlackMessage,
+  type SlackSeedApp,
+  type SlackSeedChannel,
+  type SlackSeedConfig,
+  type SlackSeedInstall,
+  type SlackSeedUser,
+  type SlackWorkspace,
+  seedSlack,
+  slack,
+  slackOutboundFaults,
+  slackSignature,
+  slackWorkspace,
+  type UrlVerification,
+} from "./slack/index.ts"
 export { seedStripe, stripe, stripeOutboundFaults, type StripeSeedConfig } from "./stripe/index.ts"
 export { ManualClock, systemTimer, type Timer } from "./time.ts"
 export {

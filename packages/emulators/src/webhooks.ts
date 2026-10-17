@@ -99,6 +99,11 @@ export interface WebhookDispatcherOptions {
   readonly fetch?: typeof fetch
 }
 
+/** A message body as sent: a string is already encoded (a form, say) and goes as it is; anything else as JSON. */
+function encodeBody(body: unknown): string {
+  return typeof body === "string" ? body : JSON.stringify(body)
+}
+
 function matches(endpoint: WebhookEndpoint, topic: string): boolean {
   return endpoint.enabled && (endpoint.events.includes("*") || endpoint.events.includes(topic))
 }
@@ -278,7 +283,7 @@ export class WebhookDispatcher {
     const { clock, policy } = this.options
     const generation = this.generation
     const at = clock()
-    const body = JSON.stringify(message.body)
+    const body = encodeBody(message.body)
     const headers = this.signed(endpoint, body, Math.floor(at.getTime() / 1000), mode)
     const started = performance.now()
     let status: number | null = null

@@ -18,6 +18,8 @@
     "@azure/msal-node": "7.1.0",
     "@microsoft/microsoft-graph-client": "3.0.7",
     "@microsoft/microsoft-graph-types": "2.43.1",
+    "@slack/bolt": "5.1.0",
+    "@slack/web-api": "8.2.0",
     "googleapis": "186.0.0",
     "openid-client": "6.8.8",
     "resend": "6.34.1",
