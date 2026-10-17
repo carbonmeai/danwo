@@ -1,6 +1,6 @@
 import type { Store } from "../store.ts"
 import type { AppRecord, UserRecord } from "./entities.ts"
-import { secretHex, slackId } from "./helpers.ts"
+import { secretHex, slackId, stableSlackId } from "./helpers.ts"
 import { installApp } from "./install.ts"
 import { findChannel, findUser, teamOf } from "./lookup.ts"
 import { type SlackStore, slackStore } from "./store.ts"
@@ -121,7 +121,7 @@ function ensureGeneral(slack: SlackStore, creator: string): void {
 /** An app's identity and credentials. */
 function credentialsOf(app: SlackSeedApp) {
   return {
-    appId: app.app_id ?? slackId("A"),
+    appId: app.app_id ?? stableSlackId("A", app.client_id),
     name: app.name,
     clientId: app.client_id,
     clientSecret: app.client_secret,

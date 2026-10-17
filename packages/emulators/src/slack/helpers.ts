@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto"
+import { createHash, randomBytes } from "node:crypto"
 
 import type { Clock, DataKey, Store } from "../store.ts"
 
@@ -13,6 +13,16 @@ const ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 /** An id in Slack's style: a type letter (`T` team, `U` user, `C` channel…) and 10 characters. */
 export function slackId(prefix: string, length = 10): string {
   const bytes = randomBytes(length)
+
+  return prefix + [...bytes].map((byte) => ALPHABET[byte % ALPHABET.length]).join("")
+}
+
+/**
+ * A Slack-style id derived from `seed`, the same on every call. Used where an id must survive a
+ * reseed, such as an app's id, which names its event endpoint.
+ */
+export function stableSlackId(prefix: string, seed: string, length = 10): string {
+  const bytes = createHash("sha256").update(`${prefix}:${seed}`).digest().subarray(0, length)
 
   return prefix + [...bytes].map((byte) => ALPHABET[byte % ALPHABET.length]).join("")
 }

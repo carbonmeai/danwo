@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 
 import { createEmulator, type Emulator } from "../src/define.ts"
 import { seedSlack, slack, slackOutboundFaults, slackWorkspace } from "../src/slack/index.ts"
+import { slackStore } from "../src/slack/store.ts"
 import { ManualClock } from "../src/time.ts"
 import { APP, BOT_TOKEN, clientFor, postMessage, slackError, WORKSPACE } from "./slack-workspace.ts"
 
@@ -306,5 +307,22 @@ describe("files", () => {
 
     expect(shared).toMatchObject({ text: "Nightly report", files: [{ name: "report.txt" }] })
     expect(slackWorkspace(emulator).file(fileId)?.toString()).toBe("all green")
+  })
+})
+
+describe("seeded app ids", () => {
+  it("derives the same app id on every seed when the seed names none", () => {
+    const idOf = () => {
+      const emulator = createEmulator(slack)
+
+      seedSlack(emulator.store, {
+        apps: [{ name: "Bot", client_id: "1.2", client_secret: "s", signing_secret: "x" }],
+      })
+
+      return slackStore(emulator.store).apps.all()[0]?.appId
+    }
+
+    expect(idOf()).toMatch(/^A[0-9A-Z]{10}$/)
+    expect(idOf()).toBe(idOf())
   })
 })
