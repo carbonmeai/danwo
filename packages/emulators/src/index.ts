@@ -57,6 +57,7 @@ export {
   revokeMicrosoftSessions,
   seedMicrosoft,
 } from "./microsoft/index.ts"
+export { listeningPort } from "./net.ts"
 export { Outbox, type OutboxMessage } from "./outbox.ts"
 export {
   type Clock,

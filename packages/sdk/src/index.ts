@@ -144,6 +144,7 @@ export {
   graphSubscriptions,
   type InboxEmail,
   type IncomingMail,
+  listeningPort,
   type MicrosoftSeedConfig,
   type MicrosoftSeedEvent,
   type MicrosoftSeedFile,
