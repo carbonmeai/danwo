@@ -48,7 +48,13 @@
         "next": "*"
       }
     ],
-    "@stylistic/multiline-comment-style": ["error", "starred-block"]
+    "@stylistic/multiline-comment-style": ["error", "starred-block"],
+    "import/no-unassigned-import": [
+      "warn",
+      {
+        "allow": ["@danwo/runner/register"]
+      }
+    ]
   },
   "ignorePatterns": ["node_modules", "dist", "coverage"],
   "jsPlugins": ["@stylistic/eslint-plugin"]
