@@ -40,22 +40,33 @@ async function login(res: ServerResponse): Promise<void> {
   res.writeHead(302, { location: url.href }).end()
 }
 
-async function callback(url: URL, res: ServerResponse): Promise<void> {
+/** Redeems the code Google sent back and returns the signed-in user's email. */
+async function redeem(url: URL): Promise<string | undefined> {
   const state = url.searchParams.get("state") ?? ""
-  const verifier = pending.get(state)
+  const verifier = pending.get(state) ?? ""
 
   pending.delete(state)
 
+  const tokens = await oidc.authorizationCodeGrant(await google(), url, {
+    pkceCodeVerifier: verifier,
+    expectedState: state,
+  })
+  return emailOf(tokens.claims())
+}
+
+/** The email claim of a verified ID token. */
+function emailOf(claims: oidc.IDToken | undefined): string | undefined {
+  const email = claims?.["email"]
+
+  return typeof email === "string" ? email : undefined
+}
+
+async function callback(url: URL, res: ServerResponse): Promise<void> {
   try {
-    const tokens = await oidc.authorizationCodeGrant(await google(), url, {
-      ...(verifier !== undefined && { pkceCodeVerifier: verifier }),
-      expectedState: state,
-    })
+    const email = await redeem(url)
     const sid = randomUUID()
 
-    const email = tokens.claims()?.["email"]
-
-    sessions.set(sid, typeof email === "string" ? email : undefined)
+    sessions.set(sid, email)
     res.writeHead(302, { location: "/", "set-cookie": `sid=${sid}; Path=/; HttpOnly` }).end()
   } catch (error) {
     page(res, 502, "<h1>Sign-in failed</h1>", String(error))
@@ -79,15 +90,24 @@ function home(req: IncomingMessage, res: ServerResponse): void {
   else page(res, 200, `<h1>Welcome</h1><a href="/login">Sign in with Google</a>`)
 }
 
+function listSessions(res: ServerResponse): void {
+  res
+    .writeHead(200, { "content-type": "application/json" })
+    .end(JSON.stringify({ sessions: [...sessions.values()] }))
+}
+
+/** The app's routes by path; anything else is the home page. */
+const ROUTES: Record<string, (url: URL, res: ServerResponse) => void> = {
+  "/login": (_url, res) => void login(res),
+  "/auth/google/callback": (url, res) => void callback(url, res),
+  "/sessions": (_url, res) => listSessions(res),
+}
+
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", `http://127.0.0.1:${port}`)
+  const route = ROUTES[url.pathname]
 
-  if (url.pathname === "/login") void login(res)
-  else if (url.pathname === "/auth/google/callback") void callback(url, res)
-  else if (url.pathname === "/sessions")
-    res
-      .writeHead(200, { "content-type": "application/json" })
-      .end(JSON.stringify({ sessions: [...sessions.values()] }))
+  if (route) route(url, res)
   else home(req, res)
 })
 

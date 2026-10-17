@@ -9,7 +9,8 @@
     "maxCognitive": 15
   },
   "duplicates": {
-    "minOccurrences": 2
+    "minOccurrences": 2,
+    "ignore": ["packages/*/test/fixtures/**/app.ts", "packages/*/test/fixtures/*-app.ts"]
   },
   "rules": {
     "unused-dependencies": "warn"
