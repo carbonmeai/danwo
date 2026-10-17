@@ -9,6 +9,22 @@ export {
   type WebhookSetup,
 } from "./define.ts"
 export {
+  GITHUB_HOSTS,
+  type GithubCheckRunView,
+  type GithubCommentView,
+  type GithubIssueView,
+  type GithubRepoView,
+  type GithubSeedConfig,
+  github,
+  githubAppKey,
+  githubOutboundFaults,
+  githubRepo,
+  githubSignIns,
+  installGithubApp,
+  seedGithub,
+  uninstallGithubApp,
+} from "./github/index.ts"
+export {
   type CalendarSeedEvent,
   type DriveSeedFile,
   GOOGLE_ENDPOINTS,
