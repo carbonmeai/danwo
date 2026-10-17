@@ -7,3 +7,4 @@ export {
   type WebSessionOptions,
 } from "./session.ts"
 export { unique } from "./replay/index.ts"
+export { redactCredentials, SecretVault } from "./secrets/index.ts"

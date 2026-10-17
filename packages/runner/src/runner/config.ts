@@ -88,7 +88,7 @@ function* foldersUp(start: string): Generator<string> {
 }
 
 /** The nearest config file at or above `cwd`, inside the repository. */
-function nearestConfig(cwd: string): string | undefined {
+export function nearestConfig(cwd: string): string | undefined {
   for (const folder of foldersUp(cwd)) {
     const file = CONFIG_FILES.map((name) => join(folder, name)).find((path) => existsSync(path))
 

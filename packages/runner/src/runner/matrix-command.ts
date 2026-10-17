@@ -32,6 +32,8 @@ export interface RunMatrixOptions {
   /** The test file; it must hold exactly one test after `grep`. */
   readonly file: string
   readonly grep?: string
+  /** A regular expression over planned fault labels: only the faults it matches run. */
+  readonly faults?: string
   readonly workers?: number
   /** Flight recorder mode; overrides the config's `record`. */
   readonly record?: RecordMode
@@ -127,12 +129,29 @@ async function trialCache(loaded: LoadedConfig): Promise<{ dir: string; done(): 
   return { dir, done: () => rm(dir, { recursive: true, force: true }) }
 }
 
+/** The planned faults whose labels `filter` matches; every one without a filter. */
+function selectFaults(plan: readonly PlannedFault[], filter: string | undefined): PlannedFault[] {
+  if (filter === undefined) return [...plan]
+
+  const pattern = new RegExp(filter)
+
+  return plan.filter((fault) => pattern.test(fault.label))
+}
+
+/** The line announcing the plan, naming the filter when one narrowed it. */
+function planLine(planned: number, kept: number, filter: string | undefined): string {
+  return filter === undefined
+    ? `clean run passed; ${planned} faults planned`
+    : `clean run passed; ${kept} of ${planned} planned faults match /${filter}/`
+}
+
 /** The clean trial, then every planned fault's; the result and the exit code. */
 async function runTrials(
   test: CatalogEntry,
   matrix: DanwoConfig["matrix"],
   run: (fault: PlannedFault | null) => Promise<RunOutcome>,
   write: (line: string) => void,
+  filter: string | undefined,
 ): Promise<{ result: FaultMatrixResult; code: number }> {
   const began = Date.now()
   const clean = await run(null)
@@ -145,13 +164,14 @@ async function runTrials(
     return { result, code: 1 }
   }
 
-  const plan = planFaults(
+  const planned = planFaults(
     clean,
     matrix?.outboundFaults ?? defaultOutboundFaults,
     matrix?.webhookFaults ?? WEBHOOK_FAULTS,
   )
+  const plan = selectFaults(planned, filter)
 
-  write(`clean run passed; ${plan.length} faults planned`)
+  write(planLine(planned.length, plan.length, filter))
   write(judgingLine(test))
 
   const runs = await retryInvalid(await Promise.all(plan.map(run)), matrix?.rerunInvalid ?? 0, run)
@@ -174,6 +194,8 @@ interface MatrixRun {
   readonly context: RunContext
   readonly began: number
   readonly write: (line: string) => void
+  /** Narrows the planned faults by label. */
+  readonly faults: string | undefined
 }
 
 /** Runs the trials; tells the reporters when the run stopped without a result. */
@@ -184,6 +206,7 @@ async function trialsOrAbort(run: MatrixRun): Promise<{ result: FaultMatrixResul
       run.loaded.config.matrix,
       trialRunner(run.crew, run.file, run.test.id, run.cacheDir),
       run.write,
+      run.faults,
     )
   } catch (error) {
     const aborted = {
@@ -245,6 +268,7 @@ export async function runMatrix(
     context: { kind: "matrix", root: loaded.root, cwd },
     began: Date.now(),
     write,
+    faults: options.faults,
   }
 
   await tellReporters(run.reporters, (r) => r.started?.(run.context), write)

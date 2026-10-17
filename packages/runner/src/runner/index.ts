@@ -25,10 +25,18 @@ export type {
   TestFixtures,
   TestOptions,
 } from "../tests/types.ts"
-export { type DanwoConfig, defineConfig, loadConfig } from "./config.ts"
+export { catalogOf, type CatalogEntry, testFilesOf } from "./catalog.ts"
+export {
+  type DanwoConfig,
+  defineConfig,
+  type LoadedConfig,
+  loadConfig,
+  nearestConfig,
+} from "./config.ts"
 export { defaultOutboundFaults } from "./faults.ts"
 export type { EnvironmentContext, WorkerEnvironment } from "./environment.ts"
-export type { FlightRecord, RecordMode } from "./record.ts"
+export { type FlightRecord, type RecordedStep, type RecordMode, runsDir } from "./record.ts"
+export { findRun } from "./report.ts"
 export { runMatrix, type RunMatrixOptions } from "./matrix-command.ts"
 export type { MatrixRunReport, Reporter, RunContext, RunKind, TestRunReport } from "./reporting.ts"
 export type { AttemptReport, TestReport } from "./tasks.ts"
