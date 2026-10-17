@@ -101,6 +101,7 @@ program
   .description("record a clean run of one test, then replay it once per planned fault")
   .argument("<file>", "test file")
   .option("-g, --grep <regexp>", "selects the test when the file has several")
+  .option("-f, --faults <regexp>", "only the planned faults whose labels match")
   .option("-w, --workers <n>", "worker processes", integerAtLeast(1))
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .addOption(recordOption())
@@ -115,6 +116,7 @@ program
         ...options
       }: {
         grep?: string
+        faults?: string
         workers?: number
         config?: string
         record?: RecordMode
@@ -128,6 +130,16 @@ program
       process.exitCode = (await runMatrix({ file, ...options, reporters, ...update })).code
     },
   )
+
+program
+  .command("mcp")
+  .description("serve this project to coding agents over MCP (stdio)")
+  .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
+  .action(async (options: { config?: string }) => {
+    const { serveStdio } = await import("@danwo/mcp")
+
+    await serveStdio({ cwd: process.cwd(), config: options.config })
+  })
 
 program
   .command("show")

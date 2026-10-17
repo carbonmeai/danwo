@@ -26,6 +26,7 @@ It drives the app through its UI like a user, while third-party services the app
 | `@danwo/proxy`     | The egress proxy                                                     |
 | `@danwo/emulators` | Provider emulators                                                   |
 | `@danwo/github`    | Reports runs to GitHub from Actions: a check run and job summary     |
+| `@danwo/mcp`       | An MCP server for coding agents: run, explain and write danwo tests  |
 
 See `examples/shop` for a small app tested with `danwo test` and `danwo matrix`.
 
@@ -59,6 +60,33 @@ steps:
 
 The summary links to the `danwo-runs` artifact and names each failure's flight record in it. In a
 config, add `reporters: [github({ artifact: "my-runs" })]` with `github` from `@danwo/github`.
+
+## Coding agents (MCP)
+
+`danwo mcp` serves the project in the current folder to a coding agent over MCP (stdio). With
+Claude Code, from the project's folder:
+
+```bash
+claude mcp add danwo -- npx danwo mcp
+```
+
+The agent gets these tools:
+
+| Tool              | What it does                                                                                            |
+| ----------------- | ------------------------------------------------------------------------------------------------------- |
+| `list_tests`      | The project's tests by file, with skip/only and whether they declare an invariant                       |
+| `run_tests`       | Runs all tests or some (files, grep, names): the failing step, error and test line, model calls, record |
+| `run_matrix`      | The fault matrix on one test, optionally narrowed to some faults (`faults: "duplicate"`)                |
+| `show_run`        | A recorded run's failures: steps, console errors, failed or faulted calls, webhooks and emulator state  |
+| `read_screenshot` | The screen at failure, or after a step, as an image                                                     |
+| `inspect_page`    | A page of the app as danwo's agent reads it (its accessibility tree), and trying a locator on it        |
+| `scaffold_test`   | Writes a new `*.danwo.ts` from a name, steps and an invariant to fill in; never overwrites a file       |
+
+It also offers the resources `danwo://config` and `danwo://runs/latest`, and a prompt,
+`write-danwo-test`, that walks the agent from inspecting the app to a passing test. Runs stream
+their progress and can be cancelled. Everything the server returns is redacted like the flight
+recorder's records, and files are only read and written inside the project. Runs and the matrix can
+take minutes: raise your client's tool timeout if it is short.
 
 ## Development
 
