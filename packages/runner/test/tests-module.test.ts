@@ -15,6 +15,22 @@ import { isSkipSignal } from "../src/tests/skip.ts"
 
 const noop = () => undefined
 
+/** The title of the describe block a hook sits in, or "file" for the file's own hooks. */
+function blockTitle(hook: { block?: { title: string } | undefined }): string {
+  return hook.block?.title ?? "file"
+}
+
+/** What `fn` threw, or undefined when it returned. */
+function caught(fn: () => void): unknown {
+  try {
+    fn()
+  } catch (error) {
+    return error
+  }
+
+  return undefined
+}
+
 describe("declarations", () => {
   it("records titles, options and modes, inheriting skip and only from describe", async () => {
     const declared = await declarationsOf(async () => {
@@ -47,7 +63,8 @@ describe("declarations", () => {
     expect(() => test("stray", noop)).toThrow(/while danwo loads a test file/)
     await expect(
       declarationsOf(async () => {
-        test.describe("async", (async () => undefined) as unknown as () => void)
+        // oxlint-disable-next-line typescript/no-misused-promises -- an async body on purpose, to check describe refuses it
+        test.describe("async", async () => undefined)
       }),
     ).rejects.toThrow(/synchronous body/)
   })
@@ -67,13 +84,20 @@ describe("declarations", () => {
       })
     })
     const deep = declared.tests[0]
-    const where = (hook: { block?: { title: string } | undefined }) => hook.block?.title ?? "file"
 
     expect(deep).toBeDefined()
     if (deep === undefined) return
 
-    expect(hooksAround(declared, deep, "beforeEach").map(where)).toEqual(["file", "outer", "inner"])
-    expect(hooksAround(declared, deep, "afterEach").map(where)).toEqual(["inner", "outer", "file"])
+    expect(hooksAround(declared, deep, "beforeEach").map(blockTitle)).toEqual([
+      "file",
+      "outer",
+      "inner",
+    ])
+    expect(hooksAround(declared, deep, "afterEach").map(blockTitle)).toEqual([
+      "inner",
+      "outer",
+      "file",
+    ])
   })
 
   it("orders afterAll innermost first", async () => {
@@ -85,23 +109,12 @@ describe("declarations", () => {
         test.beforeAll(noop)
       })
     })
-    const where = (hook: { block?: { title: string } | undefined }) => hook.block?.title ?? "file"
 
-    expect(suiteHooks(declared, "beforeAll").map(where)).toEqual(["file", "block"])
-    expect(suiteHooks(declared, "afterAll").map(where)).toEqual(["block", "file"])
+    expect(suiteHooks(declared, "beforeAll").map(blockTitle)).toEqual(["file", "block"])
+    expect(suiteHooks(declared, "afterAll").map(blockTitle)).toEqual(["block", "file"])
   })
 
   it("skips a running test with test.skip(reason) or a true condition", () => {
-    const caught = (fn: () => void) => {
-      try {
-        fn()
-      } catch (error) {
-        return error
-      }
-
-      return undefined
-    }
-
     expect(isSkipSignal(caught(() => test.skip("not today")))).toBe(true)
     expect(isSkipSignal(caught(() => test.skip(true, "on CI")))).toBe(true)
     expect(caught(() => test.skip(false, "never"))).toBeUndefined()

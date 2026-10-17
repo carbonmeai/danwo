@@ -3,6 +3,11 @@ import type { ConsoleMessage, Page } from "playwright-core"
 
 import type { AppLogRecord, StepRecorder } from "./steps.ts"
 
+/** The current time, as step and log lines record it. */
+function now(): string {
+  return new Date().toISOString()
+}
+
 function levelOf(message: ConsoleMessage): AppLogRecord["level"] {
   switch (message.type()) {
     case "error":
@@ -18,14 +23,12 @@ function levelOf(message: ConsoleMessage): AppLogRecord["level"] {
 
 /** Records the page's console, uncaught errors and main-frame navigations as app log lines. */
 export function recordAppLog(page: Page, steps: StepRecorder): void {
-  const at = () => new Date().toISOString()
-
   page.on("console", (message) => {
-    steps.appLog({ at: at(), level: levelOf(message), source: "console", text: message.text() })
+    steps.appLog({ at: now(), level: levelOf(message), source: "console", text: message.text() })
   })
   page.on("pageerror", (error) => {
     steps.appLog({
-      at: at(),
+      at: now(),
       level: "error",
       source: "page-error",
       text: error.stack ?? error.message,
@@ -33,6 +36,6 @@ export function recordAppLog(page: Page, steps: StepRecorder): void {
   })
   page.on("framenavigated", (frame) => {
     if (frame === page.mainFrame())
-      steps.appLog({ at: at(), level: "info", source: "navigation", text: frame.url() })
+      steps.appLog({ at: now(), level: "info", source: "navigation", text: frame.url() })
   })
 }

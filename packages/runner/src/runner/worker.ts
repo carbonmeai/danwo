@@ -173,7 +173,7 @@ async function runTest(
 }
 
 async function runSuiteHooks(declarations: FileDeclarations, kind: "beforeAll" | "afterAll") {
-  for (const hook of suiteHooks(declarations, kind)) await hook.fn(SUITE_FIXTURES as never)
+  for (const hook of suiteHooks(declarations, kind)) await hook.fn(SUITE_FIXTURES)
 }
 
 async function testFile(task: TestFileTask): Promise<TestReport[]> {

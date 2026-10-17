@@ -123,7 +123,7 @@ async function oauthEnvironment<Name extends string>(
   const services = await startServices([service], options)
   const { proxy } = services
   const settle = () => services.settle()
-  // The mapped key is `name` itself, which TypeScript cannot see through a computed property.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the mapped key is `name` itself, which TypeScript can't see through a computed property
   const fixtures = { [name]: service.emulator, proxy, settle } as OAuthEnvironment<Name>["fixtures"]
 
   return {

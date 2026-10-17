@@ -58,16 +58,17 @@ describe("page view", () => {
   })
 })
 
+/** The recorded target of the element `pattern` finds in the page view. */
+async function targetOf(pattern: RegExp) {
+  await page.setContent(PAGE)
+
+  const { tree } = await viewPage(page, (text) => text)
+  const ref = pattern.exec(tree)?.[1] ?? ""
+
+  return describeTarget(page, tree, ref)
+}
+
 describe("recorded targets", () => {
-  async function targetOf(pattern: RegExp) {
-    await page.setContent(PAGE)
-
-    const { tree } = await viewPage(page, (text) => text)
-    const ref = pattern.exec(tree)?.[1] ?? ""
-
-    return describeTarget(page, tree, ref)
-  }
-
   it("prefers a test id, then role and name, and counts equal matches", async () => {
     expect(await targetOf(/- button "Pay \$5\.00" \[ref=(e\d+)\]/)).toEqual({
       testId: "pay",

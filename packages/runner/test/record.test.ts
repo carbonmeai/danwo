@@ -5,6 +5,7 @@ import { join } from "node:path"
 
 import type { Exchange, Proxy } from "@danwo/proxy"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { z } from "zod"
 
 import type { SessionFlight } from "../src/flight.ts"
 import type { WorkerEnvironment } from "../src/runner/environment.ts"
@@ -159,13 +160,12 @@ describe("flight recorder redaction", () => {
   })
 
   it("clips long strings and long lists in recorded state", () => {
-    const value = redactor.value({
-      blob: "x".repeat(2_000),
-      items: Array.from({ length: 150 }, (_, i) => i),
-    }) as {
-      blob: string
-      items: unknown[]
-    }
+    const value = z.object({ blob: z.string(), items: z.array(z.unknown()) }).parse(
+      redactor.value({
+        blob: "x".repeat(2_000),
+        items: Array.from({ length: 150 }, (_, i) => i),
+      }),
+    )
 
     expect(value.blob).toMatch(/^x{500}… \(2000 chars\)$/)
     expect(value.items).toHaveLength(101)
@@ -225,8 +225,13 @@ function exchange(over: Partial<Exchange>): Exchange {
   }
 }
 
+/** A record of a run that made no exchanges. */
+function buildEmptyRecord() {
+  return buildRecord(input(environment([])))
+}
+
 function environment(exchanges: Exchange[]): WorkerEnvironment {
-  // Only what the recorder reads: the exchange log.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a test double: the recorder reads only the exchange log
   const proxy = { exchanges: () => exchanges } as unknown as Proxy
 
   return {
@@ -298,15 +303,14 @@ describe("flight records", () => {
   it("deletes a passing run's directory under on-failure and keeps it under always", async () => {
     const settings = { runDir: join(root, "run-1"), mode: "on-failure" as const }
     const dir = attemptDir(settings, "tests/a.danwo.ts › passes", "attempt-1")
-    const build = () => buildRecord(input(environment([])))
 
     await mkdir(join(dir, "screenshots"), { recursive: true })
     await writeFile(join(dir, "screenshots", "001-step-0.png"), "")
 
-    expect(await finishRecord(dir, "on-failure", false, build)).toBeUndefined()
+    expect(await finishRecord(dir, "on-failure", false, buildEmptyRecord)).toBeUndefined()
     expect(existsSync(dir)).toBe(false)
 
-    expect(await finishRecord(dir, "always", false, build)).toBeDefined()
+    expect(await finishRecord(dir, "always", false, buildEmptyRecord)).toBeDefined()
     expect(await readdir(dir)).toEqual(expect.arrayContaining(["record.json", "timeline.jsonl"]))
 
     const timeline = (await readFile(join(dir, "timeline.jsonl"), "utf8")).trim().split("\n")

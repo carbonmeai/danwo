@@ -18,6 +18,7 @@ import { fixtureScope, wantedByAll } from "../tests/fixtures.ts"
 import { type DeclaredTest, type FileDeclarations, hooksAround } from "../tests/registry.ts"
 import type { AttemptStatus } from "../tests/retry.ts"
 import { isSkipSignal } from "../tests/skip.ts"
+import type { StoredBody } from "../tests/types.ts"
 import type { DanwoConfig } from "./config.ts"
 import type { WorkerEnvironment } from "./environment.ts"
 
@@ -120,7 +121,7 @@ export async function runAttempt(
   const deadline = test.options.timeout ?? setup.config.timeout ?? DEFAULT_TIMEOUT_MS
   const session = await openSession(setup, deadline)
   const fixtures = fixtureScope(test.fixtures, builtInFixtures(session, setup.env))
-  const call = (fn: (fixtures: never) => unknown) => async () => fn(fixtures.values as never)
+  const call = (fn: StoredBody) => async () => fn(fixtures.values)
 
   const body = await stage(
     async () => {
@@ -166,7 +167,7 @@ interface Judging {
   readonly session: WebSession
   readonly setup: AttemptSetup
   readonly deadline: number
-  readonly run: (fn: (fixtures: never) => unknown) => () => Promise<unknown>
+  readonly run: (fn: StoredBody) => () => Promise<unknown>
 }
 
 /**

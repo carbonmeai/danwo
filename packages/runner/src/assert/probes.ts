@@ -19,8 +19,8 @@ export interface Reading {
 export type Probe = (target: PlaywrightLocator, budget: number) => Promise<Reading>
 
 /** Text as a reader sees it: runs of whitespace are one space, and the ends are trimmed. */
-function normalized(text: string): string {
-  return text.replace(/\s+/g, " ").trim()
+function normalized(raw: string): string {
+  return raw.replace(/\s+/g, " ").trim()
 }
 
 /** Whether `actual` matches `expected` whole, or contains it when `partial`. */
@@ -35,10 +35,10 @@ function textHolds(actual: string, expected: TextMatch, partial: boolean): boole
 /** Runs `read` on the single matched element; none or several is a reading of its own. */
 function single(read: Probe): Probe {
   return async (target, budget) => {
-    const count = await target.count()
+    const matched = await target.count()
 
-    if (count === 0) return { pass: false, received: "no element" }
-    if (count > 1) return { pass: false, received: `${count} elements`, ambiguous: true }
+    if (matched === 0) return { pass: false, received: "no element" }
+    if (matched > 1) return { pass: false, received: `${matched} elements`, ambiguous: true }
 
     return read(target, budget)
   }

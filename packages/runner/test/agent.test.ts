@@ -65,7 +65,7 @@ function scriptedActor(buttonName: string): MockLanguageModelV4 & { taps: number
     provider: "mock",
     modelId: "scripted-actor",
     doGenerate: async (options: LanguageModelV4CallOptions) => {
-      const text = promptText(options.prompt.filter((m) => m.role !== "system"))
+      const prompt = promptText(options.prompt.filter((m) => m.role !== "system"))
       const clicked = options.prompt.some(
         (message) =>
           message.role === "tool" &&
@@ -74,7 +74,7 @@ function scriptedActor(buttonName: string): MockLanguageModelV4 & { taps: number
 
       if (clicked) return toolCall("done", { status: "passed", summary: `clicked ${buttonName}` })
 
-      const match = button.exec(text)
+      const match = button.exec(prompt)
 
       if (!match?.[1]) throw new Error(`scripted actor: no button ${buttonName} in the page view`)
       actor.taps++

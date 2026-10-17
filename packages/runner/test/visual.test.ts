@@ -77,6 +77,13 @@ function screenshotEvents(session: WebSession) {
     .flatMap((step) => step.events.filter((event) => event.kind === "screenshot"))
 }
 
+/** Compares the whole page with its baseline, painting over the clock. */
+function checkMaskedPage(session: WebSession): Promise<void> {
+  return session
+    .expect(session.screen)
+    .toHaveScreenshot("page", { mask: [session.screen.getByTestId("clock")] })
+}
+
 describe("toHaveScreenshot", () => {
   it("writes a missing baseline, then matches it", async () => {
     const first = await withSession((session) =>
@@ -141,15 +148,10 @@ describe("toHaveScreenshot", () => {
   }, 60_000)
 
   it("paints over masked elements, so what changes on every load does not count", async () => {
-    const check = (session: WebSession) =>
-      session
-        .expect(session.screen)
-        .toHaveScreenshot("page", { mask: [session.screen.getByTestId("clock")] })
-
-    await withSession(check)
+    await withSession(checkMaskedPage)
     await new Promise((resolve) => setTimeout(resolve, 20))
 
-    const again = await withSession(check)
+    const again = await withSession(checkMaskedPage)
 
     expect(screenshotEvents(again)).toEqual([expect.objectContaining({ outcome: "matched" })])
   }, 60_000)

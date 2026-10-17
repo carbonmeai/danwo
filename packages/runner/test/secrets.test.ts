@@ -42,16 +42,22 @@ function promptText(value: unknown): string {
   return ""
 }
 
+/** Whether the conversation so far has a result from `tool`. */
+function used(options: LanguageModelV4CallOptions, tool: string): boolean {
+  return options.prompt.some(
+    (m) =>
+      m.role === "tool" && m.content.some((part) => "toolName" in part && part.toolName === tool),
+  )
+}
+
+/** The ref of the element with `role` and `name` in the page view. */
+function node(text: string, role: string, name: string): string | undefined {
+  return new RegExp(`- ${role} "${name}"[^\\n]*?\\[ref=([a-z0-9]+)\\]`).exec(text)?.[1]
+}
+
 /** Signs in: types the email, fills the password secret by name, clicks Sign in, ends the step. */
 function signInActor(): MockLanguageModelV4 & { prompts: string[] } {
   const prompts: string[] = []
-  const used = (options: LanguageModelV4CallOptions, tool: string) =>
-    options.prompt.some(
-      (m) =>
-        m.role === "tool" && m.content.some((part) => "toolName" in part && part.toolName === tool),
-    )
-  const node = (text: string, role: string, name: string) =>
-    new RegExp(`- ${role} "${name}"[^\\n]*?\\[ref=([a-z0-9]+)\\]`).exec(text)?.[1]
   const model = new MockLanguageModelV4({
     provider: "mock",
     modelId: "sign-in-actor",

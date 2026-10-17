@@ -123,24 +123,28 @@ function pathKeys(path: string): (string | number)[] {
     .map((key) => (/^\d+$/.test(key) ? Number(key) : key))
 }
 
-type Tree = Record<string | number, unknown>
+/** `node` with `value` put at `keys`, creating objects and arrays on the way; `node` is left as it was. */
+function withPath(node: unknown, keys: readonly (string | number)[], value: unknown): unknown {
+  const [key, ...rest] = keys
 
-/** Puts `value` at `path` in `root`, creating objects and arrays on the way. */
-function setPath(root: Tree, path: string, value: unknown): void {
-  const keys = pathKeys(path)
-  let node: Tree = root
+  if (key === undefined) return value
 
-  for (const [index, key] of keys.entries()) {
-    if (index === keys.length - 1) {
-      node[key] = value
-      break
-    }
+  if (typeof key === "number") {
+    const list: unknown[] = Array.isArray(node) ? [...node] : []
 
-    const next = keys[index + 1]
+    list[key] = withPath(list[key], rest, value)
 
-    node[key] ??= typeof next === "number" ? [] : {}
-    node = node[key] as Tree
+    return list
   }
+
+  const record: Record<string, unknown> =
+    typeof node === "object" && node !== null && !Array.isArray(node)
+      ? Object.fromEntries(Object.entries(node))
+      : {}
+
+  record[key] = withPath(record[key], rest, value)
+
+  return record
 }
 
 /** Reads every field from its element and checks the result against `schema`. */
@@ -148,9 +152,10 @@ export async function readFields<T>(
   fields: readonly { readonly path: string; readonly as: ReadAs; readonly element: Locator }[],
   schema: z.ZodType<T>,
 ): Promise<T> {
-  const root: Tree = {}
+  let root: unknown = {}
 
-  for (const field of fields) setPath(root, field.path, await readElement(field.element, field.as))
+  for (const field of fields)
+    root = withPath(root, pathKeys(field.path), await readElement(field.element, field.as))
 
   const parsed = schema.safeParse(root)
 

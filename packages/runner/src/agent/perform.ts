@@ -40,19 +40,32 @@ export interface Performed {
   readonly recorded: RecordedAction | null
 }
 
+/** The tools that act on the page: every tool but `done`. */
+type ActionName = Exclude<ToolName, "done">
+
+/** A call of one of the tools in `Names`, with that tool's input. */
+type CallOf<Names extends ActionName> = {
+  [Name in Names]: { readonly name: Name; readonly input: ToolInput<Name> }
+}[Names]
+
 /** A tool call the agent made, parsed. */
-export type Call = {
-  [Name in Exclude<ToolName, "done">]: { readonly name: Name; readonly input: ToolInput<Name> }
-}[Exclude<ToolName, "done">]
+export type Call = CallOf<ActionName>
+
+function isActionName(name: string): name is ActionName {
+  return name !== "done" && Object.hasOwn(toolInputs, name)
+}
+
+/** Parses `input` against the named tool's schema. */
+function parseAs<Name extends ActionName>(name: Name, input: unknown): CallOf<Name> | undefined {
+  const parsed = toolInputs[name].safeParse(input)
+
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- toolInputs[name] parses ToolInput<Name>; TypeScript can't correlate a generic key with its schema's output
+  return parsed.success ? ({ name, input: parsed.data } as CallOf<Name>) : undefined
+}
 
 /** Parses a raw tool call; undefined for `done` or a call that does not fit its tool. */
 export function parseCall(name: string, input: unknown): Call | undefined {
-  if (name === "done" || !(name in toolInputs)) return undefined
-
-  const schema = toolInputs[name as Exclude<ToolName, "done">]
-  const parsed = schema.safeParse(input)
-
-  return parsed.success ? ({ name, input: parsed.data } as Call) : undefined
+  return isActionName(name) ? parseAs(name, input) : undefined
 }
 
 /** What the model is told happened besides the action itself. */
@@ -303,7 +316,15 @@ export async function perform(call: Call, context: PerformContext): Promise<Perf
   if (context.tabs.dialog !== undefined && call.name !== "dialog")
     throw new Error("a dialog is open; answer it with the dialog tool first")
 
-  const handle = handlers[call.name] as Handler<Call["name"]>
+  return dispatch(call, context)
+}
 
-  return handle(call.input as never, context)
+/** Hands a call to its tool's handler. */
+function dispatch<Name extends ActionName>(
+  call: CallOf<Name>,
+  context: PerformContext,
+): Promise<Performed> | Performed {
+  const handle: Handler<Name> = handlers[call.name]
+
+  return handle(call.input, context)
 }

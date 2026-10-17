@@ -151,24 +151,25 @@ describe("recording and replay", () => {
   }, 120_000)
 })
 
+/** Greets `name` through the agent and returns how many model calls it took. */
+async function greet(
+  model: LanguageModel,
+  name: string | ReturnType<typeof unique>,
+  shown: string,
+  mode: CacheMode = "read-write",
+) {
+  let modelCalls = -1
+
+  await withSession({ model, mode, journey: "greet" }, async (session) => {
+    await session.app.open("/greet")
+    modelCalls = (await session.agent.act('greet "{name}"', { params: { name } })).modelCalls
+    await session.expect(session.screen.getByTestId("greeting")).toHaveText(`Hello, ${shown}`)
+  })
+
+  return modelCalls
+}
+
 describe("params", () => {
-  async function greet(
-    model: LanguageModel,
-    name: string | ReturnType<typeof unique>,
-    shown: string,
-    mode: CacheMode = "read-write",
-  ) {
-    let modelCalls = -1
-
-    await withSession({ model, mode, journey: "greet" }, async (session) => {
-      await session.app.open("/greet")
-      modelCalls = (await session.agent.act('greet "{name}"', { params: { name } })).modelCalls
-      await session.expect(session.screen.getByTestId("greeting")).toHaveText(`Hello, ${shown}`)
-    })
-
-    return modelCalls
-  }
-
   it("replays a unique() value with this run's value and no model calls", async () => {
     expect(await greet(scriptedActor(GREET), unique("ada-1"), "ada-1")).toBeGreaterThan(0)
     expect(await greet(scriptedActor(GREET), unique("bob-2"), "bob-2", "read-only")).toBe(0)

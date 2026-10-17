@@ -200,7 +200,7 @@ export class ElementLocator extends Finder implements Locator {
     const shownValue = secret ? `secret ${JSON.stringify(secret.name)}` : JSON.stringify(value)
 
     return this.act("fill", shownValue, options, async (target, timeout) => {
-      const typed = secret ? await this.context.secrets.resolve(secret) : (value as string)
+      const typed = isSecret(value) ? await this.context.secrets.resolve(value) : value
 
       await target.fill(typed, { timeout })
     })

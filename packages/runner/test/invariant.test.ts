@@ -3,9 +3,13 @@ import { describe, expect, it } from "vitest"
 import { test } from "../src/tests/api.ts"
 import { declarationsOf } from "../src/tests/registry.ts"
 
+/** An invariant that holds. */
+function invariant(): undefined {
+  return undefined
+}
+
 describe("test(...).invariant()", () => {
   it("registers the invariant on its test", async () => {
-    const invariant = () => undefined
     const declared = await declarationsOf(async () => {
       test("with", () => undefined).invariant(invariant)
       test("without", () => undefined)

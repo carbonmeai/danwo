@@ -1,6 +1,7 @@
 import { createEmulator, stripe } from "@danwo/emulators"
 import { startProxy } from "@danwo/proxy"
 import { describe, expect, it } from "vitest"
+import { z } from "zod"
 
 import { launchBrowser } from "../src/browser/launch.ts"
 
@@ -23,16 +24,18 @@ describe("browser through the proxy", () => {
             body,
           }),
         )
-      const product = (await (await form("name=Credits")).json()) as { id: string }
-      const session = (await (
-        await emulator.fetch(
-          new Request("https://api.stripe.com/v1/checkout/sessions", {
-            method: "POST",
-            headers: { ...auth, "Content-Type": "application/x-www-form-urlencoded" },
-            body: `mode=payment&line_items[0][price_data][currency]=usd&line_items[0][price_data][product]=${product.id}&line_items[0][price_data][unit_amount]=1500&line_items[0][quantity]=1&success_url=https://checkout.stripe.com/done`,
-          }),
-        )
-      ).json()) as { id: string; url: string }
+      const product = z.object({ id: z.string() }).parse(await (await form("name=Credits")).json())
+      const session = z.object({ id: z.string(), url: z.string() }).parse(
+        await (
+          await emulator.fetch(
+            new Request("https://api.stripe.com/v1/checkout/sessions", {
+              method: "POST",
+              headers: { ...auth, "Content-Type": "application/x-www-form-urlencoded" },
+              body: `mode=payment&line_items[0][price_data][currency]=usd&line_items[0][price_data][product]=${product.id}&line_items[0][price_data][unit_amount]=1500&line_items[0][quantity]=1&success_url=https://checkout.stripe.com/done`,
+            }),
+          )
+        ).json(),
+      )
 
       const page = await browser.newPage()
       const response = await page.goto(session.url)
@@ -43,13 +46,15 @@ describe("browser through the proxy", () => {
       await page.getByTestId("checkout-pay").click()
       await page.waitForURL("https://checkout.stripe.com/done")
 
-      const paid = (await (
-        await emulator.fetch(
-          new Request(`https://api.stripe.com/v1/checkout/sessions/${session.id}`, {
-            headers: auth,
-          }),
-        )
-      ).json()) as { status: string; payment_status: string }
+      const paid = z.object({ status: z.string(), payment_status: z.string() }).parse(
+        await (
+          await emulator.fetch(
+            new Request(`https://api.stripe.com/v1/checkout/sessions/${session.id}`, {
+              headers: auth,
+            }),
+          )
+        ).json(),
+      )
 
       expect(paid).toMatchObject({ status: "complete", payment_status: "paid" })
 

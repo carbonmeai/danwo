@@ -5,6 +5,7 @@ import { promisify } from "node:util"
 import { s3Objects } from "@danwo/emulators"
 import type { Proxy } from "@danwo/proxy"
 import { describe, expect, it } from "vitest"
+import { z } from "zod"
 
 import { awsEnvironment, awsService } from "../src/runner/aws.ts"
 import { s3Service } from "../src/runner/s3.ts"
@@ -24,15 +25,18 @@ function dockerAvailable(): boolean {
   }
 }
 
-interface AppOutput {
-  object?: string
-  keys?: string[]
-  message?: string
-  s3Error?: string
-  sqsError?: string
-}
+const AppOutput = z.object({
+  object: z.string().optional(),
+  keys: z.array(z.string()).optional(),
+  message: z.string().optional(),
+  s3Error: z.string().optional(),
+  sqsError: z.string().optional(),
+})
 
-async function runApp(proxy: Proxy, env: NodeJS.ProcessEnv = {}): Promise<AppOutput> {
+async function runApp(
+  proxy: Proxy,
+  env: NodeJS.ProcessEnv = {},
+): Promise<z.infer<typeof AppOutput>> {
   const { stdout } = await run(process.execPath, [APP], {
     env: proxy.env({
       ...process.env,
@@ -45,7 +49,7 @@ async function runApp(proxy: Proxy, env: NodeJS.ProcessEnv = {}): Promise<AppOut
     timeout: 60_000,
   })
 
-  return JSON.parse(stdout) as AppOutput
+  return AppOutput.parse(JSON.parse(stdout))
 }
 
 describe.skipIf(!dockerAvailable())("MiniStack behind the proxy", () => {

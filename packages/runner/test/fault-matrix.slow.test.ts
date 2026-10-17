@@ -19,6 +19,7 @@ import {
 import { describeOutboundFault, type Proxy } from "@danwo/proxy"
 import { MockLanguageModelV4 } from "ai/test"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { z } from "zod"
 
 import { openWebSession, type WebSession } from "../src/session.ts"
 import { type ShopEnvironment, startShopEnvironment } from "./environment.ts"
@@ -111,7 +112,7 @@ interface BrowserRun extends RunEnvironment {
  * run records its agent steps with the scripted actor; faulted runs replay them strictly and
  * stop acting at the first divergence.
  */
-function environment(cacheDir: string, refusing: MockLanguageModelV4, bug?: string) {
+function environment(recordings: string, refusing: MockLanguageModelV4, bug?: string) {
   return async ({ fault }: { fault: unknown }): Promise<BrowserRun> => {
     const clean = fault === null
     const clock = new ManualClock(new Date())
@@ -126,7 +127,7 @@ function environment(cacheDir: string, refusing: MockLanguageModelV4, bug?: stri
         proxy: shop.proxy,
         model: clean ? scriptedActor() : refusing,
         cache: {
-          dir: cacheDir,
+          dir: recordings,
           mode: clean ? "read-write" : "read-only",
           journey: "buy credits",
           appIdentity: "shop",
@@ -176,7 +177,7 @@ async function settleWebhooks(run: BrowserRun): Promise<void> {
 async function shopCredits(run: BrowserRun): Promise<number> {
   const res = await fetch(`${run.shop.shopUrl}/credits?user=u1`)
 
-  return ((await res.json()) as { credits: number }).credits
+  return z.object({ credits: z.number() }).parse(await res.json()).credits
 }
 
 /** Checkout Sessions Stripe (the emulator) actually marked paid for the user. */
@@ -186,7 +187,9 @@ async function paidPayments(run: BrowserRun): Promise<number> {
       headers: { Authorization: "Bearer sk_test_oracle" },
     }),
   )
-  const list = (await res.json()) as { data: { client_reference_id: string | null }[] }
+  const list = z
+    .object({ data: z.array(z.object({ client_reference_id: z.string().nullable() })) })
+    .parse(await res.json())
 
   return list.data.filter((s) => s.client_reference_id === "u1").length
 }

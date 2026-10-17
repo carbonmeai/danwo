@@ -35,6 +35,11 @@ import { judge } from "./judge.ts"
 import { AgentStepFailed, type LiveResult, runLive } from "./live.ts"
 import type { ActOptions, ActResult, Agent, ExtractOptions } from "./types.ts"
 
+/** The current time, as step and log lines record it. */
+function now(): string {
+  return new Date().toISOString()
+}
+
 /** Where a strict replay stopped following its recording. */
 export interface ReplayDivergence {
   /** Zero-based index of the agent step (`act` or `extract`) that diverged. */
@@ -100,7 +105,6 @@ class SessionAgent implements Agent {
   extract<T>(instruction: string, schema: z.ZodType<T>, options: ExtractOptions = {}): Promise<T> {
     const index = this.actCount++
     const { steps, vault } = this.options
-    const at = () => new Date().toISOString()
 
     return steps.run("agent", "agent.extract", vault.redact(instruction), () => {
       if (this.divergence !== undefined) {
@@ -120,10 +124,10 @@ class SessionAgent implements Agent {
         redact: vault.redact,
         signal: this.options.signal,
         model: () => this.requireModel(this.options.model),
-        onModelCall: (cost) => steps.event({ kind: "model", at: at(), ...cost }),
-        onAction: (label) => steps.event({ kind: "action", at: at(), label }),
+        onModelCall: (cost) => steps.event({ kind: "model", at: now(), ...cost }),
+        onAction: (label) => steps.event({ kind: "action", at: now(), label }),
         onRelocated: (from, to) =>
-          steps.event({ kind: "relocated", at: at(), from: describe(from), to: describe(to) }),
+          steps.event({ kind: "relocated", at: now(), from: describe(from), to: describe(to) }),
         cache: (outcome) => steps.cache(outcome),
         diverge: (reason) => {
           this.divergence = { step: index, instruction, reason: vault.redact(reason) }
@@ -281,7 +285,6 @@ class SessionAgent implements Agent {
 
   private async runModel(instruction: string, params: Params, files: Files): Promise<LiveResult> {
     const { steps } = this.options
-    const at = () => new Date().toISOString()
     const result = await runLive(instruction, {
       model: this.requireModel(this.options.model),
       tabs: this.options.tabs,
@@ -292,8 +295,8 @@ class SessionAgent implements Agent {
       timeout: this.options.actionTimeout,
       context: this.options.context,
       signal: this.options.signal,
-      onModelCall: (cost) => steps.event({ kind: "model", at: at(), ...cost }),
-      onAction: (label) => steps.event({ kind: "action", at: at(), label }),
+      onModelCall: (cost) => steps.event({ kind: "model", at: now(), ...cost }),
+      onAction: (label) => steps.event({ kind: "action", at: now(), label }),
     })
 
     if (result.status === "failed")

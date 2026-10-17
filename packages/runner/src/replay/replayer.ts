@@ -135,9 +135,18 @@ async function operationOf(
   action: RecordedAction,
   context: ReplayContext,
 ): Promise<Aimed | undefined> {
-  const aim = aims[action.kind] as Aim<RecordedAction["kind"]> | undefined
+  return aimAt(action.kind, action, context)
+}
 
-  return aim?.(action as never, context)
+/** Runs the aim for `kind`, if element actions of that kind have one. */
+function aimAt<Kind extends RecordedAction["kind"]>(
+  kind: Kind,
+  action: ActionOf<Kind>,
+  context: ReplayContext,
+): Promise<Aimed | undefined> | Aimed | undefined {
+  const aim: Aim<Kind> | undefined = aims[kind]
+
+  return aim?.(action, context)
 }
 
 /** What one replayed action did: its label, any dialog it opened, and moved targets. */
@@ -294,11 +303,20 @@ const pageActions: { readonly [Kind in RecordedAction["kind"]]?: OnPage<Kind> } 
 }
 
 function onPage(action: RecordedAction, context: ReplayContext): Promise<Replayed> {
-  const run = pageActions[action.kind] as OnPage<RecordedAction["kind"]> | undefined
+  return onPageAs(action.kind, action, context)
+}
 
-  if (run === undefined) throw new Error(`cannot replay ${action.kind} on the page`)
+/** Runs the page action for `kind`; a kind with none cannot be replayed on the page. */
+function onPageAs<Kind extends RecordedAction["kind"]>(
+  kind: Kind,
+  action: ActionOf<Kind>,
+  context: ReplayContext,
+): Promise<Replayed> {
+  const run: OnPage<Kind> | undefined = pageActions[kind]
 
-  return run(action as never, context)
+  if (run === undefined) throw new Error(`cannot replay ${kind} on the page`)
+
+  return run(action, context)
 }
 
 async function replayAction(action: RecordedAction, context: ReplayContext): Promise<Replayed> {

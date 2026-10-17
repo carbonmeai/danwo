@@ -21,6 +21,18 @@ export interface SuiteFixtures {
 
 export type TestBody<F> = (fixtures: F) => unknown
 
+/**
+ * A test body, hook or invariant as the runner keeps it. Each was type-checked against its
+ * fixtures where it was declared; the runner calls it with that same fixtures object. Declared as
+ * a method so any `TestBody<F>` fits.
+ */
+export type StoredBody = { run(fixtures: object): unknown }["run"]
+
+/** Whether `value` can be kept as a test body. */
+export function isStoredBody(value: unknown): value is StoredBody {
+  return typeof value === "function"
+}
+
 export interface TestOptions {
   /** Extra attempts after a failure; overrides the config's `retries`. */
   readonly retries?: number

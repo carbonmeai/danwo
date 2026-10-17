@@ -2,7 +2,7 @@
  * What loading a test file declared: its tests, describe blocks and hooks, as plain records the
  * worker runs and the parent turns into a test list.
  */
-import type { TestBody, TestOptions } from "./types.ts"
+import type { StoredBody, TestOptions } from "./types.ts"
 
 export type Mode = "normal" | "skip" | "only"
 
@@ -23,9 +23,9 @@ export interface DeclaredTest {
   readonly block: Block | undefined
   readonly mode: Mode
   readonly options: TestOptions
-  readonly body: TestBody<never>
+  readonly body: StoredBody
   readonly fixtures: Readonly<Record<string, FixtureDefinition>>
-  invariant: TestBody<never> | undefined
+  invariant: StoredBody | undefined
 }
 
 export type HookKind = "beforeEach" | "afterEach" | "beforeAll" | "afterAll"
@@ -33,7 +33,7 @@ export type HookKind = "beforeEach" | "afterEach" | "beforeAll" | "afterAll"
 export interface DeclaredHook {
   readonly kind: HookKind
   readonly block: Block | undefined
-  readonly fn: TestBody<never>
+  readonly fn: StoredBody
 }
 
 export interface FileDeclarations {

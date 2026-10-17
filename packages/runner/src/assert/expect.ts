@@ -59,11 +59,12 @@ function pageAssertions(screen: PageScreen): PageAssertions {
 
 /** Jest-style matchers on a plain value. */
 function expectValue<T>(actual: T): Assertion<void, T> {
-  // @vitest/expect's plugins add the Jest matchers to chai's assertion at runtime.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- @vitest/expect's plugins add the Jest matchers to chai's assertion at runtime, which chai's types don't know
   return chai.expect(actual) as unknown as Assertion<void, T>
 }
 
 /** The `expect` of danwo tests. */
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- one runtime function serves every overload of Expect, which picks the assertions by the argument's type
 export const expect = ((actual: unknown) => {
   if (actual instanceof ElementLocator) return locatorAssertions(actual)
   if (actual instanceof PageScreen) return pageAssertions(actual)

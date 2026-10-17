@@ -10,27 +10,27 @@ import {
   type Mode,
 } from "./registry.ts"
 import { SkipSignal } from "./skip.ts"
-import type {
-  DescribeCall,
-  TestAPI,
-  TestBody,
-  TestCase,
-  TestFixtures,
-  TestOptions,
+import {
+  type DescribeCall,
+  isStoredBody,
+  type StoredBody,
+  type TestAPI,
+  type TestCase,
+  type TestOptions,
 } from "./types.ts"
 
 type Definitions = Readonly<Record<string, FixtureDefinition>>
 
 /** `test(title, body)` or `test(title, options, body)`, whichever was written. */
-function declaration(args: readonly unknown[]): { options: TestOptions; body: TestBody<never> } {
+function declaration(args: readonly unknown[]): { options: TestOptions; body: StoredBody } {
   const [, second, third] = args
 
-  if (typeof second === "function") {
-    return { options: {}, body: second as TestBody<never> }
+  if (isStoredBody(second)) {
+    return { options: {}, body: second }
   }
 
-  if (typeof third === "function" && typeof second === "object" && second !== null) {
-    return { options: second, body: third as TestBody<never> }
+  if (isStoredBody(third) && typeof second === "object" && second !== null) {
+    return { options: second, body: third }
   }
 
   throw new TypeError("test() takes a title, optional options, and a body function")
@@ -137,7 +137,7 @@ function describer(own: Mode) {
 }
 
 function hook(kind: HookKind) {
-  return (fn: TestBody<never>): void => {
+  return (fn: StoredBody): void => {
     const file = currentFile(`${kind}()`)
 
     file.declarations.hooks.push({ kind, block: file.block, fn })
@@ -161,8 +161,8 @@ function testApi<F>(fixtures: Definitions): TestAPI<F> {
     extend: (definitions?: object) => testApi({ ...fixtures, ...definitions }),
   })
 
-  // The runtime functions accept every overload; the public types narrow them per fixture set.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the runtime functions take every overload's arguments; TestAPI<F> narrows them per fixture set
   return api as unknown as TestAPI<F>
 }
 
-export const test: TestAPI<TestFixtures> = testApi({})
+export const test: TestAPI = testApi({})

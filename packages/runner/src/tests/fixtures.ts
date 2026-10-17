@@ -2,10 +2,17 @@ import { type Wanted, wantedBy } from "./parameters.ts"
 // One test's `test.extend` fixtures: set up on first need, torn down last-set-up-first.
 import type { FixtureDefinition } from "./registry.ts"
 
-type SetupFunction = (
-  fixtures: Record<string, unknown>,
-  use: (value: unknown) => Promise<void>,
-) => Promise<void>
+/**
+ * A fixture's setup function. Its own fixture types were checked where `test.extend` declared it;
+ * here it is called with the test's fixture values. Declared as a method so any setup fits.
+ */
+type SetupFunction = {
+  setup(fixtures: Record<string, unknown>, use: (value: unknown) => Promise<void>): Promise<void>
+}["setup"]
+
+function isSetupFunction(definition: FixtureDefinition): definition is SetupFunction {
+  return typeof definition === "function"
+}
 
 interface Running {
   /** Lets the setup function continue past `use(value)` into its teardown. */
@@ -64,20 +71,20 @@ export function fixtureScope(
   const setUp = async (name: string, chain: readonly string[]): Promise<void> => {
     const definition = definitions[name]
 
-    if (typeof definition !== "function") {
+    if (!isSetupFunction(definition)) {
       values[name] = definition
 
       return
     }
 
-    const wanted = wantedBy(definition as SetupFunction)
+    const wanted = wantedBy(definition)
 
     // A setup taking the whole object gets every fixture it doesn't itself sit under.
     await prepareAll(
       wanted === "all" ? namesIn(wanted).filter((other) => !chain.includes(other)) : wanted,
       chain,
     )
-    values[name] = await runSetup(name, definition as SetupFunction, values, running)
+    values[name] = await runSetup(name, definition, values, running)
   }
 
   const prepareAll = async (names: readonly string[], chain: readonly string[]) => {
@@ -104,13 +111,8 @@ function runSetup(
   running: Running[],
 ): Promise<unknown> {
   return new Promise((resolve, reject) => {
-    let release = () => {}
-
+    const { promise: released, resolve: release } = Promise.withResolvers<void>()
     let used = false
-
-    const released = new Promise<void>((done) => {
-      release = done
-    })
 
     const use = async (value: unknown) => {
       used = true

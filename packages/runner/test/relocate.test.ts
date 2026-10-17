@@ -73,6 +73,17 @@ async function recordSave() {
   await withSession({ model: scripted([SAVE]), path: "/billing" }, save)
 }
 
+/** Points the extraction at the account's owner and balance. */
+const pointAtAccountFields: Move = (view) => [
+  "read",
+  {
+    fields: [
+      { path: "owner", ref: ref(view, "definition", "Ada Lovelace"), as: "text" },
+      { path: "balance", ref: ref(view, "definition", "$1,234.50"), as: "number" },
+    ],
+  },
+]
+
 describe("relocation", () => {
   it("finds a renamed button in the same form, notes the move and updates the recording", async () => {
     await recordSave()
@@ -140,17 +151,8 @@ describe("relocation", () => {
 
   it("relocates the fields of an extraction", async () => {
     const schema = z.object({ owner: z.string(), balance: z.number() })
-    const point: Move = (view) => [
-      "read",
-      {
-        fields: [
-          { path: "owner", ref: ref(view, "definition", "Ada Lovelace"), as: "text" },
-          { path: "balance", ref: ref(view, "definition", "$1,234.50"), as: "number" },
-        ],
-      },
-    ]
 
-    await withSession({ model: scripted([point]), path: "/account" }, (session) =>
+    await withSession({ model: scripted([pointAtAccountFields]), path: "/account" }, (session) =>
       session.agent.extract("owner and balance", schema),
     )
 

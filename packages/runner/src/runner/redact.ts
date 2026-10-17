@@ -83,7 +83,7 @@ export function createRedactor(secrets: (text: string) => string): Redactor {
       ),
     body: (input, contentType) => text(redactFields(input, contentType ?? "", body)),
     value: (input) => redactDeep(input, state),
-    // The copy has the input's shape: only string values and sensitive keys' values change.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the copy has the input's shape: only string values and sensitive keys' values change
     deep: <T>(input: T) => redactDeep(input, body) as T,
   }
 }

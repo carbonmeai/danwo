@@ -79,7 +79,8 @@ export function linkWorker(child: ChildProcess, onNote: (note: WorkerNote) => vo
       const call = ++lastCall
 
       return new Promise((resolve, reject) => {
-        waiting.set(call, { resolve: (value) => resolve(value as never), reject })
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the worker answers a call with what its method of that name returned
+        waiting.set(call, { resolve: (value) => resolve(value as Answer<typeof method>), reject })
         child.send({ tag: TAG, call, method, args } satisfies Message)
       })
     },
@@ -110,6 +111,7 @@ async function answer(
   methods: WorkerCalls,
   message: Extract<Message, { method: Method }>,
 ): Promise<void> {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the arguments come over IPC as sent by WorkerLink.call for this method
   const run = methods[message.method] as (...args: unknown[]) => Promise<unknown>
 
   try {
