@@ -1,0 +1,26 @@
+{
+  "name": "@danwo/proxy",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Routing proxy: provider routing, fault injection, HAR capture.",
+  "files": [
+    "src",
+    "preload.mjs"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "mockttp": "4.6.4"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-s3": "3.1152.0",
+    "@aws-sdk/s3-request-presigner": "3.1152.0",
+    "@azure/msal-node": "7.1.0",
+    "@danwo/emulators": "workspace:*",
+    "google-auth-library": "11.3.1",
+    "resend": "6.34.1",
+    "stripe": "23.0.0"
+  }
+}

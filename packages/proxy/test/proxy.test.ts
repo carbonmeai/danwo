@@ -1,0 +1,505 @@
+import { execFile } from "node:child_process"
+import { once } from "node:events"
+import { createServer, type Server } from "node:http"
+import type { AddressInfo } from "node:net"
+import { fileURLToPath } from "node:url"
+import { promisify } from "node:util"
+
+import {
+  createEmulator,
+  GOOGLE_HOSTS,
+  google,
+  MICROSOFT_HOSTS,
+  microsoft,
+  resend,
+  resendInbox,
+  s3,
+  s3Hosts,
+  s3Objects,
+  seedGoogle,
+  seedMicrosoft,
+  seedS3,
+  stripe,
+} from "@danwo/emulators"
+import { afterAll, beforeAll, describe, expect, it } from "vitest"
+
+import { MAX_CAPTURED_BODY_BYTES } from "../src/capture.ts"
+import { startProxy } from "../src/proxy.ts"
+
+const run = promisify(execFile)
+const APP = fileURLToPath(new URL("./fixtures/app.mjs", import.meta.url))
+const RESEND_APP = fileURLToPath(new URL("./fixtures/resend-app.mjs", import.meta.url))
+const S3_APP = fileURLToPath(new URL("./fixtures/s3-app.mjs", import.meta.url))
+const OAUTH_APP = fileURLToPath(new URL("./fixtures/oauth-app.mjs", import.meta.url))
+const FETCH_APP = fileURLToPath(new URL("./fixtures/fetch-app.mjs", import.meta.url))
+
+let other: Server
+let otherUrl: string
+
+beforeAll(async () => {
+  other = createServer((_req, res) => {
+    res.statusCode = 204
+    res.end()
+  })
+  other.listen(0, "127.0.0.1")
+  await once(other, "listening")
+  otherUrl = `http://127.0.0.1:${(other.address() as AddressInfo).port}/ping`
+})
+
+afterAll(() => {
+  other.close()
+})
+
+interface AppOutput {
+  customer?: string
+  checkoutUrl?: string
+  checkoutPage?: number
+  stripeError?: string
+  other?: number
+  otherError?: string
+}
+
+async function runApp(env: NodeJS.ProcessEnv): Promise<AppOutput> {
+  const { stdout } = await run(process.execPath, [APP], {
+    env: { ...env, OTHER_SERVICE_URL: otherUrl },
+    cwd: fileURLToPath(new URL("..", import.meta.url)),
+    timeout: 30_000,
+  })
+
+  return JSON.parse(stdout) as AppOutput
+}
+
+describe("routing an unmodified app", () => {
+  it("sends the official Stripe client to the emulator and passes other hosts through", async () => {
+    const emulator = createEmulator(stripe, { baseUrl: "https://checkout.stripe.com" })
+    const proxy = await startProxy({
+      routes: [{ hosts: ["api.stripe.com", "checkout.stripe.com"], handler: emulator.fetch }],
+    })
+
+    try {
+      const out = await runApp(proxy.env())
+
+      expect(out.stripeError).toBeUndefined()
+      expect(out.customer).toMatch(/^cus_/)
+      expect(emulator.store.collection("stripe.customers").count()).toBe(2) // seeded + the app's
+      expect(out.checkoutUrl).toMatch(/^https:\/\/checkout\.stripe\.com\/checkout\/cs_/)
+      expect(out.checkoutPage).toBe(200)
+      expect(out.other).toBe(204)
+
+      await proxy.settled()
+
+      const exchanges = proxy.exchanges()
+
+      expect(
+        exchanges
+          .filter((e) => e.disposition === "routed")
+          .map((e) => `${e.method} ${e.host}${e.path}`),
+      ).toEqual([
+        "POST api.stripe.com/v1/customers",
+        "POST api.stripe.com/v1/products",
+        "POST api.stripe.com/v1/checkout/sessions",
+        expect.stringMatching(/^GET checkout\.stripe\.com\/checkout\/cs_/),
+      ])
+      expect(exchanges.find((e) => e.disposition === "passthrough")).toMatchObject({
+        host: "127.0.0.1",
+        path: "/ping",
+        status: 204,
+      })
+      expect(exchanges.every((e) => e.status !== null)).toBe(true)
+    } finally {
+      await proxy.stop()
+      await emulator.close()
+    }
+  })
+
+  it("blocks unrouted hosts when asked", async () => {
+    const emulator = createEmulator(stripe)
+    const proxy = await startProxy({
+      routes: [{ hosts: ["api.stripe.com", "checkout.stripe.com"], handler: emulator.fetch }],
+      unmatched: "block",
+    })
+
+    try {
+      const out = await runApp(proxy.env())
+
+      expect(out.customer).toMatch(/^cus_/)
+      expect(out.other).toBe(502)
+      await proxy.settled()
+      expect(proxy.exchanges().find((e) => e.path === "/ping")).toMatchObject({
+        disposition: "blocked",
+        status: 502,
+      })
+    } finally {
+      await proxy.stop()
+      await emulator.close()
+    }
+  })
+})
+
+describe("routing an unmodified Resend client", () => {
+  it("sends mail from api.resend.com to the emulator's inbox", async () => {
+    const emulator = createEmulator(resend)
+    const proxy = await startProxy({
+      routes: [{ hosts: ["api.resend.com"], handler: emulator.fetch }],
+      unmatched: "block",
+    })
+
+    try {
+      const { stdout } = await run(process.execPath, [RESEND_APP], {
+        env: proxy.env(),
+        cwd: fileURLToPath(new URL("..", import.meta.url)),
+        timeout: 30_000,
+      })
+      const out = JSON.parse(stdout) as { id?: string; error?: string }
+
+      expect(out.error).toBeUndefined()
+
+      const email = resendInbox(emulator).latest("new-user@example.com")
+
+      expect(email).toMatchObject({ id: out.id, subject: "Your sign-in code" })
+      expect(email?.code()).toBe("734120")
+
+      await proxy.settled()
+      expect(
+        proxy.exchanges().map((e) => `${e.disposition} ${e.method} ${e.host}${e.path} ${e.status}`),
+      ).toEqual(["routed POST api.resend.com/emails 200"])
+    } finally {
+      await proxy.stop()
+      await emulator.close()
+    }
+  })
+})
+
+describe("routing an unmodified S3 client", () => {
+  it("sends a Tigris-configured client and its presigned URLs to the emulator", async () => {
+    const emulator = createEmulator(s3)
+
+    seedS3(emulator.store, { buckets: [{ name: "carbonme-qa" }] })
+    const proxy = await startProxy({
+      routes: [{ hosts: s3Hosts(["carbonme-qa"]), handler: emulator.fetch }],
+      unmatched: "block",
+    })
+
+    try {
+      const { stdout } = await run(process.execPath, [S3_APP], {
+        env: proxy.env({
+          ...process.env,
+          TIGRIS_STORAGE_BUCKET: "carbonme-qa",
+          TIGRIS_STORAGE_ACCESS_KEY_ID: "tid_from_app",
+          TIGRIS_STORAGE_SECRET_ACCESS_KEY: "tsec_from_app",
+        }),
+        cwd: fileURLToPath(new URL("..", import.meta.url)),
+        timeout: 30_000,
+      })
+
+      expect(JSON.parse(stdout)).toEqual({
+        streamed: "streamed body",
+        body: "hello tigris",
+        keys: ["docs/hello.txt", "docs/streamed.txt"],
+        presignedHost: "carbonme-qa.t3.storage.dev",
+        presignedBody: "hello tigris",
+      })
+      expect(s3Objects(emulator).get("carbonme-qa", "docs/hello.txt")?.contentType).toBe(
+        "text/plain",
+      )
+
+      await proxy.settled()
+      expect(
+        proxy
+          .exchanges()
+          .map((e) => `${e.disposition} ${e.method} ${e.host}${e.path.split("?")[0]} ${e.status}`),
+      ).toEqual([
+        "routed PUT carbonme-qa.t3.storage.dev/docs/hello.txt 200",
+        "routed PUT carbonme-qa.t3.storage.dev/docs/streamed.txt 200",
+        "routed GET carbonme-qa.t3.storage.dev/docs/streamed.txt 200",
+        "routed GET carbonme-qa.t3.storage.dev/docs/hello.txt 200",
+        "routed GET carbonme-qa.t3.storage.dev/ 200",
+        "routed GET carbonme-qa.t3.storage.dev/docs/hello.txt 200",
+      ])
+    } finally {
+      await proxy.stop()
+      await emulator.close()
+    }
+  })
+})
+
+interface Fetched {
+  status?: number
+  body?: string
+  error?: string
+}
+
+async function fetchThrough(
+  env: NodeJS.ProcessEnv,
+  requests: ReadonlyArray<{ url: string; method?: string; body?: string }>,
+): Promise<Fetched[]> {
+  const { stdout } = await run(process.execPath, [FETCH_APP, JSON.stringify(requests)], {
+    env,
+    timeout: 30_000,
+  })
+
+  return JSON.parse(stdout) as Fetched[]
+}
+
+interface Received {
+  method: string
+  url: string
+  host: string
+  body: string
+}
+
+/** A plain HTTP server standing in for an outside endpoint such as MiniStack. */
+async function startUpstream(): Promise<{ url: string; received: Received[]; close(): void }> {
+  const received: Received[] = []
+  const server = createServer((req, res) => {
+    let body = ""
+
+    req.on("data", (chunk: Buffer) => (body += chunk.toString()))
+    req.on("end", () => {
+      received.push({
+        method: req.method ?? "",
+        url: req.url ?? "",
+        host: req.headers.host ?? "",
+        body,
+      })
+      res.writeHead(201, { "content-type": "text/plain", "x-upstream": "yes" })
+      res.end(`ok ${req.url ?? ""}`)
+    })
+  })
+
+  server.listen(0, "127.0.0.1")
+  await once(server, "listening")
+
+  return {
+    url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+    received,
+    close: () => server.close(),
+  }
+}
+
+describe("routing unmodified Google and Microsoft sign-in", () => {
+  it("signs in with google-auth-library and MSAL on their default hosts", async () => {
+    const googleEmulator = createEmulator(google)
+    const microsoftEmulator = createEmulator(microsoft)
+
+    seedGoogle(googleEmulator.store, {
+      users: [{ email: "ada@danwo.test", name: "Ada Lovelace" }],
+      oauth_clients: [
+        {
+          client_id: "123-app.apps.googleusercontent.com",
+          client_secret: "GOCSPX-app-secret",
+          name: "Acme",
+          redirect_uris: ["https://app.danwo.test/auth/google/callback"],
+        },
+      ],
+    })
+    seedMicrosoft(microsoftEmulator.store, {
+      users: [
+        {
+          email: "grace@contoso.test",
+          name: "Grace Hopper",
+          tenant_id: "72f988bf-86f1-41af-91ab-2d7cd011db47",
+        },
+      ],
+      oauth_clients: [
+        {
+          client_id: "6731de76-14a6-49ae-97bc-6eba6914391e",
+          client_secret: "Qx~8Q~app-secret",
+          name: "Acme",
+          redirect_uris: ["https://app.danwo.test/auth/microsoft/callback"],
+        },
+      ],
+    })
+    const proxy = await startProxy({
+      routes: [
+        { hosts: [...GOOGLE_HOSTS], handler: googleEmulator.fetch },
+        { hosts: [...MICROSOFT_HOSTS], handler: microsoftEmulator.fetch },
+      ],
+      unmatched: "block",
+    })
+
+    try {
+      const { stdout } = await run(process.execPath, [OAUTH_APP], {
+        env: proxy.env(),
+        cwd: fileURLToPath(new URL("..", import.meta.url)),
+        timeout: 30_000,
+      })
+
+      expect(JSON.parse(stdout)).toEqual({
+        google: { email: "ada@danwo.test", userinfo: "ada@danwo.test" },
+        microsoft: { username: "grace@contoso.test", me: "Grace Hopper" },
+      })
+
+      await proxy.settled()
+      const calls = proxy
+        .exchanges()
+        .map((e) => `${e.disposition} ${e.method} ${e.host}${e.path.split("?")[0]} ${e.status}`)
+
+      expect(calls).toEqual(
+        expect.arrayContaining([
+          "routed POST oauth2.googleapis.com/token 200",
+          "routed GET www.googleapis.com/oauth2/v1/certs 200",
+          "routed GET openidconnect.googleapis.com/v1/userinfo 200",
+          "routed POST oauth2.googleapis.com/revoke 200",
+          "routed POST login.microsoftonline.com/common/oauth2/v2.0/token 200",
+          "routed GET graph.microsoft.com/v1.0/me 200",
+        ]),
+      )
+      expect(calls.every((call) => call.startsWith("routed "))).toBe(true)
+    } finally {
+      await proxy.stop()
+      await googleEmulator.close()
+      await microsoftEmulator.close()
+    }
+  })
+})
+
+describe("forwarding to an upstream", () => {
+  it("keeps method, path, query, Host and body, for exact and wildcard hosts", async () => {
+    const upstream = await startUpstream()
+    const proxy = await startProxy({
+      routes: [{ hosts: ["svc.danwo.test", "*.svc.danwo.test"], upstream: upstream.url }],
+      unmatched: "block",
+    })
+
+    try {
+      const out = await fetchThrough(proxy.env(), [
+        { url: "https://svc.danwo.test/queue?Action=Send", method: "POST", body: "hello" },
+        { url: "https://bucket.eu.svc.danwo.test/key.txt" },
+        { url: "https://svc.danwo.test.other/" },
+      ])
+
+      expect(out.slice(0, 2)).toEqual([
+        { status: 201, body: "ok /queue?Action=Send" },
+        { status: 201, body: "ok /key.txt" },
+      ])
+      expect(out[2]?.status).toBe(502) // a lookalike host is not covered by the wildcard
+      expect(upstream.received).toEqual([
+        { method: "POST", url: "/queue?Action=Send", host: "svc.danwo.test", body: "hello" },
+        { method: "GET", url: "/key.txt", host: "bucket.eu.svc.danwo.test", body: "" },
+      ])
+      await proxy.settled()
+      expect(proxy.exchanges().map((e) => e.disposition)).toEqual(["routed", "routed", "blocked"])
+    } finally {
+      await proxy.stop()
+      upstream.close()
+    }
+  })
+
+  it("sends each call to the most specific route, every time", async () => {
+    const broad = await startUpstream()
+    const narrow = await startUpstream()
+    const proxy = await startProxy({
+      routes: [
+        { hosts: ["*.danwo.test"], upstream: broad.url },
+        { hosts: ["*.svc.danwo.test"], upstream: narrow.url },
+      ],
+    })
+
+    try {
+      await fetchThrough(proxy.env(), [
+        { url: "https://a.svc.danwo.test/1" },
+        { url: "https://a.svc.danwo.test/2" },
+        { url: "https://other.danwo.test/3" },
+      ])
+
+      expect(narrow.received.map((r) => r.url)).toEqual(["/1", "/2"])
+      expect(broad.received.map((r) => r.url)).toEqual(["/3"])
+    } finally {
+      await proxy.stop()
+      broad.close()
+      narrow.close()
+    }
+  })
+
+  it("captures each call's headers and text body, capped, for the flight recorder", async () => {
+    const proxy = await startProxy({
+      routes: [
+        {
+          hosts: ["api.danwo.test"],
+          handler: async (request) =>
+            Response.json({ received: (await request.text()).length }, { status: 201 }),
+        },
+      ],
+      unmatched: "block",
+    })
+
+    try {
+      await fetchThrough(proxy.env(), [
+        { url: "https://api.danwo.test/small", method: "POST", body: "hello" },
+        { url: "https://api.danwo.test/large", method: "POST", body: "x".repeat(20_000) },
+      ])
+      await proxy.settled()
+
+      const [small, large] = proxy.exchanges()
+
+      expect(small?.request).toMatchObject({ body: "hello", bytes: 5, truncated: false })
+      expect(small?.request?.headers["content-type"]).toMatch(/^text\/plain/)
+      expect(small?.response).toMatchObject({ body: '{"received":5}', truncated: false })
+      expect(large?.request).toMatchObject({ bytes: 20_000, truncated: true })
+      expect(large?.request?.body).toHaveLength(MAX_CAPTURED_BODY_BYTES)
+    } finally {
+      await proxy.stop()
+    }
+  })
+
+  it("applies faults to forwarded calls", async () => {
+    const upstream = await startUpstream()
+    const proxy = await startProxy({
+      routes: [{ hosts: ["*.svc.danwo.test"], upstream: upstream.url }],
+    })
+
+    proxy.setFault((call) => {
+      if (call.index === 0) return { kind: "status", status: 503, body: "slow down" }
+      if (call.index === 1) return { kind: "reset" }
+      if (call.index === 2) return { kind: "reset-after" }
+
+      return undefined
+    })
+
+    try {
+      const out = await fetchThrough(
+        proxy.env(),
+        ["a", "b", "c", "d"].map((name) => ({
+          url: `https://q.svc.danwo.test/${name}`,
+          method: "POST",
+          body: name,
+        })),
+      )
+
+      expect(out[0]).toEqual({ status: 503, body: "slow down" })
+      expect(out[1]?.error).toBeDefined()
+      expect(out[2]?.error).toBeDefined()
+      expect(out[3]).toEqual({ status: 201, body: "ok /d" })
+      // The status and reset faults never reached the upstream; reset-after did, then dropped.
+      expect(upstream.received.map((r) => r.body)).toEqual(["c", "d"])
+      await proxy.settled()
+      expect(proxy.exchanges().map((e) => e.fault)).toEqual([
+        "status 503",
+        "reset",
+        "reset-after",
+        null,
+      ])
+    } finally {
+      await proxy.stop()
+      upstream.close()
+    }
+  })
+})
+
+describe("env", () => {
+  it("keeps the app's own NODE_OPTIONS", async () => {
+    const proxy = await startProxy({ routes: [] })
+
+    try {
+      const env = proxy.env({ NODE_OPTIONS: "--max-old-space-size=512" })
+
+      expect(env.NODE_OPTIONS).toMatch(
+        /^--max-old-space-size=512 --import=file:\/\/.*preload\.mjs$/,
+      )
+      expect(env).toMatchObject({ HTTPS_PROXY: proxy.url, NODE_USE_ENV_PROXY: "1" })
+    } finally {
+      await proxy.stop()
+    }
+  })
+})
