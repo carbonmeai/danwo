@@ -30,6 +30,8 @@ afterAll(async () => {
     fixture("uploads"),
     fixture("signin"),
     fixture("integration"),
+    fixture("slack-bot"),
+    fixture("github-bot"),
     fixture("sessions"),
     fixture("visual"),
     SHOP,
@@ -396,6 +398,64 @@ describe("danwo matrix", () => {
 
     expect(html).toContain("POST gmail.googleapis.com/gmail/v1/users/me/messages/send")
     expect(html).not.toMatch(/GOCSPX-integration-fixture|ya29\.[A-Za-z0-9]/)
+  }, 300_000)
+
+  it("faults a Slack bot's mention event and a deduplicating bot replies at most once", async () => {
+    const { code, out } = await danwo(fixture("slack-bot"), ["matrix", "tests/mention.danwo.ts"])
+
+    expect(out).toContain("PASS  clean run")
+    expect(out).toContain("PASS  status 429 on POST slack.com/api/chat.postMessage")
+    expect(out).toContain("PASS  duplicate on slack webhook events:A0MENTIONBOT")
+    expect(out).toContain("PASS  forged on slack webhook events:A0MENTIONBOT")
+    expect(out).toContain("faults: 11 passed")
+    expect(code).toBe(0)
+  }, 300_000)
+
+  it("catches a Slack bot that answers a mention twice when its event comes twice", async () => {
+    const { code, out } = await danwo(fixture("slack-bot"), ["matrix", "tests/mention.danwo.ts"], {
+      SLACK_BUG: "no-dedupe",
+    })
+
+    // A forged copy fails the bot's signature check, so only the duplicate gets through twice.
+    expect(out).toContain("FAIL  duplicate on slack webhook events:A0MENTIONBOT")
+    expect(out).toContain("PASS  forged on slack webhook events:A0MENTIONBOT")
+    expect(out).toContain("invariant: expected 2 to be less than or equal to 1")
+    expect(out).toContain("faults: 10 passed, 1 failed")
+    expect(code).toBe(1)
+
+    const report = /report: (\S+report\.html)/.exec(out)?.[1] ?? ""
+    const html = await readFile(join(fixture("slack-bot"), report), "utf8")
+
+    expect(html).toContain("POST slack.com/api/chat.postMessage")
+    expect(html).not.toMatch(/REDACTED-TEST-VALUE|mention-bot-signing-secret/)
+  }, 300_000)
+
+  it("faults a GitHub bot's issues webhook and a deduplicating bot comments at most once", async () => {
+    const { code, out } = await danwo(fixture("github-bot"), ["matrix", "tests/thanks.danwo.ts"])
+
+    expect(out).toContain("PASS  clean run")
+    expect(out).toContain(
+      "PASS  status 403 on POST api.github.com/repos/ada/widgets/issues/:id/comments",
+    )
+    expect(out).toContain("PASS  duplicate on github webhook issues@ada/widgets")
+    expect(out).toContain("faults: 12 passed")
+    expect(code).toBe(0)
+  }, 300_000)
+
+  it("catches a GitHub bot that comments twice when a webhook comes twice", async () => {
+    const { code, out } = await danwo(fixture("github-bot"), ["matrix", "tests/thanks.danwo.ts"], {
+      GITHUB_BUG: "no-dedupe",
+    })
+
+    expect(out).toContain("FAIL  duplicate on github webhook issues@ada/widgets")
+    expect(out).toContain("PASS  forged on github webhook issues@ada/widgets")
+    expect(out).toContain("faults: 11 passed, 1 failed")
+    expect(code).toBe(1)
+
+    const report = /report: (\S+report\.html)/.exec(out)?.[1] ?? ""
+    const html = await readFile(join(fixture("github-bot"), report), "utf8")
+
+    expect(html).not.toMatch(/ghp_thanksBot|ghp_adaLovelace|thanks-bot-webhook-secret/)
   }, 300_000)
 
   it("reports a run whose fault never fired as invalid", async () => {
