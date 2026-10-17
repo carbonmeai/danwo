@@ -13,6 +13,7 @@ import {
   type WebSession,
   type WebSessionOptions,
 } from "../session.ts"
+import { DanwoError } from "../support/codes.ts"
 import { DeadlineExceeded, withDeadline } from "../support/deadline.ts"
 import { type TestError, testFileLine, toTestError } from "../support/errors.ts"
 import { fixtureScope, wantedByAll } from "../tests/fixtures.ts"
@@ -292,6 +293,8 @@ function agentOptions(config: DanwoConfig): Partial<WebSessionOptions> {
     ...(config.model !== undefined && { model: config.model }),
     ...(config.judge !== undefined && { judge: config.judge }),
     ...(config.secrets !== undefined && { secrets: config.secrets }),
+    ...(config.budget !== undefined && { budget: config.budget }),
+    ...(config.judgeScreenshot !== undefined && { judgeScreenshot: config.judgeScreenshot }),
   }
 }
 
@@ -300,6 +303,7 @@ function pageOptions(config: DanwoConfig): Partial<WebSessionOptions> {
   return {
     ...(config.files !== undefined && { files: config.files }),
     ...(config.relocate !== undefined && { relocate: config.relocate }),
+    ...(config.relocation !== undefined && { relocation: config.relocation }),
   }
 }
 
@@ -330,7 +334,10 @@ function openSession(
   const baseUrl = env?.baseUrl ?? config.baseUrl
 
   if (baseUrl === undefined) {
-    throw new Error("no baseUrl: set it in danwo.config or return it from environment()")
+    throw new DanwoError(
+      "CONFIG_INVALID",
+      "no baseUrl: set it in danwo.config or return it from environment()",
+    )
   }
 
   return openWebSession({

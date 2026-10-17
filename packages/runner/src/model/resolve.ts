@@ -9,6 +9,8 @@ export function resolveModel(model: LanguageModel): Exclude<LanguageModel, strin
 export interface CallCost {
   readonly inputTokens: number
   readonly outputTokens: number
+  /** Of the input, tokens the provider read from its prompt cache, when it says. */
+  readonly cachedInputTokens?: number
   /** What the gateway billed, in US dollars, when it says. */
   readonly costUsd?: number
 }
@@ -26,10 +28,12 @@ export function callCost(
   metadata: ProviderMetadata | undefined,
 ): CallCost {
   const costUsd = gatewayCost(metadata)
+  const cached = usage.inputTokenDetails?.cacheReadTokens
 
   return {
     inputTokens: usage.inputTokens ?? 0,
     outputTokens: usage.outputTokens ?? 0,
+    ...(cached !== undefined && { cachedInputTokens: cached }),
     ...(costUsd !== undefined && { costUsd }),
   }
 }

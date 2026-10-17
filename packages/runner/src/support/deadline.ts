@@ -1,8 +1,10 @@
-export class DeadlineExceeded extends Error {
+import { DanwoError } from "./codes.ts"
+
+export class DeadlineExceeded extends DanwoError {
   readonly ms: number
 
   constructor(ms: number, what: string) {
-    super(`${what} timed out after ${ms} ms`)
+    super("TIMED_OUT", `${what} timed out after ${ms} ms`)
     this.name = "DeadlineExceeded"
     this.ms = ms
   }

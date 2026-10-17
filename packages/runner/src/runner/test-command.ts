@@ -6,7 +6,7 @@ import { type LoadedConfig, loadConfig } from "./config.ts"
 import { Crew } from "./crew.ts"
 import type { RecordMode } from "./record.ts"
 import { closeRecording, openRecording } from "./recording.ts"
-import { anyFailed, closingLines, fileErrorLine, openingLine, testLine } from "./reporter.ts"
+import { closingLines, fileErrorLine, openingLine, runExitCode, testLine } from "./reporter.ts"
 import { type Reporter, tellReporters, type TestRunReport } from "./reporting.ts"
 import type { TestFileTask, TestReport } from "./tasks.ts"
 
@@ -107,7 +107,7 @@ export async function runTests(options: RunTestsOptions = {}): Promise<number> {
 
     for (const line of closingLines(reports)) write(line)
 
-    return brokenFiles.length > 0 || anyFailed(reports) ? 1 : 0
+    return runExitCode(reports, brokenFiles)
   } finally {
     await crew.disband()
 

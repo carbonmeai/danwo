@@ -303,7 +303,7 @@ function input(env: WorkerEnvironment, mark = { exchanges: 0, deliveries: 0 }): 
     test: "tests/sign-in.danwo.ts › signs in",
     run: { kind: "test", attempt: 1 },
     status: "failed",
-    error: { code: "AssertionError", message: "nope" },
+    error: { code: "EXPECTATION_FAILED", class: "test", name: "AssertionError", message: "nope" },
     stopped: undefined,
     divergence: undefined,
     notes: [`saw ${PASSWORD}`],

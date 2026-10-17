@@ -4,6 +4,8 @@
  */
 import pc from "picocolors"
 
+import { addUsage, cacheLine, dollars, modelLine, type Usage } from "../record/usage.ts"
+import { type ErrorClass, exitCodeOf } from "../support/codes.ts"
 import type { ResultStatus } from "../tests/retry.ts"
 import type { TestReport } from "./tasks.ts"
 
@@ -71,9 +73,79 @@ export function closingLines(reports: readonly TestReport[]): string[] {
     ...reports.filter((report) => isFailure(report.status)).flatMap(failureLines),
     "",
     summaryLine(reports),
+    ...usageLines(reports),
   ]
 }
 
-export function anyFailed(reports: readonly TestReport[]): boolean {
-  return reports.some((report) => isFailure(report.status))
+/** How many of the costliest steps the summary lists. */
+const COSTLIEST = 5
+
+/** Every attempt's usage, each step named by its test. */
+function attemptUsages(reports: readonly TestReport[]): Usage[] {
+  return reports.flatMap((report) =>
+    report.attempts.flatMap((attempt) =>
+      attempt.usage === undefined
+        ? []
+        : [
+            {
+              ...attempt.usage,
+              steps: attempt.usage.steps.map((cost) => ({
+                ...cost,
+                step: { ...cost.step, label: `${report.id} › ${cost.step.label}` },
+              })),
+            },
+          ],
+    ),
+  )
+}
+
+/** The run's `cache:` and `model:` lines, then its costliest model steps, as a small table. */
+function usageLines(reports: readonly TestReport[]): string[] {
+  const usage = addUsage(attemptUsages(reports))
+  const cache = cacheLine(usage.cache)
+  const model = modelLine(usage)
+  const costliest = usage.steps
+    .toSorted((a, b) => b.spent.usd - a.spent.usd || b.spent.calls - a.spent.calls)
+    .slice(0, COSTLIEST)
+
+  return [
+    ...(cache === undefined ? [] : [pc.dim(cache)]),
+    ...(model === undefined ? [] : [pc.dim(model)]),
+    ...costliest.map(({ step, spent }) =>
+      pc.dim(
+        `  ${String(spent.calls).padStart(3)} calls  ${dollars(spent.usd).padStart(8)}  ${step.label}`,
+      ),
+    ),
+  ]
+}
+
+/** A file that could not run because of how it is written, rather than because a worker failed. */
+const CONFIG_BREAKAGE =
+  /SyntaxError|Cannot find (module|package)|must default-export|is not defined/
+
+/** The class of each failure in the run: tests by their last attempt's error, then broken files. */
+function failureClasses(
+  reports: readonly TestReport[],
+  brokenFiles: readonly { readonly error: string }[],
+): ErrorClass[] {
+  const tests = reports
+    .filter((report) => isFailure(report.status))
+    .map((report): ErrorClass =>
+      report.status === "interrupted"
+        ? "interrupted"
+        : (report.attempts.at(-1)?.error?.class ?? "test"),
+    )
+  const files = brokenFiles.map((broken): ErrorClass =>
+    CONFIG_BREAKAGE.test(broken.error) ? "config" : "infra",
+  )
+
+  return [...tests, ...files]
+}
+
+/** The run's exit code: 0 when nothing failed, else the deciding failure's (see codes.ts). */
+export function runExitCode(
+  reports: readonly TestReport[],
+  brokenFiles: readonly { readonly error: string }[],
+): number {
+  return exitCodeOf(failureClasses(reports, brokenFiles))
 }

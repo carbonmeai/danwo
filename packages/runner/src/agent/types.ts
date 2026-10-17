@@ -2,6 +2,7 @@
 import type { z } from "zod"
 
 import type { Params } from "../replay/params.ts"
+import type { Budget } from "./budget.ts"
 
 export interface ActOptions {
   /** Values the instruction names in braces, e.g. `{ params: { email: unique("ada@x.test") } }`. */
@@ -12,6 +13,8 @@ export interface ActOptions {
    * a replay needs the same names offered again.
    */
   readonly files?: Readonly<Record<string, string>>
+  /** Limits for this step, over the session's: turns, model calls, cost and wall time. */
+  readonly budget?: Budget
 }
 
 export interface ActResult {

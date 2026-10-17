@@ -6,7 +6,10 @@ import type { WebhookFault } from "@danwo/emulators"
 import type { OutboundCall, OutboundFault } from "@danwo/proxy"
 import type { LanguageModel } from "ai"
 
+import type { Budgets } from "../agent/budget.ts"
+import type { RelocationPolicy } from "../replay/policy.ts"
 import type { SessionSecret } from "../session.ts"
+import { DanwoError } from "../support/codes.ts"
 import type { SessionArgs, SessionDefinition } from "../tests/types.ts"
 import type { EnvironmentContext, WorkerEnvironment } from "./environment.ts"
 import type { RecordMode } from "./record.ts"
@@ -29,6 +32,13 @@ export interface DanwoConfig {
   readonly model?: LanguageModel
   /** The model `agent.assert` judges with; another provider than `model` is best. */
   readonly judge?: LanguageModel
+  /**
+   * Limits on what the agent spends, per step and per test: turns, model calls, dollars, wall time.
+   * Default 25 turns a step. A step or test that runs out fails with `BUDGET_EXCEEDED`.
+   */
+  readonly budget?: Budgets
+  /** Show the judge of `agent.assert` a screenshot besides the page's text (default false). */
+  readonly judgeScreenshot?: boolean
   /** The replay cache; relative to the config file. */
   readonly cache?: { readonly dir: string }
   /** Values the model never sees; tests pass `secret(name)`. */
@@ -40,6 +50,12 @@ export interface DanwoConfig {
    * the model (default true). `danwo matrix` never relocates: its runs follow recordings exactly.
    */
   readonly relocate?: boolean
+  /**
+   * How replays find recorded elements: `similar-v1` (default) also takes the one element that
+   * clearly matches a moved one, `exact` never does. The policy is part of every recording's key,
+   * so changing it records the steps afresh. Takes precedence over `relocate`.
+   */
+  readonly relocation?: RelocationPolicy
   /**
    * Saved sessions by name: each is set up once per worker and its browser state reused by every
    * test that names it (`test.use({ session })`), until the environment resets. The setup also
@@ -118,12 +134,15 @@ export async function loadConfig(cwd: string, explicit?: string): Promise<Loaded
   const path = explicit === undefined ? nearestConfig(cwd) : resolve(cwd, explicit)
 
   if (path === undefined) return { config: {}, path: undefined, root: cwd }
-  if (!existsSync(path)) throw new Error(`config file not found: ${path}`)
+  if (!existsSync(path)) throw new DanwoError("CONFIG_INVALID", `config file not found: ${path}`)
 
   const module: { default?: unknown } = await import(pathToFileURL(path).href)
 
   if (!isConfig(module.default)) {
-    throw new Error(`${path} must default-export a config object (defineConfig({...}))`)
+    throw new DanwoError(
+      "CONFIG_INVALID",
+      `${path} must default-export a config object (defineConfig({...}))`,
+    )
   }
 
   return { config: module.default, path, root: dirname(path) }

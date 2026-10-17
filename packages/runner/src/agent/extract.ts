@@ -13,6 +13,7 @@ import type { Tabs } from "../browser/tabs.ts"
 import { callCost, type CallCost } from "../model/resolve.ts"
 import { describe, describeTarget, type Target } from "../replay/target.ts"
 import { viewTabs, viewText } from "../snapshot/view.ts"
+import { DanwoError } from "../support/codes.ts"
 import { EXTRACT_PROMPT } from "./prompts.ts"
 
 /** How a field's element is read: its text, a number in its text, or whether it is on. */
@@ -57,9 +58,9 @@ const extractTools = {
 }
 
 /** The extraction could not be done or did not fit the schema. */
-export class ExtractFailed extends Error {
+export class ExtractFailed extends DanwoError {
   constructor(instruction: string, reason: string) {
-    super(`agent.extract(${JSON.stringify(instruction)}) failed: ${reason}`)
+    super("EXTRACT_FAILED", `agent.extract(${JSON.stringify(instruction)}) failed: ${reason}`)
     this.name = "ExtractFailed"
   }
 }

@@ -1,0 +1,206 @@
+/**
+ * A failed run as one Markdown page, for coding agents and terminals: what failed and where, the
+ * steps with how each used the cache and the model, the screen at failure, the app's console
+ * errors, the calls and webhooks that failed or were faulted, and what the emulators held. Built
+ * from a flight record, which is redacted already; every part is size-capped so the page stays
+ * cheap to read.
+ */
+import { dollars, stepCost } from "../record/usage.ts"
+import type { FlightRecord, RecordedExchange, RecordedStep } from "./record.ts"
+
+/** Caps that keep a page readable in an agent's context. */
+const LIMITS = {
+  message: 2_000,
+  screen: 4_000,
+  steps: 40,
+  logs: 20,
+  exchanges: 20,
+  body: 600,
+  state: 2_000,
+} as const
+
+/** `text` cut to `max` characters, saying how much was cut. */
+function clip(text: string, max: number): string {
+  return text.length <= max
+    ? text
+    : `${text.slice(0, max)}\n… (${text.length - max} more characters)`
+}
+
+/** A table cell: one line, pipes escaped. */
+function cell(text: string): string {
+  return text.replaceAll("\n", " ").replaceAll("|", "\\|")
+}
+
+/** Which run of the test this was. */
+function runLabel(record: FlightRecord): string {
+  if (record.run.kind === "test") return `attempt ${record.run.attempt}`
+
+  return record.run.fault === null ? "clean matrix run" : `fault: ${record.run.fault.label}`
+}
+
+function headerLines(record: FlightRecord): string[] {
+  const { error } = record
+  const where = error?.source ? ` at ${error.source.file}:${error.source.line}` : ""
+  const kind = error ? ` · ${error.code} (${error.class})` : ""
+
+  return [
+    `# ✗ ${record.test}`,
+    "",
+    `${runLabel(record)} · ${record.status}${kind} · ${(record.durationMs / 1000).toFixed(1)} s`,
+    "",
+    ...(error
+      ? [`**Error${where}:**`, "", "```text", clip(error.message, LIMITS.message), "```", ""]
+      : []),
+    ...(record.stopped ? [`**Body stopped:** ${record.stopped}`, ""] : []),
+    ...(record.divergence
+      ? [
+          `**Replay diverged** at step ${record.divergence.step} (${record.divergence.instruction}): ${record.divergence.reason}`,
+          "",
+        ]
+      : []),
+    ...record.notes.map((note) => `- ${note}`),
+    ...(record.notes.length > 0 ? [""] : []),
+  ]
+}
+
+function stepRow(step: RecordedStep): string {
+  const { spent } = stepCost(step)
+  const model =
+    spent.calls === 0 ? "" : `${spent.calls}${spent.usd > 0 ? ` (${dollars(spent.usd)})` : ""}`
+  const cache = step.cache
+    ? `${step.cache.mode}${step.cache.changed ? ` (${step.cache.changed.join(", ")} changed)` : ""}`
+    : ""
+  const source = step.source ? `${step.source.file}:${step.source.line}` : ""
+  const status = step.error ? `${step.status}: ${step.error.code}` : step.status
+
+  return `| ${step.index} | ${cell(step.label)} | ${cell(status)} | ${cell(cache)} | ${model} | ${step.durationMs} | ${source} |`
+}
+
+function stepLines(steps: readonly RecordedStep[]): string[] {
+  if (steps.length === 0) return []
+
+  const shown = steps.slice(-LIMITS.steps)
+  const hidden = steps.length - shown.length
+
+  return [
+    "## Steps",
+    "",
+    ...(hidden > 0 ? [`(${hidden} earlier steps not shown)`, ""] : []),
+    "| # | step | status | cache | model calls | ms | source |",
+    "| - | ---- | ------ | ----- | ----------- | -- | ------ |",
+    ...shown.map(stepRow),
+    "",
+  ]
+}
+
+function screenLines(screen: string | undefined, record: FlightRecord): string[] {
+  const candidates = record.failure?.candidates ?? []
+
+  return [
+    ...(screen === undefined
+      ? []
+      : ["## Screen at failure", "", "```text", clip(screen, LIMITS.screen), "```", ""]),
+    ...(candidates.length > 0
+      ? ["Nearest elements:", "", ...candidates.map((candidate) => `- ${candidate}`), ""]
+      : []),
+  ]
+}
+
+function logLines(record: FlightRecord): string[] {
+  const problems = record.appLog.filter((log) => log.level === "error" || log.level === "warn")
+
+  if (problems.length === 0) return []
+
+  return [
+    "## Console errors and warnings",
+    "",
+    ...problems
+      .slice(0, LIMITS.logs)
+      .map((log) => `- step ${log.step} · ${log.level} · ${cell(clip(log.text, LIMITS.body))}`),
+    "",
+  ]
+}
+
+/** An exchange worth showing: it failed, was refused, or had a fault injected. */
+function notable(exchange: RecordedExchange): boolean {
+  return (
+    exchange.fault !== null ||
+    exchange.aborted ||
+    exchange.disposition === "blocked" ||
+    (exchange.status !== null && exchange.status >= 400)
+  )
+}
+
+function exchangeLines(record: FlightRecord): string[] {
+  const shown = record.exchanges.filter(notable)
+
+  if (shown.length === 0)
+    return [`${record.exchanges.length} calls through the proxy, none failed.`, ""]
+
+  return [
+    "## Failed or faulted calls",
+    "",
+    `${shown.length} of ${record.exchanges.length} calls through the proxy:`,
+    "",
+    ...shown
+      .slice(0, LIMITS.exchanges)
+      .flatMap((exchange) => [
+        `- \`${exchange.method} ${exchange.host}${exchange.path}\` → ${exchange.status ?? (exchange.aborted ? "aborted" : "no response")}${exchange.fault ? ` · fault: ${exchange.fault}` : ""}${exchange.disposition === "blocked" ? " · blocked" : ""}`,
+        ...(exchange.response?.body
+          ? [`  - response: \`${cell(clip(exchange.response.body, LIMITS.body))}\``]
+          : []),
+      ]),
+    "",
+  ]
+}
+
+function deliveryLines(record: FlightRecord): string[] {
+  if (record.deliveries.length === 0) return []
+
+  return [
+    "## Webhook deliveries",
+    "",
+    "| topic | attempt | status | fault |",
+    "| ----- | ------- | ------ | ----- |",
+    ...record.deliveries.map(
+      (d) =>
+        `| ${cell(`${d.service ? `${d.service}: ` : ""}${d.topic}`)} | ${d.attempt} | ${d.status ?? cell(d.error ?? "no response")} | ${d.fault ?? ""} |`,
+    ),
+    "",
+  ]
+}
+
+function stateLines(record: FlightRecord): string[] {
+  const services = Object.entries(record.state)
+
+  if (services.length === 0) return []
+
+  return [
+    "## Emulator state at the end",
+    "",
+    ...services.flatMap(([service, state]) => [
+      `### ${service}`,
+      "",
+      "```json",
+      clip(JSON.stringify(state, null, 1), LIMITS.state),
+      "```",
+      "",
+    ]),
+  ]
+}
+
+/** The Markdown failure page of one run's record; `screen` is its screen-at-failure text. */
+export function failurePage(record: FlightRecord, screen?: string): string {
+  return [
+    ...headerLines(record),
+    ...stepLines(record.steps),
+    ...screenLines(screen, record),
+    ...logLines(record),
+    ...exchangeLines(record),
+    ...deliveryLines(record),
+    ...stateLines(record),
+  ]
+    .join("\n")
+    .trimEnd()
+    .concat("\n")
+}

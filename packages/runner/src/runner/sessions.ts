@@ -5,6 +5,7 @@
  * app, so the kept states are dropped then and each session is set up again on its next use.
  */
 import type { BrowserState, WebSession } from "../session.ts"
+import { DanwoError } from "../support/codes.ts"
 import { withDeadline } from "../support/deadline.ts"
 import type { SessionArgs, SessionDefinition, SessionSetup } from "../tests/types.ts"
 
@@ -46,11 +47,11 @@ export class SessionKeeper {
  * A session whose setup threw or whose name is unknown; the tests that use it fail with it. Its
  * stack is the setup's, so the failure points at the setup's line.
  */
-class SessionSetupFailed extends Error {
+class SessionSetupFailed extends DanwoError {
   constructor(name: string, cause: unknown) {
     const reason = cause instanceof Error ? cause.message : String(cause)
 
-    super(`session "${name}" could not be set up: ${reason}`, { cause })
+    super("SESSION_SETUP_FAILED", `session "${name}" could not be set up: ${reason}`, { cause })
     this.name = "SessionSetupFailed"
 
     const frames = cause instanceof Error ? cause.stack?.split("\n").slice(1) : undefined

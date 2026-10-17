@@ -12,6 +12,8 @@ import pixelmatch from "pixelmatch"
 import type { Locator as PlaywrightLocator } from "playwright-core"
 import { PNG } from "pngjs"
 
+import { DanwoError } from "../support/codes.ts"
+
 /** Whether baselines are written: only when missing, every time, or never. */
 export type BaselineUpdate = "missing" | "all" | "none"
 
@@ -71,9 +73,9 @@ export type ScreenshotEvent = {
   }
 
 /** The comparison did not match before its timeout. */
-export class ScreenshotMismatch extends Error {
+export class ScreenshotMismatch extends DanwoError {
   constructor(message: string) {
-    super(message)
+    super("SCREENSHOT_MISMATCH", message)
     this.name = "ScreenshotMismatch"
   }
 }

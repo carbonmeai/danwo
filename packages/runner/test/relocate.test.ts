@@ -107,13 +107,38 @@ describe("relocation", () => {
       }),
     )
 
-    /* The recording now points at the new name, so an exact replay works without relocating. */
+    /* The recording now points at the new name, so a strict replay, which matches exactly, works. */
     const exact = await withSession(
-      { model: scripted([]), path: "/billing?v=2", mode: "read-only", relocate: false },
-      save,
+      { model: scripted([]), path: "/billing?v=2", replay: { mode: "strict-stop" } },
+      async (session) => {
+        await save(session)
+
+        return session.flight.steps().find((entry) => entry.api === "agent.act")
+      },
     )
 
-    expect(exact.modelCalls).toBe(0)
+    expect(exact?.cache?.mode).toBe("replayed")
+  }, 60_000)
+
+  it("keys recordings by the relocation policy, so another policy finds them stale", async () => {
+    await recordSave()
+
+    const idle = scripted([])
+
+    await withSession(
+      { model: idle, path: "/billing", relocation: "exact", replay: { mode: "strict-stop" } },
+      async (session) => {
+        await expect(session.agent.act("save the billing details")).rejects.toThrow(
+          /stale: its policy changed/,
+        )
+
+        const step = session.flight.steps().find((entry) => entry.api === "agent.act")
+
+        expect(step?.cache).toEqual({ mode: "stale", changed: ["policy"] })
+        expect(step?.error?.code).toBe("STALE_RECORDING")
+      },
+    )
+    expect(idle.doGenerateCalls).toHaveLength(0)
   }, 60_000)
 
   it("hands the step back to the model when a look-alike makes the match unclear", async () => {

@@ -16,6 +16,7 @@ import {
   watched,
 } from "../agent/operate.ts"
 import type { Tabs } from "../browser/tabs.ts"
+import { checkSecretField } from "../secrets/fields.ts"
 import type { SecretVault } from "../secrets/index.ts"
 import { paramSecret, type Params, paramText } from "./params.ts"
 import { routeOf } from "./route.ts"
@@ -61,14 +62,15 @@ export interface ReplayContext {
   readonly find?: TargetFinder
 }
 
+/** The handle of a recorded secret: the step's param of that name, else the session's secret. */
+function secretOf(name: string, context: ReplayContext) {
+  return paramSecret(context.params, name) ?? context.vault.handle(name)
+}
+
 async function inputText(input: RecordedInput, context: ReplayContext): Promise<string> {
   if ("text" in input) return input.text
 
-  if ("secret" in input) {
-    const secret = paramSecret(context.params, input.secret) ?? context.vault.handle(input.secret)
-
-    return context.vault.reveal(secret)
-  }
+  if ("secret" in input) return context.vault.reveal(secretOf(input.secret, context))
 
   const text = paramText(context.params, input.param)
 
@@ -171,6 +173,10 @@ async function onElement(
   const located = await locate(context, aimed.target)
   const found = [{ recorded: aimed.target, located }]
   const opensTab = "opensTab" in action && action.opensTab === true
+
+  /* The element may have moved: a recorded secret still only goes where its purpose allows. */
+  if (action.kind === "fill" && "secret" in action.input)
+    await checkSecretField(located.element, secretOf(action.input.secret, context), context.timeout)
   const after = await watched(
     context.tabs,
     () => operate(located.element, aimed.operation, context.timeout),

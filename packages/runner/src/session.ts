@@ -5,6 +5,7 @@ import { join, resolve } from "node:path"
 import type { LanguageModel } from "ai"
 import type { Browser, BrowserContext, Page } from "playwright-core"
 
+import type { Budgets } from "./agent/budget.ts"
 import { type Agent, createAgent, type ReplayDivergence } from "./agent/index.ts"
 import { type Expect, expect } from "./assert/index.ts"
 import type { BaselineUpdate, ScreenshotEvent } from "./assert/screenshot.ts"
@@ -14,6 +15,7 @@ import { createSessionFlight, type SessionFlight } from "./flight.ts"
 import { createScreen, registerValueEngine, type Screen } from "./locate/index.ts"
 import { recordAppLog, type StepRecord, StepRecorder } from "./record/index.ts"
 import { type CacheMode, ReplayStore } from "./replay/index.ts"
+import { type RelocationPolicy, relocationOf } from "./replay/policy.ts"
 import { type Secret, SecretVault, type SessionSecret } from "./secrets/index.ts"
 
 export type { ReplayDivergence } from "./agent/index.ts"
@@ -58,6 +60,16 @@ interface ModelOptions {
   readonly model?: LanguageModel
   /** The model `agent.assert` judges with; defaults to `model`. Use another provider so the judge is not the actor. */
   readonly judge?: LanguageModel
+  /** Show the judge a screenshot of the page besides its text (default false: text only). */
+  readonly judgeScreenshot?: boolean
+  /**
+   * Limits on what the agent spends, per `agent.act` step and over the whole session: turns, model
+   * calls, dollars and wall time. Default 25 turns a step and no other limit. A step that runs out
+   * fails with `BUDGET_EXCEEDED`.
+   */
+  readonly budget?: Budgets
+  /** A step's conversation size, in characters, before older page views are dropped (default 60 000). */
+  readonly transcriptBudget?: number
   /** Trusted project context added to the agent's prompts. */
   readonly agentContext?: string
   /**
@@ -100,9 +112,15 @@ interface ReplayOptions {
    * When a recorded element is no longer where the recording found it (renamed, moved to another
    * part of the page), look for the one element that clearly matches it and carry on, noting the
    * move in the step's record; with a writable cache the recording is updated. Default true.
-   * Never under `strict-stop`, which follows its recordings exactly.
+   * Never under `strict-stop`, which follows its recordings exactly. `false` is the `exact` policy.
    */
   readonly relocate?: boolean
+  /**
+   * How a replay finds recorded elements, as a versioned policy that is part of every recording's
+   * key (see replay/policy.ts): `similar-v1` (default) also finds an element that moved, `exact`
+   * never does. Takes precedence over `relocate`.
+   */
+  readonly relocation?: RelocationPolicy
 }
 
 /** What the flight recorder keeps of the attempt. */
@@ -193,6 +211,7 @@ function replayStore(options: WebSessionOptions): ReplayStore | undefined {
     projectId: cache.projectId ?? "danwo",
     journey: cache.journey ?? "journey",
     appIdentity: cache.appIdentity ?? new URL(options.baseUrl).origin,
+    policy: relocationOf(options),
   })
 }
 
@@ -217,7 +236,7 @@ function settingsOf(options: WebSessionOptions) {
     ),
     stepScreenshots: options.record?.stepScreenshots ?? false,
     strict: options.replay?.mode === "strict-stop",
-    relocate: options.relocate ?? true,
+    relocation: relocationOf(options),
   }
 }
 
@@ -293,9 +312,12 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
     vault,
     store,
     strict: settings.strict,
-    relocate: settings.relocate,
+    relocation: settings.relocation,
     model: options.model,
     judge: options.judge,
+    ...(options.judgeScreenshot !== undefined && { judgeScreenshot: options.judgeScreenshot }),
+    ...(options.budget !== undefined && { budgets: options.budget }),
+    ...(options.transcriptBudget !== undefined && { transcriptBudget: options.transcriptBudget }),
     context: options.agentContext,
     actionTimeout,
     signal: stopped.signal,

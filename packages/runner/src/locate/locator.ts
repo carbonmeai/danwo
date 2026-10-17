@@ -7,6 +7,7 @@ import type { Page, Locator as PlaywrightLocator } from "playwright-core"
 
 import { filePaths, type Files } from "../agent/files.ts"
 import type { ScreenshotEvent, ScreenshotSettings } from "../assert/screenshot.ts"
+import { checkSecretField } from "../secrets/fields.ts"
 import { isSecret, type Secret } from "../secrets/index.ts"
 import { filterCall, roleCall, shown, textCall } from "./describe.ts"
 import { valueSelector } from "./display-value.ts"
@@ -200,6 +201,8 @@ export class ElementLocator extends Finder implements Locator {
     const shownValue = secret ? `secret ${JSON.stringify(secret.name)}` : JSON.stringify(value)
 
     return this.act("fill", shownValue, options, async (target, timeout) => {
+      if (secret !== undefined) await checkSecretField(target, secret, timeout)
+
       const typed = isSecret(value) ? await this.context.secrets.resolve(value) : value
 
       await target.fill(typed, { timeout })

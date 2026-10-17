@@ -48,6 +48,7 @@ export {
   runsDir,
 } from "./record.ts"
 export { findRun } from "./report.ts"
+export { failurePage } from "./failure-page.ts"
 export { runMatrix, type RunMatrixOptions } from "./matrix-command.ts"
 export type { MatrixRunReport, Reporter, RunContext, RunKind, TestRunReport } from "./reporting.ts"
 export type { AttemptReport, TestReport } from "./tasks.ts"
@@ -55,6 +56,11 @@ export { redactCredentials } from "../secrets/credentials.ts"
 export { createRedactor, type Redactor } from "./redact.ts"
 export { runTests, type RunTestsOptions } from "./test-command.ts"
 export { showRun, type ShowRunOptions } from "./show.ts"
+export { type CacheAction, type CacheCommandOptions, runCache } from "./cache-command.ts"
+export { exitCodeForError } from "../support/codes.ts"
+export type { RelocationPolicy } from "../replay/policy.ts"
+export type { Budget, Budgets } from "../agent/budget.ts"
+export type { ErrorClass, ErrorCode } from "../support/codes.ts"
 export {
   type AwsEnvironment,
   awsEnvironment,

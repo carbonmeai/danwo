@@ -1,8 +1,9 @@
 /**
  * A step run by the model: it is shown the instruction, the params and the page, picks one tool
- * call at a time, and sees the page again after each. Only the latest view stays in the
- * conversation; older ones shrink to a line, which keeps long steps cheap. The loop stops when the
- * model calls `done`, after too many turns, or when it repeats the same action without effect.
+ * call at a time, and sees the page again after each. The conversation only grows, so providers
+ * can cache it, until it passes its size budget and older views are dropped in one go (see
+ * transcript.ts). The loop stops when the model calls `done`, when the step's or test's budget is
+ * spent, or when the agent keeps going round in circles after being warned once.
  */
 import { generateText, type LanguageModel, type ModelMessage, type ToolCallPart } from "ai"
 
@@ -12,16 +13,17 @@ import { type Params, shownParams } from "../replay/params.ts"
 import type { RecordedAction } from "../replay/trace.ts"
 import type { SecretVault } from "../secrets/index.ts"
 import { viewTabs, viewText } from "../snapshot/view.ts"
+import type { Spends } from "./budget.ts"
+import { AgentStepFailed } from "./errors.ts"
 import type { Files } from "./files.ts"
+import { LoopGuard } from "./guard.ts"
 import { type Call, parseCall, perform } from "./perform.ts"
 import { ACTOR_PROMPT } from "./prompts.ts"
 import { agentTools } from "./tools.ts"
+import { Transcript, VIEW_MARK } from "./transcript.ts"
 
-/** Separates what a message says from the page view it carries. */
-const VIEW_MARK = "\n\nThe page now:\n"
-const MAX_TURNS = 25
-/** The same call this many times in a row means the model is stuck. */
-const MAX_REPEATS = 3
+/** No single action on an element waits longer than this, whatever the session's timeout. */
+const ACTION_CAP_MS = 15_000
 
 export interface LiveContext {
   readonly model: Exclude<LanguageModel, string>
@@ -34,6 +36,10 @@ export interface LiveContext {
   readonly timeout: number
   readonly context?: string | undefined
   readonly signal?: AbortSignal | undefined
+  /** What the step and its test may still spend. */
+  readonly spends: Spends
+  /** The conversation's size budget in characters before older views are dropped. */
+  readonly transcriptBudget?: number | undefined
   /** Called for every model call and every action, for the step's record. */
   readonly onModelCall: (cost: CallCost) => void
   readonly onAction: (label: string) => void
@@ -45,14 +51,6 @@ export interface LiveResult {
   readonly modelCalls: number
   /** The step's actions in order; null when one of them cannot be replayed. */
   readonly recorded: readonly RecordedAction[] | null
-}
-
-/** The agent could not finish the step. */
-export class AgentStepFailed extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = "AgentStepFailed"
-  }
 }
 
 function firstMessage(
@@ -72,44 +70,28 @@ function firstMessage(
   return `${lines.join("\n")}${VIEW_MARK}${view}`
 }
 
-/** Text without the page view it carried. */
-function withoutView(text: string): string {
-  return text.split(VIEW_MARK)[0] ?? text
-}
-
-/** Earlier messages keep what they said and drop the page views they carried. */
-function compact(messages: ModelMessage[]): void {
-  for (const message of messages) {
-    if (message.role === "user" && typeof message.content === "string") {
-      message.content = withoutView(message.content)
-      continue
-    }
-
-    if (message.role !== "tool") continue
-
-    for (const part of message.content) {
-      if (part.type === "tool-result" && part.output.type === "text")
-        part.output = { type: "text", value: withoutView(part.output.value) }
-    }
-  }
-}
-
 interface Turn {
   readonly calls: readonly ToolCallPart[]
   readonly response: readonly ModelMessage[]
 }
 
+/** What carrying out an action came to: what the model is told, and whether it failed. */
+interface Outcome {
+  readonly text: string
+  readonly failed: boolean
+}
+
 class Loop {
   private readonly live: LiveContext
-  private readonly messages: ModelMessage[] = []
+  private readonly transcript: Transcript
+  private readonly guard = new LoopGuard()
   private readonly recorded: RecordedAction[] = []
   private replayable = true
   private modelCalls = 0
-  private lastCall = ""
-  private repeats = 0
 
   constructor(live: LiveContext) {
     this.live = live
+    this.transcript = new Transcript(live.transcriptBudget)
   }
 
   run(instruction: string): Promise<LiveResult> {
@@ -119,34 +101,35 @@ class Loop {
   private async loop(instruction: string): Promise<LiveResult> {
     let view = await this.look()
 
-    this.messages.push({
+    this.transcript.push({
       role: "user",
       content: firstMessage(instruction, this.live, viewText(view)),
     })
 
-    for (let turn = 0; turn < MAX_TURNS; turn++) {
+    for (;;) {
+      this.live.spends.check()
+      this.live.spends.step.turn()
+
       const { calls, response } = await this.ask()
       const done = calls.find((call) => call.toolName === "done")
 
-      this.messages.push(...response)
+      this.transcript.push(...response)
       if (done !== undefined) return this.finish(done.input)
 
       if (calls.length === 0) {
-        this.messages.push({ role: "user", content: "Answer with a tool call." })
+        this.transcript.push({ role: "user", content: "Answer with a tool call." })
         continue
       }
 
-      const results = await this.carryOut(calls, view.tree)
+      const outcomes = await this.carryOut(calls, view.tree)
 
       view = await this.look()
-      compact(this.messages)
-      this.messages.push({
+      this.transcript.push({
         role: "tool",
-        content: this.resultsWithView(calls, results, viewText(view)),
+        content: this.resultsWithView(calls, outcomes, viewText(view)),
       })
+      this.transcript.compactIfOver()
     }
-
-    throw new AgentStepFailed(`the agent did not finish "${instruction}" within ${MAX_TURNS} turns`)
   }
 
   private look() {
@@ -157,14 +140,16 @@ class Loop {
     const result = await generateText({
       model: this.live.model,
       system: ACTOR_PROMPT,
-      messages: this.messages,
+      messages: this.transcript.forModel(),
       tools: agentTools,
       toolChoice: "required",
       ...(this.live.signal && { abortSignal: this.live.signal }),
     })
+    const cost = callCost(result.usage, result.providerMetadata)
 
     this.modelCalls++
-    this.live.onModelCall(callCost(result.usage, result.providerMetadata))
+    this.live.spends.call(cost)
+    this.live.onModelCall(cost)
 
     const calls = result.response.messages.flatMap((message) =>
       message.role === "assistant" && typeof message.content !== "string"
@@ -176,39 +161,44 @@ class Loop {
   }
 
   private async carryOut(calls: readonly ToolCallPart[], tree: string): Promise<string[]> {
-    const outcomes: string[] = []
+    const texts: string[] = []
 
     for (const raw of calls) {
       const call = parseCall(raw.toolName, raw.input)
+      const outcome =
+        call === undefined
+          ? { text: `not a valid ${raw.toolName} call`, failed: true }
+          : await this.act(call, tree)
 
-      outcomes.push(
-        call === undefined ? `not a valid ${raw.toolName} call` : await this.act(call, tree),
-      )
+      texts.push(this.guarded(JSON.stringify(raw.input) + raw.toolName, outcome))
     }
 
-    return outcomes
+    return texts
   }
 
-  private async act(call: Call, tree: string): Promise<string> {
-    const signature = JSON.stringify(call)
+  /** The outcome as the model is told it, with the guard's warning when the agent is stuck. */
+  private guarded(signature: string, outcome: Outcome): string {
+    const verdict = this.guard.note(signature, outcome.failed)
 
-    this.repeats = signature === this.lastCall ? this.repeats + 1 : 1
-    this.lastCall = signature
-    if (this.repeats >= MAX_REPEATS)
-      throw new AgentStepFailed(
-        `the agent repeated ${call.name} ${MAX_REPEATS} times without getting further`,
-      )
+    if (verdict.kind === "stop") throw new AgentStepFailed(verdict.reason, "AGENT_LOOPING")
 
+    return verdict.kind === "warn" ? `${outcome.text}\n\nWarning: ${verdict.message}` : outcome.text
+  }
+
+  private async act(call: Call, tree: string): Promise<Outcome> {
     try {
-      const performed = await perform(call, { ...this.live, tree })
+      const timeout = Math.min(this.live.timeout, ACTION_CAP_MS)
+      const performed = await perform(call, { ...this.live, timeout, tree })
 
       this.live.onAction(`${call.name} ${this.live.vault.redact(JSON.stringify(call.input))}`)
       if (performed.recorded === null) this.replayable = false
       else this.recorded.push(performed.recorded)
 
-      return performed.outcome
+      return { text: performed.outcome, failed: false }
     } catch (error) {
-      return `failed: ${this.live.vault.redact(error instanceof Error ? (error.message.split("\n")[0] ?? "") : String(error))}`
+      const message = error instanceof Error ? (error.message.split("\n")[0] ?? "") : String(error)
+
+      return { text: `failed: ${this.live.vault.redact(message)}`, failed: true }
     }
   }
 

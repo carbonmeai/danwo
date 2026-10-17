@@ -8,9 +8,20 @@ import { randomUUID } from "node:crypto"
 
 import type { ScreenshotEvent } from "../assert/screenshot.ts"
 import type { StepLog } from "../locate/locator.ts"
+import { classOf, codeOf } from "../support/codes.ts"
 import { callerLine, type SourceLine } from "./source.ts"
 
 export type StepKind = "locator" | "assertion" | "app" | "agent"
+
+/** How a finished step ended. */
+export type StepVerdict = "passed" | "failed" | "blocked" | "inconclusive"
+
+/** The verdict a step that threw `error` ends with, by the error's class. */
+function verdictOf(error: unknown): StepVerdict {
+  const kind = classOf(codeOf(error))
+
+  return kind === "blocked" || kind === "inconclusive" ? kind : "failed"
+}
 
 /** Something that happened inside a step. */
 export type StepEvent =
@@ -19,6 +30,7 @@ export type StepEvent =
       readonly at: string
       readonly inputTokens: number
       readonly outputTokens: number
+      readonly cachedInputTokens?: number
       readonly costUsd?: number
     }
   | { readonly kind: "action"; readonly at: string; readonly label: string }
@@ -26,15 +38,45 @@ export type StepEvent =
   /** A recorded element was found somewhere else: where it was, and where it is now. */
   | { readonly kind: "relocated"; readonly at: string; readonly from: string; readonly to: string }
 
-/** How an agent step used the replay cache. */
+/**
+ * How an agent step used the replay cache, one of a fixed set:
+ *
+ * - `off`: the session has no cache;
+ * - `replayed`: the recording replayed as recorded, with no model;
+ * - `relocated`: the recording replayed, with an element found somewhere other than recorded;
+ * - `handed-off`: the replay started, stopped matching, and the model took the step over;
+ * - `missed`: there was no recording, so the model ran (or, under strict replay, the step failed);
+ * - `stale`: a recording of this step exists under another key (see `changed`), so it was not used;
+ * - `diverged`: under strict replay the recording no longer replays; this and later steps did nothing.
+ */
 export type CacheOutcome =
   | "off"
-  | "recorded"
   | "replayed"
   | "relocated"
-  | "healed"
+  | "handed-off"
+  | "missed"
+  | "stale"
   | "diverged"
-  | "unrecorded"
+
+/** Every cache outcome, in the order summaries list them. */
+export const CACHE_OUTCOMES: readonly CacheOutcome[] = [
+  "replayed",
+  "relocated",
+  "handed-off",
+  "missed",
+  "stale",
+  "diverged",
+  "off",
+]
+
+/** What a step's cache use came to: its outcome, whether a new recording was kept, and why stale. */
+export interface CacheNote {
+  readonly mode: CacheOutcome
+  /** A new recording of the step was staged (written once a later check confirms it). */
+  readonly saved?: boolean
+  /** For `stale`: which parts of the step's key differ from the recording's. */
+  readonly changed?: readonly string[]
+}
 
 export interface StepRecord {
   readonly id: string
@@ -44,14 +86,18 @@ export interface StepRecord {
   readonly api: string
   /** The call as written, e.g. `getByRole("button", name: "Save").click()`. */
   readonly label: string
-  readonly status: "running" | "passed" | "failed"
+  /**
+   * How the step ended: `blocked` when it could not be judged (the page was not where it could be
+   * checked), `inconclusive` when the judge could not tell; other failures are `failed`.
+   */
+  readonly status: "running" | StepVerdict
   readonly startedAt: string
   readonly durationMs: number
   /** The test file line that called the step, relative to the project root. */
   readonly source?: SourceLine
   readonly error?: { readonly code: string; readonly message: string }
   readonly events: readonly StepEvent[]
-  readonly cache?: { readonly mode: CacheOutcome }
+  readonly cache?: CacheNote
 }
 
 /** One line the app wrote to its console, an uncaught page error, or a navigation. */
@@ -123,7 +169,7 @@ export class StepRecorder implements StepLog {
 
       return result
     } catch (error) {
-      this.finish(running, started, { status: "failed", error: this.errorOf(error) }, false)
+      this.finish(running, started, { status: verdictOf(error), error: this.errorOf(error) }, false)
       throw error
     }
   }
@@ -139,10 +185,10 @@ export class StepRecorder implements StepLog {
   }
 
   /** Notes how the running agent step used the replay cache. */
-  cache(mode: CacheOutcome): void {
+  cache(mode: CacheOutcome, detail: Omit<CacheNote, "mode"> = {}): void {
     const running = this.steps.at(-1)
 
-    if (running !== undefined) running.record = { ...running.record, cache: { mode } }
+    if (running !== undefined) running.record = { ...running.record, cache: { mode, ...detail } }
   }
 
   /** The index the next step will get, which is also the index of a step about to run. */
@@ -186,11 +232,8 @@ export class StepRecorder implements StepLog {
   }
 
   private errorOf(error: unknown): NonNullable<StepRecord["error"]> {
-    if (!(error instanceof Error))
-      return { code: "NonError", message: this.options.redact(String(error)) }
+    const message = error instanceof Error ? error.message : String(error)
 
-    const code = "code" in error && typeof error.code === "string" ? error.code : error.name
-
-    return { code, message: this.options.redact(error.message) }
+    return { code: codeOf(error), message: this.options.redact(message) }
   }
 }

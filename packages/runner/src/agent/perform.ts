@@ -9,6 +9,7 @@ import type { Tabs } from "../browser/tabs.ts"
 import { paramSecret, type Params, paramTyped } from "../replay/params.ts"
 import { describeTarget, type Target } from "../replay/target.ts"
 import type { RecordedAction, RecordedInput } from "../replay/trace.ts"
+import { checkSecretField } from "../secrets/fields.ts"
 import type { SecretVault } from "../secrets/index.ts"
 import { filePaths, type Files } from "./files.ts"
 import {
@@ -114,6 +115,9 @@ async function fillSecret(
   input: ToolInput<"fill_secret">,
 ): Promise<Performed> {
   const secret = paramSecret(context.params, input.secret) ?? context.vault.handle(input.secret)
+
+  await checkSecretField(context.tabs.page.getByRef(input.ref), secret, context.timeout)
+
   const value = await context.vault.reveal(secret)
 
   return onElement(context, input.ref, { kind: "fill", text: value }, (target) => ({

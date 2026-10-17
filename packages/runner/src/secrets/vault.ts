@@ -1,19 +1,34 @@
 /**
  * Secrets a session may type but never show: tests and the model hold a secret by name, the
  * browser gets its value only at the moment it is typed, and every text the session records or
- * sends to a model has the known values replaced first.
+ * sends to a model has the known values replaced first: as written, and in the forms a value
+ * takes on its way through URLs, forms, HTML, JSON and base64 (see variants.ts).
  */
+import { DanwoError } from "../support/codes.ts"
+import { variantsOf } from "./variants.ts"
 
-/** Where a secret may be typed: anywhere, or (for "password") only into password fields too. */
-export type SecretPurpose = "password" | "generic-secret"
+/**
+ * What a secret is for, which decides the fields it may be typed into (see fields.ts): a
+ * `password` only into password fields, an `otp` into one-time-code or text fields, a
+ * `generic-secret` (the default) into any field but a password one.
+ */
+export type SecretPurpose = "password" | "otp" | "generic-secret"
+
+/** What kind of field an element is, as far as secrets go. */
+export type FieldKind = "password" | "one-time-code" | "text" | "other"
 
 /** A secret's value, or a function that produces it each time it is typed. */
 export type SecretValue = string | (() => string | Promise<string>)
 
-/** How a session is given a secret: its value alone, or with the purpose it serves. */
+/** How a session is given a secret: its value alone, or with what it is for. */
 export type SessionSecret =
   | SecretValue
-  | { readonly value: SecretValue; readonly purpose?: SecretPurpose }
+  | {
+      readonly value: SecretValue
+      readonly purpose?: SecretPurpose
+      /** The kinds of field it may go into instead of its purpose's, or `"any"`. */
+      readonly fields?: readonly FieldKind[] | "any"
+    }
 
 const SECRET = Symbol.for("danwo.secret")
 
@@ -22,6 +37,8 @@ export interface Secret {
   readonly [SECRET]: true
   readonly name: string
   readonly purpose: SecretPurpose
+  /** The fields it may go into when set apart from its purpose's. */
+  readonly fields?: readonly FieldKind[] | "any"
 }
 
 /** Whether `value` is a secret handle (from any copy of this module). */
@@ -35,11 +52,16 @@ const MIN_REDACTED_LENGTH = 4
 interface Entry {
   readonly value: SecretValue
   readonly purpose: SecretPurpose
+  readonly fields?: readonly FieldKind[] | "any"
 }
 
 function entryOf(secret: SessionSecret): Entry {
   if (typeof secret === "object")
-    return { value: secret.value, purpose: secret.purpose ?? "generic-secret" }
+    return {
+      value: secret.value,
+      purpose: secret.purpose ?? "generic-secret",
+      ...(secret.fields !== undefined && { fields: secret.fields }),
+    }
 
   return { value: secret, purpose: "generic-secret" }
 }
@@ -47,8 +69,11 @@ function entryOf(secret: SessionSecret): Entry {
 /** One session's secrets: handles by name, values on demand, and redaction of every value seen. */
 export class SecretVault {
   private readonly entries = new Map<string, Entry>()
-  /** Every value this vault has handed out or was given, longest first, with its secret's name. */
-  private known: (readonly [value: string, name: string])[] = []
+  /**
+   * Every value this vault has handed out or was given, longest first, with its secret's name and
+   * the patterns that find it in any form.
+   */
+  private known: (readonly [value: string, name: string, patterns: readonly RegExp[]])[] = []
 
   constructor(secrets: Readonly<Record<string, SessionSecret>> = {}) {
     for (const [name, secret] of Object.entries(secrets)) {
@@ -63,9 +88,15 @@ export class SecretVault {
   handle(name: string): Secret {
     const entry = this.entries.get(name)
 
-    if (entry === undefined) throw new Error(`secret "${name}" is not in this session's secrets`)
+    if (entry === undefined)
+      throw new DanwoError("CONFIG_INVALID", `secret "${name}" is not in this session's secrets`)
 
-    return { [SECRET]: true, name, purpose: entry.purpose }
+    return {
+      [SECRET]: true,
+      name,
+      purpose: entry.purpose,
+      ...(entry.fields !== undefined && { fields: entry.fields }),
+    }
   }
 
   /** The value behind `secret`, produced now; it is redacted from then on. */
@@ -87,17 +118,12 @@ export class SecretVault {
     return this.known.map(([value]) => value)
   }
 
-  /** `text` with every known secret value replaced by `[secret <name>]`. */
+  /** `text` with every known secret value, in any of its forms, replaced by `[secret <name>]`. */
   readonly redact = (text: string): string => {
     let out = text
 
-    for (const [value, name] of this.known) {
-      if (out.includes(value)) out = out.split(value).join(`[secret ${name}]`)
-
-      const escaped = JSON.stringify(value).slice(1, -1)
-
-      if (escaped !== value && out.includes(escaped))
-        out = out.split(escaped).join(`[secret ${name}]`)
+    for (const [, name, patterns] of this.known) {
+      for (const pattern of patterns) out = out.replace(pattern, `[secret ${name}]`)
     }
 
     return out
@@ -106,7 +132,7 @@ export class SecretVault {
   private remember(name: string, value: string): void {
     if (value.length < MIN_REDACTED_LENGTH || this.known.some(([known]) => known === value)) return
 
-    this.known = [...this.known, [value, name] as const].toSorted(
+    this.known = [...this.known, [value, name, variantsOf(value)] as const].toSorted(
       (a, b) => b[0].length - a[0].length,
     )
   }

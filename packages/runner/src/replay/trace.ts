@@ -55,6 +55,25 @@ const action = z.discriminatedUnion("kind", [
   }),
 ])
 
+/**
+ * What a recording was made for: the parts of its key, kept with it so a step that misses can say
+ * which recording of the same step exists and what changed (see store.ts).
+ */
+const identity = z.object({
+  format: z.number(),
+  projectId: z.string(),
+  journey: z.string(),
+  appIdentity: z.string(),
+  kind: z.enum(["act", "extract"]),
+  /** Zero-based position among the journey's agent steps; not part of the key. */
+  step: z.number().int().nonnegative(),
+  instruction: z.string(),
+  params: z.record(z.string(), z.string()),
+  policy: z.string(),
+})
+
+export type StepIdentity = z.infer<typeof identity>
+
 export const traceSchema = z.object({
   version: z.literal(1),
   instruction: z.string(),
@@ -62,6 +81,14 @@ export const traceSchema = z.object({
   actions: z.array(action),
   /** The route the browser was on when the step ended (see route.ts). */
   endRoute: z.string(),
+  identity: identity.optional(),
+})
+
+/** The fields every recording file has, whichever kind of step made it. */
+export const storedSchema = z.object({
+  instruction: z.string(),
+  recordedAt: z.string(),
+  identity: identity.optional(),
 })
 
 export type Trace = z.infer<typeof traceSchema>
@@ -78,6 +105,7 @@ export const extractTraceSchema = z.object({
   fields: z
     .array(z.object({ path: z.string(), target, as: z.enum(["text", "number", "boolean"]) }))
     .min(1),
+  identity: identity.optional(),
 })
 
 export type ExtractTrace = z.infer<typeof extractTraceSchema>

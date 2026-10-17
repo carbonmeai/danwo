@@ -55,7 +55,9 @@ function failed(id: string, line: number, record?: string): TestReport {
         status: "failed",
         durationMs: 20,
         error: {
-          code: "AssertionError",
+          code: "EXPECTATION_FAILED",
+          class: "test",
+          name: "AssertionError",
           message: `expected "Paid" | key REDACTED-TEST-VALUE`,
           source: { file: "tests/checkout.danwo.ts", line },
         },
@@ -194,7 +196,7 @@ describe("github reporter for danwo test", () => {
 
     expect(summary).toContain("### danwo test: 0 passed · 1 failed · 0 flaky · 0 skipped in 1.2 s")
     expect(summary).toContain(
-      '| ❌ | tests/checkout.danwo.ts › pays | 1 | AssertionError: expected "Paid" \\| key sk_live_[redacted] (tests/checkout.danwo.ts:25) |',
+      '| ❌ | tests/checkout.danwo.ts › pays | 1 | EXPECTATION_FAILED: expected "Paid" \\| key sk_live_[redacted] (tests/checkout.danwo.ts:25) |',
     )
     expect(summary).toContain(
       "download the `danwo-runs` artifact from [this run](https://github.example/acme/shop/actions/runs/77#artifacts)",

@@ -6,7 +6,9 @@
 import type { PlannedFault, ServiceDelivery } from "@danwo/core"
 import type { Exchange } from "@danwo/proxy"
 
+import type { Usage } from "../record/usage.ts"
 import type { ReplayDivergence } from "../session.ts"
+import type { ErrorClass } from "../support/codes.ts"
 import type { SourceLine, TestError } from "../support/errors.ts"
 import type { AttemptStatus, ResultStatus } from "../tests/retry.ts"
 import type { RecordSettings } from "./record.ts"
@@ -48,6 +50,8 @@ export interface AttemptReport {
   readonly durationMs: number
   /** The attempt's flight record directory, relative to the cwd, when it was kept. */
   readonly record?: string | undefined
+  /** How its agent steps used the replay cache and the model. */
+  readonly usage?: Usage
 }
 
 /** A test's result over its attempts. */
@@ -71,6 +75,10 @@ export interface TrialReport {
   readonly record?: string | undefined
   /** The test file line the trial's failure passed through, relative to the project root. */
   readonly source?: SourceLine | undefined
+  /** The class of the trial's failure; a trial that could not be judged says nothing of its fault. */
+  readonly errorClass?: ErrorClass | undefined
+  /** How its agent steps used the replay cache and the model. */
+  readonly usage?: Usage
 }
 
 /** What a worker answers, by the name the parent calls it with. */

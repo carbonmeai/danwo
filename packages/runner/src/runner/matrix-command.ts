@@ -18,6 +18,8 @@ import {
 } from "@danwo/core"
 import type { WebhookFault } from "@danwo/emulators"
 
+import { addUsage, cacheLine, modelLine, type Usage } from "../record/usage.ts"
+import { type ErrorClass, exitCodeOf, notJudged } from "../support/codes.ts"
 import { type CatalogEntry, catalogOf } from "./catalog.ts"
 import { type DanwoConfig, type LoadedConfig, loadConfig } from "./config.ts"
 import { Crew } from "./crew.ts"
@@ -25,6 +27,7 @@ import { defaultOutboundFaults } from "./faults.ts"
 import type { RecordMode } from "./record.ts"
 import { closeRecording, openRecording } from "./recording.ts"
 import { type Reporter, type RunContext, tellReporters } from "./reporting.ts"
+import type { TrialReport } from "./tasks.ts"
 
 export interface RunMatrixOptions {
   readonly cwd?: string
@@ -79,13 +82,38 @@ function judgingLine(test: CatalogEntry): string {
     : "no invariant: the body must pass under every fault (add test(...).invariant(fn) to judge outcomes instead)"
 }
 
+/**
+ * A trial's outcome from its report. A failure whose class says nothing about the app (blocked,
+ * inconclusive, infrastructure) makes the trial `not-judged` rather than `failed`.
+ */
+function outcomeOf(report: TrialReport, fault: PlannedFault | null): RunOutcome {
+  const { errorClass, usage: _usage, ...rest } = report
+  const unjudged = report.status === "failed" && errorClass !== undefined && notJudged(errorClass)
+
+  return unjudged
+    ? {
+        ...rest,
+        fault,
+        status: "not-judged",
+        error: `not judged (${errorClass}): ${report.error ?? ""}`,
+      }
+    : checkFaultFired({ ...rest, fault })
+}
+
 /** Runs trials on the crew; any trial that could not run at all is an environment error. */
-function trialRunner(crew: Crew, file: string, testId: string, cacheDir: string) {
+function trialRunner(crew: Crew, run: Pick<MatrixRun, "file" | "test" | "cacheDir" | "usages">) {
   return async (fault: PlannedFault | null): Promise<RunOutcome> => {
     try {
-      const report = await crew.trial({ file, testId, fault, cacheDir })
+      const report = await crew.trial({
+        file: run.file,
+        testId: run.test.id,
+        fault,
+        cacheDir: run.cacheDir,
+      })
 
-      return checkFaultFired({ ...report, fault })
+      if (report.usage !== undefined) run.usages.push(report.usage)
+
+      return outcomeOf(report, fault)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
 
@@ -161,7 +189,7 @@ async function runTrials(
 
     write(formatMatrix(result))
 
-    return { result, code: 1 }
+    return { result, code: matrixExitCode([clean]) || 1 }
   }
 
   const planned = planFaults(
@@ -180,7 +208,28 @@ async function runTrials(
   write(formatMatrix(result))
   write(`${runs.length + 1} runs in ${Math.round((Date.now() - began) / 1000)} s`)
 
-  return { result, code: runs.every((r) => r.status === "passed") ? 0 : 1 }
+  return { result, code: matrixExitCode(runs) }
+}
+
+/** The class a trial's status gives the run's exit code. */
+const TRIAL_CLASS: Readonly<Record<RunOutcome["status"], ErrorClass | undefined>> = {
+  passed: undefined,
+  failed: "test",
+  invalid: "blocked",
+  "not-judged": "blocked",
+  "environment-error": "infra",
+}
+
+/** 0 when every trial passed; otherwise the deciding failure's exit code (see codes.ts). */
+function matrixExitCode(runs: readonly RunOutcome[]): number {
+  return exitCodeOf(runs.flatMap((r) => TRIAL_CLASS[r.status] ?? []))
+}
+
+/** The run's `cache:` and `model:` lines over every trial, when any step used them. */
+function usageLines(usages: readonly Usage[]): string[] {
+  const usage = addUsage(usages)
+
+  return [cacheLine(usage.cache), modelLine(usage)].filter((line) => line !== undefined)
 }
 
 /** Everything a matrix run holds while its trials run. */
@@ -196,18 +245,24 @@ interface MatrixRun {
   readonly write: (line: string) => void
   /** Narrows the planned faults by label. */
   readonly faults: string | undefined
+  /** Each finished trial's use of the cache and the model. */
+  readonly usages: Usage[]
 }
 
 /** Runs the trials; tells the reporters when the run stopped without a result. */
 async function trialsOrAbort(run: MatrixRun): Promise<{ result: FaultMatrixResult; code: number }> {
   try {
-    return await runTrials(
+    const outcome = await runTrials(
       run.test,
       run.loaded.config.matrix,
-      trialRunner(run.crew, run.file, run.test.id, run.cacheDir),
+      trialRunner(run.crew, run),
       run.write,
       run.faults,
     )
+
+    for (const line of usageLines(run.usages)) run.write(line)
+
+    return outcome
   } catch (error) {
     const aborted = {
       ...run.context,
@@ -269,6 +324,7 @@ export async function runMatrix(
     began: Date.now(),
     write,
     faults: options.faults,
+    usages: [],
   }
 
   await tellReporters(run.reporters, (r) => r.started?.(run.context), write)

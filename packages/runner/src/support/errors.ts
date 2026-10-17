@@ -1,14 +1,20 @@
 /** A failure as plain data: what crosses from a worker to the parent and lands in a flight record. */
 import { relative } from "node:path"
 
+import { classOf, codeOf, type ErrorClass, type ErrorCode } from "./codes.ts"
+
 export interface SourceLine {
   readonly file: string
   readonly line: number
 }
 
 export interface TestError {
-  /** A short kind: the error's own `code` when it has one, else its class name. */
-  readonly code: string
+  /** One of danwo's codes (see codes.ts); `TEST_FAILED` for an error of the test's own. */
+  readonly code: ErrorCode
+  /** What kind of failure the code is, which decides the run's exit and the matrix's verdict. */
+  readonly class: ErrorClass
+  /** The error's own name, e.g. `TypeError` for a test's own bug. */
+  readonly name: string
   readonly message: string
   readonly stack?: string
   /** The test file line the failure passed through, relative to the project root. */
@@ -28,15 +34,18 @@ export function testFileLine(error: unknown, root: string): SourceLine | undefin
 }
 
 export function toTestError(error: unknown, root: string): TestError {
+  const code = codeOf(error)
+
   if (!(error instanceof Error)) {
-    return { code: "NonError", message: String(error) }
+    return { code, class: classOf(code), name: "NonError", message: String(error) }
   }
 
-  const own = "code" in error ? error.code : undefined
   const source = testFileLine(error, root)
 
   return {
-    code: typeof own === "string" ? own : error.name,
+    code,
+    class: classOf(code),
+    name: error.name,
     message: error.message,
     ...(error.stack !== undefined && { stack: error.stack }),
     ...(source !== undefined && { source }),

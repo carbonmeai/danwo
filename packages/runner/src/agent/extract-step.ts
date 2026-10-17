@@ -8,13 +8,12 @@ import type { z } from "zod"
 
 import type { Tabs } from "../browser/tabs.ts"
 import type { CallCost } from "../model/resolve.ts"
-import type { CacheOutcome } from "../record/steps.ts"
+import type { CacheNote, CacheOutcome } from "../record/steps.ts"
 import type { Params } from "../replay/params.ts"
 import type { TargetFinder } from "../replay/replayer.ts"
-import type { ReplayStore } from "../replay/store.ts"
+import type { ReplayStore, StepKey } from "../replay/store.ts"
 import { findTarget, type Target } from "../replay/target.ts"
 import type { ExtractTrace } from "../replay/trace.ts"
-import { NothingRecorded } from "./errors.ts"
 import {
   ExtractFailed,
   extractLive,
@@ -22,6 +21,7 @@ import {
   readFields,
   sourceLabels,
 } from "./extract.ts"
+import { missError, missOf } from "./miss.ts"
 
 /** A recorded element that is not back within this long is gone: the page changed. */
 const FIND_MS = 5_000
@@ -41,7 +41,7 @@ export interface ExtractStepContext {
   readonly onAction: (label: string) => void
   /** A recorded element was found somewhere else. */
   readonly onRelocated: (from: Target, to: Target) => void
-  readonly cache: (outcome: CacheOutcome) => void
+  readonly cache: (outcome: CacheOutcome, detail?: Omit<CacheNote, "mode">) => void
   /** Ends the session's replay here; later steps do nothing. */
   readonly diverge: (reason: string) => string
 }
@@ -79,11 +79,11 @@ async function replayExtract<T>(
 
 /** The recording under `key` read again, or why it could not be. */
 async function fromRecording<T>(
-  key: string | undefined,
+  key: StepKey | undefined,
   schema: z.ZodType<T>,
   context: ExtractStepContext,
 ): Promise<{ value: T; moved: ExtractTrace | undefined } | { reason: string | undefined }> {
-  const trace = key === undefined ? undefined : await context.store?.readExtract(key)
+  const trace = key === undefined ? undefined : await context.store?.readExtract(key.key)
 
   if (trace === undefined) return { reason: undefined }
 
@@ -105,7 +105,7 @@ export async function extractStep<T>(
 ): Promise<T> {
   const { instruction } = step
   const { store } = context
-  const key = store?.key(`extract: ${instruction}`, step.params)
+  const key = store?.key({ kind: "extract", step: step.index, instruction, params: step.params })
   const recorded = await fromRecording(key, schema, context)
 
   if ("value" in recorded) {
@@ -116,15 +116,10 @@ export async function extractStep<T>(
     return recorded.value
   }
 
-  if (context.strict) {
-    if (recorded.reason === undefined) {
-      context.cache("unrecorded")
-      throw new NothingRecorded(step.index, instruction)
-    }
+  const miss: CacheNote =
+    recorded.reason === undefined ? await missOf(store, key) : { mode: "handed-off" }
 
-    context.cache("diverged")
-    throw new ExtractFailed(instruction, `diverged: ${context.diverge(recorded.reason)}`)
-  }
+  if (context.strict) return stopStrict(step, recorded.reason, miss, context)
 
   const live = await extractLive(instruction, schema, {
     model: context.model(),
@@ -135,24 +130,34 @@ export async function extractStep<T>(
   })
 
   await keep(key, instruction, live.sources, context)
-  context.cache(cacheOutcome(store, live.sources, recorded.reason))
+  context.cache(miss.mode, { ...miss, saved: saves(store, live.sources) })
 
   return live.value
 }
 
-function cacheOutcome(
-  store: ReplayStore | undefined,
-  sources: readonly FieldSource[] | null,
-  replayFailed: string | undefined,
-): CacheOutcome {
-  if (store === undefined || !store.writes || sources === null)
-    return store?.reads ? "unrecorded" : "off"
+/** Under strict replay a step with nothing to replay fails, and one that no longer replays diverges. */
+function stopStrict(
+  step: { readonly index: number; readonly instruction: string },
+  reason: string | undefined,
+  miss: CacheNote,
+  context: ExtractStepContext,
+): never {
+  if (reason === undefined) {
+    context.cache(miss.mode, miss)
+    throw missError(step.index, step.instruction, miss)
+  }
 
-  return replayFailed === undefined ? "recorded" : "healed"
+  context.cache("diverged")
+  throw new ExtractFailed(step.instruction, `diverged: ${context.diverge(reason)}`)
+}
+
+/** Whether the model's sources become the step's recording. */
+function saves(store: ReplayStore | undefined, sources: readonly FieldSource[] | null): boolean {
+  return store !== undefined && store.writes && sources !== null && sources.length > 0
 }
 
 async function keep(
-  key: string | undefined,
+  key: StepKey | undefined,
   instruction: string,
   sources: readonly FieldSource[] | null,
   context: ExtractStepContext,

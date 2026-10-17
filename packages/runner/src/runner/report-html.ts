@@ -5,6 +5,7 @@
  * network.
  */
 import type { ScreenshotEvent } from "../assert/screenshot.ts"
+import { dollars, type Spent, tokensText, usageOf } from "../record/usage.ts"
 import type { FlightRecord, RecordedExchange, RecordedStep } from "./record.ts"
 
 /** One kept record, as the report reads it. */
@@ -36,7 +37,11 @@ function errorBlock(record: FlightRecord): string {
   const where = source
     ? ` <span class="dim">at ${escape(`${source.file}:${source.line}`)}</span>`
     : ""
+  const code = record.error
+    ? `<p><code>${escape(record.error.code)}</code> <span class="dim">${escape(record.error.class)}</span></p>`
+    : ""
   const lines = [
+    code,
     record.error && `<p class="error">${escape(record.error.message)}${where}</p>`,
     record.stopped && `<p>${escape(record.stopped)}</p>`,
     ...record.notes
@@ -100,7 +105,8 @@ function stepRow(step: RecordedStep, loaded: Loaded): string {
   )
   const shots = screenshotNotes(step, loaded)
   const facts = [
-    step.cache && `cache ${step.cache.mode}`,
+    step.cache && cacheFact(step.cache),
+    step.error && step.error.code,
     models > 0 && `${models} model call${models === 1 ? "" : "s"}`,
     ...moves,
     ...shots.facts,
@@ -113,12 +119,43 @@ function stepRow(step: RecordedStep, loaded: Loaded): string {
   return `<tr class="${step.status}"><td class="dim">${offset(step.startedAt, loaded.record.startedAt)}</td><td><code>${escape(step.api)}</code> ${escape(step.label)}${step.error ? `<div class="error">${escape(step.error.message)}</div>` : ""}<div class="dim">${escape(facts.join(" · "))}</div>${shots.images}</td><td>${escape(step.status)}</td><td class="dim">${step.durationMs} ms</td><td>${shot}</td></tr>`
 }
 
+/** How a step used the cache: the outcome, a new recording, and what made one stale. */
+function cacheFact(cache: NonNullable<RecordedStep["cache"]>): string {
+  const saved = cache.saved ? ", recorded" : ""
+  const changed = cache.changed ? ` (${cache.changed.join(", ")} changed)` : ""
+
+  return `cache ${cache.mode}${saved}${changed}`
+}
+
 function stepsBlock(loaded: Loaded): string {
   const { steps } = loaded.record
 
   if (steps.length === 0) return ""
 
-  return `<h4>Steps</h4><table><tbody>${steps.map((s) => stepRow(s, loaded)).join("")}</tbody></table>`
+  return `<h4>Steps</h4><table><tbody>${steps.map((s) => stepRow(s, loaded)).join("")}</tbody></table>${costBlock(steps)}`
+}
+
+/** One row of the cost table: which step, what it was, what it spent, how it used the cache. */
+function costRow(index: string, what: string, spent: Spent, cache: string): string {
+  return `<tr><td class="dim">${index}</td><td>${what}</td><td>${spent.calls}</td><td class="dim">${escape(tokensText(spent))}</td><td>${escape(dollars(spent.usd))}</td><td class="dim">${escape(cache)}</td></tr>`
+}
+
+/** What each step that called the model cost, and the total. */
+function costBlock(steps: readonly RecordedStep[]): string {
+  const usage = usageOf(steps)
+
+  if (usage.spent.calls === 0) return ""
+
+  const rows = usage.steps.map(({ step, spent }) =>
+    costRow(
+      `#${step.index}`,
+      `<code>${escape(step.api)}</code> ${escape(step.label)}`,
+      spent,
+      step.cache ?? "",
+    ),
+  )
+
+  return `<h4>Model use by step</h4><table><tbody>${rows.join("")}${costRow("", "total", usage.spent, "")}</tbody></table>`
 }
 
 function appLogBlock(loaded: Loaded): string {
@@ -203,7 +240,7 @@ section.failed{border-left:4px solid var(--bad)}section.passed{border-left:4px s
 .failed .badge{color:var(--bad)}.passed .badge{color:var(--ok)}
 .dim{color:var(--dim)}.error{color:var(--bad);white-space:pre-wrap}.fault{color:var(--warn)}
 table{border-collapse:collapse;width:100%}td{border-top:1px solid var(--line);padding:4px 6px;vertical-align:top}
-tr.failed td,tr.error td{color:var(--bad)}
+tr.failed td,tr.error td{color:var(--bad)}tr.blocked td,tr.inconclusive td{color:var(--warn)}
 pre{background:var(--code);padding:8px;border-radius:4px;overflow-x:auto;white-space:pre-wrap;word-break:break-word;margin:4px 0}
 code{background:var(--code);padding:0 3px;border-radius:3px}
 img.thumb{max-width:160px;max-height:100px;border:1px solid var(--line)}img.failure{max-width:100%;max-height:420px;border:1px solid var(--line)}.compare{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.compare figure{margin:0}img.compare{max-width:240px;max-height:180px;border:1px solid var(--line)}

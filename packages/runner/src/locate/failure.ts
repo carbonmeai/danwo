@@ -4,6 +4,8 @@
  */
 import { errors, type Locator as PlaywrightLocator } from "playwright-core"
 
+import { DanwoError } from "../support/codes.ts"
+
 const MAX_CANDIDATES = 5
 const MAX_CANDIDATE_CHARS = 200
 /** How long the explanation itself may look at the page. */
@@ -74,7 +76,7 @@ async function notReady(attempt: Attempted): Promise<LocatorError> {
 
 /** The error to throw for `cause`, which Playwright raised while working on `attempt.target`. */
 export async function explain(attempt: Attempted, cause: unknown): Promise<Error> {
-  if (cause instanceof LocatorError) return cause
+  if (cause instanceof LocatorError || cause instanceof DanwoError) return cause
 
   const { api, text, timeout, target } = attempt
   const count = await target.count().catch(() => undefined)

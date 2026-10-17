@@ -41,7 +41,7 @@ function isFlightRecord(value: unknown): value is FlightRecord {
 }
 
 /** Every record under `runDir` (`<test>/<attempt>/record.json`), oldest first. */
-async function loadRecords(runDir: string): Promise<Loaded[]> {
+export async function loadRecords(runDir: string): Promise<Loaded[]> {
   const dirs = (await Promise.all((await children(runDir)).map(children))).flat()
   const loaded = await Promise.all(dirs.map((dir) => load(runDir, dir)))
 

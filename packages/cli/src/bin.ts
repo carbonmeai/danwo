@@ -5,8 +5,17 @@
  */
 import "@danwo/runner/register"
 import { github } from "@danwo/github"
-import { type RecordMode, type Reporter, runMatrix, runTests, showRun } from "@danwo/runner/runner"
-import { Command, InvalidArgumentError, Option } from "commander"
+import {
+  type CacheAction,
+  exitCodeForError,
+  type RecordMode,
+  type Reporter,
+  runCache,
+  runMatrix,
+  runTests,
+  showRun,
+} from "@danwo/runner/runner"
+import { Argument, Command, InvalidArgumentError, Option } from "commander"
 
 /** Reporters by the names `--reporter` takes; the console's list output always runs. */
 const REPORTERS: Readonly<Record<string, () => Reporter>> = { github: () => github() }
@@ -167,9 +176,37 @@ program
   .description("print the path of a recorded run's report (the newest by default)")
   .argument("[run-id]", "a run under .danwo/runs")
   .option("-o, --open", "open the report in the browser")
+  .addOption(
+    new Option(
+      "--format <format>",
+      "html: the report's path; md: a failure page for each failed run",
+    )
+      .choices(["html", "md"])
+      .default("html"),
+  )
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
-  .action(async (runId: string | undefined, options: { open?: boolean; config?: string }) => {
-    process.exitCode = await showRun({ ...(runId !== undefined && { runId }), ...options })
+  .action(
+    async (
+      runId: string | undefined,
+      options: { open?: boolean; config?: string; format?: "html" | "md" },
+    ) => {
+      process.exitCode = await showRun({ ...(runId !== undefined && { runId }), ...options })
+    },
+  )
+
+program
+  .command("cache")
+  .description("list, count or clear the replay cache's recordings")
+  .addArgument(new Argument("<action>").choices(["ls", "stats", "clear"]))
+  .option("-j, --journey <test-id>", "only the recordings of this test")
+  .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
+  .action(async (action: CacheAction, options: { journey?: string; config?: string }) => {
+    process.exitCode = await runCache(action, options)
   })
 
-await program.parseAsync()
+try {
+  await program.parseAsync()
+} catch (error) {
+  process.stderr.write(`danwo: ${error instanceof Error ? error.message : String(error)}\n`)
+  process.exitCode = exitCodeForError(error)
+}

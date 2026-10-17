@@ -14,6 +14,7 @@ import {
 } from "@danwo/core"
 import type { Proxy } from "@danwo/proxy"
 
+import { usageOf } from "../record/usage.ts"
 import { type DeclaredTest, type FileDeclarations, suiteHooks } from "../tests/registry.ts"
 import { resultOf, worthRetrying } from "../tests/retry.ts"
 import { type AttemptResult, runAttempt, type ReplayUse } from "./attempt.ts"
@@ -168,6 +169,7 @@ async function runTest(
       error: result.error,
       durationMs: result.durationMs,
       record,
+      usage: usageOf(result.flight.session.steps()),
     })
 
     if (!worthRetrying(result.status)) break
@@ -234,6 +236,19 @@ function stopNote(result: AttemptResult): string | undefined {
   )
 }
 
+/** A trial's verdict: how it ended, why, what kind of failure, and what it spent. */
+function verdictOf(result: AttemptResult) {
+  const passed = result.status === "passed"
+
+  return {
+    status: passed ? ("passed" as const) : ("failed" as const),
+    error: result.error?.message ?? null,
+    source: result.error?.source,
+    errorClass: passed ? undefined : result.error?.class,
+    usage: usageOf(result.flight.session.steps()),
+  }
+}
+
 /**
  * What a trial reports once the app's background work settled: its verdict, and the calls and
  * deliveries from its mark on. Those the environment made
@@ -248,9 +263,7 @@ function trialReport(
   const stop = stopNote(result)
 
   return {
-    status: result.status === "passed" ? "passed" : "failed",
-    error: result.error?.message ?? null,
-    source: result.error?.source,
+    ...verdictOf(result),
     // Bodies stay in the worker: the flight record has them; the run plans by route alone.
     exchanges: env.proxy
       .exchanges()

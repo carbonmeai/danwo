@@ -12,9 +12,11 @@ import type { LanguageModel } from "ai"
 import type { z } from "zod"
 
 import type { Tabs } from "../browser/tabs.ts"
-import { resolveModel } from "../model/resolve.ts"
+import { type CallCost, resolveModel } from "../model/resolve.ts"
 import type { StepRecorder } from "../record/index.ts"
+import type { CacheNote } from "../record/steps.ts"
 import type { Params } from "../replay/params.ts"
+import { type RelocationPolicy, relocates } from "../replay/policy.ts"
 import { findOrRelocate } from "../replay/relocate.ts"
 import {
   replay,
@@ -23,16 +25,19 @@ import {
   type TargetFinder,
 } from "../replay/replayer.ts"
 import { routeOf } from "../replay/route.ts"
-import type { ReplayStore } from "../replay/store.ts"
+import type { ReplayStore, StepKey } from "../replay/store.ts"
 import { describe } from "../replay/target.ts"
 import type { Trace } from "../replay/trace.ts"
 import type { SecretVault } from "../secrets/index.ts"
-import { NothingRecorded } from "./errors.ts"
+import { DanwoError } from "../support/codes.ts"
+import { type Budget, type Budgets, DEFAULT_STEP_BUDGET, Spend, Spends } from "./budget.ts"
+import { AgentStepFailed } from "./errors.ts"
 import { extractStep } from "./extract-step.ts"
 import { ExtractFailed } from "./extract.ts"
 import type { Files } from "./files.ts"
 import { judge } from "./judge.ts"
-import { AgentStepFailed, type LiveResult, runLive } from "./live.ts"
+import { type LiveResult, runLive } from "./live.ts"
+import { missError, missOf } from "./miss.ts"
 import type { ActOptions, ActResult, Agent, ExtractOptions } from "./types.ts"
 
 /** The current time, as step and log lines record it. */
@@ -61,22 +66,40 @@ export interface AgentOptions {
   readonly store: ReplayStore | undefined
   /** Replay only; stop at the first step whose recording no longer replays. */
   readonly strict: boolean
-  /** Outside strict replay, find a recorded element that moved instead of handing the step back. */
-  readonly relocate: boolean
+  /** How a replay finds recorded elements; strict replay always matches exactly. */
+  readonly relocation: RelocationPolicy
   readonly model: LanguageModel | undefined
   readonly judge: LanguageModel | undefined
   readonly context?: string | undefined
+  /** Show the judge a screenshot besides the page's text. */
+  readonly judgeScreenshot?: boolean
   readonly actionTimeout: number
+  /** Limits per agent step and over the whole session (one test attempt). */
+  readonly budgets?: Budgets
+  /** A step's conversation size, in characters, before older page views are dropped. */
+  readonly transcriptBudget?: number
   readonly signal?: AbortSignal | undefined
+}
+
+/** One `act` call: which step it is, what it says, and what it may use and spend. */
+interface ActCall {
+  readonly index: number
+  readonly instruction: string
+  readonly params: Params
+  readonly files: Files
+  readonly budget: Budget | undefined
 }
 
 class SessionAgent implements Agent {
   private readonly options: AgentOptions
   private divergence: ReplayDivergence | undefined
   private actCount = 0
+  /** What every agent step of the session spent together, against the test's budget. */
+  private readonly spent: Spend
 
   constructor(options: AgentOptions) {
     this.options = options
+    this.spent = new Spend(options.budgets?.test ?? {}, "test")
   }
 
   diverged(): ReplayDivergence | undefined {
@@ -86,10 +109,21 @@ class SessionAgent implements Agent {
   act(instruction: string, options: ActOptions = {}): Promise<ActResult> {
     const index = this.actCount++
     const label = this.options.vault.redact(instruction)
+    const call: ActCall = {
+      index,
+      instruction,
+      params: options.params ?? {},
+      files: this.filesOf(options),
+      budget: options.budget,
+    }
 
-    return this.options.steps.run("agent", "agent.act", label, () =>
-      this.step(index, instruction, options.params ?? {}, this.filesOf(options)),
-    )
+    return this.options.steps.run("agent", "agent.act", label, () => this.step(call))
+  }
+
+  /** A model call outside an `act` step's loop: recorded, and counted against the test's budget. */
+  private noteCall(cost: CallCost): void {
+    this.spent.call(cost)
+    this.options.steps.event({ kind: "model", at: now(), ...cost })
   }
 
   /** The session's files with the step's own, which resolve against the project root. */
@@ -107,6 +141,8 @@ class SessionAgent implements Agent {
     const { steps, vault } = this.options
 
     return steps.run("agent", "agent.extract", vault.redact(instruction), () => {
+      this.spent.check()
+
       if (this.divergence !== undefined) {
         steps.cache("diverged")
         throw new ExtractFailed(
@@ -124,11 +160,11 @@ class SessionAgent implements Agent {
         redact: vault.redact,
         signal: this.options.signal,
         model: () => this.requireModel(this.options.model),
-        onModelCall: (cost) => steps.event({ kind: "model", at: now(), ...cost }),
+        onModelCall: (cost) => this.noteCall(cost),
         onAction: (label) => steps.event({ kind: "action", at: now(), label }),
         onRelocated: (from, to) =>
           steps.event({ kind: "relocated", at: now(), from: describe(from), to: describe(to) }),
-        cache: (outcome) => steps.cache(outcome),
+        cache: (outcome, detail) => steps.cache(outcome, detail),
         diverge: (reason) => {
           this.divergence = { step: index, instruction, reason: vault.redact(reason) }
 
@@ -145,30 +181,30 @@ class SessionAgent implements Agent {
       "agent",
       "agent.assert",
       this.options.vault.redact(claim),
-      () =>
-        judge(claim, {
+      () => {
+        this.spent.check()
+
+        return judge(claim, {
           model: this.requireModel(this.options.judge ?? this.options.model),
           tabs: this.options.tabs,
           redact: this.options.vault.redact,
+          vocabulary: this.options.context,
+          screenshot: this.options.judgeScreenshot ?? false,
           signal: this.options.signal,
-          onModelCall: (cost) =>
-            steps.event({ kind: "model", at: new Date().toISOString(), ...cost }),
-        }),
+          onModelCall: (cost) => this.noteCall(cost),
+        })
+      },
       { verifies: true },
     )
   }
 
-  private async step(
-    index: number,
-    instruction: string,
-    params: Params,
-    files: Files,
-  ): Promise<ActResult> {
+  private async step(call: ActCall): Promise<ActResult> {
+    const { index, instruction, params, files } = call
     const { steps, store } = this.options
 
     if (this.divergence !== undefined) return this.skipped(this.divergence)
 
-    const key = store?.key(instruction, params)
+    const key = store?.key({ kind: "act", step: index, instruction, params })
     const replayed = await this.replayRecording(key, params, files)
 
     if (replayed.ok) {
@@ -177,11 +213,14 @@ class SessionAgent implements Agent {
       return { summary: "replayed the recording", modelCalls: 0, actions: replayed.actions }
     }
 
-    if (this.options.strict) return this.stopStrict(index, instruction, replayed.reason)
+    const miss: CacheNote =
+      replayed.reason === undefined ? await missOf(store, key) : { mode: "handed-off" }
 
-    const result = await this.runModel(instruction, params, files)
+    if (this.options.strict) return this.stopStrict(index, instruction, replayed.reason, miss)
 
-    this.keep(key, instruction, result, replayed.reason === undefined ? "recorded" : "healed")
+    const result = await this.runModel(call)
+
+    this.keep(key, instruction, result, miss)
 
     return {
       summary: result.summary,
@@ -203,13 +242,13 @@ class SessionAgent implements Agent {
 
   /** Replays the recording under `key`; `reason` is undefined when there is none. */
   private async replayRecording(
-    key: string | undefined,
+    key: StepKey | undefined,
     params: Params,
     files: Files,
   ): Promise<
     { ok: true; actions: number; relocated: boolean } | { ok: false; reason: string | undefined }
   > {
-    const trace = key === undefined ? undefined : await this.options.store?.read(key)
+    const trace = key === undefined ? undefined : await this.options.store?.read(key.key)
 
     if (trace === undefined || key === undefined) return { ok: false, reason: undefined }
 
@@ -223,7 +262,7 @@ class SessionAgent implements Agent {
   }
 
   /** Records where moved elements were found, and keeps the recording pointing at them. */
-  private noteMoves(key: string, outcome: ReplayOutcome): void {
+  private noteMoves(key: StepKey, outcome: ReplayOutcome): void {
     const { steps, store } = this.options
 
     for (const move of outcome.moved)
@@ -262,19 +301,24 @@ class SessionAgent implements Agent {
     }
   }
 
-  /** Relocation, when this session allows it: never under strict replay. */
+  /** Relocation, when the session's policy looks for moved elements: never under strict replay. */
   private finder(): { find?: TargetFinder } {
-    if (this.options.strict || !this.options.relocate) return {}
+    if (this.options.strict || !relocates(this.options.relocation)) return {}
 
     return {
       find: (target, timeout) => findOrRelocate(this.options.tabs.page, target, timeout),
     }
   }
 
-  private stopStrict(index: number, instruction: string, reason: string | undefined): ActResult {
+  private stopStrict(
+    index: number,
+    instruction: string,
+    reason: string | undefined,
+    miss: CacheNote,
+  ): ActResult {
     if (reason === undefined) {
-      this.options.steps.cache("unrecorded")
-      throw new NothingRecorded(index, instruction)
+      this.options.steps.cache(miss.mode, miss)
+      throw missError(index, instruction, miss)
     }
 
     this.divergence = { step: index, instruction, reason: this.options.vault.redact(reason) }
@@ -283,18 +327,25 @@ class SessionAgent implements Agent {
     return { summary: `diverged: ${this.divergence.reason}`, modelCalls: 0, actions: 0 }
   }
 
-  private async runModel(instruction: string, params: Params, files: Files): Promise<LiveResult> {
-    const { steps } = this.options
+  private async runModel(call: ActCall): Promise<LiveResult> {
+    const { steps, vault, budgets } = this.options
+    const { instruction } = call
+    const own = new Spend(
+      { ...DEFAULT_STEP_BUDGET, ...budgets?.step, ...call.budget },
+      `step "${vault.redact(instruction)}"`,
+    )
     const result = await runLive(instruction, {
       model: this.requireModel(this.options.model),
       tabs: this.options.tabs,
       appUrl: this.options.appUrl,
-      vault: this.options.vault,
-      params,
-      files,
+      vault,
+      params: call.params,
+      files: call.files,
       timeout: this.options.actionTimeout,
       context: this.options.context,
       signal: this.options.signal,
+      spends: new Spends(own, this.spent),
+      transcriptBudget: this.options.transcriptBudget,
       onModelCall: (cost) => steps.event({ kind: "model", at: now(), ...cost }),
       onAction: (label) => steps.event({ kind: "action", at: now(), label }),
     })
@@ -309,15 +360,15 @@ class SessionAgent implements Agent {
 
   /** Stages the step's actions as its recording, written once a later check confirms them. */
   private keep(
-    key: string | undefined,
+    key: StepKey | undefined,
     instruction: string,
     result: LiveResult,
-    mode: "recorded" | "healed",
+    miss: CacheNote,
   ): void {
     const { store, steps } = this.options
 
     if (store === undefined || key === undefined || result.recorded === null || !store.writes) {
-      steps.cache(store?.reads ? "unrecorded" : "off")
+      steps.cache(miss.mode, { ...miss, saved: false })
 
       return
     }
@@ -329,12 +380,15 @@ class SessionAgent implements Agent {
       actions: [...result.recorded],
       endRoute: routeOf(this.options.tabs.page.url(), new URL(this.options.appUrl).origin),
     })
-    steps.cache(mode)
+    steps.cache(miss.mode, { ...miss, saved: true })
   }
 
   private requireModel(model: LanguageModel | undefined) {
     if (model === undefined)
-      throw new Error("this session has no model: pass `model` to use agent.act and agent.assert")
+      throw new DanwoError(
+        "CONFIG_INVALID",
+        "this session has no model: pass `model` to use agent.act and agent.assert",
+      )
 
     return resolveModel(model)
   }
