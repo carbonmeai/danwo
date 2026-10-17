@@ -1,0 +1,10 @@
+{
+  "name": "@danwo/recorder",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Flight recorder: browser, backend, outbound, database and job timeline.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
