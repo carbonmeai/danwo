@@ -6,7 +6,7 @@
  */
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { join, relative, resolve } from "node:path"
 
 import {
   checkFaultFired,
@@ -24,6 +24,7 @@ import { Crew } from "./crew.ts"
 import { defaultOutboundFaults } from "./faults.ts"
 import type { RecordMode } from "./record.ts"
 import { closeRecording, openRecording } from "./recording.ts"
+import { type Reporter, type RunContext, tellReporters } from "./reporting.ts"
 
 export interface RunMatrixOptions {
   readonly cwd?: string
@@ -36,6 +37,8 @@ export interface RunMatrixOptions {
   readonly record?: RecordMode
   /** Rewrite every `toHaveScreenshot` baseline (`--update-snapshots`). */
   readonly updateScreenshots?: boolean
+  /** Reporters besides the config's, e.g. from `--reporter`. */
+  readonly reporters?: readonly Reporter[]
   readonly write?: (line: string) => void
 }
 
@@ -160,6 +163,58 @@ async function runTrials(
   return { result, code: runs.every((r) => r.status === "passed") ? 0 : 1 }
 }
 
+/** Everything a matrix run holds while its trials run. */
+interface MatrixRun {
+  readonly loaded: LoadedConfig
+  readonly file: string
+  readonly test: CatalogEntry
+  readonly crew: Crew
+  readonly cacheDir: string
+  readonly reporters: readonly Reporter[]
+  readonly context: RunContext
+  readonly began: number
+  readonly write: (line: string) => void
+}
+
+/** Runs the trials; tells the reporters when the run stopped without a result. */
+async function trialsOrAbort(run: MatrixRun): Promise<{ result: FaultMatrixResult; code: number }> {
+  try {
+    return await runTrials(
+      run.test,
+      run.loaded.config.matrix,
+      trialRunner(run.crew, run.file, run.test.id, run.cacheDir),
+      run.write,
+    )
+  } catch (error) {
+    const aborted = {
+      ...run.context,
+      error: error instanceof Error ? error.message : String(error),
+    }
+
+    await tellReporters(run.reporters, (r) => r.aborted?.(aborted), run.write)
+    throw error
+  }
+}
+
+/** Gives the reporters the finished matrix. */
+function reportMatrix(
+  run: MatrixRun,
+  result: FaultMatrixResult,
+  reportPath: string | undefined,
+): Promise<void> {
+  const report = {
+    ...run.context,
+    kind: "matrix",
+    testId: run.test.id,
+    file: relative(run.loaded.root, run.file),
+    result,
+    durationMs: Date.now() - run.began,
+    reportPath,
+  } as const
+
+  return tellReporters(run.reporters, (r) => r.matrixFinished?.(report), run.write)
+}
+
 /** Runs the matrix; resolves to its result and the process exit code. */
 export async function runMatrix(
   options: RunMatrixOptions,
@@ -180,17 +235,32 @@ export async function runMatrix(
       updateScreenshots: options.updateScreenshots ?? false,
     },
   })
+  const run: MatrixRun = {
+    loaded,
+    file,
+    test,
+    crew,
+    cacheDir: cache.dir,
+    reporters: [...(loaded.config.reporters ?? []), ...(options.reporters ?? [])],
+    context: { kind: "matrix", root: loaded.root, cwd },
+    began: Date.now(),
+    write,
+  }
+
+  await tellReporters(run.reporters, (r) => r.started?.(run.context), write)
+
+  let outcome: { result: FaultMatrixResult; code: number } | undefined
 
   try {
-    return await runTrials(
-      test,
-      loaded.config.matrix,
-      trialRunner(crew, file, test.id, cache.dir),
-      write,
-    )
+    outcome = await trialsOrAbort(run)
+
+    return outcome
   } finally {
     await crew.disband()
-    await closeRecording(recording, cwd, write)
+
+    const reportPath = await closeRecording(recording, cwd, write)
+
     await cache.done()
+    if (outcome !== undefined) await reportMatrix(run, outcome.result, reportPath)
   }
 }

@@ -9,6 +9,7 @@ import type { LanguageModel } from "ai"
 import type { SessionSecret } from "../session.ts"
 import type { EnvironmentContext, WorkerEnvironment } from "./environment.ts"
 import type { RecordMode } from "./record.ts"
+import type { Reporter } from "./reporting.ts"
 
 export interface DanwoConfig {
   /** Where test files are found, relative to the config file; default the config's folder. */
@@ -45,6 +46,8 @@ export interface DanwoConfig {
    * `.danwo/runs/<run>/` with an HTML report; `always` keeps every run; `off` records nothing.
    */
   readonly record?: RecordMode
+  /** Reporters told about every run besides the console, e.g. `github()` from `@danwo/github`. */
+  readonly reporters?: readonly Reporter[]
   /** Fault catalogue for `danwo matrix`. */
   readonly matrix?: {
     /** Default `defaultOutboundFaults`: each provider's faults by host, plain HTTP failures elsewhere. */

@@ -246,6 +246,7 @@ function trialReport(
   return {
     status: result.status === "passed" ? "passed" : "failed",
     error: result.error?.message ?? null,
+    source: result.error?.source,
     // Bodies stay in the worker: the flight record has them; the run plans by route alone.
     exchanges: env.proxy
       .exchanges()

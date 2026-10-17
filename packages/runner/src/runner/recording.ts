@@ -18,13 +18,20 @@ export function openRecording(
   return chosen === "off" ? undefined : { runDir: newRunDir(loaded.root), mode: chosen }
 }
 
-/** Writes the run's report over whatever records were kept, and says where it is. */
+/**
+ * Writes the run's report over whatever records were kept, says where it is, and resolves to its
+ * path relative to `cwd` (undefined when nothing was kept).
+ */
 export async function closeRecording(
   recording: RecordSettings | undefined,
   cwd: string,
   write: (line: string) => void,
-): Promise<void> {
+): Promise<string | undefined> {
   const report = recording && (await finishRun(recording.runDir))
 
-  if (report !== undefined) write(`report: ${relative(cwd, report)}`)
+  if (report === undefined) return undefined
+
+  write(`report: ${relative(cwd, report)}`)
+
+  return relative(cwd, report)
 }

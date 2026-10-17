@@ -7,7 +7,7 @@ import type { PlannedFault, ServiceDelivery } from "@danwo/core"
 import type { Exchange } from "@danwo/proxy"
 
 import type { ReplayDivergence } from "../session.ts"
-import type { TestError } from "../support/errors.ts"
+import type { SourceLine, TestError } from "../support/errors.ts"
 import type { AttemptStatus, ResultStatus } from "../tests/retry.ts"
 import type { RecordSettings } from "./record.ts"
 
@@ -69,6 +69,8 @@ export interface TrialReport {
   readonly notes: readonly string[]
   /** The trial's flight record directory, relative to the cwd, when it was kept. */
   readonly record?: string | undefined
+  /** The test file line the trial's failure passed through, relative to the project root. */
+  readonly source?: SourceLine | undefined
 }
 
 /** What a worker answers, by the name the parent calls it with. */

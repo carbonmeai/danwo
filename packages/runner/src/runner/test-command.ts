@@ -7,6 +7,7 @@ import { Crew } from "./crew.ts"
 import type { RecordMode } from "./record.ts"
 import { closeRecording, openRecording } from "./recording.ts"
 import { anyFailed, closingLines, fileErrorLine, openingLine, testLine } from "./reporter.ts"
+import { type Reporter, tellReporters, type TestRunReport } from "./reporting.ts"
 import type { TestFileTask, TestReport } from "./tasks.ts"
 
 export interface RunTestsOptions {
@@ -22,6 +23,8 @@ export interface RunTestsOptions {
   readonly record?: RecordMode
   /** Rewrite every `toHaveScreenshot` baseline (`--update-snapshots`). */
   readonly updateScreenshots?: boolean
+  /** Reporters besides the config's, e.g. from `--reporter`. */
+  readonly reporters?: readonly Reporter[]
   readonly write?: (line: string) => void
 }
 
@@ -37,25 +40,23 @@ function tasksOf(
   return [...byFile].map(([file, tests]) => ({ ...task, file, testIds: tests.map((t) => t.id) }))
 }
 
-/** Runs every task on the crew; true when a whole file could not run. */
+/** Runs every task on the crew; resolves to the files that could not run at all. */
 async function runTasks(
   crew: Crew,
   tasks: readonly TestFileTask[],
   cwd: string,
   write: (line: string) => void,
-): Promise<boolean> {
-  let broken = false
+): Promise<TestRunReport["brokenFiles"]> {
+  const broken: { file: string; error: string }[] = []
 
   await Promise.all(
     tasks.map((task) =>
       crew.testFile(task).catch((error: unknown) => {
-        broken = true
-        write(
-          fileErrorLine(
-            relative(cwd, task.file),
-            String(error instanceof Error ? error.message : error),
-          ),
-        )
+        const file = relative(cwd, task.file)
+        const message = String(error instanceof Error ? error.message : error)
+
+        broken.push({ file, error: message })
+        write(fileErrorLine(file, message))
       }),
     ),
   )
@@ -78,6 +79,9 @@ export async function runTests(options: RunTestsOptions = {}): Promise<number> {
 
   const { tasks, size } = planRun(loaded, options, entries)
   const recording = openRecording(loaded, options.record)
+  const reporters = [...(loaded.config.reporters ?? []), ...(options.reporters ?? [])]
+  const context = { kind: "test", root: loaded.root, cwd } as const
+  const began = Date.now()
   const reports: TestReport[] = []
   const crew = new Crew({
     size,
@@ -94,16 +98,23 @@ export async function runTests(options: RunTestsOptions = {}): Promise<number> {
   })
 
   write(openingLine(entries.length, size))
+  await tellReporters(reporters, (r) => r.started?.(context), write)
+
+  let brokenFiles: TestRunReport["brokenFiles"] = []
 
   try {
-    const broken = await runTasks(crew, tasks, cwd, write)
+    brokenFiles = await runTasks(crew, tasks, cwd, write)
 
     for (const line of closingLines(reports)) write(line)
 
-    return broken || anyFailed(reports) ? 1 : 0
+    return brokenFiles.length > 0 || anyFailed(reports) ? 1 : 0
   } finally {
     await crew.disband()
-    await closeRecording(recording, cwd, write)
+
+    const reportPath = await closeRecording(recording, cwd, write)
+    const run = { ...context, reports, brokenFiles, durationMs: Date.now() - began, reportPath }
+
+    await tellReporters(reporters, (r) => r.testsFinished?.(run), write)
   }
 }
 

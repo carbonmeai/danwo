@@ -71,6 +71,8 @@ export interface RunOutcome {
   readonly notes: readonly string[]
   /** Where the run's flight record was kept, when one was. */
   readonly record?: string | undefined
+  /** The test file line the run's failure passed through, relative to the project root. */
+  readonly source?: { readonly file: string; readonly line: number } | undefined
 }
 
 export interface FaultMatrixResult {

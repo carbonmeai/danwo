@@ -1,0 +1,70 @@
+/**
+ * Reporters: what a run tells outside services besides its console lines. A reporter hears when a
+ * run starts and gets the whole result when it ends. Reporting never decides a run: a reporter
+ * that throws is printed as a warning and the run's exit code stands.
+ */
+import type { FaultMatrixResult } from "@danwo/core"
+
+import type { TestReport } from "./tasks.ts"
+
+/** Which command a run is. */
+export type RunKind = "test" | "matrix"
+
+/** What every report shares: the command and where the project and the run's records are. */
+export interface RunContext {
+  readonly kind: RunKind
+  /** The project root: the config file's folder; test files and sources are relative to it. */
+  readonly root: string
+  /** The folder the command ran in; record folders are relative to it. */
+  readonly cwd: string
+}
+
+/** `danwo test` once every test reported. */
+export interface TestRunReport extends RunContext {
+  readonly kind: "test"
+  readonly reports: readonly TestReport[]
+  /** Test files that could not run at all (they failed to load, or their worker died). */
+  readonly brokenFiles: readonly { readonly file: string; readonly error: string }[]
+  readonly durationMs: number
+  /** The run's HTML report, relative to `cwd`, when one was written. */
+  readonly reportPath: string | undefined
+}
+
+/** `danwo matrix` once every trial finished. */
+export interface MatrixRunReport extends RunContext {
+  readonly kind: "matrix"
+  /** The test's id (its file and title path). */
+  readonly testId: string
+  /** The test file, relative to `root`. */
+  readonly file: string
+  readonly result: FaultMatrixResult
+  readonly durationMs: number
+  readonly reportPath: string | undefined
+}
+
+export interface Reporter {
+  readonly name: string
+  /** The run began; a reporter may announce it (an in-progress check, say). */
+  started?(run: RunContext): Promise<void>
+  testsFinished?(run: TestRunReport): Promise<void>
+  matrixFinished?(run: MatrixRunReport): Promise<void>
+  /** The run stopped before it had a result (an environment that would not start, say). */
+  aborted?(run: RunContext & { readonly error: string }): Promise<void>
+}
+
+/** Calls `hook` on every reporter, turning a failure into a warning line. */
+export async function tellReporters(
+  reporters: readonly Reporter[],
+  hook: (reporter: Reporter) => Promise<void> | undefined,
+  write: (line: string) => void,
+): Promise<void> {
+  for (const reporter of reporters) {
+    try {
+      await hook(reporter)
+    } catch (error) {
+      write(
+        `warning: reporter ${reporter.name} failed: ${error instanceof Error ? error.message : String(error)}`,
+      )
+    }
+  }
+}
