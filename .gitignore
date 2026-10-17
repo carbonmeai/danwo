@@ -10,5 +10,7 @@ coverage
 qa/
 .fallow/
 .danwo/
+test-results/
+playwright-report/
 .local/
 .claude/worktrees/

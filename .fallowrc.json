@@ -15,6 +15,12 @@
   "rules": {
     "unused-dependencies": "warn"
   },
-  "dynamicallyLoaded": ["**/danwo.config.ts", "**/*.danwo.ts", "packages/*/test/fixtures/**"],
+  "dynamicallyLoaded": [
+    "**/danwo.config.ts",
+    "**/*.danwo.ts",
+    "**/playwright.config.ts",
+    "**/*.spec.ts",
+    "packages/*/test/fixtures/**"
+  ],
   "ignoreDependencies": ["@danwo/example-shop"]
 }

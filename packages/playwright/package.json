@@ -1,0 +1,29 @@
+{
+  "name": "@danwo/playwright",
+  "version": "0.0.0",
+  "private": true,
+  "description": "danwo's environments, emulators, faults, invariants and fault matrix for Playwright Test suites.",
+  "bin": {
+    "danwo-playwright": "./bin/danwo-playwright.mjs"
+  },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@danwo/core": "workspace:*",
+    "@danwo/emulators": "workspace:*",
+    "@danwo/proxy": "workspace:*",
+    "@danwo/runner": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0"
+  },
+  "peerDependencies": {
+    "@playwright/test": "1.64.0"
+  }
+}

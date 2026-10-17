@@ -18,18 +18,60 @@ It drives the app through its UI like a user, while third-party services the app
 
 ## Packages
 
-| Package            | What it is                                                            |
-| ------------------ | --------------------------------------------------------------------- |
-| `@danwo/sdk`       | The public test API                                                   |
-| `@danwo/cli`       | `danwo test`, `danwo matrix`, `danwo show`, `danwo mcp`, `danwo init` |
-| `@danwo/runner`    | Browser sessions, the agent, replay, workers and the flight recorder  |
-| `@danwo/core`      | The fault matrix                                                      |
-| `@danwo/proxy`     | The egress proxy                                                      |
-| `@danwo/emulators` | Provider emulators                                                    |
-| `@danwo/github`    | Reports runs to GitHub from Actions: a check run and job summary      |
-| `@danwo/mcp`       | An MCP server for coding agents: run, explain and write danwo tests   |
+| Package             | What it is                                                              |
+| ------------------- | ----------------------------------------------------------------------- |
+| `@danwo/sdk`        | The public test API                                                     |
+| `@danwo/cli`        | `danwo test`, `danwo matrix`, `danwo show`, `danwo mcp`, `danwo init`   |
+| `@danwo/runner`     | Browser sessions, the agent, replay, workers and the flight recorder    |
+| `@danwo/core`       | The fault matrix                                                        |
+| `@danwo/proxy`      | The egress proxy                                                        |
+| `@danwo/emulators`  | Provider emulators                                                      |
+| `@danwo/github`     | Reports runs to GitHub from Actions: a check run and job summary        |
+| `@danwo/mcp`        | An MCP server for coding agents: run, explain and write danwo tests     |
+| `@danwo/playwright` | danwo's environments, faults, invariants and matrix for Playwright Test |
 
-See `examples/shop` for a small app tested with `danwo test` and `danwo matrix`.
+See `examples/shop` for a small app tested with `danwo test` and `danwo matrix`, and
+`examples/shop-playwright` for the same test in Playwright Test.
+
+## Use danwo from Playwright Test
+
+Existing Playwright suites keep their tests and gain danwo's backend: the emulators behind an
+egress proxy, faults, invariants and the fault matrix. Import `test` and `expect` from
+`@danwo/playwright` instead of `@playwright/test`:
+
+```ts
+// playwright.config.ts
+export default defineConfig({ use: { danwoConfig: "danwo.config.ts" } })
+
+// tests/buy.spec.ts
+import { expect, testWith } from "@danwo/playwright"
+import type { StripeFixtures } from "@danwo/sdk"
+
+const test = testWith<StripeFixtures>() // types `danwo.stripe`
+
+test.invariant(async ({ danwo, baseURL }) => {
+  // Runs after every test in the file, however its body went.
+})
+
+test("buys credits", async ({ page, danwo }) => {
+  danwo.inject("duplicate on webhook checkout.session.completed") // optional: a live fault
+  await page.goto("/")
+  // …
+  await danwo.settle() // deliver pending webhooks
+})
+```
+
+- Each Playwright worker starts the config's `environment()` once (or the `danwoEnvironment`
+  option's) and launches its browser behind the environment's proxy.
+- `danwo` holds the environment's fixtures (`danwo.stripe`, `danwo.slack`, …), `exchanges()` and
+  `deliveries()` since the test began, `settle()`, `inject(label)` and `clearFaults()`.
+- A failed test gets a `danwo flight record` attachment: the calls, webhooks and emulator state,
+  redacted like danwo's own records.
+- `npx danwo-playwright matrix tests/buy.spec.ts [--grep …] [--faults …]` runs the test clean,
+  plans faults from its calls and webhooks, and runs it once per fault in a fresh Playwright
+  process. Faulted runs are judged by the invariant; each trial's results are kept under
+  `test-results/danwo-matrix/`. Status faults get their provider's error body; the danwo config's
+  `matrix.webhookFaults` and `matrix.outboundFaults` choose what is planned.
 
 ## Saved sessions
 
