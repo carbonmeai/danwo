@@ -21,6 +21,10 @@ import {
   seedGoogle,
   seedMicrosoft,
   seedS3,
+  seedSlack,
+  SLACK_HOSTS,
+  slack,
+  slackWorkspace,
   stripe,
   listeningPort,
 } from "@danwo/emulators"
@@ -39,6 +43,7 @@ const FETCH_APP = fileURLToPath(new URL("./fixtures/fetch-app.ts", import.meta.u
 const GOOGLE_SYNC_APP = fileURLToPath(new URL("./fixtures/google-sync-app.ts", import.meta.url))
 const GRAPH_SYNC_APP = fileURLToPath(new URL("./fixtures/graph-sync-app.ts", import.meta.url))
 const PUBSUB_VERIFY_APP = fileURLToPath(new URL("./fixtures/pubsub-verify-app.ts", import.meta.url))
+const SLACK_APP = fileURLToPath(new URL("./fixtures/slack-app.ts", import.meta.url))
 
 let other: Server
 let otherUrl: string
@@ -644,6 +649,102 @@ describe("routing an unmodified Microsoft Graph integration", () => {
       expect(proxy.exchanges().every((exchange) => exchange.disposition === "routed")).toBe(true)
       expect(new Set(proxy.exchanges().map((exchange) => exchange.host))).toEqual(
         new Set(["graph.microsoft.com"]),
+      )
+    } finally {
+      await proxy.stop()
+      await emulator.close()
+    }
+  })
+})
+
+/** Runs the Slack app, mentions its bot once it is ready, and resolves with its last line. */
+async function runSlackApp(env: NodeJS.ProcessEnv, mention: (botUserId: string) => void) {
+  const child = spawn(process.execPath, [SLACK_APP], {
+    env,
+    cwd: fileURLToPath(new URL("..", import.meta.url)),
+  })
+  const lines: string[] = []
+  let errors = ""
+
+  child.stderr.on("data", (chunk: Buffer) => (errors += chunk.toString()))
+  child.stdout.on("data", (chunk: Buffer) => {
+    for (const line of chunk
+      .toString()
+      .split("\n")
+      .filter((l) => l !== "")) {
+      lines.push(line)
+
+      const ready = z
+        .object({ ready: z.literal(true), botUserId: z.string() })
+        .safeParse(JSON.parse(line))
+
+      if (ready.success) mention(ready.data.botUserId)
+    }
+  })
+
+  const [code] = await once(child, "exit")
+
+  if (code !== 0) throw new Error(`the Slack app failed: ${errors}`)
+
+  return JSON.parse(lines.at(-1) ?? "{}")
+}
+
+describe("routing an unmodified Slack app", () => {
+  it("installs through OAuth, gets a signed app_mention and replies in the thread", async () => {
+    const port = await freePort()
+    const emulator = createEmulator(slack)
+    const app = {
+      name: "Hello Bot",
+      client_id: "1234.5678",
+      client_secret: "hello-secret",
+      signing_secret: "hello-signing-secret",
+      redirect_urls: ["https://app.danwo.test/slack/oauth"],
+      events: { url: `http://127.0.0.1:${port}/slack/events`, bot_events: ["app_mention"] },
+    }
+
+    seedSlack(emulator.store, {
+      team: { name: "Danwo QA" },
+      users: [
+        { name: "ada", email: "ada@danwo.test", real_name: "Ada Lovelace" },
+        { name: "grace", email: "grace@danwo.test", real_name: "Grace Hopper" },
+      ],
+      apps: [app],
+    })
+
+    const proxy = await startProxy({
+      routes: [{ hosts: [...SLACK_HOSTS], handler: emulator.fetch }],
+      unmatched: "block",
+    })
+    const workspace = slackWorkspace(emulator)
+    let asked = ""
+
+    try {
+      const seen = await runSlackApp(
+        {
+          ...proxy.env(),
+          CLIENT_ID: app.client_id,
+          CLIENT_SECRET: app.client_secret,
+          SIGNING_SECRET: app.signing_secret,
+          EVENTS_PORT: String(port),
+        },
+        (botUserId) => {
+          asked = workspace.post("grace", "general", `<@${botUserId}> are you there?`)
+        },
+      )
+
+      expect(seen).toEqual({
+        mention: expect.stringMatching(/^<@U\w+> are you there\?$/),
+        replied: true,
+      })
+      expect(workspace.thread("general", asked).map((message) => message.text)).toEqual([
+        expect.stringMatching(/are you there/),
+        expect.stringMatching(/^Hello <@U/),
+      ])
+
+      await proxy.settled()
+      expect(proxy.exchanges().every((exchange) => exchange.disposition === "routed")).toBe(true)
+      expect(new Set(proxy.exchanges().map((exchange) => exchange.host))).toEqual(
+        new Set(["slack.com"]),
       )
     } finally {
       await proxy.stop()
