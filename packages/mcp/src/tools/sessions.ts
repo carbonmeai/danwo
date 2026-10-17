@@ -276,9 +276,9 @@ function registerLifecycle(server: McpServer, sessions: SessionManager): void {
   )
 }
 
+/** The groups of session tools, registered in the order clients list them. */
+const TOOL_GROUPS = [registerLifecycle, registerPageTools, registerActions, registerServiceTools]
+
 export function registerSessionTools(server: McpServer, sessions: SessionManager): void {
-  registerLifecycle(server, sessions)
-  registerPageTools(server, sessions)
-  registerActions(server, sessions)
-  registerServiceTools(server, sessions)
+  for (const registerGroup of TOOL_GROUPS) registerGroup(server, sessions)
 }
