@@ -12,6 +12,7 @@ import {
   googleOutboundFaults,
   MICROSOFT_HOSTS,
   microsoft,
+  outlookMailbox,
   resend,
   resendInbox,
   s3,
@@ -34,6 +35,7 @@ const S3_APP = fileURLToPath(new URL("./fixtures/s3-app.mjs", import.meta.url))
 const OAUTH_APP = fileURLToPath(new URL("./fixtures/oauth-app.mjs", import.meta.url))
 const FETCH_APP = fileURLToPath(new URL("./fixtures/fetch-app.mjs", import.meta.url))
 const GOOGLE_SYNC_APP = fileURLToPath(new URL("./fixtures/google-sync-app.mjs", import.meta.url))
+const GRAPH_SYNC_APP = fileURLToPath(new URL("./fixtures/graph-sync-app.mjs", import.meta.url))
 
 let other: Server
 let otherUrl: string
@@ -488,6 +490,59 @@ describe("routing an unmodified Google integration", () => {
   })
 })
 
+describe("routing an unmodified Microsoft Graph integration", () => {
+  it("subscribes with the handshake, gets a notification and syncs the inbox by delta", async () => {
+    const port = await freePort()
+    const emulator = createEmulator(microsoft)
+    const email = "ada@danwo.test"
+
+    seedMicrosoft(emulator, {
+      users: [{ email, name: "Ada Lovelace" }],
+      oauth_clients: [GRAPH_CLIENT],
+      mail: [{ user: email, subject: "Welcome" }],
+    })
+
+    const proxy = await startProxy({
+      routes: [{ hosts: [...MICROSOFT_HOSTS], handler: emulator.fetch }],
+      unmatched: "block",
+    })
+
+    try {
+      const { stdout } = await run(process.execPath, [GRAPH_SYNC_APP], {
+        env: {
+          ...proxy.env(),
+          ACCESS_TOKEN: await graphAccessToken(emulator, "Mail.ReadWrite Mail.Send"),
+          NOTIFY_PORT: String(port),
+          USER_EMAIL: email,
+        },
+        cwd: fileURLToPath(new URL("..", import.meta.url)),
+        timeout: 30_000,
+      })
+
+      expect(JSON.parse(stdout)).toEqual({
+        subscribed: 201,
+        firstRound: ["Welcome"],
+        notification: {
+          changeType: "created",
+          clientState: "graph-sync-state",
+          subscription: true,
+        },
+        changed: ["Weekly report"],
+      })
+      expect(outlookMailbox(emulator, email).latest("inbox")?.subject).toBe("Weekly report")
+
+      await proxy.settled()
+      expect(proxy.exchanges().every((exchange) => exchange.disposition === "routed")).toBe(true)
+      expect(new Set(proxy.exchanges().map((exchange) => exchange.host))).toEqual(
+        new Set(["graph.microsoft.com"]),
+      )
+    } finally {
+      await proxy.stop()
+      await emulator.close()
+    }
+  })
+})
+
 describe("forwarding to an upstream", () => {
   it("keeps method, path, query, Host and body, for exact and wildcard hosts", async () => {
     const upstream = await startUpstream()
@@ -637,3 +692,51 @@ describe("env", () => {
     }
   })
 })
+
+const GRAPH_CLIENT = {
+  client_id: "6731de76-14a6-49ae-97bc-6eba6914391e",
+  client_secret: "Qx~8Q~graph-sync",
+  name: "Graph Sync",
+  redirect_uris: ["https://app.danwo.test/oauth/callback"],
+}
+
+/** Plays the user signing in to the Graph app with `scope`, and returns the access token. */
+async function graphAccessToken(
+  emulator: { fetch: (r: Request) => Promise<Response> },
+  scope: string,
+) {
+  const authorize = new URL("https://login.microsoftonline.com/common/oauth2/v2.0/authorize")
+
+  authorize.search = new URLSearchParams({
+    client_id: GRAPH_CLIENT.client_id,
+    redirect_uri: GRAPH_CLIENT.redirect_uris[0] ?? "",
+    response_type: "code",
+    scope,
+  }).toString()
+
+  const page = await (await emulator.fetch(new Request(authorize))).text()
+  const back = await emulator.fetch(
+    new Request("https://login.microsoftonline.com/common/login", {
+      method: "POST",
+      body: new URLSearchParams({
+        request: /name="request" value="([^"]+)"/.exec(page)?.[1] ?? "",
+        user: /name="user" value="([^"]+)"/.exec(page)?.[1] ?? "",
+      }),
+    }),
+  )
+  const token = await emulator.fetch(
+    new Request("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
+      method: "POST",
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code: new URL(back.headers.get("location") ?? "").searchParams.get("code") ?? "",
+        redirect_uri: GRAPH_CLIENT.redirect_uris[0] ?? "",
+        client_id: GRAPH_CLIENT.client_id,
+        client_secret: GRAPH_CLIENT.client_secret,
+        scope,
+      }),
+    }),
+  )
+
+  return ((await token.json()) as { access_token: string }).access_token
+}
