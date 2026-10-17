@@ -10,8 +10,14 @@ const usage = {
   outputTokens: { total: 5, text: 5, reasoning: undefined },
 }
 
-/** A tool call the scripted model makes, given the latest view it was shown. */
-export type Move = (view: string) => readonly [tool: string, input: Record<string, unknown>]
+/**
+ * A tool call the scripted model makes, given the latest view it was shown and the whole
+ * conversation so far (tool results included).
+ */
+export type Move = (
+  view: string,
+  conversation: string,
+) => readonly [tool: string, input: Record<string, unknown>]
 
 export function call(tool: string, input: unknown): LanguageModelV4GenerateResult {
   return {
@@ -65,12 +71,13 @@ export function scripted(moves: readonly Move[]) {
       const view = latestView(options)
       const turn = options.prompt.filter((message) => message.role === "tool").length
       const move = moves[turn]
+      const conversation = text(options.prompt.filter((message) => message.role !== "system"))
 
       views.push(view)
-      prompts.push(text(options.prompt.filter((message) => message.role !== "system")))
+      prompts.push(conversation)
       if (move === undefined) return call("done", { status: "passed", summary: "done" })
 
-      const [tool, input] = move(view)
+      const [tool, input] = move(view, conversation)
 
       return call(tool, input)
     },
