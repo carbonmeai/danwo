@@ -1,38 +1,10 @@
-import { type ChildProcess, spawn } from "node:child_process"
-import { createServer } from "node:net"
 import { fileURLToPath } from "node:url"
 
 import { defineConfig, googleEnvironment } from "@danwo/sdk"
 
+import { freePort, launchApp } from "../app-process.ts"
+
 const APP = fileURLToPath(new URL("./app.mjs", import.meta.url))
-
-/** A free local port, so the redirect URI can be registered before the app starts. */
-function freePort(): Promise<number> {
-  return new Promise((resolve) => {
-    const probe = createServer().listen(0, "127.0.0.1", () => {
-      const address = probe.address()
-
-      probe.close(() => resolve(typeof address === "object" && address ? address.port : 0))
-    })
-  })
-}
-
-/** Starts the app on `port` with `env`; resolves once it listens. */
-async function launch(port: number, env: NodeJS.ProcessEnv): Promise<ChildProcess> {
-  const child = spawn(process.execPath, [APP], {
-    env: { ...env, PORT: String(port) },
-    stdio: ["ignore", "pipe", "inherit"],
-  })
-
-  await new Promise<void>((resolve, reject) => {
-    child.stdout?.on("data", (chunk: Buffer) => {
-      if (chunk.toString().includes("listening")) resolve()
-    })
-    child.once("exit", (code) => reject(new Error(`app exited with ${code}`)))
-  })
-
-  return child
-}
 
 export default defineConfig({
   testDir: "tests",
@@ -52,7 +24,7 @@ export default defineConfig({
         ],
       },
     })
-    let app = await launch(port, google.proxy.env())
+    let app = await launchApp(APP, port, google.proxy.env())
 
     return {
       baseUrl: `http://127.0.0.1:${port}`,
@@ -61,7 +33,7 @@ export default defineConfig({
       async reset() {
         app.kill()
         await google.reset()
-        app = await launch(port, google.proxy.env())
+        app = await launchApp(APP, port, google.proxy.env())
       },
       async close() {
         app.kill()

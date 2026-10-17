@@ -27,6 +27,7 @@ afterAll(async () => {
     fixture("invariant"),
     fixture("uploads"),
     fixture("signin"),
+    fixture("integration"),
     fixture("visual"),
     SHOP,
   ])
@@ -217,6 +218,50 @@ describe("danwo matrix", () => {
     expect(out).toContain("faults: 6 passed")
     expect(code).toBe(0)
   }, 180_000)
+
+  it("faults Gmail's push like a webhook, and a deduplicating integration survives it", async () => {
+    const { code, out } = await danwo(fixture("integration"), [
+      "matrix",
+      "tests/inbox-sync.danwo.ts",
+    ])
+
+    expect(out).toContain("PASS  clean run")
+    // Only the test's own calls are planned: the app's watch at start-up is not.
+    expect(out).not.toContain("users/me/watch")
+    expect(out).toContain("PASS  status 404 on GET gmail.googleapis.com/gmail/v1/users/me/history")
+    expect(out).toContain(
+      "PASS  duplicate on google webhook pubsub:projects/inbox-sync/subscriptions/gmail-push",
+    )
+    expect(out).toContain(
+      "PASS  forged on google webhook pubsub:projects/inbox-sync/subscriptions/gmail-push",
+    )
+    expect(out).toContain("faults: 24 passed")
+    expect(code).toBe(0)
+  }, 300_000)
+
+  it("catches an integration that lists a message twice when its push comes twice", async () => {
+    const { code, out } = await danwo(
+      fixture("integration"),
+      ["matrix", "tests/inbox-sync.danwo.ts"],
+      { INTEGRATION_BUG: "no-dedupe" },
+    )
+
+    expect(out).toContain(
+      "FAIL  duplicate on google webhook pubsub:projects/inbox-sync/subscriptions/gmail-push",
+    )
+    expect(out).toContain(
+      "FAIL  forged on google webhook pubsub:projects/inbox-sync/subscriptions/gmail-push",
+    )
+    expect(out).toContain("invariant: expected 2 to be 1")
+    expect(out).toContain("faults: 22 passed, 2 failed")
+    expect(code).toBe(1)
+
+    const report = /report: (\S+report\.html)/.exec(out)?.[1] ?? ""
+    const html = await readFile(join(fixture("integration"), report), "utf8")
+
+    expect(html).toContain("POST gmail.googleapis.com/gmail/v1/users/me/messages/send")
+    expect(html).not.toMatch(/GOCSPX-integration-fixture|ya29\.[A-Za-z0-9]/)
+  }, 300_000)
 
   it("reports a run whose fault never fired as invalid", async () => {
     const { code, out } = await danwo(fixture("invariant"), ["matrix", "tests/unfired.danwo.ts"])
