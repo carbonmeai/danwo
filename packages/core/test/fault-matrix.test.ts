@@ -13,6 +13,7 @@ import {
 } from "@danwo/emulators"
 import { type Proxy, startProxy } from "@danwo/proxy"
 import { describe, expect, it } from "vitest"
+import { z } from "zod"
 
 import { formatMatrix, type RunEnvironment, runFaultMatrix } from "../src/fault-matrix.ts"
 
@@ -107,7 +108,7 @@ async function settleWebhooks(env: ShopEnvironment): Promise<void> {
 async function credits(env: ShopEnvironment, user: string): Promise<number> {
   const res = await fetch(`${env.shopUrl}/credits?user=${user}`)
 
-  return ((await res.json()) as { credits: number }).credits
+  return z.object({ credits: z.number() }).parse(await res.json()).credits
 }
 
 /**
@@ -127,7 +128,7 @@ async function buyCredits(env: ShopEnvironment): Promise<void> {
     return
   }
 
-  const { url } = (await res.json()) as { url: string }
+  const { url } = z.object({ url: z.string() }).parse(await res.json())
   const sessionId = new URL(url).pathname.split("/").at(-1) ?? ""
 
   await env.emulator.fetch(

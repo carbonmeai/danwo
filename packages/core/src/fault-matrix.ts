@@ -291,10 +291,10 @@ function firstDeliveries(deliveries: readonly ServiceDelivery[]): ServiceDeliver
   const seen = new Set<string>()
 
   return deliveries.filter((attempt) => {
-    const message = `${attempt.service ?? ""}#${attempt.messageId}`
-    const first = attempt.attempt === 1 && attempt.fault === null && !seen.has(message)
+    const key = `${attempt.service ?? ""}#${attempt.messageId}`
+    const first = attempt.attempt === 1 && attempt.fault === null && !seen.has(key)
 
-    if (first) seen.add(message)
+    if (first) seen.add(key)
 
     return first
   })
@@ -396,11 +396,13 @@ const STATUS_LABEL: Record<RunOutcome["status"], string> = {
   "environment-error": "ENV ",
 }
 
+/** One run's lines in the plain-text report. */
+function runLine(r: RunOutcome): string {
+  return `${STATUS_LABEL[r.status]}  ${r.fault?.label ?? "clean run"}${r.notes.map((note) => `\n        ${note}`).join("")}${r.error ? `\n        ${r.error}` : ""}${r.record && r.status !== "passed" ? `\n        record: ${r.record}` : ""}`
+}
+
 /** A plain-text report: one line per run, then the counts of faulted runs by status. */
 export function formatMatrix(result: FaultMatrixResult): string {
-  const line = (r: RunOutcome) =>
-    `${STATUS_LABEL[r.status]}  ${r.fault?.label ?? "clean run"}${r.notes.map((note) => `\n        ${note}`).join("")}${r.error ? `\n        ${r.error}` : ""}${r.record && r.status !== "passed" ? `\n        record: ${r.record}` : ""}`
-
   const count = (status: RunOutcome["status"], word: string) => {
     const n = result.runs.filter((r) => r.status === status).length
 
@@ -415,7 +417,7 @@ export function formatMatrix(result: FaultMatrixResult): string {
   ].filter(Boolean)
 
   return [
-    ...[result.clean, ...result.runs].map(line),
+    ...[result.clean, ...result.runs].map(runLine),
     ...(summary.length > 0 ? [`faults: ${summary.join(", ")}`] : []),
   ].join("\n")
 }
