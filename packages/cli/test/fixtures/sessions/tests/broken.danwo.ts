@@ -1,10 +1,12 @@
 import { test } from "@danwo/sdk"
 
-/** A sign-in with the wrong password: the form never lets this session through. */
+/** Credentials the app refuses: the sign-in form never lets this session through. */
+const refused = { Email: "ada@danwo.test", Password: "not-the-password" }
+
 test.session("intruder", async ({ app, screen, expect }) => {
   await app.open("/login")
-  await screen.getByLabel("Email").fill("ada@danwo.test")
-  await screen.getByLabel("Password").fill("not-the-password")
+  for (const [label, value] of Object.entries(refused)) await screen.getByLabel(label).fill(value)
+
   await screen.getByRole("button", { name: "Sign in" }).click()
   await expect(screen.getByRole("heading", { name: /^Notes for/ })).toBeVisible({ timeout: 1_000 })
 })
@@ -12,11 +14,8 @@ test.session("intruder", async ({ app, screen, expect }) => {
 test.describe("as an intruder", () => {
   test.use({ session: "intruder" })
 
-  test("reads the notes", async ({ app }) => {
-    await app.open("/notes")
-  })
-
-  test("saves a note", async ({ app }) => {
-    await app.open("/notes")
-  })
+  for (const name of ["reads the notes", "saves a note"])
+    test(name, async ({ app }) => {
+      await app.open("/notes")
+    })
 })
