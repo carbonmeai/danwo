@@ -26,6 +26,7 @@ import {
 import type { AttemptStatus } from "../tests/retry.ts"
 import { isSkipSignal } from "../tests/skip.ts"
 import type { StoredBody } from "../tests/types.ts"
+import { backendOf } from "./backend.ts"
 import type { DanwoConfig } from "./config.ts"
 import type { WorkerEnvironment } from "./environment.ts"
 import {
@@ -304,6 +305,23 @@ function pageOptions(config: DanwoConfig): Partial<WebSessionOptions> {
     ...(config.files !== undefined && { files: config.files }),
     ...(config.relocate !== undefined && { relocate: config.relocate }),
     ...(config.relocation !== undefined && { relocation: config.relocation }),
+    ...(config.appErrors !== undefined && { appErrors: config.appErrors }),
+  }
+}
+
+/** What each action waits for, and the environment's backend to wait on. */
+function readinessOptions(
+  config: DanwoConfig,
+  env: WorkerEnvironment | undefined,
+): Partial<WebSessionOptions> {
+  const setting = config.readiness
+  const settle = typeof setting === "object" && setting.settle === true
+  const backend = backendOf(env, { settle })
+
+  return {
+    ...(setting !== undefined && { readiness: setting }),
+    ...(backend && { backend }),
+    ...(env?.mail && { mail: env.mail }),
   }
 }
 
@@ -345,6 +363,7 @@ function openSession(
     ...(env?.proxy && { proxy: { url: env.proxy.url, caSpki: env.proxy.caSpki } }),
     ...agentOptions(config),
     ...pageOptions(config),
+    ...readinessOptions(config, env),
     ...replayOptions(setup),
     ...recordOptions(setup.recordDir),
     ...(setup.screenshots && { screenshots: setup.screenshots }),
@@ -362,6 +381,7 @@ function builtInFixtures(session: WebSession, env: WorkerEnvironment | undefined
     app: session.app,
     expect: session.expect,
     secret: (name: string) => session.secret(name),
+    mail: session.mail,
     platform: "web" as const,
     ...env?.fixtures,
   }

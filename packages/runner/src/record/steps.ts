@@ -32,8 +32,19 @@ export type StepEvent =
       readonly outputTokens: number
       readonly cachedInputTokens?: number
       readonly costUsd?: number
+      /** Asked again because the model's previous answer could not be used. */
+      readonly retry?: boolean
     }
   | { readonly kind: "action"; readonly at: string; readonly label: string }
+  /** How long the step waited after an action for the page, and the backend, to go quiet. */
+  | {
+      readonly kind: "ready"
+      readonly at: string
+      readonly ms: number
+      readonly waited: "page" | "page+backend"
+    }
+  /** The app failed while the step ran: an error response, an uncaught error, a console error. */
+  | { readonly kind: "app-error"; readonly at: string; readonly text: string }
   | ScreenshotEvent
   /** A recorded element was found somewhere else: where it was, and where it is now. */
   | { readonly kind: "relocated"; readonly at: string; readonly from: string; readonly to: string }

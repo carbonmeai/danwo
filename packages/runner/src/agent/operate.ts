@@ -121,7 +121,7 @@ export async function scroll(page: Page, direction: "up" | "down"): Promise<void
 const SETTLE_MS = 5_000
 
 /** Lets a navigation an action started reach its content before the page is looked at again. */
-export async function settle(page: Page): Promise<void> {
+async function settle(page: Page): Promise<void> {
   await page.waitForLoadState("domcontentloaded", { timeout: SETTLE_MS }).catch(() => undefined)
 }
 

@@ -10,7 +10,25 @@ export {
   type VisualOptions,
 } from "../assert/index.ts"
 export type { App } from "../browser/index.ts"
-export type { ActOptions, ActResult, Agent, ExtractOptions } from "../agent/index.ts"
+export type {
+  ActOptions,
+  ActResult,
+  Agent,
+  AssertOptions,
+  ExtractOptions,
+  PollOption,
+  WaitForOptions,
+} from "../agent/index.ts"
+export type { ReadinessMode } from "../browser/readiness.ts"
+export {
+  gmailMail,
+  type MailMessage,
+  type MailSource,
+  outlookMail,
+  resendMail,
+} from "../mail/index.ts"
+export type { SessionMail } from "../session.ts"
+export { totp } from "../secrets/totp.ts"
 export { z } from "zod"
 export { unique } from "../replay/index.ts"
 export type { Secret } from "../secrets/index.ts"

@@ -1,6 +1,8 @@
 import type { RunWebhooks } from "@danwo/core"
 import type { Proxy } from "@danwo/proxy"
 
+import type { MailSource } from "../mail/index.ts"
+
 /**
  * What a worker runs its tests against, set up once per worker by the config's `environment`
  * hook: the app's URL, the proxy its browser and app go through, emulators, and any values tests
@@ -19,6 +21,11 @@ export interface WorkerEnvironment {
   readonly webhooks?: RunWebhooks | undefined
   /** Extra fixtures every test in this worker receives, e.g. `stripe`, `inbox`, `settle`. */
   readonly fixtures?: Readonly<Record<string, unknown>>
+  /**
+   * Where mail the app sends lands, e.g. `[resendMail(resend)]`: tests read it through the `mail`
+   * fixture, and the agent reads codes and links from it that replays read again.
+   */
+  readonly mail?: readonly MailSource[]
   /** Lets pending background work finish (e.g. webhook deliveries on a manual clock) before a matrix run's evidence is read. */
   settle?(): Promise<void>
   /** Back to a clean state between `danwo matrix` runs (emulators, app state, fault rules). */

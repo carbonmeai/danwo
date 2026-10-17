@@ -32,6 +32,16 @@ const ERROR_CODES = {
   AGENT_LOOPING: ["test", "the agent kept repeating itself and was made to stop"],
   BUDGET_EXCEEDED: ["test", "a step or test used up its turns, model calls, cost or time"],
   EXTRACT_FAILED: ["test", "`agent.extract` could not read a valid result"],
+  WAIT_TIMED_OUT: ["test", "`agent.waitFor` did not see its condition hold in time"],
+  MODEL_OUTPUT_INVALID: [
+    "inconclusive",
+    "the model kept answering in a form danwo could not use, even when told what was wrong",
+  ],
+  APP_ERROR: [
+    "test",
+    "the app failed during a step: a 5xx response, an uncaught error, a console error",
+  ],
+  PROVIDER_ERROR: ["test", "a provider call failed during a step and the app did not recover"],
   NOTHING_RECORDED: ["blocked", "strict replay found no recording of a step"],
   STALE_RECORDING: [
     "blocked",

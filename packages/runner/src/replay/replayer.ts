@@ -11,17 +11,17 @@ import {
   type Operation,
   operate,
   scroll,
-  settle,
   waitFor,
   watched,
 } from "../agent/operate.ts"
 import type { Tabs } from "../browser/tabs.ts"
+import type { MailDesk } from "../mail/desk.ts"
 import { checkSecretField } from "../secrets/fields.ts"
 import type { SecretVault } from "../secrets/index.ts"
 import { paramSecret, type Params, paramText } from "./params.ts"
 import { routeOf } from "./route.ts"
 import { describe, findTarget, locatorFor, type Target } from "./target.ts"
-import type { RecordedAction, RecordedInput, Trace } from "./trace.ts"
+import type { FromMail, RecordedAction, RecordedAddress, RecordedInput, Trace } from "./trace.ts"
 
 const ROUTE_POLL_MS = 100
 /** A recorded element that is not back within this long is gone: the page changed. */
@@ -60,6 +60,10 @@ export interface ReplayContext {
   readonly onAction: (label: string) => void
   /** How a recorded target is found; exact matching by default. */
   readonly find?: TargetFinder
+  /** Waits, after an action, for the page and the backend to go quiet (see readiness.ts). */
+  readonly ready: () => Promise<void>
+  /** Mail the app sent, where values a recording took from mail are read again. */
+  readonly mail: MailDesk
 }
 
 /** The handle of a recorded secret: the step's param of that name, else the session's secret. */
@@ -67,16 +71,37 @@ function secretOf(name: string, context: ReplayContext) {
   return paramSecret(context.params, name) ?? context.vault.handle(name)
 }
 
-async function inputText(input: RecordedInput, context: ReplayContext): Promise<string> {
-  if ("text" in input) return input.text
+/** An address as this run has it: as recorded, or the value of the param it came from. */
+function addressText(address: RecordedAddress, context: ReplayContext): string {
+  if ("text" in address) return address.text
 
-  if ("secret" in input) return context.vault.reveal(secretOf(input.secret, context))
+  const text = paramText(context.params, address.param)
 
-  const text = paramText(context.params, input.param)
-
-  if (text === undefined) throw new Error(`param "${input.param}" was not given`)
+  if (text === undefined) throw new Error(`param "${address.param}" was not given`)
 
   return text
+}
+
+/** The value a recording took from mail, read again from the mail of this run. */
+async function mailValue(from: FromMail, context: ReplayContext): Promise<string> {
+  const to = addressText(from.to, context)
+  const value = await context.mail.value(
+    to,
+    { kind: from.kind, match: from.match, digits: from.digits },
+    Math.min(context.timeout, FIND_MS),
+  )
+
+  if (value === undefined) throw new Error(`no mail to ${to} with a ${from.kind} arrived`)
+
+  return value
+}
+
+async function inputText(input: RecordedInput, context: ReplayContext): Promise<string> {
+  if ("text" in input) return input.text
+  if ("secret" in input) return context.vault.reveal(secretOf(input.secret, context))
+  if ("mail" in input) return mailValue(input.mail, context)
+
+  return addressText(input, context)
 }
 
 /** Exact finding: the one element the target describes on the active tab. */
@@ -287,11 +312,19 @@ const pageActions: { readonly [Kind in RecordedAction["kind"]]?: OnPage<Kind> } 
     return { label: `scroll ${direction}`, moved: [] }
   },
   navigate: async (action, context) => {
-    await context.tabs.page.goto(new URL(action.url, context.appUrl).href, {
-      timeout: context.timeout,
-    })
+    const url = action.mail === undefined ? action.url : await mailValue(action.mail, context)
+
+    await context.tabs.page.goto(new URL(url, context.appUrl).href, { timeout: context.timeout })
 
     return { label: `navigate ${action.url}`, moved: [] }
+  },
+  open_mail: async (action, context) => {
+    const to = addressText(action.to, context)
+
+    if (!(await context.mail.open(context.tabs.page, to, Math.min(context.timeout, FIND_MS))))
+      throw new Error(`no mail to ${to} arrived`)
+
+    return { label: "open mail", moved: [] }
   },
   back: async (_action, context) => {
     await context.tabs.page.goBack({ timeout: context.timeout })
@@ -391,7 +424,7 @@ async function replayStep(trace: Trace, index: number, context: ReplayContext): 
 
     context.onAction(done.label)
     checkDialog(done, trace.actions[index + 1])
-    if (done.after?.dialog === undefined) await settle(context.tabs.page)
+    if (done.after?.dialog === undefined) await context.ready()
 
     return done
   } catch (cause) {

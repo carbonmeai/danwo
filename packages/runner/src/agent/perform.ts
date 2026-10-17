@@ -6,21 +6,14 @@
 import type { Page } from "playwright-core"
 
 import type { Tabs } from "../browser/tabs.ts"
-import { paramSecret, type Params, paramTyped } from "../replay/params.ts"
+import type { MailDesk, MailOrigin } from "../mail/desk.ts"
+import { embedsValue, paramSecret, type Params, paramTyped } from "../replay/params.ts"
 import { describeTarget, type Target } from "../replay/target.ts"
-import type { RecordedAction, RecordedInput } from "../replay/trace.ts"
+import type { FromMail, RecordedAction, RecordedAddress, RecordedInput } from "../replay/trace.ts"
 import { checkSecretField } from "../secrets/fields.ts"
 import type { SecretVault } from "../secrets/index.ts"
 import { filePaths, type Files } from "./files.ts"
-import {
-  type Aftermath,
-  type Operation,
-  operate,
-  scroll,
-  settle,
-  waitFor,
-  watched,
-} from "./operate.ts"
+import { type Aftermath, type Operation, operate, scroll, waitFor, watched } from "./operate.ts"
 import { type ToolInput, toolInputs, type ToolName } from "./tools.ts"
 
 export interface PerformContext {
@@ -32,13 +25,20 @@ export interface PerformContext {
   readonly params: Params
   readonly files: Files
   readonly timeout: number
+  /** Waits, after an action, for the page and the backend to go quiet (see readiness.ts). */
+  readonly ready: () => Promise<void>
+  /** Mail the app sent, as the emulators caught it. */
+  readonly mail: MailDesk
 }
 
 export interface Performed {
   /** What happened, for the model. */
   readonly outcome: string
-  /** The action as recorded; null when it cannot be replayed (no durable target). */
-  readonly recorded: RecordedAction | null
+  /**
+   * The action as recorded; null when it cannot be replayed (no durable target), undefined when
+   * there is nothing to replay (reading mail changes nothing on the page).
+   */
+  readonly recorded: RecordedAction | null | undefined
 }
 
 /** The tools that act on the page: every tool but `done`. */
@@ -56,17 +56,27 @@ function isActionName(name: string): name is ActionName {
   return name !== "done" && Object.hasOwn(toolInputs, name)
 }
 
+/** A parsed tool call, or what was wrong with it in words the model can act on. */
+export type ParsedCall = { readonly call: Call } | { readonly problem: string }
+
 /** Parses `input` against the named tool's schema. */
-function parseAs<Name extends ActionName>(name: Name, input: unknown): CallOf<Name> | undefined {
+function parseAs(name: ActionName, input: unknown): ParsedCall {
   const parsed = toolInputs[name].safeParse(input)
 
+  if (!parsed.success)
+    return {
+      problem: parsed.error.issues
+        .map((issue) => `${issue.path.join(".") || "input"}: ${issue.message}`)
+        .join("; "),
+    }
+
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- toolInputs[name] parses ToolInput<Name>; TypeScript can't correlate a generic key with its schema's output
-  return parsed.success ? ({ name, input: parsed.data } as CallOf<Name>) : undefined
+  return { call: { name, input: parsed.data } as Call }
 }
 
-/** Parses a raw tool call; undefined for `done` or a call that does not fit its tool. */
-export function parseCall(name: string, input: unknown): Call | undefined {
-  return isActionName(name) ? parseAs(name, input) : undefined
+/** Parses a raw tool call; `done` and unknown tools are problems too. */
+export function parseCall(name: string, input: unknown): ParsedCall {
+  return isActionName(name) ? parseAs(name, input) : { problem: `there is no tool "${name}"` }
 }
 
 /** What the model is told happened besides the action itself. */
@@ -85,7 +95,7 @@ async function onElement(
   record: (target: Target, after: Aftermath) => RecordedAction,
 ): Promise<Performed> {
   const page = context.tabs.page
-  const target = await describeTarget(page, context.tree, ref)
+  const target = durable(await describeTarget(page, context.tree, ref), context)
   const after = await watched(
     context.tabs,
     () => operate(page.getByRef(ref), operation, context.timeout),
@@ -95,7 +105,7 @@ async function onElement(
     },
   )
 
-  if (after.dialog === undefined) await settle(context.tabs.page)
+  if (after.dialog === undefined) await context.ready()
 
   return {
     outcome: afterText(after),
@@ -103,9 +113,54 @@ async function onElement(
   }
 }
 
-/** How text the agent typed is recorded: as the param it came from, or as written. */
-function typedInput(params: Params, text: string): RecordedInput {
-  const param = paramTyped(params, text)
+/**
+ * A described target without the parts that would not match on another run: a name or text that
+ * holds a param's value or a value read from mail is dropped. Undefined when nothing durable is
+ * left to find the element by, so the action is not replayed against the wrong element.
+ */
+function durable(target: Target | undefined, context: PerformContext): Target | undefined {
+  if (target === undefined) return undefined
+
+  const keeps = (text: string | undefined): text is string =>
+    text !== undefined && !embedsValue(text, context.params, context.mail.values())
+  const { name, text, ...rest } = target
+  const kept: Target = { ...rest, ...(keeps(name) && { name }), ...(keeps(text) && { text }) }
+  const dropped = kept.name !== name || kept.text !== text
+
+  if (!dropped) return target
+
+  return findable(kept) ? kept : undefined
+}
+
+/** Whether a target still says which element it is: by test id, name or text. */
+function findable(target: Target): boolean {
+  return [target.testId, target.name, target.text].some((part) => part !== undefined)
+}
+
+/** An address as recorded: the param it came from, or as written. */
+function addressOf(params: Params, to: string): RecordedAddress {
+  const param = paramTyped(params, to)
+
+  return param === undefined ? { text: to } : { param }
+}
+
+/** A mail origin as recorded, with its address put the way the recording keeps it. */
+function fromMail(origin: MailOrigin, params: Params): FromMail {
+  return {
+    to: addressOf(params, origin.to),
+    kind: origin.pick.kind,
+    ...(origin.pick.match !== undefined && { match: origin.pick.match }),
+    ...(origin.pick.digits !== undefined && { digits: origin.pick.digits }),
+  }
+}
+
+/** How text the agent typed is recorded: as the mail value or param it came from, or as written. */
+function typedInput(context: PerformContext, text: string): RecordedInput {
+  const origin = context.mail.originOf(text)
+
+  if (origin !== undefined) return { mail: fromMail(origin, context.params) }
+
+  const param = paramTyped(context.params, text)
 
   return param === undefined ? { text } : { param }
 }
@@ -156,27 +211,75 @@ async function answerDialog(
   input: ToolInput<"dialog">,
 ): Promise<Performed> {
   await context.tabs.answer(input.accept, input.text)
-  await settle(context.tabs.page)
+  await context.ready()
 
   return {
     outcome: "done",
     recorded: {
       kind: "dialog",
       accept: input.accept,
-      ...(input.text !== undefined && { input: typedInput(context.params, input.text) }),
+      ...(input.text !== undefined && { input: typedInput(context, input.text) }),
     },
   }
 }
 
-function navigateTo(context: PerformContext, url: string): Promise<Performed> {
+/** What a navigation to a link read from mail is recorded under: never the link itself. */
+const MAIL_LINK = "(a link from mail)"
+
+async function navigateTo(context: PerformContext, url: string): Promise<Performed> {
   const absolute = new URL(url, context.appUrl)
   const app = new URL(context.appUrl)
+  const origin = context.mail.originOf(url)
   const recorded =
     absolute.origin === app.origin ? `${absolute.pathname}${absolute.search}` : absolute.href
 
-  return context.tabs.page
-    .goto(absolute.href, { timeout: context.timeout })
-    .then(() => ({ outcome: "done", recorded: { kind: "navigate", url: recorded } }))
+  await context.tabs.page.goto(absolute.href, { timeout: context.timeout })
+  await context.ready()
+
+  return {
+    outcome: "done",
+    recorded:
+      origin === undefined
+        ? { kind: "navigate", url: recorded }
+        : { kind: "navigate", url: MAIL_LINK, mail: fromMail(origin, context.params) },
+  }
+}
+
+/** Reads a code or a link from the newest mail to an address, for the model to use. */
+async function readMail(
+  context: PerformContext,
+  input: ToolInput<"read_mail">,
+): Promise<Performed> {
+  if (!context.mail.available)
+    return { outcome: "no mail is caught in this session", recorded: undefined }
+
+  const pick = { kind: input.pick, match: input.match }
+  const value = await context.mail.value(input.to, pick, context.timeout)
+
+  return {
+    outcome:
+      value === undefined
+        ? `no mail to ${input.to} with a ${input.pick} arrived`
+        : `the ${input.pick} is ${value}`,
+    recorded: undefined,
+  }
+}
+
+/** Shows the newest mail to an address in the active tab. */
+async function openMail(
+  context: PerformContext,
+  input: ToolInput<"open_mail">,
+): Promise<Performed> {
+  const opened = await context.mail.open(context.tabs.page, input.to, context.timeout)
+
+  if (!opened) return { outcome: `no mail to ${input.to} arrived`, recorded: undefined }
+
+  await context.ready()
+
+  return {
+    outcome: "done; the email is shown",
+    recorded: { kind: "open_mail", to: addressOf(context.params, input.to) },
+  }
 }
 
 async function scrollPage(context: PerformContext, input: ToolInput<"scroll">): Promise<Performed> {
@@ -195,7 +298,7 @@ async function scrollPage(context: PerformContext, input: ToolInput<"scroll">): 
 
 async function goBack(context: PerformContext): Promise<Performed> {
   await context.tabs.page.goBack({ timeout: context.timeout })
-  await settle(context.tabs.page)
+  await context.ready()
 
   return { outcome: "done", recorded: { kind: "back" } }
 }
@@ -228,7 +331,9 @@ async function waitUntil(
   const page: Page = context.tabs.page
   const element = input.ref === undefined ? undefined : page.getByRef(input.ref)
   const target =
-    input.ref === undefined ? undefined : await describeTarget(page, context.tree, input.ref)
+    input.ref === undefined
+      ? undefined
+      : durable(await describeTarget(page, context.tree, input.ref), context)
   const condition = {
     text: input.text,
     element,
@@ -239,8 +344,10 @@ async function waitUntil(
 
   await waitFor(page, condition, context.timeout)
 
-  /* A wait on an element nothing durable describes cannot be replayed. */
-  const lost = element !== undefined && target === undefined
+  /* A wait on an element nothing durable describes, or on text that varies, cannot be replayed. */
+  const lost =
+    (element !== undefined && target === undefined) ||
+    (input.text !== undefined && embedsValue(input.text, context.params, context.mail.values()))
 
   return { outcome: "done", recorded: lost ? null : recordedWait(input, target) }
 }
@@ -262,7 +369,7 @@ async function pressKey(context: PerformContext, input: ToolInput<"press">): Pro
     mayOpenTab: true,
   })
 
-  if (after.dialog === undefined) await settle(context.tabs.page)
+  if (after.dialog === undefined) await context.ready()
 
   return {
     outcome: afterText(after),
@@ -287,7 +394,7 @@ const handlers: { readonly [Name in Call["name"]]: Handler<Name> } = {
     onElement(context, input.ref, { kind: "fill", text: input.text }, (target) => ({
       kind: "fill",
       target,
-      input: typedInput(context.params, input.text),
+      input: typedInput(context, input.text),
     })),
   select: (input, context) =>
     onElement(context, input.ref, { kind: "select", option: input.option }, (target) => ({
@@ -313,6 +420,8 @@ const handlers: { readonly [Name in Call["name"]]: Handler<Name> } = {
   back: (_input, context) => goBack(context),
   switch_tab: (input, context) => switchTab(context, input.tab),
   wait_for: (input, context) => waitUntil(context, input),
+  read_mail: (input, context) => readMail(context, input),
+  open_mail: (input, context) => openMail(context, input),
 }
 
 /** Carries out `call` on the active tab. */

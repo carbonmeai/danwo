@@ -8,20 +8,23 @@
  * (an error page, a login wall, still loading); `inconclusive` when the page does not show enough
  * to tell either way.
  */
-import { generateText, type LanguageModel, type UserContent } from "ai"
+import { generateText, type LanguageModel, type ModelMessage, type UserContent } from "ai"
 import { z } from "zod"
 
 import type { Tabs } from "../browser/tabs.ts"
 import { callCost, type CallCost } from "../model/resolve.ts"
 import { viewTabs, viewText } from "../snapshot/view.ts"
+import { DanwoError } from "../support/codes.ts"
 import { JUDGE_PROMPT } from "./prompts.ts"
 
 const verdictSchema = z.object({
   verdict: z.enum(["holds", "fails", "blocked", "inconclusive"]),
   reason: z.string(),
+  /** For a wait that holds: text on the page whose presence shows it (see WAIT_PROMPT). */
+  evidence: z.string().optional(),
 })
 
-type Verdict = z.infer<typeof verdictSchema>
+export type Verdict = z.infer<typeof verdictSchema>
 
 /** Everything the judge sees. */
 export interface JudgeInput {
@@ -85,20 +88,46 @@ export interface JudgeCall {
   readonly model: Exclude<LanguageModel, string>
   readonly signal?: AbortSignal | undefined
   readonly onModelCall: (cost: CallCost) => void
+  /** What the judge is told about its job; default the claim checker's. */
+  readonly system?: string
 }
 
-/** Asks the judge about `input`; the verdict, or undefined when it gave none. */
-async function askJudge(input: JudgeInput, call: JudgeCall): Promise<Verdict | undefined> {
-  const result = await generateText({
-    model: call.model,
-    system: JUDGE_PROMPT,
-    messages: [{ role: "user", content: judgeMessage(input) }],
-    ...(call.signal && { abortSignal: call.signal }),
-  })
+/** Times the judge is asked again after an answer that held no verdict. */
+const VERDICT_RETRIES = 2
 
-  call.onModelCall(callCost(result.usage, result.providerMetadata))
+const NO_VERDICT =
+  'Your answer held no verdict. Answer with only a JSON object: {"verdict": "holds" | "fails" | "blocked" | "inconclusive", "reason": "..."}.'
 
-  return parseVerdict(result.text)
+/**
+ * Asks the judge about `input`. An answer with no usable verdict is sent back with what was wrong,
+ * up to `VERDICT_RETRIES` times; after that the step is `MODEL_OUTPUT_INVALID`, which says
+ * nothing about the app.
+ */
+async function askJudge(input: JudgeInput, call: JudgeCall): Promise<Verdict> {
+  const messages: ModelMessage[] = [{ role: "user", content: judgeMessage(input) }]
+
+  for (let attempt = 0; ; attempt++) {
+    const result = await generateText({
+      model: call.model,
+      system: call.system ?? JUDGE_PROMPT,
+      messages,
+      ...(call.signal && { abortSignal: call.signal }),
+    })
+    const cost = callCost(result.usage, result.providerMetadata)
+
+    call.onModelCall(attempt > 0 ? { ...cost, retry: true } : cost)
+
+    const verdict = parseVerdict(result.text)
+
+    if (verdict !== undefined) return verdict
+    if (attempt >= VERDICT_RETRIES)
+      throw new DanwoError(
+        "MODEL_OUTPUT_INVALID",
+        `the judge gave no usable verdict in ${attempt + 1} answers`,
+      )
+
+    messages.push(...result.response.messages, { role: "user", content: NO_VERDICT })
+  }
 }
 
 export interface JudgeContext extends JudgeCall {
@@ -124,12 +153,58 @@ async function inputFor(claim: string, context: JudgeContext): Promise<JudgeInpu
   }
 }
 
-/** Asks the judge about `claim`; resolves when it holds, throws ClaimFailed otherwise. */
-export async function judge(claim: string, context: JudgeContext): Promise<void> {
-  const verdict = await askJudge(await inputFor(claim, context), context)
+/** The judge's verdict on `claim` for the page as it is now, with the page text it was shown. */
+async function judgeNow(
+  claim: string,
+  context: JudgeContext,
+): Promise<{ readonly verdict: Verdict; readonly page: string }> {
+  const input = await inputFor(claim, context)
 
-  if (verdict === undefined)
-    throw new ClaimFailed(claim, "inconclusive", "the judge gave no verdict")
+  return { verdict: await askJudge(input, context), page: input.screen.text }
+}
+
+/** How long to keep asking, and how often: `poll: true` is the session's assertion timeout. */
+export interface Poll {
+  readonly timeout: number
+  readonly interval: number
+}
+
+function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms)
+
+    signal?.addEventListener("abort", () => {
+      clearTimeout(timer)
+      resolve()
+    })
+  })
+}
+
+/**
+ * Asks the judge about `claim` until it holds or `poll` runs out; the last verdict, and the page
+ * it was given on. Without `poll` it asks once.
+ */
+export async function judgeUntil(
+  claim: string,
+  context: JudgeContext,
+  poll: Poll | undefined,
+): Promise<{ readonly verdict: Verdict; readonly page: string }> {
+  const deadline = performance.now() + (poll?.timeout ?? 0)
+
+  for (;;) {
+    const judged = await judgeNow(claim, context)
+    const left = deadline - performance.now()
+
+    if (judged.verdict.verdict === "holds" || poll === undefined || left <= 0) return judged
+
+    await sleep(Math.min(poll.interval, left), context.signal)
+  }
+}
+
+/** Asks the judge about `claim`; resolves when it holds, throws ClaimFailed otherwise. */
+export async function judge(claim: string, context: JudgeContext, poll?: Poll): Promise<void> {
+  const { verdict } = await judgeUntil(claim, context, poll)
+
   if (verdict.verdict !== "holds")
     throw new ClaimFailed(claim, verdict.verdict, context.redact(verdict.reason))
 }

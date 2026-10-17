@@ -37,6 +37,15 @@ export const toolInputs = {
     network_idle: z.boolean().optional(),
     ms: z.number().max(10_000).optional(),
   }),
+  read_mail: z.object({
+    to: z.string().describe("The email address the app wrote to."),
+    pick: z.enum(["code", "link"]),
+    match: z
+      .string()
+      .optional()
+      .describe("For a link: a word in its text or URL, when the mail has several."),
+  }),
+  open_mail: z.object({ to: z.string().describe("The email address the app wrote to.") }),
   done: z.object({ status: z.enum(["passed", "failed"]), summary: z.string() }),
 }
 
@@ -68,6 +77,10 @@ const descriptions: Record<ToolName, string> = {
   switch_tab: "Make tab `tab` (as the view numbers them) the one you see and act on.",
   wait_for:
     "Wait until `text` or element `ref` appears (or with `state: hidden`, goes away), until the network is idle, or for `ms` milliseconds.",
+  read_mail:
+    "Read the newest email the app sent to `to`: its one-time code, or a link (the first, or the one `match` names). Use what it gives you with fill or navigate.",
+  open_mail:
+    "Show the newest email the app sent to `to` in the current tab, to read it or click a link in it.",
   done: "End the step: `passed` once the instruction is carried out, `failed` when it cannot be. Say why in `summary`.",
 }
 
@@ -93,5 +106,7 @@ export const agentTools = {
   back: offer("back", toolInputs.back),
   switch_tab: offer("switch_tab", toolInputs.switch_tab),
   wait_for: offer("wait_for", toolInputs.wait_for),
+  read_mail: offer("read_mail", toolInputs.read_mail),
+  open_mail: offer("open_mail", toolInputs.open_mail),
   done: offer("done", toolInputs.done),
 }

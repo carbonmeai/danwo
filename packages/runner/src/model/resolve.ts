@@ -13,6 +13,8 @@ export interface CallCost {
   readonly cachedInputTokens?: number
   /** What the gateway billed, in US dollars, when it says. */
   readonly costUsd?: number
+  /** The call asked again after the model's last answer could not be used. */
+  readonly retry?: boolean
 }
 
 function gatewayCost(metadata: ProviderMetadata | undefined): number | undefined {

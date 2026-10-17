@@ -14,6 +14,7 @@ import type { FieldKind, Secret, SecretPurpose } from "./vault.ts"
 const ALLOWED: Readonly<Record<SecretPurpose, readonly FieldKind[]>> = {
   password: ["password"],
   otp: ["one-time-code", "text"],
+  totp: ["one-time-code", "text"],
   "generic-secret": ["one-time-code", "text", "other"],
 }
 

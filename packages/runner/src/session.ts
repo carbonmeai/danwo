@@ -9,14 +9,19 @@ import type { Budgets } from "./agent/budget.ts"
 import { type Agent, createAgent, type ReplayDivergence } from "./agent/index.ts"
 import { type Expect, expect } from "./assert/index.ts"
 import type { BaselineUpdate, ScreenshotEvent } from "./assert/screenshot.ts"
+import { type AppErrorOptions, AppErrors } from "./browser/app-errors.ts"
 import { type App, type BrowserFlags, launchBrowser } from "./browser/index.ts"
+import { type Backend, Readiness, type ReadinessMode } from "./browser/readiness.ts"
 import { Tabs } from "./browser/tabs.ts"
 import { createSessionFlight, type SessionFlight } from "./flight.ts"
 import { createScreen, registerValueEngine, type Screen } from "./locate/index.ts"
+import { MailDesk } from "./mail/desk.ts"
+import type { MailMessage, MailSource } from "./mail/index.ts"
 import { recordAppLog, type StepRecord, StepRecorder } from "./record/index.ts"
 import { type CacheMode, ReplayStore } from "./replay/index.ts"
 import { type RelocationPolicy, relocationOf } from "./replay/policy.ts"
 import { type Secret, SecretVault, type SessionSecret } from "./secrets/index.ts"
+import { DanwoError } from "./support/codes.ts"
 
 export type { ReplayDivergence } from "./agent/index.ts"
 
@@ -37,6 +42,23 @@ interface AppOptions {
   readonly assertionTimeout?: number
   /** Timeout of a page load, in milliseconds. */
   readonly timeout?: number
+}
+
+/** What the session waits for after each action before going on (see browser/readiness.ts). */
+interface ReadinessSettings {
+  /**
+   * `page+backend` (the default when `backend` is given): the page settles and nothing the app
+   * started at the proxy or the webhook senders is still in flight. `page`: the page alone.
+   * `off`: no waiting beyond what each action does itself.
+   */
+  readonly readiness?: ReadinessMode | { readonly mode?: ReadinessMode; readonly capMs?: number }
+  /** How the backend is told quiet, from the environment: its proxy and webhook senders. */
+  readonly backend?: Backend
+  /**
+   * Besides the app's 5xx responses and uncaught page errors, count console errors as the app
+   * failing (default false). A live `agent.act` stops at the first failure; see browser/app-errors.ts.
+   */
+  readonly appErrors?: AppErrorOptions
 }
 
 /** The browser behind the run's proxy. */
@@ -83,6 +105,24 @@ interface ModelOptions {
    * these names, never paths. Paths resolve against `projectRoot`.
    */
   readonly files?: Readonly<Record<string, string>>
+  /**
+   * Where mail the app sends lands, e.g. `[resendMail(emulator)]`: the agent's `read_mail` and
+   * `open_mail` and the session's `mail` read from these, and a code typed from mail is recorded
+   * by where it came from, so a replay reads the new one.
+   */
+  readonly mail?: readonly MailSource[]
+}
+
+/** The mail the app sent, as a test reads it. */
+export interface SessionMail {
+  /** The newest email to `to`, if one arrived. */
+  latest(to: string): MailMessage | undefined
+  /** The code in the newest email to `to`, waiting for the email when it has not arrived yet. */
+  code(to: string, options?: { readonly digits?: number }): Promise<string>
+  /** A link in the newest email to `to`: the first, or the one whose text or URL has `match`. */
+  link(to: string, options?: { readonly match?: string }): Promise<string>
+  /** Shows the newest email to `to` in the active tab, to click its links. */
+  open(to: string): Promise<void>
 }
 
 /** Where recorded `agent.act` steps live; a step that replays needs no model call. */
@@ -143,6 +183,7 @@ interface RecordOptions {
 }
 
 export type WebSessionOptions = AppOptions &
+  ReadinessSettings &
   BrowserOptions &
   ModelOptions &
   ReplayOptions &
@@ -158,6 +199,8 @@ export interface WebSession {
   divergence(): ReplayDivergence | undefined
   /** The opaque handle of a secret from `options.secrets`; throws for an unknown name. */
   secret(name: string): Secret
+  /** Mail the app sent, from `options.mail`. */
+  readonly mail: SessionMail
   /** What the attempt did, for the flight recorder; read `steps()` after `close()` for final records. */
   readonly flight: SessionFlight
   /** The context's cookies, localStorage and IndexedDB now, to start another context from. */
@@ -261,13 +304,86 @@ function screenshotDesk(
 }
 
 /** `app` of a session: the base URL, and opening a path of it on the active tab. */
-function appOf(tabs: Tabs, steps: StepRecorder, baseUrl: string, loadTimeout: number): App {
+function appOf(
+  tabs: Tabs,
+  steps: StepRecorder,
+  page: {
+    readonly baseUrl: string
+    readonly loadTimeout: number
+    readonly ready: () => Promise<void>
+  },
+): App {
+  const { baseUrl } = page
+
   return {
     baseUrl,
     open: (path) =>
       steps.run("app", "app.open", path ?? "/", async () => {
-        await tabs.page.goto(new URL(path ?? "/", baseUrl).href, { timeout: loadTimeout })
+        await tabs.page.goto(new URL(path ?? "/", baseUrl).href, { timeout: page.loadTimeout })
+        await page.ready()
       }),
+  }
+}
+
+/** A value read from mail, or the failure of a test that needed it. */
+function need(to: string, what: string, found: string | undefined): string {
+  if (found === undefined)
+    throw new DanwoError("TEST_FAILED", `no mail to ${to} with ${what} arrived`)
+
+  return found
+}
+
+/** `mail` of a session: reading the app's mail, and showing a message in the active tab. */
+function mailOf(
+  desk: MailDesk,
+  tabs: Tabs,
+  steps: StepRecorder,
+  page: { readonly timeout: number; readonly ready: () => Promise<void> },
+): SessionMail {
+  return {
+    latest: (to) => desk.latest(to),
+    code: async (to, options = {}) =>
+      need(
+        to,
+        "a code",
+        await desk.value(to, { kind: "code", digits: options.digits }, page.timeout),
+      ),
+    link: async (to, options = {}) =>
+      need(
+        to,
+        "a link",
+        await desk.value(to, { kind: "link", match: options.match }, page.timeout),
+      ),
+    open: (to) =>
+      steps.run("app", "mail.open", to, async () => {
+        if (!(await desk.open(tabs.page, to, page.timeout)))
+          throw new DanwoError("TEST_FAILED", `no mail to ${to} arrived`)
+
+        await page.ready()
+      }),
+  }
+}
+
+/** The session's readiness, from its settings: `page+backend` by default when a backend is given. */
+function readinessOf(options: WebSessionOptions): Readiness {
+  const setting = options.readiness
+  const fallback: ReadinessMode = options.backend === undefined ? "page" : "page+backend"
+  const mode = typeof setting === "string" ? setting : (setting?.mode ?? fallback)
+  const capMs = typeof setting === "object" ? setting.capMs : undefined
+
+  return new Readiness({
+    mode,
+    ...(options.backend && { backend: options.backend }),
+    ...(capMs !== undefined && { capMs }),
+  })
+}
+
+/** Waits for the active tab to be ready and notes the wait on the step that is running. */
+function readyStep(readiness: Readiness, tabs: Tabs, steps: StepRecorder): () => Promise<void> {
+  return async () => {
+    const wait = await readiness.after(tabs.page)
+
+    if (wait !== undefined) steps.event({ kind: "ready", at: new Date().toISOString(), ...wait })
   }
 }
 
@@ -300,10 +416,22 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
     stepScreenshots: settings.stepScreenshots,
   })
 
-  ended.onStep = (step) => flight.onStep(step)
-  tabs.onEveryPage((opened) => recordAppLog(opened, steps))
+  const { backend } = options
+  const providerFailures = backend?.failures && (() => backend.failures?.() ?? [])
+  const appErrors = new AppErrors(options.baseUrl, options.appErrors, providerFailures)
 
+  ended.onStep = (step) => flight.onStep(step)
+  tabs.onEveryPage((opened) => {
+    recordAppLog(opened, steps)
+    appErrors.watch(opened)
+  })
+
+  const ready = readyStep(readinessOf(options), tabs, steps)
+  const desk = new MailDesk(options.mail ?? [])
   const agent = createAgent({
+    ready,
+    appErrors,
+    mail: desk,
     tabs,
     appUrl: options.baseUrl,
     files,
@@ -320,6 +448,7 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
     ...(options.transcriptBudget !== undefined && { transcriptBudget: options.transcriptBudget }),
     context: options.agentContext,
     actionTimeout,
+    assertionTimeout: settings.assertionTimeout,
     signal: stopped.signal,
   })
   const screen = createScreen({
@@ -327,6 +456,7 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
     steps,
     files,
     secrets: { resolve: (secret) => vault.reveal(secret) },
+    ready,
     actionTimeout,
     assertionTimeout: settings.assertionTimeout,
     shots: screenshotDesk(options, projectRoot, artifactsDir, steps),
@@ -339,8 +469,9 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
     agent,
     divergence: () => agent.diverged(),
     secret: (name) => vault.handle(name),
+    mail: mailOf(desk, tabs, steps, { timeout: actionTimeout, ready }),
     flight,
-    app: appOf(tabs, steps, options.baseUrl, settings.loadTimeout),
+    app: appOf(tabs, steps, { baseUrl: options.baseUrl, loadTimeout: settings.loadTimeout, ready }),
     browserState: () => context.storageState({ indexedDB: true }),
     async close() {
       if (closed) return

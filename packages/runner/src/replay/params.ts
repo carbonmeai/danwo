@@ -63,6 +63,25 @@ export function paramTyped(params: Params, text: string): string | undefined {
   return undefined
 }
 
+/** Values shorter than this are too common to say a text was built from them ("1", "ok"). */
+const MIN_EMBEDDED_LENGTH = 3
+
+/**
+ * Whether `text` contains the value of one of `params` (or of `others`, such as values read from
+ * an emulator): something recorded with it inside would not match on a run with other values.
+ */
+export function embedsValue(text: string, params: Params, others: readonly string[] = []): boolean {
+  const values = Object.values(params).flatMap((value) => {
+    if (isSecret(value)) return []
+
+    return [isUnique(value) ? value.value : value]
+  })
+
+  return [...values, ...others].some(
+    (value) => value.length >= MIN_EMBEDDED_LENGTH && text.includes(value),
+  )
+}
+
 /** The text of a non-secret param, for typing it again on replay. */
 export function paramText(params: Params, name: string): string | undefined {
   const value = params[name]

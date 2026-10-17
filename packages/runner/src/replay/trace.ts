@@ -16,10 +16,25 @@ const target = z.object({
   section: z.string().optional(),
 })
 
+/** An email address as recorded: as written, or the param it came from. */
+const address = z.union([z.object({ text: z.string() }), z.object({ param: z.string() })])
+
+/**
+ * A value taken from mail the app sent: from the newest mail to `to`, its code or a link. A replay
+ * reads it from the emulator again, so the recording never holds the value itself.
+ */
+const fromMail = z.object({
+  to: address,
+  kind: z.enum(["code", "link"]),
+  match: z.string().optional(),
+  digits: z.number().int().positive().optional(),
+})
+
 const input = z.union([
   z.object({ text: z.string() }),
   z.object({ param: z.string() }),
   z.object({ secret: z.string() }),
+  z.object({ mail: fromMail }),
 ])
 
 /** Set on an action that opened a new tab, so a replay waits for that tab before going on. */
@@ -42,7 +57,10 @@ const action = z.discriminatedUnion("kind", [
     direction: z.enum(["up", "down"]).optional(),
     target: target.optional(),
   }),
-  z.object({ kind: z.literal("navigate"), url: z.string() }),
+  /** A navigation; `mail` when the URL was a link from an email, read again on replay. */
+  z.object({ kind: z.literal("navigate"), url: z.string(), mail: fromMail.optional() }),
+  /** The newest mail to an address, shown in the active tab. */
+  z.object({ kind: z.literal("open_mail"), to: address }),
   z.object({ kind: z.literal("back") }),
   z.object({ kind: z.literal("switch_tab"), tab: z.number().int().nonnegative() }),
   z.object({
@@ -64,7 +82,7 @@ const identity = z.object({
   projectId: z.string(),
   journey: z.string(),
   appIdentity: z.string(),
-  kind: z.enum(["act", "extract"]),
+  kind: z.enum(["act", "extract", "wait"]),
   /** Zero-based position among the journey's agent steps; not part of the key. */
   step: z.number().int().nonnegative(),
   instruction: z.string(),
@@ -94,6 +112,8 @@ export const storedSchema = z.object({
 export type Trace = z.infer<typeof traceSchema>
 export type RecordedAction = Trace["actions"][number]
 export type RecordedInput = z.infer<typeof input>
+export type RecordedAddress = z.infer<typeof address>
+export type FromMail = z.infer<typeof fromMail>
 export type Target = z.infer<typeof target>
 
 /** A recording of one `agent.extract` step: where each field of the result was read. */
@@ -109,3 +129,18 @@ export const extractTraceSchema = z.object({
 })
 
 export type ExtractTrace = z.infer<typeof extractTraceSchema>
+
+/**
+ * A recording of one `agent.waitFor` step: the text whose presence showed the condition held, so a
+ * replay waits for that text to appear and needs no model.
+ */
+export const waitTraceSchema = z.object({
+  version: z.literal(1),
+  kind: z.literal("wait"),
+  instruction: z.string(),
+  recordedAt: z.string(),
+  evidence: z.object({ text: z.string().min(1) }),
+  identity: identity.optional(),
+})
+
+export type WaitTrace = z.infer<typeof waitTraceSchema>

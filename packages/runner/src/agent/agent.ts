@@ -11,7 +11,9 @@ import { resolve } from "node:path"
 import type { LanguageModel } from "ai"
 import type { z } from "zod"
 
+import type { AppErrors, FailureMark } from "../browser/app-errors.ts"
 import type { Tabs } from "../browser/tabs.ts"
+import type { MailDesk } from "../mail/desk.ts"
 import { type CallCost, resolveModel } from "../model/resolve.ts"
 import type { StepRecorder } from "../record/index.ts"
 import type { CacheNote } from "../record/steps.ts"
@@ -35,14 +37,39 @@ import { AgentStepFailed } from "./errors.ts"
 import { extractStep } from "./extract-step.ts"
 import { ExtractFailed } from "./extract.ts"
 import type { Files } from "./files.ts"
-import { judge } from "./judge.ts"
+import { judge, type JudgeContext, type Poll } from "./judge.ts"
 import { type LiveResult, runLive } from "./live.ts"
 import { missError, missOf } from "./miss.ts"
-import type { ActOptions, ActResult, Agent, ExtractOptions } from "./types.ts"
+import { JUDGE_PROMPT, WAIT_PROMPT } from "./prompts.ts"
+import type {
+  ActOptions,
+  ActResult,
+  Agent,
+  AssertOptions,
+  ExtractOptions,
+  PollOption,
+  WaitForOptions,
+} from "./types.ts"
+import { waitStep } from "./wait.ts"
 
 /** The current time, as step and log lines record it. */
 function now(): string {
   return new Date().toISOString()
+}
+
+/** How long `agent.waitFor` waits by default, and how often the judge looks meanwhile. */
+const DEFAULT_WAIT_MS = 30_000
+const DEFAULT_INTERVAL_MS = 1_000
+
+/** The polling an assert asked for: none, the session's defaults, or its own numbers. */
+function pollOf(option: PollOption | undefined, defaults: Poll): Poll | undefined {
+  if (option === undefined || option === false) return undefined
+  if (option === true) return defaults
+
+  return {
+    timeout: option.timeout ?? defaults.timeout,
+    interval: option.interval ?? defaults.interval,
+  }
 }
 
 /** Where a strict replay stopped following its recording. */
@@ -74,11 +101,19 @@ export interface AgentOptions {
   /** Show the judge a screenshot besides the page's text. */
   readonly judgeScreenshot?: boolean
   readonly actionTimeout: number
+  /** How long `agent.assert(..., { poll: true })` keeps asking. */
+  readonly assertionTimeout: number
   /** Limits per agent step and over the whole session (one test attempt). */
   readonly budgets?: Budgets
   /** A step's conversation size, in characters, before older page views are dropped. */
   readonly transcriptBudget?: number
   readonly signal?: AbortSignal | undefined
+  /** Waits, after an action, for the page and the backend to go quiet (see readiness.ts). */
+  readonly ready: () => Promise<void>
+  /** The app's failures while steps run; a step the app failed in is not kept. */
+  readonly appErrors?: AppErrors
+  /** Mail the app sent: codes and links a step reads, recorded by where they came from. */
+  readonly mail: MailDesk
 }
 
 /** One `act` call: which step it is, what it says, and what it may use and spend. */
@@ -174,8 +209,12 @@ class SessionAgent implements Agent {
     })
   }
 
-  assert(claim: string): Promise<void> {
+  assert(claim: string, options: AssertOptions = {}): Promise<void> {
     const { steps } = this.options
+    const poll = pollOf(options.poll, {
+      timeout: this.options.assertionTimeout,
+      interval: DEFAULT_INTERVAL_MS,
+    })
 
     return steps.run(
       "agent",
@@ -184,18 +223,86 @@ class SessionAgent implements Agent {
       () => {
         this.spent.check()
 
-        return judge(claim, {
-          model: this.requireModel(this.options.judge ?? this.options.model),
-          tabs: this.options.tabs,
-          redact: this.options.vault.redact,
-          vocabulary: this.options.context,
-          screenshot: this.options.judgeScreenshot ?? false,
-          signal: this.options.signal,
-          onModelCall: (cost) => this.noteCall(cost),
-        })
+        return judge(claim, this.judgeContext(JUDGE_PROMPT), poll)
       },
       { verifies: true },
     )
+  }
+
+  waitFor(condition: string, options: WaitForOptions = {}): Promise<void> {
+    const index = this.actCount++
+    const { steps, vault } = this.options
+    const poll: Poll = {
+      timeout: options.timeout ?? DEFAULT_WAIT_MS,
+      interval: options.interval ?? DEFAULT_INTERVAL_MS,
+    }
+
+    const body = async () => {
+      this.spent.check()
+
+      if (this.divergence !== undefined) {
+        steps.cache("diverged")
+
+        return
+      }
+
+      await waitStep(
+        { index, condition, params: options.params ?? {} },
+        {
+          tabs: this.options.tabs,
+          store: this.options.store,
+          strict: this.options.strict,
+          poll,
+          judge: () => this.judgeContext(WAIT_PROMPT),
+          redact: vault.redact,
+          volatile: () => this.options.mail.values(),
+          cache: (outcome, detail) => steps.cache(outcome, detail),
+          diverge: (reason) => {
+            this.divergence = { step: index, instruction: condition, reason: vault.redact(reason) }
+
+            return this.divergence.reason
+          },
+        },
+      )
+    }
+
+    return steps.run("agent", "agent.waitFor", vault.redact(condition), body, { verifies: true })
+  }
+
+  /** The judge as a step calls it, told its job by `system`. */
+  private judgeContext(system: string): JudgeContext {
+    return {
+      model: this.requireModel(this.options.judge ?? this.options.model),
+      system,
+      tabs: this.options.tabs,
+      redact: this.options.vault.redact,
+      vocabulary: this.options.context,
+      screenshot: this.options.judgeScreenshot ?? false,
+      signal: this.options.signal,
+      onModelCall: (cost) => this.noteCall(cost),
+    }
+  }
+
+  /**
+   * The app's failures since `mark`, noted on the step. Outside strict replay the first one fails
+   * the step; under strict replay the state the app was left in is the invariant's to judge.
+   */
+  private checkApp(mark: FailureMark | undefined): void {
+    const failed = this.noteApp(mark)
+
+    if (failed !== undefined && !this.options.strict) throw failed
+  }
+
+  /** Notes the app's failures since `mark` on the step; how it failed, if it did. */
+  private noteApp(mark: FailureMark | undefined): Error | undefined {
+    const { appErrors, steps } = this.options
+
+    if (appErrors === undefined || mark === undefined) return undefined
+
+    for (const failure of appErrors.failures(mark))
+      steps.event({ kind: "app-error", at: now(), text: this.options.vault.redact(failure.text) })
+
+    return appErrors.since(mark)
   }
 
   private async step(call: ActCall): Promise<ActResult> {
@@ -204,11 +311,13 @@ class SessionAgent implements Agent {
 
     if (this.divergence !== undefined) return this.skipped(this.divergence)
 
+    const mark = this.options.appErrors?.mark()
     const key = store?.key({ kind: "act", step: index, instruction, params })
     const replayed = await this.replayRecording(key, params, files)
 
     if (replayed.ok) {
       steps.cache(replayed.relocated ? "relocated" : "replayed")
+      this.checkApp(mark)
 
       return { summary: "replayed the recording", modelCalls: 0, actions: replayed.actions }
     }
@@ -218,8 +327,12 @@ class SessionAgent implements Agent {
 
     if (this.options.strict) return this.stopStrict(index, instruction, replayed.reason, miss)
 
-    const result = await this.runModel(call)
+    const result = await this.runModel(call, mark).catch((error: unknown) => {
+      this.noteApp(mark)
+      throw error
+    })
 
+    this.checkApp(mark)
     this.keep(key, instruction, result, miss)
 
     return {
@@ -291,6 +404,8 @@ class SessionAgent implements Agent {
         params,
         files,
         timeout: this.options.actionTimeout,
+        ready: this.options.ready,
+        mail: this.options.mail,
         onAction: (label) =>
           this.options.steps.event({ kind: "action", at: new Date().toISOString(), label }),
       })
@@ -327,8 +442,8 @@ class SessionAgent implements Agent {
     return { summary: `diverged: ${this.divergence.reason}`, modelCalls: 0, actions: 0 }
   }
 
-  private async runModel(call: ActCall): Promise<LiveResult> {
-    const { steps, vault, budgets } = this.options
+  private async runModel(call: ActCall, mark: FailureMark | undefined): Promise<LiveResult> {
+    const { steps, vault, budgets, appErrors } = this.options
     const { instruction } = call
     const own = new Spend(
       { ...DEFAULT_STEP_BUDGET, ...budgets?.step, ...call.budget },
@@ -346,6 +461,10 @@ class SessionAgent implements Agent {
       signal: this.options.signal,
       spends: new Spends(own, this.spent),
       transcriptBudget: this.options.transcriptBudget,
+      ready: this.options.ready,
+      mail: this.options.mail,
+      ...(appErrors !== undefined &&
+        mark !== undefined && { appFailure: () => appErrors.since(mark) }),
       onModelCall: (cost) => steps.event({ kind: "model", at: now(), ...cost }),
       onAction: (label) => steps.event({ kind: "action", at: now(), label }),
     })

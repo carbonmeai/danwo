@@ -5,14 +5,17 @@
  * takes on its way through URLs, forms, HTML, JSON and base64 (see variants.ts).
  */
 import { DanwoError } from "../support/codes.ts"
+import { totp, type TotpSettings } from "./totp.ts"
 import { variantsOf } from "./variants.ts"
 
 /**
  * What a secret is for, which decides the fields it may be typed into (see fields.ts): a
  * `password` only into password fields, an `otp` into one-time-code or text fields, a
- * `generic-secret` (the default) into any field but a password one.
+ * `generic-secret` (the default) into any field but a password one. A `totp` secret's value is an
+ * authenticator key (base32); what is typed is the code for that moment, into the fields an `otp`
+ * goes into.
  */
-export type SecretPurpose = "password" | "otp" | "generic-secret"
+export type SecretPurpose = "password" | "otp" | "totp" | "generic-secret"
 
 /** What kind of field an element is, as far as secrets go. */
 export type FieldKind = "password" | "one-time-code" | "text" | "other"
@@ -28,6 +31,8 @@ export type SessionSecret =
       readonly purpose?: SecretPurpose
       /** The kinds of field it may go into instead of its purpose's, or `"any"`. */
       readonly fields?: readonly FieldKind[] | "any"
+      /** For a `totp` secret: how its codes are made (default 6 digits every 30 s, SHA-1). */
+      readonly totp?: TotpSettings
     }
 
 const SECRET = Symbol.for("danwo.secret")
@@ -53,6 +58,7 @@ interface Entry {
   readonly value: SecretValue
   readonly purpose: SecretPurpose
   readonly fields?: readonly FieldKind[] | "any"
+  readonly totp?: TotpSettings
 }
 
 function entryOf(secret: SessionSecret): Entry {
@@ -61,9 +67,17 @@ function entryOf(secret: SessionSecret): Entry {
       value: secret.value,
       purpose: secret.purpose ?? "generic-secret",
       ...(secret.fields !== undefined && { fields: secret.fields }),
+      ...(secret.totp !== undefined && { totp: secret.totp }),
     }
 
   return { value: secret, purpose: "generic-secret" }
+}
+
+/** What typing `entry` types now: its value, or for a `totp` secret the code its key makes now. */
+async function typedValue(entry: Entry): Promise<{ readonly key: string; readonly typed: string }> {
+  const key = typeof entry.value === "string" ? entry.value : await entry.value()
+
+  return { key, typed: entry.purpose === "totp" ? totp(key, entry.totp) : key }
 }
 
 /** One session's secrets: handles by name, values on demand, and redaction of every value seen. */
@@ -106,11 +120,12 @@ export class SecretVault {
     if (entry === undefined)
       throw new Error(`secret "${secret.name}" is not in this session's secrets`)
 
-    const value = typeof entry.value === "string" ? entry.value : await entry.value()
+    const { key, typed } = await typedValue(entry)
 
-    this.remember(secret.name, value)
+    this.remember(secret.name, key)
+    this.remember(secret.name, typed)
 
-    return value
+    return typed
   }
 
   /** Every value revealed or given so far. */

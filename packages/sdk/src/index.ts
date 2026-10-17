@@ -5,16 +5,22 @@ import {
   type AwsFixture,
   type Expect,
   type Secret,
+  type SessionMail,
   test as baseTest,
   type TestAPI,
   type TestFixtures,
 } from "@danwo/runner/runner"
 
-/** Fixtures every danwo test gets: the browser session's `agent`, `screen` and `app`, plus `expect` and `secret` bound to it. */
+/**
+ * Fixtures every danwo test gets: the browser session's `agent`, `screen` and `app`, plus
+ * `expect`, `secret` and `mail` bound to it.
+ */
 export interface DanwoFixtures extends TestFixtures {
   readonly expect: Expect
   /** A handle for a configured secret, to fill by name without its value reaching the model. */
   readonly secret: (name: string) => Secret
+  /** Mail the app sent, from the environment's `mail` sources: codes, links, and opening it. */
+  readonly mail: SessionMail
 }
 
 /** Fixtures a `stripeEnvironment()` worker environment contributes; type them with `test.extend<StripeFixtures>()`. */
@@ -148,12 +154,21 @@ export type {
   ActResult,
   Agent,
   App,
+  AssertOptions,
   ExtractOptions,
   LocatorAssertions,
+  MailMessage,
+  MailSource,
   PageAssertions,
+  PollOption,
+  ReadinessMode,
   Screen,
+  SessionMail,
   VisualOptions,
+  WaitForOptions,
 } from "@danwo/runner/runner"
+/** Where an environment's mail lands, for the `mail` fixture and the agent's mail tools. */
+export { gmailMail, outlookMail, resendMail, totp } from "@danwo/runner/runner"
 /** zod, for the schemas `agent.extract` checks its result against. */
 export { z } from "@danwo/runner/runner"
 export {

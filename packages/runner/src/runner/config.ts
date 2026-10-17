@@ -7,6 +7,7 @@ import type { OutboundCall, OutboundFault } from "@danwo/proxy"
 import type { LanguageModel } from "ai"
 
 import type { Budgets } from "../agent/budget.ts"
+import type { ReadinessMode } from "../browser/readiness.ts"
 import type { RelocationPolicy } from "../replay/policy.ts"
 import type { SessionSecret } from "../session.ts"
 import { DanwoError } from "../support/codes.ts"
@@ -56,6 +57,23 @@ export interface DanwoConfig {
    * so changing it records the steps afresh. Takes precedence over `relocate`.
    */
   readonly relocation?: RelocationPolicy
+  /**
+   * What each step waits for after an action. `page+backend` (the default with an environment
+   * that has a proxy): the page settles, then nothing the app started at the proxy or the webhook
+   * senders is still in flight. `page`: the page alone. `off`: no waiting. `settle: true` also lets
+   * the environment play out background work (webhooks on a manual clock) after every action, so
+   * a test needs no `settle()` of its own. `capMs` bounds one wait (default 5000).
+   */
+  readonly readiness?:
+    | ReadinessMode
+    | { readonly mode?: ReadinessMode; readonly capMs?: number; readonly settle?: boolean }
+  /**
+   * What counts as the app failing during a step, besides 5xx responses from the app and uncaught
+   * page errors: `console: true` (default false) adds console errors. A live agent step stops at
+   * the first with `APP_ERROR`, or `PROVIDER_ERROR` when a provider call failed before it; a
+   * step the app failed in is never kept as a recording.
+   */
+  readonly appErrors?: { readonly console?: boolean }
   /**
    * Saved sessions by name: each is set up once per worker and its browser state reused by every
    * test that names it (`test.use({ session })`), until the environment resets. The setup also

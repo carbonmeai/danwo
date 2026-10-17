@@ -21,6 +21,8 @@ import {
   type Trace,
   traceSchema,
   storedSchema,
+  type WaitTrace,
+  waitTraceSchema,
 } from "./trace.ts"
 
 /** `off` neither reads nor writes; `read-only` replays but never writes; `read-write` does both. */
@@ -115,6 +117,11 @@ export class ReplayStore {
     return this.readAs(key, extractTraceSchema)
   }
 
+  /** The wait recorded under `key`, or undefined. */
+  readWait(key: string): Promise<WaitTrace | undefined> {
+    return this.readAs(key, waitTraceSchema)
+  }
+
   /**
    * A recording of the same step (same project, journey, kind and position) kept under another key:
    * which parts of the key changed since. Undefined when there is none.
@@ -150,8 +157,11 @@ export class ReplayStore {
     return found
   }
 
-  /** Writes an extraction's sources at once: a read changes nothing, so needs no confirming. */
-  async writeExtract(step: StepKey, trace: ExtractTrace): Promise<void> {
+  /**
+   * Writes an extraction's sources, or what a wait saw, at once: reading the page changes nothing,
+   * and the judge already confirmed it, so there is nothing to wait for a check on.
+   */
+  async writeExtract(step: StepKey, trace: ExtractTrace | WaitTrace): Promise<void> {
     if (!this.writes) return
 
     await mkdir(this.options.dir, { recursive: true })

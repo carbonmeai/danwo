@@ -11,16 +11,19 @@ export type CacheCounts = Readonly<Partial<Record<CacheOutcome, number>>>
 /** Model calls and what they took: tokens each way, and dollars as the gateway billed them. */
 export interface Spent {
   readonly calls: number
+  /** Of the calls, those that asked again after an answer could not be used. */
+  readonly retries: number
   readonly tokens: readonly [input: number, output: number]
   readonly usd: number
 }
 
-const NOTHING: Spent = { calls: 0, tokens: [0, 0], usd: 0 }
+const NOTHING: Spent = { calls: 0, retries: 0, tokens: [0, 0], usd: 0 }
 
 /** Two amounts spent, together. */
 function plus(a: Spent, b: Spent): Spent {
   return {
     calls: a.calls + b.calls,
+    retries: a.retries + b.retries,
     tokens: [a.tokens[0] + b.tokens[0], a.tokens[1] + b.tokens[1]],
     usd: a.usd + b.usd,
   }
@@ -47,6 +50,7 @@ export function stepCost(step: StepRecord): StepCost {
       event.kind === "model"
         ? plus(sum, {
             calls: 1,
+            retries: event.retry === true ? 1 : 0,
             tokens: [event.inputTokens, event.outputTokens],
             usd: event.costUsd ?? 0,
           })
@@ -149,6 +153,8 @@ export function modelLine(usage: Usage): string | undefined {
   if (spent.calls === 0) return undefined
 
   const cost = spent.usd > 0 ? ` · ${dollars(spent.usd)}` : ""
+  const retries = spent.retries > 0 ? ` (${spent.retries} asked again)` : ""
+  const calls = `${spent.calls} call${spent.calls === 1 ? "" : "s"}${retries}`
 
-  return `model: ${spent.calls} call${spent.calls === 1 ? "" : "s"} · ${tokensText(spent)}${cost}`
+  return `model: ${calls} · ${tokensText(spent)}${cost}`
 }

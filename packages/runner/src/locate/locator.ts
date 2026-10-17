@@ -47,6 +47,8 @@ export interface LocateContext {
   readonly assertionTimeout: number
   /** Where screenshot checks keep baselines, and how they number and note what they did. */
   readonly shots: ScreenshotDesk
+  /** Waits, after an action, for the page and the backend to go quiet (see readiness.ts). */
+  readonly ready?: () => Promise<void>
 }
 
 /** The session's screenshot checks: their settings, a counter, and a note per comparison. */
@@ -185,6 +187,8 @@ export class ElementLocator extends Finder implements Locator {
 
     const body = async () => {
       await this.attempt(api, this.timeout(options), perform)
+      /* A wait is itself a check of the page; anything else is followed by readiness. */
+      if (!verifies) await this.context.ready?.()
     }
 
     return this.context.steps.run("locator", api, `${this.text}.${action}(${args})`, body, {

@@ -8,11 +8,13 @@
 import { generateText, type LanguageModel, type ModelMessage, type ToolCallPart } from "ai"
 
 import type { Tabs } from "../browser/tabs.ts"
+import type { MailDesk } from "../mail/desk.ts"
 import { callCost, type CallCost } from "../model/resolve.ts"
 import { type Params, shownParams } from "../replay/params.ts"
 import type { RecordedAction } from "../replay/trace.ts"
 import type { SecretVault } from "../secrets/index.ts"
 import { viewTabs, viewText } from "../snapshot/view.ts"
+import { DanwoError } from "../support/codes.ts"
 import type { Spends } from "./budget.ts"
 import { AgentStepFailed } from "./errors.ts"
 import type { Files } from "./files.ts"
@@ -24,6 +26,19 @@ import { Transcript, VIEW_MARK } from "./transcript.ts"
 
 /** No single action on an element waits longer than this, whatever the session's timeout. */
 const ACTION_CAP_MS = 15_000
+
+/** Unusable answers in a row after the first that the model is asked again for. */
+const MAX_UNUSABLE = 2
+
+/** Errors the AI SDK raises for an answer it could not take, rather than a failed call. */
+const UNUSABLE_ANSWER: readonly string[] = [
+  "AI_ToolChoiceViolationError",
+  "AI_NoSuchToolError",
+  "AI_InvalidToolInputError",
+]
+
+const NO_TOOL_CALL =
+  "Your answer had no tool call. Answer with exactly one call of the tools you were given; call `done` when the step is finished."
 
 export interface LiveContext {
   readonly model: Exclude<LanguageModel, string>
@@ -40,6 +55,12 @@ export interface LiveContext {
   readonly spends: Spends
   /** The conversation's size budget in characters before older views are dropped. */
   readonly transcriptBudget?: number | undefined
+  /** Waits, after an action, for the page and the backend to go quiet (see readiness.ts). */
+  readonly ready: () => Promise<void>
+  /** How the app failed since the step began, if it did; the step stops at once. */
+  readonly appFailure?: () => Error | undefined
+  /** Mail the app sent, as the emulators caught it. */
+  readonly mail: MailDesk
   /** Called for every model call and every action, for the step's record. */
   readonly onModelCall: (cost: CallCost) => void
   readonly onAction: (label: string) => void
@@ -88,6 +109,8 @@ class Loop {
   private readonly recorded: RecordedAction[] = []
   private replayable = true
   private modelCalls = 0
+  /** Answers in a row that could not be used: no tool call, or only malformed ones. */
+  private unusableInARow = 0
 
   constructor(live: LiveContext) {
     this.live = live
@@ -117,11 +140,16 @@ class Loop {
       if (done !== undefined) return this.finish(done.input)
 
       if (calls.length === 0) {
-        this.transcript.push({ role: "user", content: "Answer with a tool call." })
+        this.unusable("the answer had no tool call")
+        this.transcript.push({ role: "user", content: NO_TOOL_CALL })
         continue
       }
 
       const outcomes = await this.carryOut(calls, view.tree)
+      const failure = this.live.appFailure?.()
+
+      /* On a broken app the agent would only wander; the step ends with what broke. */
+      if (failure !== undefined) throw failure
 
       view = await this.look()
       this.transcript.push({
@@ -130,6 +158,19 @@ class Loop {
       })
       this.transcript.compactIfOver()
     }
+  }
+
+  /**
+   * Notes an answer that could not be used; after `MAX_UNUSABLE` in a row the step gives up with
+   * `MODEL_OUTPUT_INVALID`, which says nothing about the app.
+   */
+  private unusable(problem: string): void {
+    this.unusableInARow++
+    if (this.unusableInARow > MAX_UNUSABLE)
+      throw new DanwoError(
+        "MODEL_OUTPUT_INVALID",
+        `the model's answers could not be used ${this.unusableInARow} times in a row: ${problem}`,
+      )
   }
 
   private look() {
@@ -144,8 +185,21 @@ class Loop {
       tools: agentTools,
       toolChoice: "required",
       ...(this.live.signal && { abortSignal: this.live.signal }),
+    }).catch((error: unknown) => {
+      /* An answer the SDK refused (no tool call when one is required) is unusable, not a crash. */
+      if (error instanceof Error && UNUSABLE_ANSWER.includes(error.name)) return undefined
+
+      throw error
     })
-    const cost = callCost(result.usage, result.providerMetadata)
+
+    if (result === undefined) {
+      this.modelCalls++
+
+      return { calls: [], response: [] }
+    }
+
+    const used = callCost(result.usage, result.providerMetadata)
+    const cost = this.unusableInARow > 0 ? { ...used, retry: true } : used
 
     this.modelCalls++
     this.live.spends.call(cost)
@@ -162,13 +216,22 @@ class Loop {
 
   private async carryOut(calls: readonly ToolCallPart[], tree: string): Promise<string[]> {
     const texts: string[] = []
+    const parsed = calls.map((raw) => parseCall(raw.toolName, raw.input))
+    const problems = parsed.flatMap((one) => ("problem" in one ? [one.problem] : []))
 
-    for (const raw of calls) {
-      const call = parseCall(raw.toolName, raw.input)
+    /* A turn whose every call was malformed is an unusable answer; one good call resets the count. */
+    if (problems.length === calls.length) this.unusable(problems.join("; "))
+    else this.unusableInARow = 0
+
+    for (const [index, raw] of calls.entries()) {
+      const one = parsed[index]
       const outcome =
-        call === undefined
-          ? { text: `not a valid ${raw.toolName} call`, failed: true }
-          : await this.act(call, tree)
+        one === undefined || "problem" in one
+          ? {
+              text: `not a valid ${raw.toolName} call (${one?.problem ?? "unknown"}); fix the input and call it again`,
+              failed: true,
+            }
+          : await this.act(one.call, tree)
 
       texts.push(this.guarded(JSON.stringify(raw.input) + raw.toolName, outcome))
     }
@@ -192,7 +255,7 @@ class Loop {
 
       this.live.onAction(`${call.name} ${this.live.vault.redact(JSON.stringify(call.input))}`)
       if (performed.recorded === null) this.replayable = false
-      else this.recorded.push(performed.recorded)
+      else if (performed.recorded !== undefined) this.recorded.push(performed.recorded)
 
       return { text: performed.outcome, failed: false }
     } catch (error) {
