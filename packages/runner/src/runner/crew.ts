@@ -12,6 +12,8 @@ import { linkWorker, type WorkerLink } from "./wire.ts"
 
 const WORKER_ENTRY = fileURLToPath(new URL("./worker.ts", import.meta.url))
 const TYPESCRIPT_HOOK = new URL("./register.ts", import.meta.url).href
+/** Strips types under `node_modules`, where Node will not; first, so the hooks after it load. */
+const INSTALLED_HOOK = new URL("../../strip-types.mjs", import.meta.url).href
 
 /** How long a worker gets to dispose its environment before it is killed. */
 const STOP_GRACE_MS = 10_000
@@ -116,7 +118,7 @@ export class Crew {
 
   private spawn(): WorkerLink {
     const child = fork(WORKER_ENTRY, [], {
-      execArgv: ["--import", TYPESCRIPT_HOOK],
+      execArgv: ["--import", INSTALLED_HOOK, "--import", TYPESCRIPT_HOOK],
       stdio: ["ignore", "inherit", "inherit", "ipc"],
       env: process.env,
     })

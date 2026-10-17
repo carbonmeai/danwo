@@ -52,7 +52,7 @@
     "import/no-unassigned-import": [
       "warn",
       {
-        "allow": ["@danwo/runner/register"]
+        "allow": ["@danwo/runner/register", "@danwo/runner/strip-types"]
       }
     ]
   },

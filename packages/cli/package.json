@@ -4,8 +4,12 @@
   "private": true,
   "description": "Command-line interface.",
   "bin": {
-    "danwo": "./src/bin.ts"
+    "danwo": "./bin/danwo.mjs"
   },
+  "files": [
+    "bin",
+    "src"
+  ],
   "type": "module",
   "dependencies": {
     "@danwo/github": "workspace:*",

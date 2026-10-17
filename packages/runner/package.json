@@ -3,11 +3,16 @@
   "version": "0.0.0",
   "private": true,
   "description": "Browser sessions, the agent's act/assert, the replay cache and the test runner.",
+  "files": [
+    "src",
+    "strip-types.mjs"
+  ],
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./runner": "./src/runner/index.ts",
-    "./register": "./src/runner/register.ts"
+    "./register": "./src/runner/register.ts",
+    "./strip-types": "./strip-types.mjs"
   },
   "dependencies": {
     "@ai-sdk/provider": "4.0.26",
