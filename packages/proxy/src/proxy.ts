@@ -193,6 +193,34 @@ async function callHandler(handler: Handler, req: CompletedRequest) {
   }
 }
 
+/** Answers a request the way `fault` says, or through its handler when there is no fault. */
+async function answerUnder(
+  fault: OutboundFault | undefined,
+  handler: Handler,
+  req: CompletedRequest,
+) {
+  switch (fault?.kind) {
+    case "status":
+      return {
+        statusCode: fault.status,
+        headers: { "content-type": "application/json", ...fault.headers },
+        body: fault.body ?? "",
+      }
+    case "reset":
+      return "reset" as const
+    case "reset-after":
+      await callHandler(handler, req)
+
+      return "reset" as const
+    case "delay":
+      await new Promise((resolve) => setTimeout(resolve, fault.ms))
+
+      return callHandler(handler, req)
+    default:
+      return callHandler(handler, req)
+  }
+}
+
 /**
  * Starts an HTTPS-intercepting proxy. Requests for a routed host are answered in-process by its
  * handler or forwarded to its upstream; others pass through or are blocked. Faults apply to both
@@ -217,6 +245,13 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   // The route handler can run before the exchange is logged; hold its fault label until then.
   const faultLabels = new Map<string, string>()
 
+  function labelFault(id: string, label: string): void {
+    const exchange = log.get(id)
+
+    if (exchange) exchange.fault = label
+    else faultLabels.set(id, label)
+  }
+
   async function handle(handler: Handler, req: CompletedRequest) {
     const call = {
       host: req.destination.hostname,
@@ -226,33 +261,9 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
     }
     const fault = faultRule?.(call)
 
-    if (fault) {
-      const exchange = log.get(req.id)
+    if (fault) labelFault(req.id, describeOutboundFault(fault))
 
-      if (exchange) exchange.fault = describeOutboundFault(fault)
-      else faultLabels.set(req.id, describeOutboundFault(fault))
-    }
-
-    switch (fault?.kind) {
-      case "status":
-        return {
-          statusCode: fault.status,
-          headers: { "content-type": "application/json", ...fault.headers },
-          body: fault.body ?? "",
-        }
-      case "reset":
-        return "reset" as const
-      case "reset-after":
-        await callHandler(handler, req)
-
-        return "reset" as const
-      case "delay":
-        await new Promise((resolve) => setTimeout(resolve, fault.ms))
-
-        return callHandler(handler, req)
-      default:
-        return callHandler(handler, req)
-    }
+    return answerUnder(fault, handler, req)
   }
 
   /*
