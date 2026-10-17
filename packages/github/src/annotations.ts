@@ -91,7 +91,7 @@ function outcomeAnnotation(base: PathBase, file: string, outcome: RunOutcome): A
     start_line: source.line,
     end_line: source.line,
     annotation_level: outcome.status === "failed" ? "failure" : "warning",
-    title: `${outcome.status}: ${outcome.fault?.label ?? "clean run"}`,
+    title: `${outcome.status === "not-judged" ? "not judged" : outcome.status}: ${outcome.fault?.label ?? "clean run"}`,
     message: outcomeDetails(outcome),
   }
 }

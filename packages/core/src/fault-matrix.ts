@@ -61,9 +61,11 @@ export interface RunOutcome {
   readonly fault: PlannedFault | null
   /**
    * `invalid`: the run's planned fault fired on no call or delivery (the app took another path,
-   * say a cached value), so the run says nothing about that fault, pass or fail.
+   * say a cached value), so the run says nothing about that fault, pass or fail. `not-judged`: the
+   * run could not be judged (it was blocked, the judge could not tell, or the browser or model
+   * provider failed), so it says nothing about the fault either; `error` says why.
    */
-  readonly status: "passed" | "failed" | "invalid" | "environment-error"
+  readonly status: "passed" | "failed" | "invalid" | "not-judged" | "environment-error"
   readonly error: string | null
   readonly exchanges: readonly Exchange[]
   readonly deliveries: readonly ServiceDelivery[]
@@ -210,9 +212,17 @@ export function faultFired(outcome: RunOutcome): boolean {
   return evidence.some((item) => item.fault !== null)
 }
 
-/** Marks a faulted run `invalid` when its fault never fired; environment errors stay as they are. */
+/**
+ * Marks a faulted run `invalid` when its fault never fired; environment errors and runs that could
+ * not be judged stay as they are.
+ */
 export function checkFaultFired(outcome: RunOutcome): RunOutcome {
-  if (outcome.status === "environment-error" || faultFired(outcome)) return outcome
+  if (
+    outcome.status === "environment-error" ||
+    outcome.status === "not-judged" ||
+    faultFired(outcome)
+  )
+    return outcome
 
   return {
     ...outcome,
@@ -393,6 +403,7 @@ const STATUS_LABEL: Record<RunOutcome["status"], string> = {
   passed: "PASS",
   failed: "FAIL",
   invalid: "INVALID",
+  "not-judged": "NOT JUDGED",
   "environment-error": "ENV ",
 }
 
@@ -413,6 +424,7 @@ export function formatMatrix(result: FaultMatrixResult): string {
     count("passed", "passed"),
     count("failed", "failed"),
     count("invalid", "invalid (fault never fired)"),
+    count("not-judged", "not judged"),
     count("environment-error", "environment errors"),
   ].filter(Boolean)
 

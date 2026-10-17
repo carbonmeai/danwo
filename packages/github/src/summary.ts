@@ -26,6 +26,7 @@ const STATUS_MARK: Readonly<Record<string, string>> = {
   interrupted: "⛔",
   skipped: "⏭️",
   invalid: "❔",
+  "not-judged": "➖",
   "environment-error": "💥",
 }
 
@@ -115,6 +116,7 @@ function matrixCounts(runs: readonly RunOutcome[]): string {
     `${count("passed")} passed`,
     `${count("failed")} failed`,
     count("invalid") > 0 ? `${count("invalid")} invalid` : "",
+    count("not-judged") > 0 ? `${count("not-judged")} not judged` : "",
     count("environment-error") > 0 ? `${count("environment-error")} environment errors` : "",
   ]
 

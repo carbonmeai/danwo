@@ -16,6 +16,7 @@ const MARK: Readonly<Record<Outcome["status"], string>> = {
   passed: "✓",
   failed: "✗",
   invalid: "?",
+  "not-judged": "–",
   "environment-error": "!",
 }
 
