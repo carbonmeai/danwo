@@ -80,10 +80,6 @@
         "@danwo/runner": "workspace:*",
       },
     },
-    "packages/github-app": {
-      "name": "@danwo/github-app",
-      "version": "0.0.0",
-    },
     "packages/mcp": {
       "name": "@danwo/mcp",
       "version": "0.0.0",
@@ -212,8 +208,6 @@
     "@danwo/example-shop": ["@danwo/example-shop@workspace:examples/shop"],
 
     "@danwo/github": ["@danwo/github@workspace:packages/github"],
-
-    "@danwo/github-app": ["@danwo/github-app@workspace:packages/github-app"],
 
     "@danwo/mcp": ["@danwo/mcp@workspace:packages/mcp"],
 
