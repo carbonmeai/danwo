@@ -1,0 +1,106 @@
+/**
+ * danwo's MCP server: tools for coding agents to list, run and explain danwo tests, look at the
+ * app as the agent sees it and write new tests; resources for the project's config and the
+ * latest run; and a prompt that walks an agent through writing a test.
+ */
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import { z } from "zod"
+
+import type { ConfigSummary } from "./jobs/protocol.ts"
+import { runJob } from "./jobs/run.ts"
+import { Project } from "./project.ts"
+import { loadRun } from "./records.ts"
+import { registerInspectTool } from "./tools/inspect.ts"
+import { registerMatrixTool } from "./tools/matrix.ts"
+import { registerRunTools, runSummary } from "./tools/runs.ts"
+import { registerScaffoldTool } from "./tools/scaffold.ts"
+import { registerTestTools } from "./tools/tests.ts"
+
+export interface DanwoServerOptions {
+  /** The project folder; its nearest `danwo.config.*` is the project's config. */
+  readonly cwd: string
+  /** A config file, relative to `cwd`, instead of the nearest one. */
+  readonly config?: string | undefined
+  readonly version?: string
+}
+
+function configText(summary: ConfigSummary): string {
+  return [
+    `root: ${summary.root}`,
+    `config: ${summary.file ?? "(none)"}`,
+    `tests: ${summary.testDir} matching ${summary.testMatch.join(", ")}`,
+    `app: ${summary.environment ? "started by the config's environment" : (summary.baseUrl ?? "(no baseUrl)")}`,
+    `workers: ${summary.workers} · retries: ${summary.retries}`,
+    `agent model: ${summary.model ?? "(none: agent.act and agent.assert are unavailable)"}`,
+    `secrets (pass secret(name)): ${summary.secrets.join(", ") || "(none)"}`,
+    `files (upload by name): ${summary.files.join(", ") || "(none)"}`,
+    `replay cache: ${summary.cache ?? "(none)"}`,
+  ].join("\n")
+}
+
+const WRITE_TEST_GUIDE = (goal: string) => `Write a danwo test for: ${goal}
+
+1. Read the danwo://config resource to see where tests live and what the app runs against.
+2. Call inspect_page on the pages the journey visits. Pick locators from the accessibility tree
+   (prefer getByRole with a name, then getByLabel, getByText, getByTestId) and check each with
+   inspect_page's locator option: a locator that clicks or fills must match exactly one element.
+3. Call scaffold_test with the steps: locator code for steps you can pin down, agent.act /
+   agent.assert for the rest. Describe the invariant: what must hold however the run went (for
+   example, what the payment provider charged matches what the app granted).
+4. Run it with run_tests. On a failure, read show_run for the failing step, the screen at failure
+   and the network calls, and read_screenshot if the page itself matters. Fix the test (or report
+   the app bug the test found) and run it again.
+5. Replace the invariant stub with real checks, then run_matrix on the test to see it hold under
+   provider faults.`
+
+function registerContext(server: McpServer, project: Project): void {
+  server.registerResource(
+    "config",
+    "danwo://config",
+    {
+      description: "The project's danwo config: where tests live, the app, model, secrets' names",
+      mimeType: "text/plain",
+    },
+    async (uri) => {
+      const summary = await runJob(project.place, { kind: "config" })
+
+      return { contents: [{ uri: uri.href, text: configText(summary) }] }
+    },
+  )
+  server.registerResource(
+    "latest-run",
+    "danwo://runs/latest",
+    { description: "The newest recorded run: its failures explained", mimeType: "text/plain" },
+    async (uri) => {
+      const run = await loadRun(project)
+      const summary = run === undefined ? "no recorded runs yet" : await runSummary(project, run)
+
+      return { contents: [{ uri: uri.href, text: summary }] }
+    },
+  )
+  server.registerPrompt(
+    "write-danwo-test",
+    {
+      description: "Inspect the app, scaffold a danwo test, run it and fix it until it passes",
+      argsSchema: { goal: z.string().describe("the user journey the test should cover") },
+    },
+    ({ goal }) => ({
+      messages: [{ role: "user", content: { type: "text", text: WRITE_TEST_GUIDE(goal) } }],
+    }),
+  )
+}
+
+/** The server for one project, not yet connected to a transport. */
+export function createDanwoServer(options: DanwoServerOptions): McpServer {
+  const project = new Project(options.cwd, options.config)
+  const server = new McpServer({ name: "danwo", version: options.version ?? "0.0.0" })
+
+  registerTestTools(server, project)
+  registerMatrixTool(server, project)
+  registerRunTools(server, project)
+  registerInspectTool(server, project)
+  registerScaffoldTool(server, project)
+  registerContext(server, project)
+
+  return server
+}
