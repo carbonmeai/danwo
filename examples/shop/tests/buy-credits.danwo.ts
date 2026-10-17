@@ -1,6 +1,16 @@
-import { type StripeFixtures, test as base } from "@danwo/sdk"
+import { type StripeFixtures, test as base, z } from "@danwo/sdk"
 
 const test = base.extend<StripeFixtures>()
+
+const PaidSessions = z.object({
+  data: z.array(
+    z.object({
+      client_reference_id: z.string().nullable(),
+      metadata: z.record(z.string(), z.string()).nullable(),
+    }),
+  ),
+})
+const Credits = z.object({ credits: z.number() })
 
 /** Credits Stripe took payment for: the paid checkout sessions of `user`, read from the emulator. */
 async function paidCredits(stripe: StripeFixtures["stripe"], user: string): Promise<number> {
@@ -9,9 +19,7 @@ async function paidCredits(stripe: StripeFixtures["stripe"], user: string): Prom
       headers: { authorization: "Bearer sk_test_danwo_example" },
     }),
   )
-  const { data } = (await res.json()) as {
-    data: { client_reference_id: string | null; metadata: Record<string, string> | null }[]
-  }
+  const { data } = PaidSessions.parse(await res.json())
 
   return data
     .filter((session) => session.client_reference_id === user)
@@ -32,7 +40,7 @@ test("buys 500 credits through Stripe Checkout", async ({ app, screen, expect, s
 }).invariant(async ({ app, stripe, expect }) => {
   // Whichever way the purchase went, the shop grants exactly the credits Stripe was paid for.
   const res = await fetch(`${app.baseUrl}/credits?user=u1`)
-  const { credits } = (await res.json()) as { credits: number }
+  const { credits } = Credits.parse(await res.json())
 
   expect(credits).toBe(await paidCredits(stripe, "u1"))
 })

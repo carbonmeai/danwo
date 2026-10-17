@@ -6,6 +6,7 @@
  * `listening <port>`). SHOP_BUG=no-dedupe turns off webhook de-duplication, a bug to catch.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
+import { text as readText } from "node:stream/consumers"
 
 import { Stripe } from "stripe"
 
@@ -17,11 +18,16 @@ const credits = new Map<string, number>()
 const handledEvents = new Set<string>()
 
 async function readBody(req: IncomingMessage): Promise<string> {
-  const chunks: Buffer[] = []
+  return readText(req)
+}
 
-  for await (const chunk of req) chunks.push(Buffer.from(chunk as Uint8Array))
+/** The user and amount of a JSON purchase body. */
+function purchaseOf(value: unknown): { user: string; amount: number } {
+  const object = typeof value === "object" && value !== null ? value : {}
+  const user = "user" in object && typeof object.user === "string" ? object.user : ""
+  const amount = "amount" in object ? Number(object.amount) : Number.NaN
 
-  return Buffer.concat(chunks).toString("utf8")
+  return { user, amount }
 }
 
 function send(res: ServerResponse, status: number, body: unknown): void {
@@ -52,9 +58,7 @@ async function readPurchase(
     return { user: params.get("user") ?? "", amount: Number(params.get("amount")), form: true }
   }
 
-  const { user, amount } = JSON.parse(body) as { user: string; amount: number }
-
-  return { user, amount, form: false }
+  return { ...purchaseOf(JSON.parse(body)), form: false }
 }
 
 async function buy(req: IncomingMessage, res: ServerResponse): Promise<void> {
