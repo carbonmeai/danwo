@@ -14,6 +14,7 @@ It drives the app through its UI like a user, while third-party services the app
 - **Egress proxy**: routes real provider hostnames to emulators, logs every exchange and applies faults.
 - **Flight recorder**: for failed runs, an offline HTML report with steps, screenshots, network exchanges, webhook deliveries and emulator state, with secrets redacted.
 - **Visual checks**: `toHaveScreenshot` with baselines and masks.
+- **Saved sessions**: sign in once per worker and start every test that names the session from that browser state (cookies, localStorage, IndexedDB); it is set up again when the environment resets or its check fails.
 
 ## Packages
 
@@ -29,6 +30,38 @@ It drives the app through its UI like a user, while third-party services the app
 | `@danwo/mcp`       | An MCP server for coding agents: run, explain and write danwo tests  |
 
 See `examples/shop` for a small app tested with `danwo test` and `danwo matrix`.
+
+## Saved sessions
+
+Define a session in the config (or a test file with `test.session`) and name it where tests use it:
+
+```ts
+// danwo.config.ts
+export default defineConfig({
+  sessions: {
+    ada: {
+      async setup({ app, screen, secret }) {
+        await app.open("/login")
+        await screen.getByLabel("Email").fill("ada@example.com")
+        await screen.getByLabel("Password").fill(secret("password"))
+        await screen.getByRole("button", { name: "Sign in" }).click()
+      },
+      // Optional: runs when a test reuses the state; throwing sets the session up again.
+      async check({ app, screen, expect }) {
+        await app.open("/account")
+        await expect(screen.getByRole("heading", { name: "Account" })).toBeVisible()
+      },
+    },
+  },
+})
+
+// a test file
+test.use({ session: "ada" }) // or test(title, { session: "ada" }, body); `false` opts out
+```
+
+The setup runs once per worker; its agent steps record and replay like any others. Every reset
+of the environment (each `danwo matrix` trial) drops the kept state. The flight record notes
+whether a test's session was created, reused or renewed; the state itself is never recorded.
 
 ## GitHub Checks
 

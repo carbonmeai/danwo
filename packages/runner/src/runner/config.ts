@@ -7,6 +7,7 @@ import type { OutboundCall, OutboundFault } from "@danwo/proxy"
 import type { LanguageModel } from "ai"
 
 import type { SessionSecret } from "../session.ts"
+import type { SessionArgs, SessionDefinition } from "../tests/types.ts"
 import type { EnvironmentContext, WorkerEnvironment } from "./environment.ts"
 import type { RecordMode } from "./record.ts"
 import type { Reporter } from "./reporting.ts"
@@ -39,6 +40,12 @@ export interface DanwoConfig {
    * the model (default true). `danwo matrix` never relocates: its runs follow recordings exactly.
    */
   readonly relocate?: boolean
+  /**
+   * Saved sessions by name: each is set up once per worker and its browser state reused by every
+   * test that names it (`test.use({ session })`), until the environment resets. The setup also
+   * receives the environment's fixtures.
+   */
+  readonly sessions?: Readonly<Record<string, SessionDefinition<SessionArgs>>>
   /** Starts what a worker's tests run against (app, emulators, proxy); called once per worker. */
   readonly environment?: (context: EnvironmentContext) => Promise<WorkerEnvironment>
   /**

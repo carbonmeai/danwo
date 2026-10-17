@@ -29,6 +29,7 @@ import {
   markEvidence,
   type RecordSettings,
 } from "./record.ts"
+import { SessionKeeper } from "./sessions.ts"
 import type {
   AttemptReport,
   TestFileTask,
@@ -51,6 +52,8 @@ interface Bench {
   /** Undefined when the run records nothing. */
   readonly recording: RecordSettings | undefined
   readonly updateScreenshots: boolean
+  /** Saved sessions, kept across this worker's tests until the environment resets. */
+  readonly sessions: SessionKeeper
 }
 
 let bench: Bench | undefined
@@ -78,7 +81,7 @@ async function attemptOnce(
   replay: ReplayUse,
   recordAs: string,
 ): Promise<{ result: AttemptResult; recordDir: string | undefined; mark: EvidenceMark }> {
-  const { loaded, env, recording, updateScreenshots } = benchOrFail()
+  const { loaded, env, recording, updateScreenshots, sessions } = benchOrFail()
   const recordDir = recording && attemptDir(recording, id, recordAs)
   const mark = markEvidence(env)
   const test = findDeclared(declarations, file, id)
@@ -93,6 +96,7 @@ async function attemptOnce(
       dir: baselineDir(file, test.titlePath),
       update: updateScreenshots ? "all" : "missing",
     },
+    sessions,
   })
 
   return { result, recordDir, mark }
@@ -151,7 +155,7 @@ async function runTest(
         error: result.error,
         stopped: result.stopped,
         divergence: result.divergence,
-        notes: [],
+        notes: result.notes,
         durationMs: result.durationMs,
         flight: result.flight,
         env,
@@ -292,7 +296,7 @@ async function runTrial(task: TrialTask, env: TrialEnvironment): Promise<TrialRe
       error: result.error,
       stopped: result.stopped,
       divergence: result.divergence,
-      notes: report.notes,
+      notes: [...report.notes, ...result.notes],
       durationMs: result.durationMs,
       flight: result.flight,
       env,
@@ -307,6 +311,8 @@ async function trial(task: TrialTask): Promise<TrialReport> {
   const env = trialEnvironment()
 
   await env.reset?.()
+  // The app was reset with it: sign-ins saved before belong to the app as it was.
+  benchOrFail().sessions.invalidate()
   applyFault(env, task.fault)
 
   try {
@@ -329,6 +335,7 @@ const calls: WorkerCalls = {
       workerIndex: start.workerIndex,
       recording,
       updateScreenshots: start.updateScreenshots,
+      sessions: new SessionKeeper(),
     }
   },
   testFile,

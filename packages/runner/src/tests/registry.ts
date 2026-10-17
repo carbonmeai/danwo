@@ -2,7 +2,13 @@
  * What loading a test file declared: its tests, describe blocks and hooks, as plain records the
  * worker runs and the parent turns into a test list.
  */
-import type { StoredBody, TestOptions } from "./types.ts"
+import type {
+  SessionArgs,
+  SessionDefinition,
+  StoredBody,
+  TestOptions,
+  UseOptions,
+} from "./types.ts"
 
 export type Mode = "normal" | "skip" | "only"
 
@@ -36,9 +42,18 @@ export interface DeclaredHook {
   readonly fn: StoredBody
 }
 
+/** A `test.use` call: options for every test of `block` (the file's top level when undefined). */
+export interface DeclaredUse {
+  readonly block: Block | undefined
+  readonly options: UseOptions
+}
+
 export interface FileDeclarations {
   readonly tests: DeclaredTest[]
   readonly hooks: DeclaredHook[]
+  readonly uses: DeclaredUse[]
+  /** Sessions the file defined with `test.session()`, by name. */
+  readonly sessions: Map<string, SessionDefinition<SessionArgs>>
   /** Set once the file finished loading; nothing can be declared on it afterwards. */
   sealed: boolean
 }
@@ -69,7 +84,13 @@ export async function declarationsOf(load: () => Promise<unknown>): Promise<File
     throw new Error("danwo loads one test file at a time")
   }
 
-  const declarations: FileDeclarations = { tests: [], hooks: [], sealed: false }
+  const declarations: FileDeclarations = {
+    tests: [],
+    hooks: [],
+    uses: [],
+    sessions: new Map(),
+    sealed: false,
+  }
 
   loading = { declarations, block: undefined }
 
@@ -121,6 +142,24 @@ export function hooksAround(
   return applies.toSorted((a, b) =>
     kind === "beforeEach" ? depth(b) - depth(a) : depth(a) - depth(b),
   )
+}
+
+/**
+ * The saved session `test` starts in: its own `session` option, else the innermost `test.use`
+ * around it that names one. `false` on the test opts out.
+ */
+export function sessionOf(file: FileDeclarations, test: DeclaredTest): string | undefined {
+  if (test.options.session !== undefined) return test.options.session || undefined
+
+  for (const block of [...enclosing(test.block), undefined]) {
+    const use = file.uses.findLast(
+      (candidate) => candidate.block === block && candidate.options.session !== undefined,
+    )
+
+    if (use !== undefined) return use.options.session
+  }
+
+  return undefined
 }
 
 /** The file's `beforeAll` hooks outermost first, or its `afterAll` hooks innermost first. */

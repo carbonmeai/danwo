@@ -17,6 +17,12 @@ import { type CacheMode, ReplayStore } from "./replay/index.ts"
 import { type Secret, SecretVault, type SessionSecret } from "./secrets/index.ts"
 
 export type { ReplayDivergence } from "./agent/index.ts"
+
+/**
+ * What a browser context remembers of the sites it visited: cookies, and each origin's
+ * localStorage and IndexedDB. A saved session is one of these, taken after signing in.
+ */
+export type BrowserState = Awaited<ReturnType<BrowserContext["storageState"]>>
 export type { SessionSecret } from "./secrets/index.ts"
 
 /** The app, and how long to wait for it. */
@@ -38,6 +44,8 @@ interface BrowserOptions {
   /** Extra launch options: `args` are added to the proxy's flags; `proxy` replaces the danwo proxy. */
   readonly launch?: BrowserFlags
   readonly headed?: boolean
+  /** Start the browser context with this state, e.g. a saved session's cookies and storage. */
+  readonly browserState?: BrowserState
 }
 
 /** Who carries out `agent.act` and judges `agent.assert`. */
@@ -134,6 +142,8 @@ export interface WebSession {
   secret(name: string): Secret
   /** What the attempt did, for the flight recorder; read `steps()` after `close()` for final records. */
   readonly flight: SessionFlight
+  /** The context's cookies, localStorage and IndexedDB now, to start another context from. */
+  browserState(): Promise<BrowserState>
   /** Ends the attempt and closes the browser. */
   close(): Promise<void>
 }
@@ -158,7 +168,9 @@ async function openBrowser(options: WebSessionOptions): Promise<Opened> {
   })
 
   try {
-    const context = await browser.newContext()
+    const context = await browser.newContext(
+      options.browserState === undefined ? {} : { storageState: options.browserState },
+    )
     const page = await context.newPage()
 
     return { browser, context, page }
@@ -307,6 +319,7 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
     secret: (name) => vault.handle(name),
     flight,
     app: appOf(tabs, steps, options.baseUrl, settings.loadTimeout),
+    browserState: () => context.storageState({ indexedDB: true }),
     async close() {
       if (closed) return
       closed = true

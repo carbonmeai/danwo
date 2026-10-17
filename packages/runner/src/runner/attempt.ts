@@ -7,6 +7,7 @@
 import type { SessionFlight } from "../flight.ts"
 import type { FailureEvidence } from "../record/index.ts"
 import {
+  type BrowserState,
   openWebSession,
   type ReplayDivergence,
   type WebSession,
@@ -15,12 +16,23 @@ import {
 import { DeadlineExceeded, withDeadline } from "../support/deadline.ts"
 import { type TestError, testFileLine, toTestError } from "../support/errors.ts"
 import { fixtureScope, wantedByAll } from "../tests/fixtures.ts"
-import { type DeclaredTest, type FileDeclarations, hooksAround } from "../tests/registry.ts"
+import {
+  type DeclaredTest,
+  type FileDeclarations,
+  hooksAround,
+  sessionOf,
+} from "../tests/registry.ts"
 import type { AttemptStatus } from "../tests/retry.ts"
 import { isSkipSignal } from "../tests/skip.ts"
 import type { StoredBody } from "../tests/types.ts"
 import type { DanwoConfig } from "./config.ts"
 import type { WorkerEnvironment } from "./environment.ts"
+import {
+  type SessionContext,
+  SessionKeeper,
+  type StartingState,
+  startingState,
+} from "./sessions.ts"
 
 /**
  * How an attempt uses the replay cache: `learn` replays what it can and records new steps;
@@ -42,6 +54,8 @@ export interface AttemptSetup {
   readonly recordDir: string | undefined
   /** Where the test's `toHaveScreenshot` baselines live, and whether to rewrite them. */
   readonly screenshots?: { readonly dir: string; readonly update: "missing" | "all" }
+  /** The worker's saved sessions; without it, a test's session is set up afresh every attempt. */
+  readonly sessions?: SessionKeeper
 }
 
 /** What the session saw, for the flight recorder; it stays in the worker. */
@@ -60,6 +74,8 @@ export interface AttemptResult {
   /** A replay-only trial with an invariant: where the body broke before the invariant judged. */
   readonly stopped: string | undefined
   readonly flight: AttemptFlight
+  /** For the flight record: how the test's saved session was had (reused, created, renewed). */
+  readonly notes: readonly string[]
 }
 
 const DEFAULT_TIMEOUT_MS = 60_000
@@ -119,12 +135,13 @@ export async function runAttempt(
 ): Promise<AttemptResult> {
   const started = Date.now()
   const deadline = test.options.timeout ?? setup.config.timeout ?? DEFAULT_TIMEOUT_MS
-  const session = await openSession(setup, deadline)
+  const { session, start } = await openStarted(file, test, setup, deadline)
   const fixtures = fixtureScope(test.fixtures, builtInFixtures(session, setup.env))
   const call = (fn: StoredBody) => async () => fn(fixtures.values)
 
   const body = await stage(
     async () => {
+      if (start?.error !== undefined) throw start.error
       await fixtures.prepare(wantedByAll(everyUser(file, test)))
       for (const hook of hooksAround(file, test, "beforeEach")) await call(hook.fn)()
       await call(test.body)()
@@ -160,7 +177,58 @@ export async function runAttempt(
     divergence,
     stopped: judged.stopped,
     flight: { session: session.flight, failure, startedAt: new Date(started).toISOString() },
+    notes: start === undefined ? [] : [start.note],
   }
+}
+
+/** How a test's saved session is looked up, set up and checked, from inside its attempt. */
+function sessionContext(
+  file: FileDeclarations,
+  setup: AttemptSetup,
+  deadline: number,
+): SessionContext {
+  const { screenshots: _baselines, ...plain } = setup
+
+  return {
+    keeper: setup.sessions ?? new SessionKeeper(),
+    definition: (name) => file.sessions.get(name) ?? setup.config.sessions?.[name],
+    // A session's own steps replay under its name and are not part of any test's record.
+    open: (journey) => openSession({ ...plain, id: journey, recordDir: undefined }, deadline),
+    call: async (fn, web) => fn(builtInFixtures(web, setup.env)),
+    deadline,
+  }
+}
+
+/**
+ * Opens the test's browser, in its saved session's state when it names one. A kept state whose
+ * check fails is set up afresh and the browser opened again from the new state.
+ */
+async function openStarted(
+  file: FileDeclarations,
+  test: DeclaredTest,
+  setup: AttemptSetup,
+  deadline: number,
+): Promise<{ session: WebSession; start: StartingState | undefined }> {
+  const name = sessionOf(file, test)
+
+  if (name === undefined) return { session: await openSession(setup, deadline), start: undefined }
+
+  const context = sessionContext(file, setup, deadline)
+  const start = await startingState(name, context)
+  const session = await openSession(setup, deadline, start.state)
+  const { check } = start
+
+  if (!start.reused || check === undefined) return { session, start }
+
+  const checked = await stage(() => context.call(check, session), deadline, "body")
+
+  if (checked.status === "passed") return { session, start }
+
+  await session.close()
+
+  const renewed = await startingState(name, context, true)
+
+  return { session: await openSession(setup, deadline, renewed.state), start: renewed }
 }
 
 interface Judging {
@@ -253,7 +321,11 @@ function recordOptions(recordDir: string | undefined): Partial<WebSessionOptions
     : { artifactsDir: recordDir, record: { stepScreenshots: true } }
 }
 
-function openSession(setup: AttemptSetup, timeout: number): Promise<WebSession> {
+function openSession(
+  setup: AttemptSetup,
+  timeout: number,
+  state?: BrowserState,
+): Promise<WebSession> {
   const { config, env } = setup
   const baseUrl = env?.baseUrl ?? config.baseUrl
 
@@ -269,6 +341,7 @@ function openSession(setup: AttemptSetup, timeout: number): Promise<WebSession> 
     ...replayOptions(setup),
     ...recordOptions(setup.recordDir),
     ...(setup.screenshots && { screenshots: setup.screenshots }),
+    ...(state && { browserState: state }),
     projectRoot: setup.root,
     timeout,
   })
@@ -282,7 +355,7 @@ function builtInFixtures(session: WebSession, env: WorkerEnvironment | undefined
     app: session.app,
     expect: session.expect,
     secret: (name: string) => session.secret(name),
-    platform: "web",
+    platform: "web" as const,
     ...env?.fixtures,
   }
 }

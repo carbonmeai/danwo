@@ -106,9 +106,14 @@ export {
   type StripeOptions,
   stripeService,
   type TestAPI,
+  type SessionDefinition,
+  type SessionFixtures,
+  type SessionSetup,
   type TestCase,
   type TestFixtures,
+  type TestOptions,
   unique,
+  type UseOptions,
   type WorkerEnvironment,
 } from "@danwo/runner/runner"
 export type {

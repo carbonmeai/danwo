@@ -19,11 +19,16 @@ export { test } from "../tests/api.ts"
 export type {
   FixtureDefinitions,
   FixtureSetup,
+  SessionDefinition,
+  SessionExtras,
+  SessionFixtures,
+  SessionSetup,
   SuiteFixtures,
   TestAPI,
   TestCase,
   TestFixtures,
   TestOptions,
+  UseOptions,
 } from "../tests/types.ts"
 export { catalogOf, type CatalogEntry, testFilesOf } from "./catalog.ts"
 export {

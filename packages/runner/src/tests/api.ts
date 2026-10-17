@@ -13,10 +13,13 @@ import { SkipSignal } from "./skip.ts"
 import {
   type DescribeCall,
   isStoredBody,
+  type SessionArgs,
+  type SessionDefinition,
   type StoredBody,
   type TestAPI,
   type TestCase,
   type TestOptions,
+  type UseOptions,
 } from "./types.ts"
 
 type Definitions = Readonly<Record<string, FixtureDefinition>>
@@ -144,6 +147,20 @@ function hook(kind: HookKind) {
   }
 }
 
+function use(options: UseOptions): void {
+  const file = currentFile("test.use()")
+
+  file.declarations.uses.push({ block: file.block, options })
+}
+
+/**
+ * `test.session`: records the file's definition of a saved session. The runner hands every setup
+ * the same fixtures; `TestAPI` types the definition by the file's own fixture set.
+ */
+function session(name: string, definition: SessionDefinition<SessionArgs>): void {
+  currentFile("test.session()").declarations.sessions.set(name, definition)
+}
+
 const describe: DescribeCall = Object.assign(describer("normal"), {
   skip: describer("skip"),
   only: describer("only"),
@@ -158,6 +175,8 @@ function testApi<F>(fixtures: Definitions): TestAPI<F> {
     afterEach: hook("afterEach"),
     beforeAll: hook("beforeAll"),
     afterAll: hook("afterAll"),
+    use,
+    session,
     extend: (definitions?: object) => testApi({ ...fixtures, ...definitions }),
   })
 
