@@ -9,6 +9,7 @@ import {
   createEmulator,
   GOOGLE_HOSTS,
   google,
+  googleOutboundFaults,
   MICROSOFT_HOSTS,
   microsoft,
   resend,
@@ -32,6 +33,7 @@ const RESEND_APP = fileURLToPath(new URL("./fixtures/resend-app.mjs", import.met
 const S3_APP = fileURLToPath(new URL("./fixtures/s3-app.mjs", import.meta.url))
 const OAUTH_APP = fileURLToPath(new URL("./fixtures/oauth-app.mjs", import.meta.url))
 const FETCH_APP = fileURLToPath(new URL("./fixtures/fetch-app.mjs", import.meta.url))
+const GOOGLE_SYNC_APP = fileURLToPath(new URL("./fixtures/google-sync-app.mjs", import.meta.url))
 
 let other: Server
 let otherUrl: string
@@ -350,6 +352,138 @@ describe("routing unmodified Google and Microsoft sign-in", () => {
       await proxy.stop()
       await googleEmulator.close()
       await microsoftEmulator.close()
+    }
+  })
+})
+
+/** A port nothing listens on yet, for a child process to open. */
+async function freePort(): Promise<number> {
+  const server = createServer()
+
+  server.listen(0, "127.0.0.1")
+  await once(server, "listening")
+
+  const { port } = server.address() as AddressInfo
+
+  server.close()
+
+  return port
+}
+
+/** Plays the user consenting to `scope` for the app, and returns the access token. */
+async function googleAccessToken(
+  emulator: { fetch: (r: Request) => Promise<Response> },
+  scope: string,
+) {
+  const authorize = new URL("https://accounts.google.com/o/oauth2/v2/auth")
+
+  authorize.search = new URLSearchParams({
+    client_id: "123-sync.apps.googleusercontent.com",
+    redirect_uri: "https://app.danwo.test/oauth/callback",
+    response_type: "code",
+    scope,
+  }).toString()
+
+  const page = await (await emulator.fetch(new Request(authorize))).text()
+  const back = await emulator.fetch(
+    new Request("https://accounts.google.com/o/oauth2/v2/auth/callback", {
+      method: "POST",
+      body: new URLSearchParams({
+        request: /name="request" value="([^"]+)"/.exec(page)?.[1] ?? "",
+        user: /name="user" value="([^"]+)"/.exec(page)?.[1] ?? "",
+      }),
+    }),
+  )
+  const token = await emulator.fetch(
+    new Request("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code: new URL(back.headers.get("location") ?? "").searchParams.get("code") ?? "",
+        redirect_uri: "https://app.danwo.test/oauth/callback",
+        client_id: "123-sync.apps.googleusercontent.com",
+        client_secret: "GOCSPX-sync",
+      }),
+    }),
+  )
+
+  return ((await token.json()) as { access_token: string }).access_token
+}
+
+describe("routing an unmodified Google integration", () => {
+  it("syncs Gmail from a watch push and falls back to a full Calendar sync on 410", async () => {
+    const port = await freePort()
+    const emulator = createEmulator(google)
+
+    seedGoogle(emulator.store, {
+      users: [{ email: "ada@danwo.test", name: "Ada Lovelace" }],
+      oauth_clients: [
+        {
+          client_id: "123-sync.apps.googleusercontent.com",
+          client_secret: "GOCSPX-sync",
+          name: "Sync",
+          redirect_uris: ["https://app.danwo.test/oauth/callback"],
+        },
+      ],
+      pubsub: [
+        {
+          subscription: "projects/app/subscriptions/gmail-push",
+          topic: "projects/app/topics/gmail",
+          endpoint: `http://127.0.0.1:${port}/push`,
+        },
+      ],
+    })
+
+    const proxy = await startProxy({
+      routes: [{ hosts: [...GOOGLE_HOSTS], handler: emulator.fetch }],
+      unmatched: "block",
+    })
+    const scope = [
+      "https://www.googleapis.com/auth/gmail.modify",
+      "https://www.googleapis.com/auth/calendar",
+    ].join(" ")
+    let syncs = 0
+
+    proxy.setFault((call) => {
+      const isSync = call.method === "GET" && call.path.includes("/events?syncToken=")
+
+      if (!isSync || ++syncs !== 2) return undefined
+
+      return googleOutboundFaults({
+        method: "GET",
+        path: "/calendar/v3/calendars/primary/events",
+      }).find((fault) => fault.kind === "status" && fault.status === 410)
+    })
+
+    try {
+      const { stdout } = await run(process.execPath, [GOOGLE_SYNC_APP], {
+        env: {
+          ...proxy.env(),
+          ACCESS_TOKEN: await googleAccessToken(emulator, scope),
+          PUSH_PORT: String(port),
+        },
+        cwd: fileURLToPath(new URL("..", import.meta.url)),
+        timeout: 30_000,
+      })
+
+      expect(JSON.parse(stdout)).toEqual({
+        gmail: { push: "ada@danwo.test", subjects: ["Note to self"] },
+        calendar: {
+          changed: ["Planning"],
+          expired: 410,
+          reason: "fullSyncRequired",
+          resynced: ["Planning"],
+        },
+      })
+
+      await proxy.settled()
+      expect(proxy.exchanges().every((exchange) => exchange.disposition === "routed")).toBe(true)
+      expect(proxy.exchanges().map((exchange) => exchange.host)).toEqual(
+        expect.arrayContaining(["gmail.googleapis.com", "www.googleapis.com"]),
+      )
+    } finally {
+      await proxy.stop()
+      await emulator.close()
     }
   })
 })
