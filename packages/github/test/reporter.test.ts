@@ -5,6 +5,7 @@ import { join } from "node:path"
 import type { RunOutcome } from "@danwo/core"
 import type { MatrixRunReport, TestReport, TestRunReport } from "@danwo/runner/runner"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { z } from "zod"
 
 import { github } from "../src/index.ts"
 import { type FakeGitHub, startFakeGitHub } from "./fake-github.ts"
@@ -123,6 +124,17 @@ function matrixRun(): MatrixRunReport {
   }
 }
 
+/** The `output` of a check run request. */
+const CheckOutput = z.object({
+  summary: z.string().default(""),
+  annotations: z.array(z.unknown()).default([]),
+})
+
+/** The annotations a check run request carried. */
+function annotationsOf(body: Record<string, unknown> | undefined): unknown[] {
+  return CheckOutput.optional().parse(body?.["output"])?.annotations ?? []
+}
+
 const reporterWith = (env: Record<string, string>) =>
   github({ env, log: (line) => logged.push(line) })
 
@@ -152,12 +164,6 @@ describe("github reporter for danwo test", () => {
       status: "in_progress",
       details_url: "https://github.example/acme/shop/actions/runs/77",
     })
-
-    const annotationsOf = (body: Record<string, unknown> | undefined) => {
-      const output = body?.["output"] as { annotations?: unknown[] } | undefined
-
-      return output?.annotations ?? []
-    }
 
     expect(annotationsOf(update?.body)).toHaveLength(50)
     expect(annotationsOf(complete?.body)).toHaveLength(10)
@@ -248,7 +254,7 @@ describe("github reporter for danwo matrix", () => {
     await reporter.matrixFinished?.(matrixRun())
 
     const [create, complete] = fake.requests
-    const output = complete?.body["output"] as { summary: string; annotations: unknown[] }
+    const output = CheckOutput.parse(complete?.body["output"])
 
     expect(create?.body).toMatchObject({ name: "danwo matrix" })
     expect(complete?.body).toMatchObject({
