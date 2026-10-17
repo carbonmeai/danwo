@@ -138,58 +138,56 @@ function done(res: ServerResponse, user: string): void {
   )
 }
 
-async function webhook(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const body = await readBody(req)
-  let event: Stripe.Event
-
+/** The verified event in a webhook request, or undefined if its signature doesn't check out. */
+function verifiedEvent(body: string, signature: string): Stripe.Event | undefined {
   try {
-    event = stripe.webhooks.constructEvent(
-      body,
-      String(req.headers["stripe-signature"]),
-      webhookSecret,
-    )
+    return stripe.webhooks.constructEvent(body, signature, webhookSecret)
   } catch {
-    send(res, 400, { error: "bad signature" })
-
-    return
+    return undefined
   }
+}
 
-  if (event.type === "checkout.session.completed") {
-    if (dedupe && handledEvents.has(event.id)) {
-      send(res, 200, { duplicate: true })
+/** Grants a completed checkout's credits; returns false if the event was already handled. */
+function grantCredits(event: Stripe.CheckoutSessionCompletedEvent): boolean {
+  if (dedupe && handledEvents.has(event.id)) return false
 
-      return
-    }
+  handledEvents.add(event.id)
 
-    handledEvents.add(event.id)
-    const session = event.data.object
-    const user = session.metadata?.user ?? ""
+  const session = event.data.object
+  const user = session.metadata?.user ?? ""
 
-    credits.set(user, (credits.get(user) ?? 0) + Number(session.metadata?.credits ?? 0))
-  }
+  credits.set(user, (credits.get(user) ?? 0) + Number(session.metadata?.credits ?? 0))
+
+  return true
+}
+
+async function webhook(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const event = verifiedEvent(await readBody(req), String(req.headers["stripe-signature"]))
+
+  if (!event) return send(res, 400, { error: "bad signature" })
+  if (event.type === "checkout.session.completed" && !grantCredits(event))
+    return send(res, 200, { duplicate: true })
 
   send(res, 200, { received: true })
 }
 
+type Route = (req: IncomingMessage, res: ServerResponse, url: URL) => unknown
+
+const ROUTES: Record<string, Route> = {
+  "GET /": (_req, res) => home(res),
+  "GET /done": (_req, res, url) => done(res, url.searchParams.get("user") ?? ""),
+  "POST /buy": (req, res) => buy(req, res),
+  "POST /webhooks/stripe": (req, res) => webhook(req, res),
+  "GET /credits": (_req, res, url) =>
+    send(res, 200, { credits: credits.get(url.searchParams.get("user") ?? "") ?? 0 }),
+}
+
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://shop")
-  const route = `${req.method} ${url.pathname}`
-  const handled =
-    route === "GET /"
-      ? Promise.resolve(home(res))
-      : route === "GET /done"
-        ? Promise.resolve(done(res, url.searchParams.get("user") ?? ""))
-        : route === "POST /buy"
-          ? buy(req, res)
-          : route === "POST /webhooks/stripe"
-            ? webhook(req, res)
-            : route === "GET /credits"
-              ? Promise.resolve(
-                  send(res, 200, { credits: credits.get(url.searchParams.get("user") ?? "") ?? 0 }),
-                )
-              : Promise.resolve(send(res, 404, { error: "not found" }))
+  const route = ROUTES[`${req.method} ${url.pathname}`]
+  const handled = route ? route(req, res, url) : send(res, 404, { error: "not found" })
 
-  handled.catch((error: unknown) => {
+  Promise.resolve(handled).catch((error: unknown) => {
     send(res, 500, { error: error instanceof Error ? error.message : "error" })
   })
 })
