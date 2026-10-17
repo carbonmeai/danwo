@@ -18,6 +18,12 @@ const PAGES: Readonly<Record<string, string>> = {
     <a href="/basket">Add oats to basket</a>
     <button type="button">Clear</button>`,
   "/basket": `<!doctype html><title>Basket</title><h1>Basket</h1><p>1 item: Oats</p>`,
+  "/unlock": `<!doctype html><title>Unlock</title><h1>Unlock the pantry</h1>
+    <form method="post" action="/unlocked">
+      <label>Pantry key <input type="password" name="key"></label>
+      <button type="submit">Unlock</button>
+    </form>`,
+  "/unlocked": `<!doctype html><title>Unlocked</title><h1>Pantry unlocked</h1>`,
 }
 
 function answer(res: ServerResponse, path: string): void {

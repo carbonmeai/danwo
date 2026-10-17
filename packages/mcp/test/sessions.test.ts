@@ -1,0 +1,158 @@
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
+import { afterEach, beforeEach, describe, expect, it } from "vitest"
+
+import { initProject, initReport } from "../src/init.ts"
+import { locatorCode, parseLocator } from "../src/locators.ts"
+import { snapshotChange } from "../src/sessions/diff.ts"
+import { parseFault } from "../src/sessions/faults.ts"
+
+describe("locator expressions", () => {
+  it("reads the screen's queries as a test writes them", () => {
+    expect(parseLocator('getByRole("button", { name: "Pay" })')).toEqual({
+      by: "role",
+      value: "button",
+      name: "Pay",
+    })
+    expect(parseLocator("screen.getByLabel('Email', { exact: true })")).toEqual({
+      by: "label",
+      value: "Email",
+      exact: true,
+    })
+    expect(parseLocator("getByText(/^Credits: /i)").value).toEqual(/^Credits: /i)
+    expect(locatorCode(parseLocator('getByTestId("checkout-pay")'))).toBe(
+      'screen.getByTestId("checkout-pay")',
+    )
+  })
+
+  it("refuses what is not one of the queries", () => {
+    expect(() => parseLocator("page.locator('#pay')")).toThrow(/is not a locator/)
+  })
+})
+
+describe("fault names", () => {
+  it("reads outbound faults onto the route the matrix names", () => {
+    expect(parseFault("status 500 on POST api.stripe.com/v1/checkout/sessions")).toEqual({
+      target: "outbound",
+      route: "POST api.stripe.com/v1/checkout/sessions",
+      fault: { kind: "status", status: 500 },
+      nth: 1,
+      label: "status 500 on POST api.stripe.com/v1/checkout/sessions",
+    })
+    expect(
+      parseFault("reset-after on GET checkout.stripe.com/checkout/cs_test_a1B2c3D4e5 #2"),
+    ).toMatchObject({
+      route: "GET checkout.stripe.com/checkout/:id",
+      fault: { kind: "reset-after" },
+      nth: 2,
+    })
+  })
+
+  it("reads webhook faults, with or without a service", () => {
+    expect(parseFault("duplicate on webhook checkout.session.completed")).toMatchObject({
+      target: "webhook",
+      topic: "checkout.session.completed",
+      fault: { kind: "duplicate" },
+    })
+    expect(
+      parseFault("stale 3600s on google webhook pubsub:projects/p/subscriptions/s"),
+    ).toMatchObject({
+      service: "google",
+      topic: "pubsub:projects/p/subscriptions/s",
+      fault: { kind: "stale", seconds: 3600 },
+    })
+  })
+
+  it("explains the forms it reads when it cannot read one", () => {
+    expect(() => parseFault("explode on POST api.stripe.com/x")).toThrow(/status <code> on/)
+    expect(() => parseFault("duplicate")).toThrow(/cannot read the fault/)
+  })
+})
+
+describe("snapshot changes", () => {
+  const page = '- heading "Shop" [ref=e1]\n- button "Buy" [ref=e2]'
+
+  it("finds nothing new when only refs changed", () => {
+    expect(snapshotChange(page, page.replace("e2", "f1e7"))).toEqual({ kind: "same" })
+  })
+
+  it("lists what went and what came", () => {
+    const after = '- heading "Shop" [ref=e1]\n- button "Buy" [ref=e2]\n- status "Added" [ref=e3]'
+
+    expect(snapshotChange(page, after)).toEqual({
+      kind: "diff",
+      lines: ['+ - status "Added" [ref=e3]'],
+    })
+  })
+
+  it("answers with the whole page when most of it changed", () => {
+    expect(snapshotChange(page, '- heading "Thanks" [ref=e9]')).toEqual({ kind: "whole" })
+  })
+})
+
+describe("danwo init", () => {
+  let dir: string
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "danwo-init-"))
+  })
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  it("creates the three client configs, then leaves them alone", async () => {
+    const first = await initProject({ cwd: dir })
+
+    expect(first.map((change) => change.outcome)).toEqual(["created", "created", "created"])
+    expect(JSON.parse(await readFile(join(dir, ".mcp.json"), "utf8"))).toEqual({
+      mcpServers: { danwo: { command: "npx", args: ["danwo", "mcp"] } },
+    })
+    expect(await readFile(join(dir, ".codex/config.toml"), "utf8")).toBe(
+      '[mcp_servers.danwo]\ncommand = "npx"\nargs = ["danwo","mcp"]\n',
+    )
+    expect(initReport(await initProject({ cwd: dir }))).toBe(
+      "unchanged .mcp.json\nunchanged .cursor/mcp.json\nunchanged .codex/config.toml",
+    )
+  })
+
+  it("merges into existing configs, keeping their other servers", async () => {
+    await mkdir(join(dir, ".codex"))
+    await writeFile(
+      join(dir, ".mcp.json"),
+      JSON.stringify({ mcpServers: { other: { command: "other" } }, extra: true }),
+    )
+    await writeFile(
+      join(dir, ".codex/config.toml"),
+      'model = "o5"\n\n[mcp_servers.danwo]\ncommand = "old"\n\n[mcp_servers.other]\ncommand = "other"\n',
+    )
+
+    const changes = await initProject({ cwd: dir, starterConfig: true })
+
+    expect(changes.map((change) => `${change.outcome} ${change.file}`)).toEqual([
+      "updated .mcp.json",
+      "created .cursor/mcp.json",
+      "updated .codex/config.toml",
+      "created danwo.config.ts",
+    ])
+    expect(JSON.parse(await readFile(join(dir, ".mcp.json"), "utf8"))).toEqual({
+      mcpServers: {
+        other: { command: "other" },
+        danwo: { command: "npx", args: ["danwo", "mcp"] },
+      },
+      extra: true,
+    })
+    expect(await readFile(join(dir, ".codex/config.toml"), "utf8")).toBe(
+      'model = "o5"\n\n[mcp_servers.danwo]\ncommand = "npx"\nargs = ["danwo","mcp"]\n\n[mcp_servers.other]\ncommand = "other"\n',
+    )
+    expect(await readFile(join(dir, "danwo.config.ts"), "utf8")).toContain("defineConfig")
+  })
+
+  it("refuses to rewrite a config that is not JSON", async () => {
+    await writeFile(join(dir, ".mcp.json"), "{ not json")
+
+    await expect(initProject({ cwd: dir })).rejects.toThrow(/\.mcp\.json is not a JSON object/)
+  })
+})

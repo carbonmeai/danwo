@@ -5,12 +5,15 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js"
 import { type CallToolResult, CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js"
 
-import { createDanwoServer } from "../src/index.ts"
+import { createDanwoServer, type DanwoServerOptions } from "../src/index.ts"
 
 export const PANTRY = fileURLToPath(new URL("./fixtures/pantry", import.meta.url))
 
-export async function connect(cwd: string): Promise<Client> {
-  const server = createDanwoServer({ cwd })
+export async function connect(
+  cwd: string,
+  options: Omit<DanwoServerOptions, "cwd"> = {},
+): Promise<Client> {
+  const server = createDanwoServer({ cwd, ...options })
   const client = new Client({ name: "danwo-test", version: "0.0.0" })
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair()
 

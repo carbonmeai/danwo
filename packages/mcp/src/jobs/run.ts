@@ -23,8 +23,8 @@ export interface JobOptions {
   readonly signal?: AbortSignal | undefined
 }
 
-/** Signals the job process's whole group: its workers, browsers and apps go with it. */
-function stopGroup(child: ChildProcess): void {
+/** Signals a process's whole group: its workers, browsers and apps go with it. */
+export function stopGroup(child: ChildProcess): void {
   const signalGroup = (signal: NodeJS.Signals) => {
     try {
       if (child.pid !== undefined) process.kill(-child.pid, signal)
@@ -45,13 +45,21 @@ export function stopAllJobs(): void {
   for (const child of running) stopGroup(child)
 }
 
-function forkJob(place: JobPlace): ChildProcess {
-  const child = fork(CHILD_ENTRY, [], {
+/**
+ * Forks `entry` in the project's folder with danwo's TypeScript hooks, leading its own process
+ * group so stopping it takes everything it started.
+ */
+export function forkInProject(entry: URL, place: JobPlace): ChildProcess {
+  return fork(entry, [], {
     cwd: place.cwd,
     execArgv: HOOKS.flatMap((hook) => ["--import", hook]),
     stdio: ["ignore", "pipe", "pipe", "ipc"],
     detached: true,
   })
+}
+
+function forkJob(place: JobPlace): ChildProcess {
+  const child = forkInProject(CHILD_ENTRY, place)
 
   running.add(child)
   child.once("exit", () => running.delete(child))
@@ -59,8 +67,8 @@ function forkJob(place: JobPlace): ChildProcess {
   return child
 }
 
-/** The last few thousand characters the job process wrote to stderr. */
-function stderrTail(child: ChildProcess): () => string {
+/** The last few thousand characters the process wrote to stderr. */
+export function stderrTail(child: ChildProcess): () => string {
   let tail = ""
 
   child.stdout?.resume()

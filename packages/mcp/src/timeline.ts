@@ -39,7 +39,12 @@ function exchangeLine(exchange: Exchange): string {
   return `${exchange.method} ${exchange.host}${oneLine(exchange.path, 120)} → ${status}${fault}${body}`
 }
 
-function deliveryLine(delivery: Delivery): string {
+/** One webhook delivery attempt, as a line: recorded runs and live sessions show them alike. */
+export function deliveryLine(
+  delivery: Pick<Delivery, "topic" | "attempt" | "status" | "error" | "fault"> & {
+    readonly service?: string | undefined
+  },
+): string {
   const service = delivery.service === undefined ? "" : `${delivery.service} `
   const outcome = delivery.status ?? delivery.error ?? "no answer"
   const fault = delivery.fault === null ? "" : ` [fault: ${delivery.fault}]`

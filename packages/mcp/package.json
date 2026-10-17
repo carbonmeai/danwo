@@ -11,6 +11,9 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@danwo/core": "workspace:*",
+    "@danwo/emulators": "workspace:*",
+    "@danwo/proxy": "workspace:*",
     "@danwo/runner": "workspace:*",
     "@modelcontextprotocol/sdk": "1.32.1",
     "playwright-core": "1.64.0",

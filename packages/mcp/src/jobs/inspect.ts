@@ -8,8 +8,8 @@ import { launchBrowser, redactCredentials, SecretVault } from "@danwo/runner"
 import { type DanwoConfig, loadConfig, type WorkerEnvironment } from "@danwo/runner/runner"
 import type { Locator, Page } from "playwright-core"
 
+import { locate, locatorCode } from "../locators.ts"
 import type { Job, JobPlace, LocatorMatch, LocatorQuery, PageInspection } from "./protocol.ts"
-import { isAriaRole } from "./roles.ts"
 
 /** About 20k tokens of page text at most. */
 const MAX_TREE_CHARS = 80_000
@@ -19,64 +19,11 @@ const LOAD_TIMEOUT_MS = 30_000
 
 /** The page's snapshot without the agent's element refs, which mean nothing to a test author. */
 function treeOf(snapshot: string): string {
-  const tree = snapshot.replace(/ \[ref=e\d+\]/g, "")
+  const tree = snapshot.replace(/ \[ref=(?:f\d+)?e\d+\]/g, "")
 
   return tree.length > MAX_TREE_CHARS
     ? `${tree.slice(0, MAX_TREE_CHARS)}\n… (page cut at ${MAX_TREE_CHARS} characters)`
     : tree
-}
-
-function quoted(text: string): string {
-  return JSON.stringify(text)
-}
-
-/** The locator a test would write for `query`, as code. */
-export function locatorCode(query: LocatorQuery): string {
-  const exact = query.exact === undefined ? "" : `exact: ${query.exact}`
-
-  if (query.by === "role") {
-    const options = [query.name === undefined ? "" : `name: ${quoted(query.name)}`, exact]
-      .filter((part) => part !== "")
-      .join(", ")
-
-    return `screen.getByRole(${quoted(query.value)}${options === "" ? "" : `, { ${options} }`})`
-  }
-
-  const method = `getBy${query.by[0]?.toUpperCase() ?? ""}${query.by.slice(1)}`
-
-  return `screen.${method}(${quoted(query.value)}${exact === "" ? "" : `, { ${exact} }`})`
-}
-
-function byRole(page: Page, query: LocatorQuery, exact: Exact): Locator {
-  if (!isAriaRole(query.value)) throw new Error(`"${query.value}" is not an ARIA role`)
-
-  return page.getByRole(query.value, {
-    ...exact,
-    ...(query.name !== undefined && { name: query.name }),
-  })
-}
-
-type Exact = { exact?: boolean }
-
-/** The text queries, by the name a test calls them with. */
-const BY_TEXT: Readonly<
-  Record<Exclude<LocatorQuery["by"], "role">, (page: Page, value: string, exact: Exact) => Locator>
-> = {
-  text: (page, value, exact) => page.getByText(value, exact),
-  label: (page, value, exact) => page.getByLabel(value, exact),
-  placeholder: (page, value, exact) => page.getByPlaceholder(value, exact),
-  testId: (page, value) => page.getByTestId(value),
-  altText: (page, value, exact) => page.getByAltText(value, exact),
-  title: (page, value, exact) => page.getByTitle(value, exact),
-}
-
-/** The Playwright locator behind `query`; danwo's screen queries match the same elements. */
-function locate(page: Page, query: LocatorQuery): Locator {
-  const exact = query.exact === undefined ? {} : { exact: query.exact }
-
-  return query.by === "role"
-    ? byRole(page, query, exact)
-    : BY_TEXT[query.by](page, query.value, exact)
 }
 
 async function matchOf(locator: Locator, redact: (text: string) => string): Promise<LocatorMatch> {

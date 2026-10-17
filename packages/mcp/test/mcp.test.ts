@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
-import { locatorCode } from "../src/jobs/inspect.ts"
+import { locatorCode } from "../src/locators.ts"
 import { Project } from "../src/project.ts"
 import { testSource } from "../src/tools/scaffold.ts"
 import { connect, PANTRY, resultOf, textOf } from "./client.ts"
@@ -18,13 +18,33 @@ describe("the server", () => {
     const prompts = (await client.listPrompts()).prompts.map((p) => p.name)
 
     expect(tools).toEqual([
+      "check",
+      "check_locator",
+      "clear_faults",
+      "click",
+      "close_session",
+      "deliver_webhooks",
+      "emulator_state",
+      "exchanges",
+      "fill",
+      "fill_secret",
+      "hover",
+      "inject_fault",
       "inspect_page",
       "list_tests",
+      "navigate",
+      "open_session",
+      "press",
       "read_screenshot",
       "run_matrix",
       "run_tests",
       "scaffold_test",
+      "screenshot",
+      "select",
       "show_run",
+      "snapshot",
+      "start_recording",
+      "stop_recording",
     ])
     expect(resources).toEqual(["danwo://config", "danwo://runs/latest"])
     expect(prompts).toEqual(["write-danwo-test"])

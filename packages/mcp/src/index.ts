@@ -10,6 +10,7 @@ import { stopAllJobs } from "./jobs/run.ts"
 import { createDanwoServer, type DanwoServerOptions } from "./server.ts"
 
 export { createDanwoServer, type DanwoServerOptions } from "./server.ts"
+export { type InitChange, type InitOptions, initProject, initReport } from "./init.ts"
 export { stopAllJobs } from "./jobs/run.ts"
 
 /**
