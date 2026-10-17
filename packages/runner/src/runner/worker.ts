@@ -230,16 +230,28 @@ function stopNote(result: AttemptResult): string | undefined {
   )
 }
 
-/** What a trial reports once the app's background work settled: its verdict and evidence. */
-function trialReport(result: AttemptResult, env: TrialEnvironment): TrialReport {
+/**
+ * What a trial reports once the app's background work settled: its verdict, and the calls and
+ * deliveries from its mark on. Those the environment made
+ * while resetting (an app starting up) happen before a fault is armed, so they are not the
+ * test's to plan faults on.
+ */
+function trialReport(
+  result: AttemptResult,
+  env: TrialEnvironment,
+  mark: EvidenceMark,
+): TrialReport {
   const stop = stopNote(result)
 
   return {
     status: result.status === "passed" ? "passed" : "failed",
     error: result.error?.message ?? null,
     // Bodies stay in the worker: the flight record has them; the run plans by route alone.
-    exchanges: env.proxy.exchanges().map(({ request: _q, response: _r, ...call }) => call),
-    deliveries: deliveriesOf(env.webhooks),
+    exchanges: env.proxy
+      .exchanges()
+      .slice(mark.exchanges)
+      .map(({ request: _q, response: _r, ...call }) => call),
+    deliveries: deliveriesOf(env.webhooks).slice(mark.deliveries),
     divergence: result.divergence,
     notes: [...(stop === undefined ? [] : [stop]), ...(env.notes?.() ?? [])],
   }
@@ -270,7 +282,7 @@ async function runTrial(task: TrialTask, env: TrialEnvironment): Promise<TrialRe
   await env.settle?.()
   await env.proxy.settled().catch(() => undefined)
 
-  const report = trialReport(result, env)
+  const report = trialReport(result, env, mark)
   const record = await keepRecord(recordDir, trialNeedsRecord(report, task.fault), () =>
     buildRecord({
       test: task.testId,

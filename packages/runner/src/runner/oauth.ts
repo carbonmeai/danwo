@@ -14,7 +14,7 @@ import {
 } from "@danwo/emulators"
 import type { Proxy } from "@danwo/proxy"
 
-import { type Service, settleWebhooks, startServices } from "./services.ts"
+import { type Service, type Services, settleWebhooks, startServices } from "./services.ts"
 
 /**
  * Seed data applied on start and after every reset. A function runs each time, so it can use
@@ -38,10 +38,14 @@ export interface OAuthService extends Service {
   readonly clock: ManualClock
 }
 
-/** A sign-in provider's emulator behind its own danwo proxy. */
+/** A Google or Microsoft emulator behind its own danwo proxy. */
 export interface OAuthEnvironment<Name extends string> {
   readonly emulator: Emulator
   readonly proxy: Proxy
+  /** Its push notifications, by service name, for `danwo matrix` to fault. */
+  readonly webhooks: Services["webhooks"]
+  /** Plays every pending push notification and retry to the end. */
+  readonly settle: () => Promise<void>
   /** Emulator back to its seed, proxy log and fault rules cleared. */
   reset(): Promise<void>
   /** Fixtures for tests: the emulator under `Name` (`google`, `microsoft`), `proxy`, `settle`. */
@@ -125,6 +129,8 @@ async function oauthEnvironment<Name extends string>(
   return {
     emulator: service.emulator,
     proxy,
+    webhooks: services.webhooks,
+    settle,
     reset: () => services.reset(),
     fixtures,
     close: () => services.close(),

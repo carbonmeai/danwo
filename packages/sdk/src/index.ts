@@ -127,6 +127,7 @@ export { z } from "@danwo/runner/runner"
 export {
   type CalendarEntry,
   type CalendarSeedEvent,
+  type Emulator,
   type DriveEntry,
   type DriveSeedFile,
   type GmailMailbox,
