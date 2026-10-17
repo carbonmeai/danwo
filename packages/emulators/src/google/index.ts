@@ -1,13 +1,13 @@
 import type { Emulator } from "../define.ts"
 import { defineEmulator } from "../define.ts"
 import { type PersonName, personName } from "../oauth/account.ts"
-import { createSigningKey } from "../oauth/jwt.ts"
+import { createSigningKey, type SigningKey } from "../oauth/jwt.ts"
 import { type SignIns, signIns } from "../oauth/sign-ins.ts"
 import type { Store } from "../store.ts"
 import { googleErrors } from "./api.ts"
 import type { GoogleRouteContext } from "./context.ts"
 import { newUid } from "./helpers.ts"
-import { PUSH_DELIVERY, pushEndpoints, pushHeaders } from "./push.ts"
+import { PUSH_DELIVERY, pushEndpoints, pushHeaders, pushPayload } from "./push.ts"
 import { authorizeRoutes } from "./routes/authorize.ts"
 import { calendarEventRoutes } from "./routes/calendar-events.ts"
 import { calendarListRoutes } from "./routes/calendar-lists.ts"
@@ -137,6 +137,17 @@ function routes(context: GoogleRouteContext): void {
     register(context)
 }
 
+/** Each emulator's signing key, shared by its certificate URLs and its signed pushes. */
+const signingKeys = new WeakMap<Store, SigningKey>()
+
+function keyOf(store: Store): SigningKey {
+  const key = signingKeys.get(store) ?? createSigningKey()
+
+  signingKeys.set(store, key)
+
+  return key
+}
+
 /**
  * Google on its real hostnames: sign-in (the account chooser, OpenID Connect discovery, the token
  * endpoint with PKCE and refresh, userinfo, signing keys and revocation), Gmail, Calendar and Drive, each
@@ -147,11 +158,17 @@ export const google = defineEmulator({
   name: "google",
   setup({ app, store, clock, outbox }) {
     app.onError(googleErrors())
-    routes({ app, clock, store, outbox, google: () => googleStore(store), key: createSigningKey() })
+    routes({ app, clock, store, outbox, google: () => googleStore(store), key: keyOf(store) })
   },
   webhooks: ({ store, outbox, clock }) => ({
     endpoints: () => pushEndpoints({ store, outbox, clock }),
-    sign: ({ endpoint, body }) => pushHeaders(endpoint, body),
+    sign: ({ endpoint, body, timestamp }) =>
+      pushHeaders({ store, outbox, clock }, endpoint, body, {
+        key: keyOf(store),
+        timestamp,
+        now: Math.floor(clock().getTime() / 1000),
+      }),
+    payload: pushPayload,
     policy: PUSH_DELIVERY,
   }),
 })

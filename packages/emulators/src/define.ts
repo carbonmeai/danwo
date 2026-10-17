@@ -6,6 +6,7 @@ import {
   type DeliveryPolicy,
   WebhookDispatcher,
   type WebhookEndpoint,
+  type WebhookPayload,
   type WebhookSigner,
 } from "./webhooks.ts"
 
@@ -24,6 +25,7 @@ export interface WebhookSetup {
   readonly endpoints: () => readonly WebhookEndpoint[]
   readonly sign: WebhookSigner
   readonly policy: DeliveryPolicy
+  readonly payload?: WebhookPayload
 }
 
 /** A provider emulator: routes and state set up per instance, optional seed data and webhooks. */
@@ -123,6 +125,7 @@ function dispatcherFor(
     outbox: context.outbox,
     endpoints: setup.endpoints,
     sign: setup.sign,
+    ...(setup.payload && { payload: setup.payload }),
     policy: options.deliveryPolicy ?? setup.policy,
     clock: context.clock,
     timer: options.timer ?? systemTimer,

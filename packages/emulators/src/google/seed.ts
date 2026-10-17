@@ -25,6 +25,11 @@ export interface PubSubSeedSubscription {
   /** `projects/<project>/topics/<name>`, the topic apps pass to `users.watch`. */
   readonly topic: string
   readonly endpoint: string
+  /**
+   * Signs each push with an OIDC token for this service account, as a subscription with
+   * authentication does. `audience` defaults to `endpoint`.
+   */
+  readonly oidcToken?: { readonly serviceAccountEmail: string; readonly audience?: string }
 }
 
 /** Seeding changes state without notifying anyone: its outbox is never delivered. */
@@ -80,8 +85,18 @@ export function seedGmail(
 
 /** Registers Pub/Sub push subscriptions. */
 export function seedPubSub(store: Store, subscriptions: readonly PubSubSeedSubscription[]): void {
-  for (const { subscription, topic, endpoint } of subscriptions)
-    googleStore(store).subscriptions.insert({ name: subscription, topic, endpoint })
+  for (const { subscription, topic, endpoint, oidcToken } of subscriptions)
+    googleStore(store).subscriptions.insert({
+      name: subscription,
+      topic,
+      endpoint,
+      oidc: oidcToken
+        ? {
+            serviceAccountEmail: oidcToken.serviceAccountEmail,
+            audience: oidcToken.audience ?? null,
+          }
+        : null,
+    })
 }
 
 /** An event already on a primary calendar when the emulator starts. */

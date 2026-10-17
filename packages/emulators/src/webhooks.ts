@@ -19,6 +19,12 @@ export type WebhookSigner = (input: {
   timestamp: number
 }) => Record<string, string>
 
+/**
+ * The request body POSTed for one message, from its JSON. Providers whose notifications carry their
+ * meaning in headers send less than the message, e.g. nothing at all.
+ */
+export type WebhookPayload = (endpoint: WebhookEndpoint, body: string) => string
+
 export interface DeliveryPolicy {
   /** Delay before each retry after a failed attempt; its length is the number of retries. */
   readonly retryDelaysMs: readonly number[]
@@ -85,6 +91,8 @@ export interface WebhookDispatcherOptions {
   readonly outbox: Outbox
   readonly endpoints: () => readonly WebhookEndpoint[]
   readonly sign: WebhookSigner
+  /** What is POSTed; the message's JSON when absent. Signing always sees the JSON. */
+  readonly payload?: WebhookPayload
   readonly policy: DeliveryPolicy
   readonly clock: Clock
   readonly timer: Timer
@@ -237,25 +245,41 @@ export class WebhookDispatcher {
     return task
   }
 
+  /** The attempt's headers: signed now, signed in the past, or signed with the wrong secret. */
+  private signed(
+    endpoint: WebhookEndpoint,
+    body: string,
+    now: number,
+    mode: AttemptMode,
+  ): Record<string, string> {
+    const { sign } = this.options
+
+    if (mode.signing === "forged")
+      return sign({
+        endpoint: { ...endpoint, secret: `${endpoint.secret}_forged` },
+        body,
+        timestamp: now,
+      })
+
+    return sign({ endpoint, body, timestamp: mode.signing === "normal" ? now : now - mode.signing })
+  }
+
+  /** What is POSTed for a message whose JSON is `body`. */
+  private posted(endpoint: WebhookEndpoint, body: string): string {
+    return this.options.payload ? this.options.payload(endpoint, body) : body
+  }
+
   private async send(
     message: OutboxMessage,
     endpoint: WebhookEndpoint,
     attempt: number,
     mode: AttemptMode,
   ): Promise<boolean> {
-    const { clock, sign, policy } = this.options
+    const { clock, policy } = this.options
     const generation = this.generation
     const at = clock()
     const body = JSON.stringify(message.body)
-    const now = Math.floor(at.getTime() / 1000)
-    const headers =
-      mode.signing === "forged"
-        ? sign({
-            endpoint: { ...endpoint, secret: `${endpoint.secret}_forged` },
-            body,
-            timestamp: now,
-          })
-        : sign({ endpoint, body, timestamp: mode.signing === "normal" ? now : now - mode.signing })
+    const headers = this.signed(endpoint, body, Math.floor(at.getTime() / 1000), mode)
     const started = performance.now()
     let status: number | null = null
     let error: string | null = null
@@ -264,7 +288,7 @@ export class WebhookDispatcher {
       const response = await (this.options.fetch ?? fetch)(endpoint.url, {
         method: "POST",
         headers,
-        body,
+        body: this.posted(endpoint, body),
         signal: AbortSignal.any([this.controller.signal, AbortSignal.timeout(policy.timeoutMs)]),
       })
 

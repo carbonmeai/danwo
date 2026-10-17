@@ -7,14 +7,17 @@ import type { Clock, Store } from "../store.ts"
 import type { WebhookEndpoint } from "../webhooks.ts"
 import { badRequest, jsonBody, notFound } from "./api.ts"
 import type { ChannelRecord, ChannelTarget } from "./entities.ts"
+import { type PushSigning, pushAuthorization, SIGNED_PUSH } from "./push-auth.ts"
 import { googleStore } from "./store.ts"
 
 /**
  * Push notifications, both kinds Google uses:
- * - Calendar and Drive `watch` channels: a POST to the app's address with `X-Goog-*` headers saying
- *   which resource changed (`sync` first, then `exists`, `update`, `change` and so on);
+ * - Calendar and Drive `watch` channels: a POST with an empty body to the app's address, whose
+ *   `X-Goog-*` headers say which resource changed (`sync` first, then `exists`, `update`, `change`
+ *   and so on);
  * - Gmail's Pub/Sub topics: each push subscription to the watched topic gets a POST with the
- *   `{ message: { data, messageId, publishTime }, subscription }` envelope.
+ *   `{ message: { data, messageId, publishTime }, subscription }` envelope, and an OIDC token in
+ *   `Authorization` when the subscription is authenticated.
  * Both go through the emulator's webhook dispatcher, so retries and the fault matrix apply.
  */
 
@@ -170,7 +173,7 @@ export function pushEndpoints(push: PushContext): WebhookEndpoint[] {
     id: `${SUBSCRIPTION}${subscription.name}`,
     url: subscription.endpoint,
     events: [`${SUBSCRIPTION}${subscription.name}`],
-    secret: "",
+    secret: subscription.oidc ? SIGNED_PUSH : "",
     enabled: true,
   }))
   const channels = google.channels
@@ -214,7 +217,6 @@ function noticeOf(body: string): ChannelNotice {
 /** The `X-Goog-*` headers of one channel notification. */
 function channelHeaders(notice: ChannelNotice): Record<string, string> {
   return {
-    "content-type": "application/json; charset=utf-8",
     "x-goog-channel-id": notice.channelId,
     "x-goog-message-number": String(notice.messageNumber),
     "x-goog-resource-id": notice.resourceId,
@@ -229,9 +231,38 @@ function channelHeaders(notice: ChannelNotice): Record<string, string> {
 /** How Google's pushes are retried: a few attempts over a minute. */
 export const PUSH_DELIVERY = { retryDelaysMs: [1000, 10_000, 60_000], timeoutMs: 10_000 }
 
-/** The headers of one push: `X-Goog-*` for a channel, plain JSON for a Pub/Sub push. */
-export function pushHeaders(endpoint: WebhookEndpoint, body: string): Record<string, string> {
-  if (!endpoint.id.startsWith(CHANNEL)) return { "content-type": "application/json" }
+/** The headers of a Pub/Sub push: JSON, plus the subscription's token when it has one. */
+function subscriptionHeaders(
+  push: PushContext,
+  endpoint: WebhookEndpoint,
+  signing: PushSigning,
+): Record<string, string> {
+  const name = endpoint.id.slice(SUBSCRIPTION.length)
+  const subscription = googleStore(push.store).subscriptions.findOneBy("name", name)
+  const forged = endpoint.secret !== SIGNED_PUSH
+
+  return {
+    "content-type": "application/json",
+    ...(subscription && pushAuthorization(subscription, signing, forged)),
+  }
+}
+
+/**
+ * The headers of one push: `X-Goog-*` for a channel, JSON and the token for a Pub/Sub push. A
+ * forged attempt arrives with a changed `secret`, which signs the token with the wrong key.
+ */
+export function pushHeaders(
+  push: PushContext,
+  endpoint: WebhookEndpoint,
+  body: string,
+  signing: PushSigning,
+): Record<string, string> {
+  if (endpoint.id.startsWith(SUBSCRIPTION)) return subscriptionHeaders(push, endpoint, signing)
 
   return channelHeaders(noticeOf(body))
+}
+
+/** What a push POSTs: the Pub/Sub envelope, or nothing for a channel, as Google sends. */
+export function pushPayload(endpoint: WebhookEndpoint, body: string): string {
+  return endpoint.id.startsWith(CHANNEL) ? "" : body
 }

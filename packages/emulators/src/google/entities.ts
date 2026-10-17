@@ -71,8 +71,23 @@ export type GmailMailboxRecord = Entity & {
   watch: GmailWatch | null
 }
 
-/** A Pub/Sub push subscription: messages published to `topic` are POSTed to `endpoint`. */
-export type PushSubscriptionRecord = Entity & { name: string; topic: string; endpoint: string }
+/** How a push subscription proves its pushes come from Google: an OIDC token for this account. */
+export interface PushAuthentication {
+  serviceAccountEmail: string
+  /** The token's `aud`; the push endpoint when null. */
+  audience: string | null
+}
+
+/**
+ * A Pub/Sub push subscription: messages published to `topic` are POSTed to `endpoint`, with a
+ * signed token in `Authorization` when `oidc` is set.
+ */
+export type PushSubscriptionRecord = Entity & {
+  name: string
+  topic: string
+  endpoint: string
+  oidc: PushAuthentication | null
+}
 
 /** A calendar a user owns. The primary calendar's id is the user's email. */
 export type CalendarRecord = Entity & {
