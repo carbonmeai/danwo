@@ -1,0 +1,37 @@
+{
+  "name": "danwo",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --project unit",
+    "lint": "oxlint --type-aware",
+    "lint:fix": "oxlint --type-aware --fix",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "check": "bun run format:check && bun run lint && bun run fallow && bun run typecheck && bun run test",
+    "test:slow": "vitest run --project slow",
+    "test:all": "vitest run",
+    "fallow": "fallow --baseline fallow-baselines/dead-code.json --health-baseline fallow-baselines/health.json --dupes-baseline fallow-baselines/dupes.json",
+    "fallow:report": "fallow",
+    "fallow:baseline": "fallow dead-code --save-baseline fallow-baselines/dead-code.json && fallow health --save-baseline fallow-baselines/health.json && fallow dupes --save-baseline fallow-baselines/dupes.json"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.0.5",
+    "@stylistic/eslint-plugin": "5.10.0",
+    "@types/node": "^24",
+    "fallow": "3.33.1",
+    "oxfmt": "0.73.0",
+    "oxlint": "1.88.0",
+    "oxlint-tsgolint": "7.0.2004",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

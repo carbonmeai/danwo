@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.base.json",
+  "include": [
+    "packages/*/src",
+    "packages/*/test",
+    "packages/*/*.mjs",
+    "examples/*/src",
+    "examples/*/tests",
+    "examples/*/*.ts",
+    "vitest.config.ts",
+    "scripts"
+  ],
+  "compilerOptions": {
+    "allowJs": true
+  }
+}

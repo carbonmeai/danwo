@@ -1,0 +1,109 @@
+{
+  "kind": "health",
+  "finding_counts": {
+    "examples/shop/src/server.ts": {
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "packages/emulators/src/http.ts": {
+      "complexity_moderate": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 4
+      }
+    },
+    "packages/emulators/src/resend/routes/emails.ts": {
+      "complexity_moderate": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "packages/emulators/src/resend/routes/webhooks.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "packages/emulators/src/stripe/expand.ts": {
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "packages/emulators/src/stripe/formatters.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "packages/emulators/src/stripe/helpers.ts": {
+      "complexity_critical": {
+        "count": 1
+      }
+    },
+    "packages/emulators/src/stripe/idempotency.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "packages/emulators/src/stripe/index.ts": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "packages/emulators/src/stripe/resolve.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "packages/emulators/src/stripe/routes/checkout-sessions.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "packages/emulators/src/stripe/routes/customers.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "packages/emulators/src/stripe/routes/payment-intents.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "packages/proxy/src/proxy.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    }
+  },
+  "runtime_coverage_findings": [],
+  "target_keys": [
+    "packages/emulators/src/resend/index.ts:dead code",
+    "packages/emulators/src/stripe/helpers.ts:complexity",
+    "packages/emulators/src/resend/helpers.ts:high impact",
+    "packages/emulators/src/stripe/routes/checkout-sessions.ts:complexity"
+  ]
+}

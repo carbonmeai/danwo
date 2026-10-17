@@ -1,0 +1,13 @@
+docs
+node_modules
+dist
+coverage
+.DS_Store
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+qa/
+.fallow/
+.danwo/
+.local/

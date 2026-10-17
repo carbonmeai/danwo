@@ -1,0 +1,10 @@
+{
+  "kind": "dupes",
+  "clone_groups": [
+    "packages/emulators/src/stripe/routes/payment-intents.ts:101-111|packages/emulators/src/stripe/routes/payment-intents.ts:139-149|packages/emulators/src/stripe/routes/payment-intents.ts:181-191|packages/emulators/src/stripe/routes/payment-intents.ts:86-96",
+    "packages/emulators/src/stripe/routes/payment-intents.ts:101-111|packages/emulators/src/stripe/routes/payment-intents.ts:139-149|packages/emulators/src/stripe/routes/payment-intents.ts:181-191",
+    "packages/emulators/src/stripe/routes/customers.ts:31-41|packages/emulators/src/stripe/routes/customers.ts:46-56|packages/emulators/src/stripe/routes/customers.ts:70-80"
+  ],
+  "clone_fingerprints": ["dup:2e383137:4", "dup:cc90217a:3", "dup:7037d80d:3"],
+  "normalized_clone_fingerprints": ["dup:132096c3:4", "dup:f8c5208d:3", "dup:3b582ae2:3"]
+}
