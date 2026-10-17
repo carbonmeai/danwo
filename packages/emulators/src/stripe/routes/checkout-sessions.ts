@@ -155,13 +155,13 @@ function newSession(
     lines: plan.lines,
     customer: textOrNull(params.customer),
     customerEmail: textOrNull(params.customer_email),
+    expiresAt: integer(params.expires_at) ?? created + DAY_SECONDS,
     clientReferenceId: textOrNull(params.client_reference_id),
+    metadata: metadataOf(params.metadata) ?? {},
     successUrl: textOrNull(params.success_url),
     cancelUrl: textOrNull(params.cancel_url),
-    configuration: textOrNull(params.payment_method_configuration),
-    expiresAt: integer(params.expires_at) ?? created + DAY_SECONDS,
-    metadata: metadataOf(params.metadata) ?? {},
     invoiceCreation: plan.invoice,
+    configuration: textOrNull(params.payment_method_configuration),
   })
 }
 
