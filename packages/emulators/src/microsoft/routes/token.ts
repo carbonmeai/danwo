@@ -51,6 +51,12 @@ const REDEEM_FAILURES: Readonly<Record<RedeemFailure, AadFailure>> = {
   ),
 }
 
+/** A refresh token the user's sessions were revoked from. */
+const REVOKED_GRANT = grantFailure(
+  50173,
+  "The provided grant has expired due to it being revoked, a fresh auth token is needed. The user might have changed or reset their password.",
+)
+
 /** The scope a token is granted: what was asked for, without the sign-in-only scopes. */
 function resourceScope(requested: string): string {
   return requested
@@ -117,13 +123,11 @@ export function tokenRoutes(context: MicrosoftRouteContext): void {
   }
 
   const refresh = (c: Context, form: Record<string, string>, clientId: string) => {
-    const current = liveToken(
-      context.microsoft().tokens,
-      form.refresh_token ?? "",
-      "refresh",
-      clock,
-    )
+    const tokens = context.microsoft().tokens
+    const current = liveToken(tokens, form.refresh_token ?? "", "refresh", clock)
 
+    if (tokens.findOneBy("token", form.refresh_token ?? "")?.revoked)
+      return aadError(c, clock, REVOKED_GRANT)
     if (!current || current.clientId !== clientId)
       return aadError(c, clock, REDEEM_FAILURES.expired_code)
 

@@ -1,5 +1,6 @@
-import { createHash, randomUUID } from "node:crypto"
+import { createHash, randomBytes, randomUUID } from "node:crypto"
 
+import { HttpError } from "../errors.ts"
 import type { Context } from "../http.ts"
 import type { Clock } from "../store.ts"
 import type { MicrosoftUser } from "./entities.ts"
@@ -34,6 +35,54 @@ export function issuerFor(tenant: string): string {
 /** Microsoft's per-app subject: the same user has a different `sub` in each app. */
 export function pairwiseSubject(oid: string, clientId: string): string {
   return createHash("sha256").update(`${oid}:${clientId}`).digest("base64url").slice(0, 43)
+}
+
+/** One Graph failure: its status, error code and message, plus any response headers. */
+export interface GraphFailure {
+  readonly status: number
+  readonly code: string
+  readonly message: string
+  readonly headers?: Record<string, string>
+}
+
+/** Graph's error body, with the request ids every Graph error carries. */
+function graphErrorBody(clock: Clock, failure: Pick<GraphFailure, "code" | "message">) {
+  return {
+    error: {
+      code: failure.code,
+      message: failure.message,
+      innerError: {
+        date: clock().toISOString(),
+        "request-id": randomUUID(),
+        "client-request-id": randomUUID(),
+      },
+    },
+  }
+}
+
+/** A failure a Graph handler throws, answered with Graph's error body and this code. */
+export class GraphProblem extends HttpError {
+  readonly code: string
+
+  constructor(status: number, code: string, message: string) {
+    super(status, message)
+    this.code = code
+  }
+}
+
+/** Answers with Graph's error body. */
+export function graphError(c: Context, clock: Clock, failure: GraphFailure): Response {
+  return c.json(graphErrorBody(clock, failure), failure.status, failure.headers ?? {})
+}
+
+/** A Graph-style opaque id: `prefix` and random URL-safe characters. */
+export function graphId(prefix: string, bytes = 24): string {
+  return `${prefix}${randomBytes(bytes).toString("base64url")}`
+}
+
+/** A fresh change key, which an item gets on every change and shows as its ETag. */
+export function newChangeKey(): string {
+  return randomBytes(12).toString("base64")
 }
 
 /** One AADSTS failure: its OAuth error, number and message. */
