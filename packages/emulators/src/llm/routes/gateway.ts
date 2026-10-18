@@ -23,6 +23,29 @@ function unknownModel(c: Context, model: string): Response {
   )
 }
 
+/** The gateway's 400 for a prompt that is not a list of messages, with the issue it found. */
+function promptNotAList(c: Context, prompt: unknown): Response {
+  const received = prompt === null ? "null" : typeof prompt
+
+  return c.json(
+    {
+      error: {
+        message: "Invalid request body",
+        param: [
+          {
+            expected: "array",
+            code: "invalid_type",
+            path: ["prompt"],
+            message: `Invalid input: expected array, received ${received}`,
+          },
+        ],
+        type: "invalid_request_error",
+      },
+    },
+    400,
+  )
+}
+
 export function gatewayRoutes(emulator: EmulatorContext): void {
   const { app, clock } = emulator
   const settings = () => llmStore(emulator.store).settings()
@@ -38,7 +61,11 @@ export function gatewayRoutes(emulator: EmulatorContext): void {
     if (unknown(model)) return unknownModel(c, model)
 
     const stream = c.req.header("ai-language-model-streaming") === "true"
-    const request = gatewayRequest(await bodyOf(c), model, stream)
+    const body = await bodyOf(c)
+
+    if (!Array.isArray(body.prompt)) return promptNotAList(c, body.prompt)
+
+    const request = gatewayRequest(body, model, stream)
     const answered = await answer(emulator, c, "language-model", request)
     const whole = gatewayResult(answered.reply, answered.usage, model, priceOf(model))
 
