@@ -20,6 +20,7 @@ export interface PaystackLedger {
   subscriptions(): Subscription[]
 }
 
+/** Reads back what a Paystack emulator holds: transactions, transfers, refunds, customers, subscriptions. */
 export function paystackLedger(emulator: Pick<Emulator, "store">): PaystackLedger {
   const paystack = paystackStore(emulator.store)
   const successful = (currency?: string) =>
@@ -54,6 +55,7 @@ export interface PaystackBank {
 /** Runs nothing later: an inbound transfer schedules no follow-up work. */
 const NO_TIMER = { setTimeout: () => undefined, clearTimeout: () => undefined }
 
+/** A test's stand-in for a customer's bank, for paying into dedicated accounts. */
 export function paystackBank(emulator: Pick<Emulator, "store" | "outbox">): PaystackBank {
   const paystack = paystackStore(emulator.store)
 
