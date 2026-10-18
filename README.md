@@ -27,6 +27,7 @@ It drives the app through its UI like a user, while third-party services the app
 | `@danwo/proxy`      | The egress proxy                                                        |
 | `@danwo/emulators`  | Provider emulators                                                      |
 | `@danwo/github`     | Reports runs to GitHub from Actions: a check run and job summary        |
+| `@danwo/skill`      | The coding-agent skill, task guides and the generated capability spec   |
 | `@danwo/mcp`        | An MCP server for coding agents: run, explain and write danwo tests     |
 | `@danwo/playwright` | danwo's environments, faults, invariants and matrix for Playwright Test |
 
@@ -146,6 +147,23 @@ Codex (`.codex/config.toml`), merging into files that exist; `--starter-config` 
 ```bash
 claude mcp add danwo -- npx danwo mcp
 ```
+
+### Skill, spec and guides
+
+`danwo init` also installs danwo's skill (`SKILL.md`) into `.claude/skills/danwo` (Claude Code)
+and `.agents/skills/danwo` (Codex, Cursor and other agents that read the shared folder). It
+teaches the inspect → check locators → scaffold → run → failure page → fix → invariant → matrix
+loop and how to triage each error code. A copy you edited is kept; `--no-skill` skips it.
+
+- `danwo spec [--topic <topic>] [--json]`: everything this danwo provides, generated from its code
+  each time: the test API, fixtures, locators and matchers, agent methods, secrets, config keys,
+  environments and seed shapes, emulator helpers, fault labels per provider, commands, error codes
+  and cache outcomes.
+- `danwo guide [topic]`: short task guides (first test, locators or agent, the matrix, providers,
+  email and OTP, sessions, secrets, debugging, CI, Playwright).
+
+Over MCP they are the resources `danwo://spec` and `danwo://guide/<topic>`, and `show_run` with
+`format: "md"` returns the failure page.
 
 ### Live sessions
 

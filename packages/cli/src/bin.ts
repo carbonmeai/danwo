@@ -17,6 +17,8 @@ import {
 } from "@danwo/runner/runner"
 import { Argument, Command, InvalidArgumentError, Option } from "commander"
 
+import { cliCommands } from "./commands.ts"
+
 /** Reporters by the names `--reporter` takes; the console's list output always runs. */
 const REPORTERS: Readonly<Record<string, () => Reporter>> = { github: () => github() }
 
@@ -152,20 +154,23 @@ program
       cwd: process.cwd(),
       config: options.config,
       sessions: { max: options.maxSessions },
+      commands: cliCommands(program),
     })
   })
 
 program
   .command("init")
   .description(
-    "register danwo's MCP server with Claude Code, Cursor and Codex in this project (.mcp.json, .cursor/mcp.json, .codex/config.toml)",
+    "register danwo's MCP server with Claude Code, Cursor and Codex in this project (.mcp.json, .cursor/mcp.json, .codex/config.toml) and install danwo's skill for them",
   )
   .option("--starter-config", "also write a starter danwo.config.ts when there is none")
-  .action(async (options: { starterConfig?: boolean }) => {
+  .option("--no-skill", "do not install danwo's skill into .claude/skills and .agents/skills")
+  .action(async (options: { starterConfig?: boolean; skill: boolean }) => {
     const { initProject, initReport } = await import("@danwo/mcp")
     const changes = await initProject({
       cwd: process.cwd(),
       starterConfig: options.starterConfig ?? false,
+      skill: options.skill,
     })
 
     console.log(initReport(changes))
@@ -202,6 +207,34 @@ program
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .action(async (action: CacheAction, options: { journey?: string; config?: string }) => {
     process.exitCode = await runCache(action, options)
+  })
+
+program
+  .command("spec")
+  .description(
+    "print what this danwo provides, generated from its code: API, config, faults, codes",
+  )
+  .option("--json", "compact JSON instead of text")
+  .option(
+    "-t, --topic <topic>",
+    "one section: api, fixtures, locators, expect, agent, secrets, config, environments, emulators, faults, cli, errors, cache, exports",
+  )
+  .action(async (options: { json?: boolean; topic?: string }) => {
+    const { buildSpec, renderSpec, specJson, specTopic } = await import("@danwo/skill")
+    const spec = buildSpec({ commands: cliCommands(program) })
+    const shown = options.topic === undefined ? spec : specTopic(spec, options.topic)
+
+    console.log(options.json ? specJson(shown) : renderSpec(shown))
+  })
+
+program
+  .command("guide")
+  .description("list task guides, or print one")
+  .argument("[topic]", "a guide's topic; without one, the list")
+  .action(async (topic: string | undefined) => {
+    const { guideIndex, readGuide } = await import("@danwo/skill")
+
+    console.log(topic === undefined ? guideIndex() : readGuide(topic).trimEnd())
   })
 
 try {

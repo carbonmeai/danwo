@@ -83,6 +83,37 @@ type CheckBody = {
 
 const bodyOf = (fake: FakeGitHub, at: number) => fake.requests.at(at)?.body as CheckBody | undefined
 
+describe("danwo spec and danwo guide", () => {
+  it("prints the spec, one topic of it, and its JSON, with the CLI's own commands", async () => {
+    const cwd = fixture("invariant")
+    const cli = await danwo(cwd, ["spec", "--topic", "cli"])
+
+    expect(cli.code).toBe(0)
+    expect(cli.out).toContain("## Commands [cli]")
+    expect(cli.out).toContain("matrix (command): danwo matrix <file>")
+    expect(cli.out).toContain("-f, --faults <regexp>")
+
+    const json = await danwo(cwd, ["spec", "--json"])
+    const parsed: unknown = JSON.parse(json.out)
+
+    expect(parsed).toHaveProperty("sections")
+
+    const unknown = await danwo(cwd, ["spec", "--topic", "nope"])
+
+    expect(unknown.code).toBe(1)
+    expect(unknown.out).toContain('unknown spec topic "nope"')
+  })
+
+  it("lists the guides and prints one", async () => {
+    const cwd = fixture("invariant")
+    const list = await danwo(cwd, ["guide"])
+
+    expect(list.code).toBe(0)
+    expect(list.out).toMatch(/^first-test {2}/)
+    expect((await danwo(cwd, ["guide", "secrets"])).out).toMatch(/^# Secrets/)
+  })
+})
+
 describe("danwo test", () => {
   it("runs files across two workers, retries, reports, and exits 1 on a failure", async () => {
     const { code, out } = await danwo(fixture("basic"), [

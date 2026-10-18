@@ -15,6 +15,7 @@
     "@danwo/github": "workspace:*",
     "@danwo/mcp": "workspace:*",
     "@danwo/runner": "workspace:*",
+    "@danwo/skill": "workspace:*",
     "commander": "15.0.0"
   },
   "devDependencies": {
