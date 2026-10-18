@@ -7,7 +7,7 @@
   ],
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/ui",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/ui && tsc --noEmit -p packages/dashboard",
     "ui:codegen": "bun run --cwd packages/ui lib",
     "test": "vitest run --project unit --project ui",
     "lint": "oxlint --type-aware --deny-warnings",

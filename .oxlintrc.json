@@ -56,7 +56,13 @@
       }
     ]
   },
-  "ignorePatterns": ["node_modules", "dist", "coverage"],
+  "ignorePatterns": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "**/routeTree.gen.ts",
+    "**/styled-system/**"
+  ],
   "jsPlugins": ["@stylistic/eslint-plugin"],
   "overrides": [
     {
@@ -69,6 +75,17 @@
         "typescript/unbound-method": "off",
         "unicorn/consistent-function-scoping": "off",
         "vitest/require-mock-type-parameters": "off"
+      }
+    },
+    {
+      "files": ["packages/dashboard/src/routes/**"],
+      "rules": {
+        "eslint/no-underscore-dangle": [
+          "warn",
+          {
+            "allow": ["_splat"]
+          }
+        ]
       }
     }
   ]

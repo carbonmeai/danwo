@@ -1,0 +1,36 @@
+{
+  "name": "@danwo/dashboard",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The danwo dashboard: runs, flight records, matrix grids and flaky tests, read from a project's .danwo folder.",
+  "files": [
+    "src",
+    "panda.config.ts",
+    "postcss.config.ts",
+    "vite.config.ts",
+    "tsconfig.json"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "codegen": "panda codegen"
+  },
+  "dependencies": {
+    "@danwo/runner": "workspace:*",
+    "@danwo/ui": "workspace:*",
+    "@pandacss/dev": "2.2.0",
+    "@pandacss/preset-base": "2.2.0",
+    "@tanstack/react-router": "1.170.44",
+    "@tanstack/react-start": "1.169.1",
+    "@vitejs/plugin-react": "6.1.2",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "vite": "8.2.2"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7"
+  }
+}

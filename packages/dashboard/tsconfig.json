@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "es2024",
+    "lib": ["es2024", "DOM", "DOM.Iterable"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node", "vite/client"],
+    "paths": {
+      "@danwo/ui/blocks/*": ["../ui/src/blocks/*"],
+      "@danwo/ui/hooks/*": ["../ui/src/hooks/*"],
+      "@danwo/ui/icons": ["../ui/src/icons"],
+      "@danwo/ui/icons/*": ["../ui/src/icons/*"],
+      "@danwo/ui/primitives/*": ["../ui/src/primitives/*"],
+      "@danwo/ui/theme/*": ["../ui/src/theme/*"]
+    }
+  },
+  "include": ["src", "test", "vite.config.ts", "panda.config.ts"],
+  "exclude": ["src/styled-system", "node_modules"]
+}

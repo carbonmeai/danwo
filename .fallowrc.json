@@ -19,6 +19,11 @@
         "maxCognitive": 32,
         "maxCrap": 1000,
         "reason": "Design-system components carried over whole: many small prop branches, exercised through the dashboard's browser tests rather than unit coverage."
+      },
+      {
+        "files": ["packages/dashboard/src/routes/**"],
+        "maxCrap": 120,
+        "reason": "Page components: their branches are conditional rendering, exercised by the dashboard's browser test rather than unit coverage; the data they render is unit tested in packages/dashboard/src/data."
       }
     ]
   },

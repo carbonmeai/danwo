@@ -1,12 +1,12 @@
 import { defineTextStyles, defineTokens } from "@pandacss/dev"
 
 export const fonts = defineTokens.fonts({
-  dmSans: { value: "var(--font-dm-sans), sans-serif" },
-  ebGaramond: { value: "var(--font-eb-garamond), serif" },
-  mono: { value: "var(--font-mono), ui-monospace, monospace" },
-  poppins: { value: "var(--font-poppins), sans-serif" },
+  dmSans: { value: "var(--font-dm-sans, sans-serif)" },
+  ebGaramond: { value: "var(--font-eb-garamond, serif)" },
+  mono: { value: "var(--font-mono, ui-monospace, monospace)" },
+  poppins: { value: "var(--font-poppins, sans-serif)" },
   sans: {
-    value: "var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
+    value: "var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif)",
   },
 })
 
