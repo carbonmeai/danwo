@@ -15,7 +15,7 @@ import { androidCaFileName } from "./ca.ts"
 
 /** How many times `adb root` is tried, and the pause between tries. */
 const ROOT_ATTEMPTS = 5
-const ROOT_RETRY_MS = 2_000
+const ROOT_RETRY_MS = 1_000
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -24,7 +24,8 @@ export const DEVICE_PROXY_PORT = 8765
 
 const CA_DIR = "/data/misc/user/0/cacerts-added"
 const CHROME = "com.android.chrome"
-const CHROME_FLAGS = "chrome --disable-fre --no-default-browser-check --no-first-run"
+const CHROME_FLAGS =
+  "chrome --disable-fre --no-default-browser-check --no-first-run --disable-background-networking"
 
 /** What the binder needs from the run. */
 export interface BindOptions {
@@ -48,20 +49,28 @@ export class AndroidBinder {
   private async root(): Promise<void> {
     if (await this.adb.isRoot()) return
 
-    /* Just after a boot adbd can drop the request ("unable to connect for root"); try again. */
-    for (let attempt = 1; ; attempt++) {
+    /*
+     * Just after a boot adbd can drop the request ("unable to connect for root"), and a restarted
+     * adbd answers before it runs as root; so ask again until `id -u` says 0.
+     */
+    let failure: unknown
+
+    for (let attempt = 1; attempt <= ROOT_ATTEMPTS; attempt++) {
       try {
         await this.adb.run(["root"])
         await this.adb.waitForDevice()
-
-        return
+        if (await this.adb.isRoot()) return
       } catch (error) {
-        if (attempt === ROOT_ATTEMPTS) throw error
-
-        await sleep(ROOT_RETRY_MS)
-        await this.adb.waitForDevice()
+        failure = error
       }
+
+      await sleep(ROOT_RETRY_MS)
+      await this.adb.waitForDevice().catch(() => undefined)
     }
+
+    throw new Error(`${this.adb.serial} did not run adbd as root after ${ROOT_ATTEMPTS} tries`, {
+      cause: failure,
+    })
   }
 
   /** The run's CA into the user trust store, readable by the system like a CA a user added. */

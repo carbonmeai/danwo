@@ -74,9 +74,33 @@ describe("the CA's file name", () => {
   })
 })
 
+/** An `Exec` like `fakeAdb`'s whose adbd turns root after `adb root`, refusing the first `refused`. */
+function rootingAdb(refused = 0) {
+  const { commands, exec } = fakeAdb()
+  let refusals = refused
+  let rooted = false
+
+  const rooting: Exec = async (file, args, options) => {
+    if (args.includes("root")) {
+      if (refusals-- > 0) {
+        commands.push("root")
+        throw new Error("unable to connect for root: closed")
+      }
+
+      rooted = true
+    }
+
+    const answer = await exec(file, args, options)
+
+    return args.join(" ").endsWith("id -u") ? (rooted ? "0" : "2000") : answer
+  }
+
+  return { commands, exec: rooting }
+}
+
 describe("the binder", () => {
   it("binds in order: root, CA, Chrome, a quiet device, then the proxy route", async () => {
-    const { commands, exec } = fakeAdb({ "id -u": "2000" })
+    const { commands, exec } = rootingAdb()
     const binder = new AndroidBinder(new Adb(TOOLS.adb, "emulator-5554", exec), {
       caCert: CA,
       proxyPort: 41234,
@@ -91,10 +115,11 @@ describe("the binder", () => {
       "shell id -u",
       "root",
       "wait-for-device",
+      "shell id -u",
       "shell mkdir -p /data/misc/user/0/cacerts-added",
       "shell chown system:system /data/misc/user/0/cacerts-added/e0fa6ee6.0 && chmod 644 /data/misc/user/0/cacerts-added/e0fa6ee6.0 && restorecon /data/misc/user/0/cacerts-added/e0fa6ee6.0",
       "shell am set-debug-app --persistent com.android.chrome",
-      "shell echo 'chrome --disable-fre --no-default-browser-check --no-first-run' > /data/local/tmp/chrome-command-line",
+      "shell echo 'chrome --disable-fre --no-default-browser-check --no-first-run --disable-background-networking' > /data/local/tmp/chrome-command-line",
       "shell pm grant com.android.chrome android.permission.POST_NOTIFICATIONS",
       "shell settings put global window_animation_scale 0",
       "shell settings put global transition_animation_scale 0",
@@ -106,24 +131,20 @@ describe("the binder", () => {
   })
 
   it("tries adb root again when adbd drops the request just after a boot", async () => {
-    const { commands, exec } = fakeAdb({ "id -u": "2000" })
-    let refused = 1
-    const binder = new AndroidBinder(
-      new Adb(TOOLS.adb, "emulator-5554", async (file, args, options) => {
-        if (args.includes("root") && refused-- > 0)
-          throw new Error("unable to connect for root: closed")
-
-        return exec(file, args, options)
-      }),
-      { caCert: CA, proxyPort: 41234 },
-    )
+    const { commands, exec } = rootingAdb(1)
+    const binder = new AndroidBinder(new Adb(TOOLS.adb, "emulator-5554", exec), {
+      caCert: CA,
+      proxyPort: 41234,
+    })
 
     await binder.rebind()
-    expect(commands.slice(0, 4)).toEqual([
+    expect(commands.slice(0, 6)).toEqual([
       "shell id -u",
+      "root",
       "wait-for-device",
       "root",
       "wait-for-device",
+      "shell id -u",
     ])
   })
 
