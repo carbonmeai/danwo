@@ -5,6 +5,7 @@ import { systemTimer, type Timer } from "./time.ts"
 import {
   type DeliveryPolicy,
   WebhookDispatcher,
+  type WebhookAnswerHandler,
   type WebhookEndpoint,
   type WebhookPayload,
   type WebhookSigner,
@@ -18,6 +19,8 @@ export interface EmulatorContext {
   /** The emulator's own origin, used in URLs it hands out (checkout pages, sign-in pages). */
   readonly baseUrl: string
   readonly clock: Clock
+  /** Schedules work for later on the emulator's time, such as a message's status changes. */
+  readonly timer: Timer
 }
 
 /** How an emulator's webhooks are addressed, signed and retried. */
@@ -26,6 +29,8 @@ export interface WebhookSetup {
   readonly sign: WebhookSigner
   readonly policy: DeliveryPolicy
   readonly payload?: WebhookPayload
+  /** Reads what an endpoint answered to a delivered webhook, for providers that act on the answer. */
+  readonly onAnswer?: WebhookAnswerHandler
 }
 
 /** A provider emulator: routes and state set up per instance, optional seed data and webhooks. */
@@ -85,6 +90,7 @@ export function createEmulator(
     outbox: new Outbox(clock),
     baseUrl,
     clock,
+    timer: options.timer ?? systemTimer,
   }
 
   definition.setup(context)
@@ -126,9 +132,10 @@ function dispatcherFor(
     endpoints: setup.endpoints,
     sign: setup.sign,
     ...(setup.payload && { payload: setup.payload }),
+    ...(setup.onAnswer && { onAnswer: setup.onAnswer }),
     policy: options.deliveryPolicy ?? setup.policy,
     clock: context.clock,
-    timer: options.timer ?? systemTimer,
+    timer: context.timer,
     ...(options.fetch && { fetch: options.fetch }),
   })
 }

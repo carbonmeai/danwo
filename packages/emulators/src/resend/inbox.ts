@@ -1,4 +1,5 @@
 import type { Emulator } from "../define.ts"
+import { waitUntil } from "../poll.ts"
 import type { Email } from "./entities.ts"
 import { resendStore } from "./store.ts"
 
@@ -67,8 +68,6 @@ function sentTo(email: Email, address: string): boolean {
   return recipients.some((recipient) => recipient.toLowerCase().includes(wanted))
 }
 
-const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
 /** What the Resend emulator accepted, read the way a test reads a mailbox. */
 export function resendInbox(emulator: Pick<Emulator, "store">): ResendInbox {
   const list = (to?: string) =>
@@ -78,20 +77,16 @@ export function resendInbox(emulator: Pick<Emulator, "store">): ResendInbox {
       .toReversed()
       .map(asInboxEmail)
 
-  const waitFor: ResendInbox["waitFor"] = async (to, options = {}) => {
+  const waitFor: ResendInbox["waitFor"] = (to, options = {}) => {
     const timeout = options.timeoutMs ?? 10_000
-    const giveUpAt = Date.now() + timeout
     const isNew = (email: InboxEmail) =>
       options.since === undefined || email.createdAt > options.since
 
-    while (Date.now() <= giveUpAt) {
-      const found = list(to).find(isNew)
-
-      if (found) return found
-      await pause(50)
-    }
-
-    throw new Error(`no email to ${to} arrived within ${timeout} ms`)
+    return waitUntil(
+      () => list(to).find(isNew),
+      timeout,
+      `no email to ${to} arrived within ${timeout} ms`,
+    )
   }
 
   return { list, latest: (to) => list(to)[0], waitFor }

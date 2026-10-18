@@ -127,8 +127,27 @@ export {
 export { seedStripe, stripe, stripeOutboundFaults, type StripeSeedConfig } from "./stripe/index.ts"
 export { ManualClock, systemTimer, type Timer } from "./time.ts"
 export {
+  type PhoneMessage,
+  seedTwilio,
+  twilio,
+  TWILIO_HOSTS,
+  type TwilioInbox,
+  twilioInbox,
+  twilioOutboundFaults,
+  type TwilioPhone,
+  twilioPhone,
+  type TwilioSeedAccount,
+  type TwilioSeedApiKey,
+  type TwilioSeedConfig,
+  type TwilioSeedNumber,
+  type TwilioSeedService,
+  type TwilioSeedUnreachable,
+  twilioSignature,
+} from "./twilio/index.ts"
+export {
   type DeliveryAttempt,
   type DeliveryPolicy,
+  type WebhookAnswer,
   WebhookDispatcher,
   type WebhookEndpoint,
   type WebhookFault,

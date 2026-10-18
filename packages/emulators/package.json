@@ -29,6 +29,7 @@
     "openid-client": "6.8.8",
     "resend": "6.34.1",
     "stripe": "23.0.0",
+    "twilio": "6.2.0",
     "zod": "4.6.1"
   }
 }

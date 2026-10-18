@@ -12,15 +12,17 @@ export interface ObjectRow<T, X = null> extends Entity {
 }
 
 /** API objects of one kind, addressed by their provider ids. */
-export class ObjectTable<T extends { id: string }, X = null> {
+export class ObjectTable<T extends object, X = null> {
   private readonly rows: Collection<ObjectRow<T, X>>
+  private readonly keyOf: (object: T) => string
 
-  constructor(rows: Collection<ObjectRow<T, X>>) {
+  constructor(rows: Collection<ObjectRow<T, X>>, keyOf: (object: T) => string) {
     this.rows = rows
+    this.keyOf = keyOf
   }
 
   add(object: T, extra: X): T {
-    this.rows.insert({ key: object.id, object, extra })
+    this.rows.insert({ key: this.keyOf(object), object, extra })
 
     return object
   }
@@ -31,6 +33,13 @@ export class ObjectTable<T extends { id: string }, X = null> {
 
   extra(id: string): X | undefined {
     return this.row(id)?.extra
+  }
+
+  /** Replaces what the emulator remembers about an object; false when there is no such object. */
+  setExtra(id: string, extra: X): boolean {
+    const row = this.row(id)
+
+    return row !== undefined && this.rows.update(row.id, { extra }) !== undefined
   }
 
   /** Applies `changes` to the stored object and returns the new version. */
@@ -66,10 +75,18 @@ export class ObjectTable<T extends { id: string }, X = null> {
   }
 }
 
-/** The table of `name` objects in `store`. */
+/** The table of `name` objects in `store`, addressed by their `id`. */
 export function objectTable<T extends { id: string }, X = null>(
   store: Store,
   name: string,
 ): ObjectTable<T, X> {
-  return new ObjectTable(store.collection<ObjectRow<T, X>>(name, ["key"]))
+  return new ObjectTable(store.collection<ObjectRow<T, X>>(name, ["key"]), (object) => object.id)
+}
+
+/** The table of `name` objects in `store`, for providers that call their ids `sid`. */
+export function sidTable<T extends { sid: string }, X = null>(
+  store: Store,
+  name: string,
+): ObjectTable<T, X> {
+  return new ObjectTable(store.collection<ObjectRow<T, X>>(name, ["key"]), (object) => object.sid)
 }

@@ -25,6 +25,20 @@ export type WebhookSigner = (input: {
  */
 export type WebhookPayload = (endpoint: WebhookEndpoint, body: string) => string
 
+/** What an endpoint answered to one delivered webhook. */
+export interface WebhookAnswer {
+  readonly status: number
+  readonly contentType: string
+  readonly body: string
+}
+
+/** Called with what an endpoint answered to each delivered attempt. */
+export type WebhookAnswerHandler = (
+  message: OutboxMessage,
+  endpoint: WebhookEndpoint,
+  answer: WebhookAnswer,
+) => void
+
 export interface DeliveryPolicy {
   /** Delay before each retry after a failed attempt; its length is the number of retries. */
   readonly retryDelaysMs: readonly number[]
@@ -93,6 +107,8 @@ export interface WebhookDispatcherOptions {
   readonly sign: WebhookSigner
   /** What is POSTed; the message's JSON when absent. Signing always sees the JSON. */
   readonly payload?: WebhookPayload
+  /** Reads the answer to every delivered attempt; without it, answers are dropped unread. */
+  readonly onAnswer?: WebhookAnswerHandler
   readonly policy: DeliveryPolicy
   readonly clock: Clock
   readonly timer: Timer
@@ -274,6 +290,43 @@ export class WebhookDispatcher {
     return this.options.payload ? this.options.payload(endpoint, body) : body
   }
 
+  /** The endpoint's answer when someone reads answers; otherwise its body is dropped unread. */
+  private async answerOf(response: Response): Promise<WebhookAnswer | undefined> {
+    if (!this.options.onAnswer) {
+      await response.body?.cancel()
+
+      return undefined
+    }
+
+    return {
+      status: response.status,
+      contentType: response.headers.get("content-type") ?? "",
+      body: await response.text(),
+    }
+  }
+
+  /** POSTs one attempt: its status (null when the request did not complete) and the answer. */
+  private async post(
+    endpoint: WebhookEndpoint,
+    headers: Record<string, string>,
+    body: string,
+    policy: DeliveryPolicy,
+  ): Promise<{ status: number | null; error: string | null; answer?: WebhookAnswer }> {
+    try {
+      const response = await (this.options.fetch ?? fetch)(endpoint.url, {
+        method: "POST",
+        headers,
+        body: this.posted(endpoint, body),
+        signal: AbortSignal.any([this.controller.signal, AbortSignal.timeout(policy.timeoutMs)]),
+      })
+      const answer = await this.answerOf(response)
+
+      return { status: response.status, error: null, ...(answer && { answer }) }
+    } catch (err) {
+      return { status: null, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
   private async send(
     message: OutboxMessage,
     endpoint: WebhookEndpoint,
@@ -286,26 +339,11 @@ export class WebhookDispatcher {
     const body = encodeBody(message.body)
     const headers = this.signed(endpoint, body, Math.floor(at.getTime() / 1000), mode)
     const started = performance.now()
-    let status: number | null = null
-    let error: string | null = null
-
-    try {
-      const response = await (this.options.fetch ?? fetch)(endpoint.url, {
-        method: "POST",
-        headers,
-        body: this.posted(endpoint, body),
-        signal: AbortSignal.any([this.controller.signal, AbortSignal.timeout(policy.timeoutMs)]),
-      })
-
-      status = response.status
-      await response.body?.cancel()
-    } catch (err) {
-      error = err instanceof Error ? err.message : String(err)
-    }
-
+    const { status, error, answer } = await this.post(endpoint, headers, body, policy)
     const delivered = status !== null && status >= 200 && status < 300
 
     if (generation !== this.generation) return delivered
+    if (delivered && answer) this.options.onAnswer?.(message, endpoint, answer)
     this.log.push({
       messageId: message.id,
       topic: message.topic,
