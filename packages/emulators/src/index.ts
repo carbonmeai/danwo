@@ -23,6 +23,26 @@ export {
   seedFlutterwave,
 } from "./flutterwave/index.ts"
 export {
+  AUTH0_HOSTS,
+  auth0,
+  type Auth0LoginView,
+  auth0OtpAt,
+  auth0OutboundFaults,
+  type Auth0SeedApi,
+  type Auth0SeedClient,
+  type Auth0SeedConfig,
+  type Auth0SeedRole,
+  type Auth0SeedTenant,
+  type Auth0SeedUser,
+  type Auth0Tenant,
+  auth0Tenant,
+  type Auth0UserView,
+  connectAuth0Upstream,
+  isAuth0Host,
+  MANAGEMENT_SCOPES as AUTH0_MANAGEMENT_SCOPES,
+  seedAuth0,
+} from "./auth0/index.ts"
+export {
   BACHS_HOSTS,
   bachs,
   type BachsDeposit,

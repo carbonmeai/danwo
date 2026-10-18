@@ -1,17 +1,8 @@
+import { escapeHtml as escape, htmlPage } from "../html.ts"
 import type { Context } from "../http.ts"
 import type { Clock } from "../store.ts"
 import { type AuthorizeParams, issueCode, type OAuthTables } from "./pkce.ts"
 import { randomToken } from "./tokens.ts"
-
-const ENTITIES: Readonly<Record<string, string>> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-}
-
-const escape = (text: string) => text.replace(/[&<>"']/g, (char) => ENTITIES[char] ?? char)
 
 const STYLE = `
   :root { color-scheme: light dark; --ink: #202124; --muted: #5f6368; --line: #dadce0; --paper: #fff; }
@@ -27,14 +18,7 @@ const STYLE = `
   .cancel { background: none; border: 0; color: var(--muted); font: inherit; cursor: pointer; padding: 8px 0; }
 `
 
-function page(title: string, body: string): string {
-  return `<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escape(title)}</title><style>${STYLE}</style></head>
-<body><main>${body}</main></body>
-</html>`
-}
+const page = (title: string, body: string) => htmlPage(title, STYLE, body)
 
 /** An account the chooser offers. */
 export interface ChooserAccount {
