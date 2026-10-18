@@ -1,6 +1,8 @@
 /** Starts the shop's server as its own process, the way a test environment launches a backend. */
 import { type ChildProcess, spawn } from "node:child_process"
+import { once } from "node:events"
 import { createInterface } from "node:readline"
+import type { Readable } from "node:stream"
 import { fileURLToPath } from "node:url"
 
 const SERVER = fileURLToPath(new URL("./server.ts", import.meta.url))
@@ -12,37 +14,35 @@ export interface Shop {
   stop(): Promise<void>
 }
 
-/** The port the server announces on its first `listening <port>` line. */
-async function announcedPort(child: ChildProcess): Promise<string> {
-  if (child.stdout === null) throw new Error("the shop's output is not piped")
-
-  for await (const line of createInterface({ input: child.stdout })) {
+/** The port the server announces on its first `listening <port>` line of `output`. */
+async function announcedPort(output: Readable): Promise<string> {
+  for await (const line of createInterface({ input: output })) {
     const port = /^listening (\d+)$/.exec(line)?.[1]
 
     if (port !== undefined) return port
   }
 
-  throw new Error(`the shop stopped before listening (exit ${String(child.exitCode)})`)
+  throw new Error("the shop stopped before listening")
 }
 
 /** The shop on a free port, once it is listening. */
 export async function launchShop(env: NodeJS.ProcessEnv): Promise<Shop> {
+  /* PORT 0: the server picks a free port and prints it. */
   const child = spawn(process.execPath, [SERVER], {
-    env: { ...env, PORT: "0" },
     stdio: ["ignore", "pipe", "inherit"],
+    env: { ...env, PORT: "0" },
   })
-  const port = await announcedPort(child)
+  const port = await announcedPort(child.stdout)
 
-  return {
-    url: `http://127.0.0.1:${port}`,
-    child,
-    async stop() {
-      if (child.exitCode !== null) return
+  return { url: `http://127.0.0.1:${port}`, child, stop: () => stopShop(child) }
+}
 
-      const exited = new Promise((resolve) => child.once("exit", resolve))
+/** Ends the shop's process, if it still runs, and waits for it to go. */
+async function stopShop(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return
 
-      child.kill()
-      await exited
-    },
-  }
+  const exited = once(child, "exit")
+
+  child.kill()
+  await exited
 }

@@ -12,8 +12,12 @@ import { Pressable, StyleSheet, Text, View } from "react-native"
 
 const SHOP = "http://shop.danwo.test"
 const USER = "u1"
-/** How often the app asks the server for the balance, so a webhook that lands later shows up. */
+/**
+ * After a checkout the app asks the server for the balance every second for a while, so credits a
+ * webhook grants a little later still show up.
+ */
 const REFRESH_MS = 1_000
+const REFRESH_FOR_MS = 15_000
 
 /** The user's credits as the server has them, or undefined before the first answer. */
 async function fetchCredits(): Promise<number | undefined> {
@@ -43,6 +47,8 @@ export default function App() {
   const [status, setStatus] = useState("Ready")
   const returned = Linking.useURL()
 
+  const paid = returned?.startsWith("danwoshop://done") === true
+
   useEffect(() => {
     let live = true
 
@@ -56,13 +62,15 @@ export default function App() {
 
     refresh()
 
-    const timer = setInterval(refresh, REFRESH_MS)
+    const timer = paid ? setInterval(refresh, REFRESH_MS) : undefined
+    const stop = setTimeout(() => clearInterval(timer), REFRESH_FOR_MS)
 
     return () => {
       live = false
       clearInterval(timer)
+      clearTimeout(stop)
     }
-  }, [])
+  }, [paid, returned])
 
   useEffect(() => {
     if (returned?.startsWith("danwoshop://done")) setStatus("Thanks for your order")

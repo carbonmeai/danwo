@@ -26,6 +26,8 @@ test("buys 500 credits through Stripe Checkout in a Custom Tab", async ({
   await expect(screen.getByTestId("status")).toHaveText("Thanks for your order")
   await expect(screen.getByTestId("credits")).toHaveText("Credits: 500")
 }).invariant(async ({ app, stripe, expect }) => {
-  // Whichever way the purchase went, the shop grants exactly the credits Stripe was paid for.
-  expect(await grantedCredits(app.baseUrl, "u1")).toBe(await paidCredits(stripe, "u1"))
+  /* However the purchase went on the device, credits match the paid Checkout Sessions. */
+  const paid = await paidCredits(stripe, "u1")
+
+  expect(await grantedCredits(app.baseUrl, "u1")).toBe(paid)
 })

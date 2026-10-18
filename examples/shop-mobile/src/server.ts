@@ -8,6 +8,7 @@
  * SHOP_TEST_RESET=1 adds `POST /__test/reset`, which empties the shop's books.
  */
 import { createServer, type IncomingMessage } from "node:http"
+import type { AddressInfo } from "node:net"
 import { text } from "node:stream/consumers"
 
 import { Stripe } from "stripe"
@@ -19,7 +20,6 @@ const CREDITS = 500
 const PRICE = 500
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "")
-const testReset = process.env.SHOP_TEST_RESET === "1"
 
 interface Answer {
   readonly status: number
@@ -49,45 +49,55 @@ async function checkout(user: string): Promise<Answer> {
   return { status: 200, body: { url: session.url } }
 }
 
+type Handler = (req: IncomingMessage, user: string) => Answer | Promise<Answer>
+
+/** What the server answers, by method and path. */
+const HANDLERS = new Map<string, Handler>([
+  ["POST /checkout", (_req, user) => checkout(user)],
+  ["GET /credits", (_req, user) => ({ status: 200, body: { credits: credits.get(user) ?? 0 } })],
+  [
+    "POST /webhooks/stripe",
+    async (req) =>
+      handleWebhook(stripe, process.env.STRIPE_WEBHOOK_SECRET ?? "", {
+        body: await text(req),
+        signature: String(req.headers["stripe-signature"]),
+      }),
+  ],
+])
+
+if (process.env.SHOP_TEST_RESET === "1") {
+  HANDLERS.set("POST /__test/reset", () => {
+    emptyBooks()
+
+    return { status: 200, body: { reset: true } }
+  })
+}
+
+const notFound: Handler = () => ({ status: 404, body: { error: "not found" } })
+
+/** A failure on the way (Stripe unreachable) as a 502. */
+function failed(error: unknown): Answer {
+  return { status: 502, body: { error: error instanceof Error ? error.message : "error" } }
+}
+
 /** The answer to one request. */
 async function answer(req: IncomingMessage): Promise<Answer> {
   const url = new URL(req.url ?? "/", "http://shop")
-  const user = url.searchParams.get("user") ?? ""
+  const handler = HANDLERS.get(`${req.method} ${url.pathname}`) ?? notFound
 
-  switch (`${req.method} ${url.pathname}`) {
-    case "POST /checkout":
-      return checkout(user)
-    case "GET /credits":
-      return { status: 200, body: { credits: credits.get(user) ?? 0 } }
-    case "POST /webhooks/stripe":
-      return handleWebhook(stripe, process.env.STRIPE_WEBHOOK_SECRET ?? "", {
-        body: await text(req),
-        signature: String(req.headers["stripe-signature"]),
-      })
-    case "POST /__test/reset":
-      if (!testReset) break
-      emptyBooks()
-
-      return { status: 200, body: { reset: true } }
-  }
-
-  return { status: 404, body: { error: "not found" } }
+  return Promise.resolve(url.searchParams.get("user") ?? "")
+    .then((user) => handler(req, user))
+    .catch(failed)
 }
 
-const server = createServer((req, res) => {
-  answer(req)
-    .catch((error: unknown) => ({
-      status: 502,
-      body: { error: error instanceof Error ? error.message : "error" },
-    }))
-    .then(({ status, body }) => {
-      res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body))
-    })
-    .catch(() => res.destroy())
+const server = createServer(async (req, res) => {
+  const { status, body } = await answer(req)
+
+  res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body))
 })
 
 server.listen(Number(process.env.PORT ?? 0), "127.0.0.1", () => {
-  const address = server.address()
+  const { port } = server.address() as AddressInfo
 
-  console.log(`listening ${typeof address === "object" && address ? address.port : ""}`)
+  process.stdout.write(`listening ${port}\n`)
 })
