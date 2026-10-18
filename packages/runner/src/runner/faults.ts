@@ -1,5 +1,7 @@
 import {
   auth0OutboundFaults,
+  clerkOutboundFaults,
+  isClerkHost,
   FLUTTERWAVE_HOSTS,
   flutterwaveOutboundFaults,
   BACHS_HOSTS,
@@ -49,10 +51,11 @@ function hostsOf(hosts: readonly string[], catalogue: Catalogue): Array<[string,
   return hosts.map((host) => [host, catalogue])
 }
 
-/** The catalogue for providers known by a host pattern rather than a list: S3 buckets and Auth0 tenants. */
+/** The catalogue for providers known by a host pattern rather than a list: S3 buckets, Auth0 tenants and Clerk instances. */
 function catalogueByPattern(host: string): Catalogue | undefined {
   if (isS3Host(host)) return s3OutboundFaults
   if (isAuth0Host(host)) return auth0OutboundFaults
+  if (isClerkHost(host)) return clerkOutboundFaults
 
   return undefined
 }
@@ -72,8 +75,8 @@ function genericOutboundFaults(call: OutboundCall): readonly OutboundFault[] {
 
 /**
  * `danwo matrix`'s default fault catalogue: each call gets its provider's faults by host (Stripe,
- * Resend, S3 and Tigris, Auth0, Google, Microsoft, Slack, GitHub, Twilio, Flutterwave, Paystack, Bachs and
- * the model APIs, with error bodies their SDKs parse),
+ * Resend, S3 and Tigris, Auth0, Google, Microsoft, Slack, GitHub, Twilio, Flutterwave, Paystack, Bachs,
+ * Clerk and the model APIs, with error bodies their SDKs parse),
  * and any other routed host (an outside endpoint such as MiniStack) gets plain HTTP failures.
  */
 export function defaultOutboundFaults(call: OutboundCall): readonly OutboundFault[] {

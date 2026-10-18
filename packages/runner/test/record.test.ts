@@ -246,6 +246,23 @@ describe("flight recorder redaction", () => {
     )
   })
 
+  it("hides Clerk keys, session tokens, dev browsers and handshake nonces", () => {
+    expect(
+      redactor.text(
+        "keys sk_test_AbC123 pk_test_ZGFud28k dvb_2x-Yz_9 https://app.test/?__clerk_handshake_nonce=hsn_1&x=1#__clerk_ticket=t0k",
+      ),
+    ).toBe(
+      "keys sk_test_[redacted] pk_test_[redacted] dvb_[redacted] https://app.test/?__clerk_handshake_nonce=[redacted]&x=1#__clerk_ticket=[redacted]",
+    )
+    expect(redactor.text("__session=REDACTED-TEST-VALUE; Path=/")).toBe(
+      "__session=[redacted]; Path=/",
+    )
+    expect(redactor.headers({ cookie: "__client_uat=1", "set-cookie": "__session=x" })).toEqual({
+      cookie: "[redacted]",
+      "set-cookie": "[redacted]",
+    })
+  })
+
   it("hides Flutterwave keys, the webhook secret hash and its signature", () => {
     expect(
       redactor.text(

@@ -18,7 +18,7 @@ import { instanceFrom } from "./seed.ts"
 import { clerkStore, INSTANCE } from "./store.ts"
 
 export { clerkOutboundFaults } from "./faults.ts"
-export { CLERK_HOSTS, cookieSuffix, publishableKeyFor } from "./helpers.ts"
+export { CLERK_HOSTS, cookieSuffix, isClerkHost, publishableKeyFor } from "./helpers.ts"
 export { type ClerkInstanceView, clerkInstance } from "./inspect.ts"
 export {
   type ClerkSeedConfig,

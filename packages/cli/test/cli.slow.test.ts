@@ -34,6 +34,7 @@ afterAll(async () => {
     fixture("slack-bot"),
     fixture("github-bot"),
     fixture("sms-app"),
+    fixture("clerk-app"),
     fixture("flutterwave-shop"),
     fixture("naira-shop"),
     fixture("bachs-store"),
@@ -531,6 +532,42 @@ describe("danwo matrix", () => {
 
     expect(html).toContain("POST verify.twilio.com")
     expect(html).not.toContain("7e57ab1e7e57ab1e7e57ab1e7e57ab1e")
+  }, 300_000)
+
+  it("faults Clerk's handshake, signing keys and user lookups, and a careful app still signs in", async () => {
+    const { code, out } = await danwo(fixture("clerk-app"), ["matrix", "tests/sign-in.danwo.ts"])
+
+    expect(out).toContain("PASS  clean run")
+    expect(out).toContain("PASS  status 500 on GET api.clerk.com/v1/clients/handshake_payload")
+    expect(out).toContain("PASS  reset on GET api.clerk.com/v1/jwks")
+    expect(out).toContain("PASS  status 429 on GET api.clerk.com/v1/users/:id")
+    expect(out).toContain("faults: 9 passed")
+    expect(code).toBe(0)
+  }, 300_000)
+
+  it("signs in through Clerk's <SignIn/> with a code read from Clerk's mail", async () => {
+    const { code, out } = await danwo(fixture("clerk-app"), ["test", "tests/email-code.danwo.ts"], {
+      CLERK_SIGN_IN: "code",
+    })
+
+    expect(out).toContain("1 passed")
+    expect(code).toBe(0)
+  }, 300_000)
+
+  it("catches an app that believes a session token it never verified", async () => {
+    const { code, out } = await danwo(fixture("clerk-app"), ["matrix", "tests/sign-in.danwo.ts"], {
+      CLERK_BUG: "trust-cookie",
+    })
+
+    expect(out).toContain("FAIL  clean run")
+    expect(out).toContain("invariant: expected 200 to be 401")
+    expect(code).toBe(1)
+
+    const report = /report: (\S+report\.html)/.exec(out)?.[1] ?? ""
+    const html = await readFile(join(fixture("clerk-app"), report), "utf8")
+
+    expect(html).toContain("api.clerk.com")
+    expect(html).not.toMatch(/sk_test_DanwoClerk|dvb_[A-Za-z0-9]{8}/)
   }, 300_000)
 
   it("faults Flutterwave Standard end to end, and a careful shop credits each payment once", async () => {

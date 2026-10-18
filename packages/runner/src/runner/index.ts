@@ -37,6 +37,7 @@ export {
   pickFrom,
   resendMail,
   twilioSms,
+  clerkMail,
 } from "../mail/index.ts"
 export { backendOf } from "./backend.ts"
 export type { SessionMail } from "../session.ts"
@@ -176,6 +177,12 @@ export {
   type BachsOptions,
   bachsService,
 } from "./oauth.ts"
+export {
+  type ClerkEnvironment,
+  clerkEnvironment,
+  type ClerkOptions,
+  clerkService,
+} from "./clerk.ts"
 export { type LlmEnvironment, llmEnvironment, type LlmOptions, llmService } from "./llm.ts"
 export {
   type S3Environment,

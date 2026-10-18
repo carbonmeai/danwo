@@ -5,6 +5,7 @@
  * new code from the emulator and needs no model.
  */
 import {
+  clerkInstance,
   type Emulator,
   gmailMailbox,
   outlookMailbox,
@@ -90,6 +91,22 @@ export function twilioSms(emulator: Pick<Emulator, "store">): MailSource {
       const found = inbox.latest(phone)
 
       return found && { to: [found.to], subject: "", html: undefined, text: found.body }
+    },
+  }
+}
+
+/**
+ * Emails the Clerk emulator sent: sign-in and sign-up verification codes, read like any mail, so
+ * `mail.code(email)` and a recorded typed code work for Clerk's `<SignIn/>` and Account Portal.
+ */
+export function clerkMail(emulator: Pick<Emulator, "store">): MailSource {
+  const view = clerkInstance(emulator)
+
+  return {
+    latest(address) {
+      const found = view.messages(address).at(-1)
+
+      return found && { to: [found.to], subject: found.subject, html: undefined, text: found.body }
     },
   }
 }

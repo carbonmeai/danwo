@@ -24,7 +24,7 @@ export interface ClerkInstanceView {
 }
 
 /** The Clerk emulator's instance, users, sessions and sent codes, for tests. */
-export function clerkInstance(emulator: Emulator): ClerkInstanceView {
+export function clerkInstance(emulator: Pick<Emulator, "store">): ClerkInstanceView {
   const context = contextOf(emulator.store)
 
   const userSessions = (email: string) => {

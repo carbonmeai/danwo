@@ -119,6 +119,17 @@ export interface BachsFixtures {
   readonly settle: () => Promise<void>
 }
 
+/** Fixtures a `clerkEnvironment()` or `clerkService()` contributes. */
+export interface ClerkFixtures {
+  /**
+   * The Clerk emulator: read the instance's keys, users, sessions and emailed codes, and revoke a
+   * user's sessions mid-test, with `clerkInstance(clerk)`.
+   */
+  readonly clerk: Emulator
+  readonly proxy: Proxy
+  readonly settle: () => Promise<void>
+}
+
 /** Fixtures an `llmEnvironment()` or `llmService()` contributes. */
 export interface LlmFixtures {
   /**
@@ -385,3 +396,25 @@ export {
   sqliteWorkerFile,
   type WorkerDatabaseOptions,
 } from "@danwo/data"
+/**
+ * Clerk: a development instance's Backend API, its Frontend API serving ClerkJS and `<SignIn/>`,
+ * and its Account Portal; `clerkMail` reads its emailed codes as a session's mail source.
+ */
+export {
+  type ClerkEnvironment,
+  clerkEnvironment,
+  clerkMail,
+  type ClerkOptions,
+  clerkService,
+} from "@danwo/runner/runner"
+export {
+  type ClerkInstance,
+  clerkInstance,
+  type ClerkInstanceView,
+  type ClerkMessage,
+  type ClerkSeedConfig,
+  type ClerkSeedOrganization,
+  type ClerkSeedTemplate,
+  type ClerkSeedUser,
+  type ClerkUser,
+} from "@danwo/emulators"

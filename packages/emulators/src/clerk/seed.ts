@@ -32,11 +32,12 @@ export interface ClerkSeedTemplate {
   readonly lifetime?: number
 }
 
+/** A Clerk emulator's seed: the instance, and the users, organizations and JWT templates it starts with. */
 export interface ClerkSeedConfig {
   /**
    * The instance: its slug names the hosts (`<slug>.clerk.accounts.dev`, `<slug>.accounts.dev`),
    * and the publishable key is derived from it. `secretKey` is what the app's server sends.
-   * `password: false` makes the Account Portal sign in by emailed code instead.
+   * `password: false` makes sign-in (the Account Portal and `<SignIn/>`) use an emailed code.
    */
   readonly instance?: {
     readonly slug?: string
@@ -50,7 +51,7 @@ export interface ClerkSeedConfig {
 
 /** The slug and secret key an emulator uses when the seed names none. */
 export const DEFAULT_SLUG = "danwo-app"
-export const DEFAULT_SECRET_KEY = "sk_test_danwo_clerk_secret_key"
+export const DEFAULT_SECRET_KEY = "REDACTED-TEST-VALUE"
 
 /** The instance a seed describes. */
 export function instanceFrom(config: ClerkSeedConfig["instance"] = {}): ClerkInstance {

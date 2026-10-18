@@ -1,8 +1,9 @@
 /**
  * Credentials recognisable by their shape alone, wherever they appear in text: provider API keys
  * and signing secrets, bearer and basic credentials, AWS keys and signatures, OAuth codes and
- * tokens, Auth0 tickets, Slack and GitHub tokens, Flutterwave keys, PEM private keys, and URLs that work as bearer tokens (upload
- * sessions, pre-authenticated downloads, Slack webhook and response URLs).
+ * tokens, Auth0 tickets, Slack and GitHub tokens, Flutterwave keys, Clerk dev browser tokens and
+ * handshake nonces, PEM private keys, and URLs that work as bearer tokens (upload sessions,
+ * pre-authenticated downloads, Slack webhook and response URLs).
  * Values a session was given are redacted by its vault; these catch the ones it never was.
  */
 
@@ -50,6 +51,15 @@ const TOKEN_PATTERNS: readonly [RegExp, string][] = [
   [/([?&](?:upload_id|ticket)=)[^&#\s"']+/g, `$1${REDACTED}`],
   /* Flutterwave secret, public and encryption keys, test and live. */
   [/\b(FLW(?:SECK|PUBK)(?:_TEST)?-?)[A-Za-z0-9]+(?:-X)?/g, `$1${REDACTED}`],
+  /*
+   * Clerk: dev browser tokens (they stand in for the browser's session cookie), and the handshake
+   * nonces, handshake payloads and sign-in tickets that redirects carry.
+   */
+  [/\b(dvb_)[A-Za-z0-9_-]+/g, `$1${REDACTED}`],
+  [
+    /([?&#](?:__clerk_db_jwt|__clerk_handshake_nonce|__clerk_handshake|__clerk_ticket)=)[^&#\s"']+/g,
+    `$1${REDACTED}`,
+  ],
   /* OpenAI project, service-account and legacy keys; Anthropic keys; AI Gateway keys. */
   [/\b(sk-(?:ant-[a-z]+\d*-|proj-|svcacct-|admin-)?)[A-Za-z0-9_-]{16,}/g, `$1${REDACTED}`],
   [/\b(vck_)[A-Za-z0-9_-]{8,}/g, `$1${REDACTED}`],

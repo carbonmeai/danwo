@@ -12,6 +12,11 @@ export const BAPI_HOST = "api.clerk.com"
  */
 export const CLERK_HOSTS = [BAPI_HOST, "*.clerk.accounts.dev", "*.accounts.dev"] as const
 
+/** Whether `host` is one a Clerk development instance answers on. */
+export function isClerkHost(host: string): boolean {
+  return host === BAPI_HOST || host.endsWith(".accounts.dev")
+}
+
 const ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
 /** A Clerk-style id: a type prefix and 27 random base-62 characters, e.g. `user_2x…`. */

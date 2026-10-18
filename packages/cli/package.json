@@ -26,8 +26,11 @@
   "devDependencies": {
     "@aws-sdk/client-s3": "3.1152.0",
     "@bachs/sdk": "1.0.0",
+    "@clerk/express": "2.1.80",
     "@danwo/sdk": "workspace:*",
+    "@types/express": "5.0.6",
     "@types/pg": "8.23.1",
+    "express": "5.2.1",
     "openai": "7.38.0",
     "openid-client": "6.8.8",
     "pg": "8.23.1",

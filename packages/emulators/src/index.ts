@@ -58,6 +58,22 @@ export {
   seedBachs,
 } from "./bachs/index.ts"
 export {
+  clerk,
+  CLERK_HOSTS,
+  type ClerkInstance,
+  clerkInstance,
+  type ClerkInstanceView,
+  type ClerkMessage,
+  clerkOutboundFaults,
+  type ClerkSeedConfig,
+  type ClerkSeedOrganization,
+  type ClerkSeedTemplate,
+  type ClerkSeedUser,
+  type ClerkUser,
+  isClerkHost,
+  seedClerk,
+} from "./clerk/index.ts"
+export {
   GITHUB_HOSTS,
   type GithubCheckRunView,
   type GithubCommentView,

@@ -38,8 +38,11 @@ const UNAVAILABLE = fault(
   "The service is temporarily unavailable, please retry later.",
 )
 
-/** Frontend API paths: the browser's, not the app server's, so the matrix leaves them alone. */
+/** Frontend API paths: the browser's, not the app server's, so the matrix leaves most alone. */
 const FRONTEND = /^\/v1\/(client(\/|$)|environment$|dev_browser$)/
+
+/** ClerkJS refreshing the session token, about every 50 seconds while a page is open. */
+const TOKEN_REFRESH = /^\/v1\/client\/sessions\/[^/]+\/tokens(\/[^/]+)?$/
 
 const WRITES = new Set(["POST", "PATCH", "PUT", "DELETE"])
 
@@ -60,12 +63,14 @@ function backendFaults(method: string) {
  * Backend API call: a 429 with `Retry-After`, a 500 and a 503 in Clerk's error format, a 10 s
  * delay and a reset, with a reset after Clerk acted for writes. Collecting a handshake's cookies
  * and loading the signing keys meet 500 and reset only, the failures a server's sign-in check
- * must survive. The browser's pages and the Frontend API are left alone. The 5xx wording is
- * approximate.
+ * must survive. Of the Frontend API, only ClerkJS's token refresh fails (500 and 503), so a
+ * page must cope with a token it cannot renew; the rest of the browser's calls and pages are left
+ * alone. The 5xx wording is approximate.
  */
 export function clerkOutboundFaults(call: { method: string; path: string }) {
   const path = call.path.split("?")[0] ?? ""
 
+  if (TOKEN_REFRESH.test(path)) return [INTERNAL, UNAVAILABLE]
   if (!path.startsWith("/v1/") || FRONTEND.test(path)) return []
   if (path === "/v1/jwks" || path === "/v1/clients/handshake_payload")
     return [INTERNAL, { kind: "reset" } as const]
