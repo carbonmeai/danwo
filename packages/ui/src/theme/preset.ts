@@ -9,6 +9,7 @@ import { keyframes } from "./keyframes"
 import { opacity } from "./opacity"
 import { radii } from "./radii"
 import { semanticShadows, shadows } from "./shadows"
+import { signalColors } from "./signals"
 import { sizes } from "./sizes"
 import { spacing } from "./spacing"
 import { glass } from "./translucence"
@@ -57,7 +58,7 @@ export const danwoUi = definePreset({
       textStyles,
     },
     semanticTokens: {
-      colors: semanticColors,
+      colors: { ...semanticColors, ...signalColors },
       shadows: semanticShadows,
     },
     tokens: {

@@ -10,6 +10,7 @@ import { join, relative, resolve } from "node:path"
 
 import type { PlannedFault, RunOutcome } from "@danwo/matrix"
 
+import type { LintFinding, LintSeverity } from "../lint/index.ts"
 import { addUsage, type Usage } from "../record/usage.ts"
 import { redactCredentials } from "../secrets/index.ts"
 import type { MatrixRunReport, Reporter, RunContext, TestRunReport } from "./reporting.ts"
@@ -26,6 +27,13 @@ export interface HistoryError {
   readonly source?: { readonly file: string; readonly line: number }
 }
 
+/** How often one lint rule fired in an attempt or a matrix run, at one severity. */
+export interface HistoryLint {
+  readonly rule: string
+  readonly severity: LintSeverity
+  readonly count: number
+}
+
 export interface HistoryAttempt {
   readonly status: string
   readonly durationMs: number
@@ -33,6 +41,8 @@ export interface HistoryAttempt {
   /** The attempt's flight record directory, relative to the project root, when it was kept. */
   readonly record?: string
   readonly usage?: Usage
+  /** What the integration lint found, counted by rule; absent when it found nothing. */
+  readonly lint?: readonly HistoryLint[]
 }
 
 export interface HistoryTest {
@@ -73,6 +83,8 @@ export interface TestHistory extends HistoryBase {
 
 export interface MatrixHistory extends HistoryBase {
   readonly kind: "matrix"
+  /** What the integration lint found across the trials, counted by rule. */
+  readonly lint?: readonly HistoryLint[]
   readonly testId: string
   readonly file: string
   readonly clean: HistoryTrial
@@ -83,6 +95,24 @@ export type RunHistory = TestHistory | MatrixHistory
 
 export function historyDir(root: string): string {
   return join(root, ".danwo", "history")
+}
+
+/** Findings counted by rule and severity, in a stable order. */
+function lintCounts(findings: readonly LintFinding[]): HistoryLint[] {
+  const counts = new Map<string, HistoryLint>()
+
+  for (const finding of findings) {
+    const key = `${finding.severity} ${finding.rule}`
+    const seen = counts.get(key)
+
+    counts.set(key, {
+      rule: finding.rule,
+      severity: finding.severity,
+      count: (seen?.count ?? 0) + 1,
+    })
+  }
+
+  return [...counts.values()].toSorted((a, b) => a.rule.localeCompare(b.rule))
 }
 
 /** A redacted one-line message. */
@@ -112,6 +142,7 @@ function attemptOf(context: RunContext, attempt: AttemptReport): HistoryAttempt 
     }),
     ...(record !== undefined && { record }),
     ...(attempt.usage && { usage: attempt.usage }),
+    ...(attempt.lint?.length && { lint: lintCounts(attempt.lint) }),
   }
 }
 
@@ -190,6 +221,7 @@ function matrixHistory(run: MatrixRunReport): MatrixHistory {
     file: run.file,
     clean: trialOf(run, run.result.clean),
     trials: run.result.runs.map((outcome) => trialOf(run, outcome)),
+    ...(run.lint?.length && { lint: lintCounts(run.lint.flatMap((trial) => trial.findings)) }),
   }
 }
 

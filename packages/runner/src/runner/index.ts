@@ -97,6 +97,7 @@ export {
   historyDir,
   type HistoryAttempt,
   type HistoryError,
+  type HistoryLint,
   type HistoryTest,
   type HistoryTrial,
   type MatrixHistory,

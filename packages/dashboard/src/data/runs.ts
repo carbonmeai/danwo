@@ -8,6 +8,7 @@ import { join } from "node:path"
 import type { MatrixHistory, RunHistory, TestHistory, Usage } from "@danwo/runner/runner"
 
 import { danwoDir, entries, isVersioned, readJson } from "./files.ts"
+import { type Health, healthOf } from "./trend.ts"
 
 /** The statuses a row counts; tests and matrix trials share the words. */
 export interface RunCounts {
@@ -119,12 +120,18 @@ function rowOf(run: RunHistory): RunRow {
 export interface RunPage {
   readonly rows: readonly RunRow[]
   readonly total: number
+  /** The recent runs' pass rate, flakiness, failures and spend, with their trend. */
+  readonly health: Health
 }
 
 export async function listRuns(root: string, page = 0, size = 50): Promise<RunPage> {
   const runs = await loadHistory(root)
 
-  return { rows: runs.slice(page * size, (page + 1) * size).map(rowOf), total: runs.length }
+  return {
+    rows: runs.slice(page * size, (page + 1) * size).map(rowOf),
+    total: runs.length,
+    health: healthOf(runs),
+  }
 }
 
 /** One run in full, or undefined when the history has no run with that id. */

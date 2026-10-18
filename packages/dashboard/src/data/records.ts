@@ -16,6 +16,7 @@ import {
 } from "@danwo/runner/runner"
 
 import { insideArea, isVersioned, readJson } from "./files.ts"
+import { type Timeline, timelineOf } from "./timeline.ts"
 
 /** A step with what the page needs beside the record's own fields. */
 export interface StepView {
@@ -43,6 +44,8 @@ export interface RecordView {
   /** The emulators' state when the run ended, as indented JSON. */
   readonly state: string
   readonly steps: readonly StepView[]
+  /** Steps, calls and webhooks on one clock. */
+  readonly timeline: Timeline
   readonly screen?: string
   /** The Markdown failure page, for failed records. */
   readonly page?: string
@@ -105,6 +108,7 @@ export async function getRecord(root: string, dir: string): Promise<RecordView |
     record: rest,
     state: JSON.stringify(state, null, 2),
     steps: record.steps.map(stepView),
+    timeline: timelineOf(record),
     ...(screen !== undefined && { screen: redactCredentials(screen) }),
     ...(failed && { page: failurePage(record, screen) }),
   }

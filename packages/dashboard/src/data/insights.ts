@@ -2,9 +2,10 @@
  * Tests across runs: which ones flip between passing and failing, which are slowest and which cost
  * the most model money, from every `danwo test` run the history keeps.
  */
-import type { HistoryTest, TestHistory } from "@danwo/runner/runner"
+import type { HistoryLint, HistoryTest, RunHistory, TestHistory } from "@danwo/runner/runner"
 
 import { loadHistory } from "./runs.ts"
+import { cacheHitRate } from "./trend.ts"
 
 /** One test's record over the runs that ran it. */
 export interface TestInsight {
@@ -24,11 +25,37 @@ export interface TestInsight {
   readonly lastStatus: string
 }
 
+/** One run's replay-cache hit rate, oldest run first. */
+export interface CachePoint {
+  readonly id: string
+  readonly startedAt: string
+  readonly rate: number
+}
+
+/** One integration lint rule, counted over every run that kept its findings. */
+export interface LintRule {
+  readonly rule: string
+  readonly severity: HistoryLint["severity"]
+  readonly count: number
+  /** How many runs it fired in. */
+  readonly runs: number
+}
+
+/** A test's outcome in one run, for the flakiness strip: oldest first. */
+export interface Outcome {
+  readonly run: string
+  readonly status: string
+}
+
 export interface Insights {
   readonly flaky: readonly TestInsight[]
   readonly slowest: readonly TestInsight[]
   readonly costliest: readonly TestInsight[]
   readonly runs: number
+  /** For each flaky test, its outcome in every run that ran it, oldest first. */
+  readonly history: Readonly<Record<string, readonly Outcome[]>>
+  readonly cache: readonly CachePoint[]
+  readonly lint: readonly LintRule[]
 }
 
 interface Seen {
@@ -94,17 +121,68 @@ function appearances(runs: readonly TestHistory[]): Map<string, Seen[]> {
   return byTest
 }
 
+/** Every run's replay-cache hit rate, for runs that had agent steps, oldest first. */
+function cacheTrend(runs: readonly RunHistory[]): CachePoint[] {
+  return runs.toReversed().flatMap((run) => {
+    const rate = cacheHitRate(run.usage)
+
+    return rate === null ? [] : [{ id: run.id, startedAt: run.startedAt, rate }]
+  })
+}
+
+/** The lint counts a run kept: its attempts' for a test run, the run's own for a matrix. */
+function lintOfRun(run: RunHistory): readonly HistoryLint[] {
+  if (run.kind === "matrix") return run.lint ?? []
+
+  return run.tests.flatMap((test) => test.attempts.flatMap((attempt) => attempt.lint ?? []))
+}
+
+/** Lint rules by how often they fired across the runs, most first. */
+function lintRules(runs: readonly RunHistory[]): LintRule[] {
+  const rules = new Map<string, Omit<LintRule, "rule">>()
+
+  for (const run of runs) {
+    const counted = new Set<string>()
+
+    for (const lint of lintOfRun(run)) {
+      const rule = rules.get(lint.rule) ?? { severity: lint.severity, count: 0, runs: 0 }
+
+      rules.set(lint.rule, {
+        severity: lint.severity,
+        count: rule.count + lint.count,
+        runs: rule.runs + (counted.has(lint.rule) ? 0 : 1),
+      })
+      counted.add(lint.rule)
+    }
+  }
+
+  return [...rules]
+    .map(([rule, counted]) => ({ rule, ...counted }))
+    .toSorted((a, b) => b.count - a.count || a.rule.localeCompare(b.rule))
+}
+
 /** The flaky, slowest and costliest tests across the project's runs, at most `limit` each. */
 export async function getInsights(root: string, limit = 50): Promise<Insights> {
-  const runs = (await loadHistory(root)).filter((run): run is TestHistory => run.kind === "test")
-  const all = [...appearances(runs)].map(([id, seen]) => insightOf(id, seen))
+  const history = await loadHistory(root)
+  const runs = history.filter((run): run is TestHistory => run.kind === "test")
+  const byTest = appearances(runs)
+  const all = [...byTest].map(([id, appeared]) => insightOf(id, appeared))
+  const flaky = all
+    .filter((t) => t.flaky > 0 || t.flips > 0)
+    .toSorted((a, b) => b.flaky + b.flips - (a.flaky + a.flips))
+    .slice(0, limit)
 
   return {
     runs: runs.length,
-    flaky: all
-      .filter((t) => t.flaky > 0 || t.flips > 0)
-      .toSorted((a, b) => b.flaky + b.flips - (a.flaky + a.flips))
-      .slice(0, limit),
+    flaky,
+    history: Object.fromEntries(
+      flaky.map((t) => [
+        t.id,
+        (byTest.get(t.id) ?? []).map((s) => ({ run: s.run.id, status: s.test.status })),
+      ]),
+    ),
+    cache: cacheTrend(history),
+    lint: lintRules(history),
     slowest: all.toSorted((a, b) => b.averageMs - a.averageMs).slice(0, limit),
     costliest: all
       .filter((t) => t.costUsd > 0 || t.modelCalls > 0)
