@@ -6,12 +6,14 @@
 import type { PlannedFault, ServiceDelivery } from "@danwo/core"
 import type { Exchange } from "@danwo/proxy"
 
+import type { CheckPace } from "../assert/pace.ts"
 import type { Usage } from "../record/usage.ts"
 import type { ReplayDivergence } from "../session.ts"
 import type { ErrorClass } from "../support/codes.ts"
 import type { SourceLine, TestError } from "../support/errors.ts"
 import type { AttemptStatus, ResultStatus } from "../tests/retry.ts"
 import type { RecordSettings } from "./record.ts"
+import type { TrialTimings } from "./timings.ts"
 
 /** What a worker needs before its first task: where the project is and how to record. */
 export interface WorkerStart {
@@ -41,6 +43,8 @@ export interface TrialTask {
   /** Null for the clean trial. */
   readonly fault: PlannedFault | null
   readonly cacheDir: string
+  /** For a faulted trial: how long the clean trial's checks took, so its own wait only so long. */
+  readonly pace?: CheckPace
 }
 
 /** One attempt of a test, as the parent reports it. */
@@ -79,6 +83,10 @@ export interface TrialReport {
   readonly errorClass?: ErrorClass | undefined
   /** How its agent steps used the replay cache and the model. */
   readonly usage?: Usage
+  /** Milliseconds in each phase of the trial. */
+  readonly timings?: TrialTimings
+  /** For a passing clean trial: how long each of its checks took, by `checkKey`. */
+  readonly pace?: Readonly<Record<string, number>>
 }
 
 /** What a worker answers, by the name the parent calls it with. */

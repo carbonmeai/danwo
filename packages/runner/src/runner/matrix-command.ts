@@ -5,7 +5,7 @@
  * spread across the worker crew. A fault that never fired makes its trial invalid.
  */
 import { mkdtemp, rm } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { availableParallelism, tmpdir } from "node:os"
 import { join, relative, resolve } from "node:path"
 
 import {
@@ -17,6 +17,7 @@ import {
   type RunOutcome,
 } from "@danwo/core"
 
+import type { CheckPace } from "../assert/pace.ts"
 import { addUsage, cacheLine, modelLine, type Usage } from "../record/usage.ts"
 import { type ErrorClass, exitCodeOf, notJudged } from "../support/codes.ts"
 import { type CatalogEntry, catalogOf } from "./catalog.ts"
@@ -27,6 +28,8 @@ import type { RecordMode } from "./record.ts"
 import { closeRecording, openRecording } from "./recording.ts"
 import { type Reporter, type RunContext, tellReporters } from "./reporting.ts"
 import type { TrialReport } from "./tasks.ts"
+import { type TrialTimings, timingsLine } from "./timings.ts"
+import { runPool, shuffledOrder } from "./trial-pool.ts"
 
 export interface RunMatrixOptions {
   readonly cwd?: string
@@ -36,7 +39,12 @@ export interface RunMatrixOptions {
   readonly grep?: string
   /** A regular expression over planned fault labels: only the faults it matches run. */
   readonly faults?: string
+  /** Default: the config's `matrix.workers`, else its `workers`, else the machine's cores (at most 8). */
   readonly workers?: number
+  /** Starts no new trial once this many failed (`--max-failures`). */
+  readonly maxFailures?: number
+  /** Runs the faulted trials in a shuffled order from this seed (`--shuffle`). */
+  readonly shuffle?: number
   /** Flight recorder mode; overrides the config's `record`. */
   readonly record?: RecordMode
   /** Rewrite every `toHaveScreenshot` baseline (`--update-snapshots`). */
@@ -78,7 +86,7 @@ function judgingLine(test: CatalogEntry): string {
  * inconclusive, infrastructure) makes the trial `not-judged` rather than `failed`.
  */
 function outcomeOf(report: TrialReport, fault: PlannedFault | null): RunOutcome {
-  const { errorClass, usage: _usage, ...rest } = report
+  const { errorClass, usage: _usage, timings: _timings, pace: _pace, ...rest } = report
   const unjudged = report.status === "failed" && errorClass !== undefined && notJudged(errorClass)
 
   return unjudged
@@ -92,17 +100,19 @@ function outcomeOf(report: TrialReport, fault: PlannedFault | null): RunOutcome 
 }
 
 /** Runs trials on the crew; any trial that could not run at all is an environment error. */
-function trialRunner(crew: Crew, run: Pick<MatrixRun, "file" | "test" | "cacheDir" | "usages">) {
+function trialRunner(crew: Crew, run: MatrixRun) {
   return async (fault: PlannedFault | null): Promise<RunOutcome> => {
     try {
+      const pace = fault === null ? undefined : run.pace.current
       const report = await crew.trial({
         file: run.file,
         testId: run.test.id,
         fault,
         cacheDir: run.cacheDir,
+        ...(pace && { pace }),
       })
 
-      if (report.usage !== undefined) run.usages.push(report.usage)
+      keepTrialFacts(run, fault, report)
 
       return outcomeOf(report, fault)
     } catch (error) {
@@ -118,6 +128,33 @@ function trialRunner(crew: Crew, run: Pick<MatrixRun, "file" | "test" | "cacheDi
       }
     }
   }
+}
+
+/**
+ * What the run keeps of a finished trial besides its outcome: its use of the cache and the model,
+ * a faulted trial's timings, and the clean trial's check pace (for tests with an invariant, which
+ * judges a faulted trial however early its body stopped).
+ */
+function keepTrialFacts(run: MatrixRun, fault: PlannedFault | null, report: TrialReport): void {
+  if (report.usage !== undefined) run.usages.push(report.usage)
+
+  if (fault !== null) {
+    if (report.timings !== undefined) run.timings.push(report.timings)
+
+    return
+  }
+
+  if (run.test.invariant) run.pace.current = paceFrom(report, run.loaded.config.matrix?.checkPace)
+}
+
+/** The pace faulted trials keep: the clean trial's check timings, unless the config turns it off. */
+function paceFrom(
+  report: TrialReport,
+  setting: NonNullable<DanwoConfig["matrix"]>["checkPace"],
+): CheckPace | undefined {
+  if (setting === false || report.pace === undefined) return undefined
+
+  return { took: report.pace, ...setting }
 }
 
 /** Runs the invalid trials again, up to `rounds` times, keeping each in its place. */
@@ -164,14 +201,55 @@ function planLine(planned: number, kept: number, filter: string | undefined): st
     : `clean run passed; ${kept} of ${planned} planned faults match /${filter}/`
 }
 
+/** How the faulted trials are handed out. */
+interface Dispatch {
+  /** Trials at once: the crew's size. */
+  readonly workers: number
+  /** Starts no new trial once this many failed. */
+  readonly maxFailures: number | undefined
+  /** Runs the trials in a shuffled order from this seed. */
+  readonly shuffle: number | undefined
+}
+
+/** The faulted trials over the crew; the ones that ran, in plan order, and how many did not. */
+async function runPlan(
+  plan: readonly PlannedFault[],
+  run: (fault: PlannedFault | null) => Promise<RunOutcome>,
+  dispatch: Dispatch,
+  write: (line: string) => void,
+): Promise<RunOutcome[]> {
+  if (dispatch.shuffle !== undefined) write(`trials in shuffled order (seed ${dispatch.shuffle})`)
+
+  const results = await runPool(plan, run, (o) => o.status === "failed", {
+    size: dispatch.workers,
+    ...(dispatch.shuffle !== undefined && { order: shuffledOrder(plan.length, dispatch.shuffle) }),
+    ...(dispatch.maxFailures !== undefined && { stopAfter: dispatch.maxFailures }),
+  })
+  const ran = results.filter((outcome) => outcome !== undefined)
+  const left = plan.length - ran.length
+
+  if (left > 0)
+    write(`stopped after ${dispatch.maxFailures} failed: ${left} planned faults not run`)
+
+  return ran
+}
+
+/** What one matrix run's trials need besides the runner. */
+interface TrialsSetup {
+  readonly test: CatalogEntry
+  readonly matrix: DanwoConfig["matrix"]
+  readonly write: (line: string) => void
+  /** Narrows the planned faults by label. */
+  readonly filter: string | undefined
+  readonly dispatch: Dispatch
+}
+
 /** The clean trial, then every planned fault's; the result and the exit code. */
 async function runTrials(
-  test: CatalogEntry,
-  matrix: DanwoConfig["matrix"],
   run: (fault: PlannedFault | null) => Promise<RunOutcome>,
-  write: (line: string) => void,
-  filter: string | undefined,
+  setup: TrialsSetup,
 ): Promise<{ result: FaultMatrixResult; code: number }> {
+  const { matrix, write } = setup
   const began = Date.now()
   const clean = await run(null)
 
@@ -188,18 +266,32 @@ async function runTrials(
     matrix?.outboundFaults ?? defaultOutboundFaults,
     matrix?.webhookFaults ?? DEFAULT_WEBHOOK_FAULTS,
   )
-  const plan = selectFaults(planned, filter)
+  const plan = selectFaults(planned, setup.filter)
 
-  write(planLine(planned.length, plan.length, filter))
-  write(judgingLine(test))
+  write(planLine(planned.length, plan.length, setup.filter))
+  write(judgingLine(setup.test))
 
-  const runs = await retryInvalid(await Promise.all(plan.map(run)), matrix?.rerunInvalid ?? 0, run)
+  const ran = await runPlan(plan, run, setup.dispatch, write)
+  const runs = await retryInvalid(ran, matrix?.rerunInvalid ?? 0, run)
   const result = { clean, runs }
 
   write(formatMatrix(result))
   write(`${runs.length + 1} runs in ${Math.round((Date.now() - began) / 1000)} s`)
 
   return { result, code: matrixExitCode(runs) }
+}
+
+/** At most this many workers unless asked for more: each runs its own app, browser and emulators. */
+const MAX_DEFAULT_WORKERS = 8
+
+/** How many workers run the trials: asked for, configured, or one per core. */
+function matrixWorkers(options: RunMatrixOptions, config: DanwoConfig): number {
+  return (
+    options.workers ??
+    config.matrix?.workers ??
+    config.workers ??
+    Math.min(availableParallelism(), MAX_DEFAULT_WORKERS)
+  )
 }
 
 /** The class a trial's status gives the run's exit code. */
@@ -236,22 +328,31 @@ interface MatrixRun {
   readonly write: (line: string) => void
   /** Narrows the planned faults by label. */
   readonly faults: string | undefined
+  readonly dispatch: Dispatch
   /** Each finished trial's use of the cache and the model. */
   readonly usages: Usage[]
+  /** Each finished faulted trial's time, phase by phase. */
+  readonly timings: TrialTimings[]
+  /** The clean trial's check timings, once it passed: they pace every faulted trial. */
+  readonly pace: { current: CheckPace | undefined }
 }
 
 /** Runs the trials; tells the reporters when the run stopped without a result. */
 async function trialsOrAbort(run: MatrixRun): Promise<{ result: FaultMatrixResult; code: number }> {
   try {
-    const outcome = await runTrials(
-      run.test,
-      run.loaded.config.matrix,
-      trialRunner(run.crew, run),
-      run.write,
-      run.faults,
-    )
+    const outcome = await runTrials(trialRunner(run.crew, run), {
+      test: run.test,
+      matrix: run.loaded.config.matrix,
+      write: run.write,
+      filter: run.faults,
+      dispatch: run.dispatch,
+    })
 
     for (const line of usageLines(run.usages)) run.write(line)
+
+    const timeLine = timingsLine(run.timings)
+
+    if (timeLine !== undefined) run.write(timeLine)
 
     return outcome
   } catch (error) {
@@ -295,8 +396,9 @@ export async function runMatrix(
   const test = await theTest(loaded, file, options)
   const cache = await trialCache(loaded)
   const recording = openRecording(loaded, options.record)
+  const workers = matrixWorkers(options, loaded.config)
   const crew = new Crew({
-    size: options.workers ?? loaded.config.workers ?? 1,
+    size: workers,
     start: {
       cwd,
       configPath: loaded.path,
@@ -315,7 +417,10 @@ export async function runMatrix(
     began: Date.now(),
     write,
     faults: options.faults,
+    dispatch: { workers, maxFailures: options.maxFailures, shuffle: options.shuffle },
     usages: [],
+    timings: [],
+    pace: { current: undefined },
   }
 
   await tellReporters(run.reporters, (r) => r.started?.(run.context), write)

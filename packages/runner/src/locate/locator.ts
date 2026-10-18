@@ -45,6 +45,11 @@ export interface LocateContext {
   readonly files: Files
   readonly actionTimeout: number
   readonly assertionTimeout: number
+  /**
+   * How long the next check may wait, given its API, its call and its normal timeout; checks that
+   * replay a passing run's steps wait only a few times as long as they took there.
+   */
+  readonly checkTimeout?: (api: string, label: string, fallback: number) => number
   /** Where screenshot checks keep baselines, and how they number and note what they did. */
   readonly shots: ScreenshotDesk
   /** Waits, after an action, for the page and the backend to go quiet (see readiness.ts). */

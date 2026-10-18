@@ -13,7 +13,10 @@ import {
   type RunOutcome,
 } from "@danwo/core"
 import type { Proxy } from "@danwo/proxy"
+import type { Browser } from "playwright-core"
 
+import { type CheckPace, paceOf } from "../assert/pace.ts"
+import { launchBrowser } from "../browser/index.ts"
 import { usageOf } from "../record/usage.ts"
 import { type DeclaredTest, type FileDeclarations, suiteHooks } from "../tests/registry.ts"
 import { resultOf, worthRetrying } from "../tests/retry.ts"
@@ -40,6 +43,7 @@ import type {
   WorkerCalls,
   WorkerStart,
 } from "./tasks.ts"
+import { noTimings, TRIAL_PHASES, type TrialPhase, timed } from "./timings.ts"
 import { answerCalls, sendNote } from "./wire.ts"
 
 /** What `beforeAll` and `afterAll` receive: there is no browser session outside a test. */
@@ -58,6 +62,21 @@ interface Bench {
 }
 
 let bench: Bench | undefined
+/** The worker's browser, launched on first use; each attempt opens its own context in it. */
+let browser: Promise<Browser> | undefined
+
+/** The worker's browser behind its environment's proxy, launched again if it went away. */
+async function workerBrowser(): Promise<Browser> {
+  const current = await browser?.catch(() => undefined)
+
+  if (current?.isConnected()) return current
+
+  const proxy = benchOrFail().env?.proxy
+
+  browser = launchBrowser(proxy && { proxy: { url: proxy.url, caSpki: proxy.caSpki } })
+
+  return browser
+}
 
 function benchOrFail(): Bench {
   if (bench === undefined) throw new Error("the worker was given a task before it started")
@@ -81,6 +100,7 @@ async function attemptOnce(
   id: string,
   replay: ReplayUse,
   recordAs: string,
+  checkPace?: CheckPace,
 ): Promise<{ result: AttemptResult; recordDir: string | undefined; mark: EvidenceMark }> {
   const { loaded, env, recording, updateScreenshots, sessions } = benchOrFail()
   const recordDir = recording && attemptDir(recording, id, recordAs)
@@ -98,6 +118,8 @@ async function attemptOnce(
       update: updateScreenshots ? "all" : "missing",
     },
     sessions,
+    browser: workerBrowser,
+    ...(checkPace && { checkPace }),
   })
 
   return { result, recordDir, mark }
@@ -282,8 +304,19 @@ function trialNeedsRecord(report: TrialReport, fault: TrialTask["fault"]): boole
   return report.status !== "passed" || !faultFired(outcome)
 }
 
+/** A clean trial that passed reports how long its checks took, to pace the faulted trials. */
+function cleanPace(task: TrialTask, result: AttemptResult): Pick<TrialReport, "pace"> {
+  if (task.fault !== null || result.status !== "passed") return {}
+
+  return { pace: paceOf(result.flight.session.steps()) }
+}
+
 /** Runs the trial's attempt in the reset, faulted environment and reports it. */
-async function runTrial(task: TrialTask, env: TrialEnvironment): Promise<TrialReport> {
+async function runTrial(
+  task: TrialTask,
+  env: TrialEnvironment,
+  timings: Record<TrialPhase, number>,
+): Promise<TrialReport> {
   const replay: ReplayUse = {
     kind: task.fault === null ? "learn" : "replay-only",
     dir: task.cacheDir,
@@ -295,41 +328,68 @@ async function runTrial(task: TrialTask, env: TrialEnvironment): Promise<TrialRe
     task.testId,
     replay,
     task.fault?.label ?? "clean",
+    task.pace,
   )
 
-  await env.settle?.()
-  await env.proxy.settled().catch(() => undefined)
+  for (const phase of TRIAL_PHASES) timings[phase] += result.timings[phase]
+  await timed(timings, "settle", async () => {
+    await env.settle?.()
+    await env.proxy.settled().catch(() => undefined)
+  })
 
-  const report = trialReport(result, env, mark)
-  const record = await keepRecord(recordDir, trialNeedsRecord(report, task.fault), () =>
-    buildRecord({
-      test: task.testId,
-      run: { kind: "matrix", fault: task.fault },
-      status: report.status,
-      error: result.error,
-      stopped: result.stopped,
-      divergence: result.divergence,
-      notes: [...report.notes, ...result.notes],
-      durationMs: result.durationMs,
-      flight: result.flight,
-      env,
-      mark,
-    }),
+  const report = { ...trialReport(result, env, mark), timings, ...cleanPace(task, result) }
+  const record = await timed(timings, "close", () =>
+    keepRecord(recordDir, trialNeedsRecord(report, task.fault), () =>
+      buildRecord({
+        test: task.testId,
+        run: { kind: "matrix", fault: task.fault },
+        status: report.status,
+        error: result.error,
+        stopped: result.stopped,
+        divergence: result.divergence,
+        notes: [...report.notes, ...result.notes],
+        durationMs: result.durationMs,
+        flight: result.flight,
+        env,
+        mark,
+      }),
+    ),
   )
 
   return record === undefined ? report : { ...report, record }
 }
 
-async function trial(task: TrialTask): Promise<TrialReport> {
-  const env = trialEnvironment()
+/** Whether this worker's environment has a snapshot to restore. */
+let snapshotted = false
+
+/**
+ * Puts the environment where every trial starts. The worker's first trial resets it and, when
+ * the environment can, keeps a snapshot; every later trial restores that snapshot instead of
+ * resetting, which skips app restarts and reseeding.
+ */
+async function startingPoint(env: TrialEnvironment): Promise<void> {
+  const keeps = env.snapshot !== undefined && env.restore !== undefined
+
+  if (snapshotted && keeps) return env.restore?.()
 
   await env.reset?.()
+  if (!keeps) return
+
+  await env.snapshot?.()
+  snapshotted = true
+}
+
+async function trial(task: TrialTask): Promise<TrialReport> {
+  const env = trialEnvironment()
+  const timings = noTimings()
+
+  await timed(timings, "prepare", () => startingPoint(env))
   // The app was reset with it: sign-ins saved before belong to the app as it was.
   benchOrFail().sessions.invalidate()
   applyFault(env, task.fault)
 
   try {
-    return await runTrial(task, env)
+    return await runTrial(task, env, timings)
   } finally {
     env.proxy.setFault(undefined)
     clearWebhookFaults(env.webhooks)
@@ -354,6 +414,7 @@ const calls: WorkerCalls = {
   testFile,
   trial,
   async stop() {
+    await (await browser?.catch(() => undefined))?.close()
     await bench?.env?.close()
     process.disconnect?.()
     process.exit(0)

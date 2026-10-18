@@ -104,6 +104,14 @@ export interface DanwoConfig {
     readonly webhookFaults?: readonly WebhookFault[]
     /** Runs a faulted run again up to this many times while its fault never fires (default 0). */
     readonly rerunInvalid?: number
+    /** Worker processes for `danwo matrix`; default `workers`, else one per core (at most 8). */
+    readonly workers?: number
+    /**
+     * How long a faulted run's checks wait: at most `factor` times (default 3) as long as the same
+     * check took in the clean run, and at least `floorMs` (default 1000). `false` keeps every
+     * check's normal timeout.
+     */
+    readonly checkPace?: false | { readonly factor?: number; readonly floorMs?: number }
   }
 }
 

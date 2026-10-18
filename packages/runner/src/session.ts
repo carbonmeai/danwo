@@ -8,6 +8,7 @@ import type { Browser, BrowserContext, Page } from "playwright-core"
 import type { Budgets } from "./agent/budget.ts"
 import { type Agent, createAgent, type ReplayDivergence } from "./agent/index.ts"
 import { type Expect, expect } from "./assert/index.ts"
+import { type CheckPace, checkKey, pacedTimeout } from "./assert/pace.ts"
 import type { BaselineUpdate, ScreenshotEvent } from "./assert/screenshot.ts"
 import { type AppErrorOptions, AppErrors } from "./browser/app-errors.ts"
 import { type App, type BrowserFlags, launchBrowser } from "./browser/index.ts"
@@ -40,6 +41,11 @@ interface AppOptions {
   readonly actionTimeout?: number
   /** Default timeout of one `expect` poll, in milliseconds. */
   readonly assertionTimeout?: number
+  /**
+   * Check timings from a passing run of the same steps: each check then waits only a few times as
+   * long as it took there (`danwo matrix` paces its faulted trials by their clean run).
+   */
+  readonly checkPace?: CheckPace
   /** Timeout of a page load, in milliseconds. */
   readonly timeout?: number
 }
@@ -68,6 +74,11 @@ interface BrowserOptions {
   /** Extra launch options: `args` are added to the proxy's flags; `proxy` replaces the danwo proxy. */
   readonly launch?: BrowserFlags
   readonly headed?: boolean
+  /**
+   * An open browser to start the session's context in, launched with the same proxy settings; it
+   * stays open when the session closes. Without it, the session launches and closes its own.
+   */
+  readonly browser?: Browser
   /** Start the browser context with this state, e.g. a saved session's cookies and storage. */
   readonly browserState?: BrowserState
 }
@@ -255,14 +266,19 @@ interface Opened {
   readonly page: Page
 }
 
-async function openBrowser(options: WebSessionOptions): Promise<Opened> {
+async function openBrowser(
+  options: WebSessionOptions,
+): Promise<Opened & { readonly own: boolean }> {
   await registerValueEngine()
 
-  const browser = await launchBrowser({
-    ...(options.proxy && { proxy: options.proxy }),
-    ...(options.launch && { flags: options.launch }),
-    headless: !(options.headed ?? false),
-  })
+  const own = options.browser === undefined
+  const browser =
+    options.browser ??
+    (await launchBrowser({
+      ...(options.proxy && { proxy: options.proxy }),
+      ...(options.launch && { flags: options.launch }),
+      headless: !(options.headed ?? false),
+    }))
 
   try {
     const context = await browser.newContext(
@@ -270,9 +286,9 @@ async function openBrowser(options: WebSessionOptions): Promise<Opened> {
     )
     const page = await context.newPage()
 
-    return { browser, context, page }
+    return { browser, context, page, own }
   } catch (error) {
-    await browser.close()
+    if (own) await browser.close()
     throw error
   }
 }
@@ -414,6 +430,12 @@ function readinessOf(options: WebSessionOptions): Readiness {
   })
 }
 
+/** The next check's timeout under `pace`, keyed as the step recorder will record that check. */
+function pacer(pace: CheckPace, steps: StepRecorder, redact: (text: string) => string) {
+  return (api: string, label: string, fallback: number) =>
+    pacedTimeout(pace, checkKey(steps.next, api, redact(label)), fallback)
+}
+
 /** Waits for the active tab to be ready and notes the wait on the step that is running. */
 function readyStep(readiness: Readiness, tabs: Tabs, steps: StepRecorder): () => Promise<void> {
   return async () => {
@@ -431,7 +453,7 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
   const store = replayStore(options)
   const ownsArtifacts = options.artifactsDir === undefined
   const artifactsDir = options.artifactsDir ?? (await mkdtemp(join(tmpdir(), "danwo-attempt-")))
-  const { browser, context, page } = await openBrowser(options)
+  const { browser, context, page, own } = await openBrowser(options)
   const tabs = new Tabs(context, page)
   const settings = settingsOf(options)
   const { projectRoot, files, actionTimeout } = settings
@@ -496,6 +518,7 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
     ready,
     actionTimeout,
     assertionTimeout: settings.assertionTimeout,
+    ...(options.checkPace && { checkTimeout: pacer(options.checkPace, steps, vault.redact) }),
     shots: screenshotDesk(options, projectRoot, artifactsDir, steps),
   })
   let closed = false
@@ -521,7 +544,7 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
       try {
         await context.close()
       } finally {
-        await browser.close()
+        if (own) await browser.close()
         if (ownsArtifacts) await rm(artifactsDir, { recursive: true, force: true })
       }
     },

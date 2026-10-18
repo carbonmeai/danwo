@@ -22,7 +22,13 @@ import {
 } from "@danwo/emulators"
 import type { Proxy } from "@danwo/proxy"
 
-import { type Service, type Services, settleWebhooks, startServices } from "./services.ts"
+import {
+  keptEmulator,
+  type Service,
+  type Services,
+  settleWebhooks,
+  startServices,
+} from "./services.ts"
 
 /**
  * Seed data applied on start and after every reset. A function runs each time, so it can use
@@ -70,6 +76,10 @@ export interface OAuthEnvironment<Name extends string> {
   readonly settle: () => Promise<void>
   /** Emulator back to its seed, proxy log and fault rules cleared. */
   reset(): Promise<void>
+  /** Keeps the emulator's state now (right after a reset), for `restore`. */
+  snapshot(): Promise<void>
+  /** Emulator back to the kept state, faster than a reset; proxy log and fault rules cleared. */
+  restore(): Promise<void>
   /** Fixtures for tests: the emulator under `Name` (`google`, `microsoft`), `proxy`, `settle`. */
   readonly fixtures: { readonly proxy: Proxy; readonly settle: () => Promise<void> } & {
     readonly [K in Name]: Emulator
@@ -139,6 +149,7 @@ function oauthService<Config>(
       emulator.reset()
       apply()
     },
+    ...keptEmulator(emulator, clock),
     close: () => emulator.close(),
   }
 }
@@ -160,6 +171,8 @@ async function oauthEnvironment<Name extends string>(
     webhooks: services.webhooks,
     settle,
     reset: () => services.reset(),
+    snapshot: () => services.snapshot(),
+    restore: () => services.restore(),
     fixtures,
     close: () => services.close(),
   }

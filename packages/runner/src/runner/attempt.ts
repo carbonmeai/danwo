@@ -4,6 +4,9 @@
  * teardown. The attempt's verdict is decided by the first failure in that order, except in a
  * replay-only trial: there a body that broke stops where it broke and the invariant alone judges.
  */
+import type { Browser } from "playwright-core"
+
+import type { CheckPace } from "../assert/pace.ts"
 import type { SessionFlight } from "../flight.ts"
 import type { FailureEvidence } from "../record/index.ts"
 import {
@@ -35,6 +38,7 @@ import {
   type StartingState,
   startingState,
 } from "./sessions.ts"
+import { noTimings, type TrialPhase, timed } from "./timings.ts"
 
 /**
  * How an attempt uses the replay cache: `learn` replays what it can and records new steps;
@@ -58,6 +62,10 @@ export interface AttemptSetup {
   readonly screenshots?: { readonly dir: string; readonly update: "missing" | "all" }
   /** The worker's saved sessions; without it, a test's session is set up afresh every attempt. */
   readonly sessions?: SessionKeeper
+  /** Check timings of a passing run of the same steps, to bound how long each check waits. */
+  readonly checkPace?: CheckPace
+  /** The worker's browser, kept open across attempts; each attempt gets a fresh context in it. */
+  readonly browser?: () => Promise<Browser>
 }
 
 /** What the session saw, for the flight recorder; it stays in the worker. */
@@ -78,6 +86,8 @@ export interface AttemptResult {
   readonly flight: AttemptFlight
   /** For the flight record: how the test's saved session was had (reused, created, renewed). */
   readonly notes: readonly string[]
+  /** Milliseconds in each phase the attempt runs; `prepare` and `settle` are the worker's. */
+  readonly timings: Readonly<Record<TrialPhase, number>>
 }
 
 const DEFAULT_TIMEOUT_MS = 60_000
@@ -136,23 +146,62 @@ export async function runAttempt(
   setup: AttemptSetup,
 ): Promise<AttemptResult> {
   const started = Date.now()
+  const timings = noTimings()
   const deadline = test.options.timeout ?? setup.config.timeout ?? DEFAULT_TIMEOUT_MS
-  const { session, start } = await openStarted(file, test, setup, deadline)
+  const { session, start } = await timed(timings, "open", () =>
+    openStarted(file, test, setup, deadline),
+  )
   const fixtures = fixtureScope(test.fixtures, builtInFixtures(session, setup.env))
   const call = (fn: StoredBody) => async () => fn(fixtures.values)
 
-  const body = await stage(
-    async () => {
-      if (start?.error !== undefined) throw start.error
-      await fixtures.prepare(wantedByAll(everyUser(file, test)))
-      for (const hook of hooksAround(file, test, "beforeEach")) await call(hook.fn)()
-      await call(test.body)()
-    },
-    deadline,
-    "body",
+  const body = await timed(timings, "body", () =>
+    stage(
+      async () => {
+        if (start?.error !== undefined) throw start.error
+        await fixtures.prepare(wantedByAll(everyUser(file, test)))
+        for (const hook of hooksAround(file, test, "beforeEach")) await call(hook.fn)()
+        await call(test.body)()
+      },
+      deadline,
+      "body",
+    ),
   )
-  const judged = await judge(body, test, { session, setup, deadline, run: call })
-  let verdict = judged.verdict
+  const judged = await timed(timings, "invariant", () =>
+    judge(body, test, { session, setup, deadline, run: call }),
+  )
+  const ended = await timed(timings, "close", () =>
+    endAttempt(file, test, { session, setup, fixtures, verdict: judged.verdict, call }),
+  )
+
+  return {
+    status: ended.verdict.status,
+    error: reportedError(ended.verdict, setup.root),
+    durationMs: Date.now() - started,
+    divergence: ended.divergence,
+    stopped: judged.stopped,
+    flight: {
+      session: session.flight,
+      failure: ended.failure,
+      startedAt: new Date(started).toISOString(),
+    },
+    notes: start === undefined ? [] : [start.note],
+    timings,
+  }
+}
+
+/** What an attempt's end works on: its session, fixtures and verdict so far. */
+interface Ending {
+  readonly session: WebSession
+  readonly setup: AttemptSetup
+  readonly fixtures: ReturnType<typeof fixtureScope>
+  readonly verdict: Verdict
+  readonly call: (fn: StoredBody) => () => Promise<unknown>
+}
+
+/** `afterEach` hooks, fixture teardown, the screen at failure, then the session closed. */
+async function endAttempt(file: FileDeclarations, test: DeclaredTest, ending: Ending) {
+  const { session, setup, fixtures, call } = ending
+  let { verdict } = ending
 
   if (verdict.status !== "timed-out") {
     const afterEach = hooksAround(file, test, "afterEach").map((hook) => call(hook.fn))
@@ -172,15 +221,7 @@ export async function runAttempt(
 
   await session.close()
 
-  return {
-    status: verdict.status,
-    error: reportedError(verdict, setup.root),
-    durationMs: Date.now() - started,
-    divergence,
-    stopped: judged.stopped,
-    flight: { session: session.flight, failure, startedAt: new Date(started).toISOString() },
-    notes: start === undefined ? [] : [start.note],
-  }
+  return { verdict, failure, divergence }
 }
 
 /** How a test's saved session is looked up, set up and checked, from inside its attempt. */
@@ -344,7 +385,20 @@ function recordOptions(recordDir: string | undefined): Partial<WebSessionOptions
     : { artifactsDir: recordDir, record: { stepScreenshots: true } }
 }
 
-function openSession(
+/** What this attempt alone brings: its baselines, starting state, check pace and browser. */
+async function attemptOptions(
+  setup: AttemptSetup,
+  state: BrowserState | undefined,
+): Promise<Partial<WebSessionOptions>> {
+  return {
+    ...(setup.screenshots && { screenshots: setup.screenshots }),
+    ...(state && { browserState: state }),
+    ...(setup.checkPace && { checkPace: setup.checkPace }),
+    ...(setup.browser && { browser: await setup.browser() }),
+  }
+}
+
+async function openSession(
   setup: AttemptSetup,
   timeout: number,
   state?: BrowserState,
@@ -367,8 +421,7 @@ function openSession(
     ...readinessOptions(config, env),
     ...replayOptions(setup),
     ...recordOptions(setup.recordDir),
-    ...(setup.screenshots && { screenshots: setup.screenshots }),
-    ...(state && { browserState: state }),
+    ...(await attemptOptions(setup, state)),
     projectRoot: setup.root,
     timeout,
   })

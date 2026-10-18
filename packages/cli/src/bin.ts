@@ -113,7 +113,13 @@ program
   .argument("<file>", "test file")
   .option("-g, --grep <regexp>", "selects the test when the file has several")
   .option("-f, --faults <regexp>", "only the planned faults whose labels match")
-  .option("-w, --workers <n>", "worker processes", integerAtLeast(1))
+  .option(
+    "-w, --workers <n>",
+    "worker processes (default: one per core, at most 8)",
+    integerAtLeast(1),
+  )
+  .option("--max-failures <n>", "start no new run once this many failed", integerAtLeast(1))
+  .option("--shuffle <seed>", "run the faulted runs in a shuffled order", integerAtLeast(0))
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .addOption(recordOption())
   .addOption(updateOption())
@@ -129,6 +135,8 @@ program
         grep?: string
         faults?: string
         workers?: number
+        maxFailures?: number
+        shuffle?: number
         config?: string
         record?: RecordMode
         updateSnapshots?: boolean

@@ -115,10 +115,11 @@ async function settle(locator: ElementLocator, check: Matcher, negate: boolean, 
 
 /** Runs a check as a step that verifies. */
 function run(locator: ElementLocator, check: Matcher, negate: boolean, options?: AssertOptions) {
-  const { steps, assertionTimeout } = locator.session
+  const { steps, assertionTimeout, checkTimeout } = locator.session
   const api = `expect.${negate ? "not." : ""}${check.name}`
   const label = `${locator.text} ${negate ? "not." : ""}${check.name}(${check.args})`
-  const timeout = options?.timeout ?? assertionTimeout
+  const normal = options?.timeout ?? assertionTimeout
+  const timeout = checkTimeout?.(api, label, normal) ?? normal
 
   return steps.run("assertion", api, label, () => settle(locator, check, negate, timeout), {
     verifies: true,

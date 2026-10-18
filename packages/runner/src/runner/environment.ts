@@ -30,6 +30,18 @@ export interface WorkerEnvironment {
   settle?(): Promise<void>
   /** Back to a clean state between `danwo matrix` runs (emulators, app state, fault rules). */
   reset?(): Promise<void>
+  /**
+   * Keeps the state it is in now, right after a `reset()`, for `restore()` to return to: e.g.
+   * emulator stores in memory, a Postgres template database, a copy of a data folder. Optional,
+   * and only used together with `restore`.
+   */
+  snapshot?(): Promise<void>
+  /**
+   * Back to what `snapshot()` kept, faster than `reset()`. `danwo matrix` resets each worker's
+   * environment once, snapshots it, and restores it before every later trial. Like `reset`, it
+   * also clears the proxy's log and fault rules. Without it every trial resets.
+   */
+  restore?(): Promise<void>
   /** Facts to print next to a matrix run's verdict. */
   notes?(): readonly string[]
   /**

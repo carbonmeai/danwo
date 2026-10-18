@@ -8,7 +8,7 @@ import {
 } from "@danwo/emulators"
 import type { Proxy } from "@danwo/proxy"
 
-import { type Service, settleWebhooks, startServices } from "./services.ts"
+import { keptEmulator, type Service, settleWebhooks, startServices } from "./services.ts"
 
 /** Options of `stripeService()` and `stripeEnvironment()`. */
 export interface StripeOptions {
@@ -30,6 +30,10 @@ export interface StripeEnvironment {
   readonly settle: () => Promise<void>
   /** Emulator back to its seed, proxy log and fault rules cleared. */
   reset(): Promise<void>
+  /** Keeps the emulator's state now (right after a reset), for `restore`. */
+  snapshot(): Promise<void>
+  /** Emulator back to the kept state, faster than a reset; proxy log and fault rules cleared. */
+  restore(): Promise<void>
   /** Fixtures for tests: `stripe` (the emulator), `proxy`, `settle`. */
   readonly fixtures: {
     readonly stripe: Emulator
@@ -74,6 +78,7 @@ export function stripeService(options: StripeOptions = {}): StripeService {
       emulator.reset()
       seed()
     },
+    ...keptEmulator(emulator, clock),
     close: () => emulator.close(),
   }
 }
@@ -97,6 +102,8 @@ export async function stripeEnvironment(
     clock: service.clock,
     settle,
     reset: () => services.reset(),
+    snapshot: () => services.snapshot(),
+    restore: () => services.restore(),
     fixtures: { stripe: service.emulator, proxy, settle },
     close: () => services.close(),
   }

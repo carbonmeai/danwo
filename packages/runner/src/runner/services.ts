@@ -1,5 +1,5 @@
 import { clearWebhookFaults } from "@danwo/core"
-import type { Emulator, ManualClock, WebhookDispatcher } from "@danwo/emulators"
+import type { Emulator, ManualClock, StoreSnapshot, WebhookDispatcher } from "@danwo/emulators"
 import { type Proxy, type Route, startProxy } from "@danwo/proxy"
 
 /**
@@ -18,6 +18,10 @@ export interface Service {
   state?(): unknown
   settle?(): Promise<void>
   reset?(): Promise<void>
+  /** Keeps the state it is in now (just reset), for `restore` to return to. */
+  snapshot?(): Promise<void>
+  /** Back to the kept state, faster than a reset; services without one are reset instead. */
+  restore?(): Promise<void>
   close(): Promise<void>
 }
 
@@ -34,6 +38,10 @@ export interface Services {
   settle(): Promise<void>
   /** Every service back to its seed; proxy log and fault rules cleared. */
   reset(): Promise<void>
+  /** Keeps every service's state now, for `restore`. */
+  snapshot(): Promise<void>
+  /** Every service back to its kept state (or its seed, when it keeps none); log and faults cleared. */
+  restore(): Promise<void>
   close(): Promise<void>
 }
 
@@ -55,6 +63,12 @@ export async function startServices(
     for (const service of services) await service.settle?.()
   }
 
+  const clearRun = () => {
+    proxy.clear()
+    proxy.setFault(undefined)
+    clearWebhookFaults(webhooks)
+  }
+
   return {
     proxy,
     webhooks,
@@ -68,9 +82,18 @@ export async function startServices(
     settle,
     async reset() {
       for (const service of services) await service.reset?.()
-      proxy.clear()
-      proxy.setFault(undefined)
-      clearWebhookFaults(webhooks)
+      clearRun()
+    },
+    async snapshot() {
+      for (const service of services) await service.snapshot?.()
+    },
+    async restore() {
+      for (const service of services) {
+        if (service.restore) await service.restore()
+        else await service.reset?.()
+      }
+
+      clearRun()
     },
     async close() {
       await proxy.stop()
@@ -85,6 +108,30 @@ function webhooksByService(
   const entries = services.flatMap((s) => (s.webhooks ? [[s.name, s.webhooks] as const] : []))
 
   return entries.length > 0 ? Object.fromEntries(entries) : undefined
+}
+
+/**
+ * `snapshot` and `restore` for a service backed by one emulator: the emulator's store is kept in
+ * memory and put back, and webhook deliveries and anything else scheduled on its clock are dropped.
+ */
+export function keptEmulator(
+  emulator: Emulator,
+  clock?: ManualClock,
+): Required<Pick<Service, "snapshot" | "restore">> {
+  let kept: StoreSnapshot | undefined
+
+  return {
+    async snapshot() {
+      kept = emulator.snapshot()
+    },
+    async restore() {
+      if (kept === undefined) throw new Error("restore() before snapshot()")
+
+      emulator.webhooks?.reset()
+      clock?.cancelAll()
+      emulator.restore(kept)
+    },
+  }
 }
 
 /** Plays every pending webhook delivery and retry of `emulator` to the end on `clock`. */
