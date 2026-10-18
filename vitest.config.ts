@@ -13,7 +13,7 @@ export default defineConfig({
       {
         test: {
           name: "unit",
-          include: ["packages/*/test/**/*.test.ts"],
+          include: ["packages/*/test/**/*.test.ts", "benchmarks/test/**/*.test.ts"],
           exclude: ["**/*.slow.test.ts", "**/node_modules/**"],
         },
       },
@@ -28,7 +28,7 @@ export default defineConfig({
       {
         test: {
           name: "slow",
-          include: ["packages/*/test/**/*.slow.test.ts"],
+          include: ["packages/*/test/**/*.slow.test.ts", "benchmarks/test/**/*.slow.test.ts"],
           testTimeout: 300_000,
         },
       },

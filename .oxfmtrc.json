@@ -2,6 +2,12 @@
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "printWidth": 100,
   "semi": false,
-  "ignorePatterns": ["bun.lock", "**/routeTree.gen.ts", "**/styled-system/**"],
+  "ignorePatterns": [
+    "bun.lock",
+    "**/routeTree.gen.ts",
+    "**/styled-system/**",
+    "benchmarks/recordings/**",
+    "benchmarks/results/**"
+  ],
   "sortImports": true
 }

@@ -15,6 +15,20 @@
         "vitest": "^5.0.5",
       },
     },
+    "benchmarks": {
+      "name": "@danwo/bench",
+      "version": "0.0.0",
+      "dependencies": {
+        "stripe": "23.0.0",
+        "zod": "4.6.1",
+      },
+      "devDependencies": {
+        "@danwo/cli": "workspace:*",
+        "@danwo/emulators": "workspace:*",
+        "@danwo/sdk": "workspace:*",
+        "ai": "7.0.143",
+      },
+    },
     "examples/shop": {
       "name": "@danwo/example-shop",
       "version": "0.0.0",
@@ -426,6 +440,8 @@
     "@clack/core": ["@clack/core@1.4.3", "", { "dependencies": { "fast-wrap-ansi": "^0.2.0", "sisteransi": "^1.0.5" } }, "sha512-/kr3UWNtdJfxZtPgDqUOmG2pvwlmcLGheex5yiZKdwbzZJxhV+HMNR9QNmyY5cGwTNV6LrR7Jtp+KjhUAP1qBQ=="],
 
     "@clack/prompts": ["@clack/prompts@1.7.0", "", { "dependencies": { "@clack/core": "1.4.3", "fast-string-width": "^3.0.2", "fast-wrap-ansi": "^0.2.0", "sisteransi": "^1.0.5" } }, "sha512-y7/yvZ2TPAnR9+jnc00klvNNLkJiXFFrQA/hlLCcxA9a2A4zQIOimyFQ9XfwYKiGD1fb5GY8vbKIIgO8d5Tb2A=="],
+
+    "@danwo/bench": ["@danwo/bench@workspace:benchmarks"],
 
     "@danwo/cli": ["@danwo/cli@workspace:packages/cli"],
 

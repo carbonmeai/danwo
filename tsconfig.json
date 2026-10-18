@@ -8,7 +8,12 @@
     "examples/*/tests",
     "examples/*/*.ts",
     "vitest.config.ts",
-    "scripts"
+    "scripts",
+    "benchmarks/app",
+    "benchmarks/bench",
+    "benchmarks/tests",
+    "benchmarks/test",
+    "benchmarks/*.ts"
   ],
   "compilerOptions": {
     "allowJs": true

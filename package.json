@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "packages/*",
-    "examples/*"
+    "examples/*",
+    "benchmarks"
   ],
   "type": "module",
   "scripts": {
@@ -18,7 +19,8 @@
     "test:slow": "vitest run --project slow --maxWorkers=4",
     "test:all": "vitest run",
     "fallow": "fallow",
-    "plain-js": "node scripts/plain-js.ts"
+    "plain-js": "node scripts/plain-js.ts",
+    "bench": "bun run --cwd benchmarks bench"
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "5.10.0",

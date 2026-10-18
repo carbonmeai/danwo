@@ -345,6 +345,24 @@ project around the current folder. It reads `.danwo` and never writes to it:
 
 Every run adds a redacted summary to `.danwo/history/`. See `danwo guide dashboard`.
 
+## Benchmark
+
+`benchmarks/` holds a benchmark app with eleven scenarios (sign-up with an emailed code, a
+Stripe checkout with a bank approval step, a validated form, a sortable paged table, a dialog, an
+upload, a cross-origin widget, a canvas, a Slack notification, webhook-driven order status and a
+slow report) and eight bugs it can be started with. Each scenario is written three ways: locators
+only, the agent alone, and mixed. `bun run bench` measures the pass rate on the correct app, how
+many planted bugs make the right test fail, false failures, model calls and cost on the first run
+and on the replay, and how many provider bugs `danwo matrix` catches.
+
+```bash
+bun run bench          # no model: locators, the UI bugs, the matrix; agent and mixed replay
+bun run bench --live   # every style with a real model (AI_GATEWAY_API_KEY; a dollar or two)
+```
+
+Results land in `benchmarks/results/`. The agent and mixed recordings are committed, so the
+benchmark replays them with no model calls and fails if a change makes a replay diverge.
+
 ## Development
 
 Node 24 and bun.
