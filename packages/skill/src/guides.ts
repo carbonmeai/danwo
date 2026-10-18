@@ -27,6 +27,7 @@ const ORDER = [
   "sessions",
   "secrets",
   "debugging",
+  "dashboard",
   "ci",
   "playwright",
 ]

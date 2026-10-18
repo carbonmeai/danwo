@@ -21,6 +21,7 @@ describe("danwo guide", () => {
       "sessions",
       "secrets",
       "debugging",
+      "dashboard",
       "ci",
       "playwright",
     ])

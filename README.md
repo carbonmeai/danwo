@@ -21,20 +21,22 @@ It drives the app through its UI like a user, while third-party services the app
 
 ## Packages
 
-| Package             | What it is                                                               |
-| ------------------- | ------------------------------------------------------------------------ |
-| `@danwo/sdk`        | The public test API                                                      |
-| `@danwo/cli`        | `danwo test`, `matrix`, `record`, `show`, `mcp`, `init`, `spec`, `guide` |
-| `@danwo/recorder`   | Writes tests: records someone using the app; locators and the writer     |
-| `@danwo/runner`     | Browser sessions, the agent, replay, workers and the flight recorder     |
-| `@danwo/matrix`     | The fault matrix                                                         |
-| `@danwo/data`       | Snapshots of the app's Postgres, SQLite and Redis for fast matrix trials |
-| `@danwo/proxy`      | The egress proxy                                                         |
-| `@danwo/emulators`  | Provider emulators                                                       |
-| `@danwo/github`     | Reports runs to GitHub from Actions: a check run and job summary         |
-| `@danwo/skill`      | The coding-agent skill, task guides and the generated capability spec    |
-| `@danwo/mcp`        | An MCP server for coding agents: run, explain and write danwo tests      |
-| `@danwo/playwright` | danwo's environments, faults, invariants and matrix for Playwright Test  |
+| Package             | What it is                                                                        |
+| ------------------- | --------------------------------------------------------------------------------- |
+| `@danwo/sdk`        | The public test API                                                               |
+| `@danwo/cli`        | `danwo test`, `matrix`, `record`, `show`, `serve`, `mcp`, `init`, `spec`, `guide` |
+| `@danwo/recorder`   | Writes tests: records someone using the app; locators and the writer              |
+| `@danwo/runner`     | Browser sessions, the agent, replay, workers and the flight recorder              |
+| `@danwo/matrix`     | The fault matrix                                                                  |
+| `@danwo/data`       | Snapshots of the app's Postgres, SQLite and Redis for fast matrix trials          |
+| `@danwo/proxy`      | The egress proxy                                                                  |
+| `@danwo/emulators`  | Provider emulators                                                                |
+| `@danwo/github`     | Reports runs to GitHub from Actions: a check run and job summary                  |
+| `@danwo/skill`      | The coding-agent skill, task guides and the generated capability spec             |
+| `@danwo/mcp`        | An MCP server for coding agents: run, explain and write danwo tests               |
+| `@danwo/playwright` | danwo's environments, faults, invariants and matrix for Playwright Test           |
+| `@danwo/dashboard`  | `danwo serve`: runs, flight records, matrix grids and flaky tests                 |
+| `@danwo/ui`         | The design system the dashboard is built with                                     |
 
 See `examples/shop` for a small app tested with `danwo test` and `danwo matrix`, and
 `examples/shop-playwright` for the same test in Playwright Test.
@@ -301,6 +303,22 @@ It also offers the resources `danwo://config` and `danwo://runs/latest`, and a p
 their progress and can be cancelled. Everything the server returns is redacted like the flight
 recorder's records, and files are only read and written inside the project. Runs and the matrix can
 take minutes: raise your client's tool timeout if it is short.
+
+## Dashboard
+
+`danwo serve` starts a local dashboard on `http://127.0.0.1:4310/` (`--port`, `--open`) for the
+project around the current folder. It reads `.danwo` and never writes to it:
+
+- **Runs**: every `danwo test` and `danwo matrix`, with pass/fail/flaky/not-judged counts, time,
+  model calls and cost.
+- **A run**: its tests with status, retries and cache use, or its faults as a grid where failed,
+  not-judged and invalid trials read apart.
+- **A flight record**: steps with screenshots, cache outcomes and expected vs observed effects,
+  console errors, redacted network calls, webhook deliveries, emulator state and the failure page.
+- **Insights** (flaky, slowest and costliest tests across runs) and **Impact** (what each test
+  touches behind the app).
+
+Every run adds a redacted summary to `.danwo/history/`. See `danwo guide dashboard`.
 
 ## Development
 

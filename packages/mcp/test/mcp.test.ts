@@ -49,6 +49,7 @@ describe("the server", () => {
     expect(resources).toEqual([
       "danwo://config",
       "danwo://guide/ci",
+      "danwo://guide/dashboard",
       "danwo://guide/debugging",
       "danwo://guide/email-and-otp",
       "danwo://guide/first-test",
