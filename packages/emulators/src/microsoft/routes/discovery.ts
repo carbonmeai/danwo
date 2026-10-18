@@ -16,7 +16,24 @@ export function discoveryRoutes({ app, key }: MicrosoftRouteContext): void {
     c.json(discoveryDocument(c.req.param("tenant"))),
   )
 
-  app.get("/:tenant/discovery/v2.0/keys", (c) => c.json({ keys: [key.jwk] }))
+  /** Microsoft's keys carry no `alg`, and name the cloud and issuer pattern they sign for. */
+  app.get("/:tenant/discovery/v2.0/keys", (c) => {
+    const { kty, use, kid, n, e } = key.jwk
+
+    return c.json({
+      keys: [
+        {
+          kty,
+          use,
+          kid,
+          n,
+          e,
+          cloud_instance_name: "microsoftonline.com",
+          issuer: `${MICROSOFT_LOGIN}/{tenantid}/v2.0`,
+        },
+      ],
+    })
+  })
 
   app.get("/:tenant/discovery/instance", (c) => {
     const endpoint = c.req.query("authorization_endpoint")

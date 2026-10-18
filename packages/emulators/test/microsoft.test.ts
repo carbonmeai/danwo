@@ -266,7 +266,10 @@ describe("the authorization page", () => {
       )
     ).json()
 
-    expect(keys).toMatchObject({ keys: [{ kty: "RSA", alg: "RS256", use: "sig" }] })
+    expect(keys).toMatchObject({
+      keys: [{ kty: "RSA", use: "sig", cloud_instance_name: "microsoftonline.com" }],
+    })
+    expect(keys.keys[0]).not.toHaveProperty("alg")
   })
 })
 

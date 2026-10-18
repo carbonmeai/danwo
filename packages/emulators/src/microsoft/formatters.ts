@@ -28,6 +28,7 @@ export function discoveryDocument(tenant: string): ServerMetadata {
       "client_secret_post",
       "private_key_jwt",
       "client_secret_basic",
+      "self_signed_tls_client_auth",
     ],
     response_modes_supported: ["query", "fragment", "form_post"],
     response_types_supported: ["code", "id_token", "code id_token", "id_token token"],
@@ -51,10 +52,16 @@ export function discoveryDocument(tenant: string): ServerMetadata {
     request_uri_parameter_supported: false,
     http_logout_supported: true,
     frontchannel_logout_supported: true,
+    kerberos_endpoint: `${base}/kerberos`,
+    mtls_endpoint_aliases: {
+      token_endpoint: `https://mtlsauth.microsoft.com/${tenant}/oauth2/v2.0/token`,
+    },
+    tls_client_certificate_bound_access_tokens: true,
     tenant_region_scope: null,
     cloud_instance_name: "microsoftonline.com",
     cloud_graph_host_name: "graph.windows.net",
     msgraph_host: "graph.microsoft.com",
+    rbac_url: "https://pas.windows.net",
   }
 }
 
