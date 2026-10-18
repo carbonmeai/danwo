@@ -35,6 +35,7 @@ afterAll(async () => {
     fixture("sms-app"),
     fixture("flutterwave-shop"),
     fixture("naira-shop"),
+    fixture("bachs-store"),
     fixture("sessions"),
     fixture("visual"),
     SHOP,
@@ -583,6 +584,42 @@ describe("danwo matrix", () => {
 
     expect(html).toContain("POST api.paystack.co")
     expect(html).not.toContain("4a1ra4a1ra4a1ra4a1ra4a1ra4a1ra4a1ra4a1ra4")
+  }, 300_000)
+
+  it("faults Bachs checkout creation and its signed webhooks, and a careful store grants each pack once", async () => {
+    const { code, out } = await danwo(fixture("bachs-store"), ["matrix", "tests/credits.danwo.ts"])
+
+    expect(out).toContain("PASS  clean run")
+    expect(out).toContain("PASS  status 429 on POST sandbox-api.bachs.io/v1/checkout-sessions")
+    expect(out).toContain("PASS  reset-after on POST sandbox-api.bachs.io/v1/checkout-sessions")
+    expect(out).toContain("PASS  duplicate on bachs webhook collection.succeeded")
+    expect(out).toContain("PASS  delay 600000ms on bachs webhook collection.succeeded")
+    expect(out).toContain("PASS  forged on bachs webhook collection.succeeded")
+    expect(out).toContain("faults: 10 passed")
+    expect(code).toBe(0)
+  }, 300_000)
+
+  it("catches a store that grants credits twice when Bachs delivers collection.succeeded twice", async () => {
+    const { code, out } = await danwo(
+      fixture("bachs-store"),
+      ["matrix", "tests/credits.danwo.ts"],
+      {
+        BACHS_BUG: "no-dedupe",
+      },
+    )
+
+    // A forged delivery fails the SDK's signature check; only the repeated event grants twice.
+    expect(out).toContain("FAIL  duplicate on bachs webhook collection.succeeded")
+    expect(out).toContain("PASS  forged on bachs webhook collection.succeeded")
+    expect(out).toContain("invariant: expected 'Credits: 1000' to be 'Credits: 500'")
+    expect(out).toContain("faults: 9 passed, 1 failed")
+    expect(code).toBe(1)
+
+    const report = /report: (\S+report\.html)/.exec(out)?.[1] ?? ""
+    const html = await readFile(join(fixture("bachs-store"), report), "utf8")
+
+    expect(html).toContain("POST sandbox-api.bachs.io/v1/checkout-sessions")
+    expect(html).not.toMatch(/sk_sandbox_creditStore|REDACTED-TEST-VALUE/)
   }, 300_000)
 
   it("faults a GitHub bot's issues webhook and a deduplicating bot comments at most once", async () => {
