@@ -120,6 +120,14 @@ test("buys credits", async ({ page, danwo }) => {
   `test-results/danwo-matrix/`. Status faults get their provider's error body; the danwo config's
   `matrix.webhookFaults` and `matrix.outboundFaults` choose what is planned.
 
+## Vision
+
+The agent reads the page as text first. For what text cannot show (a canvas, an icon button with
+no name, a widget in a frame it cannot list) it looks at a screenshot with numbered marks and acts
+there; each such action replays with no model call by finding its place by how it looks. Set
+`vision: "auto" | "always" | "off"` in the config (default `auto`), or `{ mode, model }` for a model
+of its own that places described targets. `act`, `assert` and `extract` take `{ vision }` per call.
+
 ## Saved sessions
 
 Define a session in the config (or a test file with `test.session`) and name it where tests use it:

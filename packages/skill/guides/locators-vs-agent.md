@@ -42,3 +42,15 @@ recorded by where they came from, not as text.
 - Claims about what the page means ("the order is confirmed"): `agent.assert`, polled with
   `{ poll: true }` when the page gets there in its own time.
 - Numbers you then compare with the backend: `agent.extract`.
+
+## What only an image shows
+
+Some of a page is not in the text the agent reads: a canvas or chart, an icon button with no name,
+a widget in a frame the view cannot list. With `vision` on (`auto` by default) the agent is told
+when a page has such parts and can `look` at a screenshot with numbered marks, then click, type,
+drag or scroll at a mark or at coordinates. Those actions replay with no model call: each place is
+found again by how it looks, at the same spot of the same element, and searched for when it moved
+(never under strict replay). A changed picture hands the step back to the model, or diverges under
+strict replay. `agent.assert` and `agent.extract` see a screenshot the same way, and
+`act(..., { vision: false })` keeps a step to the text view. Forms inside frames, even from another
+origin, need no image: the agent reaches them through the text view and replays them by frame.
