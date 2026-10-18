@@ -39,6 +39,38 @@ the labels each provider gets. Without an invariant the body itself must pass un
 
 The matrix needs the environment to provide `proxy`, `reset()`, and `webhooks` for webhook faults.
 
+## Races
+
+Beside the one-call faults, the matrix plans races from what the clean run did, and only where
+they can happen:
+
+- `double-submit on POST /buy`: each form post or fetch the page sent to the app that changes
+  something is sent twice at once; the page gets the first answer. `#2` names the second such
+  request to the same route.
+- `2 concurrent users`: the whole test runs as that many people at once, each in a fresh
+  browser, and the invariant judges the combined state once. A test asks for it with
+  `test("buys the last lamp", { concurrent: 2 }, …)`; nothing else plans it.
+- `webhooks before redirect from checkout.stripe.com`: after paying, the browser is kept from
+  landing back on the app until the provider's webhooks were delivered. Planned only when the
+  clean run delivered webhooks and came back to the app from another site.
+- `reorder webhooks payment_intent.created, payment_intent.succeeded`: two different webhooks one
+  endpoint got in a row arrive the other way round.
+- `slow-then-retry 3000ms on POST api.stripe.com/v1/checkout/sessions`: a server-side call that
+  moves money is held until the app's client times out (or 3000ms), then processed anyway, so
+  the app's retry races the first request. Applies to Stripe's payment paths and to Paystack,
+  Flutterwave and Bachs posts.
+
+A race that was planned but did not happen (no second request, no redirect with a webhook
+waiting) is INVALID, like any fault that never fired. Each trial's notes say what the race did:
+`POST /buy sent twice at once: 303 and 303`, `held the return from checkout.stripe.com until 1
+webhook delivery landed`, `user 2: passed`.
+
+`matrix.races` turns them off: `false` for all (a test's own `concurrent` still runs), or one at
+a time with `{ doubleSubmit: false }`, `{ beforeRedirect: false }`, `{ webhookOrder: false }`,
+`{ slowThenRetry: false }` or `{ slowThenRetry: { ms: 5000 } }`. `--faults` filters them by
+label like any fault. A live session's `inject_fault` arms `slow-then-retry …` and
+`reorder webhooks …` labels too.
+
 ## Making it fast
 
 Trials run in parallel, one per worker: `--workers n`, `matrix.workers`, else `workers`, else one
