@@ -27,6 +27,7 @@
     "@slack/web-api": "8.2.0",
     "googleapis": "186.0.0",
     "openid-client": "6.8.8",
+    "paystack-sdk": "4.2.1",
     "resend": "6.34.1",
     "stripe": "23.0.0",
     "twilio": "6.2.0",

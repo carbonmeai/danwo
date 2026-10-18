@@ -121,6 +121,23 @@ export {
   TIGRIS_ENDPOINTS,
 } from "./s3/index.ts"
 export {
+  paystack,
+  PAYSTACK_HOSTS,
+  PAYSTACK_TRANSFER_OTP,
+  type PaystackBank,
+  paystackBank,
+  type PaystackLedger,
+  paystackLedger,
+  paystackOutboundFaults,
+  type PaystackSeedAccount,
+  type PaystackSeedConfig,
+  type PaystackSeedCustomer,
+  type PaystackSeedIntegration,
+  type PaystackSeedPlan,
+  paystackSignature,
+  seedPaystack,
+} from "./paystack/index.ts"
+export {
   SLACK_HOSTS,
   type SlackAction,
   type SlackEphemeral,
