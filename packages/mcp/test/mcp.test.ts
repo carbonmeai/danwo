@@ -52,6 +52,7 @@ describe("the server", () => {
       "danwo://guide/dashboard",
       "danwo://guide/debugging",
       "danwo://guide/email-and-otp",
+      "danwo://guide/fidelity",
       "danwo://guide/first-test",
       "danwo://guide/lint",
       "danwo://guide/llm",

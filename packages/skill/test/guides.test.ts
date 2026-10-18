@@ -16,6 +16,7 @@ describe("danwo guide", () => {
       "matrix",
       "lint",
       "providers",
+      "fidelity",
       "llm",
       "email-and-otp",
       "sessions",

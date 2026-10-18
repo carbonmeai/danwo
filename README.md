@@ -23,24 +23,25 @@ It drives the app through its UI like a user, while third-party services the app
 
 ## Packages
 
-| Package             | What it is                                                                                                          |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `@danwo/sdk`        | The public test API                                                                                                 |
-| `@danwo/cli`        | `danwo test`, `matrix`, `record`, `show`, `serve`, `mcp`, `init`, `spec`, `guide`, `device doctor`, `build-android` |
-| `@danwo/recorder`   | Writes tests: records someone using the app; locators and the writer                                                |
-| `@danwo/runner`     | Browser sessions, the agent, replay, workers and the flight recorder                                                |
-| `@danwo/matrix`     | The fault matrix                                                                                                    |
-| `@danwo/data`       | Snapshots of the app's Postgres, SQLite and Redis for fast matrix trials                                            |
-| `@danwo/proxy`      | The egress proxy                                                                                                    |
-| `@danwo/emulators`  | Provider emulators                                                                                                  |
-| `@danwo/github`     | Reports runs to GitHub from Actions: a check run and job summary                                                    |
-| `@danwo/skill`      | The coding-agent skill, task guides and the generated capability spec                                               |
-| `@danwo/mcp`        | An MCP server for coding agents: run, explain and write danwo tests                                                 |
-| `@danwo/playwright` | danwo's environments, faults, invariants and matrix for Playwright Test                                             |
-| `@danwo/dashboard`  | `danwo serve`: runs, flight records, matrix grids and flaky tests                                                   |
-| `@danwo/ui`         | The design system the dashboard is built with                                                                       |
-| `@danwo/device`     | Android emulators bound to the run's proxy and CA, driven through agent-device                                      |
-| `@danwo/expo`       | The danwo build of an Expo app (`danwo build-android`)                                                              |
+| Package             | What it is                                                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `@danwo/sdk`        | The public test API                                                                                                             |
+| `@danwo/cli`        | `danwo test`, `matrix`, `record`, `show`, `serve`, `mcp`, `init`, `spec`, `guide`, `fidelity`, `device doctor`, `build-android` |
+| `@danwo/recorder`   | Writes tests: records someone using the app; locators and the writer                                                            |
+| `@danwo/runner`     | Browser sessions, the agent, replay, workers and the flight recorder                                                            |
+| `@danwo/matrix`     | The fault matrix                                                                                                                |
+| `@danwo/data`       | Snapshots of the app's Postgres, SQLite and Redis for fast matrix trials                                                        |
+| `@danwo/proxy`      | The egress proxy                                                                                                                |
+| `@danwo/emulators`  | Provider emulators                                                                                                              |
+| `@danwo/fidelity`   | Checks the emulators against the real providers by structure                                                                    |
+| `@danwo/github`     | Reports runs to GitHub from Actions: a check run and job summary                                                                |
+| `@danwo/skill`      | The coding-agent skill, task guides and the generated capability spec                                                           |
+| `@danwo/mcp`        | An MCP server for coding agents: run, explain and write danwo tests                                                             |
+| `@danwo/playwright` | danwo's environments, faults, invariants and matrix for Playwright Test                                                         |
+| `@danwo/dashboard`  | `danwo serve`: runs, flight records, matrix grids and flaky tests                                                               |
+| `@danwo/ui`         | The design system the dashboard is built with                                                                                   |
+| `@danwo/device`     | Android emulators bound to the run's proxy and CA, driven through agent-device                                                  |
+| `@danwo/expo`       | The danwo build of an Expo app (`danwo build-android`)                                                                          |
 
 See `examples/shop` for a small app tested with `danwo test` and `danwo matrix`, and
 `examples/shop-playwright` for the same test in Playwright Test. `examples/shop-mobile` is an
@@ -385,6 +386,24 @@ bun run bench --live   # every style with a real model (AI_GATEWAY_API_KEY; a do
 
 Results land in `benchmarks/results/`. The agent and mixed recordings are committed, so the
 benchmark replays them with no model calls and fails if a change makes a replay diverge.
+
+## Emulator fidelity
+
+`danwo fidelity` runs a scenario suite per provider against the emulator and the provider's own
+sandbox or test mode, and compares the answers by structure: statuses, error codes and the JSON's
+keys, types and fixed values, leaving ids, times and secrets out. Each difference prints classified
+as a missing field, extra field, type mismatch, status mismatch, error-code mismatch or ordering.
+
+```bash
+danwo fidelity                         # emulators against the committed goldens (in bun run check)
+danwo fidelity stripe --update-golden  # with DANWO_FIDELITY_STRIPE_KEY=sk_test_…: record the sandbox
+DANWO_FIDELITY_PUBLIC=1 danwo fidelity slack github google microsoft   # public endpoints, no keys
+```
+
+Goldens live in `fidelity/<provider>.json` and hold structure only; accepted differences, each with
+its reason, are in `fidelity/known-differences.json`. Only test and sandbox keys run: a live-looking
+key stops the run. Keys come from the environment or a git-ignored `.env.fidelity`. See
+`danwo guide fidelity`.
 
 ## Development
 

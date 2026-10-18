@@ -22,6 +22,7 @@ const ORDER = [
   "matrix",
   "lint",
   "providers",
+  "fidelity",
   "llm",
   "email-and-otp",
   "sessions",
