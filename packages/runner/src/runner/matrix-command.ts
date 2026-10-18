@@ -24,9 +24,13 @@ import { type CatalogEntry, catalogOf } from "./catalog.ts"
 import { type DanwoConfig, type LoadedConfig, loadConfig } from "./config.ts"
 import { Crew } from "./crew.ts"
 import { DEFAULT_WEBHOOK_FAULTS, defaultOutboundFaults } from "./faults.ts"
-import type { RecordMode } from "./record.ts"
 import { closeRecording, openRecording } from "./recording.ts"
-import { type Reporter, type RunContext, tellReporters } from "./reporting.ts"
+import {
+  type Reporter,
+  type RunCommandOptions,
+  type RunContext,
+  tellReporters,
+} from "./reporting.ts"
 import type { TrialReport } from "./tasks.ts"
 import { type TrialTimings, timingsLine } from "./timings.ts"
 import { runPool, shuffledOrder } from "./trial-pool.ts"
@@ -50,17 +54,7 @@ interface MatrixScheduling {
   readonly shuffle?: number
 }
 
-export interface RunMatrixOptions extends MatrixSelection, MatrixScheduling {
-  readonly cwd?: string
-  readonly config?: string
-  /** Flight recorder mode; overrides the config's `record`. */
-  readonly record?: RecordMode
-  /** Rewrite every `toHaveScreenshot` baseline (`--update-snapshots`). */
-  readonly updateScreenshots?: boolean
-  /** Reporters besides the config's, e.g. from `--reporter`. */
-  readonly reporters?: readonly Reporter[]
-  readonly write?: (line: string) => void
-}
+export interface RunMatrixOptions extends MatrixSelection, MatrixScheduling, RunCommandOptions {}
 
 const printLine = (line: string) => process.stdout.write(`${line}\n`)
 

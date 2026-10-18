@@ -42,11 +42,12 @@ import { noTimings, type TrialPhase, timed } from "./timings.ts"
 
 /**
  * How an attempt uses the replay cache: `learn` replays what it can and records new steps;
- * `replay-only` never calls the model and stops at the first step that no longer replays.
+ * `replay-only` never calls the model and stops at the first step that no longer replays. A
+ * `readOnly` learner replays and may call the model, but writes nothing back (CI runs).
  */
 export type ReplayUse =
   | { readonly kind: "none" }
-  | { readonly kind: "learn"; readonly dir: string }
+  | { readonly kind: "learn"; readonly dir: string; readonly readOnly?: boolean }
   | { readonly kind: "replay-only"; readonly dir: string }
 
 export interface AttemptSetup {
@@ -373,7 +374,8 @@ function replayOptions(setup: AttemptSetup): Partial<WebSessionOptions> {
 
   if (replay.kind === "none") return {}
 
-  const cache = { dir: replay.dir, mode: "read-write" as const, journey: setup.id }
+  const mode = replay.kind === "learn" && replay.readOnly === true ? "read-only" : "read-write"
+  const cache = { dir: replay.dir, mode, journey: setup.id } as const
 
   return replay.kind === "replay-only" ? { cache, replay: { mode: "strict-stop" } } : { cache }
 }

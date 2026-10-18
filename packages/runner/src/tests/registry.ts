@@ -54,6 +54,8 @@ export interface FileDeclarations {
   readonly uses: DeclaredUse[]
   /** Sessions the file defined with `test.session()`, by name. */
   readonly sessions: Map<string, SessionDefinition<SessionArgs>>
+  /** The lines of the file's `test.only` and `describe.only` calls, when they could be read. */
+  readonly focusLines: number[]
   /** Set once the file finished loading; nothing can be declared on it afterwards. */
   sealed: boolean
 }
@@ -89,6 +91,7 @@ export async function declarationsOf(load: () => Promise<unknown>): Promise<File
     hooks: [],
     uses: [],
     sessions: new Map(),
+    focusLines: [],
     sealed: false,
   }
 

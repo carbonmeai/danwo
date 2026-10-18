@@ -172,6 +172,8 @@ export type {
 export { gmailMail, outlookMail, resendMail, totp } from "@danwo/runner/runner"
 /** zod, for the schemas `agent.extract` checks its result against. */
 export { z } from "@danwo/runner/runner"
+/** A JUnit XML reporter for CI systems other than GitHub, and the config's change-impact rules. */
+export { type ImpactConfig, junit, type JunitOptions } from "@danwo/runner/runner"
 export {
   type CalendarEntry,
   type CalendarSeedEvent,

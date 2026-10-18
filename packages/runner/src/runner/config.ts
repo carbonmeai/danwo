@@ -13,6 +13,7 @@ import type { EffectsSetting, SessionSecret } from "../session.ts"
 import { DanwoError } from "../support/codes.ts"
 import type { SessionArgs, SessionDefinition } from "../tests/types.ts"
 import type { EnvironmentContext, WorkerEnvironment } from "./environment.ts"
+import type { ImpactConfig } from "./impact.ts"
 import type { RecordMode } from "./record.ts"
 import type { Reporter } from "./reporting.ts"
 
@@ -97,6 +98,12 @@ export interface DanwoConfig {
   readonly record?: RecordMode
   /** Reporters told about every run besides the console, e.g. `github()` from `@danwo/github`. */
   readonly reporters?: readonly Reporter[]
+  /**
+   * How `danwo test --changed` maps the app's own source files to what tests touch: globs →
+   * app paths (`/checkout`), provider hosts, calls or webhooks. Test files and what they import
+   * need no rule; a change no rule or import explains selects every test.
+   */
+  readonly impact?: ImpactConfig
   /** Fault catalogue for `danwo matrix`. */
   readonly matrix?: {
     /** Default `defaultOutboundFaults`: each provider's faults by host, plain HTTP failures elsewhere. */

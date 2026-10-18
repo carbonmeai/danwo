@@ -67,10 +67,25 @@ export function fileErrorLine(file: string, error: string): string {
   return `  ${pc.red("✗")} ${file}: ${error.split("\n")[0] ?? error}`
 }
 
-/** The failures in full and the summary, after every test reported. */
+/** A flaky test: it passed only after failing, so its failed attempts are worth a look. */
+function flakyLines(report: TestReport): string[] {
+  const failed = report.attempts.filter((attempt) => attempt.status !== "passed")
+
+  return [
+    "",
+    pc.yellow(`~ flaky: ${report.id} (passed on attempt ${report.attempts.length})`),
+    ...failed.flatMap((attempt) => [
+      ...(attempt.error ? [`  ${attempt.error.code}: ${attempt.error.message}`] : []),
+      ...(attempt.record ? [pc.dim(`  record: ${attempt.record}`)] : []),
+    ]),
+  ]
+}
+
+/** The failures in full, the flaky tests, and the summary, after every test reported. */
 export function closingLines(reports: readonly TestReport[]): string[] {
   return [
     ...reports.filter((report) => isFailure(report.status)).flatMap(failureLines),
+    ...reports.filter((report) => report.status === "flaky").flatMap(flakyLines),
     "",
     summaryLine(reports),
     ...usageLines(reports),

@@ -1,10 +1,11 @@
 import { spawn } from "node:child_process"
-import { join, relative } from "node:path"
+import { basename, join, relative } from "node:path"
 
 import { loadConfig } from "./config.ts"
 import { failurePage } from "./failure-page.ts"
 import { runsDir } from "./record.ts"
 import { findRun, loadRecords } from "./report.ts"
+import { flakyIds, lastRunPath, readResults } from "./results.ts"
 
 export interface ShowRunOptions {
   readonly cwd?: string
@@ -20,14 +21,28 @@ export interface ShowRunOptions {
 
 const OPENER: Readonly<Record<string, string>> = { darwin: "open", win32: "explorer" }
 
+/** The tests that ended flaky in `run`, when it is the run the latest results describe. */
+async function flakyIn(root: string, run: string): Promise<Set<string>> {
+  const results = await readResults(lastRunPath(root))
+
+  return results?.run === basename(run) ? flakyIds(results) : new Set()
+}
+
 /** Every failed record of the run as Markdown pages, separated by rules. */
-async function failurePages(run: string): Promise<string> {
+async function failurePages(root: string, run: string): Promise<string> {
   const failed = (await loadRecords(run)).filter(({ record }) => record.status !== "passed")
+  const flaky = await flakyIn(root, run)
 
   if (failed.length === 0) return "No failed runs in this recording.\n"
 
   return failed
-    .map(({ record, dir, screen }) => `${failurePage(record, screen)}\nrecord: ${dir}\n`)
+    .map(({ record, dir, screen }) => {
+      const note = flaky.has(record.test)
+        ? "> flaky: this test passed on a later attempt; this page is an attempt that failed.\n\n"
+        : ""
+
+      return `${note}${failurePage(record, screen)}\nrecord: ${dir}\n`
+    })
     .join("\n---\n\n")
 }
 
@@ -48,7 +63,7 @@ export async function showRun(options: ShowRunOptions = {}): Promise<number> {
   }
 
   if (options.format === "md") {
-    write(await failurePages(run))
+    write(await failurePages(loaded.root, run))
 
     return 0
   }

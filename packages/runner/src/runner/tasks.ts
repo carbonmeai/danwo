@@ -34,6 +34,8 @@ export interface TestFileTask {
   readonly retries: number
   /** Absolute replay cache directory; undefined runs without one. */
   readonly cacheDir: string | undefined
+  /** Replay from the cache without writing new recordings to it (CI runs). */
+  readonly cacheReadOnly?: boolean
 }
 
 /** `danwo matrix`: one run of one test. The clean trial records; a faulted one only replays. */
@@ -58,12 +60,25 @@ export interface AttemptReport {
   readonly usage?: Usage
 }
 
+/**
+ * What a passing test touched, for picking the tests a change can affect: the app's pages it
+ * visited, and the provider calls it caused as route templates (ids folded to `:id`).
+ */
+export interface TestImpact {
+  /** App paths, without query strings, e.g. `/checkout`. */
+  readonly routes: readonly string[]
+  /** Provider calls, e.g. `POST api.stripe.com/v1/checkout/sessions`. */
+  readonly calls: readonly string[]
+}
+
 /** A test's result over its attempts. */
 export interface TestReport {
   readonly id: string
   readonly status: ResultStatus
   readonly attempts: readonly AttemptReport[]
   readonly workerIndex: number
+  /** What its passing attempt touched; absent when no attempt passed. */
+  readonly impact?: TestImpact
 }
 
 /** A trial's outcome, with the evidence the matrix plans faults from and checks they fired. */

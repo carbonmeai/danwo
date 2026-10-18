@@ -8,6 +8,9 @@ import { github } from "@danwo/github"
 import {
   type CacheAction,
   exitCodeForError,
+  explainImpact,
+  junit,
+  mergeReports,
   type RecordMode,
   type Reporter,
   runCache,
@@ -20,7 +23,10 @@ import { Argument, Command, InvalidArgumentError, Option } from "commander"
 import { cliCommands } from "./commands.ts"
 
 /** Reporters by the names `--reporter` takes; the console's list output always runs. */
-const REPORTERS: Readonly<Record<string, () => Reporter>> = { github: () => github() }
+const REPORTERS: Readonly<Record<string, () => Reporter>> = {
+  github: () => github(),
+  junit: () => junit(),
+}
 
 /** The reporters named by `--reporter`, comma-separated or repeated. */
 function reportersOf(names: readonly string[] | undefined): Reporter[] {
@@ -32,7 +38,7 @@ function reportersOf(names: readonly string[] | undefined): Reporter[] {
       const make = REPORTERS[name]
 
       if (make === undefined) {
-        throw new InvalidArgumentError(`unknown reporter "${name}" (known: list, github)`)
+        throw new InvalidArgumentError(`unknown reporter "${name}" (known: list, github, junit)`)
       }
 
       return make()
@@ -63,7 +69,7 @@ const updateOption = () =>
 const reporterOption = () =>
   new Option(
     "--reporter <names...>",
-    "reporters besides the console's list: github (a check run and job summary in GitHub Actions)",
+    "reporters besides the console's list: github (a check run and job summary in GitHub Actions), junit (.danwo/junit.xml)",
   )
 
 const program = new Command()
@@ -77,6 +83,16 @@ program
   .option("-w, --workers <n>", "worker processes", integerAtLeast(1))
   .option("-r, --retries <n>", "retries per test", integerAtLeast(0))
   .option("-g, --grep <regexp>", "only tests whose full title matches")
+  .option("--last-failed", "only the tests that failed in the latest run; merges into it")
+  .option("--changed", "only the tests the changed files can affect (see danwo impact)")
+  .option("--since <ref>", "what --changed compares with (default: HEAD, uncommitted changes)")
+  .option("--shard <i/n>", "this machine's share of the test files, e.g. 2/4")
+  .option(
+    "--max-failures <n>",
+    "start no new test file once this many tests failed",
+    integerAtLeast(1),
+  )
+  .option("--ci", "CI defaults even without the CI variable: 1 retry, read-only cache, no .only")
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .addOption(recordOption())
   .addOption(updateOption())
@@ -92,6 +108,12 @@ program
         workers?: number
         retries?: number
         grep?: string
+        lastFailed?: boolean
+        changed?: boolean
+        since?: string
+        shard?: string
+        maxFailures?: number
+        ci?: boolean
         config?: string
         record?: RecordMode
         updateSnapshots?: boolean
@@ -149,6 +171,32 @@ program
       process.exitCode = (await runMatrix({ file, ...options, reporters, ...update })).code
     },
   )
+
+program
+  .command("merge-reports")
+  .description("join the results of a split run (danwo test --shard i/n) into one report")
+  .argument("[files...]", "results files (default: .danwo/results/shard-*.json)")
+  .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
+  .addOption(reporterOption())
+  .action(async (files: string[], options: { config?: string; reporter?: string[] }) => {
+    process.exitCode = await mergeReports({
+      files,
+      ...(options.config !== undefined && { config: options.config }),
+      reporters: reportersOf(options.reporter),
+    })
+  })
+
+program
+  .command("impact")
+  .description("which tests a change to these files selects for danwo test --changed, and why")
+  .argument("<files...>", "changed files")
+  .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
+  .action(async (files: string[], options: { config?: string }) => {
+    process.exitCode = await explainImpact({
+      files,
+      ...(options.config !== undefined && { config: options.config }),
+    })
+  })
 
 program
   .command("mcp")

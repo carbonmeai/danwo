@@ -49,6 +49,11 @@ export class Crew {
     this.idle = [...this.members]
   }
 
+  /** How many workers the crew has: how many tasks run at once. */
+  get size(): number {
+    return this.members.length
+  }
+
   /** Runs a test file on the next free worker. */
   testFile(task: TestFileTask): Promise<readonly TestReport[]> {
     return this.withMember((link) => link.call("testFile", task))

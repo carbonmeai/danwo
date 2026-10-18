@@ -1,8 +1,10 @@
 // The `test` function a test file imports, and everything hanging off it.
+import { callerLine } from "../support/errors.ts"
 import {
   type Block,
   currentFile,
   type DeclaredTest,
+  type FileDeclarations,
   type FixtureDefinition,
   type HookKind,
   inheritedMode,
@@ -83,6 +85,7 @@ function declarer(own: Mode, fixtures: Definitions) {
     }
 
     file.declarations.tests.push(test)
+    noteFocus(file.declarations, own)
 
     return testCase(test, () => file.declarations.sealed)
   }
@@ -120,10 +123,19 @@ function skipper(fixtures: Definitions) {
   }
 }
 
+/** Remembers where a `.only` was written, so a run that forbids them can say where. */
+function noteFocus(declarations: FileDeclarations, own: Mode): void {
+  const line = own === "only" ? callerLine() : undefined
+
+  if (line !== undefined) declarations.focusLines.push(line)
+}
+
 function describer(own: Mode) {
   return (title: string, body: () => void): void => {
     const file = currentFile("describe()")
     const outer = file.block
+
+    noteFocus(file.declarations, own)
 
     file.block = { title, parent: outer, mode: inheritedMode(own, outer) }
 

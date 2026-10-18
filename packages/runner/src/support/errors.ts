@@ -33,6 +33,11 @@ export function testFileLine(error: unknown, root: string): SourceLine | undefin
   return { file: relative(root, match[1]), line: Number(match[2]) }
 }
 
+/** The test file line that called the function calling this one, while a test file loads. */
+export function callerLine(): number | undefined {
+  return testFileLine(new Error("caller"), "/")?.line
+}
+
 export function toTestError(error: unknown, root: string): TestError {
   const code = codeOf(error)
 

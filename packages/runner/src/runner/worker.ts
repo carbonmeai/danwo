@@ -24,6 +24,7 @@ import { type AttemptResult, runAttempt, type ReplayUse } from "./attempt.ts"
 import { loadTestFile, testIdOf } from "./catalog.ts"
 import { type LoadedConfig, loadConfig } from "./config.ts"
 import type { WorkerEnvironment } from "./environment.ts"
+import { impactOf } from "./impact.ts"
 import {
   attemptDir,
   buildRecord,
@@ -37,6 +38,7 @@ import { SessionKeeper } from "./sessions.ts"
 import type {
   AttemptReport,
   TestFileTask,
+  TestImpact,
   TestReport,
   TrialReport,
   TrialTask,
@@ -157,9 +159,12 @@ async function runTest(
 ): Promise<TestReport> {
   const { env, workerIndex } = benchOrFail()
   const replay: ReplayUse =
-    task.cacheDir === undefined ? { kind: "none" } : { kind: "learn", dir: task.cacheDir }
+    task.cacheDir === undefined
+      ? { kind: "none" }
+      : { kind: "learn", dir: task.cacheDir, readOnly: task.cacheReadOnly ?? false }
   const tries = 1 + (findDeclared(first, task.file, id).options.retries ?? task.retries)
   const attempts: AttemptReport[] = []
+  let impact: TestImpact | undefined
 
   for (let n = 1; n <= tries; n++) {
     const declarations = n === 1 ? first : await loadTestFile(task.file)
@@ -194,10 +199,23 @@ async function runTest(
       usage: usageOf(result.flight.session.steps()),
     })
 
+    if (result.status === "passed") impact = attemptImpact(result, mark)
     if (!worthRetrying(result.status)) break
   }
 
-  return { id, status: resultOf(attempts), attempts, workerIndex }
+  return { id, status: resultOf(attempts), attempts, workerIndex, ...(impact && { impact }) }
+}
+
+/** What a passing attempt touched: the app's pages, and the calls and webhooks behind them. */
+function attemptImpact(result: AttemptResult, mark: EvidenceMark): TestImpact {
+  const { env, loaded } = benchOrFail()
+
+  return impactOf({
+    appLog: result.flight.session.appLog(),
+    exchanges: (env?.proxy?.exchanges() ?? []).slice(mark.exchanges),
+    deliveries: deliveriesOf(env?.webhooks).slice(mark.deliveries),
+    baseUrl: env?.baseUrl ?? loaded.config.baseUrl,
+  })
 }
 
 async function runSuiteHooks(declarations: FileDeclarations, kind: "beforeAll" | "afterAll") {

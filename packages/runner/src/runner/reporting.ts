@@ -5,6 +5,7 @@
  */
 import type { FaultMatrixResult } from "@danwo/core"
 
+import type { RecordMode } from "./record.ts"
 import type { TestReport } from "./tasks.ts"
 
 /** Which command a run is. */
@@ -50,6 +51,19 @@ export interface Reporter {
   matrixFinished?(run: MatrixRunReport): Promise<void>
   /** The run stopped before it had a result (an environment that would not start, say). */
   aborted?(run: RunContext & { readonly error: string }): Promise<void>
+}
+
+/** What every run command takes besides its own selection: where, how to record, who to tell. */
+export interface RunCommandOptions {
+  readonly cwd?: string
+  readonly config?: string
+  /** Flight recorder mode; overrides the config's `record`. */
+  readonly record?: RecordMode
+  /** Rewrite every `toHaveScreenshot` baseline (`--update-snapshots`). */
+  readonly updateScreenshots?: boolean
+  /** Reporters besides the config's, e.g. from `--reporter`. */
+  readonly reporters?: readonly Reporter[]
+  readonly write?: (line: string) => void
 }
 
 /** Calls `hook` on every reporter, turning a failure into a warning line. */
