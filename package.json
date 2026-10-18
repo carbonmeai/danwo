@@ -14,7 +14,7 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "check": "bun run format:check && bun run plain-js && bun run lint && bun run fallow && bun run typecheck && bun run test",
-    "test:slow": "vitest run --project slow",
+    "test:slow": "vitest run --project slow --maxWorkers=4",
     "test:all": "vitest run",
     "fallow": "fallow",
     "plain-js": "node scripts/plain-js.ts"
