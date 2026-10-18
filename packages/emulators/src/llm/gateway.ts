@@ -16,20 +16,30 @@ import { deltas, llmId, messageText, sse } from "./wire.ts"
 
 type Content = LanguageModelV4GenerateResult["content"][number]
 
+/** The unified finish reason; the gateway does not pass the upstream's own reason on. */
 function finishReason(reply: LlmReply): LanguageModelV4FinishReason {
   if (reply.refusal !== undefined || reply.stop === "content_filter")
-    return { unified: "content-filter", raw: "content_filter" }
-  if (reply.stop === "length") return { unified: "length", raw: "length" }
+    return { unified: "content-filter", raw: undefined }
+  if (reply.stop === "length") return { unified: "length", raw: undefined }
 
-  return (reply.toolCalls?.length ?? 0) > 0
-    ? { unified: "tool-calls", raw: "tool_calls" }
-    : { unified: "stop", raw: "stop" }
+  return { unified: (reply.toolCalls?.length ?? 0) > 0 ? "tool-calls" : "stop", raw: undefined }
 }
 
+/** The provider a gateway model id routes to: `openai` for `openai/gpt-4.1-nano`. */
+function upstreamOf(model: string): string {
+  return model.split("/")[0] || "openai"
+}
+
+/** Token counts, with the upstream's own usage object passed through as `raw`. */
 function usage(counts: LlmUsage): LanguageModelV4Usage {
   return {
     inputTokens: { total: counts.input, noCache: counts.input, cacheRead: 0, cacheWrite: 0 },
     outputTokens: { total: counts.output, text: counts.output, reasoning: 0 },
+    raw: {
+      input_tokens: counts.input,
+      output_tokens: counts.output,
+      total_tokens: counts.input + counts.output,
+    },
   }
 }
 
@@ -40,19 +50,25 @@ function metadata(cost: number | null) {
     : { providerMetadata: { gateway: { cost: cost.toFixed(8), marketCost: cost.toFixed(8) } } }
 }
 
-function content(reply: LlmReply): Content[] {
+/** The reply as content items, each carrying the upstream provider's (empty) metadata for it. */
+function content(reply: LlmReply, upstream: string): Content[] {
   const text = reply.refusal ?? messageText(reply)
+  const providerMetadata = { [upstream]: {} }
   const calls = (reply.toolCalls ?? []).map((call): Content => ({
     type: "tool-call",
     toolCallId: llmId("call_"),
     toolName: call.name,
     input: argumentsText(call.arguments),
+    providerMetadata,
   }))
 
-  return [...(text === "" ? [] : [{ type: "text" as const, text }]), ...calls]
+  return [...(text === "" ? [] : [{ type: "text" as const, text, providerMetadata }]), ...calls]
 }
 
-/** A whole generate result. */
+/**
+ * A whole generate result. The gateway sends no `response` block: the AI SDK fills the response's
+ * id and model in from the call itself.
+ */
 export function gatewayResult(
   reply: LlmReply,
   counts: LlmUsage,
@@ -60,11 +76,10 @@ export function gatewayResult(
   cost: number | null,
 ): LanguageModelV4GenerateResult {
   return {
-    content: content(reply),
+    content: content(reply, upstreamOf(model)),
     finishReason: finishReason(reply),
     usage: usage(counts),
     warnings: [],
-    response: { id: llmId("gen_"), modelId: model },
     ...metadata(cost),
   } satisfies LanguageModelV4GenerateResult
 }
@@ -99,11 +114,11 @@ function contentParts(item: Content): LanguageModelV4StreamPart[] {
   ]
 }
 
-/** A generate result as its stream of parts. */
-export function gatewayStream(whole: LanguageModelV4GenerateResult): string[] {
+/** A generate result as its stream of parts, for a call to `model`. */
+export function gatewayStream(whole: LanguageModelV4GenerateResult, model: string): string[] {
   const parts: LanguageModelV4StreamPart[] = [
     { type: "stream-start", warnings: [] },
-    { type: "response-metadata", ...whole.response },
+    { type: "response-metadata", id: llmId("gen_"), modelId: model },
     ...whole.content.flatMap(contentParts),
     {
       type: "finish",

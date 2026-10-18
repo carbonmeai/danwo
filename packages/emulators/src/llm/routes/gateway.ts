@@ -19,7 +19,7 @@ export function gatewayRoutes(emulator: EmulatorContext): void {
     const answered = await answer(emulator, c, "language-model", request)
     const whole = gatewayResult(answered.reply, answered.usage, model, answered.cost)
 
-    return send(c, answered, stream, whole, () => gatewayStream(whole))
+    return send(c, answered, stream, whole, () => gatewayStream(whole, model))
   })
 
   app.post("/v4/ai/embedding-model", async (c) => {
