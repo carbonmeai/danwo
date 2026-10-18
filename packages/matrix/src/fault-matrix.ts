@@ -55,6 +55,37 @@ export type PlannedFault =
       readonly fault: WebhookFault
       readonly label: string
     }
+  | RaceFault
+
+/**
+ * A race the run sets up from the browser's side rather than on one call or delivery:
+ * - `page`: the app's own request (`POST /checkout`) the page sent, sent twice at once;
+ * - `users`: the whole test run by `users` people at once, in separate browsers;
+ * - `redirect`: the provider's webhooks delivered before the browser lands back on the app.
+ */
+export type RaceFault =
+  | {
+      readonly target: "page"
+      /** The app request as `METHOD /path`, ids folded to `:id`. */
+      readonly route: string
+      /** Which request to `route` in the clean run, from 0. */
+      readonly occurrence: number
+      readonly label: string
+    }
+  | { readonly target: "users"; readonly users: number; readonly label: string }
+  | {
+      readonly target: "redirect"
+      /** Which return to the app from another site in the clean run, from 0. */
+      readonly occurrence: number
+      /**
+       * The provider call whose answer redirected the browser back (`POST checkout.stripe.com/…`),
+       * and which such return through that method and host, from 0: its answer is held at the
+       * proxy. Hosted pages put their own codes in paths, so the route alone does not find it
+       * again. Absent when the browser came back by following a link, which is held in the browser.
+       */
+      readonly via?: { readonly route: string; readonly occurrence: number }
+      readonly label: string
+    }
 
 export interface RunOutcome {
   /** Null for the clean run. */
@@ -75,6 +106,11 @@ export interface RunOutcome {
   readonly record?: string | undefined
   /** The test file line the run's failure passed through, relative to the project root. */
   readonly source?: { readonly file: string; readonly line: number } | undefined
+  /**
+   * Whether a race fault (page, users, redirect) was set up: those leave no fault label on a call
+   * or delivery, so the run reports it.
+   */
+  readonly fired?: boolean | undefined
 }
 
 export interface FaultMatrixResult {
@@ -203,13 +239,27 @@ function applyWebhookFault(
   )
 }
 
-/** Whether the run's planned fault was injected: some exchange or delivery carries a fault label. */
+/**
+ * Whether the run's planned fault was injected: some exchange or delivery carries a fault label,
+ * or, for a race fault, the run says it set the race up.
+ */
 export function faultFired(outcome: RunOutcome): boolean {
-  if (outcome.fault === null) return true
+  const { fault } = outcome
 
-  const evidence = outcome.fault.target === "outbound" ? outcome.exchanges : outcome.deliveries
+  if (fault === null) return true
+  if (fault.target === "outbound") return outcome.exchanges.some((item) => item.fault !== null)
+  if (fault.target === "webhook") return outcome.deliveries.some((item) => item.fault !== null)
 
-  return evidence.some((item) => item.fault !== null)
+  return outcome.fired === true
+}
+
+/** What a fault lands on, in words, for a run whose fault never fired. */
+const MISSED: Readonly<Record<PlannedFault["target"], string>> = {
+  outbound: "no call",
+  webhook: "no delivery",
+  page: "no request",
+  users: "no second user",
+  redirect: "no redirect with a webhook pending",
 }
 
 /**
@@ -227,7 +277,7 @@ export function checkFaultFired(outcome: RunOutcome): RunOutcome {
   return {
     ...outcome,
     status: "invalid",
-    error: `the fault never fired: no ${outcome.fault?.target === "webhook" ? "delivery" : "call"} matched ${outcome.fault?.label ?? "it"} in this run (the body ${outcome.status})${outcome.error ? `: ${outcome.error}` : ""}`,
+    error: `the fault never fired: ${MISSED[outcome.fault?.target ?? "outbound"]} matched ${outcome.fault?.label ?? "it"} in this run (the body ${outcome.status})${outcome.error ? `: ${outcome.error}` : ""}`,
   }
 }
 

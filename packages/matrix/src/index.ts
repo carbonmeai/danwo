@@ -10,6 +10,7 @@ export {
   formatMatrix,
   type PlannedFault,
   planFaults,
+  type RaceFault,
   type RunEnvironment,
   type RunOutcome,
   type RunWebhooks,
@@ -18,3 +19,11 @@ export {
   type ServiceDelivery,
   webhookSources,
 } from "./fault-matrix.ts"
+export {
+  appRoute,
+  planRaceFaults,
+  type RaceCall,
+  type RaceEvidence,
+  type RacePlanOptions,
+  type RaceReturn,
+} from "./races.ts"
