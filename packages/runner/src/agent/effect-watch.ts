@@ -9,6 +9,8 @@
  * unknown). Steps after it are not compared. Each comparison is noted on the step, saying what was
  * left out.
  */
+import { setTimeout as sleep } from "node:timers/promises"
+
 import type { BackendActivity, BackendEvent } from "../browser/readiness.ts"
 import type { Tabs } from "../browser/tabs.ts"
 import type { EffectsEvent } from "../record/steps.ts"
@@ -53,10 +55,6 @@ export function markOf(activity: (() => BackendActivity) | undefined): BackendMa
 
 /** What a comparison came to, as the step's record notes it. */
 export type EffectCheck = Omit<EffectsEvent, "kind" | "at">
-
-function pause(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
 
 /** The backend's history between two marks (to now when `to` is not given). */
 function between(now: BackendActivity, from: BackendMark, to?: BackendMark): BackendActivity {
@@ -138,7 +136,7 @@ export class EffectWatch {
     let check = await this.once(expected)
 
     while (check.result === "diverged" && check.note === undefined && Date.now() < deadline) {
-      await pause(POLL_MS)
+      await sleep(POLL_MS)
       check = await this.once(expected)
     }
 
