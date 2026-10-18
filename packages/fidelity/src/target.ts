@@ -39,6 +39,25 @@ export function credential(target: Target, name: string): string {
   return value
 }
 
+/** A request authorized with the target's `key` as a bearer token, with an optional JSON body. */
+export function bearerRequest(
+  target: Target,
+  method: string,
+  url: string,
+  body?: unknown,
+  headers: Readonly<Record<string, string>> = {},
+): Request {
+  return new Request(url, {
+    method,
+    headers: {
+      authorization: `Bearer ${credential(target, "key")}`,
+      ...(body !== undefined && { "content-type": "application/json" }),
+      ...headers,
+    },
+    ...(body !== undefined && { body: JSON.stringify(body) }),
+  })
+}
+
 /** Adds `value` under `key` to `pairs`, nesting objects and arrays the way Stripe reads forms. */
 function addFormValue(pairs: [string, string][], key: string, value: unknown): void {
   if (value === undefined || value === null) return

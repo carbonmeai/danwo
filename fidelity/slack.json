@@ -1,0 +1,37 @@
+{
+  "provider": "slack",
+  "source": "live",
+  "recorded": "2026-10-18",
+  "scenarios": {
+    "api.test": {
+      "steps": [
+        {
+          "step": "call api.test",
+          "status": 200,
+          "shape": "885e708eab82"
+        }
+      ],
+      "facts": []
+    },
+    "errors: missing token, unknown token": {
+      "steps": [
+        {
+          "step": "auth.test without a token",
+          "status": 200,
+          "shape": "327b65d0cce5"
+        },
+        {
+          "step": "chat.postMessage with an unknown token",
+          "status": 200,
+          "shape": "0fe79f63c726"
+        }
+      ],
+      "facts": []
+    }
+  },
+  "shapes": {
+    "0fe79f63c726": {"t":"object","keys":{"ok":{"t":"literal","v":false},"error":{"t":"literal","v":"invalid_auth"}}},
+    "327b65d0cce5": {"t":"object","keys":{"ok":{"t":"literal","v":false},"error":{"t":"literal","v":"not_authed"}}},
+    "885e708eab82": {"t":"object","keys":{"ok":{"t":"literal","v":true},"args":{"t":"object","keys":{},"open":true}}}
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "provider": "google",
+  "source": "live",
+  "recorded": "2026-10-18",
+  "scenarios": {
+    "sign-in: discovery document": {
+      "steps": [
+        {
+          "step": "read the discovery document",
+          "status": 200,
+          "shape": "3f2a239fbf02"
+        }
+      ],
+      "facts": []
+    },
+    "sign-in: signing keys": {
+      "steps": [
+        {
+          "step": "read the signing keys",
+          "status": 200,
+          "shape": "d505aa681b5a"
+        }
+      ],
+      "facts": []
+    }
+  },
+  "shapes": {
+    "3f2a239fbf02": {"t":"object","keys":{"issuer":{"t":"literal","v":"https://accounts.google.com"},"authorization_endpoint":{"t":"literal","v":"https://accounts.google.com/o/oauth2/v2/auth"},"device_authorization_endpoint":{"t":"string"},"token_endpoint":{"t":"literal","v":"https://oauth2.googleapis.com/token"},"userinfo_endpoint":{"t":"string"},"revocation_endpoint":{"t":"string"},"jwks_uri":{"t":"literal","v":"https://www.googleapis.com/oauth2/v3/certs"},"response_types_supported":{"t":"array","of":{"t":"string"}},"response_modes_supported":{"t":"array","of":{"t":"string"}},"subject_types_supported":{"t":"array","of":{"t":"string"}},"id_token_signing_alg_values_supported":{"t":"array","of":{"t":"string"}},"scopes_supported":{"t":"array","of":{"t":"string"}},"token_endpoint_auth_methods_supported":{"t":"array","of":{"t":"string"}},"claims_supported":{"t":"array","of":{"t":"string"}},"code_challenge_methods_supported":{"t":"array","of":{"t":"string"}},"grant_types_supported":{"t":"array","of":{"t":"string"}},"authorization_response_iss_parameter_supported":{"t":"boolean"}}},
+    "d505aa681b5a": {"t":"object","keys":{"keys":{"t":"array","of":{"t":"object","keys":{"e":{"t":"string"},"kid":{"t":"string"},"kty":{"t":"literal","v":"RSA"},"use":{"t":"literal","v":"sig"},"alg":{"t":"literal","v":"RS256"},"n":{"t":"string"}}}}}}
+  }
+}

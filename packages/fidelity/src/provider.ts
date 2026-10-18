@@ -65,6 +65,20 @@ export function requiredCredentials(
   return missing ? undefined : found
 }
 
+/**
+ * The opt-in for suites that call a provider's public endpoints (sign-in discovery documents,
+ * signing keys, a public repository): they need no key, but a plain run stays off the network.
+ */
+export const PUBLIC_ENDPOINTS: CredentialVariable = {
+  name: "DANWO_FIDELITY_PUBLIC",
+  description: "set to 1 to call public endpoints that need no key",
+}
+
+/** Whether `env` opts in to calling public endpoints. */
+export function publicEndpointsAllowed(env: Readonly<Record<string, string | undefined>>): boolean {
+  return env[PUBLIC_ENDPOINTS.name]?.trim() === "1"
+}
+
 /** Refuses `value` when it matches any of `livePatterns`. */
 export function refuseLive(
   provider: string,

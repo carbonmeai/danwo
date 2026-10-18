@@ -51,5 +51,53 @@
     "path": "scheduled_at",
     "kind": "extra-field",
     "reason": "The resend SDK's email type declares scheduled_at and the API returns it; the published API description leaves the field out."
+  },
+  {
+    "provider": "flutterwave",
+    "step": "call with a bad key",
+    "kind": "status-mismatch",
+    "reason": "The emulator accepts any well-formed test key (FLWSECK_TEST-…) so apps need no registered key; Flutterwave refuses keys it did not issue."
+  },
+  {
+    "provider": "google",
+    "step": "read the discovery document",
+    "path": "authorization_response_iss_parameter_supported",
+    "kind": "missing-field",
+    "reason": "The emulator's sign-in redirect carries no iss parameter, and advertising support would make OpenID clients reject its redirects."
+  },
+  {
+    "provider": "microsoft",
+    "step": "read the signing keys",
+    "path": "keys[].x5t",
+    "kind": "missing-field",
+    "reason": "x5t is the thumbprint of the key's certificate; the emulator signs with a bare key and has no certificate."
+  },
+  {
+    "provider": "microsoft",
+    "step": "read the signing keys",
+    "path": "keys[].x5c",
+    "kind": "missing-field",
+    "reason": "The emulator signs with a bare key and has no certificate chain to publish."
+  },
+  {
+    "provider": "github",
+    "step": "read a public repository",
+    "path": "homepage",
+    "kind": "type-mismatch",
+    "reason": "Seed data: the real repository has an empty homepage string, the seeded one none."
+  },
+  {
+    "provider": "github",
+    "step": "read a public repository",
+    "path": "temp_clone_token",
+    "kind": "missing-field",
+    "reason": "GitHub sends null to anonymous callers, but the typed repository schema the emulator is checked against declares a string; left out until the schema allows null."
+  },
+  {
+    "provider": "github",
+    "step": "read a public repository",
+    "path": "permissions",
+    "kind": "extra-field",
+    "reason": "The emulator answers every caller as the repository's admin; GitHub leaves permissions out for anonymous callers."
   }
 ]

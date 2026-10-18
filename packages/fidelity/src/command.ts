@@ -20,12 +20,12 @@ export interface FidelityCommandOptions {
   readonly write?: (line: string) => void
 }
 
-/** A provider's published API description, downloaded once into a temporary folder. */
-async function published(
-  provider: FidelityProvider,
-  folder: string,
-): Promise<ApiDescription | undefined> {
-  if (provider.openapi === undefined) return undefined
+/**
+ * A provider's published API description, downloaded once into a temporary folder. A provider that
+ * publishes none has its documented answers written into its scenarios, which need no description.
+ */
+async function published(provider: FidelityProvider, folder: string): Promise<ApiDescription> {
+  if (provider.openapi === undefined) return { paths: {} }
 
   const response = await fetch(provider.openapi)
 
@@ -60,11 +60,7 @@ async function descriptionsFor(
       providers.map(async (p) => [p.name, await published(p, folder)] as const),
     )
 
-    return new Map(
-      entries.flatMap(([name, description]) =>
-        description === undefined ? [] : [[name, description]],
-      ),
-    )
+    return new Map(entries)
   } finally {
     await rm(folder, { recursive: true, force: true })
   }

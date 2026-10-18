@@ -1,0 +1,37 @@
+{
+  "provider": "twilio",
+  "source": "openapi",
+  "recorded": "2026-10-18",
+  "scenarios": {
+    "messages: send from the test number": {
+      "steps": [
+        {
+          "step": "send a message",
+          "status": 201,
+          "shape": "dfc19d9d6f7c"
+        }
+      ],
+      "facts": []
+    },
+    "messages: invalid recipient, unowned sender": {
+      "steps": [
+        {
+          "step": "send to an invalid number",
+          "status": 400,
+          "shape": "9ddbd9cab392"
+        },
+        {
+          "step": "send from a number not owned",
+          "status": 400,
+          "shape": "38bdf9025373"
+        }
+      ],
+      "facts": []
+    }
+  },
+  "shapes": {
+    "38bdf9025373": {"t":"object","keys":{"code":{"t":"literal","v":21606},"message":{"t":"string"},"more_info":{"t":"string"},"status":{"t":"literal","v":400},"details":{"t":"union","of":[{"t":"any"},{"t":"null"}]}},"optional":["details"]},
+    "9ddbd9cab392": {"t":"object","keys":{"code":{"t":"literal","v":21211},"message":{"t":"string"},"more_info":{"t":"string"},"status":{"t":"literal","v":400},"details":{"t":"union","of":[{"t":"any"},{"t":"null"}]}},"optional":["details"]},
+    "dfc19d9d6f7c": {"t":"object","keys":{"body":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"num_segments":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"direction":{"t":"string"},"from":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"to":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"date_updated":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"price":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"error_message":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"uri":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"account_sid":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"num_media":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"status":{"t":"literal","v":"queued"},"messaging_service_sid":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"sid":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"date_sent":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"date_created":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"error_code":{"t":"union","of":[{"t":"number"},{"t":"null"}]},"price_unit":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"api_version":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"subresource_uris":{"t":"union","of":[{"t":"object","keys":{},"open":true},{"t":"null"}]}},"optional":["body","num_segments","direction","from","to","date_updated","price","error_message","uri","account_sid","num_media","status","messaging_service_sid","sid","date_sent","date_created","error_code","price_unit","api_version","subresource_uris"]}
+  }
+}

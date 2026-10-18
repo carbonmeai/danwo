@@ -1,0 +1,54 @@
+{
+  "provider": "bachs",
+  "source": "openapi",
+  "recorded": "2026-10-18",
+  "scenarios": {
+    "customers: create, fetch and list": {
+      "steps": [
+        {
+          "step": "create a customer",
+          "status": 201,
+          "shape": "4f70fda585ff"
+        },
+        {
+          "step": "fetch the customer",
+          "status": 200,
+          "shape": "4f70fda585ff"
+        },
+        {
+          "step": "list customers",
+          "status": 200,
+          "shape": "b2839259286b"
+        }
+      ],
+      "facts": []
+    },
+    "errors: not found, missing key, validation": {
+      "steps": [
+        {
+          "step": "fetch an unknown customer",
+          "status": 404,
+          "shape": "d76e1abb5708"
+        },
+        {
+          "step": "call without a key",
+          "status": 401,
+          "shape": "6eb2b79ad4a5"
+        },
+        {
+          "step": "create a customer without an email",
+          "status": 400,
+          "shape": "f8385befbca3"
+        }
+      ],
+      "facts": []
+    }
+  },
+  "shapes": {
+    "4f70fda585ff": {"t":"object","keys":{"customer_id":{"t":"string"},"email":{"t":"string"},"name":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"phone_number":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"metadata":{"t":"object","keys":{},"open":true},"billing_address":{"t":"union","of":[{"t":"object","keys":{"line1":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"line2":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"city":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"state":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"postal_code":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"country":{"t":"union","of":[{"t":"string"},{"t":"null"}]}}},{"t":"null"}]},"created_at":{"t":"string"},"updated_at":{"t":"string"}},"open":true},
+    "6eb2b79ad4a5": {"t":"object","keys":{"error_code":{"t":"literal","v":"UNAUTHORIZED"},"detail":{"t":"string"},"doc_url":{"t":"string"},"errors":{"t":"array","of":{"t":"object","keys":{"field":{"t":"string"},"message":{"t":"string"}},"open":true}},"details":{"t":"object","keys":{},"open":true}},"optional":["doc_url","errors","details"]},
+    "b2839259286b": {"t":"object","keys":{"items":{"t":"array","of":{"t":"object","keys":{"customer_id":{"t":"string"},"email":{"t":"string"},"name":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"phone_number":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"metadata":{"t":"object","keys":{},"open":true},"billing_address":{"t":"union","of":[{"t":"object","keys":{"line1":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"line2":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"city":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"state":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"postal_code":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"country":{"t":"union","of":[{"t":"string"},{"t":"null"}]}}},{"t":"null"}]},"created_at":{"t":"string"},"updated_at":{"t":"string"}},"open":true}},"pagination":{"t":"object","keys":{},"open":true}}},
+    "d76e1abb5708": {"t":"object","keys":{"error_code":{"t":"literal","v":"NOT_FOUND"},"detail":{"t":"string"},"doc_url":{"t":"string"},"errors":{"t":"array","of":{"t":"object","keys":{"field":{"t":"string"},"message":{"t":"string"}},"open":true}},"details":{"t":"object","keys":{},"open":true}},"optional":["doc_url","errors","details"]},
+    "f8385befbca3": {"t":"object","keys":{"error_code":{"t":"literal","v":"VALIDATION_ERROR"},"detail":{"t":"string"},"doc_url":{"t":"string"},"errors":{"t":"array","of":{"t":"object","keys":{"field":{"t":"string"},"message":{"t":"string"}},"open":true}},"details":{"t":"object","keys":{},"open":true}},"optional":["doc_url","errors","details"]}
+  }
+}

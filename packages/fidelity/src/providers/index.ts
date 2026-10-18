@@ -1,9 +1,28 @@
 /** Every provider with a fidelity suite, in the order they are checked. */
 import type { FidelityProvider } from "../provider.ts"
+import { bachsFidelity } from "./bachs.ts"
+import { flutterwaveFidelity } from "./flutterwave.ts"
+import { githubFidelity } from "./github.ts"
+import { googleFidelity } from "./google.ts"
+import { microsoftFidelity } from "./microsoft.ts"
+import { paystackFidelity } from "./paystack.ts"
 import { resendFidelity } from "./resend.ts"
+import { slackFidelity } from "./slack.ts"
 import { stripeFidelity } from "./stripe.ts"
+import { twilioFidelity } from "./twilio.ts"
 
-export const FIDELITY_PROVIDERS: readonly FidelityProvider[] = [stripeFidelity, resendFidelity]
+export const FIDELITY_PROVIDERS: readonly FidelityProvider[] = [
+  stripeFidelity,
+  resendFidelity,
+  twilioFidelity,
+  paystackFidelity,
+  flutterwaveFidelity,
+  bachsFidelity,
+  slackFidelity,
+  githubFidelity,
+  googleFidelity,
+  microsoftFidelity,
+]
 
 /** The providers named in `names`, or all of them; an unknown name is an error. */
 export function providersNamed(names: readonly string[]): FidelityProvider[] {

@@ -113,6 +113,24 @@ describe("credentials", () => {
     expect(stripe?.live({ DANWO_FIDELITY_STRIPE_KEY: "sk_test_abc" })?.kind).toBe("live")
   })
 
+  it.each([
+    ["paystack", "DANWO_FIDELITY_PAYSTACK_KEY", "sk_live_abc", "sk_test_abc"],
+    ["flutterwave", "DANWO_FIDELITY_FLUTTERWAVE_KEY", "REDACTED-TEST-VALUE", "REDACTED-TEST-VALUE"],
+    ["bachs", "DANWO_FIDELITY_BACHS_KEY", "sk_live_abc", "sk_sandbox_abc"],
+  ])("refuses a live %s key and accepts a test one", (name, variable, live, test) => {
+    const provider = FIDELITY_PROVIDERS.find((candidate) => candidate.name === name)
+
+    expect(() => provider?.live({ [variable]: live })).toThrow(LiveCredentialRefused)
+    expect(provider?.live({ [variable]: test })?.kind).toBe("live")
+  })
+
+  it("calls public endpoints only when opted in", () => {
+    const google = FIDELITY_PROVIDERS.find((provider) => provider.name === "google")
+
+    expect(google?.live({})).toBeUndefined()
+    expect(google?.live({ DANWO_FIDELITY_PUBLIC: "1" })?.kind).toBe("live")
+  })
+
   it("encodes nested form values the way Stripe reads them", () => {
     expect(decodeURIComponent(formBody({ a: [{ b: 1 }], c: { d: "e" }, f: undefined }))).toBe(
       "a[0][b]=1&c[d]=e",

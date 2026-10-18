@@ -1,0 +1,69 @@
+{
+  "provider": "paystack",
+  "source": "openapi",
+  "recorded": "2026-10-18",
+  "scenarios": {
+    "transactions: initialize and verify": {
+      "steps": [
+        {
+          "step": "initialize a transaction",
+          "status": 200,
+          "shape": "29729520b05a"
+        },
+        {
+          "step": "verify the unpaid transaction",
+          "status": 200,
+          "shape": "52caec038fe9"
+        }
+      ],
+      "facts": []
+    },
+    "customers: create and fetch": {
+      "steps": [
+        {
+          "step": "create a customer",
+          "status": 200,
+          "shape": "defeb8cb49e3"
+        },
+        {
+          "step": "fetch the customer",
+          "status": 200,
+          "shape": "defeb8cb49e3"
+        }
+      ],
+      "facts": []
+    },
+    "banks: list": {
+      "steps": [
+        {
+          "step": "list banks",
+          "status": 200,
+          "shape": "8244904fc191"
+        }
+      ],
+      "facts": []
+    },
+    "errors: unknown reference, bad key": {
+      "steps": [
+        {
+          "step": "verify an unknown reference",
+          "status": 400,
+          "shape": "049dd12f2305"
+        },
+        {
+          "step": "call with a bad key",
+          "status": 401,
+          "shape": "049dd12f2305"
+        }
+      ],
+      "facts": []
+    }
+  },
+  "shapes": {
+    "049dd12f2305": {"t":"object","keys":{"status":{"t":"literal","v":false},"message":{"t":"string"},"meta":{"t":"object","keys":{},"open":true},"type":{"t":"string"},"code":{"t":"string"},"data":{"t":"union","of":[{"t":"object","keys":{},"open":true},{"t":"null"}]}},"optional":["meta","type","code","data"]},
+    "29729520b05a": {"t":"object","keys":{"status":{"t":"literal","v":true},"message":{"t":"string"},"data":{"t":"object","keys":{"authorization_url":{"t":"string"},"access_code":{"t":"string"},"reference":{"t":"string"}}}}},
+    "52caec038fe9": {"t":"object","keys":{"status":{"t":"literal","v":true},"message":{"t":"string"},"data":{"t":"object","keys":{"id":{"t":"number"},"domain":{"t":"string"},"status":{"t":"string"},"reference":{"t":"string"},"amount":{"t":"number"},"currency":{"t":"string"},"channel":{"t":"string"},"created_at":{"t":"string"},"customer":{"t":"object","keys":{"id":{"t":"number"},"email":{"t":"string"},"customer_code":{"t":"string"}},"open":true},"metadata":{"t":"union","of":[{"t":"object","keys":{},"open":true},{"t":"null"}]}},"open":true}}},
+    "8244904fc191": {"t":"object","keys":{"status":{"t":"literal","v":true},"message":{"t":"string"},"data":{"t":"array","of":{"t":"object","keys":{"id":{"t":"number"},"name":{"t":"string"},"slug":{"t":"string"},"code":{"t":"string"},"active":{"t":"boolean"},"country":{"t":"string"},"currency":{"t":"string"},"type":{"t":"string"}},"open":true}},"meta":{"t":"object","keys":{"next":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"previous":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"perPage":{"t":"number"}},"optional":["next","previous","perPage"],"open":true}},"optional":["meta"]},
+    "defeb8cb49e3": {"t":"object","keys":{"status":{"t":"literal","v":true},"message":{"t":"string"},"data":{"t":"object","keys":{"id":{"t":"number"},"email":{"t":"string"},"customer_code":{"t":"string"},"integration":{"t":"number"},"domain":{"t":"string"},"createdAt":{"t":"string"},"updatedAt":{"t":"string"}},"open":true}}}
+  }
+}

@@ -30,6 +30,12 @@ const MAX_DEPTH = 2
 
 const LITERAL_PATHS = ["object", "**.object"]
 
+/**
+ * Marks a hand-written object schema whose documentation lists only some of its fields, so fields
+ * it does not list are not reported as extra.
+ */
+export const OPEN = "x-danwo-open"
+
 function isSchema(value: unknown): value is Schema {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
@@ -120,7 +126,12 @@ function objectSchemaShape(schema: Schema, walk: Walk): Shape {
   )
   const optional = names.filter((name) => !required.includes(name))
 
-  return { t: "object", keys, ...(optional.length > 0 && { optional }) }
+  return {
+    t: "object",
+    keys,
+    ...(optional.length > 0 && { optional }),
+    ...(schema[OPEN] === true && { open: true }),
+  }
 }
 
 function arraySchemaShape(schema: Schema, walk: Walk): Shape {

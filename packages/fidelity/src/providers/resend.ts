@@ -8,7 +8,7 @@ import { resend } from "@danwo/emulators"
 import { type FidelityProvider, requiredCredentials } from "../provider.ts"
 import type { Scenario, ScenarioContext, StepDoc } from "../scenario.ts"
 import { asJsonObject, type Json } from "../shape.ts"
-import { credential, emulatorTarget, liveTarget } from "../target.ts"
+import { bearerRequest, emulatorTarget, liveTarget } from "../target.ts"
 
 const API = "https://api.resend.com"
 const KEY = "DANWO_FIDELITY_RESEND_KEY"
@@ -39,15 +39,7 @@ function call(
   body?: unknown,
   headers: Readonly<Record<string, string>> = {},
 ): Request {
-  return new Request(`${API}${path}`, {
-    method,
-    headers: {
-      authorization: `Bearer ${credential(context.target, "key")}`,
-      ...(body !== undefined && { "content-type": "application/json" }),
-      ...headers,
-    },
-    ...(body !== undefined && { body: JSON.stringify(body) }),
-  })
+  return bearerRequest(context.target, method, `${API}${path}`, body, headers)
 }
 
 function email(context: ScenarioContext, subject: string): Record<string, unknown> {

@@ -1,0 +1,31 @@
+{
+  "provider": "microsoft",
+  "source": "live",
+  "recorded": "2026-10-18",
+  "scenarios": {
+    "sign-in: discovery document": {
+      "steps": [
+        {
+          "step": "read the discovery document",
+          "status": 200,
+          "shape": "66aa9cd59ed6"
+        }
+      ],
+      "facts": []
+    },
+    "sign-in: signing keys": {
+      "steps": [
+        {
+          "step": "read the signing keys",
+          "status": 200,
+          "shape": "a7c7181f72ff"
+        }
+      ],
+      "facts": []
+    }
+  },
+  "shapes": {
+    "66aa9cd59ed6": {"t":"object","keys":{"token_endpoint":{"t":"literal","v":"https://login.microsoftonline.com/common/oauth2/v2.0/token"},"token_endpoint_auth_methods_supported":{"t":"array","of":{"t":"string"}},"jwks_uri":{"t":"literal","v":"https://login.microsoftonline.com/common/discovery/v2.0/keys"},"response_modes_supported":{"t":"array","of":{"t":"string"}},"subject_types_supported":{"t":"array","of":{"t":"string"}},"id_token_signing_alg_values_supported":{"t":"array","of":{"t":"string"}},"response_types_supported":{"t":"array","of":{"t":"string"}},"scopes_supported":{"t":"array","of":{"t":"string"}},"issuer":{"t":"literal","v":"https://login.microsoftonline.com/{tenantid}/v2.0"},"request_uri_parameter_supported":{"t":"boolean"},"userinfo_endpoint":{"t":"string"},"authorization_endpoint":{"t":"literal","v":"https://login.microsoftonline.com/common/oauth2/v2.0/authorize"},"device_authorization_endpoint":{"t":"string"},"http_logout_supported":{"t":"boolean"},"frontchannel_logout_supported":{"t":"boolean"},"end_session_endpoint":{"t":"string"},"claims_supported":{"t":"array","of":{"t":"string"}},"kerberos_endpoint":{"t":"string"},"mtls_endpoint_aliases":{"t":"object","keys":{"token_endpoint":{"t":"string"}}},"tls_client_certificate_bound_access_tokens":{"t":"boolean"},"tenant_region_scope":{"t":"null"},"cloud_instance_name":{"t":"string"},"cloud_graph_host_name":{"t":"string"},"msgraph_host":{"t":"string"},"rbac_url":{"t":"string"}}},
+    "a7c7181f72ff": {"t":"object","keys":{"keys":{"t":"array","of":{"t":"object","keys":{"kty":{"t":"literal","v":"RSA"},"use":{"t":"literal","v":"sig"},"kid":{"t":"string"},"x5t":{"t":"string"},"n":{"t":"string"},"e":{"t":"string"},"x5c":{"t":"array","of":{"t":"string"}},"cloud_instance_name":{"t":"string"},"issuer":{"t":"string"}}}}}}
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "provider": "flutterwave",
+  "source": "openapi",
+  "recorded": "2026-10-18",
+  "scenarios": {
+    "payments: hosted link": {
+      "steps": [
+        {
+          "step": "create a payment link",
+          "status": 200,
+          "shape": "47bbecb8c107"
+        }
+      ],
+      "facts": []
+    },
+    "banks: list": {
+      "steps": [
+        {
+          "step": "list Nigerian banks",
+          "status": 200,
+          "shape": "1da89d581c77"
+        }
+      ],
+      "facts": []
+    },
+    "errors: missing key, bad key": {
+      "steps": [
+        {
+          "step": "call without a key",
+          "status": 401,
+          "shape": "60706079db1a"
+        },
+        {
+          "step": "call with a bad key",
+          "status": 401,
+          "shape": "60706079db1a"
+        }
+      ],
+      "facts": []
+    }
+  },
+  "shapes": {
+    "1da89d581c77": {"t":"object","keys":{"status":{"t":"literal","v":"success"},"message":{"t":"string"},"data":{"t":"array","of":{"t":"object","keys":{"id":{"t":"number"},"code":{"t":"string"},"name":{"t":"string"}},"open":true}}}},
+    "47bbecb8c107": {"t":"object","keys":{"status":{"t":"literal","v":"success"},"message":{"t":"string"},"data":{"t":"object","keys":{"link":{"t":"string"}}}}},
+    "60706079db1a": {"t":"object","keys":{"status":{"t":"literal","v":"error"},"message":{"t":"string"},"data":{"t":"union","of":[{"t":"any"},{"t":"null"}]}},"optional":["data"]}
+  }
+}
