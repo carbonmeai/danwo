@@ -31,20 +31,28 @@ import type { TrialReport } from "./tasks.ts"
 import { type TrialTimings, timingsLine } from "./timings.ts"
 import { runPool, shuffledOrder } from "./trial-pool.ts"
 
-export interface RunMatrixOptions {
-  readonly cwd?: string
-  readonly config?: string
+/** Which test and which of its faults a matrix run covers. */
+interface MatrixSelection {
   /** The test file; it must hold exactly one test after `grep`. */
   readonly file: string
   readonly grep?: string
   /** A regular expression over planned fault labels: only the faults it matches run. */
   readonly faults?: string
+}
+
+/** How the faulted trials are handed out. */
+interface MatrixScheduling {
   /** Default: the config's `matrix.workers`, else its `workers`, else the machine's cores (at most 8). */
   readonly workers?: number
   /** Starts no new trial once this many failed (`--max-failures`). */
   readonly maxFailures?: number
   /** Runs the faulted trials in a shuffled order from this seed (`--shuffle`). */
   readonly shuffle?: number
+}
+
+export interface RunMatrixOptions extends MatrixSelection, MatrixScheduling {
+  readonly cwd?: string
+  readonly config?: string
   /** Flight recorder mode; overrides the config's `record`. */
   readonly record?: RecordMode
   /** Rewrite every `toHaveScreenshot` baseline (`--update-snapshots`). */

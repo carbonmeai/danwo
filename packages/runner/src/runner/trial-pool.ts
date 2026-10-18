@@ -3,6 +3,7 @@
  * order or a shuffled one, and no new ones once enough have failed. Results keep the plan's order
  * whatever order the trials ran in, so a shuffled run reads the same as an ordered one.
  */
+import { createHash } from "node:crypto"
 
 export interface PoolOptions {
   /** Trials running at once: the crew's size. */
@@ -47,29 +48,15 @@ export async function runPool<I, O>(
   return results
 }
 
-/** A repeatable shuffle of `0..count-1` from `seed`, so a shuffled run can be run again. */
+/**
+ * A repeatable shuffle of `0..count-1` from `seed`, so a shuffled run can be run again: each index
+ * is ranked by a digest of the seed and the index, and the ranks give the order.
+ */
 export function shuffledOrder(count: number, seed: number): number[] {
-  const order = [...Array.from({ length: count }).keys()]
-  let state = seed >>> 0
+  const rank = (index: number) =>
+    createHash("sha256").update(`${seed}:${index}`).digest().readUInt32BE(0)
 
-  const next = () => {
-    state = (state + 0x6d2b79f5) >>> 0
-
-    let t = state
-
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-
-    return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296
-  }
-
-  for (let i = order.length - 1; i > 0; i--) {
-    const j = Math.floor(next() * (i + 1))
-    const swap = order[i] ?? i
-
-    order[i] = order[j] ?? j
-    order[j] = swap
-  }
-
-  return order
+  return Array.from({ length: count }, (_, index) => ({ index, rank: rank(index) }))
+    .toSorted((a, b) => a.rank - b.rank || a.index - b.index)
+    .map((entry) => entry.index)
 }
