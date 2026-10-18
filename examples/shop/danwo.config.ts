@@ -13,6 +13,18 @@ export default defineConfig({
    * they caused on the emulator's clock, so tests never wait or settle by hand.
    */
   readiness: { mode: "page+backend", settle: true },
+  /*
+   * What `danwo test --changed` runs for a change to the shop's own code: the webhook handler
+   * affects the tests that received Stripe's checkout webhook; the server's pages affect every
+   * test that visited one.
+   */
+  impact: {
+    rules: {
+      "src/webhooks.ts": ["webhook checkout.session.completed"],
+      "src/server.ts": ["/"],
+      "src/launch.ts": ["/"],
+    },
+  },
   // One Stripe emulator, proxy and shop per worker; `danwo matrix` resets them between runs.
   async environment() {
     let shop: Shop | undefined

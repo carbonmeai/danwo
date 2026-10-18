@@ -13,12 +13,10 @@ import { text as readText } from "node:stream/consumers"
 
 import { Stripe } from "stripe"
 
+import { credits, emptyBooks, handleWebhook } from "./webhooks.ts"
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "")
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET ?? ""
-const dedupe = process.env.SHOP_BUG !== "no-dedupe"
-
-const credits = new Map<string, number>()
-const handledEvents = new Set<string>()
 
 async function readBody(req: IncomingMessage): Promise<string> {
   return readText(req)
@@ -145,37 +143,11 @@ function done(res: ServerResponse, user: string): void {
   )
 }
 
-/** The verified event in a webhook request, or undefined if its signature doesn't check out. */
-function verifiedEvent(body: string, signature: string): Stripe.Event | undefined {
-  try {
-    return stripe.webhooks.constructEvent(body, signature, webhookSecret)
-  } catch {
-    return undefined
-  }
-}
-
-/** Grants a completed checkout's credits; returns false if the event was already handled. */
-function grantCredits(event: Stripe.CheckoutSessionCompletedEvent): boolean {
-  if (dedupe && handledEvents.has(event.id)) return false
-
-  handledEvents.add(event.id)
-
-  const session = event.data.object
-  const user = session.metadata?.user ?? ""
-
-  credits.set(user, (credits.get(user) ?? 0) + Number(session.metadata?.credits ?? 0))
-
-  return true
-}
-
 async function webhook(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const event = verifiedEvent(await readBody(req), String(req.headers["stripe-signature"]))
+  const signature = String(req.headers["stripe-signature"])
+  const answer = handleWebhook(stripe, webhookSecret, { body: await readBody(req), signature })
 
-  if (!event) return send(res, 400, { error: "bad signature" })
-  if (event.type === "checkout.session.completed" && !grantCredits(event))
-    return send(res, 200, { duplicate: true })
-
-  send(res, 200, { received: true })
+  send(res, answer.status, answer.body)
 }
 
 type Route = (req: IncomingMessage, res: ServerResponse, url: URL) => unknown
@@ -187,13 +159,12 @@ const ROUTES: Record<string, Route> = {
   "POST /webhooks/stripe": (req, res) => webhook(req, res),
   "GET /credits": (_req, res, url) =>
     send(res, 200, { credits: credits.get(url.searchParams.get("user") ?? "") ?? 0 }),
-  ...(process.env.SHOP_TEST_RESET === "1" && { "POST /__test/reset": emptyBooks }),
+  ...(process.env.SHOP_TEST_RESET === "1" && { "POST /__test/reset": resetBooks }),
 }
 
 /** Forgets every credit and handled event. */
-function emptyBooks(_req: IncomingMessage, res: ServerResponse): void {
-  credits.clear()
-  handledEvents.clear()
+function resetBooks(_req: IncomingMessage, res: ServerResponse): void {
+  emptyBooks()
   send(res, 200, { reset: true })
 }
 
