@@ -34,6 +34,7 @@ afterAll(async () => {
     fixture("github-bot"),
     fixture("sms-app"),
     fixture("flutterwave-shop"),
+    fixture("naira-shop"),
     fixture("sessions"),
     fixture("visual"),
     SHOP,
@@ -532,6 +533,56 @@ describe("danwo matrix", () => {
 
     expect(html).toContain("POST api.flutterwave.com/v3/payments")
     expect(html).not.toMatch(/5150515051505150515051505150|flutterwave-shop-hash/)
+  }, 300_000)
+
+  it("pays on Paystack's hosted page with a plain card and with a PIN and OTP card", async () => {
+    const { code, out } = await danwo(fixture("naira-shop"), ["test"])
+
+    expect(out).toContain(
+      "✓ tests/buy-credits.danwo.ts › buys 500 credits with a card on Paystack's page",
+    )
+    expect(out).toContain(
+      "✓ tests/pin-card.danwo.ts › pays with a card that asks for its PIN and then an OTP",
+    )
+    expect(code).toBe(0)
+  }, 300_000)
+
+  it("faults Paystack calls and charge.success, and a careful shop grants one pack per payment", async () => {
+    const { code, out } = await danwo(fixture("naira-shop"), [
+      "matrix",
+      "tests/buy-credits.danwo.ts",
+    ])
+
+    expect(out).toContain("PASS  clean run")
+    expect(out).toContain("PASS  reset-after on POST api.paystack.co/transaction/initialize")
+    expect(out).toContain("PASS  status 200 on GET api.paystack.co/transaction/verify/:id")
+    expect(out).toContain("PASS  duplicate on paystack webhook charge.success")
+    expect(out).toContain("PASS  forged on paystack webhook charge.success")
+    expect(out).toContain("faults: 14 passed")
+    expect(code).toBe(0)
+  }, 300_000)
+
+  it("catches a shop that grants credits twice when Paystack sends charge.success twice", async () => {
+    const { code, out } = await danwo(
+      fixture("naira-shop"),
+      ["matrix", "tests/buy-credits.danwo.ts"],
+      { PAYSTACK_BUG: "no-dedupe" },
+    )
+
+    // A forged event fails the shop's signature check; only the repeated real one pays out twice.
+    expect(out).toContain("FAIL  duplicate on paystack webhook charge.success")
+    expect(out).toContain("PASS  forged on paystack webhook charge.success")
+    expect(out).toContain(
+      'invariant: expect(getByRole("status")).toHaveText("Credits: 500") failed',
+    )
+    expect(out).toContain("faults: 13 passed, 1 failed")
+    expect(code).toBe(1)
+
+    const report = /report: (\S+report\.html)/.exec(out)?.[1] ?? ""
+    const html = await readFile(join(fixture("naira-shop"), report), "utf8")
+
+    expect(html).toContain("POST api.paystack.co")
+    expect(html).not.toContain("4a1ra4a1ra4a1ra4a1ra4a1ra4a1ra4a1ra4a1ra4")
   }, 300_000)
 
   it("faults a GitHub bot's issues webhook and a deduplicating bot comments at most once", async () => {
