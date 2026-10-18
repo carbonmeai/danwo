@@ -90,6 +90,7 @@ export class AndroidDevice implements DeviceTarget {
   }
 
   /** The device's serial, e.g. `emulator-5554`. */
+  // fallow-ignore-next-line unused-class-member -- the `device` fixture's, for tests
   get serial(): string {
     return this.emulator.adb.serial
   }
@@ -148,6 +149,7 @@ export class AndroidDevice implements DeviceTarget {
   }
 
   /** Redoes what an adbd restart, a reboot or a snapshot load lost: root, this run's CA, the proxy route. */
+  // fallow-ignore-next-line unused-class-member -- the `device` fixture's, for tests
   rebind(): Promise<void> {
     return this.binder.rebind()
   }

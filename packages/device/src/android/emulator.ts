@@ -35,9 +35,9 @@ const BOOT_POLL_MS = 1_000
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-/** Serials of the emulators adb sees as ready. */
-async function runningSerials(tools: AndroidTools, exec: Exec): Promise<string[]> {
-  const listing = await exec(tools.adb, ["devices"])
+/** Serials of the emulators the adb at `adbPath` sees as ready. */
+export async function runningSerials(adbPath: string, exec: Exec): Promise<string[]> {
+  const listing = await exec(adbPath, ["devices"])
 
   return listing
     .split("\n")
@@ -61,7 +61,7 @@ async function findRunning(
 ): Promise<Adb | undefined> {
   if (options.serial !== undefined) return new Adb(tools.adb, options.serial, exec)
 
-  for (const serial of await runningSerials(tools, exec)) {
+  for (const serial of await runningSerials(tools.adb, exec)) {
     const adb = new Adb(tools.adb, serial, exec)
 
     if (options.avd === undefined || (await avdOf(adb)) === options.avd) return adb
@@ -86,7 +86,9 @@ async function waitForBoot(adb: Adb, timeoutMs: number): Promise<void> {
 
 /** The first console port no running emulator uses. */
 async function freePort(tools: AndroidTools, exec: Exec): Promise<number> {
-  const used = new Set((await runningSerials(tools, exec)).map((serial) => Number(serial.slice(9))))
+  const used = new Set(
+    (await runningSerials(tools.adb, exec)).map((serial) => Number(serial.slice(9))),
+  )
 
   for (let port = FIRST_PORT; port <= LAST_PORT; port += 2) {
     if (!used.has(port)) return port

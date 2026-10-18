@@ -9,6 +9,7 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 
 import { Adb, type Exec, execProgram } from "./adb.ts"
+import { runningSerials } from "./android/emulator.ts"
 import { androidSdkRoot, javaHome } from "./toolchain.ts"
 
 /** One finding. */
@@ -108,12 +109,7 @@ async function avdChecks(sdk: string): Promise<DoctorCheck[]> {
 /** Running emulators whose proxy setting points at a port nothing forwards: their network is dead. */
 async function staleProxies(sdk: string, exec: Exec): Promise<DoctorCheck[]> {
   const adbPath = join(sdk, "platform-tools", "adb")
-  const listing = await exec(adbPath, ["devices"]).catch(() => "")
-  const serials = listing
-    .split("\n")
-    .map((line) => line.trim().split(/\s+/))
-    .filter(([serial, state]) => serial?.startsWith("emulator-") === true && state === "device")
-    .map(([serial]) => serial ?? "")
+  const serials = await runningSerials(adbPath, exec).catch((): string[] => [])
 
   return Promise.all(
     serials.map(async (serial): Promise<DoctorCheck> => {

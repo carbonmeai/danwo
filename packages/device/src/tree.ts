@@ -49,13 +49,16 @@ export function roleOf(node: DriverNode): string {
   const type = node.type ?? ""
   const byClass = ROLE_BY_CLASS.find(([pattern]) => pattern.test(type))
 
-  if (byClass !== undefined) return byClass[1]
+  return byClass === undefined ? roleByKind(node) : byClass[1]
+}
+
+/** The role of a node whose class says nothing: the driver's kind, or a React Native hint. */
+function roleByKind(node: DriverNode): string {
   if (node.kind === "button" || node.kind === "link") return node.kind
   /* React Native's Pressable without a role: a tappable view group with a label. */
   if (node.hittable === true && (node.label ?? "") !== "") return "button"
-  if (node.kind === "text") return "text"
 
-  return "generic"
+  return node.kind === "text" ? "text" : "generic"
 }
 
 /** React Native's `testID`: Android's resource id without the package part. */

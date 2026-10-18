@@ -280,12 +280,12 @@ describe("acting on a device", () => {
 
     expect(await screen.getByTestId("buy").innerText()).toBe("Buy 500 credits Buy 500 credits")
     expect(await screen.getByTestId("credits").textContent()).toBe("Credits: 0")
-    expect(await screen.getByRole("text").count()).toBe(2)
-    expect(await screen.getByRole("text").allTextContents()).toEqual([
+    expect(await screen.getByText(/credits/i).count()).toBe(2)
+    expect(await screen.getByText(/credits/i).allTextContents()).toEqual([
       "Credits: 0",
       "Buy 500 credits",
     ])
-    expect(await screen.getByRole("text").all()).toHaveLength(2)
+    expect(await screen.getByText(/credits/i).all()).toHaveLength(2)
     expect(await screen.getByTestId("buy").isVisible()).toBe(true)
     expect(await screen.getByTestId("gone").isHidden()).toBe(true)
     expect(await screen.getByTestId("buy").isEnabled()).toBe(true)
@@ -349,7 +349,7 @@ describe("expect on a device", () => {
     await check(screen.getByTestId("buy")).toBeEnabled()
     await check(screen.getByTestId("buy")).not.toBeDisabled()
     await check(screen.getByRole("switch")).not.toBeChecked()
-    await check(screen.getByRole("text")).toHaveCount(2)
+    await check(screen.getByText(/credits/i)).toHaveCount(2)
     await expect(check(screen.getByTestId("credits")).toHaveText("Credits: 1000")).rejects.toThrow(
       'expect(getByTestId("credits")).toHaveText("Credits: 1000") failed after 300 ms\n  received: "Credits: 500"',
     )
