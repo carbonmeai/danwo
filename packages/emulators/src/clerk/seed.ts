@@ -3,8 +3,8 @@ import { contextOf, type ClerkContext } from "./context.ts"
 import { newUser } from "./entities.ts"
 import { clerkId, publishableKeyFor } from "./helpers.ts"
 import { addMembership, createOrganization } from "./organizations.ts"
-import { INSTANCE, type ClerkInstance } from "./store.ts"
 import { userByEmail } from "./routes/users.ts"
+import { INSTANCE, type ClerkInstance } from "./store.ts"
 
 /** A seeded user: an email address, and a password unless sign-in is by emailed code. */
 export interface ClerkSeedUser {
@@ -38,7 +38,11 @@ export interface ClerkSeedConfig {
    * and the publishable key is derived from it. `secretKey` is what the app's server sends.
    * `password: false` makes the Account Portal sign in by emailed code instead.
    */
-  readonly instance?: { readonly slug?: string; readonly secretKey?: string; readonly password?: boolean }
+  readonly instance?: {
+    readonly slug?: string
+    readonly secretKey?: string
+    readonly password?: boolean
+  }
   readonly users?: readonly ClerkSeedUser[]
   readonly organizations?: readonly ClerkSeedOrganization[]
   readonly jwtTemplates?: readonly ClerkSeedTemplate[]
@@ -87,7 +91,10 @@ function seedUsers(context: ClerkContext, users: readonly ClerkSeedUser[]): void
 
 function seedOrganizations(context: ClerkContext, orgs: readonly ClerkSeedOrganization[]): void {
   for (const org of orgs) {
-    const created = createOrganization(context, { name: org.name, ...(org.slug !== undefined && { slug: org.slug }) })
+    const created = createOrganization(context, {
+      name: org.name,
+      ...(org.slug !== undefined && { slug: org.slug }),
+    })
 
     for (const member of org.members ?? []) {
       const user = userByEmail(context, member.email)

@@ -10,7 +10,9 @@ afterEach(() => bed.close())
 
 describe("the Clerk Backend API", () => {
   it("creates, lists, counts, updates and deletes users", async () => {
-    bed = clerkTestbed({ users: [{ email: "ada@danwo.test", password: "s3cret-pass", firstName: "Ada" }] })
+    bed = clerkTestbed({
+      users: [{ email: "ada@danwo.test", password: "s3cret-pass", firstName: "Ada" }],
+    })
 
     const grace = await bed.client.users.createUser({
       emailAddress: ["grace@danwo.test"],
@@ -36,16 +38,20 @@ describe("the Clerk Backend API", () => {
 
     expect(renamed.lastName).toBe("Hopper")
 
-    const merged = await bed.client.users.updateUserMetadata(grace.id, { publicMetadata: { seats: 3 } })
+    const merged = await bed.client.users.updateUserMetadata(grace.id, {
+      publicMetadata: { seats: 3 },
+    })
 
     expect(merged.publicMetadata).toEqual({ plan: "pro", seats: 3 })
-    await expect(bed.client.users.verifyPassword({ userId: grace.id, password: "another-pass" })).resolves.toEqual({
+    await expect(
+      bed.client.users.verifyPassword({ userId: grace.id, password: "another-pass" }),
+    ).resolves.toEqual({
       verified: true,
     })
 
     const deleted = await bed.client.users.deleteUser(grace.id)
 
-    expect(deleted.deleted).toBe(true)
+    expect(deleted.id).toBe(grace.id)
     await expect(bed.client.users.getUser(grace.id)).rejects.toSatisfy(
       (error: unknown) => isClerkAPIResponseError(error) && error.status === 404,
     )
@@ -74,7 +80,12 @@ describe("the Clerk Backend API", () => {
   it("starts, lists, verifies, mints tokens for and revokes sessions", async () => {
     bed = clerkTestbed({
       users: [{ email: "ada@danwo.test", password: "s3cret-pass" }],
-      jwtTemplates: [{ name: "supabase", claims: { email: "{{user.primary_email_address}}", role: "authenticated" } }],
+      jwtTemplates: [
+        {
+          name: "supabase",
+          claims: { email: "{{user.primary_email_address}}", role: "authenticated" },
+        },
+      ],
     })
 
     const [ada] = (await bed.client.users.getUserList()).data
@@ -86,10 +97,16 @@ describe("the Clerk Backend API", () => {
     const token = await bed.client.sessions.getToken(session.id)
     const claims = await verifyToken(token.jwt, { secretKey: bed.secretKey })
 
-    expect(claims).toMatchObject({ sid: session.id, sub: ada?.id, iss: "https://danwo-app.clerk.accounts.dev" })
+    expect(claims).toMatchObject({
+      sid: session.id,
+      sub: ada?.id,
+      iss: "https://danwo-app.clerk.accounts.dev",
+    })
 
     const templated = await bed.client.sessions.getToken(session.id, "supabase")
-    const payload = JSON.parse(Buffer.from(templated.jwt.split(".")[1] ?? "", "base64url").toString())
+    const payload = JSON.parse(
+      Buffer.from(templated.jwt.split(".")[1] ?? "", "base64url").toString(),
+    )
 
     expect(payload).toMatchObject({ email: "ada@danwo.test", role: "authenticated", sub: ada?.id })
 
@@ -97,7 +114,8 @@ describe("the Clerk Backend API", () => {
 
     expect(revoked.status).toBe("revoked")
     await expect(bed.client.sessions.getToken(session.id)).rejects.toSatisfy(
-      (error: unknown) => isClerkAPIResponseError(error) && error.errors[0]?.code === "session_not_active",
+      (error: unknown) =>
+        isClerkAPIResponseError(error) && error.errors[0]?.code === "session_not_active",
     )
   })
 
@@ -112,7 +130,10 @@ describe("the Clerk Backend API", () => {
     const users = (await bed.client.users.getUserList()).data
     const ada = users.find((u) => u.primaryEmailAddress?.emailAddress === "ada@danwo.test")
     const grace = users.find((u) => u.primaryEmailAddress?.emailAddress === "grace@danwo.test")
-    const org = await bed.client.organizations.createOrganization({ name: "Analytical Engines", createdBy: ada?.id ?? "" })
+    const org = await bed.client.organizations.createOrganization({
+      name: "Analytical Engines",
+      createdBy: ada?.id ?? "",
+    })
 
     expect(org.slug).toBe("analytical-engines")
     await bed.client.organizations.createOrganizationMembership({
@@ -121,7 +142,9 @@ describe("the Clerk Backend API", () => {
       role: "org:member",
     })
 
-    const members = await bed.client.organizations.getOrganizationMembershipList({ organizationId: org.id })
+    const members = await bed.client.organizations.getOrganizationMembershipList({
+      organizationId: org.id,
+    })
 
     expect(members.totalCount).toBe(2)
     expect(members.data.map((m) => [m.publicUserData?.identifier, m.role])).toEqual([
@@ -146,7 +169,10 @@ describe("the Clerk Backend API", () => {
     bed = clerkTestbed({ users: [{ email: "ada@danwo.test", password: "s3cret-pass" }] })
 
     const [ada] = (await bed.client.users.getUserList()).data
-    const token = await bed.client.signInTokens.createSignInToken({ userId: ada?.id ?? "", expiresInSeconds: 600 })
+    const token = await bed.client.signInTokens.createSignInToken({
+      userId: ada?.id ?? "",
+      expiresInSeconds: 600,
+    })
 
     expect(token.url).toMatch(/^https:\/\/danwo-app\.accounts\.dev\/sign-in\?__clerk_ticket=/)
 

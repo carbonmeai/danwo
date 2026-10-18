@@ -32,6 +32,15 @@ function shortcodeValues(context: ClerkContext, session: SessionJSON): Record<st
   }
 }
 
+/** A shortcode's value inside a longer string: primitives as they are, the rest as JSON. */
+function text(value: unknown): string {
+  if (value === null || value === undefined) return ""
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+    return String(value)
+
+  return JSON.stringify(value)
+}
+
 /** Replaces shortcodes in one claim value: a lone `{{x}}` keeps the value's type. */
 function resolve(value: unknown, values: Record<string, unknown>): unknown {
   if (typeof value === "string") {
@@ -39,7 +48,7 @@ function resolve(value: unknown, values: Record<string, unknown>): unknown {
 
     if (lone) return values[lone[1] ?? ""] ?? null
 
-    return value.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, path: string) => String(values[path] ?? ""))
+    return value.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, path: string) => text(values[path]))
   }
 
   if (Array.isArray(value)) return value.map((item) => resolve(item, values))

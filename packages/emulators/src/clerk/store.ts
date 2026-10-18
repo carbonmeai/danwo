@@ -84,8 +84,14 @@ export interface AttemptRecord {
   identifier: string
   user_id: string | null
   status: "needs_identifier" | "needs_first_factor" | "missing_requirements" | "complete"
+  /** The first factor (or, for a sign-up, the verification) being worked on: `password` or `email_code`. */
+  strategy: string | null
+  /** The session a completed attempt started. */
+  created_session_id: string | null
   /** The code emailed for this attempt, if one was sent. */
   code: string | null
+  /** When the code was sent; it expires ten minutes later. */
+  code_sent_at: number | null
   attempts: number
   /** A sign-up's chosen password, kept until the user is created. */
   password: string | null

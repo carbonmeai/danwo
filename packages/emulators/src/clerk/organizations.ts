@@ -52,7 +52,10 @@ export interface NewOrganization {
 }
 
 /** Creates an organization; its creator, if given, becomes its first admin. */
-export function createOrganization(context: ClerkContext, fields: NewOrganization): OrganizationJSON {
+export function createOrganization(
+  context: ClerkContext,
+  fields: NewOrganization,
+): OrganizationJSON {
   const slug = fields.slug ?? slugify(fields.name)
 
   if (context.clerk.organizations.where((o) => o.slug === slug).length > 0)
@@ -121,7 +124,9 @@ export function membershipOf(
   orgId: string,
   userId: string,
 ): MembershipRecord | undefined {
-  return context.clerk.memberships.where((m) => m.organization_id === orgId && m.user_id === userId)[0]
+  return context.clerk.memberships.where(
+    (m) => m.organization_id === orgId && m.user_id === userId,
+  )[0]
 }
 
 /** An organization with its member count, as the API answers it. */

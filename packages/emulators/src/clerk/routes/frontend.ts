@@ -1,4 +1,4 @@
-import type { App, Context } from "../../http.ts"
+import type { App, Context, Middleware } from "../../http.ts"
 import type { ClerkContext } from "../context.ts"
 import { devBrowserFor, handshakeDirectives, storeNonce } from "../handshake.ts"
 import { invalidParameter } from "../helpers.ts"
@@ -34,6 +34,55 @@ function handshake(c: Context, context: ClerkContext): Response {
   back.searchParams.set("__clerk_handshake_nonce", storeNonce(context, directives))
 
   return c.redirect(back.toString(), 307)
+}
+
+/**
+ * ClerkJS calls the Frontend API from the app's own origin with credentials, so every answer names
+ * that origin and preflights are answered here.
+ */
+export function frontendCors(): Middleware {
+  return async (c, next) => {
+    const origin = c.req.header("origin")
+
+    if (origin === undefined) return next()
+
+    const headers = {
+      "access-control-allow-origin": origin,
+      "access-control-allow-credentials": "true",
+      "access-control-allow-headers":
+        c.req.header("access-control-request-headers") ?? "content-type",
+      "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS",
+      vary: "Origin",
+    }
+
+    if (c.req.method === "OPTIONS") return new Response(null, { status: 204, headers })
+
+    for (const [name, value] of Object.entries(headers)) c.header(name, value)
+
+    return next()
+  }
+}
+
+/**
+ * ClerkJS sends `PATCH` and `DELETE` as a `POST` with `_method` in the query, so they pass
+ * through anything that only allows simple requests; the request is replayed with its real method.
+ */
+export function methodOverride(app: App): Middleware {
+  return async (c, next) => {
+    const method = c.req.query("_method")
+
+    if (c.req.method !== "POST" || method === undefined) return next()
+
+    const url = new URL(c.req.url)
+
+    url.searchParams.delete("_method")
+
+    const body = method.toUpperCase() === "GET" ? null : await c.req.raw.arrayBuffer()
+
+    return app.fetch(
+      new Request(url, { method: method.toUpperCase(), headers: c.req.raw.headers, body }),
+    )
+  }
 }
 
 /** The Frontend API's handshake and public keys. */

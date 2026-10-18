@@ -1,8 +1,8 @@
 import type { App } from "../../http.ts"
 import { bodyOf } from "../backend-auth.ts"
+import { clientJson } from "../client-json.ts"
 import { type ClerkContext, instanceOf, now } from "../context.ts"
 import { clerkId, invalidParameter, notFound, num, record, secretToken, str } from "../helpers.ts"
-import { clientJson } from "../client-json.ts"
 import { userOf } from "./users.ts"
 
 function keyRoutes(app: App, context: ClerkContext): void {

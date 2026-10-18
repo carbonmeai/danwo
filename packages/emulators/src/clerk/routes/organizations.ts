@@ -101,7 +101,10 @@ function membershipRoutes(app: App, context: ClerkContext): void {
     if (!membership) throw notFound("organization membership")
     if (role === undefined) throw invalidParameter("role")
 
-    const changed = context.clerk.memberships.change(membership.id, { role, updated_at: now(context) })
+    const changed = context.clerk.memberships.change(membership.id, {
+      role,
+      updated_at: now(context),
+    })
 
     return c.json(membershipJson(context, changed ?? membership))
   })
@@ -153,7 +156,10 @@ function invitationRoutes(app: App, context: ClerkContext): void {
   })
   app.post("/v1/organizations/:id/invitations/:invitation/revoke", (c) => {
     const id = c.req.param("invitation")
-    const changed = context.clerk.invitations.change(id, { status: "revoked", updated_at: now(context) })
+    const changed = context.clerk.invitations.change(id, {
+      status: "revoked",
+      updated_at: now(context),
+    })
 
     if (!changed) throw notFound("organization invitation")
 

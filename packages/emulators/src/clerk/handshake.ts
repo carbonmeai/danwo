@@ -47,7 +47,11 @@ export function handshakeDirectives(
   const browser = both("__clerk_db_jwt", devBrowser.id, COOKIE_MAX_AGE, suffix)
 
   if (!session)
-    return [...browser, ...both("__session", "", 0, suffix), ...both("__client_uat", "0", COOKIE_MAX_AGE, suffix)]
+    return [
+      ...browser,
+      ...both("__session", "", 0, suffix),
+      ...both("__client_uat", "0", COOKIE_MAX_AGE, suffix),
+    ]
 
   const uat = String(Math.floor(context.wallClock().getTime() / 1000) - 1)
 

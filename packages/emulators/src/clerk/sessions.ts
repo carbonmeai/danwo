@@ -29,7 +29,11 @@ export function newClient(context: ClerkContext): ClientRecord {
 }
 
 /** Starts a session for `userId` on `client` and makes it the client's active one. */
-export function startSession(context: ClerkContext, client: ClientRecord, userId: string): SessionJSON {
+export function startSession(
+  context: ClerkContext,
+  client: ClientRecord,
+  userId: string,
+): SessionJSON {
   const at = now(context)
   const session = context.clerk.sessions.add(
     {
@@ -85,7 +89,9 @@ export function endSession(
     context.clerk.clients.change(client.id, {
       session_ids: remaining,
       last_active_session_id:
-        client.last_active_session_id === id ? (remaining.at(-1) ?? null) : client.last_active_session_id,
+        client.last_active_session_id === id
+          ? (remaining.at(-1) ?? null)
+          : client.last_active_session_id,
       updated_at: at,
     })
   }
@@ -93,11 +99,11 @@ export function endSession(
   return ended
 }
 
-/** The organization a session's token carries, from its last active organization. */
+/** The organization a session's token carries, from its last active organization (empty when none). */
 function organizationClaim(context: ClerkContext, session: SessionJSON) {
   const orgId = session.last_active_organization_id
 
-  if (orgId === undefined) return {}
+  if (orgId === undefined || orgId === "") return {}
 
   const org = context.clerk.organizations.get(orgId)
   const membership = context.clerk.memberships.where(
@@ -138,7 +144,10 @@ export function sessionToken(context: ClerkContext, session: SessionJSON, azp?: 
 }
 
 /** The client's active session, if it still has a live one. */
-export function activeSession(context: ClerkContext, client: ClientRecord): SessionJSON | undefined {
+export function activeSession(
+  context: ClerkContext,
+  client: ClientRecord,
+): SessionJSON | undefined {
   const id = client.last_active_session_id
   const session = id === null ? undefined : context.clerk.sessions.get(id)
 

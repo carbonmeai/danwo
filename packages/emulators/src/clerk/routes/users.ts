@@ -93,13 +93,15 @@ function updates(body: Record<string, unknown>): Partial<ClerkUser> {
   return changes
 }
 
+/** One metadata object with `patch` merged in; a null value removes its key. */
+function merge(current: Record<string, unknown>, patch: unknown): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries({ ...current, ...record(patch) }).filter(([, value]) => value !== null),
+  )
+}
+
 /** Merges `metadata` into a user's, as `PATCH /users/:id/metadata` does: null removes a key. */
 function mergeMetadata(user: ClerkUser, body: Record<string, unknown>): Partial<ClerkUser> {
-  const merge = (current: Record<string, unknown>, patch: unknown) =>
-    Object.fromEntries(
-      Object.entries({ ...current, ...record(patch) }).filter(([, value]) => value !== null),
-    )
-
   return {
     public_metadata: merge(user.public_metadata, body.public_metadata),
     private_metadata: merge(user.private_metadata, body.private_metadata),
@@ -119,10 +121,18 @@ function readRoutes(app: App, context: ClerkContext): void {
   app.get("/v1/users", (c) => {
     const { limit, offset } = pageOf(c)
 
-    return c.json(ordered(c, context.clerk.users.where((u) => matches(c, u))).slice(offset, offset + limit))
+    return c.json(
+      ordered(
+        c,
+        context.clerk.users.where((u) => matches(c, u)),
+      ).slice(offset, offset + limit),
+    )
   })
   app.get("/v1/users/count", (c) =>
-    c.json({ object: "total_count", total_count: context.clerk.users.where((u) => matches(c, u)).length }),
+    c.json({
+      object: "total_count",
+      total_count: context.clerk.users.where((u) => matches(c, u)).length,
+    }),
   )
   app.get("/v1/users/:id", (c) => c.json(userOf(context, c.req.param("id"))))
 }
@@ -139,7 +149,10 @@ function writeRoutes(app: App, context: ClerkContext): void {
     const user = userOf(context, c.req.param("id"))
 
     return c.json(
-      context.clerk.users.change(user.id, { ...mergeMetadata(user, await bodyOf(c)), updated_at: now(context) }),
+      context.clerk.users.change(user.id, {
+        ...mergeMetadata(user, await bodyOf(c)),
+        updated_at: now(context),
+      }),
     )
   })
   app.delete("/v1/users/:id", (c) => {
@@ -169,7 +182,12 @@ function accountRoutes(app: App, context: ClerkContext): void {
     const given = str((await bodyOf(c)).password)
 
     if (given === undefined || context.clerk.users.extra(user.id)?.password !== given)
-      throw new ClerkFailure(422, "incorrect_password", "Password is incorrect.", "Password is incorrect.")
+      throw new ClerkFailure(
+        422,
+        "incorrect_password",
+        "Password is incorrect.",
+        "Password is incorrect.",
+      )
 
     return c.json({ verified: true })
   })

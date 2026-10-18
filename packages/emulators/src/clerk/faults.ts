@@ -25,8 +25,18 @@ const RATE_LIMITED = fault(
   "Too many requests, retry later",
   { "retry-after": "10" },
 )
-const INTERNAL = fault(500, "internal_clerk_error", "Oops, an unexpected error occurred", "There was an internal error on our servers. We've been notified and are working on fixing it.")
-const UNAVAILABLE = fault(503, "service_unavailable", "Service unavailable", "The service is temporarily unavailable, please retry later.")
+const INTERNAL = fault(
+  500,
+  "internal_clerk_error",
+  "Oops, an unexpected error occurred",
+  "There was an internal error on our servers. We've been notified and are working on fixing it.",
+)
+const UNAVAILABLE = fault(
+  503,
+  "service_unavailable",
+  "Service unavailable",
+  "The service is temporarily unavailable, please retry later.",
+)
 
 /** Frontend API paths: the browser's, not the app server's, so the matrix leaves them alone. */
 const FRONTEND = /^\/v1\/(client(\/|$)|environment$|dev_browser$)/

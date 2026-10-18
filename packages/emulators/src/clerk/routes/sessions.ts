@@ -49,8 +49,7 @@ function listed(context: ClerkContext, query: (name: string) => string | undefin
 /** A token for a session: the plain session token, or one shaped by a JWT template. */
 function tokenFor(context: ClerkContext, session: SessionJSON, template: string | undefined) {
   const base = sessionClaims(context, session, undefined)
-  const claims =
-    template === undefined ? base : templateClaims(context, template, session, base)
+  const claims = template === undefined ? base : templateClaims(context, template, session, base)
 
   return { object: "token", jwt: context.key.sign(claims) }
 }
@@ -64,7 +63,9 @@ function readRoutes(app: App, context: ClerkContext): void {
     const { limit, offset } = pageOf(c)
     const page = sessions.slice(offset, offset + limit)
 
-    return c.json(c.req.query("paginated") === "true" ? { data: page, total_count: sessions.length } : page)
+    return c.json(
+      c.req.query("paginated") === "true" ? { data: page, total_count: sessions.length } : page,
+    )
   })
   app.get("/v1/sessions/:id", (c) => c.json(sessionOf(context, c.req.param("id"))))
 }
@@ -77,7 +78,9 @@ function writeRoutes(app: App, context: ClerkContext): void {
 
     return c.json(startSession(context, newClient(context), userOf(context, userId).id))
   })
-  app.post("/v1/sessions/:id/revoke", (c) => c.json(endSession(context, c.req.param("id"), "revoked")))
+  app.post("/v1/sessions/:id/revoke", (c) =>
+    c.json(endSession(context, c.req.param("id"), "revoked")),
+  )
   app.post("/v1/sessions/:id/verify", (c) => c.json(liveSessionOf(context, c.req.param("id"))))
   app.post("/v1/sessions/:id/tokens", (c) =>
     c.json(tokenFor(context, liveSessionOf(context, c.req.param("id")), undefined)),

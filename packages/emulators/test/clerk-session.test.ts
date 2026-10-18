@@ -64,7 +64,12 @@ async function authenticate(url: string, jar: Jar) {
 /** Signs in on the Account Portal with a password, as the browser would. */
 async function signInOnPortal(jar: Jar, email: string, password: string): Promise<string> {
   const devBrowser = jar.get("__clerk_db_jwt") ?? ""
-  const form = new URLSearchParams({ identifier: email, password, redirect_url: `${APP}/dashboard`, __clerk_db_jwt: devBrowser })
+  const form = new URLSearchParams({
+    identifier: email,
+    password,
+    redirect_url: `${APP}/dashboard`,
+    __clerk_db_jwt: devBrowser,
+  })
   const answer = await fetch(`https://danwo-app.accounts.dev/sign-in`, {
     method: "POST",
     body: form,
@@ -94,7 +99,9 @@ describe("Clerk sessions in an app's middleware", () => {
     const signedIn = await authenticate(back, jar)
 
     expect(signedIn.status).toBe("signed-in")
-    expect(signedIn.toAuth()).toMatchObject({ userId: clerkInstance(bed.emulator).user("ada@danwo.test")?.id })
+    expect(signedIn.toAuth()).toMatchObject({
+      userId: clerkInstance(bed.emulator).user("ada@danwo.test")?.id,
+    })
 
     const again = await bed.client.authenticateRequest(navigation(`${APP}/dashboard`, jar), {
       publishableKey: bed.publishableKey,
@@ -113,18 +120,28 @@ describe("Clerk sessions in an app's middleware", () => {
 
     const wrong = await fetch("https://danwo-app.accounts.dev/sign-in", {
       method: "POST",
-      body: new URLSearchParams({ identifier: "ada@danwo.test", password: "nope", redirect_url: APP }),
+      body: new URLSearchParams({
+        identifier: "ada@danwo.test",
+        password: "nope",
+        redirect_url: APP,
+      }),
     })
 
     expect(wrong.status).toBe(422)
     expect(await wrong.text()).toContain("Password is incorrect")
 
-    const signedIn = await authenticate(await signInOnPortal(jar, "ada@danwo.test", "s3cret-pass"), jar)
+    const signedIn = await authenticate(
+      await signInOnPortal(jar, "ada@danwo.test", "s3cret-pass"),
+      jar,
+    )
 
     expect(signedIn.status).toBe("signed-in")
     expect(clerkInstance(bed.emulator).revokeSessions("ada@danwo.test")).toBe(1)
 
-    const afterRevoke = await authenticate(`${APP}/?__clerk_db_jwt=${jar.get("__clerk_db_jwt") ?? ""}`, jar)
+    const afterRevoke = await authenticate(
+      `${APP}/?__clerk_db_jwt=${jar.get("__clerk_db_jwt") ?? ""}`,
+      jar,
+    )
 
     expect(afterRevoke.status).toBe("signed-out")
   })
@@ -138,14 +155,23 @@ describe("Clerk sessions in an app's middleware", () => {
 
     const asked = await fetch("https://danwo-app.accounts.dev/sign-in", {
       method: "POST",
-      body: new URLSearchParams({ identifier: "ada@danwo.test", redirect_url: APP, __clerk_db_jwt: jar.get("__clerk_db_jwt") ?? "" }),
+      body: new URLSearchParams({
+        identifier: "ada@danwo.test",
+        redirect_url: APP,
+        __clerk_db_jwt: jar.get("__clerk_db_jwt") ?? "",
+      }),
     })
     const page = await asked.text()
     const attempt = /name="attempt" value="([^"]+)"/.exec(page)?.[1] ?? ""
     const code = await clerkInstance(bed.emulator).code("ada@danwo.test")
     const verified = await fetch("https://danwo-app.accounts.dev/sign-in/verify", {
       method: "POST",
-      body: new URLSearchParams({ attempt, code, redirect_url: APP, __clerk_db_jwt: jar.get("__clerk_db_jwt") ?? "" }),
+      body: new URLSearchParams({
+        attempt,
+        code,
+        redirect_url: APP,
+        __clerk_db_jwt: jar.get("__clerk_db_jwt") ?? "",
+      }),
       redirect: "manual",
     })
 

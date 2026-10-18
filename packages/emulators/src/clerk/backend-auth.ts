@@ -1,7 +1,7 @@
 import type { Context, Middleware } from "../http.ts"
+import type { Store } from "../store.ts"
 import { instanceOf } from "./context.ts"
 import { ClerkFailure, record } from "./helpers.ts"
-import type { Store } from "../store.ts"
 
 /** The Backend API takes the instance's secret key as a Bearer token on every call. */
 export function backendAuth(store: Store): Middleware {

@@ -26,11 +26,13 @@ export interface ClerkInstanceView {
 /** The Clerk emulator's instance, users, sessions and sent codes, for tests. */
 export function clerkInstance(emulator: Emulator): ClerkInstanceView {
   const context = contextOf(emulator.store)
+
   const userSessions = (email: string) => {
     const user = userByEmail(context, email)
 
     return user ? context.clerk.sessions.where((s) => s.user_id === user.id) : []
   }
+
   const messages = (to: string) =>
     context.clerk.messages.where((m) => m.to.toLowerCase() === to.toLowerCase())
 
@@ -51,6 +53,10 @@ export function clerkInstance(emulator: Emulator): ClerkInstanceView {
     },
     messages,
     code: (to, timeoutMs = 5000) =>
-      waitUntil(() => messages(to).at(-1)?.code ?? undefined, timeoutMs, `no Clerk code was emailed to ${to}`),
+      waitUntil(
+        () => messages(to).at(-1)?.code ?? undefined,
+        timeoutMs,
+        `no Clerk code was emailed to ${to}`,
+      ),
   }
 }

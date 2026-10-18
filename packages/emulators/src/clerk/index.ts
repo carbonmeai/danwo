@@ -6,11 +6,14 @@ import { backendAuth } from "./backend-auth.ts"
 import { type ClerkContext, instanceOf, registerContext } from "./context.ts"
 import { BAPI_HOST, ClerkFailure, clerkErrorBody } from "./helpers.ts"
 import { accountsRoutes } from "./routes/accounts.ts"
-import { frontendRoutes } from "./routes/frontend.ts"
+import { attemptRoutes } from "./routes/attempts.ts"
+import { clientApiRoutes } from "./routes/client.ts"
+import { frontendCors, frontendRoutes, methodOverride } from "./routes/frontend.ts"
 import { instanceRoutes } from "./routes/instance.ts"
 import { organizationRoutes } from "./routes/organizations.ts"
 import { sessionRoutes } from "./routes/sessions.ts"
 import { userRoutes } from "./routes/users.ts"
+import { clerkScripts } from "./scripts.ts"
 import { instanceFrom } from "./seed.ts"
 import { clerkStore, INSTANCE } from "./store.ts"
 
@@ -35,7 +38,13 @@ const clerkErrors: ErrorHandler = (error, c) => {
   const message = error instanceof Error ? error.message : "Internal server error"
 
   return c.json(
-    clerkErrorBody([{ message, long_message: message, code: status === 404 ? "resource_not_found" : "internal_clerk_error" }]),
+    clerkErrorBody([
+      {
+        message,
+        long_message: message,
+        code: status === 404 ? "resource_not_found" : "internal_clerk_error",
+      },
+    ]),
     status,
   )
 }
@@ -50,7 +59,10 @@ function clerkApp(): App {
 }
 
 /** Sends each request to the app for its host: the Backend API, the Frontend API or the portal. */
-function byHost(context: ClerkContext, apps: { backend: App; frontend: App; accounts: App }): Middleware {
+function byHost(
+  context: ClerkContext,
+  apps: { backend: App; frontend: App; accounts: App },
+): Middleware {
   return (c, next) => {
     const host = new URL(c.req.url).hostname
     const instance = instanceOf(context)
@@ -94,7 +106,12 @@ export const clerk = defineEmulator({
     sessionRoutes(apps.backend, context)
     organizationRoutes(apps.backend, context)
     instanceRoutes(apps.backend, context)
+    apps.frontend.use(frontendCors())
+    apps.frontend.use(methodOverride(apps.frontend))
+    apps.frontend.use(clerkScripts())
     frontendRoutes(apps.frontend, context)
+    clientApiRoutes(apps.frontend, context)
+    attemptRoutes(apps.frontend, context)
     accountsRoutes(apps.accounts, context)
   },
   seed: ({ store }) => {

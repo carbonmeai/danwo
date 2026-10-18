@@ -1,7 +1,13 @@
 import { createClerkClient } from "@clerk/backend"
 import { vi } from "vitest"
 
-import { clerk, CLERK_HOSTS, clerkInstance, seedClerk, type ClerkSeedConfig } from "../src/clerk/index.ts"
+import {
+  clerk,
+  CLERK_HOSTS,
+  clerkInstance,
+  seedClerk,
+  type ClerkSeedConfig,
+} from "../src/clerk/index.ts"
 import { createEmulator, type Emulator } from "../src/define.ts"
 
 /** Whether a URL is one of the hosts the Clerk emulator answers. */

@@ -64,13 +64,21 @@ function field(label: string, name: string, type: string, value = ""): string {
 }
 
 function query(state: PortalState): string {
-  return new URLSearchParams({ redirect_url: state.redirectUrl, __clerk_db_jwt: state.devBrowser }).toString()
+  return new URLSearchParams({
+    redirect_url: state.redirectUrl,
+    __clerk_db_jwt: state.devBrowser,
+  }).toString()
 }
 
 /** The sign-in page: email, and a password unless the instance signs in by emailed code. */
 export function signInPage(
   state: PortalState,
-  options: { readonly password: boolean; readonly appName: string; readonly email?: string; readonly error?: string },
+  options: {
+    readonly password: boolean
+    readonly appName: string
+    readonly email?: string
+    readonly error?: string
+  },
 ): string {
   const password = options.password ? field("Password", "password", "password") : ""
 
