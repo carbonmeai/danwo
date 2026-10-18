@@ -1,0 +1,101 @@
+{
+  "provider": "gateway",
+  "source": "live",
+  "recorded": "2026-10-18",
+  "scenarios": {
+    "language model: text": {
+      "steps": [
+        {
+          "step": "generate text",
+          "status": 200,
+          "shape": "217b54675036"
+        }
+      ],
+      "facts": []
+    },
+    "language model: tool call": {
+      "steps": [
+        {
+          "step": "call a tool",
+          "status": 200,
+          "shape": "ff828095aeba"
+        }
+      ],
+      "facts": [
+        {
+          "name": "finish reason",
+          "value": "tool-calls"
+        }
+      ]
+    },
+    "language model: structured output": {
+      "steps": [
+        {
+          "step": "generate json",
+          "status": 200,
+          "shape": "217b54675036"
+        }
+      ],
+      "facts": [
+        {
+          "name": "output matches the schema",
+          "value": true
+        }
+      ]
+    },
+    "language model: stream": {
+      "steps": [
+        {
+          "step": "stream text",
+          "status": 200,
+          "shape": "983b12160d33"
+        }
+      ],
+      "facts": [
+        {
+          "name": "event types",
+          "value": "stream-start,response-metadata,text-start,text-delta,text-end,finish"
+        }
+      ]
+    },
+    "embedding model": {
+      "steps": [
+        {
+          "step": "embed",
+          "status": 200,
+          "shape": "2c1520eaeac2"
+        }
+      ],
+      "facts": []
+    },
+    "errors: unknown model, missing key, malformed request": {
+      "steps": [
+        {
+          "step": "an unknown model",
+          "status": 404,
+          "shape": "6e39860640a1"
+        },
+        {
+          "step": "no key",
+          "status": 401,
+          "shape": "40d2cdf11b64"
+        },
+        {
+          "step": "a prompt that is not a list",
+          "status": 400,
+          "shape": "abce64a1fec7"
+        }
+      ],
+      "facts": []
+    }
+  },
+  "shapes": {
+    "217b54675036": {"t":"object","keys":{"content":{"t":"array","of":{"t":"object","keys":{"type":{"t":"literal","v":"text"},"text":{"t":"string"},"providerMetadata":{"t":"object","keys":{},"open":true}}}},"finishReason":{"t":"object","keys":{"unified":{"t":"literal","v":"stop"}}},"usage":{"t":"object","keys":{"inputTokens":{"t":"object","keys":{"total":{"t":"number"},"noCache":{"t":"number"},"cacheRead":{"t":"number"},"cacheWrite":{"t":"number"}}},"outputTokens":{"t":"object","keys":{"total":{"t":"number"},"text":{"t":"number"},"reasoning":{"t":"number"}}},"raw":{"t":"object","keys":{},"open":true}}},"providerMetadata":{"t":"object","keys":{"openai":{"t":"object","keys":{},"open":true},"gateway":{"t":"object","keys":{"routing":{"t":"object","keys":{},"open":true},"cost":{"t":"string"},"marketCost":{"t":"string"},"surchargeCost":{"t":"string"},"gatewayCost":{"t":"string"},"inferenceCost":{"t":"string"},"inputInferenceCost":{"t":"string"},"outputInferenceCost":{"t":"string"},"providerAllowlistCost":{"t":"string"},"generationId":{"t":"string"}}}}},"warnings":{"t":"array","of":null}}},
+    "2c1520eaeac2": {"t":"object","keys":{"embeddings":{"t":"array","of":{"t":"array","of":{"t":"number"}}},"warnings":{"t":"array","of":null},"usage":{"t":"object","keys":{"tokens":{"t":"number"}}},"providerMetadata":{"t":"object","keys":{"gateway":{"t":"object","keys":{"routing":{"t":"object","keys":{},"open":true},"cost":{"t":"string"},"marketCost":{"t":"string"},"surchargeCost":{"t":"string"},"gatewayCost":{"t":"string"},"generationId":{"t":"string"}}}}}}},
+    "40d2cdf11b64": {"t":"object","keys":{"error":{"t":"object","keys":{"message":{"t":"string"},"type":{"t":"literal","v":"authentication_error"}}}}},
+    "6e39860640a1": {"t":"object","keys":{"error":{"t":"object","keys":{"message":{"t":"string"},"type":{"t":"literal","v":"model_not_found"},"param":{"t":"object","keys":{},"open":true}}}}},
+    "983b12160d33": {"t":"object","keys":{"stream-start":{"t":"array","of":{"t":"object","keys":{"type":{"t":"literal","v":"stream-start"},"warnings":{"t":"array","of":null}}}},"response-metadata":{"t":"array","of":{"t":"object","keys":{"type":{"t":"literal","v":"response-metadata"},"id":{"t":"string"},"timestamp":{"t":"string"},"modelId":{"t":"string"}}}},"text-start":{"t":"array","of":{"t":"object","keys":{"type":{"t":"literal","v":"text-start"},"id":{"t":"string"},"providerMetadata":{"t":"object","keys":{"openai":{"t":"object","keys":{},"open":true}}}}}},"text-delta":{"t":"array","of":{"t":"object","keys":{"type":{"t":"literal","v":"text-delta"},"id":{"t":"string"},"delta":{"t":"string"}}}},"text-end":{"t":"array","of":{"t":"object","keys":{"type":{"t":"literal","v":"text-end"},"id":{"t":"string"},"providerMetadata":{"t":"object","keys":{"openai":{"t":"object","keys":{},"open":true}}}}}},"finish":{"t":"array","of":{"t":"object","keys":{"type":{"t":"literal","v":"finish"},"finishReason":{"t":"object","keys":{"unified":{"t":"literal","v":"stop"}}},"usage":{"t":"object","keys":{"inputTokens":{"t":"object","keys":{"total":{"t":"number"},"noCache":{"t":"number"},"cacheRead":{"t":"number"},"cacheWrite":{"t":"number"}}},"outputTokens":{"t":"object","keys":{"total":{"t":"number"},"text":{"t":"number"},"reasoning":{"t":"number"}}},"raw":{"t":"object","keys":{},"open":true}}},"providerMetadata":{"t":"object","keys":{"openai":{"t":"object","keys":{},"open":true},"gateway":{"t":"object","keys":{"routing":{"t":"object","keys":{},"open":true},"cost":{"t":"string"},"marketCost":{"t":"string"},"surchargeCost":{"t":"string"},"gatewayCost":{"t":"string"},"inferenceCost":{"t":"string"},"inputInferenceCost":{"t":"string"},"outputInferenceCost":{"t":"string"},"providerAllowlistCost":{"t":"string"},"generationId":{"t":"string"}}}}}}}}}},
+    "abce64a1fec7": {"t":"object","keys":{"error":{"t":"object","keys":{"message":{"t":"string"},"param":{"t":"array","of":{"t":"object","keys":{"expected":{"t":"string"},"code":{"t":"string"},"path":{"t":"array","of":{"t":"string"}},"message":{"t":"string"}}}},"type":{"t":"literal","v":"invalid_request_error"}}}}},
+    "ff828095aeba": {"t":"object","keys":{"content":{"t":"array","of":{"t":"object","keys":{"type":{"t":"literal","v":"tool-call"},"toolCallId":{"t":"string"},"toolName":{"t":"string"},"input":{"t":"string"},"providerMetadata":{"t":"object","keys":{},"open":true}}}},"finishReason":{"t":"object","keys":{"unified":{"t":"literal","v":"tool-calls"}}},"usage":{"t":"object","keys":{"inputTokens":{"t":"object","keys":{"total":{"t":"number"},"noCache":{"t":"number"},"cacheRead":{"t":"number"},"cacheWrite":{"t":"number"}}},"outputTokens":{"t":"object","keys":{"total":{"t":"number"},"text":{"t":"number"},"reasoning":{"t":"number"}}},"raw":{"t":"object","keys":{},"open":true}}},"providerMetadata":{"t":"object","keys":{"openai":{"t":"object","keys":{},"open":true},"gateway":{"t":"object","keys":{"routing":{"t":"object","keys":{},"open":true},"cost":{"t":"string"},"marketCost":{"t":"string"},"surchargeCost":{"t":"string"},"gatewayCost":{"t":"string"},"inferenceCost":{"t":"string"},"inputInferenceCost":{"t":"string"},"outputInferenceCost":{"t":"string"},"providerAllowlistCost":{"t":"string"},"generationId":{"t":"string"}}}}},"warnings":{"t":"array","of":null}}}
+  }
+}

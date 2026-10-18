@@ -2,6 +2,7 @@
 import type { FidelityProvider } from "../provider.ts"
 import { bachsFidelity } from "./bachs.ts"
 import { flutterwaveFidelity } from "./flutterwave.ts"
+import { gatewayFidelity } from "./gateway.ts"
 import { githubFidelity } from "./github.ts"
 import { googleFidelity } from "./google.ts"
 import { microsoftFidelity } from "./microsoft.ts"
@@ -22,6 +23,7 @@ export const FIDELITY_PROVIDERS: readonly FidelityProvider[] = [
   githubFidelity,
   googleFidelity,
   microsoftFidelity,
+  gatewayFidelity,
 ]
 
 /** The providers named in `names`, or all of them; an unknown name is an error. */

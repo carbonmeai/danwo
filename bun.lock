@@ -189,8 +189,10 @@
       "name": "@danwo/fidelity",
       "version": "0.0.0",
       "dependencies": {
+        "@ai-sdk/gateway": "4.0.116",
         "@danwo/emulators": "workspace:*",
         "@danwo/runner": "workspace:*",
+        "ai": "7.0.143",
       },
       "devDependencies": {
         "yaml": "2.8.1",
