@@ -205,6 +205,10 @@ export class ElementLocator extends Finder implements Locator {
     return this.act("click", "", options, (target, timeout) => target.click({ timeout }))
   }
 
+  tap(options?: ActionOptions): Promise<void> {
+    return this.click(options)
+  }
+
   fill(value: string | Secret, options?: ActionOptions): Promise<void> {
     const secret = isSecret(value) ? value : undefined
     const shownValue = secret ? `secret ${JSON.stringify(secret.name)}` : JSON.stringify(value)

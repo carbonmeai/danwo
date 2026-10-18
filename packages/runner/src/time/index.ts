@@ -114,10 +114,13 @@ export async function showTime(context: BrowserContext, machine: TimeMachine): P
     await context.clock.setSystemTime(machine.now())
 }
 
-/** The session's `time`: every travel is a step, after which the page shows the new time. */
+/**
+ * The session's `time`: every travel is a step, after which the page shows the new time. Without
+ * a browser `context` (a device session) only the services behind the app move.
+ */
 export function sessionTime(
   machine: TimeMachine,
-  context: BrowserContext,
+  context: BrowserContext | undefined,
   run: RunStep,
   ready: () => Promise<void>,
 ): SessionTime {
@@ -127,7 +130,7 @@ export function sessionTime(
 
     await run(describeSpan(ms), async () => {
       await machine.travel(ms)
-      await showTime(context, machine)
+      if (context !== undefined) await showTime(context, machine)
       await ready()
     })
   }

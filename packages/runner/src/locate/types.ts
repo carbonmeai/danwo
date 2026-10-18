@@ -51,6 +51,8 @@ export interface Screen {
 export interface Locator extends Screen {
   /** Actions that take no input; each waits for the element to be ready. */
   readonly click: Action
+  /** `click` by its mobile name; the same action on a web page. */
+  readonly tap: Action
   readonly clear: Action
   readonly check: Action
   readonly uncheck: Action

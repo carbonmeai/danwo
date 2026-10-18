@@ -7,6 +7,8 @@
 import type { Browser, BrowserContext } from "playwright-core"
 
 import type { CheckPace } from "../assert/pace.ts"
+import { openDeviceSession } from "../device/session.ts"
+import type { DeviceTarget } from "../device/types.ts"
 import type { SessionFlight } from "../flight.ts"
 import type { FailureEvidence } from "../record/index.ts"
 import {
@@ -414,12 +416,42 @@ async function attemptOptions(
   }
 }
 
+/** An attempt on the environment's device: its app reset and launched, no browser. */
+function openOnDevice(setup: AttemptSetup, device: DeviceTarget, timeout: number) {
+  const { config, env } = setup
+  const setting = config.readiness
+  const backend = backendOf(env, { settle: typeof setting === "object" && setting.settle === true })
+
+  return openDeviceSession(device, {
+    baseUrl: env?.baseUrl ?? config.baseUrl,
+    projectRoot: setup.root,
+    ...(config.secrets !== undefined && { secrets: config.secrets }),
+    ...(env?.mail && { mail: env.mail }),
+    ...(backend && { backend }),
+    time: timeMachineOf(env),
+    ...(setup.recordDir !== undefined && { artifactsDir: setup.recordDir, stepScreenshots: true }),
+    actionTimeout: Math.min(timeout, DEVICE_ACTION_MS),
+  })
+}
+
+/** How long one action on a device may wait for its element. */
+const DEVICE_ACTION_MS = 15_000
+
 async function openSession(
   setup: AttemptSetup,
   timeout: number,
   state?: BrowserState,
 ): Promise<WebSession> {
   const { config, env } = setup
+
+  if (env?.device !== undefined) {
+    if (state !== undefined) {
+      throw new DanwoError("CONFIG_INVALID", "saved sessions are not supported on Android yet")
+    }
+
+    return openOnDevice(setup, env.device, timeout)
+  }
+
   const baseUrl = env?.baseUrl ?? config.baseUrl
 
   if (baseUrl === undefined) {
@@ -445,6 +477,9 @@ async function openSession(
 
 /** What every test receives: the session's handles, then whatever the environment adds. */
 function builtInFixtures(session: WebSession, env: WorkerEnvironment | undefined) {
+  const platform: "web" | "android" =
+    "platform" in session && session.platform === "android" ? "android" : "web"
+
   return {
     agent: session.agent,
     screen: session.screen,
@@ -453,7 +488,7 @@ function builtInFixtures(session: WebSession, env: WorkerEnvironment | undefined
     secret: (name: string) => session.secret(name),
     mail: session.mail,
     time: session.time,
-    platform: "web" as const,
+    platform,
     ...env?.fixtures,
   }
 }

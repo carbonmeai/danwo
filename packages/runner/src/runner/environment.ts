@@ -1,6 +1,7 @@
 import type { RunWebhooks } from "@danwo/matrix"
 import type { Proxy } from "@danwo/proxy"
 
+import type { DeviceTarget } from "../device/types.ts"
 import type { MailSource } from "../mail/index.ts"
 
 /**
@@ -19,6 +20,12 @@ export interface WorkerEnvironment {
    * (`{ stripe, resend }`). Without it the matrix plans outbound faults only.
    */
   readonly webhooks?: RunWebhooks | undefined
+  /**
+   * A mobile device the worker's tests run on instead of a browser, e.g. `androidDevice()` from
+   * @danwo/device: each attempt resets and launches the app on it, and `screen`, `app` and `expect`
+   * act on the device.
+   */
+  readonly device?: DeviceTarget
   /** Extra fixtures every test in this worker receives, e.g. `stripe`, `inbox`, `settle`. */
   readonly fixtures?: Readonly<Record<string, unknown>>
   /**

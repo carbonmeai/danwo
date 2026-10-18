@@ -20,6 +20,13 @@ export type {
   WaitForOptions,
 } from "../agent/index.ts"
 export type { ReadinessMode } from "../browser/readiness.ts"
+export type {
+  DeviceForeground,
+  DeviceLogLine,
+  DeviceNode,
+  DeviceScreenReading,
+  DeviceTarget,
+} from "../device/types.ts"
 export {
   gmailMail,
   latestMail,

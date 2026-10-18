@@ -138,7 +138,7 @@ export interface StepRecord {
 export interface AppLogRecord {
   readonly at: string
   readonly level: "debug" | "info" | "warn" | "error"
-  readonly source: "console" | "page-error" | "navigation"
+  readonly source: "console" | "page-error" | "navigation" | "device-log"
   readonly text: string
   /** The step that was running (or last ran) when it was logged. */
   readonly step: number

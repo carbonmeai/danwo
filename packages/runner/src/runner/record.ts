@@ -36,8 +36,11 @@ export type RecordedStep = StepRecord & {
 export type RecordedExchange = Omit<Exchange, "request" | "response"> & {
   readonly request?: CapturedMessage
   readonly response?: CapturedMessage
-  /** Who sent the call: the browser (a page's own request) or a server (the app). */
-  readonly origin?: "page" | "server"
+  /**
+   * Who sent the call: the browser (a page's own request), a server (the app's backend), or a
+   * mobile app on a device (its own HTTP client).
+   */
+  readonly origin?: "page" | "server" | "device"
   /** The kind of credential it carried, by shape; the credential itself is redacted. */
   readonly credential?: CredentialKind
 }
@@ -206,6 +209,18 @@ function redactedPath(host: string, path: string, redactor: Redactor): string {
   return whole.startsWith(host) ? whole.slice(host.length) : redactor.text(path)
 }
 
+/** HTTP clients of mobile apps, by the user agent they send. */
+const DEVICE_AGENT = /^(okhttp\/|Dalvik\/|CFNetwork\/)/
+
+/** Who sent a call, from its headers. */
+function originOf(headers: Readonly<Record<string, string>>): "page" | "server" | "device" {
+  if (sentByBrowser(headers)) return "page"
+
+  const agent = Object.entries(headers).find(([name]) => name.toLowerCase() === "user-agent")?.[1]
+
+  return agent !== undefined && DEVICE_AGENT.test(agent) ? "device" : "server"
+}
+
 /** An exchange as a flight record keeps it: path, headers and bodies redacted. */
 export function redactExchange(exchange: Exchange, redactor: Redactor): RecordedExchange {
   const { request, response, ...rest } = exchange
@@ -214,7 +229,7 @@ export function redactExchange(exchange: Exchange, redactor: Redactor): Recorded
   return {
     ...rest,
     path: redactedPath(rest.host, rest.path, redactor),
-    ...(request && { origin: sentByBrowser(request.headers) ? "page" : "server" }),
+    ...(request && { origin: originOf(request.headers) }),
     ...(credential && { credential }),
     ...(request && { request: redactMessage(request, redactor) }),
     ...(response && { response: redactMessage(response, redactor) }),

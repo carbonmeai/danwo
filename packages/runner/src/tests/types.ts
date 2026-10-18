@@ -19,7 +19,7 @@ export interface TestFixtures {
    * (renewals, retries and expiries run as they fall due) and the page's clock forward together.
    */
   readonly time: SessionTime
-  readonly platform: "web"
+  readonly platform: "web" | "android"
 }
 
 /** What `beforeAll` and `afterAll` receive: no browser session exists outside a test. */
