@@ -28,24 +28,27 @@ async function flutterwave(method: string, path: string, body?: unknown): Promis
   return response.json()
 }
 
-/** The verified transaction's tx_ref, when it is a successful payment of the full price in NGN. */
+/** An object's fields; none for anything else. */
+function fields(value: unknown): Map<string, unknown> {
+  return typeof value === "object" && value !== null ? new Map(Object.entries(value)) : new Map()
+}
+
+/** Whether a transaction is a successful payment of the full price in NGN. */
+function fullPayment(tx: Map<string, unknown>): boolean {
+  return (
+    tx.get("status") === "successful" &&
+    tx.get("currency") === "NGN" &&
+    Number(tx.get("amount")) >= price
+  )
+}
+
+/** The verified transaction's tx_ref, when it pays one of this app's orders in full. */
 async function verifiedPayment(id: string): Promise<string | undefined> {
   const answer = await flutterwave("GET", `/v3/transactions/${encodeURIComponent(id)}/verify`)
-  const data =
-    typeof answer === "object" && answer !== null && "data" in answer ? answer.data : null
-
-  if (typeof data !== "object" || data === null) return undefined
-
-  const tx = new Map(Object.entries(data))
+  const tx = fields(fields(answer).get("data"))
   const txRef = tx.get("tx_ref")
 
-  return tx.get("status") === "successful" &&
-    tx.get("currency") === "NGN" &&
-    Number(tx.get("amount")) >= price &&
-    typeof txRef === "string" &&
-    orders.has(txRef)
-    ? txRef
-    : undefined
+  return fullPayment(tx) && typeof txRef === "string" && orders.has(txRef) ? txRef : undefined
 }
 
 /** Credits an order once, however often its payment is reported. */
