@@ -9,6 +9,8 @@ export interface LlmSettings {
   readonly unscripted: Unscripted
   readonly prices: Readonly<Record<string, LlmPrice>>
   readonly models: readonly string[]
+  /** Unlisted models are unknown to the gateway rather than answered. */
+  readonly knownModelsOnly?: boolean
 }
 
 export const SETTINGS: DataKey<LlmSettings> = { name: "llm.settings" }

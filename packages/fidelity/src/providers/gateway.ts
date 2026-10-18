@@ -224,6 +224,7 @@ export const gatewayFidelity: FidelityProvider = {
     emulatorTarget(llm, { key: "danwo-fidelity-gateway" }, (emulator) => {
       seedLlm(emulator.store, {
         models: [LANGUAGE_MODEL, EMBEDDING_MODEL],
+        knownModelsOnly: true,
         prices: { [LANGUAGE_MODEL]: { input: 0.1, output: 0.4 } },
         scripts: [
           {

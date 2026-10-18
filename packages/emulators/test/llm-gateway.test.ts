@@ -97,4 +97,12 @@ describe("AI Gateway", () => {
     expect(a.embedding).toHaveLength(1536)
     expect(b.embedding).toEqual(a.embedding)
   })
+
+  it("refuses an unlisted model as the gateway does, when asked to", async () => {
+    seedLlm(emulator.store, { models: ["openai/gpt-5-mini"], knownModelsOnly: true })
+
+    await expect(
+      generateText({ model: gatewayFor()("openai/no-such-model"), prompt: "say hi" }),
+    ).rejects.toThrow(/not found/)
+  })
 })
