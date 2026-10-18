@@ -501,11 +501,7 @@ describe("one-off payment through Checkout", () => {
 describe("refunds and deleted customers", () => {
   it("refunds a payment intent's charge in full, then refuses a second refund", async () => {
     const s = client()
-    const pi = await s.paymentIntents.create({
-      amount: 2000,
-      currency: "usd",
-      payment_method_types: ["card"],
-    })
+    const pi = await s.paymentIntents.create({ amount: 2000, currency: "usd" })
 
     await s.paymentIntents.confirm(pi.id, { payment_method: "pm_card_visa" })
 
