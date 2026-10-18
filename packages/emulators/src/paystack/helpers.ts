@@ -27,9 +27,12 @@ export function paystackCode(prefix: string, length = 15): string {
   return `${prefix}_${randomFrom(LOWER, length)}`
 }
 
-/** A transaction reference in Paystack's style, when the caller gives none. */
+/**
+ * A transaction reference in Paystack's style, when the caller gives none: letters and digits, with
+ * digits always among them, as Paystack's are (and as danwo's matrix recognises a generated id).
+ */
 export function newReference(): string {
-  return randomFrom(MIXED, 16)
+  return `${randomFrom(MIXED, 12)}${randomFrom("0123456789", 4)}`
 }
 
 /** The code in a hosted payment page's address. */
