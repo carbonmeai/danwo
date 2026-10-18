@@ -6,11 +6,15 @@ import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
 import {
+  BACHS_HOSTS,
+  bachs,
+  bachsLedger,
   createEmulator,
   GITHUB_HOSTS,
   github,
   githubAppKey,
   githubRepo,
+  seedBachs,
   seedGithub,
   GOOGLE_HOSTS,
   gmailMailbox,
@@ -61,6 +65,7 @@ const SLACK_APP = fileURLToPath(new URL("./fixtures/slack-app.ts", import.meta.u
 const GITHUB_BOT_APP = fileURLToPath(new URL("./fixtures/github-bot-app.ts", import.meta.url))
 const TWILIO_VERIFY_APP = fileURLToPath(new URL("./fixtures/twilio-verify-app.ts", import.meta.url))
 const PAYSTACK_APP = fileURLToPath(new URL("./fixtures/paystack-app.ts", import.meta.url))
+const BACHS_SHOP_APP = fileURLToPath(new URL("./fixtures/bachs-shop-app.ts", import.meta.url))
 
 let other: Server
 let otherUrl: string
@@ -989,6 +994,77 @@ describe("routing an unmodified Paystack app", () => {
         "routed POST api.paystack.co/transaction/initialize",
         `routed GET api.paystack.co/transaction/verify/${started.reference}`,
       ])
+    } finally {
+      child.kill()
+      await proxy.stop()
+      await emulator.close()
+    }
+  })
+})
+
+const BachsShopOutput = z.union([
+  z.object({ port: z.number() }),
+  z.object({ checkout_url: z.string(), checkout_id: z.string() }),
+  z.object({ fulfilled: z.string() }),
+])
+
+describe("routing an unmodified Bachs app", () => {
+  it("creates a checkout on the sandbox host and fulfils on the signed collection.succeeded", async () => {
+    const emulator = createEmulator(bachs)
+    const proxy = await startProxy({
+      routes: [{ hosts: [...BACHS_HOSTS], handler: emulator.fetch }],
+      unmatched: "block",
+    })
+    const child = spawn(process.execPath, [BACHS_SHOP_APP], {
+      env: {
+        ...proxy.env(),
+        BACHS_API_KEY: "sk_sandbox_danwoShop",
+        BACHS_WEBHOOK_SECRET: "whsec_shop",
+      },
+      cwd: fileURLToPath(new URL("..", import.meta.url)),
+      stdio: ["pipe", "pipe", "inherit"],
+    })
+    const lines = createInterface({ input: child.stdout })[Symbol.asyncIterator]()
+    const next = async () => BachsShopOutput.parse(JSON.parse(String((await lines.next()).value)))
+
+    try {
+      const started = await next()
+      const port = "port" in started ? started.port : 0
+
+      seedBachs(emulator.store, {
+        webhookEndpoints: [
+          {
+            url: `http://127.0.0.1:${port}/webhooks/bachs`,
+            events: ["collection.succeeded"],
+            secret: "whsec_shop",
+          },
+        ],
+      })
+      child.stdin.write("buy\n")
+
+      const created = await next()
+      const url = "checkout_url" in created ? created.checkout_url : ""
+
+      expect(url).toMatch(/^https:\/\/checkout\.bachs\.io\/c\//)
+
+      const paid = await emulator.fetch(
+        new Request(`${url}/pay`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: "card=4242424242424242",
+        }),
+      )
+
+      expect(paid.status).toBe(200)
+      expect(await next()).toEqual({
+        fulfilled: "checkout_id" in created ? created.checkout_id : "",
+      })
+      expect(bachsLedger(emulator).succeeded("order_1042")).toHaveLength(1)
+
+      await proxy.settled()
+      expect(
+        proxy.exchanges().map((e) => `${e.disposition} ${e.method} ${e.host}${e.path} ${e.status}`),
+      ).toEqual(["routed POST sandbox-api.bachs.io/v1/checkout-sessions 201"])
     } finally {
       child.kill()
       await proxy.stop()
