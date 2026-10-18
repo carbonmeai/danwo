@@ -69,9 +69,10 @@ function testIdOf(identifier: string | undefined): string | undefined {
 
 /** A field's value; an empty field showing its hint has the value "". */
 function valueOf(node: DriverNode): string | undefined {
-  if (node.editable === true && node.hintShowing !== true) return node.value ?? ""
+  if (node.editable !== true) return node.value
 
-  return node.value
+  /* Android reports the hint as the text of an empty field that shows it. */
+  return node.hintShowing === true ? "" : (node.value ?? "")
 }
 
 /** The fields of a mapped node that only some elements have. */
