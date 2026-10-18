@@ -11,6 +11,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@danwo/data": "workspace:*",
     "@danwo/emulators": "workspace:*",
     "@danwo/proxy": "workspace:*",
     "@danwo/runner": "workspace:*"

@@ -161,6 +161,7 @@ export function apiSections(index = new SourceIndex()): SpecSection[] {
   const environments = sdk.filter(
     (d) =>
       /^[a-z0-9]+(Environment|Service)$/i.test(d.name) ||
+      /^[a-z]+(Snapshot|WorkerDatabase|WorkerFile)$/.test(d.name) ||
       PROVIDER_OPTIONS.test(d.name) ||
       ["startServices", "Services", "Seed", "EnvironmentContext", "MINISTACK_IMAGE"].includes(
         d.name,
