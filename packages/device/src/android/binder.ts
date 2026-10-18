@@ -13,6 +13,12 @@ import { join } from "node:path"
 import type { Adb } from "../adb.ts"
 import { androidCaFileName } from "./ca.ts"
 
+/** How many times `adb root` is tried, and the pause between tries. */
+const ROOT_ATTEMPTS = 5
+const ROOT_RETRY_MS = 2_000
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
 /** The port the device talks to; `adb reverse` maps it to the run's proxy on the host. */
 export const DEVICE_PROXY_PORT = 8765
 
@@ -42,8 +48,20 @@ export class AndroidBinder {
   private async root(): Promise<void> {
     if (await this.adb.isRoot()) return
 
-    await this.adb.run(["root"])
-    await this.adb.waitForDevice()
+    /* Just after a boot adbd can drop the request ("unable to connect for root"); try again. */
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await this.adb.run(["root"])
+        await this.adb.waitForDevice()
+
+        return
+      } catch (error) {
+        if (attempt === ROOT_ATTEMPTS) throw error
+
+        await sleep(ROOT_RETRY_MS)
+        await this.adb.waitForDevice()
+      }
+    }
   }
 
   /** The run's CA into the user trust store, readable by the system like a CA a user added. */

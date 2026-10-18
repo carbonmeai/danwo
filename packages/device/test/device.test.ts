@@ -105,6 +105,28 @@ describe("the binder", () => {
     ])
   })
 
+  it("tries adb root again when adbd drops the request just after a boot", async () => {
+    const { commands, exec } = fakeAdb({ "id -u": "2000" })
+    let refused = 1
+    const binder = new AndroidBinder(
+      new Adb(TOOLS.adb, "emulator-5554", async (file, args, options) => {
+        if (args.includes("root") && refused-- > 0)
+          throw new Error("unable to connect for root: closed")
+
+        return exec(file, args, options)
+      }),
+      { caCert: CA, proxyPort: 41234 },
+    )
+
+    await binder.rebind()
+    expect(commands.slice(0, 4)).toEqual([
+      "shell id -u",
+      "wait-for-device",
+      "root",
+      "wait-for-device",
+    ])
+  })
+
   it("rebinds without restarting a root adbd, and unbinds the proxy setting and reverse rules", async () => {
     const { commands, exec } = fakeAdb({ "id -u": "0" })
     const binder = new AndroidBinder(new Adb(TOOLS.adb, "emulator-5554", exec), {
