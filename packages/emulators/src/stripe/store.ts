@@ -4,6 +4,7 @@ import type {
   Charge,
   CheckoutSession,
   Customer,
+  DeletedCustomer,
   EndpointSecret,
   Invoice,
   PaymentIntent,
@@ -11,6 +12,7 @@ import type {
   PaymentMethodConfiguration,
   Price,
   Product,
+  Refund,
   SessionPlan,
   StripeWebhookEndpoint,
 } from "./entities.ts"
@@ -21,6 +23,8 @@ type Kind = <T extends { id: string }, X = null>(name: string) => ObjectTable<T,
 function catalog(kind: Kind) {
   return {
     customers: kind<Customer>("customers"),
+    /** Customers deleted through the API, which still read back as `deleted: true`. */
+    deletedCustomers: kind<DeletedCustomer>("deleted_customers"),
     products: kind<Product>("products"),
     prices: kind<Price>("prices"),
   }
@@ -31,6 +35,7 @@ function payments(kind: Kind) {
   return {
     paymentIntents: kind<PaymentIntent>("payment_intents"),
     charges: kind<Charge>("charges"),
+    refunds: kind<Refund>("refunds"),
     paymentMethods: kind<PaymentMethod>("payment_methods"),
     checkoutSessions: kind<CheckoutSession, SessionPlan>("checkout_sessions"),
     invoices: kind<Invoice>("invoices"),

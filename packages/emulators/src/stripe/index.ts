@@ -27,6 +27,7 @@ import { paymentMethodConfigurationRoutes } from "./routes/payment-method-config
 import { paymentMethodRoutes } from "./routes/payment-methods.ts"
 import { priceRoutes } from "./routes/prices.ts"
 import { productRoutes } from "./routes/products.ts"
+import { refundRoutes } from "./routes/refunds.ts"
 import { webhookEndpointRoutes } from "./routes/webhook-endpoints.ts"
 import { STRIPE_SANDBOX_DELIVERY, stripeWebhookHeaders } from "./signature.ts"
 import { stripeStore } from "./store.ts"
@@ -197,6 +198,7 @@ function routes(context: StripeRouteContext): void {
     priceRoutes,
     paymentIntentRoutes,
     chargeRoutes,
+    refundRoutes,
     paymentMethodRoutes,
     checkoutSessionRoutes,
     customerSessionRoutes,

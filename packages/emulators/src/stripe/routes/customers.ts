@@ -31,7 +31,7 @@ function invoiceSettingsChange(
 
 /** Customers: create, retrieve, update, delete, list, and their saved payment methods. */
 export function customerRoutes({ app, objects, events, clock }: StripeRouteContext): void {
-  const { customers } = objects
+  const { customers, deletedCustomers } = objects
 
   app.post("/v1/customers", async (c) => {
     const params = await readParams(c)
@@ -55,7 +55,7 @@ export function customerRoutes({ app, objects, events, clock }: StripeRouteConte
 
   app.get("/v1/customers/:id", (c) => {
     const id = c.req.param("id")
-    const customer = customers.get(id)
+    const customer = customers.get(id) ?? deletedCustomers.get(id)
 
     return customer ? c.json(customer) : noSuch(c, "customer", id)
   })
@@ -87,7 +87,7 @@ export function customerRoutes({ app, objects, events, clock }: StripeRouteConte
     customers.remove(id)
     events.emit("customer.deleted", customer)
 
-    return c.json({ id, object: "customer", deleted: true })
+    return c.json(deletedCustomers.add({ id, object: "customer", deleted: true }, null))
   })
 
   app.get("/v1/customers", (c) => {

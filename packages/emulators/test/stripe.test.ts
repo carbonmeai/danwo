@@ -497,3 +497,48 @@ describe("one-off payment through Checkout", () => {
     ])
   })
 })
+
+describe("refunds and deleted customers", () => {
+  it("refunds a payment intent's charge in full, then refuses a second refund", async () => {
+    const s = client()
+    const pi = await s.paymentIntents.create({
+      amount: 2000,
+      currency: "usd",
+      payment_method_types: ["card"],
+    })
+
+    await s.paymentIntents.confirm(pi.id, { payment_method: "pm_card_visa" })
+
+    const refund = await s.refunds.create({ payment_intent: pi.id })
+
+    expect(refund).toMatchObject({
+      object: "refund",
+      amount: 2000,
+      status: "succeeded",
+      payment_intent: pi.id,
+    })
+    await expect(s.refunds.retrieve(refund.id)).resolves.toMatchObject({ id: refund.id })
+    await expect(s.charges.retrieve(String(refund.charge))).resolves.toMatchObject({
+      refunded: true,
+      amount_refunded: 2000,
+    })
+    await expect(s.refunds.create({ payment_intent: pi.id })).rejects.toMatchObject({
+      code: "charge_already_refunded",
+    })
+    expect(outboxEvents().map((e) => e.type)).toEqual(
+      expect.arrayContaining(["refund.created", "charge.refunded"]),
+    )
+  })
+
+  it("reads a deleted customer back as deleted", async () => {
+    const s = client()
+    const customer = await s.customers.create({ email: "gone@example.com" })
+
+    await s.customers.del(customer.id)
+
+    await expect(s.customers.retrieve(customer.id)).resolves.toMatchObject({
+      id: customer.id,
+      deleted: true,
+    })
+  })
+})
