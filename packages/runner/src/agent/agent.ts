@@ -12,12 +12,13 @@ import type { LanguageModel } from "ai"
 import type { z } from "zod"
 
 import type { AppErrors, FailureMark } from "../browser/app-errors.ts"
+import type { BackendActivity } from "../browser/readiness.ts"
 import type { Tabs } from "../browser/tabs.ts"
 import type { MailDesk } from "../mail/desk.ts"
 import { type CallCost, resolveModel } from "../model/resolve.ts"
 import type { StepRecorder } from "../record/index.ts"
 import type { CacheNote } from "../record/steps.ts"
-import type { Params } from "../replay/params.ts"
+import { type Params, paramText } from "../replay/params.ts"
 import { type RelocationPolicy, relocates } from "../replay/policy.ts"
 import { findOrRelocate } from "../replay/relocate.ts"
 import {
@@ -33,6 +34,7 @@ import type { Trace } from "../replay/trace.ts"
 import type { SecretVault } from "../secrets/index.ts"
 import { DanwoError } from "../support/codes.ts"
 import { type Budget, type Budgets, DEFAULT_STEP_BUDGET, Spend, Spends } from "./budget.ts"
+import { type BackendMark, EffectWatch, markOf } from "./effect-watch.ts"
 import { AgentStepFailed } from "./errors.ts"
 import { extractStep } from "./extract-step.ts"
 import { ExtractFailed } from "./extract.ts"
@@ -114,6 +116,10 @@ export interface AgentOptions {
   readonly appErrors?: AppErrors
   /** Mail the app sent: codes and links a step reads, recorded by where they came from. */
   readonly mail: MailDesk
+  /** Whether replays must have their recordings' effects, and text to leave out of them. */
+  readonly effects?: { readonly enabled: boolean; readonly ignore: readonly RegExp[] }
+  /** The backend's history, which a step's backend effect is read from. */
+  readonly activity?: () => BackendActivity
 }
 
 /** One `act` call: which step it is, what it says, and what it may use and spend. */
@@ -123,7 +129,14 @@ interface ActCall {
   readonly params: Params
   readonly files: Files
   readonly budget: Budget | undefined
+  /** Whether its replay must have its recording's effects. */
+  readonly effects: boolean
 }
+
+/** How replaying a step's recording went: how many actions, or why it did not replay. */
+type Replayed =
+  | { readonly ok: true; readonly actions: number; readonly relocated: boolean }
+  | { readonly ok: false; readonly reason: string | undefined; readonly effect?: boolean }
 
 class SessionAgent implements Agent {
   private readonly options: AgentOptions
@@ -131,10 +144,13 @@ class SessionAgent implements Agent {
   private actCount = 0
   /** What every agent step of the session spent together, against the test's budget. */
   private readonly spent: Spend
+  /** Where the backend's history stood when the session began; earlier events are not its own. */
+  private readonly sessionMark: BackendMark
 
   constructor(options: AgentOptions) {
     this.options = options
     this.spent = new Spend(options.budgets?.test ?? {}, "test")
+    this.sessionMark = markOf(options.activity)
   }
 
   diverged(): ReplayDivergence | undefined {
@@ -150,6 +166,7 @@ class SessionAgent implements Agent {
       params: options.params ?? {},
       files: this.filesOf(options),
       budget: options.budget,
+      effects: options.effects ?? true,
     }
 
     return this.options.steps.run("agent", "agent.act", label, () => this.step(call))
@@ -313,7 +330,8 @@ class SessionAgent implements Agent {
 
     const mark = this.options.appErrors?.mark()
     const key = store?.key({ kind: "act", step: index, instruction, params })
-    const replayed = await this.replayRecording(key, params, files)
+    const watch = await this.watchFor(call, key)
+    const replayed = await this.replayRecording(key, params, files, watch)
 
     if (replayed.ok) {
       steps.cache(replayed.relocated ? "relocated" : "replayed")
@@ -322,8 +340,7 @@ class SessionAgent implements Agent {
       return { summary: "replayed the recording", modelCalls: 0, actions: replayed.actions }
     }
 
-    const miss: CacheNote =
-      replayed.reason === undefined ? await missOf(store, key) : { mode: "handed-off" }
+    const miss = await this.missFor(key, replayed)
 
     if (this.options.strict) return this.stopStrict(index, instruction, replayed.reason, miss)
 
@@ -333,7 +350,7 @@ class SessionAgent implements Agent {
     })
 
     this.checkApp(mark)
-    this.keep(key, instruction, result, miss)
+    await this.keep(key, call, result, { miss, watch })
 
     return {
       summary: result.summary,
@@ -353,14 +370,43 @@ class SessionAgent implements Agent {
     }
   }
 
+  /**
+   * A watch of the step's effects, when its replay must have them or its run will be recorded:
+   * the session has effects on, the step did not turn them off, and there is a cache.
+   */
+  private async watchFor(
+    call: ActCall,
+    key: StepKey | undefined,
+  ): Promise<EffectWatch | undefined> {
+    const { effects, tabs, vault, activity } = this.options
+
+    if (key === undefined || !call.effects || effects?.enabled === false) return undefined
+
+    return EffectWatch.start(
+      {
+        tabs,
+        redact: vault.redact,
+        ignore: effects?.ignore ?? [],
+        ...(activity !== undefined && { activity }),
+      },
+      this.sessionMark,
+    )
+  }
+
+  /** Why the step had no usable recording: none, a stale one, or one that stopped matching. */
+  private async missFor(key: StepKey | undefined, replayed: Replayed): Promise<CacheNote> {
+    if (replayed.ok || replayed.reason === undefined) return missOf(this.options.store, key)
+
+    return { mode: "handed-off", ...(replayed.effect === true && { because: "effect" }) }
+  }
+
   /** Replays the recording under `key`; `reason` is undefined when there is none. */
   private async replayRecording(
     key: StepKey | undefined,
     params: Params,
     files: Files,
-  ): Promise<
-    { ok: true; actions: number; relocated: boolean } | { ok: false; reason: string | undefined }
-  > {
+    watch: EffectWatch | undefined,
+  ): Promise<Replayed> {
     const trace = key === undefined ? undefined : await this.options.store?.read(key.key)
 
     if (trace === undefined || key === undefined) return { ok: false, reason: undefined }
@@ -369,9 +415,27 @@ class SessionAgent implements Agent {
 
     if (typeof outcome === "string") return { ok: false, reason: outcome }
 
+    const effect = await this.checkEffects(trace, watch)
+
+    if (effect !== undefined) return { ok: false, reason: `effect: ${effect}`, effect: true }
+
     this.noteMoves(key, outcome)
 
     return { ok: true, actions: trace.actions.length, relocated: outcome.moved.length > 0 }
+  }
+
+  /** Compares the replay's effects with the recording's and notes how; why they differ, if they do. */
+  private async checkEffects(
+    trace: Trace,
+    watch: EffectWatch | undefined,
+  ): Promise<string | undefined> {
+    if (watch === undefined || trace.effects === undefined) return undefined
+
+    const check = await watch.compare(trace.effects)
+
+    this.options.steps.event({ kind: "effects", at: now(), ...check })
+
+    return check.result === "diverged" ? check.reason : undefined
   }
 
   /** Records where moved elements were found, and keeps the recording pointing at them. */
@@ -437,7 +501,10 @@ class SessionAgent implements Agent {
     }
 
     this.divergence = { step: index, instruction, reason: this.options.vault.redact(reason) }
-    this.options.steps.cache("diverged")
+    this.options.steps.cache(
+      "diverged",
+      miss.because === undefined ? {} : { because: miss.because },
+    )
 
     return { summary: `diverged: ${this.divergence.reason}`, modelCalls: 0, actions: 0 }
   }
@@ -477,14 +544,18 @@ class SessionAgent implements Agent {
     return result
   }
 
-  /** Stages the step's actions as its recording, written once a later check confirms them. */
-  private keep(
+  /**
+   * Stages the step's actions as its recording, written once a later check confirms them, with the
+   * effects the step had when it was watched.
+   */
+  private async keep(
     key: StepKey | undefined,
-    instruction: string,
+    call: ActCall,
     result: LiveResult,
-    miss: CacheNote,
-  ): void {
+    seen: { readonly miss: CacheNote; readonly watch: EffectWatch | undefined },
+  ): Promise<void> {
     const { store, steps } = this.options
+    const { miss, watch } = seen
 
     if (store === undefined || key === undefined || result.recorded === null || !store.writes) {
       steps.cache(miss.mode, { ...miss, saved: false })
@@ -492,14 +563,24 @@ class SessionAgent implements Agent {
       return
     }
 
+    const effects = await watch?.effects(this.runValues(call.params))
+
     store.stage(key, steps.next - 1, {
       version: 1,
-      instruction,
+      instruction: call.instruction,
       recordedAt: new Date().toISOString(),
       actions: [...result.recorded],
       endRoute: routeOf(this.options.tabs.page.url(), new URL(this.options.appUrl).origin),
+      ...(effects !== undefined && { effects }),
     })
     steps.cache(miss.mode, { ...miss, saved: true })
+  }
+
+  /** Values that differ from run to run, which an effect may not hold: params and mail values. */
+  private runValues(params: Params): string[] {
+    const named = Object.keys(params).flatMap((name) => paramText(params, name) ?? [])
+
+    return [...named, ...this.options.mail.values()]
   }
 
   private requireModel(model: LanguageModel | undefined) {

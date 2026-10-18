@@ -5,6 +5,7 @@
  * network.
  */
 import type { ScreenshotEvent } from "../assert/screenshot.ts"
+import { effectNotes, effectsOf } from "../record/effect-notes.ts"
 import { dollars, type Spent, tokensText, usageOf } from "../record/usage.ts"
 import type { FlightRecord, RecordedExchange, RecordedStep } from "./record.ts"
 
@@ -104,11 +105,13 @@ function stepRow(step: RecordedStep, loaded: Loaded): string {
     e.kind === "relocated" ? [`relocated ${e.from} → ${e.to}`] : [],
   )
   const shots = screenshotNotes(step, loaded)
+  const effects = effectsOf(step.events)
   const facts = [
     step.cache && cacheFact(step.cache),
     step.error && step.error.code,
     models > 0 && `${models} model call${models === 1 ? "" : "s"}`,
     ...moves,
+    ...(effects === undefined ? [] : effectNotes(effects)),
     ...shots.facts,
     step.source && `${step.source.file}:${step.source.line}`,
   ].filter(Boolean)
@@ -123,8 +126,9 @@ function stepRow(step: RecordedStep, loaded: Loaded): string {
 function cacheFact(cache: NonNullable<RecordedStep["cache"]>): string {
   const saved = cache.saved ? ", recorded" : ""
   const changed = cache.changed ? ` (${cache.changed.join(", ")} changed)` : ""
+  const because = cache.because === undefined ? "" : ` (${cache.because})`
 
-  return `cache ${cache.mode}${saved}${changed}`
+  return `cache ${cache.mode}${because}${saved}${changed}`
 }
 
 function stepsBlock(loaded: Loaded): string {

@@ -5,6 +5,7 @@
  * from a flight record, which is redacted already; every part is size-capped so the page stays
  * cheap to read.
  */
+import { effectNotes, effectsOf } from "../record/effect-notes.ts"
 import { dollars, stepCost } from "../record/usage.ts"
 import type { FlightRecord, RecordedExchange, RecordedStep } from "./record.ts"
 
@@ -63,13 +64,19 @@ function headerLines(record: FlightRecord): string[] {
   ]
 }
 
+/** A step's cache outcome, with what made a recording stale or why it stopped matching. */
+function cacheText(cache: RecordedStep["cache"]): string {
+  if (cache === undefined) return ""
+  if (cache.changed) return `${cache.mode} (${cache.changed.join(", ")} changed)`
+
+  return cache.because === undefined ? cache.mode : `${cache.mode} (${cache.because})`
+}
+
 function stepRow(step: RecordedStep): string {
   const { spent } = stepCost(step)
   const model =
     spent.calls === 0 ? "" : `${spent.calls}${spent.usd > 0 ? ` (${dollars(spent.usd)})` : ""}`
-  const cache = step.cache
-    ? `${step.cache.mode}${step.cache.changed ? ` (${step.cache.changed.join(", ")} changed)` : ""}`
-    : ""
+  const cache = cacheText(step.cache)
   const source = step.source ? `${step.source.file}:${step.source.line}` : ""
   const status = step.error ? `${step.status}: ${step.error.code}` : step.status
 
@@ -189,11 +196,28 @@ function stateLines(record: FlightRecord): string[] {
   ]
 }
 
+/** Steps whose replay did not have its recorded effects, or compared them only in part. */
+function effectSection(steps: readonly RecordedStep[]): string[] {
+  const noted = steps.flatMap((step) => {
+    const check = effectsOf(step.events)
+
+    if (check === undefined || check.result === "matched") return []
+
+    return [
+      `- step ${step.index} ${cell(step.label)}`,
+      ...effectNotes(check).map((l) => `  - ${l}`),
+    ]
+  })
+
+  return noted.length === 0 ? [] : ["## Effects", "", ...noted, ""]
+}
+
 /** The Markdown failure page of one run's record; `screen` is its screen-at-failure text. */
 export function failurePage(record: FlightRecord, screen?: string): string {
   return [
     ...headerLines(record),
     ...stepLines(record.steps),
+    ...effectSection(record.steps),
     ...screenLines(screen, record),
     ...logLines(record),
     ...exchangeLines(record),

@@ -5,10 +5,11 @@
  * round sees nothing new. With `settle`, the environment's own settling (webhooks on a manual
  * clock, retries) runs as part of it.
  */
-import { type RunWebhooks, webhookSources } from "@danwo/core"
+import { type RunWebhooks, routeOf, webhookSources } from "@danwo/core"
 import type { WebhookDispatcher } from "@danwo/emulators"
+import type { Proxy } from "@danwo/proxy"
 
-import type { Backend } from "../browser/readiness.ts"
+import type { Backend, BackendActivity, BackendEvent } from "../browser/readiness.ts"
 import type { WorkerEnvironment } from "./environment.ts"
 
 /** The pause between rounds, for deliveries a finished call has only just queued. */
@@ -39,6 +40,31 @@ async function round(env: WorkerEnvironment, timeoutMs: number, settle: boolean)
   if (settle) await env.settle?.()
 }
 
+/** Files a browser fetches for a page (styles, scripts, images, fonts), not calls the app makes. */
+const ASSET = /(?:\.(?:css|js|mjs|map|png|jpe?g|gif|svg|webp|ico|woff2?|ttf)|\/favicon[^/]*)$/i
+
+function providerCalls(proxy: Proxy): BackendEvent[] {
+  return proxy
+    .exchanges()
+    .filter((call) => !ASSET.test(call.path.split("?")[0] ?? ""))
+    .map((call) => ({ signature: routeOf(call), fault: call.fault }))
+}
+
+/** First attempts only: a retry is the same delivery again, not something new the app caused. */
+function firstDeliveries(webhooks: RunWebhooks | undefined): BackendEvent[] {
+  return dispatchers(webhooks).flatMap((dispatcher) =>
+    dispatcher
+      .attempts()
+      .filter((attempt) => attempt.attempt === 1)
+      .map((attempt) => ({ signature: `webhook ${attempt.topic}`, fault: attempt.fault })),
+  )
+}
+
+/** Provider calls and webhook deliveries so far, each in the order it happened. */
+function activityOf(proxy: Proxy, webhooks: RunWebhooks | undefined): BackendActivity {
+  return { calls: providerCalls(proxy), deliveries: firstDeliveries(webhooks) }
+}
+
 /** The environment's backend, or undefined when it has no proxy to watch. */
 export function backendOf(
   env: WorkerEnvironment | undefined,
@@ -49,6 +75,7 @@ export function backendOf(
   const proxy = env.proxy
 
   return {
+    activity: () => activityOf(proxy, env.webhooks),
     failures: () =>
       proxy
         .exchanges()

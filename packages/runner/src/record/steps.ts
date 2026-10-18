@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto"
 
 import type { ScreenshotEvent } from "../assert/screenshot.ts"
 import type { StepLog } from "../locate/locator.ts"
+import type { Effects } from "../replay/effects.ts"
 import { classOf, codeOf } from "../support/codes.ts"
 import { callerLine, type SourceLine } from "./source.ts"
 
@@ -48,6 +49,23 @@ export type StepEvent =
   | ScreenshotEvent
   /** A recorded element was found somewhere else: where it was, and where it is now. */
   | { readonly kind: "relocated"; readonly at: string; readonly from: string; readonly to: string }
+  | EffectsEvent
+
+/**
+ * How a replayed step's effects compared with its recording's: what was expected and what was
+ * observed, why they differ when they do, and what was left out (a step after an injected fault).
+ */
+export interface EffectsEvent {
+  readonly kind: "effects"
+  readonly at: string
+  /** `matched`, `diverged`, `partial` (compared up to an injected fault) or `skipped`. */
+  readonly result: "matched" | "diverged" | "partial" | "skipped"
+  readonly expected?: Effects
+  readonly observed?: Effects
+  readonly reason?: string
+  /** What was not compared, and why. */
+  readonly note?: string
+}
 
 /**
  * How an agent step used the replay cache, one of a fixed set:
@@ -87,6 +105,11 @@ export interface CacheNote {
   readonly saved?: boolean
   /** For `stale`: which parts of the step's key differ from the recording's. */
   readonly changed?: readonly string[]
+  /**
+   * For `diverged` and `handed-off`: `effect` when every action replayed but the step did not have
+   * its recorded effect on the page or the backend (see replay/effects.ts).
+   */
+  readonly because?: "effect"
 }
 
 export interface StepRecord {

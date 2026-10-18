@@ -17,6 +17,25 @@ export interface Backend {
   quiet(timeoutMs: number): Promise<void>
   /** Provider calls that failed (5xx or no answer), oldest first, each as one line. */
   failures?(): readonly string[]
+  /**
+   * Everything the app has done at the proxy and the webhook senders so far, each list oldest first
+   * and only ever growing: what a step's backend effect is read from (see replay/effects.ts).
+   */
+  activity?(): BackendActivity
+}
+
+/** The provider calls the app made, and the webhooks delivered to it. */
+export interface BackendActivity {
+  readonly calls: readonly BackendEvent[]
+  readonly deliveries: readonly BackendEvent[]
+}
+
+/** One thing the app did behind the page: a provider call, or a webhook delivered to it. */
+export interface BackendEvent {
+  /** `POST api.stripe.com/v1/checkout/sessions`, or `webhook checkout.session.completed`. */
+  readonly signature: string
+  /** The fault injected into it, if any. */
+  readonly fault: string | null
 }
 
 export interface ReadinessOptions {

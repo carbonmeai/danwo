@@ -1,6 +1,7 @@
 // Runner: browser sessions driven like a user: locators, assertions and the agent.
 export { type BrowserProxy, launchBrowser, type LaunchOptions } from "./browser/index.ts"
 export {
+  type EffectsSetting,
   openWebSession,
   type ReplayDivergence,
   type WebSession,

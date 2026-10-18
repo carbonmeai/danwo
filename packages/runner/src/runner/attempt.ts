@@ -305,6 +305,7 @@ function pageOptions(config: DanwoConfig): Partial<WebSessionOptions> {
     ...(config.files !== undefined && { files: config.files }),
     ...(config.relocate !== undefined && { relocate: config.relocate }),
     ...(config.relocation !== undefined && { relocation: config.relocation }),
+    ...(config.effects !== undefined && { effects: config.effects }),
     ...(config.appErrors !== undefined && { appErrors: config.appErrors }),
   }
 }

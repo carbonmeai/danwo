@@ -161,6 +161,42 @@ interface ReplayOptions {
    * never does. Takes precedence over `relocate`.
    */
   readonly relocation?: RelocationPolicy
+  /**
+   * Whether a replayed step must have the effects its recording had: the same elements appearing
+   * and vanishing, the same provider calls and webhooks behind the page (default true). `ignore`
+   * leaves text matching a pattern out of page effects, for content that changes on its own.
+   */
+  readonly effects?: EffectsSetting
+}
+
+/** Effects on or off, or on with text to leave out. */
+export type EffectsSetting = boolean | { readonly ignore?: readonly (string | RegExp)[] }
+
+/** What the agent takes of the effects setting. */
+function effectsOf(setting: EffectsSetting | undefined) {
+  if (setting === false) return { enabled: false, ignore: [] }
+
+  const patterns = typeof setting === "object" ? (setting.ignore ?? []) : []
+
+  return {
+    enabled: true,
+    ignore: patterns.map((pattern) =>
+      typeof pattern === "string" ? new RegExp(pattern) : pattern,
+    ),
+  }
+}
+
+/** The agent's effect settings and where it reads the backend's history from. */
+function effectsOptions(options: {
+  readonly effects?: EffectsSetting
+  readonly backend?: Backend
+}) {
+  const { backend } = options
+  const effects = effectsOf(options.effects)
+
+  if (backend?.activity === undefined) return { effects }
+
+  return { effects, activity: () => backend.activity?.() ?? { calls: [], deliveries: [] } }
 }
 
 /** What the flight recorder keeps of the attempt. */
@@ -432,6 +468,7 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
     ready,
     appErrors,
     mail: desk,
+    ...effectsOptions(options),
     tabs,
     appUrl: options.baseUrl,
     files,

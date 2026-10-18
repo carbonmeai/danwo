@@ -9,7 +9,7 @@ import type { LanguageModel } from "ai"
 import type { Budgets } from "../agent/budget.ts"
 import type { ReadinessMode } from "../browser/readiness.ts"
 import type { RelocationPolicy } from "../replay/policy.ts"
-import type { SessionSecret } from "../session.ts"
+import type { EffectsSetting, SessionSecret } from "../session.ts"
 import { DanwoError } from "../support/codes.ts"
 import type { SessionArgs, SessionDefinition } from "../tests/types.ts"
 import type { EnvironmentContext, WorkerEnvironment } from "./environment.ts"
@@ -57,6 +57,13 @@ export interface DanwoConfig {
    * so changing it records the steps afresh. Takes precedence over `relocate`.
    */
   readonly relocation?: RelocationPolicy
+  /**
+   * Whether a replayed agent step must have the effects its recording had: the same elements
+   * appearing and vanishing on the page, the same provider calls and webhooks behind it (default
+   * true). `{ ignore: [...] }` leaves text matching any pattern out of page effects. An `act` call
+   * can turn effects off for itself with `{ effects: false }`.
+   */
+  readonly effects?: EffectsSetting
   /**
    * What each step waits for after an action. `page+backend` (the default with an environment
    * that has a proxy): the page settles, then nothing the app started at the proxy or the webhook

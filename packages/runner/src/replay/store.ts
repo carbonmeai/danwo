@@ -29,7 +29,7 @@ import {
 export type CacheMode = "off" | "read-only" | "read-write"
 
 /** The version of how keys are made; a new one starts every recording afresh. */
-const KEY_FORMAT = 2
+const KEY_FORMAT = 3
 
 export interface ReplayStoreOptions {
   readonly dir: string

@@ -15,6 +15,11 @@ export interface ActOptions {
   readonly files?: Readonly<Record<string, string>>
   /** Limits for this step, over the session's: turns, model calls, cost and wall time. */
   readonly budget?: Budget
+  /**
+   * Whether a replay of this step must have the effects its recording had, on the page and behind
+   * it (default true, unless the session turned effects off). `false` replays its actions only.
+   */
+  readonly effects?: boolean
 }
 
 export interface ActResult {

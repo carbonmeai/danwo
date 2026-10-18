@@ -5,6 +5,8 @@
  */
 import { z } from "zod"
 
+import { effectsSchema } from "./effects.ts"
+
 /** How a recorded action's element is found again; see target.ts. */
 const target = z.object({
   testId: z.string().optional(),
@@ -99,6 +101,8 @@ export const traceSchema = z.object({
   actions: z.array(action),
   /** The route the browser was on when the step ended (see route.ts). */
   endRoute: z.string(),
+  /** What the step changed on the page and behind it; a replay must change the same (effects.ts). */
+  effects: effectsSchema.optional(),
   identity: identity.optional(),
 })
 
