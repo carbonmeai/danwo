@@ -1,7 +1,7 @@
 /**
  * Credentials recognisable by their shape alone, wherever they appear in text: provider API keys
  * and signing secrets, bearer and basic credentials, AWS keys and signatures, OAuth codes and
- * tokens, Slack and GitHub tokens, PEM private keys, and URLs that work as bearer tokens (upload
+ * tokens, Slack and GitHub tokens, Flutterwave keys, PEM private keys, and URLs that work as bearer tokens (upload
  * sessions, pre-authenticated downloads, Slack webhook and response URLs).
  * Values a session was given are redacted by its vault; these catch the ones it never was.
  */
@@ -44,6 +44,8 @@ const TOKEN_PATTERNS: readonly [RegExp, string][] = [
   /* PEM private keys, raw or with their line breaks escaped inside JSON. */
   [/-----BEGIN ([A-Z ]*)PRIVATE KEY-----[\s\S]*?-----END \1PRIVATE KEY-----/g, REDACTED],
   [/([?&]upload_id=)[^&#\s"']+/g, `$1${REDACTED}`],
+  /* Flutterwave secret, public and encryption keys, test and live. */
+  [/\b(FLW(?:SECK|PUBK)(?:_TEST)?-?)[A-Za-z0-9]+(?:-X)?/g, `$1${REDACTED}`],
 ]
 
 /** `text` with every credential-shaped value replaced. */

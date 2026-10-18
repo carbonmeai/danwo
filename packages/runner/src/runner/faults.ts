@@ -1,4 +1,6 @@
 import {
+  FLUTTERWAVE_HOSTS,
+  flutterwaveOutboundFaults,
   GITHUB_HOSTS,
   githubOutboundFaults,
   GOOGLE_HOSTS,
@@ -28,6 +30,7 @@ const BY_HOST = new Map<string, Catalogue>([
   ...hostsOf(SLACK_HOSTS, slackOutboundFaults),
   ...hostsOf(GITHUB_HOSTS, githubOutboundFaults),
   ...hostsOf(TWILIO_HOSTS, twilioOutboundFaults),
+  ...hostsOf(FLUTTERWAVE_HOSTS, flutterwaveOutboundFaults),
 ])
 
 /** Pairs every host with the catalogue that serves it. */
@@ -50,7 +53,7 @@ function genericOutboundFaults(call: OutboundCall): readonly OutboundFault[] {
 
 /**
  * `danwo matrix`'s default fault catalogue: each call gets its provider's faults by host (Stripe,
- * Resend, S3 and Tigris, Google, Microsoft, Slack, GitHub and Twilio, with error bodies their SDKs parse),
+ * Resend, S3 and Tigris, Google, Microsoft, Slack, GitHub, Twilio and Flutterwave, with error bodies their SDKs parse),
  * and any other routed host (an outside endpoint such as MiniStack) gets plain HTTP failures.
  */
 export function defaultOutboundFaults(call: OutboundCall): readonly OutboundFault[] {

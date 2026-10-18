@@ -216,6 +216,27 @@ describe("flight recorder redaction", () => {
     })
   })
 
+  it("hides Flutterwave keys, the webhook secret hash and its signature", () => {
+    expect(
+      redactor.text(
+        "secret REDACTED-TEST-VALUE public REDACTED-TEST-VALUE live REDACTED-TEST-VALUE encryption REDACTED-TEST-VALUE",
+      ),
+    ).toBe(
+      "secret FLWSECK_TEST-[redacted] public FLWPUBK_TEST-[redacted] live FLWSECK-[redacted] encryption FLWSECK_TEST[redacted]",
+    )
+    expect(
+      redactor.headers({
+        "verif-hash": "hash-123",
+        "flutterwave-signature": "c2ln",
+        accept: "*/*",
+      }),
+    ).toEqual({ "verif-hash": "[redacted]", "flutterwave-signature": "[redacted]", accept: "*/*" })
+    expect(redactor.value({ secretHash: "hash-123", url: "http://app.test/hook" })).toEqual({
+      secretHash: "[redacted]",
+      url: "http://app.test/hook",
+    })
+  })
+
   it("hides Twilio auth tokens, API key secrets and request signatures", () => {
     expect(
       redactor.value({

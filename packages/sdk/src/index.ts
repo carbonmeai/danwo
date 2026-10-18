@@ -88,6 +88,17 @@ export interface GithubFixtures {
   readonly settle: () => Promise<void>
 }
 
+/** Fixtures a `flutterwaveEnvironment()` or `flutterwaveService()` contributes. */
+export interface FlutterwaveFixtures {
+  /**
+   * The Flutterwave emulator: read its books with `flutterwaveLedger(flutterwave)` and pay a virtual
+   * account with `flutterwaveBank(flutterwave).transferIn(...)`.
+   */
+  readonly flutterwave: Emulator
+  readonly proxy: Proxy
+  readonly settle: () => Promise<void>
+}
+
 /** Fixtures a `twilioEnvironment()` or `twilioService()` contributes. */
 export interface TwilioFixtures {
   /**
@@ -121,6 +132,10 @@ export {
   defineConfig,
   type EnvironmentContext,
   expect,
+  type FlutterwaveEnvironment,
+  flutterwaveEnvironment,
+  type FlutterwaveOptions,
+  flutterwaveService,
   type GithubEnvironment,
   githubEnvironment,
   type GithubOptions,
@@ -201,6 +216,11 @@ export {
   type Emulator,
   type DriveEntry,
   type DriveSeedFile,
+  type FlutterwaveBank,
+  flutterwaveBank,
+  type FlutterwaveLedger,
+  flutterwaveLedger,
+  type FlutterwaveSeedConfig,
   type GithubCheckRunView,
   type GithubCommentView,
   type GithubIssueView,

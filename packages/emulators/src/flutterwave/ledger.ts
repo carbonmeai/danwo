@@ -22,6 +22,7 @@ function stateOf(emulator: Pick<Emulator, "store" | "outbox">): FlutterwaveState
   }
 }
 
+/** What `flutterwaveLedger(emulator)` reads and does: the merchant's books in the emulator. */
 export interface FlutterwaveLedger {
   /** Every transaction, oldest first; successful and failed attempts alike. */
   transactions(): Transaction[]
@@ -56,6 +57,7 @@ export function flutterwaveLedger(emulator: Pick<Emulator, "store" | "outbox">):
   }
 }
 
+/** What `flutterwaveBank(emulator)` does: money arriving at virtual accounts. */
 export interface FlutterwaveBank {
   /**
    * A bank transfer into the virtual account `accountNumber`, as the customer's bank makes it: a

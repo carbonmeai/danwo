@@ -2,6 +2,9 @@ import {
   createEmulator,
   type Emulator,
   type EmulatorDefinition,
+  FLUTTERWAVE_HOSTS,
+  flutterwave,
+  type FlutterwaveSeedConfig,
   GITHUB_HOSTS,
   github,
   type GithubSeedConfig,
@@ -12,6 +15,7 @@ import {
   MICROSOFT_HOSTS,
   microsoft,
   type MicrosoftSeedConfig,
+  seedFlutterwave,
   seedGithub,
   seedGoogle,
   seedMicrosoft,
@@ -70,6 +74,12 @@ export interface TwilioOptions {
   readonly seed?: Seed<TwilioSeedConfig>
 }
 
+/** Options of `flutterwaveService()` and `flutterwaveEnvironment()`. */
+export interface FlutterwaveOptions {
+  /** The dashboard's webhook (the app's URL and secret hash), balances, accounts and plans. */
+  readonly seed?: Seed<FlutterwaveSeedConfig>
+}
+
 export interface OAuthService extends Service {
   readonly emulator: Emulator
   /** The emulator's clock; push deliveries and their retries run on it. */
@@ -107,6 +117,8 @@ export type SlackEnvironment = OAuthEnvironment<"slack">
 export type GithubEnvironment = OAuthEnvironment<"github">
 /** What `twilioEnvironment()` starts: the Twilio emulator behind its own proxy. */
 export type TwilioEnvironment = OAuthEnvironment<"twilio">
+/** What `flutterwaveEnvironment()` starts: the Flutterwave emulator behind its own proxy. */
+export type FlutterwaveEnvironment = OAuthEnvironment<"flutterwave">
 
 interface Provider<Config> {
   readonly name: string
@@ -288,4 +300,29 @@ export function twilioEnvironment(
   options: TwilioOptions & { readonly unmatched?: "passthrough" | "block" } = {},
 ): Promise<TwilioEnvironment> {
   return oauthEnvironment("twilio", twilioService(options), options)
+}
+
+const FLUTTERWAVE: Provider<FlutterwaveSeedConfig> = {
+  name: "flutterwave",
+  definition: flutterwave,
+  hosts: FLUTTERWAVE_HOSTS,
+  apply: (emulator, config) => seedFlutterwave(emulator.store, config),
+}
+
+/**
+ * Flutterwave for `startServices`: Standard payment links with their hosted checkout (the browser
+ * pays on `checkout.flutterwave.com` through the same proxy), verification, refunds, plans and
+ * subscriptions, transfers and virtual accounts, with webhooks and transfer settlements on a manual
+ * clock that `settle` plays to the end; gives tests the `flutterwave` fixture. Read the books with
+ * `flutterwaveLedger(flutterwave)`.
+ */
+export function flutterwaveService(options: FlutterwaveOptions = {}): OAuthService {
+  return oauthService(FLUTTERWAVE, options.seed)
+}
+
+/** A worker-scoped Flutterwave emulator behind its own proxy; combine services with `startServices`. */
+export function flutterwaveEnvironment(
+  options: FlutterwaveOptions & { readonly unmatched?: "passthrough" | "block" } = {},
+): Promise<FlutterwaveEnvironment> {
+  return oauthEnvironment("flutterwave", flutterwaveService(options), options)
 }

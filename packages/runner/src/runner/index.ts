@@ -103,6 +103,10 @@ export {
   MINISTACK_IMAGE,
 } from "./aws.ts"
 export {
+  type FlutterwaveEnvironment,
+  flutterwaveEnvironment,
+  type FlutterwaveOptions,
+  flutterwaveService,
   type GithubEnvironment,
   githubEnvironment,
   type GithubOptions,
