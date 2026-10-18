@@ -25,7 +25,7 @@ const TOKEN_PATTERNS: readonly [RegExp, string][] = [
    * Google's access (`ya29.`) and refresh (`1//`) tokens, Microsoft's (`EwA`, `1.A`).
    */
   [
-    /([?&#](?:code|code_verifier|access_token|id_token|refresh_token|client_secret|session_state)=)[^&#\s"']+/gi,
+    /([?&#](?:code|code_verifier|access_token|id_token|id_token_hint|refresh_token|client_secret|session_state)=)[^&#\s"']+/gi,
     `$1${REDACTED}`,
   ],
   [/\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, REDACTED],
@@ -38,12 +38,6 @@ const TOKEN_PATTERNS: readonly [RegExp, string][] = [
    */
   [/(graph\.microsoft\.com\/(?:up|download)\/)[^\s"'?#/]+/g, `$1${REDACTED}`],
   [/(hooks\.slack\.com\/)[^\s"'?#]+/g, `$1${REDACTED}`],
-  /* Auth0's verification and password-change tickets, and the ID token a logout link carries. */
-  [
-    /(\/u\/(?:email-verification|reset-verify|password-reset)\?(?:[^#\s"']*&)?ticket=)[^&#\s"']+/g,
-    `$1${REDACTED}`,
-  ],
-  [/([?&]id_token_hint=)[^&#\s"']+/g, `$1${REDACTED}`],
   /* Bachs portal session URLs sign the customer in; recovery links let anyone replace the card. */
   [/((?:portal\.bachs\.io\/s|checkout\.bachs\.io\/recover)\/)[^\s"'?#/]+/g, `$1${REDACTED}`],
   /* Slack bot, user, refresh and app tokens; GitHub's OAuth, App, refresh and personal tokens. */
@@ -52,7 +46,8 @@ const TOKEN_PATTERNS: readonly [RegExp, string][] = [
   [/\b(github_pat_)[A-Za-z0-9_]{16,}/g, `$1${REDACTED}`],
   /* PEM private keys, raw or with their line breaks escaped inside JSON. */
   [/-----BEGIN ([A-Z ]*)PRIVATE KEY-----[\s\S]*?-----END \1PRIVATE KEY-----/g, REDACTED],
-  [/([?&]upload_id=)[^&#\s"']+/g, `$1${REDACTED}`],
+  /* Upload sessions, and Auth0's verification and password-change tickets. */
+  [/([?&](?:upload_id|ticket)=)[^&#\s"']+/g, `$1${REDACTED}`],
   /* Flutterwave secret, public and encryption keys, test and live. */
   [/\b(FLW(?:SECK|PUBK)(?:_TEST)?-?)[A-Za-z0-9]+(?:-X)?/g, `$1${REDACTED}`],
   /* OpenAI project, service-account and legacy keys; Anthropic keys; AI Gateway keys. */
