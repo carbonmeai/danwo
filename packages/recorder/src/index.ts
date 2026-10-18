@@ -1,5 +1,6 @@
 /**
- * Writing danwo tests: finding locators the way a test writes them, and writing new test files.
+ * Writing danwo tests: by recording someone using the app (`danwo record`), or from a description
+ * (MCP's `scaffold_test`). Both find locators the same way and write files with the same writer.
  */
 export {
   locate,
@@ -17,3 +18,7 @@ export {
   type TestFile,
   writeNewTest,
 } from "./writer.ts"
+export { type FinishOptions, type RecordedTest, recordedReport } from "./finish.ts"
+export { type RecordOptions, Recording, startRecording } from "./recording.ts"
+export { type SecretUse, secretName } from "./step-writer.ts"
+export { draftInvariant, type DraftFacts, type InvariantPlan } from "./invariants.ts"

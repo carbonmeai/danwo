@@ -22,11 +22,14 @@ export type {
 export type { ReadinessMode } from "../browser/readiness.ts"
 export {
   gmailMail,
+  latestMail,
   type MailMessage,
   type MailSource,
   outlookMail,
+  pickFrom,
   resendMail,
 } from "../mail/index.ts"
+export { backendOf } from "./backend.ts"
 export type { SessionMail } from "../session.ts"
 export { totp } from "../secrets/totp.ts"
 export { z } from "zod"

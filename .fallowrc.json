@@ -20,7 +20,8 @@
     "**/*.danwo.ts",
     "**/playwright.config.ts",
     "**/*.spec.ts",
-    "packages/*/test/fixtures/**"
+    "packages/*/test/fixtures/**",
+    "packages/recorder/src/page-script.ts"
   ],
   "ignoreDependencies": ["@danwo/example-shop"]
 }

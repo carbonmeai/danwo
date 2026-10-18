@@ -15,24 +15,47 @@ It drives the app through its UI like a user, while third-party services the app
 - **Flight recorder**: for failed runs, an offline HTML report with steps, screenshots, network exchanges, webhook deliveries and emulator state, with secrets redacted.
 - **Visual checks**: `toHaveScreenshot` with baselines and masks.
 - **Saved sessions**: sign in once per worker and start every test that names the session from that browser state (cookies, localStorage, IndexedDB); it is set up again when the environment resets or its check fails.
+- **`danwo record`**: use the app in a browser and get a test: a locator line per action, what each action caused behind the app, and an invariant drafted from it.
 
 ## Packages
 
-| Package             | What it is                                                              |
-| ------------------- | ----------------------------------------------------------------------- |
-| `@danwo/sdk`        | The public test API                                                     |
-| `@danwo/cli`        | `danwo test`, `danwo matrix`, `danwo show`, `danwo mcp`, `danwo init`   |
-| `@danwo/runner`     | Browser sessions, the agent, replay, workers and the flight recorder    |
-| `@danwo/core`       | The fault matrix                                                        |
-| `@danwo/proxy`      | The egress proxy                                                        |
-| `@danwo/emulators`  | Provider emulators                                                      |
-| `@danwo/github`     | Reports runs to GitHub from Actions: a check run and job summary        |
-| `@danwo/skill`      | The coding-agent skill, task guides and the generated capability spec   |
-| `@danwo/mcp`        | An MCP server for coding agents: run, explain and write danwo tests     |
-| `@danwo/playwright` | danwo's environments, faults, invariants and matrix for Playwright Test |
+| Package             | What it is                                                               |
+| ------------------- | ------------------------------------------------------------------------ |
+| `@danwo/sdk`        | The public test API                                                      |
+| `@danwo/cli`        | `danwo test`, `matrix`, `record`, `show`, `mcp`, `init`, `spec`, `guide` |
+| `@danwo/recorder`   | Writes tests: records someone using the app; locators and the writer     |
+| `@danwo/runner`     | Browser sessions, the agent, replay, workers and the flight recorder     |
+| `@danwo/core`       | The fault matrix                                                         |
+| `@danwo/proxy`      | The egress proxy                                                         |
+| `@danwo/emulators`  | Provider emulators                                                       |
+| `@danwo/github`     | Reports runs to GitHub from Actions: a check run and job summary         |
+| `@danwo/skill`      | The coding-agent skill, task guides and the generated capability spec    |
+| `@danwo/mcp`        | An MCP server for coding agents: run, explain and write danwo tests      |
+| `@danwo/playwright` | danwo's environments, faults, invariants and matrix for Playwright Test  |
 
 See `examples/shop` for a small app tested with `danwo test` and `danwo matrix`, and
 `examples/shop-playwright` for the same test in Playwright Test.
+
+## Record a test
+
+`danwo record [path]` starts the project's environment and opens the app in a browser behind the
+proxy. Use the app; the danwo toolbar in the corner stops the recording, adds an assertion (press
+Assert, then click the element) and adds a note. On Stop (or Ctrl-C) it writes a new test, never
+replacing a file:
+
+- one locator line per action, preferring `getByRole` with a name, then a label, a test id, then
+  text; each one finds only that element, and none holds a value that changes between runs;
+- a `// →` line after each action with the provider calls and webhooks it caused;
+- password fields as `secret("password")`, never their value, with the config line to add;
+- a code or link the app emailed as `await mail.code(…)` / `mail.link(…)`, so replays read the new
+  one from the emulator;
+- an invariant drafted from what it saw behind the app. After a Stripe checkout, a number the app
+  showed stays in step with the checkouts Stripe was paid for; a Slack message or GitHub comment
+  sent in answer to a webhook is sent at most as often as recorded. Otherwise the file lists what
+  it saw so you can write the rule.
+
+Then run what it prints: `danwo matrix tests/recorded.danwo.ts`. `--out` and `--name` set the file
+and the test's title.
 
 ## Use danwo from Playwright Test
 

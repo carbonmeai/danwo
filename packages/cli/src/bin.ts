@@ -185,6 +185,30 @@ program
   })
 
 program
+  .command("record")
+  .description(
+    "record a test by using the app in a browser: locators for each action, what it caused behind the app, and a drafted invariant",
+  )
+  .argument("[path]", "the app page to start on", "/")
+  .option(
+    "-o, --out <file>",
+    "the new test file, relative to the project (default: <testDir>/recorded.danwo.ts)",
+  )
+  .option("-n, --name <title>", "the test's title", "recorded journey")
+  .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
+  .action(async (path: string, options: { out?: string; name: string; config?: string }) => {
+    const { recordedReport, startRecording } = await import("@danwo/recorder")
+    const recording = await startRecording({ cwd: process.cwd(), config: options.config, path })
+    const interrupted = new Promise<void>((resolve) => process.once("SIGINT", () => resolve()))
+
+    console.log(
+      "recording: use the app in the browser, then press Stop on the danwo toolbar (or Ctrl-C)",
+    )
+    await Promise.race([recording.stopped, interrupted])
+    console.log(recordedReport(await recording.finish({ out: options.out, name: options.name })))
+  })
+
+program
   .command("show")
   .description("print the path of a recorded run's report (the newest by default)")
   .argument("[run-id]", "a run under .danwo/runs")
