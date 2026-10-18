@@ -170,6 +170,26 @@ export {
   slackWorkspace,
   type UrlVerification,
 } from "./slack/index.ts"
+export {
+  LLM_BEHAVIOURS,
+  LLM_HOSTS,
+  llm,
+  type LlmBehaviour,
+  type LlmCall,
+  type LlmCalls,
+  llmCalls,
+  type LlmMatchInput,
+  llmOutboundFaults,
+  type LlmProvider,
+  type LlmRecordOptions,
+  type LlmReply,
+  type LlmScript,
+  type LlmScripts,
+  llmScripts,
+  type LlmSeedConfig,
+  type LlmToolCall,
+  seedLlm,
+} from "./llm/index.ts"
 export { seedStripe, stripe, stripeOutboundFaults, type StripeSeedConfig } from "./stripe/index.ts"
 export { ManualClock, systemTimer, type Timer } from "./time.ts"
 export {

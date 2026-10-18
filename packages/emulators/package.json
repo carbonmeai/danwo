@@ -11,6 +11,8 @@
     ".": "./src/index.ts"
   },
   "devDependencies": {
+    "@ai-sdk/provider": "4.0.26",
+    "@anthropic-ai/sdk": "0.135.0",
     "@aws-sdk/client-s3": "3.1152.0",
     "@aws-sdk/lib-storage": "3.1152.0",
     "@aws-sdk/s3-presigned-post": "3.1152.0",
@@ -26,7 +28,9 @@
     "@octokit/webhooks": "14.2.0",
     "@slack/bolt": "5.1.0",
     "@slack/web-api": "8.2.0",
+    "ai": "7.0.143",
     "googleapis": "186.0.0",
+    "openai": "7.38.0",
     "openid-client": "6.8.8",
     "paystack-sdk": "4.2.1",
     "resend": "6.34.1",
