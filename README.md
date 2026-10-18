@@ -398,11 +398,12 @@ as a missing field, extra field, type mismatch, status mismatch, error-code mism
 danwo fidelity                         # emulators against the committed goldens (in bun run check)
 danwo fidelity stripe --update-golden  # with DANWO_FIDELITY_STRIPE_KEY=sk_test_…: record the sandbox
 DANWO_FIDELITY_PUBLIC=1 danwo fidelity slack github google microsoft   # public endpoints, no keys
+danwo fidelity gateway                 # with AI_GATEWAY_API_KEY: the AI Gateway, a fraction of a cent
 ```
 
 Goldens live in `fidelity/<provider>.json` and hold structure only; accepted differences, each with
 its reason, are in `fidelity/known-differences.json`. Only test and sandbox keys run: a live-looking
-key stops the run. Keys come from the environment or a git-ignored `.env.fidelity`. See
+key stops the run. Keys come from the environment or a git-ignored `.env.fidelity` or `.env`. See
 `danwo guide fidelity`.
 
 ## Development

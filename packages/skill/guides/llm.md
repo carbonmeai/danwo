@@ -37,7 +37,10 @@ const llm = await llmEnvironment({
 - `unscripted: "echo"` (the default) answers an unscripted call with its own words, marked
   `[danwo: unscripted]`; `"fail"` answers it with a 500, so a test notices.
 - Token counts are an estimate (about four characters a token), the same every run, and
-  `prices` (dollars per million tokens) give each call a cost; the gateway reports it as its own.
+  `prices` (dollars per million tokens) give each call a cost; the gateway reports it as its own,
+  split into input and output inference cost, with its routing and a generation id.
+- `knownModelsOnly: true` makes the gateway answer a model `models` does not list with its 404
+  `model_not_found`, for testing an app's handling of a mistyped model id.
 
 Add scripts from a test with `llmScripts(llm).add(...)`, and read the app's calls back with
 `llmCalls(llm).all()`: model, system prompt, messages, tools offered, the reply, tokens and cost.
