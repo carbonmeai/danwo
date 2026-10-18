@@ -3,6 +3,8 @@
  * `danwo test` and `danwo matrix`. Runs under Node >= 24 with native type stripping; the runner
  * forks its workers with its own resolve hook.
  */
+import { resolve as resolvePath } from "node:path"
+
 import "@danwo/runner/register"
 import { github } from "@danwo/github"
 import {
@@ -355,6 +357,44 @@ program
     const { guideIndex, readGuide } = await import("@danwo/skill")
 
     console.log(topic === undefined ? guideIndex() : readGuide(topic).trimEnd())
+  })
+
+program
+  .command("device")
+  .description(
+    "check this machine for Android testing: SDK, adb, emulator, rootable images, AVDs, JDK",
+  )
+  .addArgument(new Argument("<action>").choices(["doctor"]))
+  .action(async () => {
+    const { deviceDoctor } = await import("@danwo/device")
+    const checks = await deviceDoctor()
+
+    for (const check of checks)
+      console.log(`${check.status.padEnd(4)}  ${check.name}: ${check.detail}`)
+    process.exitCode = checks.some((check) => check.status === "fail") ? 1 : 0
+  })
+
+program
+  .command("build-android")
+  .description(
+    "build the danwo build of an Expo app as a release APK (trusting danwo's per-run CA); unchanged sources reuse the kept build",
+  )
+  .argument("[project]", "the Expo project's folder", ".")
+  .option("--force", "build again even when the sources are unchanged")
+  .option("--verbose", "print the build tools' output")
+  .action(async (project: string, options: { force?: boolean; verbose?: boolean }) => {
+    const { buildAndroid } = await import("@danwo/expo")
+    const build = await buildAndroid({
+      project: resolvePath(project),
+      force: options.force === true,
+      ...(options.verbose === true && { onLine: (line: string) => console.log(line) }),
+    })
+
+    console.log(
+      build.cached
+        ? `reused ${build.apk}`
+        : `built ${build.apk} in ${Math.round(build.durationMs / 1000)} s (log: ${build.log})`,
+    )
   })
 
 try {
