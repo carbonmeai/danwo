@@ -94,6 +94,8 @@ interface BrowserOptions {
   readonly browser?: Browser
   /** Start the browser context with this state, e.g. a saved session's cookies and storage. */
   readonly browserState?: BrowserState
+  /** Called with the session's browser context before its first page opens, e.g. to route requests. */
+  readonly onContext?: (context: BrowserContext) => Promise<void>
 }
 
 /** Who carries out `agent.act` and judges `agent.assert`. */
@@ -308,6 +310,9 @@ async function openBrowser(
     const context = await browser.newContext(
       options.browserState === undefined ? {} : { storageState: options.browserState },
     )
+
+    await options.onContext?.(context)
+
     const page = await context.newPage()
 
     return { browser, context, page, own }

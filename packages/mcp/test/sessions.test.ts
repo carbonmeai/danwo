@@ -65,6 +65,26 @@ describe("fault names", () => {
     })
   })
 
+  it("reads the race faults a live session can arm: a slow call and a reorder", () => {
+    expect(
+      parseFault("slow-then-retry 3000ms on POST api.stripe.com/v1/checkout/sessions"),
+    ).toMatchObject({ target: "outbound", fault: { kind: "slow-then-retry", ms: 3000 }, nth: 1 })
+    expect(parseFault("reorder webhooks payment_intent.created, payment_intent.succeeded")).toEqual(
+      {
+        target: "webhook",
+        topic: "payment_intent.created",
+        fault: { kind: "after", topic: "payment_intent.succeeded" },
+        nth: 1,
+        label: "reorder webhooks payment_intent.created, payment_intent.succeeded",
+      },
+    )
+    expect(parseFault("reorder stripe webhooks a.b, c.d #2")).toMatchObject({
+      service: "stripe",
+      topic: "a.b",
+      nth: 2,
+    })
+  })
+
   it("explains the forms it reads when it cannot read one", () => {
     expect(() => parseFault("explode on POST api.stripe.com/x")).toThrow(/status <code> on/)
     expect(() => parseFault("duplicate")).toThrow(/cannot read the fault/)

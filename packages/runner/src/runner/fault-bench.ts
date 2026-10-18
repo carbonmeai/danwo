@@ -17,6 +17,7 @@ type NamedOutboundFault =
   | { readonly kind: "reset" }
   | { readonly kind: "reset-after" }
   | { readonly kind: "delay"; readonly ms: number }
+  | { readonly kind: "slow-then-retry"; readonly ms: number }
   | { readonly kind: "emulate"; readonly behaviour: string }
 
 export type NamedFault =
@@ -43,9 +44,10 @@ const WEBHOOK = /^(?:(\S+) )?webhook (\S+)$/
 
 export const FAULT_FORMS = [
   "status <code> on <METHOD> <host><path>   e.g. status 500 on POST api.stripe.com/v1/checkout/sessions",
-  "reset | reset-after | delay <ms>ms on <METHOD> <host><path>",
+  "reset | reset-after | delay <ms>ms | slow-then-retry <ms>ms on <METHOD> <host><path>",
   `${LLM_BEHAVIOURS.join(" | ")} on <METHOD> <model API host><path>   e.g. refusal on POST api.openai.com/v1/chat/completions`,
   "duplicate | forged | delay <ms>ms | stale <seconds>s on [<service> ]webhook <topic>   e.g. duplicate on webhook checkout.session.completed",
+  "reorder [<service> ]webhooks <first>, <second>   e.g. reorder webhooks payment_intent.created, payment_intent.succeeded",
   "append #<n> to fault the n-th matching call or delivery instead of the next one",
 ]
 
@@ -53,12 +55,20 @@ function unknownFault(label: string): Error {
   return new Error(`cannot read the fault "${label}". Write one of:\n${FAULT_FORMS.join("\n")}`)
 }
 
-function outboundFault(spec: string, label: string): NamedOutboundFault {
-  const status = /^status (\d{3})$/.exec(spec)?.[1]
-  const delay = /^delay (\d+)ms$/.exec(spec)?.[1]
+/** Outbound faults named with a number: the pattern, and the fault for the number it captured. */
+const NUMBERED_OUTBOUND: readonly (readonly [RegExp, (n: number) => NamedOutboundFault])[] = [
+  [/^status (\d{3})$/, (status) => ({ kind: "status", status })],
+  [/^delay (\d+)ms$/, (ms) => ({ kind: "delay", ms })],
+  [/^slow-then-retry (\d+)ms$/, (ms) => ({ kind: "slow-then-retry", ms })],
+]
 
-  if (status !== undefined) return { kind: "status", status: Number(status) }
-  if (delay !== undefined) return { kind: "delay", ms: Number(delay) }
+function outboundFault(spec: string, label: string): NamedOutboundFault {
+  for (const [pattern, fault] of NUMBERED_OUTBOUND) {
+    const n = pattern.exec(spec)?.[1]
+
+    if (n !== undefined) return fault(Number(n))
+  }
+
   if (spec === "reset" || spec === "reset-after") return { kind: spec }
   if (LLM_BEHAVIOURS.some((behaviour) => behaviour === spec))
     return { kind: "emulate", behaviour: spec }
@@ -90,8 +100,30 @@ function partsOf(label: string): { spec: string; target: string; nth: number } {
   return { spec: trimmed.slice(0, on).trim(), target, nth: nth?.[1] ? Number(nth[1]) : 1 }
 }
 
+const REORDER = /^reorder (?:(\S+) )?webhooks (\S+), (\S+?)(?:\s#(\d+))?$/
+
+/** `reorder [<service> ]webhooks <first>, <second>`: the first held until the second is delivered. */
+function reorderOf(label: string): NamedFault | undefined {
+  const [, service, first, second, n] = REORDER.exec(label.trim()) ?? []
+
+  if (first === undefined || second === undefined) return undefined
+
+  return {
+    target: "webhook",
+    ...(service !== undefined && { service }),
+    topic: first,
+    fault: { kind: "after", topic: second },
+    nth: n === undefined ? 1 : Number(n),
+    label: label.trim(),
+  }
+}
+
 /** Reads a fault's name into what to arm. */
 export function parseFault(label: string): NamedFault {
+  const reorder = reorderOf(label)
+
+  if (reorder !== undefined) return reorder
+
   const { spec, target, nth } = partsOf(label)
   const webhook = WEBHOOK.exec(target)
 

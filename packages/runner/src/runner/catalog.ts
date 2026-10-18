@@ -19,6 +19,8 @@ export interface CatalogEntry {
   readonly mode: DeclaredTest["mode"]
   /** Whether it declares `test(...).invariant(fn)`. */
   readonly invariant: boolean
+  /** Its `concurrent` option: how many people `danwo matrix` may run it by at once. */
+  readonly concurrent?: number
 }
 
 export function testIdOf(
@@ -94,6 +96,7 @@ export async function catalogOf(
         file,
         mode: test.mode,
         invariant: test.invariant !== undefined,
+        ...(test.options.concurrent !== undefined && { concurrent: test.options.concurrent }),
       })
     }
   }

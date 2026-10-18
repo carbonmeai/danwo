@@ -17,7 +17,9 @@ const MONEY_PATHS = [
 ]
 
 /** Whether a call is a Stripe API POST that moves money. */
-export function movesStripeMoney(exchange: RecordedExchange): boolean {
+export function movesStripeMoney(
+  exchange: Pick<RecordedExchange, "method" | "host" | "path">,
+): boolean {
   return (
     exchange.method === "POST" &&
     exchange.host === "api.stripe.com" &&

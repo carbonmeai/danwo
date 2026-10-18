@@ -14,6 +14,8 @@ import {
   formatMatrix,
   type PlannedFault,
   planFaults,
+  planRaceFaults,
+  type RaceEvidence,
   type RunOutcome,
 } from "@danwo/matrix"
 
@@ -26,6 +28,7 @@ import { type DanwoConfig, type LoadedConfig, loadConfig } from "./config.ts"
 import { Crew } from "./crew.ts"
 import { DEFAULT_WEBHOOK_FAULTS, defaultOutboundFaults } from "./faults.ts"
 import { historyReporter } from "./history.ts"
+import { racePlan } from "./races.ts"
 import { closeRecording, openRecording } from "./recording.ts"
 import {
   type Reporter,
@@ -91,7 +94,15 @@ function judgingLine(test: CatalogEntry): string {
  * inconclusive, infrastructure) makes the trial `not-judged` rather than `failed`.
  */
 function outcomeOf(report: TrialReport, fault: PlannedFault | null): RunOutcome {
-  const { errorClass, usage: _usage, timings: _timings, pace: _pace, lint: _lint, ...rest } = report
+  const {
+    errorClass,
+    usage: _usage,
+    timings: _timings,
+    pace: _pace,
+    lint: _lint,
+    races: _races,
+    ...rest
+  } = report
   const unjudged = report.status === "failed" && errorClass !== undefined && notJudged(errorClass)
 
   return unjudged
@@ -151,6 +162,7 @@ function keepTrialFacts(run: MatrixRun, fault: PlannedFault | null, report: Tria
     return
   }
 
+  run.races.current = report.races
   if (run.test.invariant) run.pace.current = paceFrom(report, run.loaded.config.matrix?.checkPace)
 }
 
@@ -249,6 +261,22 @@ interface TrialsSetup {
   /** Narrows the planned faults by label. */
   readonly filter: string | undefined
   readonly dispatch: Dispatch
+  /** What the clean trial showed from the browser's side, once it ran. */
+  readonly races: () => RaceEvidence | undefined
+}
+
+/** Every fault the clean run allows: one per call and webhook, then the races. */
+function planAll(clean: RunOutcome, setup: TrialsSetup): PlannedFault[] {
+  const { matrix } = setup
+
+  return [
+    ...planFaults(
+      clean,
+      matrix?.outboundFaults ?? defaultOutboundFaults,
+      matrix?.webhookFaults ?? DEFAULT_WEBHOOK_FAULTS,
+    ),
+    ...planRaceFaults(clean, racePlan(matrix, setup.test, setup.races())),
+  ]
 }
 
 /** The clean trial, then every planned fault's; the result and the exit code. */
@@ -268,11 +296,7 @@ async function runTrials(
     return { result, code: matrixExitCode([clean]) || 1 }
   }
 
-  const planned = planFaults(
-    clean,
-    matrix?.outboundFaults ?? defaultOutboundFaults,
-    matrix?.webhookFaults ?? DEFAULT_WEBHOOK_FAULTS,
-  )
+  const planned = planAll(clean, setup)
   const plan = selectFaults(planned, setup.filter)
 
   write(planLine(planned.length, plan.length, setup.filter))
@@ -344,6 +368,8 @@ interface MatrixRun {
   readonly pace: { current: CheckPace | undefined }
   /** Each trial's integration lint findings. */
   readonly lint: TrialFindings[]
+  /** The clean trial's browser-side evidence, once it ran: what races are planned from. */
+  readonly races: { current: RaceEvidence | undefined }
 }
 
 /** Runs the trials; tells the reporters when the run stopped without a result. */
@@ -355,6 +381,7 @@ async function trialsOrAbort(run: MatrixRun): Promise<{ result: FaultMatrixResul
       write: run.write,
       filter: run.faults,
       dispatch: run.dispatch,
+      races: () => run.races.current,
     })
 
     for (const line of usageLines(run.usages)) run.write(line)
@@ -442,6 +469,7 @@ export async function runMatrix(
     timings: [],
     pace: { current: undefined },
     lint: [],
+    races: { current: undefined },
   }
 
   await tellReporters(run.reporters, (r) => r.started?.(run.context), write)

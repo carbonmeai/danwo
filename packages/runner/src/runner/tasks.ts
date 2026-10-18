@@ -3,7 +3,7 @@
  * boundary. Two kinds of task exist. A test file runs its selected tests, each with its retries,
  * for `danwo test`. A trial runs one test once, clean or with one planned fault, for `danwo matrix`.
  */
-import type { PlannedFault, ServiceDelivery } from "@danwo/matrix"
+import type { PlannedFault, RaceEvidence, ServiceDelivery } from "@danwo/matrix"
 import type { Exchange } from "@danwo/proxy"
 
 import type { CheckPace } from "../assert/pace.ts"
@@ -109,6 +109,10 @@ export interface TrialReport {
   readonly pace?: Readonly<Record<string, number>>
   /** What the integration lint found in the trial. */
   readonly lint?: readonly LintFinding[]
+  /** For a passing clean trial: the app requests and returns to the app races can be planned on. */
+  readonly races?: RaceEvidence
+  /** For a race trial (page, users, redirect): whether its race was set up. */
+  readonly fired?: boolean
 }
 
 /** What a worker answers, by the name the parent calls it with. */

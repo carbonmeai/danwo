@@ -8,7 +8,7 @@ import { randomBytes } from "node:crypto"
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises"
 import { join, relative, resolve } from "node:path"
 
-import type { RunOutcome } from "@danwo/matrix"
+import type { PlannedFault, RunOutcome } from "@danwo/matrix"
 
 import { addUsage, type Usage } from "../record/usage.ts"
 import { redactCredentials } from "../secrets/index.ts"
@@ -44,7 +44,8 @@ export interface HistoryTest {
 export interface HistoryTrial {
   /** The fault's label; null for the clean run. */
   readonly fault: string | null
-  readonly target: "outbound" | "webhook" | null
+  /** What the fault landed on: a call, a webhook, or a race (`page`, `users`, `redirect`). */
+  readonly target: PlannedFault["target"] | null
   readonly status: RunOutcome["status"]
   readonly error?: string
   readonly notes: readonly string[]

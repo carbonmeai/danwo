@@ -133,7 +133,25 @@ export interface DanwoConfig {
      * check's normal timeout.
      */
     readonly checkPace?: false | { readonly factor?: number; readonly floorMs?: number }
+    /**
+     * Race faults, each planned only where the clean run allows it; all on by default, `false`
+     * turns every one off. `doubleSubmit`: each change-making request the page sends the app,
+     * sent twice at once. `beforeRedirect`: a provider's webhooks delivered before the browser
+     * lands back on the app. `webhookOrder`: two webhooks in a row delivered the other way round.
+     * `slowThenRetry`: a payment provider's call held up to `ms` (default 3000) or until the app
+     * gives up and retries, then processed anyway. Running a test by several people at once is
+     * the test's own `concurrent` option.
+     */
+    readonly races?: false | RaceSettings
   }
+}
+
+/** Which race faults `danwo matrix` plans; each is on unless set to `false`. */
+export interface RaceSettings {
+  readonly doubleSubmit?: boolean
+  readonly beforeRedirect?: boolean
+  readonly webhookOrder?: boolean
+  readonly slowThenRetry?: false | { readonly ms?: number }
 }
 
 /** Types a project's config; returns it unchanged. */

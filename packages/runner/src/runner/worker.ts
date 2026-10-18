@@ -21,11 +21,12 @@ import { type LintConfig, type LintFinding, lint } from "../lint/index.ts"
 import { usageOf } from "../record/usage.ts"
 import { type DeclaredTest, type FileDeclarations, suiteHooks } from "../tests/registry.ts"
 import { resultOf, worthRetrying } from "../tests/retry.ts"
-import { type AttemptResult, runAttempt, type ReplayUse } from "./attempt.ts"
+import { type AttemptResult, type AttemptSetup, runAttempt, type ReplayUse } from "./attempt.ts"
 import { loadTestFile, testIdOf } from "./catalog.ts"
 import { type LoadedConfig, loadConfig } from "./config.ts"
 import type { WorkerEnvironment } from "./environment.ts"
 import { impactOf } from "./impact.ts"
+import { trialRace } from "./races.ts"
 import {
   attemptDir,
   buildRecord,
@@ -101,6 +102,14 @@ function findDeclared(declarations: FileDeclarations, file: string, id: string):
   return test
 }
 
+/** What a trial adds to one of its attempts: a race in its browser, or its place among several users. */
+type AttemptExtras = Partial<
+  Pick<AttemptSetup, "onContext" | "beforeInvariant" | "skipInvariant">
+> & {
+  /** Keeps no flight record: another attempt of the same trial keeps the trial's. */
+  readonly unrecorded?: boolean
+}
+
 /** One attempt of `id`, with its flight record directory when the run records. */
 async function attemptOnce(
   declarations: FileDeclarations,
@@ -109,9 +118,12 @@ async function attemptOnce(
   replay: ReplayUse,
   recordAs: string,
   checkPace?: CheckPace,
+  extras: AttemptExtras = {},
 ): Promise<{ result: AttemptResult; recordDir: string | undefined; mark: EvidenceMark }> {
   const { loaded, env, recording, updateScreenshots, sessions } = benchOrFail()
-  const recordDir = recording && attemptDir(recording, id, recordAs)
+  const { unrecorded, ...race } = extras
+  const recordDir =
+    unrecorded === true ? undefined : recording && attemptDir(recording, id, recordAs)
   const mark = markEvidence(env)
   const test = findDeclared(declarations, file, id)
   const result = await runAttempt(declarations, test, {
@@ -128,6 +140,7 @@ async function attemptOnce(
     sessions,
     browser: workerBrowser,
     ...(checkPace && { checkPace }),
+    ...race,
   })
 
   return { result, recordDir, mark }
@@ -358,6 +371,97 @@ function cleanPace(task: TrialTask, result: AttemptResult): Pick<TrialReport, "p
   return { pace: paceOf(result.flight.session.steps()) }
 }
 
+/** What a trial's race reports: the clean trial's evidence, or whether a race fired and its notes. */
+type RaceFacts = Pick<TrialReport, "races" | "fired"> & { readonly notes: readonly string[] }
+
+/** One trial attempt with what its race reported. */
+interface TrialRun {
+  readonly result: AttemptResult
+  readonly recordDir: string | undefined
+  readonly mark: EvidenceMark
+  readonly race: RaceFacts | undefined
+}
+
+/** How one of several users' attempts ended, for the trial's notes. */
+function userOutcome(settled: PromiseSettledResult<{ result: AttemptResult }>): string {
+  if (settled.status === "rejected") return `could not run: ${String(settled.reason)}`
+
+  const { result } = settled.value
+
+  return result.status === "passed"
+    ? "passed"
+    : `${result.status}: ${result.error?.message.split("\n")[0] ?? ""}`
+}
+
+/**
+ * A trial run by `users` people at once, each in a browser of their own against the same app. The
+ * first judges the invariant once everyone's body is done; the others run their body alone.
+ */
+async function withOtherUsers(
+  task: TrialTask,
+  declarations: FileDeclarations,
+  replay: ReplayUse,
+  users: number,
+): Promise<TrialRun> {
+  const label = task.fault?.label ?? "clean"
+  const others = Array.from({ length: users - 1 }, () =>
+    attemptOnce(declarations, task.file, task.testId, replay, label, task.pace, {
+      skipInvariant: true,
+      unrecorded: true,
+    }),
+  )
+  const othersDone = Promise.allSettled(others)
+  const first = await attemptOnce(declarations, task.file, task.testId, replay, label, task.pace, {
+    beforeInvariant: async () => {
+      await othersDone
+    },
+  })
+  const settled = await othersDone
+  const notes = settled.map((outcome, at) => `user ${at + 2}: ${userOutcome(outcome)}`)
+
+  return {
+    ...first,
+    race: { fired: settled.every((outcome) => outcome.status === "fulfilled"), notes },
+  }
+}
+
+/** The trial's attempt: its race set up in the browser, or run by several users at once. */
+async function trialRun(
+  task: TrialTask,
+  env: TrialEnvironment,
+  declarations: FileDeclarations,
+  replay: ReplayUse,
+): Promise<TrialRun> {
+  const { fault } = task
+
+  if (fault?.target === "users") return withOtherUsers(task, declarations, replay, fault.users)
+
+  const baseUrl = env.baseUrl ?? benchOrFail().loaded.config.baseUrl
+  const race = trialRace(fault, baseUrl, env)
+  const extras = race === undefined ? {} : { onContext: race.onContext }
+  const label = fault?.label ?? "clean"
+  const run = await attemptOnce(
+    declarations,
+    task.file,
+    task.testId,
+    replay,
+    label,
+    task.pace,
+    extras,
+  )
+
+  return { ...run, race: race?.report() }
+}
+
+/** A report's race fields, and its notes followed by the race's. */
+function withRace(report: TrialReport, race: RaceFacts | undefined): TrialReport {
+  if (race === undefined) return report
+
+  const { notes, ...facts } = race
+
+  return { ...report, ...facts, notes: [...report.notes, ...notes] }
+}
+
 /** Runs the trial's attempt in the reset, faulted environment and reports it. */
 async function runTrial(
   task: TrialTask,
@@ -369,14 +473,7 @@ async function runTrial(
     dir: task.cacheDir,
   }
   const declarations = await loadTestFile(task.file)
-  const { result, recordDir, mark } = await attemptOnce(
-    declarations,
-    task.file,
-    task.testId,
-    replay,
-    task.fault?.label ?? "clean",
-    task.pace,
-  )
+  const { result, recordDir, mark, race } = await trialRun(task, env, declarations, replay)
 
   for (const phase of TRIAL_PHASES) timings[phase] += result.timings[phase]
   await timed(timings, "settle", async () => {
@@ -384,7 +481,8 @@ async function runTrial(
     await env.proxy.settled().catch(() => undefined)
   })
 
-  const verdict = { ...trialReport(result, env, mark), timings, ...cleanPace(task, result) }
+  const reported = withRace(trialReport(result, env, mark), race)
+  const verdict = { ...reported, timings, ...cleanPace(task, result) }
   const input: RecordInput = {
     test: task.testId,
     run: { kind: "matrix", fault: task.fault },

@@ -54,6 +54,12 @@ export interface TestOptions {
    * signed out where an enclosing `test.use` names one.
    */
   readonly session?: string | false
+  /**
+   * For `danwo matrix`: also run the test by this many people at once (2 or more), each in a
+   * browser of their own against the same app, and judge the run once by its invariant. For tests
+   * that race over shared state, such as two buyers and the last item in stock.
+   */
+  readonly concurrent?: number
 }
 
 /** Options `test.use` applies to every test of its describe block, or of its file at the top level. */

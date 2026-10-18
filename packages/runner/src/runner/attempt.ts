@@ -4,7 +4,7 @@
  * teardown. The attempt's verdict is decided by the first failure in that order, except in a
  * replay-only trial: there a body that broke stops where it broke and the invariant alone judges.
  */
-import type { Browser } from "playwright-core"
+import type { Browser, BrowserContext } from "playwright-core"
 
 import type { CheckPace } from "../assert/pace.ts"
 import type { SessionFlight } from "../flight.ts"
@@ -68,6 +68,12 @@ export interface AttemptSetup {
   readonly checkPace?: CheckPace
   /** The worker's browser, kept open across attempts; each attempt gets a fresh context in it. */
   readonly browser?: () => Promise<Browser>
+  /** Called with the test's browser context before its first page, e.g. to set up a race. */
+  readonly onContext?: (context: BrowserContext) => Promise<void>
+  /** Awaited before the invariant runs: a trial with several users waits for the others here. */
+  readonly beforeInvariant?: () => Promise<void>
+  /** Runs the body alone: another attempt of the same trial judges the invariant. */
+  readonly skipInvariant?: boolean
 }
 
 /** What the session saw, for the flight recorder; it stays in the worker. */
@@ -232,7 +238,8 @@ function sessionContext(
   setup: AttemptSetup,
   deadline: number,
 ): SessionContext {
-  const { screenshots: _baselines, ...plain } = setup
+  // A saved session's own setup is no part of the test's race, so its browser is left unrouted.
+  const { screenshots: _baselines, onContext: _race, ...plain } = setup
 
   return {
     keeper: setup.sessions ?? new SessionKeeper(),
@@ -294,15 +301,18 @@ async function judge(
   judging: Judging,
 ): Promise<{ verdict: Verdict; stopped: string | undefined }> {
   const { invariant } = test
-  const replayOnly = judging.setup.replay.kind === "replay-only"
+  const { setup } = judging
+  const replayOnly = setup.replay.kind === "replay-only"
+  const unjudged = invariant === undefined || setup.skipInvariant === true
 
-  if (invariant === undefined || body.status === "skipped" || (broke(body) && !replayOnly)) {
+  if (unjudged || body.status === "skipped" || (broke(body) && !replayOnly)) {
     return { verdict: body, stopped: undefined }
   }
 
   const stopped = broke(body) ? whereItBroke(body, judging) : undefined
 
-  await judging.setup.env?.settle?.()
+  await setup.beforeInvariant?.()
+  await setup.env?.settle?.()
 
   return { verdict: await stage(judging.run(invariant), judging.deadline, "invariant"), stopped }
 }
@@ -400,6 +410,7 @@ async function attemptOptions(
     ...(state && { browserState: state }),
     ...(setup.checkPace && { checkPace: setup.checkPace }),
     ...(setup.browser && { browser: await setup.browser() }),
+    ...(setup.onContext && { onContext: setup.onContext }),
   }
 }
 
