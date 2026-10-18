@@ -6,6 +6,7 @@ import { planFaults, type RunOutcome, type ServiceDelivery } from "@danwo/matrix
 import type { Exchange } from "@danwo/proxy"
 import {
   CACHE_OUTCOMES,
+  LINT_RULES,
   DEFAULT_WEBHOOK_FAULTS,
   defaultOutboundFaults,
   errorCodeTable,
@@ -197,6 +198,23 @@ export function cacheSection(index: SourceIndex): SpecSection {
       kind: "outcome",
       signature: "",
       doc: meaning(outcome),
+      members: [],
+    })),
+  }
+}
+
+/** Every integration lint rule with its default level and the providers it is about. */
+export function lintSection(): SpecSection {
+  return {
+    topic: "lint",
+    title: "Integration lint rules",
+    about:
+      "Every `danwo test` and `danwo matrix` run is linted over its provider calls and webhooks. Findings print after the run, go into flight records, GitHub annotations and JUnit, and do not fail the run unless config `lint.failOn` says so. Set a rule's level with `lint.rules`; `danwo lint` re-runs the rules over a recorded run.",
+    entries: LINT_RULES.map((rule) => ({
+      name: rule.id,
+      kind: rule.severity,
+      signature: rule.providers.join(", "),
+      doc: `${rule.summary} ${rule.hint}`,
       members: [],
     })),
   }

@@ -12,6 +12,7 @@ It drives the app through its UI like a user, while third-party services the app
 - **`danwo matrix`**: reruns a test once per planned fault (provider errors, dropped connections, slow responses, duplicate, late, forged or stale webhooks) and judges each run by the test's invariant.
 - **Emulators**: Stripe, Resend, S3 and Tigris, Google (sign-in, Gmail, Calendar, Drive), Microsoft (sign-in, Outlook mail and calendar, OneDrive, Graph change notifications), Slack, GitHub and Twilio (messages, status callbacks, incoming texts, Verify), each checked against the official SDK; Flutterwave (Standard checkout with its test cards, verification, refunds, plans, transfers, virtual accounts) is checked against its v3 API docs. Other AWS services can be forwarded to MiniStack.
 - **Egress proxy**: routes real provider hostnames to emulators, logs every exchange and applies faults.
+- **Integration lint**: every run is reviewed from the calls and webhooks it made, with no invariant to write: money moved without an idempotency key, webhooks accepted unsigned or stale, payments trusted on the redirect, secret keys in the browser or in URLs, retries that ignore `Retry-After` or create twice.
 - **Flight recorder**: for failed runs, an offline HTML report with steps, screenshots, network exchanges, webhook deliveries and emulator state, with secrets redacted.
 - **Visual checks**: `toHaveScreenshot` with baselines and masks.
 - **Saved sessions**: sign in once per worker and start every test that names the session from that browser state (cookies, localStorage, IndexedDB); it is set up again when the environment resets or its check fails.
@@ -209,6 +210,28 @@ config, add `reporters: [github({ artifact: "my-runs" })]` with `github` from `@
   <files…>` explains the selection.
 
 `danwo guide ci` has the details and a sharded workflow.
+
+## Integration lint
+
+`danwo test` and `danwo matrix` lint each run's provider calls and webhooks and print what they
+found after the results:
+
+```text
+integration lint: 2 errors, 1 warning
+  error   payments/unconfirmed  the test passed after a stripe payment that the app never confirmed: no verify call and no webhook came after it
+          at tests/buy.danwo.ts:6; Fulfil from the provider's signed webhook, or verify the payment with the provider's API on the redirect, before granting anything.
+```
+
+Findings also go into flight records, GitHub check annotations (warning level) and JUnit. They do
+not fail a run unless the config says so:
+
+```ts
+lint: { rules: { "stripe/idempotency-key": "error" }, failOn: "error" },
+```
+
+`--no-lint` skips it for one run; `danwo lint [run]` runs the rules again over a recorded run;
+`danwo spec --topic lint` lists every rule and `danwo guide lint` explains them. Some rules speak
+only about matrix trials that forged, aged or delayed a webhook.
 
 ## Coding agents (MCP)
 

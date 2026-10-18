@@ -3,7 +3,7 @@
  * is asked for. Declarations come from the sources, the rest from the tables the code runs on, so
  * the spec cannot fall behind what the installed danwo does.
  */
-import { cacheSection, cliSection, errorSection, faultSection } from "./generated.ts"
+import { cacheSection, cliSection, errorSection, faultSection, lintSection } from "./generated.ts"
 import { type CliCommand, isSpecTopic, SPEC_TOPICS, type Spec, type SpecTopic } from "./model.ts"
 import { apiSections, exportsSection } from "./sections.ts"
 import { SourceIndex } from "./source.ts"
@@ -22,6 +22,7 @@ export function buildSpec(options: SpecOptions = {}): Spec {
     ...(options.commands === undefined ? [] : [cliSection(options.commands)]),
     errorSection(),
     cacheSection(index),
+    lintSection(),
     exportsSection(index),
   ]
 

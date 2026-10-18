@@ -20,6 +20,7 @@ const ORDER = [
   "first-test",
   "locators-vs-agent",
   "matrix",
+  "lint",
   "providers",
   "email-and-otp",
   "sessions",

@@ -15,6 +15,7 @@ export const SPEC_TOPICS = [
   "cli",
   "errors",
   "cache",
+  "lint",
   "exports",
 ] as const
 
