@@ -20,6 +20,11 @@ export interface AppOptions {
 }
 
 const DEFAULT_PERMISSIONS = ["android.permission.POST_NOTIFICATIONS"]
+/** How long a launched app may take to come to the front, and how often that is checked. */
+const LAUNCH_TIMEOUT_MS = 20_000
+const LAUNCH_POLL_MS = 200
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const BROWSERS = new Set(["com.android.chrome", "org.chromium.chrome", "com.chrome.beta"])
 
 /** Logcat's priority letters as log levels. */
@@ -92,9 +97,16 @@ export class AndroidApp {
     return component
   }
 
-  /** Data cleared, permissions granted, then launched and in front. */
+  /**
+   * Data cleared, permissions granted, then launched and in front. A browser an earlier attempt
+   * left open (a Custom Tab it never came back from) is stopped first, so nothing covers the app.
+   */
   async start(): Promise<void> {
     await this.adb.shell(`pm clear ${this.package}`)
+
+    for (const browser of BROWSERS) {
+      await this.adb.shell(`am force-stop ${browser}`).catch(() => undefined)
+    }
 
     for (const permission of this.options.permissions ?? DEFAULT_PERMISSIONS) {
       await this.adb.shell(`pm grant ${this.package} ${permission}`).catch(() => undefined)
@@ -102,7 +114,25 @@ export class AndroidApp {
 
     await this.adb.shell("logcat -c").catch(() => undefined)
     this.logsAfter = Date.now() / 1000
-    await this.adb.shell(`am start -W -n ${await this.launcher()}`)
+    await this.adb.shell(`am start -n ${await this.launcher()}`)
+    await this.waitInFront()
+  }
+
+  /** Waits until the app is the activity in front, which a launch only asks for. */
+  private async waitInFront(): Promise<void> {
+    const deadline = Date.now() + LAUNCH_TIMEOUT_MS
+    let front = await this.foreground()
+
+    while (front.package !== this.package) {
+      if (Date.now() >= deadline) {
+        throw new Error(
+          `${this.package} did not come to the front within ${LAUNCH_TIMEOUT_MS} ms (in front: ${front.package || "nothing"})`,
+        )
+      }
+
+      await sleep(LAUNCH_POLL_MS)
+      front = await this.foreground()
+    }
   }
 
   /** Opens `url` with the device's handler for it: the app for its own scheme, else the browser. */

@@ -11,7 +11,21 @@ export type Exec = (
   options?: { readonly timeoutMs?: number },
 ) => Promise<string>
 
-/** The real `exec`: the program's stdout, or an error carrying its stderr. */
+/** Why a program failed: what it printed, else how it ended (an exit code, a signal, a timeout). */
+function failureOf(
+  error: Error & { code?: unknown; signal?: unknown; killed?: boolean },
+  stdout: string,
+  stderr: string,
+): string {
+  const printed = [stderr.trim(), stdout.trim()].filter((text) => text !== "").join("\n")
+
+  if (printed !== "") return printed.slice(-2000)
+  if (error.killed === true) return `timed out (${String(error.signal)})`
+
+  return error.code === undefined ? error.message : `exited ${String(error.code)}`
+}
+
+/** The real `exec`: the program's stdout, or an error carrying what it printed. */
 export const execProgram: Exec = (file, args, options = {}) =>
   new Promise((resolve, reject) => {
     execFile(
@@ -19,7 +33,8 @@ export const execProgram: Exec = (file, args, options = {}) =>
       [...args],
       { timeout: options.timeoutMs ?? 60_000, maxBuffer: 32 * 1024 * 1024 },
       (error, stdout, stderr) => {
-        if (error) reject(new Error(`${file} ${args.join(" ")}: ${stderr.trim() || error.message}`))
+        if (error)
+          reject(new Error(`${file} ${args.join(" ")}: ${failureOf(error, stdout, stderr)}`))
         else resolve(stdout)
       },
     )

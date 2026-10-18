@@ -129,6 +129,8 @@ describe("the app", () => {
   it("starts afresh: data cleared, permissions granted, the launcher activity started", async () => {
     const { commands, exec } = fakeAdb({
       "resolve-activity": "priority=0 preferredOrder=0\ncom.danwo.shopmobile/.MainActivity",
+      "dumpsys activity":
+        "topResumedActivity=ActivityRecord{1 u0 com.danwo.shopmobile/.MainActivity t3}",
     })
     const app = new AndroidApp(new Adb(TOOLS.adb, "emulator-5554", exec), {
       package: "com.danwo.shopmobile",
@@ -138,10 +140,14 @@ describe("the app", () => {
 
     expect(commands).toEqual([
       "shell pm clear com.danwo.shopmobile",
+      "shell am force-stop com.android.chrome",
+      "shell am force-stop org.chromium.chrome",
+      "shell am force-stop com.chrome.beta",
       "shell pm grant com.danwo.shopmobile android.permission.POST_NOTIFICATIONS",
       "shell logcat -c",
       "shell cmd package resolve-activity --brief com.danwo.shopmobile",
-      "shell am start -W -n com.danwo.shopmobile/.MainActivity",
+      "shell am start -n com.danwo.shopmobile/.MainActivity",
+      "shell dumpsys activity activities",
     ])
   })
 
