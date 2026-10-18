@@ -299,6 +299,27 @@ program
   })
 
 program
+  .command("serve")
+  .description(
+    "start the dashboard: runs, flight records, matrix grids and flaky tests from .danwo",
+  )
+  .option(
+    "-p, --port <port>",
+    "port on 127.0.0.1 (default 4310; 0 picks a free one)",
+    integerAtLeast(0),
+  )
+  .option("-o, --open", "open the dashboard in the browser")
+  .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
+  .action(async (options: { port?: number; open?: boolean; config?: string }) => {
+    const { serveDashboard } = await import("@danwo/dashboard")
+    const dashboard = await serveDashboard(options)
+    const stop = () => void dashboard.close().then(() => process.exit(0))
+
+    process.once("SIGINT", stop)
+    process.once("SIGTERM", stop)
+  })
+
+program
   .command("cache")
   .description("list, count or clear the replay cache's recordings")
   .addArgument(new Argument("<action>").choices(["ls", "stats", "clear"]))

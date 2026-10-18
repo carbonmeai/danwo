@@ -12,6 +12,7 @@
   ],
   "type": "module",
   "dependencies": {
+    "@danwo/dashboard": "workspace:*",
     "@danwo/github": "workspace:*",
     "@danwo/mcp": "workspace:*",
     "@danwo/recorder": "workspace:*",
