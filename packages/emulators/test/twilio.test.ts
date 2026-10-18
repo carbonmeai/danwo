@@ -143,6 +143,19 @@ describe("Twilio messages", () => {
     expect(await errorOf(client.messages("SM404").fetch())).toBe(20404)
   })
 
+  it("refuses Twilio's magic test numbers with their fixed errors", async () => {
+    const client = twilioClient(emulator)
+    const to = (number: string) =>
+      errorOf(client.messages.create({ from: APP_NUMBER, to: number, body: "x" }))
+
+    expect(await to("+15005550001")).toBe(21211)
+    expect(await to("+15005550002")).toBe(21612)
+    expect(await to("+15005550004")).toBe(21610)
+    expect(
+      await errorOf(client.messages.create({ from: "+15005550001", to: PERSON, body: "x" })),
+    ).toBe(21212)
+  })
+
   it("accepts an API key and secret as the account", async () => {
     const client = twilioClient(emulator, "REDACTED-TEST-VALUE", "key-secret")
 

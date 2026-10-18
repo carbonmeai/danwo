@@ -15,11 +15,35 @@ const sidOf = (c: Context) => c.req.param("file").replace(/\.json$/, "")
 /** A refusal: Twilio's error code and message. */
 type Problem = readonly [number, string]
 
+/**
+ * Twilio's magic recipients: numbers its test credentials refuse with a fixed error, so an app can
+ * exercise each refusal. No real phone has them, so the emulator refuses them for every account.
+ */
+const MAGIC_TO: Readonly<Record<string, Problem>> = {
+  "+15005550001": [21211, "The 'To' number +15005550001 is not a valid phone number."],
+  "+15005550002": [21612, "The 'To' phone number is not currently reachable via SMS."],
+  "+15005550003": [
+    21408,
+    "Permission to send an SMS has not been enabled for the region indicated by the 'To' number: +15005550003.",
+  ],
+  "+15005550004": [21610, "Attempt to send to unsubscribed recipient"],
+  "+15005550009": [21614, "'To' number is not a valid mobile number"],
+}
+
+/** Twilio's magic senders that its test credentials refuse. */
+const MAGIC_FROM: Readonly<Record<string, Problem>> = {
+  "+15005550001": [
+    21212,
+    "The 'From' number +15005550001 is not a valid phone number, shortcode, or alphanumeric sender ID.",
+  ],
+  "+15005550008": [21611, "This 'From' number has exceeded the maximum number of queued messages"],
+}
+
 function recipientProblem(to: string): Problem | undefined {
   if (to === "") return [21604, "A 'To' phone number is required."]
   if (!isE164(to)) return [21211, `Invalid 'To' Phone Number: ${to}`]
 
-  return undefined
+  return MAGIC_TO[to]
 }
 
 /** A send names a number of the account, or a Messaging Service that picks one. */
@@ -30,6 +54,7 @@ function senderProblem(
 ): Problem | undefined {
   if (draft.messagingServiceSid !== null) return undefined
   if (draft.from === "") return [21603, "A 'From' phone number is required."]
+  if (MAGIC_FROM[draft.from] !== undefined) return MAGIC_FROM[draft.from]
   if (context.twilio.numbers.get(draft.from)?.accountSid !== account.id)
     return [
       21606,
