@@ -11,7 +11,8 @@ export const REDACTED = "[redacted]"
 
 /** Each shape, and what keeps a hint of which credential it was (`sk_test_[redacted]`). */
 const TOKEN_PATTERNS: readonly [RegExp, string][] = [
-  [/\b((?:sk|rk|pk)_(?:test|live)_)[A-Za-z0-9]+/g, `$1${REDACTED}`],
+  /* Stripe's secret, restricted and publishable keys; Bachs's sandbox keys. */
+  [/\b((?:sk|rk|pk)_(?:test|live)_|sk_sandbox_)[A-Za-z0-9]+/g, `$1${REDACTED}`],
   [/\b(whsec_)[A-Za-z0-9+/=_-]+/g, `$1${REDACTED}`],
   [/\b(re_)[A-Za-z0-9_]{8,}/g, `$1${REDACTED}`],
   [/(_secret_)[A-Za-z0-9]+/g, `$1${REDACTED}`],
@@ -37,6 +38,8 @@ const TOKEN_PATTERNS: readonly [RegExp, string][] = [
    */
   [/(graph\.microsoft\.com\/(?:up|download)\/)[^\s"'?#/]+/g, `$1${REDACTED}`],
   [/(hooks\.slack\.com\/)[^\s"'?#]+/g, `$1${REDACTED}`],
+  /* Bachs portal session URLs sign the customer in; recovery links let anyone replace the card. */
+  [/((?:portal\.bachs\.io\/s|checkout\.bachs\.io\/recover)\/)[^\s"'?#/]+/g, `$1${REDACTED}`],
   /* Slack bot, user, refresh and app tokens; GitHub's OAuth, App, refresh and personal tokens. */
   [/\b(xox[abpe]-|xoxe\.xox[bp]-|xapp-)[A-Za-z0-9-]+/g, `$1${REDACTED}`],
   [/\b(gh[opusr]_)[A-Za-z0-9]{16,}/g, `$1${REDACTED}`],

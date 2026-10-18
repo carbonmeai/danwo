@@ -1,4 +1,7 @@
 import {
+  BACHS_HOSTS,
+  bachs,
+  type BachsSeedConfig,
   createEmulator,
   type Emulator,
   type EmulatorDefinition,
@@ -19,6 +22,7 @@ import {
   PAYSTACK_HOSTS,
   paystack,
   type PaystackSeedConfig,
+  seedBachs,
   seedGithub,
   seedGoogle,
   seedMicrosoft,
@@ -90,6 +94,12 @@ export interface FlutterwaveOptions {
   readonly seed?: Seed<FlutterwaveSeedConfig>
 }
 
+/** Options of `bachsService()` and `bachsEnvironment()`. */
+export interface BachsOptions {
+  /** Products, customers, webhook endpoints (the app's URL), balances, payout destinations. */
+  readonly seed?: Seed<BachsSeedConfig>
+}
+
 export interface OAuthService extends Service {
   readonly emulator: Emulator
   /** The emulator's clock; push deliveries and their retries run on it. */
@@ -127,6 +137,8 @@ export type SlackEnvironment = OAuthEnvironment<"slack">
 export type GithubEnvironment = OAuthEnvironment<"github">
 /** What `paystackEnvironment()` starts: the Paystack emulator behind its own proxy. */
 export type PaystackEnvironment = OAuthEnvironment<"paystack">
+/** What `bachsEnvironment()` starts: the Bachs emulator behind its own proxy. */
+export type BachsEnvironment = OAuthEnvironment<"bachs">
 /** What `twilioEnvironment()` starts: the Twilio emulator behind its own proxy. */
 export type TwilioEnvironment = OAuthEnvironment<"twilio">
 /** What `flutterwaveEnvironment()` starts: the Flutterwave emulator behind its own proxy. */
@@ -360,4 +372,28 @@ export function paystackEnvironment(
   options: PaystackOptions & { readonly unmatched?: "passthrough" | "block" } = {},
 ): Promise<PaystackEnvironment> {
   return oauthEnvironment("paystack", paystackService(options), options)
+}
+
+const BACHS: Provider<BachsSeedConfig> = {
+  name: "bachs",
+  definition: bachs,
+  hosts: BACHS_HOSTS,
+  apply: (emulator, config) => seedBachs(emulator.store, config),
+}
+
+/**
+ * Bachs for `startServices`: the API on its live and sandbox hosts, the hosted checkout, overlay
+ * script, recovery page and customer portal, with payments settling, subscriptions renewing and
+ * payouts completing on a manual clock that `settle` plays to the end; gives tests the `bachs`
+ * fixture. Read what happened with `bachsLedger(bachs)`.
+ */
+export function bachsService(options: BachsOptions = {}): OAuthService {
+  return oauthService(BACHS, options.seed)
+}
+
+/** A worker-scoped Bachs emulator behind its own proxy; combine services with `startServices`. */
+export function bachsEnvironment(
+  options: BachsOptions & { readonly unmatched?: "passthrough" | "block" } = {},
+): Promise<BachsEnvironment> {
+  return oauthEnvironment("bachs", bachsService(options), options)
 }

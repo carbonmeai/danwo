@@ -99,6 +99,14 @@ export interface FlutterwaveFixtures {
   readonly settle: () => Promise<void>
 }
 
+/** Fixtures a `bachsEnvironment()` or `bachsService()` contributes. */
+export interface BachsFixtures {
+  /** The Bachs emulator: read payments, subscriptions, refunds and payouts with `bachsLedger(bachs)`. */
+  readonly bachs: Emulator
+  readonly proxy: Proxy
+  readonly settle: () => Promise<void>
+}
+
 /** Fixtures a `twilioEnvironment()` or `twilioService()` contributes. */
 export interface TwilioFixtures {
   /**
@@ -191,6 +199,10 @@ export {
   twilioEnvironment,
   type TwilioOptions,
   twilioService,
+  type BachsEnvironment,
+  bachsEnvironment,
+  type BachsOptions,
+  bachsService,
   unique,
   type UseOptions,
   type WorkerEnvironment,
@@ -300,6 +312,10 @@ export {
   twilioPhone,
   type TwilioSeedConfig,
   uninstallGithubApp,
+  type BachsDeposit,
+  type BachsLedger,
+  bachsLedger,
+  type BachsSeedConfig,
 } from "@danwo/emulators"
 export {
   type DatabaseSnapshot,

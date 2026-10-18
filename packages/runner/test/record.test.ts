@@ -192,6 +192,19 @@ describe("flight recorder redaction", () => {
     ).toBe("post to https://hooks.slack.com/[redacted] or https://hooks.slack.com/[redacted]")
     expect(
       redactor.text(
+        "key sk_sandbox_abc123 live sk_live_9xz portal https://portal.bachs.io/s/6Yc0nQ recover https://checkout.bachs.io/recover/ab12",
+      ),
+    ).toBe(
+      "key sk_sandbox_[redacted] live sk_live_[redacted] portal https://portal.bachs.io/s/[redacted] recover https://checkout.bachs.io/recover/[redacted]",
+    )
+    expect(
+      redactor.headers({ "x-bachs-signature": "abc", "x-bachs-signature-v2": "t=1,v1=abc" }),
+    ).toEqual({
+      "x-bachs-signature": "[redacted]",
+      "x-bachs-signature-v2": "[redacted]",
+    })
+    expect(
+      redactor.text(
         'key "REDACTED-TEST-VALUE\\nMIIEow\\nIBAAK\\n-----END RSA PRIVATE KEY-----\\n" end',
       ),
     ).toBe('key "[redacted]\\n" end')
