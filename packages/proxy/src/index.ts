@@ -13,5 +13,6 @@ export {
   type Route,
   startProxy,
 } from "./proxy.ts"
+export { APP_CLOCK_VARIABLE, type AppClock } from "./app-clock.ts"
 export { type CapturedMessage, MAX_CAPTURED_BODY_BYTES } from "./capture.ts"
 export { forwardTo } from "./upstream.ts"

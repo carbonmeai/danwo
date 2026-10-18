@@ -11,6 +11,7 @@ import {
   type Headers as MockttpHeaders,
 } from "mockttp"
 
+import { APP_CLOCK_VARIABLE, type AppClock, createAppClock } from "./app-clock.ts"
 import { type CapturedMessage, captureMessage } from "./capture.ts"
 import { forwardTo } from "./upstream.ts"
 
@@ -121,10 +122,13 @@ export interface Proxy {
   readonly caSpki: string
   /**
    * Environment for a Node app to route through the proxy with no code changes: proxy variables,
-   * `NODE_USE_ENV_PROXY=1`, the CA in `NODE_EXTRA_CA_CERTS`, and the agent preload appended to
-   * `NODE_OPTIONS`. Merged over `base` (default `process.env`).
+   * `NODE_USE_ENV_PROXY=1`, the CA in `NODE_EXTRA_CA_CERTS`, and the preload appended to
+   * `NODE_OPTIONS` (and to `BUN_OPTIONS` for Bun apps). The preload also runs the app's `Date` on
+   * `clock`. Merged over `base` (default `process.env`).
    */
   env(base?: NodeJS.ProcessEnv): NodeJS.ProcessEnv
+  /** The clock of every app started with `env()`: an offset ahead of real time the runner moves. */
+  readonly clock: AppClock
   exchanges(): readonly Exchange[]
   /** Sets the rule that picks a fault for each routed call; `undefined` removes it. */
   setFault(rule: OutboundFaultRule | undefined): void
@@ -244,6 +248,8 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   const caCertPath = join(dir, "ca.pem")
 
   await writeFile(caCertPath, ca.cert)
+
+  const clock = createAppClock(dir)
 
   const server = getLocal({ https: ca })
 
@@ -399,6 +405,7 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
     caCert: ca.cert,
     caCertPath,
     caSpki: await generateSPKIFingerprint(ca.cert),
+    clock,
     env(base = process.env) {
       const preload = `--import=${pathToFileURL(PRELOAD).href}`
 
@@ -411,6 +418,8 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
         NODE_USE_ENV_PROXY: "1",
         NODE_EXTRA_CA_CERTS: caCertPath,
         NODE_OPTIONS: [base.NODE_OPTIONS, preload].filter(Boolean).join(" "),
+        BUN_OPTIONS: [base.BUN_OPTIONS, `--preload=${PRELOAD}`].filter(Boolean).join(" "),
+        [APP_CLOCK_VARIABLE]: clock.file,
       }
     },
     exchanges: () => [...log.values()],
