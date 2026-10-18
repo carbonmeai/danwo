@@ -2,11 +2,12 @@
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 
+import { failurePage } from "@danwo/runner/runner"
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { z } from "zod"
 
 import type { Project } from "../project.ts"
-import { type LoadedRun, loadRecord, loadRun, runLabel } from "../records.ts"
+import { type LoadedRecord, type LoadedRun, loadRecord, loadRun, runLabel } from "../records.ts"
 import { answer, text } from "../reply.ts"
 import { timelineOf } from "../timeline.ts"
 
@@ -29,6 +30,28 @@ export async function runSummary(project: Project, run: LoadedRun, test?: string
     .map((r) => `also failed: ${r.record.test} · ${runLabel(r.record)} · record ${r.dir}`)
 
   return [head, ...detailed, ...others].join("\n\n")
+}
+
+/** One record's Markdown failure page, with its screen at failure when it was kept. */
+async function pageOf(project: Project, loaded: LoadedRecord): Promise<string> {
+  const file = loaded.record.failure?.screen
+  const screen =
+    file === undefined
+      ? undefined
+      : await readFile(join(project.inside(loaded.dir), file), "utf8").catch(() => undefined)
+
+  return `${failurePage(loaded.record, screen)}\nrecord: ${loaded.dir}\n`
+}
+
+/** The run's failed records as Markdown failure pages, separated by rules. */
+async function failurePages(project: Project, run: LoadedRun, test?: string): Promise<string> {
+  const failed = run.records.filter(
+    (r) => r.record.status !== "passed" && (test === undefined || r.record.test.includes(test)),
+  )
+
+  if (failed.length === 0) return `run ${run.id}: no failed records`
+
+  return (await Promise.all(failed.map((r) => pageOf(project, r)))).join("\n---\n\n")
 }
 
 async function screenshotPath(project: Project, record: string, step: number | undefined) {
@@ -58,6 +81,12 @@ export function registerRunTools(server: McpServer, project: Project): void {
       inputSchema: {
         run: z.string().optional().describe("a run id under .danwo/runs; default the newest"),
         test: z.string().optional().describe("only records whose test id contains this"),
+        format: z
+          .enum(["text", "md"])
+          .optional()
+          .describe(
+            "text (default): a compact timeline; md: the full Markdown failure page of each failed record",
+          ),
       },
       annotations: { readOnlyHint: true },
     },
@@ -68,7 +97,11 @@ export function registerRunTools(server: McpServer, project: Project): void {
         if (run === undefined)
           return text(args.run ? `no recorded run ${args.run}` : "no recorded runs yet")
 
-        return text(await runSummary(project, run, args.test))
+        return text(
+          args.format === "md"
+            ? await failurePages(project, run, args.test)
+            : await runSummary(project, run, args.test),
+        )
       }),
   )
 

@@ -15,6 +15,7 @@
     "@danwo/emulators": "workspace:*",
     "@danwo/proxy": "workspace:*",
     "@danwo/runner": "workspace:*",
+    "@danwo/skill": "workspace:*",
     "@modelcontextprotocol/sdk": "1.32.1",
     "playwright-core": "1.64.0",
     "zod": "4.6.1"

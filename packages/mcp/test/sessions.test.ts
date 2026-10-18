@@ -104,7 +104,7 @@ describe("danwo init", () => {
   })
 
   it("creates the three client configs, then leaves them alone", async () => {
-    const first = await initProject({ cwd: dir })
+    const first = await initProject({ cwd: dir, skill: false })
 
     expect(first.map((change) => change.outcome)).toEqual(["created", "created", "created"])
     expect(JSON.parse(await readFile(join(dir, ".mcp.json"), "utf8"))).toEqual({
@@ -113,7 +113,7 @@ describe("danwo init", () => {
     expect(await readFile(join(dir, ".codex/config.toml"), "utf8")).toBe(
       '[mcp_servers.danwo]\ncommand = "npx"\nargs = ["danwo","mcp"]\n',
     )
-    expect(initReport(await initProject({ cwd: dir }))).toBe(
+    expect(initReport(await initProject({ cwd: dir, skill: false }))).toBe(
       "unchanged .mcp.json\nunchanged .cursor/mcp.json\nunchanged .codex/config.toml",
     )
   })
@@ -129,7 +129,7 @@ describe("danwo init", () => {
       'model = "o5"\n\n[mcp_servers.danwo]\ncommand = "old"\n\n[mcp_servers.other]\ncommand = "other"\n',
     )
 
-    const changes = await initProject({ cwd: dir, starterConfig: true })
+    const changes = await initProject({ cwd: dir, starterConfig: true, skill: false })
 
     expect(changes.map((change) => `${change.outcome} ${change.file}`)).toEqual([
       "updated .mcp.json",
@@ -150,9 +150,24 @@ describe("danwo init", () => {
     expect(await readFile(join(dir, "danwo.config.ts"), "utf8")).toContain("defineConfig")
   })
 
+  it("installs the skill with the client configs, keeping an edited copy", async () => {
+    const report = initReport(await initProject({ cwd: dir }))
+
+    expect(report).toContain("created   .claude/skills/danwo/SKILL.md")
+    expect(report).toContain("created   .agents/skills/danwo/SKILL.md")
+
+    await writeFile(join(dir, ".claude/skills/danwo/SKILL.md"), "mine\n")
+    expect(initReport(await initProject({ cwd: dir }))).toContain(
+      "kept      .claude/skills/danwo/SKILL.md (edited here",
+    )
+    expect(await readFile(join(dir, ".claude/skills/danwo/SKILL.md"), "utf8")).toBe("mine\n")
+  })
+
   it("refuses to rewrite a config that is not JSON", async () => {
     await writeFile(join(dir, ".mcp.json"), "{ not json")
 
-    await expect(initProject({ cwd: dir })).rejects.toThrow(/\.mcp\.json is not a JSON object/)
+    await expect(initProject({ cwd: dir, skill: false })).rejects.toThrow(
+      /\.mcp\.json is not a JSON object/,
+    )
   })
 })

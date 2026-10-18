@@ -3,7 +3,8 @@
  * app as the agent sees it and write new tests; resources for the project's config and the
  * latest run; and a prompt that walks an agent through writing a test.
  */
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import { buildSpec, type CliCommand, listGuides, readGuide, renderSpec } from "@danwo/skill"
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { z } from "zod"
 
 import type { ConfigSummary } from "./jobs/protocol.ts"
@@ -26,6 +27,49 @@ export interface DanwoServerOptions {
   readonly version?: string
   /** How many live sessions may be open at once, and when an idle one closes. */
   readonly sessions?: SessionLimits
+  /** The CLI's commands, for the spec resource's `cli` section. */
+  readonly commands?: readonly CliCommand[]
+}
+
+/** The spec and the task guides, so an agent can look up danwo itself. */
+function registerReference(server: McpServer, commands: readonly CliCommand[] | undefined): void {
+  server.registerResource(
+    "spec",
+    "danwo://spec",
+    {
+      description:
+        "Everything this danwo provides, generated from its code: test API, fixtures, locators, matchers, agent, secrets, config, environments, emulator helpers, fault labels, commands, error codes",
+      mimeType: "text/plain",
+    },
+    (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          text: renderSpec(buildSpec(commands === undefined ? {} : { commands })),
+        },
+      ],
+    }),
+  )
+  server.registerResource(
+    "guide",
+    new ResourceTemplate("danwo://guide/{topic}", {
+      list: () => ({
+        resources: listGuides().map((guide) => ({
+          uri: `danwo://guide/${guide.topic}`,
+          name: guide.title,
+          description: guide.summary,
+          mimeType: "text/markdown",
+        })),
+      }),
+    }),
+    {
+      description: "A task guide: writing a test, the matrix, providers, debugging…",
+      mimeType: "text/markdown",
+    },
+    (uri, { topic }) => ({
+      contents: [{ uri: uri.href, text: readGuide(String(topic)), mimeType: "text/markdown" }],
+    }),
+  )
 }
 
 function configText(summary: ConfigSummary): string {
@@ -57,9 +101,11 @@ const WRITE_TEST_GUIDE = (goal: string) => `Write a danwo test for: ${goal}
    would inject with inject_fault and repeat the step. Then close_session.
 4. Call scaffold_test with the steps (the checked locator lines; agent.act / agent.assert for
    steps no locator pins down) and the invariant.
-5. Run it with run_tests. On a failure, read show_run for the failing step, the screen at failure
-   and the network calls, and read_screenshot if the page itself matters. Fix the test (or report
-   the app bug the test found) and run it again.
+5. Run it with run_tests. On a failure, read show_run with format "md" for the failure page: the
+   error code, the failing step, the screen at failure, the provider calls and webhooks; and
+   read_screenshot if the page itself matters. Fix the test (or report the app bug the test
+   found) and run it again. danwo://spec lists every API and error code; danwo://guide/debugging
+   says what each code calls for.
 6. Replace the invariant stub with real checks, then run_matrix on the test to see it hold under
    provider faults.`
 
@@ -121,6 +167,7 @@ export function createDanwoServer(options: DanwoServerOptions): McpServer {
   registerInspectTool(server, project)
   registerScaffoldTool(server, project)
   registerContext(server, project)
+  registerReference(server, options.commands)
 
   return server
 }

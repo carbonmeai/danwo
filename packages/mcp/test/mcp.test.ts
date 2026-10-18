@@ -46,8 +46,32 @@ describe("the server", () => {
       "start_recording",
       "stop_recording",
     ])
-    expect(resources).toEqual(["danwo://config", "danwo://runs/latest"])
+    expect(resources).toEqual([
+      "danwo://config",
+      "danwo://guide/ci",
+      "danwo://guide/debugging",
+      "danwo://guide/email-and-otp",
+      "danwo://guide/first-test",
+      "danwo://guide/locators-vs-agent",
+      "danwo://guide/matrix",
+      "danwo://guide/playwright",
+      "danwo://guide/providers",
+      "danwo://guide/secrets",
+      "danwo://guide/sessions",
+      "danwo://runs/latest",
+      "danwo://spec",
+    ])
     expect(prompts).toEqual(["write-danwo-test"])
+    await client.close()
+  })
+
+  it("serves the spec and the guides as resources", async () => {
+    const client = await connect(PANTRY)
+    const read = async (uri: string) =>
+      (await client.readResource({ uri })).contents.map((c) => ("text" in c ? c.text : "")).join("")
+
+    expect(await read("danwo://spec")).toContain("## Error codes [errors]")
+    expect(await read("danwo://guide/matrix")).toMatch(/^# Invariants and the fault matrix/)
     await client.close()
   })
 

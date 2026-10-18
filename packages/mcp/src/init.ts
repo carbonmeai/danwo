@@ -1,13 +1,15 @@
 /**
  * `danwo init`: registers danwo's MCP server with the coding agents a project uses (Claude Code's
  * `.mcp.json`, Cursor's `.cursor/mcp.json`, Codex's `.codex/config.toml`), merging into files that
- * exist and leaving their other servers alone. Optionally writes a starter `danwo.config.ts`. It
- * asks nothing and reports each file it created, updated or left as it was.
+ * exist and leaving their other servers alone, and installs danwo's skill for those agents, keeping
+ * any copy the user edited. Optionally writes a starter `danwo.config.ts`. It asks nothing and
+ * reports each file it created, updated or left as it was.
  */
 import { existsSync } from "node:fs"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
+import { installSkill } from "@danwo/skill"
 import { z } from "zod"
 
 export interface InitOptions {
@@ -17,12 +19,15 @@ export interface InitOptions {
   readonly command?: readonly string[]
   /** Also write a starter `danwo.config.ts` when the project has no config. */
   readonly starterConfig?: boolean
+  /** Install danwo's skill into `.claude/skills` and `.agents/skills` (default true). */
+  readonly skill?: boolean
 }
 
 export interface InitChange {
   /** Relative to the project folder. */
   readonly file: string
-  readonly outcome: "created" | "updated" | "unchanged"
+  /** `kept`: a skill file the user edited, left as it is. */
+  readonly outcome: "created" | "updated" | "unchanged" | "kept"
 }
 
 const SERVER = "danwo"
@@ -134,11 +139,18 @@ export async function initProject(options: InitOptions): Promise<InitChange[]> {
 
   if (options.starterConfig === true && !existsSync(join(options.cwd, CONFIG_FILE)))
     changes.push(await apply(options.cwd, CONFIG_FILE, () => STARTER_CONFIG))
+  if (options.skill !== false) changes.push(...(await installSkill(options.cwd)))
 
   return changes
 }
 
 /** The report `danwo init` prints. */
 export function initReport(changes: readonly InitChange[]): string {
-  return changes.map((change) => `${change.outcome.padEnd(9)} ${change.file}`).join("\n")
+  return changes
+    .map((change) =>
+      change.outcome === "kept"
+        ? `kept      ${change.file} (edited here; danwo's version is in @danwo/skill)`
+        : `${change.outcome.padEnd(9)} ${change.file}`,
+    )
+    .join("\n")
 }

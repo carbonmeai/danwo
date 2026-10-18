@@ -75,6 +75,14 @@ describe("running and explaining tests", () => {
       / {2}#1 ✗ getByRole\("heading", name: "Order placed"\) toBeVisible\(\) \(tests\/basket\.danwo\.ts:11, \d+ ms, screenshot\)/,
     )
 
+    const page = textOf(
+      await client.callTool({ name: "show_run", arguments: { run, format: "md" } }),
+    )
+
+    expect(page).toContain("EXPECTATION_FAILED")
+    expect(page).toContain("tests/basket.danwo.ts:11")
+    expect(page).toContain(`record: ${failingRecord}`)
+
     const newest = textOf(await client.callTool({ name: "show_run", arguments: {} }))
 
     expect(newest).toMatch(/^run \S+: \d+ records, 0 failed/)
