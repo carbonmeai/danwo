@@ -391,9 +391,31 @@ function planWebhookFaults(
   })
 }
 
+const READS = new Set(["GET", "HEAD"])
+
+/**
+ * Where each routed call stands in a poll: the same read (GET or HEAD, same route) made several
+ * times in a row, such as an app asking for a balance every second. `first` starts one, `repeat`
+ * continues it, `none` is any other call.
+ */
+export function pollPositions(
+  calls: readonly Pick<OutboundCall, "method" | "host" | "path">[],
+): ("first" | "repeat" | "none")[] {
+  const routes = calls.map((call) => (READS.has(call.method) ? routeOf(call) : undefined))
+
+  return routes.map((route, index) => {
+    if (route === undefined) return "none"
+    if (routes[index - 1] === route) return "repeat"
+
+    return routes[index + 1] === route ? "first" : "none"
+  })
+}
+
 /**
  * Turns a clean run into a fault plan: every routed call × each outbound fault, and every webhook
- * delivered (first attempt, per topic occurrence) × each webhook fault.
+ * delivered (first attempt, per topic occurrence) × each webhook fault. A poll gets faults on its
+ * first call only: how many times it repeats depends on timing, so a fault on a later repeat may
+ * fall on a call the next run never makes.
  */
 export function planFaults(
   clean: RunOutcome,
@@ -402,14 +424,19 @@ export function planFaults(
 ): PlannedFault[] {
   const plan: PlannedFault[] = []
   const routed = clean.exchanges.filter((e) => e.disposition === "routed")
+  const polls = pollPositions(routed)
   const routeCounts = new Map<string, number>()
 
   routed.forEach((exchange, index) => {
     const call = { host: exchange.host, method: exchange.method, path: exchange.path, index }
     const route = routeOf(call)
     const occurrence = routeCounts.get(route) ?? 0
+    const nth = occurrence > 0 ? ` #${occurrence + 1}` : ""
+    const poll = polls[index] === "first" ? " (poll)" : ""
 
     routeCounts.set(route, occurrence + 1)
+    if (polls[index] === "repeat") return
+
     for (const fault of outboundFaults(call))
       plan.push({
         target: "outbound",
@@ -417,7 +444,7 @@ export function planFaults(
         route,
         occurrence,
         fault,
-        label: `${describeOutboundFault(fault)} on ${route}${occurrence > 0 ? ` #${occurrence + 1}` : ""}`,
+        label: `${describeOutboundFault(fault)} on ${route}${nth}${poll}`,
       })
   })
 

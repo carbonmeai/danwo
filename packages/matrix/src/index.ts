@@ -10,6 +10,7 @@ export {
   formatMatrix,
   type PlannedFault,
   planFaults,
+  pollPositions,
   type RaceFault,
   type RunEnvironment,
   type RunOutcome,
