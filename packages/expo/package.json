@@ -1,0 +1,16 @@
+{
+  "name": "@danwo/expo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The danwo build of an Expo app: trusts danwo's per-run CA, built with `danwo build-android`.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@danwo/device": "workspace:*"
+  }
+}
