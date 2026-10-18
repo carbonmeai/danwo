@@ -34,6 +34,11 @@ export interface ProxyOptions {
    * real host; `block` answers 502, so a run cannot reach a real service by accident.
    */
   readonly unmatched?: "passthrough" | "block"
+  /**
+   * Hosts (exact, or `*.domain`) answered 502 and logged as `blocked` even when other hosts pass
+   * through: background traffic of no interest to a run, such as a device browser's own sync.
+   */
+  readonly blocked?: readonly string[]
 }
 
 /** A request to a routed host, as a fault rule sees it. */
@@ -406,6 +411,17 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
       .thenCallback((req) => handle(handler, req))
   }
 
+  const blocked = options.blocked ?? []
+  const isBlocked = (host: string) => blocked.some((pattern) => hostMatches(pattern, host))
+
+  if (blocked.length > 0) {
+    await server
+      .forAnyRequest()
+      .matching((req) => !isRouted(req.destination.hostname) && isBlocked(req.destination.hostname))
+      .always()
+      .thenReply(502, "danwo proxy: host is blocked for this run")
+  }
+
   if (options.unmatched === "block") {
     await server
       .forUnmatchedRequest()
@@ -444,7 +460,7 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
       path: req.path,
       disposition: isRouted(host)
         ? "routed"
-        : options.unmatched === "block"
+        : options.unmatched === "block" || isBlocked(host)
           ? "blocked"
           : "passthrough",
       startedAt: new Date(req.timingEvents.startTime).toISOString(),

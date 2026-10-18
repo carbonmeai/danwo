@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url"
 
-import { withAndroidDevice } from "@danwo/device"
+import { ANDROID_BACKGROUND_HOSTS, withAndroidDevice } from "@danwo/device"
 import { buildAndroid } from "@danwo/expo"
 import { forwardTo } from "@danwo/proxy"
 import { defineConfig, type Service, startServices, stripeService } from "@danwo/sdk"
@@ -51,7 +51,8 @@ export default defineConfig({
       ],
       close: async () => undefined,
     }
-    const services = await startServices([stripe, backend])
+    /* The emulator's own background calls (Chrome sync, Play services) never leave the machine. */
+    const services = await startServices([stripe, backend], { blocked: ANDROID_BACKGROUND_HOSTS })
 
     const start = async () => {
       shop = await launchShop(

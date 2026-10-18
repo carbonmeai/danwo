@@ -171,6 +171,32 @@ describe("routing an unmodified app", () => {
       await emulator.close()
     }
   })
+
+  it("blocks listed hosts while others pass through, and still routes a listed host it routes", async () => {
+    const emulator = createEmulator(stripe)
+    const proxy = await startProxy({
+      routes: [{ hosts: ["api.stripe.com", "checkout.stripe.com"], handler: emulator.fetch }],
+      blocked: ["127.0.0.1", "api.stripe.com"],
+    })
+
+    try {
+      const out = await runApp(proxy.env())
+
+      expect(out.customer).toMatch(/^cus_/)
+      expect(out.other).toBe(502)
+      await proxy.settled()
+      expect(proxy.exchanges().find((e) => e.path === "/ping")).toMatchObject({
+        disposition: "blocked",
+        status: 502,
+      })
+      expect(proxy.exchanges().find((e) => e.host === "api.stripe.com")).toMatchObject({
+        disposition: "routed",
+      })
+    } finally {
+      await proxy.stop()
+      await emulator.close()
+    }
+  })
 })
 
 describe("routing an unmodified Resend client", () => {

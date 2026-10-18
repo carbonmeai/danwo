@@ -58,11 +58,16 @@ export interface Services {
  */
 export async function startServices(
   services: readonly Service[],
-  options: { readonly unmatched?: "passthrough" | "block" } = {},
+  options: {
+    readonly unmatched?: "passthrough" | "block"
+    /** Hosts answered as blocked even when others pass through, e.g. `ANDROID_BACKGROUND_HOSTS`. */
+    readonly blocked?: readonly string[]
+  } = {},
 ): Promise<Services> {
   const proxy = await startProxy({
     routes: services.flatMap((s) => s.routes),
     ...(options.unmatched && { unmatched: options.unmatched }),
+    ...(options.blocked && { blocked: options.blocked }),
   })
   const webhooks = webhooksByService(services)
 
