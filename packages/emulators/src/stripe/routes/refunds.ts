@@ -64,21 +64,16 @@ function refundObject(
   }
 }
 
-async function createRefund(context: StripeRouteContext, c: Context): Promise<Response> {
-  const params = await readParams(c)
+/** The 404 for a refund whose charge or payment intent does not exist. */
+function missingTarget(c: Context, params: Record<string, unknown>): Response {
+  return params["charge"] === undefined
+    ? noSuch(c, "payment_intent", text(params["payment_intent"]) ?? "", "payment_intent")
+    : noSuch(c, "charge", text(params["charge"]) ?? "", "charge")
+}
 
-  if (params["charge"] === undefined && params["payment_intent"] === undefined)
-    return badParam(c, "charge")
-
-  const charge = chargeFor(context, params)
-
-  if (charge === undefined)
-    return params["charge"] === undefined
-      ? noSuch(c, "payment_intent", text(params["payment_intent"]) ?? "", "payment_intent")
-      : noSuch(c, "charge", text(params["charge"]) ?? "", "charge")
-
+/** Why `amount` cannot be refunded from `charge`, as Stripe answers it, or undefined when it can. */
+function refundProblem(c: Context, charge: Charge, amount: number): Response | undefined {
   const left = charge.amount - charge.amount_refunded
-  const amount = integer(params["amount"]) ?? left
 
   if (left <= 0)
     return stripeError(
@@ -88,15 +83,33 @@ async function createRefund(context: StripeRouteContext, c: Context): Promise<Re
       `Charge ${charge.id} has already been refunded.`,
       "charge_already_refunded",
     )
-  if (amount <= 0 || amount > left)
-    return stripeError(
-      c,
-      400,
-      "invalid_request_error",
-      `Refund amount (${amount}) is greater than unrefunded amount on charge (${left})`,
-      "amount_too_large",
-      "amount",
-    )
+
+  if (amount > 0 && amount <= left) return undefined
+
+  return stripeError(
+    c,
+    400,
+    "invalid_request_error",
+    `Refund amount (${amount}) is greater than unrefunded amount on charge (${left})`,
+    "amount_too_large",
+    "amount",
+  )
+}
+
+async function createRefund(context: StripeRouteContext, c: Context): Promise<Response> {
+  const params = await readParams(c)
+
+  if (params["charge"] === undefined && params["payment_intent"] === undefined)
+    return badParam(c, "charge")
+
+  const charge = chargeFor(context, params)
+
+  if (charge === undefined) return missingTarget(c, params)
+
+  const amount = integer(params["amount"]) ?? charge.amount - charge.amount_refunded
+  const problem = refundProblem(c, charge, amount)
+
+  if (problem) return problem
 
   const refund = context.objects.refunds.add(refundObject(context, charge, amount, params), null)
   const refunded = context.objects.charges.change(charge.id, {
