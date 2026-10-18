@@ -18,29 +18,34 @@ It drives the app through its UI like a user, while third-party services the app
 - **Visual checks**: `toHaveScreenshot` with baselines and masks.
 - **Saved sessions**: sign in once per worker and start every test that names the session from that browser state (cookies, localStorage, IndexedDB); it is set up again when the environment resets or its check fails.
 - **Time travel**: `time.travel({ days: 30 })` moves the app's clock, every emulator's clock and the page's clock together, so trials end, subscriptions renew and retries run in seconds; faults still apply to what falls due afterwards. See `danwo guide time`.
+- **Android apps**: the same tests, invariants and fault matrix against a React Native or Expo app on an Android emulator bound to the run's proxy and CA, Custom Tabs included. See `danwo guide mobile`.
 - **`danwo record`**: use the app in a browser and get a test: a locator line per action, what each action caused behind the app, and an invariant drafted from it.
 
 ## Packages
 
-| Package             | What it is                                                                        |
-| ------------------- | --------------------------------------------------------------------------------- |
-| `@danwo/sdk`        | The public test API                                                               |
-| `@danwo/cli`        | `danwo test`, `matrix`, `record`, `show`, `serve`, `mcp`, `init`, `spec`, `guide` |
-| `@danwo/recorder`   | Writes tests: records someone using the app; locators and the writer              |
-| `@danwo/runner`     | Browser sessions, the agent, replay, workers and the flight recorder              |
-| `@danwo/matrix`     | The fault matrix                                                                  |
-| `@danwo/data`       | Snapshots of the app's Postgres, SQLite and Redis for fast matrix trials          |
-| `@danwo/proxy`      | The egress proxy                                                                  |
-| `@danwo/emulators`  | Provider emulators                                                                |
-| `@danwo/github`     | Reports runs to GitHub from Actions: a check run and job summary                  |
-| `@danwo/skill`      | The coding-agent skill, task guides and the generated capability spec             |
-| `@danwo/mcp`        | An MCP server for coding agents: run, explain and write danwo tests               |
-| `@danwo/playwright` | danwo's environments, faults, invariants and matrix for Playwright Test           |
-| `@danwo/dashboard`  | `danwo serve`: runs, flight records, matrix grids and flaky tests                 |
-| `@danwo/ui`         | The design system the dashboard is built with                                     |
+| Package             | What it is                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `@danwo/sdk`        | The public test API                                                                                                 |
+| `@danwo/cli`        | `danwo test`, `matrix`, `record`, `show`, `serve`, `mcp`, `init`, `spec`, `guide`, `device doctor`, `build-android` |
+| `@danwo/recorder`   | Writes tests: records someone using the app; locators and the writer                                                |
+| `@danwo/runner`     | Browser sessions, the agent, replay, workers and the flight recorder                                                |
+| `@danwo/matrix`     | The fault matrix                                                                                                    |
+| `@danwo/data`       | Snapshots of the app's Postgres, SQLite and Redis for fast matrix trials                                            |
+| `@danwo/proxy`      | The egress proxy                                                                                                    |
+| `@danwo/emulators`  | Provider emulators                                                                                                  |
+| `@danwo/github`     | Reports runs to GitHub from Actions: a check run and job summary                                                    |
+| `@danwo/skill`      | The coding-agent skill, task guides and the generated capability spec                                               |
+| `@danwo/mcp`        | An MCP server for coding agents: run, explain and write danwo tests                                                 |
+| `@danwo/playwright` | danwo's environments, faults, invariants and matrix for Playwright Test                                             |
+| `@danwo/dashboard`  | `danwo serve`: runs, flight records, matrix grids and flaky tests                                                   |
+| `@danwo/ui`         | The design system the dashboard is built with                                                                       |
+| `@danwo/device`     | Android emulators bound to the run's proxy and CA, driven through agent-device                                      |
+| `@danwo/expo`       | The danwo build of an Expo app (`danwo build-android`)                                                              |
 
 See `examples/shop` for a small app tested with `danwo test` and `danwo matrix`, and
-`examples/shop-playwright` for the same test in Playwright Test.
+`examples/shop-playwright` for the same test in Playwright Test. `examples/shop-mobile` is an
+Expo app that buys the credits through Stripe Checkout in a Custom Tab, tested on an Android
+emulator.
 
 ## Snapshots of the app's data
 
@@ -124,6 +129,24 @@ test("buys credits", async ({ page, danwo }) => {
   process. Faulted runs are judged by the invariant; each trial's results are kept under
   `test-results/danwo-matrix/`. Status faults get their provider's error body; the danwo config's
   `matrix.webhookFaults` and `matrix.outboundFaults` choose what is planned.
+
+## Android apps
+
+```ts
+test("buys 500 credits", async ({ screen, expect }) => {
+  await screen.getByTestId("buy").tap()
+  await screen.getByLabel("Email").fill("buyer@example.com") // Stripe Checkout, in a Custom Tab
+  await screen.getByRole("button", { name: "Pay $5.00" }).tap()
+  await expect(screen.getByTestId("credits")).toHaveText("Credits: 500")
+})
+```
+
+`withAndroidDevice(env, { avd, app })` from `@danwo/device` boots an emulator (or uses a running
+one), roots it, trusts the run's CA, routes its traffic through danwo's proxy with `adb reverse`,
+installs the app, and gives each test a fresh launch. Locators resolve on the accessibility tree:
+React Native's `testID`, roles, labels and text. `danwo build-android` makes the release APK of an
+Expo app that trusts user CAs, cached by a hash of its sources; `danwo device doctor` checks the
+machine. Phase one runs one emulator, locators only. See `danwo guide mobile`.
 
 ## Vision
 

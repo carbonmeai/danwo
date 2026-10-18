@@ -25,6 +25,7 @@ describe("danwo guide", () => {
       "dashboard",
       "ci",
       "playwright",
+      "mobile",
     ])
     expect(guides.every((g) => g.title !== "" && g.summary !== "")).toBe(true)
     expect(guideIndex()).toContain("matrix ")

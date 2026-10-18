@@ -57,6 +57,7 @@ describe("the server", () => {
       "danwo://guide/llm",
       "danwo://guide/locators-vs-agent",
       "danwo://guide/matrix",
+      "danwo://guide/mobile",
       "danwo://guide/playwright",
       "danwo://guide/providers",
       "danwo://guide/secrets",

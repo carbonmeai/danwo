@@ -31,6 +31,7 @@ const ORDER = [
   "dashboard",
   "ci",
   "playwright",
+  "mobile",
 ]
 
 /** Where a topic sorts: its place in `ORDER`, else after every listed one. */
