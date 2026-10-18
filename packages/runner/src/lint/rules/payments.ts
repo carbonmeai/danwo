@@ -44,12 +44,20 @@ function lastPayment(subject: LintSubject): RecordedExchange | undefined {
   )
 }
 
-/** Webhook topics that confirm a payment, by provider. */
+/**
+ * Webhook topics that confirm a payment, by provider. A started subscription confirms a checkout
+ * whose first period is a free trial, where nothing is collected yet.
+ */
 const CONFIRMING_TOPICS: Readonly<Record<string, readonly string[]>> = {
-  stripe: ["checkout.session.completed", "payment_intent.succeeded", "charge.succeeded"],
-  paystack: ["charge.success"],
+  stripe: [
+    "checkout.session.completed",
+    "payment_intent.succeeded",
+    "charge.succeeded",
+    "customer.subscription.created",
+  ],
+  paystack: ["charge.success", "subscription.create"],
   flutterwave: ["charge.completed"],
-  bachs: ["collection.succeeded", "checkout.completed"],
+  bachs: ["collection.succeeded", "checkout.completed", "customer.subscription.created"],
 }
 
 /** A span of the run by the wall clock: after the payment, before the body's last check ended. */
