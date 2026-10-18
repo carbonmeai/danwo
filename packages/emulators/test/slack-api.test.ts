@@ -44,7 +44,10 @@ describe("auth", () => {
   it("echoes api.test without a token, failing with the error it is given", async () => {
     const client = clientFor(emulator)
 
-    expect(await client.api.test({ foo: "bar" })).toMatchObject({ ok: true, args: { foo: "bar" } })
+    expect(await client.apiCall("api.test", { foo: "bar" })).toMatchObject({
+      ok: true,
+      args: { foo: "bar" },
+    })
     expect(await slackError(client.api.test({ error: "my_error" }))).toMatchObject({
       ok: false,
       error: "my_error",
