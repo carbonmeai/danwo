@@ -16,9 +16,13 @@ import {
   seedGoogle,
   seedMicrosoft,
   seedSlack,
+  seedTwilio,
   SLACK_HOSTS,
   slack,
   type SlackSeedConfig,
+  twilio,
+  TWILIO_HOSTS,
+  type TwilioSeedConfig,
 } from "@danwo/emulators"
 import type { Proxy } from "@danwo/proxy"
 
@@ -60,6 +64,12 @@ export interface GithubOptions {
   readonly seed?: Seed<GithubSeedConfig>
 }
 
+/** Options of `twilioService()` and `twilioEnvironment()`. */
+export interface TwilioOptions {
+  /** Accounts, API keys, numbers (with the app's SMS URL), Verify services and unreachable phones. */
+  readonly seed?: Seed<TwilioSeedConfig>
+}
+
 export interface OAuthService extends Service {
   readonly emulator: Emulator
   /** The emulator's clock; push deliveries and their retries run on it. */
@@ -95,6 +105,8 @@ export type MicrosoftEnvironment = OAuthEnvironment<"microsoft">
 export type SlackEnvironment = OAuthEnvironment<"slack">
 /** What `githubEnvironment()` starts: the GitHub emulator behind its own proxy. */
 export type GithubEnvironment = OAuthEnvironment<"github">
+/** What `twilioEnvironment()` starts: the Twilio emulator behind its own proxy. */
+export type TwilioEnvironment = OAuthEnvironment<"twilio">
 
 interface Provider<Config> {
   readonly name: string
@@ -252,4 +264,28 @@ export function githubEnvironment(
   options: GithubOptions & { readonly unmatched?: "passthrough" | "block" } = {},
 ): Promise<GithubEnvironment> {
   return oauthEnvironment("github", githubService(options), options)
+}
+
+const TWILIO: Provider<TwilioSeedConfig> = {
+  name: "twilio",
+  definition: twilio,
+  hosts: TWILIO_HOSTS,
+  apply: (emulator, config) => seedTwilio(emulator.store, config),
+}
+
+/**
+ * Twilio for `startServices`: messages with status callbacks, texts to the app's numbers and Verify,
+ * with message statuses moving on a manual clock that `settle` plays to the end; gives tests the
+ * `twilio` fixture. Read texts and codes with `twilioInbox(twilio)`, or with `twilioSms(twilio)`
+ * as a session's message source.
+ */
+export function twilioService(options: TwilioOptions = {}): OAuthService {
+  return oauthService(TWILIO, options.seed)
+}
+
+/** A worker-scoped Twilio emulator behind its own proxy; combine services with `startServices`. */
+export function twilioEnvironment(
+  options: TwilioOptions & { readonly unmatched?: "passthrough" | "block" } = {},
+): Promise<TwilioEnvironment> {
+  return oauthEnvironment("twilio", twilioService(options), options)
 }

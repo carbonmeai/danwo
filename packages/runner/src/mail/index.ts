@@ -4,7 +4,13 @@
  * came from (the newest mail to that address) instead of the code itself, so a replay reads the
  * new code from the emulator and needs no model.
  */
-import { type Emulator, gmailMailbox, outlookMailbox, resendInbox } from "@danwo/emulators"
+import {
+  type Emulator,
+  gmailMailbox,
+  outlookMailbox,
+  resendInbox,
+  twilioInbox,
+} from "@danwo/emulators"
 
 /** One email as a test or the agent reads it. */
 export interface MailMessage {
@@ -67,6 +73,23 @@ export function outlookMail(emulator: Pick<Emulator, "store" | "outbox">): MailS
       const found = outlookMailbox(emulator, address).latest("inbox")
 
       return found && { to: found.to, subject: found.subject, html: found.body, text: undefined }
+    },
+  }
+}
+
+/**
+ * Texts the Twilio emulator sent to phones, by the app or by Verify, read like mail: the address is
+ * the phone number, so `read_mail`, `mail.code(phone)` and the recording of a typed code work for
+ * SMS just as for email, and a replay reads the new code from the new phone's texts.
+ */
+export function twilioSms(emulator: Pick<Emulator, "store">): MailSource {
+  const inbox = twilioInbox(emulator)
+
+  return {
+    latest(phone) {
+      const found = inbox.latest(phone)
+
+      return found && { to: [found.to], subject: "", html: undefined, text: found.body }
     },
   }
 }

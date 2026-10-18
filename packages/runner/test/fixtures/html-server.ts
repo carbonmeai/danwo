@@ -1,5 +1,5 @@
 import { once } from "node:events"
-import { createServer } from "node:http"
+import { createServer, type IncomingMessage, type Server } from "node:http"
 
 import { listeningPort } from "@danwo/emulators"
 
@@ -37,6 +37,30 @@ export async function serveHtml(
     res.end(answer.body)
   })
 
+  return listen(server)
+}
+
+/** Serves the page `pageFor` resolves to for each request; a request it throws on gets a 500. */
+export async function serveForms(
+  pageFor: (req: IncomingMessage) => Promise<string>,
+): Promise<HtmlServer> {
+  const server = createServer((req, res) => {
+    pageFor(req).then(
+      (html) => {
+        res.writeHead(200, { "content-type": "text/html" })
+        res.end(html)
+      },
+      () => {
+        res.writeHead(500)
+        res.end()
+      },
+    )
+  })
+
+  return listen(server)
+}
+
+async function listen(server: Server): Promise<HtmlServer> {
   server.listen(0, "127.0.0.1")
   await once(server, "listening")
 

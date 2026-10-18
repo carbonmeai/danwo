@@ -88,6 +88,17 @@ export interface GithubFixtures {
   readonly settle: () => Promise<void>
 }
 
+/** Fixtures a `twilioEnvironment()` or `twilioService()` contributes. */
+export interface TwilioFixtures {
+  /**
+   * The Twilio emulator: read the texts phones got with `twilioInbox(twilio)` and text the app's
+   * numbers with `twilioPhone(twilio).send(from, to, body)`.
+   */
+  readonly twilio: Emulator
+  readonly proxy: Proxy
+  readonly settle: () => Promise<void>
+}
+
 /** `test` typed with danwo's fixtures; the same runtime function as the runner's. */
 export const test: TestAPI<DanwoFixtures> =
   baseTest.extend<Omit<DanwoFixtures, keyof TestFixtures>>()
@@ -146,6 +157,10 @@ export {
   type TestCase,
   type TestFixtures,
   type TestOptions,
+  type TwilioEnvironment,
+  twilioEnvironment,
+  type TwilioOptions,
+  twilioService,
   unique,
   type UseOptions,
   type WorkerEnvironment,
@@ -168,8 +183,11 @@ export type {
   VisualOptions,
   WaitForOptions,
 } from "@danwo/runner/runner"
-/** Where an environment's mail lands, for the `mail` fixture and the agent's mail tools. */
-export { gmailMail, outlookMail, resendMail, totp } from "@danwo/runner/runner"
+/**
+ * Where an environment's mail and texts land, for the `mail` fixture and the agent's mail tools; a
+ * text is addressed by its phone number.
+ */
+export { gmailMail, outlookMail, resendMail, totp, twilioSms } from "@danwo/runner/runner"
 /** zod, for the schemas `agent.extract` checks its result against. */
 export { z } from "@danwo/runner/runner"
 /** A JUnit XML reporter for CI systems other than GitHub, and the config's change-impact rules. */
@@ -223,6 +241,7 @@ export {
   resendInbox,
   type S3Objects,
   s3Objects,
+  type PhoneMessage,
   type SignIn,
   type SignIns,
   type SlackAction,
@@ -232,5 +251,10 @@ export {
   type SlackWorkspace,
   slackWorkspace,
   type StoredObject,
+  type TwilioInbox,
+  twilioInbox,
+  type TwilioPhone,
+  twilioPhone,
+  type TwilioSeedConfig,
   uninstallGithubApp,
 } from "@danwo/emulators"

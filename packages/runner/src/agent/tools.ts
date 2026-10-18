@@ -38,7 +38,7 @@ export const toolInputs = {
     ms: z.number().max(10_000).optional(),
   }),
   read_mail: z.object({
-    to: z.string().describe("The email address the app wrote to."),
+    to: z.string().describe("The email address or phone number the app wrote to."),
     pick: z.enum(["code", "link"]),
     match: z
       .string()
@@ -78,7 +78,7 @@ const descriptions: Record<ToolName, string> = {
   wait_for:
     "Wait until `text` or element `ref` appears (or with `state: hidden`, goes away), until the network is idle, or for `ms` milliseconds.",
   read_mail:
-    "Read the newest email the app sent to `to`: its one-time code, or a link (the first, or the one `match` names). Use what it gives you with fill or navigate.",
+    "Read the newest email or text message the app sent to `to` (an email address or a phone number): its one-time code, or a link (the first, or the one `match` names). Use what it gives you with fill or navigate.",
   open_mail:
     "Show the newest email the app sent to `to` in the current tab, to read it or click a link in it.",
   done: "End the step: `passed` once the instruction is carried out, `failed` when it cannot be. Say why in `summary`.",

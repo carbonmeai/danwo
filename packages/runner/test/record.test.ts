@@ -216,6 +216,28 @@ describe("flight recorder redaction", () => {
     })
   })
 
+  it("hides Twilio auth tokens, API key secrets and request signatures", () => {
+    expect(
+      redactor.value({
+        id: "AC1",
+        authToken: "f00d",
+        auth_token: "f00d",
+        secret: "sk",
+        name: "kept",
+      }),
+    ).toEqual({
+      id: "AC1",
+      authToken: "[redacted]",
+      auth_token: "[redacted]",
+      secret: "[redacted]",
+      name: "kept",
+    })
+    expect(redactor.headers({ "x-twilio-signature": "abc=", accept: "*/*" })).toEqual({
+      "x-twilio-signature": "[redacted]",
+      accept: "*/*",
+    })
+  })
+
   it("clips long strings and long lists in recorded state", () => {
     const value = z.object({ blob: z.string(), items: z.array(z.unknown()) }).parse(
       redactor.value({

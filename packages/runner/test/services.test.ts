@@ -9,6 +9,8 @@ import {
   outlookMailbox,
   s3Objects,
   slackWorkspace,
+  twilioInbox,
+  twilioPhone,
 } from "@danwo/emulators"
 import { describe, expect, it } from "vitest"
 
@@ -18,6 +20,7 @@ import {
   googleService,
   microsoftService,
   slackService,
+  twilioService,
 } from "../src/runner/oauth.ts"
 import { s3Service } from "../src/runner/s3.ts"
 import { startServices } from "../src/runner/services.ts"
@@ -322,5 +325,70 @@ describe("slackService and githubService", () => {
 
     expect(slackFaults.some((f) => f.kind === "status" && f.status === 429)).toBe(true)
     expect(githubFaults.some((f) => f.kind === "status" && f.status === 403)).toBe(true)
+  })
+})
+
+describe("twilioService", () => {
+  const ACCOUNT = "REDACTED-TEST-VALUE"
+  const TOKEN = "0000000000000000000000000000000a"
+  const AUTH = `Basic ${Buffer.from(`${ACCOUNT}:${TOKEN}`).toString("base64")}`
+
+  it("joins Stripe behind one proxy, plays status callbacks and texts on settle, and reseeds on reset", async () => {
+    const app = await receiver()
+    const twilio = twilioService({
+      seed: () => ({
+        accounts: [{ sid: ACCOUNT, authToken: TOKEN }],
+        numbers: [{ number: "+15005550006", smsUrl: `${app.url}/sms` }],
+      }),
+    })
+    const services = await startServices([stripeService(), twilio])
+
+    try {
+      expect(Object.keys(services.webhooks ?? {}).toSorted()).toEqual(["stripe", "twilio"])
+
+      const sent = await twilio.emulator.fetch(
+        new Request(`https://api.twilio.com/2010-04-01/Accounts/${ACCOUNT}/Messages.json`, {
+          method: "POST",
+          headers: { authorization: AUTH, "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            From: "+15005550006",
+            To: "+14155550123",
+            Body: "Your code is 123456",
+            StatusCallback: `${app.url}/status`,
+          }).toString(),
+        }),
+      )
+
+      expect(sent.status).toBe(201)
+      twilioPhone(twilio.emulator).send("+14155550123", "+15005550006", "STOP")
+      await services.settle()
+
+      const statuses = app.received
+        .filter((r) => r.path === "/status")
+        .map((r) => new URLSearchParams(r.body).get("MessageStatus"))
+
+      expect(statuses).toEqual(["sent", "delivered"])
+      expect(
+        app.received.find((r) => r.path === "/sms")?.headers["x-twilio-signature"],
+      ).toBeTruthy()
+      expect(twilioInbox(twilio.emulator).latest("+14155550123")?.code()).toBe("123456")
+
+      await services.reset()
+      expect(twilioInbox(twilio.emulator).list()).toEqual([])
+    } finally {
+      await services.close()
+      app.close()
+    }
+  })
+
+  it("gives Twilio hosts Twilio's faults in the default catalogue", () => {
+    const faults = defaultOutboundFaults({
+      method: "POST",
+      host: "verify.twilio.com",
+      path: "/v2/Services/VA1/VerificationCheck",
+      index: 0,
+    })
+
+    expect(faults.some((f) => f.kind === "status" && f.body?.includes("20429"))).toBe(true)
   })
 })

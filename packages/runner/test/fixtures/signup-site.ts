@@ -4,13 +4,13 @@
  * read the mail where the emulator caught it.
  */
 import { randomInt } from "node:crypto"
-import { once } from "node:events"
-import { createServer, type IncomingMessage } from "node:http"
+import type { IncomingMessage } from "node:http"
 import { text } from "node:stream/consumers"
 
-import { createEmulator, type Emulator, listeningPort, resend } from "@danwo/emulators"
+import { createEmulator, type Emulator, resend } from "@danwo/emulators"
 
 import { totp } from "../../src/secrets/totp.ts"
+import { serveForms } from "./html-server.ts"
 
 /** The authenticator key the app shares with its one user, in base32. */
 export const AUTHENTICATOR_KEY = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
@@ -124,29 +124,9 @@ export async function startSignupSite(): Promise<SignupSite> {
     return at.pathname === "/2fa" ? TWO_FACTOR : SIGN_UP
   }
 
-  const server = createServer((req, res) => {
-    answer(req, req.url ?? "/").then(
-      (html) => {
-        res.writeHead(200, { "content-type": "text/html" })
-        res.end(html)
-      },
-      () => {
-        res.writeHead(500)
-        res.end()
-      },
-    )
-  })
+  const server = await serveForms((req) => answer(req, req.url ?? "/"))
 
-  server.listen(0, "127.0.0.1")
-  await once(server, "listening")
-  url = `http://127.0.0.1:${listeningPort(server)}`
+  url = server.url
 
-  return {
-    url,
-    resend: mail,
-    close: async () => {
-      server.close()
-      await once(server, "close")
-    },
-  }
+  return { url, resend: mail, close: () => server.close() }
 }

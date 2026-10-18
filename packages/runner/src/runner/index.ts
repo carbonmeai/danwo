@@ -28,6 +28,7 @@ export {
   outlookMail,
   pickFrom,
   resendMail,
+  twilioSms,
 } from "../mail/index.ts"
 export { backendOf } from "./backend.ts"
 export type { SessionMail } from "../session.ts"
@@ -120,6 +121,10 @@ export {
   slackEnvironment,
   type SlackOptions,
   slackService,
+  type TwilioEnvironment,
+  twilioEnvironment,
+  type TwilioOptions,
+  twilioService,
 } from "./oauth.ts"
 export {
   type S3Environment,

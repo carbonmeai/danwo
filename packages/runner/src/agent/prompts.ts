@@ -20,9 +20,9 @@ How to work:
 - To attach a file, use upload_file with names from "Files you may upload". Never invent a name.
 - When several tabs are open the view lists them; a tab the app opens becomes the active one.
   Use switch_tab to go back to another.
-- When the app emails a code or a link (sign-up, sign-in, reset), get it with read_mail and type
-  or open what it gives you; to read the whole email or click in it, use open_mail. Never guess a
-  code.
+- When the app emails or texts a code or a link (sign-up, sign-in, reset, phone verification),
+  get it with read_mail (to is the email address or the phone number) and type or open what it
+  gives you; to read the whole email or click in it, use open_mail. Never guess a code.
 - If the page makes the instruction impossible (an error, a missing control), call done with
   status "failed" and say what you saw. Do not work around errors the app shows.`
 
