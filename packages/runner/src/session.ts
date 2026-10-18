@@ -334,9 +334,22 @@ function replayStore(options: WebSessionOptions): ReplayStore | undefined {
     mode: options.replay ? "read-only" : cache.mode,
     projectId: cache.projectId ?? "danwo",
     journey: cache.journey ?? "journey",
-    appIdentity: cache.appIdentity ?? new URL(options.baseUrl).origin,
+    appIdentity: cache.appIdentity ?? appIdentityOf(options.baseUrl),
     policy: relocationOf(options),
   })
+}
+
+const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]"])
+
+/**
+ * Which app a recording belongs to: its origin, except that an app on this machine is known by
+ * scheme and host alone. Test environments start local apps on a free port each run, so the port
+ * would make every recording unreachable on the next run.
+ */
+function appIdentityOf(baseUrl: string): string {
+  const url = new URL(baseUrl)
+
+  return LOOPBACK.has(url.hostname) ? `${url.protocol}//${url.hostname}` : url.origin
 }
 
 /** How long actions, checks and page loads wait, with defaults filled in. */
