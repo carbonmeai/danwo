@@ -26,6 +26,7 @@ It drives the app through its UI like a user, while third-party services the app
 | `@danwo/recorder`   | Writes tests: records someone using the app; locators and the writer     |
 | `@danwo/runner`     | Browser sessions, the agent, replay, workers and the flight recorder     |
 | `@danwo/core`       | The fault matrix                                                         |
+| `@danwo/data`       | Snapshots of the app's Postgres, SQLite and Redis for fast matrix trials |
 | `@danwo/proxy`      | The egress proxy                                                         |
 | `@danwo/emulators`  | Provider emulators                                                       |
 | `@danwo/github`     | Reports runs to GitHub from Actions: a check run and job summary         |
@@ -35,6 +36,28 @@ It drives the app through its UI like a user, while third-party services the app
 
 See `examples/shop` for a small app tested with `danwo test` and `danwo matrix`, and
 `examples/shop-playwright` for the same test in Playwright Test.
+
+## Snapshots of the app's data
+
+`danwo matrix` restores each worker's environment before every trial. The emulators restore from
+memory; for the app's own data stores, `@danwo/sdk` exports ready-made snapshots to call from the
+environment's `snapshot()` and `restore()`:
+
+```ts
+const url = await postgresWorkerDatabase(process.env.DATABASE_URL ?? "", workerIndex) // `<db>_w0`…
+const db = postgresSnapshot({ url }) // also sqliteSnapshot({ file }) and redisSnapshot({ url })
+
+return {
+  // …baseUrl, proxy, fixtures and reset as usual
+  snapshot: () => db.snapshot(),
+  restore: () => db.restore(),
+  close: () => db.close(),
+}
+```
+
+A Postgres restore puts a fresh copy of the snapshot in place in tens of milliseconds; the app's
+pool must reconnect when its connections are closed. See `danwo guide matrix` for the details and
+what each store needs.
 
 ## Record a test
 

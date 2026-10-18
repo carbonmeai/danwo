@@ -55,41 +55,78 @@ The run prints `trial time (median …): prepare · open · body · invariant ·
 When `prepare` dominates, the environment's reset is the cost (often an app restart or a fresh
 database). Give the environment `snapshot()` and `restore()`: the matrix resets each worker
 once, snapshots it, then restores before every later trial. The emulator environments have both
-(`stripe.snapshot()`, `stripe.restore()`), so an environment adds its app's state:
+(`stripe.snapshot()`, `stripe.restore()`), so an environment adds its app's own data stores.
+`@danwo/sdk` has ready-made snapshots for them:
+
+| Helper                                     | Snapshot                                  | Restore                                                                             | Needs                                                                    |
+| ------------------------------------------ | ----------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `postgresSnapshot({ url })`                | a template database copied from the app's | the app's database moved aside, the template copied into its place (tens of ms)     | Postgres 14+, a role that may create databases, `pg` in dev dependencies |
+| `postgresWorkerDatabase(url, workerIndex)` |                                           | a database of its own per worker, `<db>_w0`, `<db>_w1`… copied from a migrated base | the base migrated first, with nobody connected                           |
+| `sqliteSnapshot({ file })`                 | SQLite's online backup of the file        | the backup written back through SQLite's locks                                      | Node 24 (`node:sqlite`)                                                  |
+| `sqliteWorkerFile(file, workerIndex)`      |                                           | a copy per worker, `app.w0.db`…                                                     |                                                                          |
+| `redisSnapshot({ url })`                   | every key `DUMP`ed with its expiry        | `FLUSHDB`, then every key `RESTORE`d                                                | test-sized data                                                          |
 
 ```ts
-async environment({ workerIndex }) {
-  const db = `app_test_${workerIndex}`
-  const stripe = await stripeEnvironment({ seed: () => ({ webhookEndpoints: [/* … */] }) })
-  const app = await startApp({ DATABASE_URL: `postgres://localhost/${db}`, ...stripe.proxy.env() })
+import {
+  defineConfig,
+  postgresSnapshot,
+  postgresWorkerDatabase,
+  stripeEnvironment,
+} from "@danwo/sdk"
 
-  return {
-    baseUrl: app.url,
-    proxy: stripe.proxy,
-    webhooks: stripe.emulator.webhooks,
-    fixtures: stripe.fixtures,
-    settle: stripe.settle,
-    reset: async () => {
-      await stripe.reset()
-      await app.restart() // migrations and seed data, the slow way
-    },
-    async snapshot() {
-      await stripe.snapshot()
-      // Keep the freshly seeded database as a template.
-      await psql(`DROP DATABASE IF EXISTS ${db}_kept`)
-      await psql(`CREATE DATABASE ${db}_kept TEMPLATE ${db}`)
-    },
-    async restore() {
-      await stripe.restore()
-      await app.disconnectDatabase()
-      await psql(`DROP DATABASE ${db}`)
-      await psql(`CREATE DATABASE ${db} TEMPLATE ${db}_kept`) // a file copy: fast
-      await app.connectDatabase()
-    },
-    close: async () => { await app.stop(); await stripe.close() },
-  }
-}
+export default defineConfig({
+  async environment({ workerIndex }) {
+    // Migrate and seed DATABASE_URL's database once before the run; each worker copies it.
+    const url = await postgresWorkerDatabase(process.env.DATABASE_URL ?? "", workerIndex)
+    const db = postgresSnapshot({ url })
+    const stripe = await stripeEnvironment({ seed: () => ({ webhookEndpoints: [/* … */] }) })
+    const app = await startApp({ ...stripe.proxy.env(), DATABASE_URL: url })
+
+    return {
+      baseUrl: app.url,
+      proxy: stripe.proxy,
+      webhooks: stripe.emulator.webhooks,
+      fixtures: stripe.fixtures,
+      settle: stripe.settle,
+      reset: async () => {
+        await stripe.reset()
+        await app.restart()
+      },
+      snapshot: async () => {
+        await stripe.snapshot()
+        await db.snapshot()
+      },
+      restore: async () => {
+        await stripe.restore()
+        await db.restore()
+      },
+      close: async () => {
+        await app.stop()
+        await stripe.close()
+        await db.close()
+      },
+    }
+  },
+})
 ```
+
+What the app has to allow:
+
+- **Postgres.** A restore closes every session on the app's database and puts a fresh copy in its
+  place under the same name, so the app's pool has to open new connections when old ones are
+  closed under it. `pg.Pool` does, as long as it has an `error` listener; pools that cache a
+  broken connection need resetting from `onRestore`. `strategy: "swap"` keeps a spare copy ready
+  so a restore is two renames: worth it for large databases and trials of a second or more.
+- **SQLite.** The app can keep its connection open; it reads the restored rows on its next query.
+  A restore waits while the app holds a write transaction open (`busyTimeoutMs`).
+- **Everything else the app keeps in memory** (caches, counters, an ORM's identity map) is not in
+  the database: clear it from `onRestore`, for example through a test-only reset endpoint.
+- **MySQL** has no in-server database copy, so there is no helper for it; reset it with the
+  app's own fixtures or a test-only endpoint.
+
+Measured on a Postgres 17 container with a small schema (a 2,000-row catalogue): a restore took
+about 20 to 40 ms, a rebuild by migration about 45 ms, and a rebuild plus app restart about
+230 ms per trial. The gap grows with the schema and seed data; the restore does not.
 
 An app with in-memory state can expose a test-only reset (the shop example's
 `POST /__test/reset`, on only when `SHOP_TEST_RESET=1`); a file-based one can copy its data folder.
