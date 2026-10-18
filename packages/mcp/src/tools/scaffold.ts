@@ -3,9 +3,9 @@
  * its steps as `agent.act` / `agent.assert` instructions or locator code, and an invariant stub
  * that fails until it is written. It never overwrites a file.
  */
-import { mkdir, writeFile } from "node:fs/promises"
-import { dirname, join } from "node:path"
+import { join } from "node:path"
 
+import { type InvariantDraft, renderTest, writeNewTest } from "@danwo/recorder"
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { z } from "zod"
 
@@ -53,38 +53,25 @@ function fixturesOf(steps: readonly Step[]): string[] {
   ]
 }
 
-function invariantCode(invariant: string): string[] {
-  return [
-    `}).invariant(async () => {`,
-    `  /* ${invariant.replace(/\*\//g, "* /")} */`,
-    `  throw new Error(${JSON.stringify(`invariant not written yet: ${invariant}`)})`,
-    `})`,
-  ]
+/** An invariant that fails until it is written, saying what it should check. */
+function invariantStub(invariant: string): InvariantDraft {
+  return {
+    fixtures: [],
+    body: [
+      `/* ${invariant.replace(/\*\//g, "* /")} */`,
+      `throw new Error(${JSON.stringify(`invariant not written yet: ${invariant}`)})`,
+    ],
+  }
 }
 
 /** The test file's source. */
 export function testSource(draft: TestDraft): string {
-  const body = [`await app.open(${JSON.stringify(draft.path)})`, ...draft.steps.map(stepCode)]
-
-  return [
-    `import { test } from "@danwo/sdk"`,
-    ``,
-    `test(${JSON.stringify(draft.name)}, async ({ ${fixturesOf(draft.steps).join(", ")} }) => {`,
-    ...body.map((line) => `  ${line}`),
-    ...(draft.invariant === undefined ? ["})"] : invariantCode(draft.invariant)),
-    ``,
-  ].join("\n")
-}
-
-/** Writes `source` at `path`, refusing to replace an existing file. */
-async function writeNew(path: string, source: string): Promise<void> {
-  await mkdir(dirname(path), { recursive: true })
-  await writeFile(path, source, { flag: "wx" }).catch((error: unknown) => {
-    const exists = error instanceof Error && "code" in error && error.code === "EEXIST"
-
-    throw exists
-      ? new Error(`${path} already exists; scaffold_test never overwrites a file`)
-      : error
+  return renderTest({
+    imports: [{ from: "@danwo/sdk", names: ["test"] }],
+    name: draft.name,
+    fixtures: fixturesOf(draft.steps),
+    body: [`await app.open(${JSON.stringify(draft.path)})`, ...draft.steps.map(stepCode)],
+    invariant: draft.invariant === undefined ? undefined : invariantStub(draft.invariant),
   })
 }
 
@@ -120,7 +107,7 @@ export function registerScaffoldTool(server: McpServer, project: Project): void 
           invariant: args.invariant,
         }
 
-        await writeNew(path, testSource(draft))
+        await writeNewTest(path, testSource(draft))
 
         return text([`wrote ${project.relative(path)}`, "", testSource(draft)])
       }),

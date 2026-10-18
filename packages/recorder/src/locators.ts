@@ -5,7 +5,7 @@
  */
 import type { Locator, Page } from "playwright-core"
 
-import { isAriaRole } from "./jobs/roles.ts"
+import { isAriaRole } from "./roles.ts"
 
 /** Text a query matches: a string (a substring unless exact), or a regular expression. */
 export type TextMatch = string | RegExp

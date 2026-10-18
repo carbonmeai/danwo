@@ -1,3 +1,4 @@
+import { locate, locatorCode, parseLocator, type ScreenQuery } from "@danwo/recorder"
 /**
  * `check_locator`: whether a locator a test would use finds exactly one element on the live page.
  * One match gives the line to paste into the test; none or several say why a test using it would
@@ -5,8 +6,6 @@
  */
 import { likeness } from "@danwo/runner"
 import type { Locator, Page } from "playwright-core"
-
-import { locate, locatorCode, parseLocator, type ScreenQuery } from "../locators.ts"
 
 const MAX_SHOWN = 5
 const MAX_LINE = 200

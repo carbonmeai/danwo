@@ -46,6 +46,7 @@
       "dependencies": {
         "@danwo/github": "workspace:*",
         "@danwo/mcp": "workspace:*",
+        "@danwo/recorder": "workspace:*",
         "@danwo/runner": "workspace:*",
         "@danwo/skill": "workspace:*",
         "commander": "15.0.0",
@@ -114,6 +115,7 @@
         "@danwo/core": "workspace:*",
         "@danwo/emulators": "workspace:*",
         "@danwo/proxy": "workspace:*",
+        "@danwo/recorder": "workspace:*",
         "@danwo/runner": "workspace:*",
         "@danwo/skill": "workspace:*",
         "@modelcontextprotocol/sdk": "1.32.1",
@@ -163,6 +165,15 @@
     "packages/recorder": {
       "name": "@danwo/recorder",
       "version": "0.0.0",
+      "dependencies": {
+        "@danwo/runner": "workspace:*",
+        "playwright-core": "1.64.0",
+        "zod": "4.6.1",
+      },
+      "devDependencies": {
+        "@danwo/emulators": "workspace:*",
+        "@danwo/sdk": "workspace:*",
+      },
     },
     "packages/runner": {
       "name": "@danwo/runner",

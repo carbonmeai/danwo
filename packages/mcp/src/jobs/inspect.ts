@@ -1,3 +1,4 @@
+import { locate, locatorCode } from "@danwo/recorder"
 /**
  * `inspect_page` in the job process: starts the project's environment as a worker would, opens a
  * path of the app in danwo's browser behind the environment's proxy, and reads the page as an
@@ -8,7 +9,6 @@ import { launchBrowser, redactCredentials, SecretVault } from "@danwo/runner"
 import { type DanwoConfig, loadConfig, type WorkerEnvironment } from "@danwo/runner/runner"
 import type { Locator, Page } from "playwright-core"
 
-import { locate, locatorCode } from "../locators.ts"
 import type { Job, JobPlace, LocatorMatch, LocatorQuery, PageInspection } from "./protocol.ts"
 
 /** About 20k tokens of page text at most. */

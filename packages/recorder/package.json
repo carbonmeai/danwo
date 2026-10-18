@@ -2,9 +2,21 @@
   "name": "@danwo/recorder",
   "version": "0.0.0",
   "private": true,
-  "description": "Flight recorder: browser, backend, outbound, database and job timeline.",
+  "description": "Writes danwo tests: records someone using the app, and finds the locators and invariant the test needs.",
+  "files": [
+    "src"
+  ],
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@danwo/runner": "workspace:*",
+    "playwright-core": "1.64.0",
+    "zod": "4.6.1"
+  },
+  "devDependencies": {
+    "@danwo/emulators": "workspace:*",
+    "@danwo/sdk": "workspace:*"
   }
 }

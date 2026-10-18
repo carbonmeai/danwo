@@ -7,10 +7,10 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
+import { locate, locatorCode, parseLocator } from "@danwo/recorder"
 import type { SecretVault } from "@danwo/runner"
 import type { Browser, BrowserContext, Locator, Page } from "playwright-core"
 
-import { locate, locatorCode, parseLocator } from "../locators.ts"
 import { snapshotChange } from "./diff.ts"
 import { checkLocator } from "./locator-check.ts"
 import type { SessionAnswer, SessionCall } from "./protocol.ts"

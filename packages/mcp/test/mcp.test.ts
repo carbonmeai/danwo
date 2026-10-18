@@ -3,9 +3,9 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { locatorCode } from "@danwo/recorder"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
-import { locatorCode } from "../src/locators.ts"
 import { Project } from "../src/project.ts"
 import { testSource } from "../src/tools/scaffold.ts"
 import { connect, PANTRY, resultOf, textOf } from "./client.ts"
