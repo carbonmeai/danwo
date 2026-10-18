@@ -130,9 +130,9 @@ export const bachs = defineEmulator({
     ])
       register(context)
   },
-  webhooks: ({ store, clock }) => ({
+  webhooks: ({ store, clock, wallClock }) => ({
     endpoints: () => deliveryEndpoints(bachsStore(store)),
-    sign: bachsSigner(clock),
+    sign: bachsSigner(clock, wallClock),
     policy: BACHS_DELIVERY,
   }),
 })

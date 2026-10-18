@@ -21,6 +21,11 @@ export interface EmulatorContext {
   readonly clock: Clock
   /** Schedules work for later on the emulator's time, such as a message's status changes. */
   readonly timer: Timer
+  /**
+   * Real time as the apps see it: the system clock, plus any time travel that moved their clocks.
+   * For stamps apps compare with their own clock, such as webhook signature timestamps.
+   */
+  readonly wallClock: Clock
 }
 
 /** How an emulator's webhooks are addressed, signed and retried. */
@@ -57,6 +62,8 @@ export interface EmulatorOptions {
   readonly clock?: Clock
   /** Schedules webhook retries; a manual timer makes them deterministic. */
   readonly timer?: Timer
+  /** Real time as the apps see it (see `EmulatorContext.wallClock`); the system clock by default. */
+  readonly wallClock?: Clock
   readonly deliveryPolicy?: DeliveryPolicy
   /** Used to deliver webhooks; defaults to the global fetch. */
   readonly fetch?: typeof fetch
@@ -91,6 +98,7 @@ export function createEmulator(
     baseUrl,
     clock,
     timer: options.timer ?? systemTimer,
+    wallClock: options.wallClock ?? systemClock,
   }
 
   definition.setup(context)

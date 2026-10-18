@@ -12,15 +12,16 @@ export function bachsSignature(secret: string, body: string, timestamp: number):
  * Signs deliveries the way Bachs does: the timestamp and signature as separate headers, and the same
  * digest in `X-Bachs-Signature-V2` with the scheme named (`t=<timestamp>,v1=<signature>`).
  *
- * The timestamp is wall-clock time, shifted back by however far the attempt meant to sign in the
- * past (a stale delivery). Apps check it against their own clock in both directions (the SDK
- * refuses one more than five minutes off either way), and the emulator's clock may have run ahead
- * of theirs while deliveries were held back; real Bachs signs with the time it actually sends.
+ * The timestamp is the apps' wall-clock time (`wall`, which follows time travel), shifted back by
+ * however far the attempt meant to sign in the past (a stale delivery). Apps check it against their
+ * own clock in both directions (the SDK refuses one more than five minutes off either way), and the
+ * emulator's clock may have run ahead of theirs while deliveries were held back; real Bachs signs
+ * with the time it actually sends.
  */
-export function bachsSigner(clock: Clock): WebhookSigner {
+export function bachsSigner(clock: Clock, wall: Clock): WebhookSigner {
   return ({ endpoint, body, timestamp }) => {
     const pastBy = Math.max(0, Math.floor(clock().getTime() / 1000) - timestamp)
-    const sentAt = Math.floor(Date.now() / 1000) - pastBy
+    const sentAt = Math.floor(wall().getTime() / 1000) - pastBy
     const signature = bachsSignature(endpoint.secret, body, sentAt)
 
     return {

@@ -45,12 +45,24 @@ export class ManualClock {
   private nowMs: number
   private queue: Pending[] = []
   private nextId = 1
+  private travelledMs = 0
 
   constructor(start: Date) {
     this.nowMs = start.getTime()
   }
 
   readonly clock: Clock = () => new Date(this.nowMs)
+
+  /**
+   * Real time as the apps see it once time travel has moved their clocks: the system clock plus
+   * every `travelled` jump. Signatures apps check against their own clock are stamped with it.
+   */
+  readonly wall: Clock = () => new Date(Date.now() + this.travelledMs)
+
+  /** Notes a jump of time travel, which moved the apps' clocks `ms` ahead of real time. */
+  travelled(ms: number): void {
+    this.travelledMs += ms
+  }
 
   readonly timer: Timer = {
     setTimeout: (callback, ms) => {
@@ -92,6 +104,7 @@ export class ManualClock {
   restart(now: Date): void {
     this.queue = []
     this.nowMs = now.getTime()
+    this.travelledMs = 0
   }
 
   /** Milliseconds until the next scheduled callback, or undefined if none. */
