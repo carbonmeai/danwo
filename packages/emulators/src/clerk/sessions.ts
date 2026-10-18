@@ -8,7 +8,7 @@ import type { ClientRecord } from "./store.ts"
 const SESSION_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000
 
 /** How long a session token is valid: Clerk's short-lived 60 seconds. */
-export const TOKEN_LIFETIME_S = 60
+const TOKEN_LIFETIME_S = 60
 
 /** A new client, the record a browser's sign-ins and sessions hang off. */
 export function newClient(context: ClerkContext): ClientRecord {

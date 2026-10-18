@@ -5,7 +5,7 @@ import type {
 } from "@clerk/backend"
 
 import { type ClerkContext, instanceOf, now } from "./context.ts"
-import { primaryEmail } from "./entities.ts"
+import { type ClerkUser, primaryEmail } from "./entities.ts"
 import { clerkId, ClerkFailure, notFound } from "./helpers.ts"
 import type { MembershipRecord } from "./store.ts"
 
@@ -136,13 +136,34 @@ export function organizationJson(context: ClerkContext, org: OrganizationJSON): 
   return { ...org, members_count: members }
 }
 
+/** A member's public face on a membership; a deleted user keeps only their id. */
+function memberData(user: ClerkUser | undefined, userId: string) {
+  if (!user)
+    return {
+      identifier: userId,
+      first_name: null,
+      last_name: null,
+      image_url: "",
+      has_image: false,
+      user_id: userId,
+    }
+
+  return {
+    identifier: primaryEmail(user) ?? user.id,
+    first_name: user.first_name,
+    last_name: user.last_name,
+    image_url: user.image_url,
+    has_image: user.has_image,
+    user_id: userId,
+  }
+}
+
 /** A membership with both its organization and the member's public data, as the API answers it. */
 export function membershipJson(
   context: ClerkContext,
   membership: MembershipRecord,
 ): OrganizationMembershipJSON {
   const org = organizationOf(context, membership.organization_id)
-  const user = context.clerk.users.get(membership.user_id)
 
   return {
     object: "organization_membership",
@@ -154,14 +175,7 @@ export function membershipJson(
     created_at: membership.created_at,
     updated_at: membership.updated_at,
     organization: organizationJson(context, org),
-    public_user_data: {
-      identifier: user ? (primaryEmail(user) ?? user.id) : membership.user_id,
-      first_name: user?.first_name ?? null,
-      last_name: user?.last_name ?? null,
-      image_url: user?.image_url ?? "",
-      has_image: user?.has_image ?? false,
-      user_id: membership.user_id,
-    },
+    public_user_data: memberData(context.clerk.users.get(membership.user_id), membership.user_id),
   }
 }
 

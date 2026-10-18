@@ -30,14 +30,14 @@ export function verifiedEmail(address: string, strategy = "admin"): ClerkEmail {
 /** The fields a user is created with; the rest start empty. */
 export interface NewUser {
   readonly emails: readonly string[]
-  readonly firstName?: string | null
-  readonly lastName?: string | null
-  readonly username?: string | null
-  readonly externalId?: string | null
+  readonly firstName?: string | null | undefined
+  readonly lastName?: string | null | undefined
+  readonly username?: string | null | undefined
+  readonly externalId?: string | null | undefined
   readonly hasPassword: boolean
-  readonly publicMetadata?: Record<string, unknown>
-  readonly privateMetadata?: Record<string, unknown>
-  readonly unsafeMetadata?: Record<string, unknown>
+  readonly publicMetadata?: Record<string, unknown> | undefined
+  readonly privateMetadata?: Record<string, unknown> | undefined
+  readonly unsafeMetadata?: Record<string, unknown> | undefined
 }
 
 /** A user's name parts, null when not given. */

@@ -12,7 +12,7 @@ export const MAX_CODE_TRIES = 3
 export const CODE_LIFETIME_MS = 10 * 60 * 1000
 
 /** Sends a six-digit code to `to` and returns it. */
-export function emailCode(context: ClerkContext, to: string): string {
+function emailCode(context: ClerkContext, to: string): string {
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0")
 
   context.clerk.messages.add(

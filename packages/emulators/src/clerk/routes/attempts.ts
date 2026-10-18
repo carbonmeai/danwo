@@ -193,11 +193,12 @@ function signInRoutes(app: App, context: ClerkContext): void {
   })
 }
 
-/** The fields a sign-up sets, checked: a free email address and a long enough password. */
-function signUpFields(context: ClerkContext, body: Record<string, unknown>) {
-  const email = str(body.email_address)
-  const password = str(body.password)
-
+/** Refuses a taken email address or a short password. */
+function checkSignUp(
+  context: ClerkContext,
+  email: string | undefined,
+  password: string | undefined,
+): void {
   if (email !== undefined && userByEmail(context, email))
     throw formError(
       "form_identifier_exists",
@@ -210,13 +211,23 @@ function signUpFields(context: ClerkContext, body: Record<string, unknown>) {
       "password",
       "Passwords must be 8 characters or more.",
     )
+}
 
-  return {
-    ...(email !== undefined && { identifier: email }),
-    ...(password !== undefined && { password }),
-    ...(str(body.first_name) !== undefined && { first_name: str(body.first_name) ?? null }),
-    ...(str(body.last_name) !== undefined && { last_name: str(body.last_name) ?? null }),
+/** The fields a sign-up sets, checked: a free email address and a long enough password. */
+function signUpFields(
+  context: ClerkContext,
+  body: Record<string, unknown>,
+): Partial<AttemptRecord> {
+  const given = {
+    identifier: str(body.email_address),
+    password: str(body.password),
+    first_name: str(body.first_name),
+    last_name: str(body.last_name),
   }
+
+  checkSignUp(context, given.identifier, given.password)
+
+  return Object.fromEntries(Object.entries(given).filter(([, value]) => value !== undefined))
 }
 
 /** Verifies a sign-up's emailed code; a complete sign-up creates the user and signs them in. */

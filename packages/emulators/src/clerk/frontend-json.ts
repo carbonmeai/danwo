@@ -55,7 +55,7 @@ function emailJson(email: ClerkEmail) {
  * A user as the Frontend API shows it to the signed-in browser: no private metadata, with
  * passkeys and the profile image id the browser SDK reads.
  */
-export function browserUser(context: ClerkContext, user: ClerkUser) {
+function browserUser(context: ClerkContext, user: ClerkUser) {
   const memberships = context.clerk.memberships
     .where((m) => m.user_id === user.id)
     .map((m) => membershipJson(context, m))
@@ -101,7 +101,7 @@ export function browserUser(context: ClerkContext, user: ClerkUser) {
 }
 
 /** The public face of a user, as sessions and memberships carry it. */
-export function publicUserData(user: ClerkUser): PublicUserDataJSON {
+function publicUserData(user: ClerkUser): PublicUserDataJSON {
   return {
     first_name: user.first_name,
     last_name: user.last_name,

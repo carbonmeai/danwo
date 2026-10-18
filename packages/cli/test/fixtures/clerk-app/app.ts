@@ -39,21 +39,19 @@ const scripts = `
 const page = (title: string, body: string) =>
   `<!doctype html><title>${title}</title><main><h1>${title}</h1>${body}</main>${scripts}`
 
+/** The claims of a request's `__session` cookie, decoded without checking its signature. */
+function unverifiedClaims(req: Request): Record<string, unknown> {
+  const payload =
+    /(?:^|;\s*)__session=[^.;]*\.([^.;]+)/.exec(req.headers.cookie ?? "")?.[1] ?? "e30"
+
+  return Object(JSON.parse(Buffer.from(payload, "base64url").toString()))
+}
+
 /** The user a request's `__session` cookie names, read without checking its signature. */
 function unverifiedUser(req: Request): string | null {
-  const token = /(?:^|;\s*)__session=([^;]+)/.exec(req.headers.cookie ?? "")?.[1]
-  const payload = token?.split(".")[1]
+  const { sub } = unverifiedClaims(req)
 
-  if (payload === undefined) return null
-
-  const claims: unknown = JSON.parse(Buffer.from(payload, "base64url").toString())
-
-  return claims !== null &&
-    typeof claims === "object" &&
-    "sub" in claims &&
-    typeof claims.sub === "string"
-    ? claims.sub
-    : null
+  return typeof sub === "string" ? sub : null
 }
 
 /** The email the Backend API has for a user, or null when Clerk could not be reached. */

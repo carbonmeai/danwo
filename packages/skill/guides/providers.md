@@ -143,3 +143,41 @@ const auth0 = await auth0Environment({
 
 Not emulated: the implicit and device flows, passwordless, SAML and enterprise connections,
 log streams, and Lucene ranges or parentheses (the Management API answers 400).
+
+## Clerk
+
+`clerkEnvironment({ seed })` (or `clerkService` in `startServices`) plays a Clerk development
+instance on its real hosts: the Backend API on `api.clerk.com`, the Frontend API on
+`<slug>.clerk.accounts.dev` and the Account Portal on `<slug>.accounts.dev`. Read the keys with
+`clerkInstance(clerk.emulator).instance` and give the app `CLERK_PUBLISHABLE_KEY` and
+`CLERK_SECRET_KEY`; `@clerk/express`, `@clerk/nextjs` and `@clerk/backend` then run unchanged,
+dev-browser handshake included.
+
+```ts
+const clerk = await clerkEnvironment({
+  seed: {
+    instance: { password: true }, // false: sign in by emailed code
+    users: [{ email: "ada@danwo.test", password: "s3cret-pass" }],
+    organizations: [{ name: "Acme", members: [{ email: "ada@danwo.test", role: "org:admin" }] }],
+  },
+})
+const { publishableKey, secretKey } = clerkInstance(clerk.emulator).instance
+```
+
+The page loads ClerkJS and `<SignIn/>` from the Frontend API host
+(`/npm/@clerk/clerk-js@6/dist/clerk.browser.js` and `/npm/@clerk/ui@1/dist/ui.browser.js`), as it
+does from Clerk. The emulator serves the app's own installed `@clerk/clerk-js` and `@clerk/ui`
+when their major version fits, and otherwise downloads the published (MIT) build once from a
+public npm CDN into `~/.cache/danwo/clerk`. Sign-in works with a password or an emailed code;
+return `mail: [clerkMail(clerk.emulator)]` from the environment so `mail.code(email)` reads the
+codes. Session tokens are RS256 JWTs with Clerk's claims, valid 60 seconds.
+
+In tests, `clerkInstance(clerk)` reads users, sessions and codes, and
+`revokeSessions(email)` signs a user out everywhere mid-test: the next token refresh is refused
+and the next handshake signs the app out. `danwo matrix` faults the Backend API (429 with
+`Retry-After`, 500, 503, a slow answer, resets), the signing keys and handshake payloads (500,
+reset) and ClerkJS's token refresh (500, 503). Recordings redact `sk_test_` keys, session
+tokens, Clerk cookies, dev browser tokens and handshake nonces.
+
+Not emulated: social and enterprise sign-in, phone codes, passkeys, MFA, waitlists, billing and
+Clerk's webhooks.

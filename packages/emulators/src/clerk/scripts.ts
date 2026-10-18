@@ -31,7 +31,7 @@ interface ScriptRequest {
 }
 
 /** Reads `/npm/@scope/name@version/dist/file.js`, or nothing for other paths. */
-export function scriptRequest(path: string): ScriptRequest | undefined {
+function scriptRequest(path: string): ScriptRequest | undefined {
   const match = /^\/npm\/(@[^/]+\/[^/@]+)@([^/]+)\/(.+)$/.exec(path)
 
   if (!match) return undefined
@@ -56,22 +56,24 @@ function manifestVersion(manifest: string): string {
     : ""
 }
 
+/**
+ * The manifests of `name` that the app (from the working directory) and danwo would load, nearest
+ * first. They are found by path, as the packages' exports maps do not expose `package.json`.
+ */
+function manifestsOf(name: string): string[] {
+  const from = [join(process.cwd(), "package.json"), import.meta.filename]
+  const dirs = from.flatMap((base) => createRequire(base).resolve.paths(name) ?? [])
+
+  return dirs.map((dir) => join(dir, name, "package.json")).filter((path) => existsSync(path))
+}
+
 /** The installed copy of a package that the app or danwo resolves, if its major version fits. */
 function installedRoot(request: ScriptRequest): string | undefined {
   const major = /^\d+/.exec(request.version)?.[0]
 
-  for (const base of [join(process.cwd(), "package.json"), import.meta.filename]) {
-    let manifest: string
-
-    try {
-      manifest = createRequire(base).resolve(`${request.name}/package.json`)
-    } catch {
-      continue
-    }
-
+  for (const manifest of manifestsOf(request.name))
     if (major === undefined || manifestVersion(manifest).startsWith(`${major}.`))
       return dirname(manifest)
-  }
 
   return undefined
 }

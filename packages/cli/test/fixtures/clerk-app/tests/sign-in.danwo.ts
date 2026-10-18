@@ -1,7 +1,8 @@
 import { type ClerkFixtures, test as base } from "@danwo/sdk"
 
+import { enterEmail } from "./steps.ts"
+
 const test = base.extend<ClerkFixtures>()
-const EMAIL = "ada@danwo.test"
 
 /** One base64url JSON part of a token. */
 function part(value: object): string {
@@ -24,9 +25,7 @@ test("signs in with Clerk's <SignIn/> and sees their own account", async ({
   screen,
   expect,
 }) => {
-  await app.open("/")
-  await screen.getByLabel("Email address").fill(EMAIL)
-  await screen.getByRole("button", { name: "Continue", exact: true }).click()
+  await enterEmail(app, screen)
   await screen.getByLabel("Password", { exact: true }).fill("s3cret-pass")
   await screen.getByRole("button", { name: "Continue", exact: true }).click()
   await expect(screen.getByRole("heading", { name: "Signed in" })).toBeVisible()

@@ -50,8 +50,8 @@ export interface ClerkSeedConfig {
 }
 
 /** The slug and secret key an emulator uses when the seed names none. */
-export const DEFAULT_SLUG = "danwo-app"
-export const DEFAULT_SECRET_KEY = "REDACTED-TEST-VALUE"
+const DEFAULT_SLUG = "danwo-app"
+const DEFAULT_SECRET_KEY = "REDACTED-TEST-VALUE"
 
 /** The instance a seed describes. */
 export function instanceFrom(config: ClerkSeedConfig["instance"] = {}): ClerkInstance {
@@ -75,13 +75,13 @@ function seedUsers(context: ClerkContext, users: readonly ClerkSeedUser[]): void
     const record = newUser(
       {
         emails: [user.email],
-        firstName: user.firstName ?? null,
-        lastName: user.lastName ?? null,
-        username: user.username ?? null,
-        externalId: user.externalId ?? null,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        username: user.username,
+        externalId: user.externalId,
         hasPassword: user.password !== undefined,
-        publicMetadata: user.publicMetadata ?? {},
-        privateMetadata: user.privateMetadata ?? {},
+        publicMetadata: user.publicMetadata,
+        privateMetadata: user.privateMetadata,
       },
       context.clock().getTime(),
     )

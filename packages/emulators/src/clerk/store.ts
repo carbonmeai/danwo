@@ -23,7 +23,7 @@ export interface ClerkInstance {
 }
 
 /** What the emulator keeps about a user beyond what the API shows. */
-export interface UserSecrets {
+interface UserSecrets {
   readonly password: string | null
 }
 
@@ -48,7 +48,7 @@ export interface DevBrowser {
 }
 
 /** A handshake's cookie directives, kept until the app's server collects them by nonce. */
-export interface HandshakeNonce {
+interface HandshakeNonce {
   readonly id: string
   readonly directives: readonly string[]
 }

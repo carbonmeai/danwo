@@ -1,4 +1,3 @@
-import type { App } from "../http.ts"
 import type { SigningKey } from "../oauth/jwt.ts"
 import type { Outbox } from "../outbox.ts"
 import type { Clock, Store } from "../store.ts"
@@ -33,13 +32,6 @@ export function contextOf(store: Store): ClerkContext {
   if (!context) throw new Error("this store does not belong to a Clerk emulator")
 
   return context
-}
-
-/** The three apps a Clerk emulator serves, one per host it answers on. */
-export interface ClerkApps {
-  readonly backend: App
-  readonly frontend: App
-  readonly accounts: App
 }
 
 /** The instance the emulator plays. */

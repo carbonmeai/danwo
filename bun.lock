@@ -155,7 +155,6 @@
         "@bachs/sdk": "1.0.0",
         "@clerk/backend": "3.25.0",
         "@clerk/clerk-js": "6.39.1",
-        "@clerk/express": "2.1.80",
         "@clerk/shared": "4.40.0",
         "@clerk/ui": "1.40.2",
         "@microsoft/microsoft-graph-client": "3.0.7",
@@ -175,7 +174,6 @@
         "paystack-sdk": "4.2.1",
         "resend": "6.34.1",
         "stripe": "23.0.0",
-        "svix": "2.8.0",
         "twilio": "6.2.0",
         "zod": "4.6.1",
       },
@@ -2549,8 +2547,6 @@
     "stylis": ["stylis@4.2.0", "", {}, "sha512-Orov6g6BB1sDfYgzWfTHDOxamtX1bE/zo104Dh9e6fqJ3PooipYyfJ0pUmrZO2wAvO8YbEyeFrkV91XTsGMSrw=="],
 
     "supports-preserve-symlinks-flag": ["supports-preserve-symlinks-flag@1.0.0", "", {}, "sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w=="],
-
-    "svix": ["svix@2.8.0", "", { "dependencies": { "standardwebhooks": "^1.1.1" } }, "sha512-3bvu4FoVP9szUn5WBXUXUs97lLVC+Jyr0+jm+Q+DVcPMLXmeoZepbmbCzJVqGDNf9i00P7WLAH6m0q9HrzH1+g=="],
 
     "symbol-observable": ["symbol-observable@1.2.0", "", {}, "sha512-e900nM8RRtGhlV36KGEU9k65K3mPb1WV70OdjfxlG2EAuM1noi/E/BaW/uMhL7bPEssK8QV57vN3esixjUvcXQ=="],
 

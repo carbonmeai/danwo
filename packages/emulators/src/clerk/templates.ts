@@ -1,7 +1,7 @@
 import type { SessionJSON } from "@clerk/backend"
 
 import type { ClerkContext } from "./context.ts"
-import { primaryEmail } from "./entities.ts"
+import { type ClerkUser, primaryEmail } from "./entities.ts"
 import { notFound } from "./helpers.ts"
 import type { JwtTemplateRecord } from "./store.ts"
 
@@ -14,21 +14,28 @@ function templateNamed(context: ClerkContext, name: string): JwtTemplateRecord {
   return template
 }
 
-/** The values a template's `{{…}}` shortcodes read, by path. */
-function shortcodeValues(context: ClerkContext, session: SessionJSON): Record<string, unknown> {
-  const user = context.clerk.users.get(session.user_id)
+/** The user's shortcode values; a user deleted since the session started has none. */
+function userValues(user: ClerkUser | undefined): Record<string, unknown> {
+  if (!user) return {}
 
   return {
+    "user.first_name": user.first_name,
+    "user.last_name": user.last_name,
+    "user.username": user.username,
+    "user.primary_email_address": primaryEmail(user) ?? null,
+    "user.public_metadata": user.public_metadata,
+    "user.unsafe_metadata": user.unsafe_metadata,
+    "user.external_id": user.external_id,
+  }
+}
+
+/** The values a template's `{{…}}` shortcodes read, by path. */
+function shortcodeValues(context: ClerkContext, session: SessionJSON): Record<string, unknown> {
+  return {
     "user.id": session.user_id,
-    "user.first_name": user?.first_name ?? null,
-    "user.last_name": user?.last_name ?? null,
-    "user.username": user?.username ?? null,
-    "user.primary_email_address": user ? primaryEmail(user) : null,
-    "user.public_metadata": user?.public_metadata ?? {},
-    "user.unsafe_metadata": user?.unsafe_metadata ?? {},
-    "user.external_id": user?.external_id ?? null,
+    ...userValues(context.clerk.users.get(session.user_id)),
     "session.id": session.id,
-    "org.id": session.last_active_organization_id ?? null,
+    "org.id": session.last_active_organization_id || null,
   }
 }
 

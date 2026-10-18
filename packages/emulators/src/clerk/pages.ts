@@ -3,15 +3,7 @@
  * code, written with labelled fields so locators and the agent can drive them.
  */
 
-const ENTITIES: Readonly<Record<string, string>> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-}
-
-const escape = (text: string) => text.replace(/[&<>"']/g, (char) => ENTITIES[char] ?? char)
+import { escapeHtml as escape } from "../stripe/checkout-page.ts"
 
 const STYLE = `
   :root { color-scheme: light dark; --ink: #131316; --muted: #747686; --line: #e3e3e7; --paper: #fff; --brand: #6c47ff; }
@@ -30,13 +22,13 @@ const STYLE = `
   footer a { color: var(--brand); }
 `
 
+/** A portal page: the card with its form, and a note that this is a development instance. */
 function page(title: string, body: string): string {
-  return `<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escape(title)}</title><style>${STYLE}</style></head>
-<body><main>${body}</main></body>
-</html>`
+  const head = `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">`
+
+  return `<!doctype html><html lang="en"><head>${head}<title>${escape(title)}</title>
+<style>${STYLE}</style></head><body><main>${body}</main>
+<footer><small>Development mode</small></footer></body></html>`
 }
 
 /** What every portal form carries along: where to go back to and which dev browser this is. */
