@@ -83,6 +83,11 @@ export class ManualClock {
     this.nowMs = target
   }
 
+  /** Drops every scheduled callback without running it; time stays where it is. */
+  cancelAll(): void {
+    this.queue = []
+  }
+
   /** Milliseconds until the next scheduled callback, or undefined if none. */
   nextIn(): number | undefined {
     const next = this.queue.reduce<number | undefined>(
