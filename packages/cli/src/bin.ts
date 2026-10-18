@@ -10,6 +10,7 @@ import {
   exitCodeForError,
   explainImpact,
   junit,
+  lintRun,
   mergeReports,
   type RecordMode,
   type Reporter,
@@ -66,6 +67,13 @@ const recordOption = () =>
 const updateOption = () =>
   new Option("-u, --update-snapshots", "rewrite every toHaveScreenshot baseline")
 
+/** `--lint` and `--no-lint`; neither given follows the config (on unless it says `lint: false`). */
+function withLintOptions(command: Command): Command {
+  return command
+    .option("--lint", "run the integration lint over provider calls and webhooks (default: on)")
+    .option("--no-lint", "skip the integration lint")
+}
+
 const reporterOption = () =>
   new Option(
     "--reporter <names...>",
@@ -76,8 +84,7 @@ const program = new Command()
   .name("danwo")
   .description("Drive your app like a user, judge the layers below, and run the fault matrix.")
 
-program
-  .command("test")
+withLintOptions(program.command("test"))
   .description("run test files in worker processes")
   .argument("[patterns...]", "file paths or substrings narrowing the config's testMatch")
   .option("-w, --workers <n>", "worker processes", integerAtLeast(1))
@@ -118,6 +125,7 @@ program
         record?: RecordMode
         updateSnapshots?: boolean
         reporter?: string[]
+        lint?: boolean
       },
     ) => {
       process.exitCode = await runTests({
@@ -129,8 +137,7 @@ program
     },
   )
 
-program
-  .command("matrix")
+withLintOptions(program.command("matrix"))
   .description("record a clean run of one test, then replay it once per planned fault")
   .argument("<file>", "test file")
   .option("-g, --grep <regexp>", "selects the test when the file has several")
@@ -163,6 +170,7 @@ program
         record?: RecordMode
         updateSnapshots?: boolean
         reporter?: string[]
+        lint?: boolean
       },
     ) => {
       const update = updateSnapshots ? { updateScreenshots: true } : {}
@@ -280,6 +288,17 @@ program
   )
 
 program
+  .command("lint")
+  .description(
+    "run the integration lint again over a recorded run (the newest by default); record passing runs too with --record always",
+  )
+  .argument("[run-id]", "a run under .danwo/runs")
+  .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
+  .action(async (runId: string | undefined, options: { config?: string }) => {
+    process.exitCode = await lintRun({ ...(runId !== undefined && { runId }), ...options })
+  })
+
+program
   .command("cache")
   .description("list, count or clear the replay cache's recordings")
   .addArgument(new Argument("<action>").choices(["ls", "stats", "clear"]))
@@ -297,7 +316,7 @@ program
   .option("--json", "compact JSON instead of text")
   .option(
     "-t, --topic <topic>",
-    "one section: api, fixtures, locators, expect, agent, secrets, config, environments, emulators, faults, cli, errors, cache, exports",
+    "one section: api, fixtures, locators, expect, agent, secrets, config, environments, emulators, faults, cli, errors, cache, lint, exports",
   )
   .action(async (options: { json?: boolean; topic?: string }) => {
     const { buildSpec, renderSpec, specJson, specTopic } = await import("@danwo/skill")

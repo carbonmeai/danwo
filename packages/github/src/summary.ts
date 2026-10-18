@@ -3,7 +3,13 @@
  * flight records are. It is the check run's output and the job summary alike.
  */
 import type { RunOutcome } from "@danwo/matrix"
-import type { MatrixRunReport, TestReport, TestRunReport } from "@danwo/runner/runner"
+import {
+  distinctFindings,
+  type LintFinding,
+  type MatrixRunReport,
+  type TestReport,
+  type TestRunReport,
+} from "@danwo/runner/runner"
 
 import { fileOfTestId, shown } from "./annotations.ts"
 
@@ -88,6 +94,22 @@ export function testTitle(run: TestRunReport): string {
     : tally(run.reports)
 }
 
+/** The integration lint's findings, once per rule and message, as a table. */
+function lintSection(findings: readonly LintFinding[]): string[] {
+  const distinct = distinctFindings(findings)
+
+  if (distinct.length === 0) return []
+
+  return [
+    "",
+    `**Integration lint**: ${distinct.length} finding${distinct.length === 1 ? "" : "s"}`,
+    "",
+    "| Level | Rule | Finding |",
+    "|---|---|---|",
+    ...distinct.map((f) => `| ${f.severity} | \`${f.rule}\` | ${cell(f.message)} |`),
+  ]
+}
+
 /** The summary of a `danwo test` run. */
 export function testSummary(run: TestRunReport, link: RecordsLink): string {
   const notable = run.reports.filter((r) => FAILED.has(r.status) || r.status === "flaky")
@@ -104,6 +126,7 @@ export function testSummary(run: TestRunReport, link: RecordsLink): string {
     ...run.brokenFiles.map(
       (broken) => `\n❌ \`${broken.file}\` could not run: ${cell(broken.error)}`,
     ),
+    ...lintSection(run.reports.flatMap((r) => r.attempts.flatMap((a) => a.lint ?? []))),
     ...recordsSection(link, records),
   ]
 
@@ -152,6 +175,7 @@ export function matrixSummary(run: MatrixRunReport, link: RecordsLink): string {
     "| | Run | Details |",
     "|---|---|---|",
     ...[...failing, ...passing].map(outcomeRow),
+    ...lintSection((run.lint ?? []).flatMap((trial) => trial.findings)),
     ...recordsSection(link, records),
   ]
 

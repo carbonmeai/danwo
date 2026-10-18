@@ -1,6 +1,7 @@
 /** `danwo test`: run the project's tests across worker processes and report them. */
 import { basename, relative, resolve } from "node:path"
 
+import { type LintFinding, lintReport, withLint } from "../lint/index.ts"
 import { catalogOf, testFilesOf, type CatalogEntry } from "./catalog.ts"
 import { ciDefaults, inCi, parseShard, type Shard, shardFiles, shardLabel } from "./ci.ts"
 import { type LoadedConfig, loadConfig } from "./config.ts"
@@ -203,6 +204,33 @@ interface RunInput extends Picked {
   readonly write: (line: string) => void
 }
 
+/** The crew a run's tests go to, each worker started for this project and its recording. */
+function testCrew(
+  input: RunInput,
+  size: number,
+  recording: ReturnType<typeof openRecording>,
+  onTested: (report: TestReport) => void,
+): Crew {
+  const { loaded, options, cwd } = input
+
+  return new Crew({
+    size,
+    start: {
+      cwd,
+      configPath: loaded.path,
+      record: recording,
+      updateScreenshots: options.updateScreenshots ?? false,
+      ...(options.lint !== undefined && { lint: options.lint }),
+    },
+    onTested,
+  })
+}
+
+/** Every attempt's integration lint findings. */
+function findingsOf(reports: readonly TestReport[]): LintFinding[] {
+  return reports.flatMap((report) => report.attempts.flatMap((attempt) => attempt.lint ?? []))
+}
+
 /** Runs the picked tests on a crew and reports them; resolves to the exit code. */
 async function executeRun(input: RunInput): Promise<number> {
   const { loaded, options, cwd, write } = input
@@ -212,18 +240,9 @@ async function executeRun(input: RunInput): Promise<number> {
   const context = { kind: "test", root: loaded.root, cwd } as const
   const began = Date.now()
   const reports: TestReport[] = []
-  const crew = new Crew({
-    size,
-    start: {
-      cwd,
-      configPath: loaded.path,
-      record: recording,
-      updateScreenshots: options.updateScreenshots ?? false,
-    },
-    onTested: (report) => {
-      reports.push(report)
-      write(testLine(report))
-    },
+  const crew = testCrew(input, size, recording, (report) => {
+    reports.push(report)
+    write(testLine(report))
   })
 
   write(openingLine(input.entries.length, size))
@@ -251,7 +270,10 @@ async function executeRun(input: RunInput): Promise<number> {
     ...(recording && { run: basename(recording.runDir) }),
   })
 
+  const findings = findingsOf(results.reports)
+
   for (const line of closingLines(results.reports)) write(line)
+  for (const line of lintReport(findings)) write(line)
   if (ran.notRun > 0)
     write(`stopped after ${options.maxFailures} failed: ${ran.notRun} test files not run`)
 
@@ -260,7 +282,7 @@ async function executeRun(input: RunInput): Promise<number> {
 
   await tellReporters(reporters, (r) => r.testsFinished?.(run), write)
 
-  return runExitCode(results.reports, results.brokenFiles)
+  return withLint(runExitCode(results.reports, results.brokenFiles), findings, loaded.config.lint)
 }
 
 /**

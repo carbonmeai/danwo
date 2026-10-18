@@ -18,6 +18,7 @@ import {
 } from "@danwo/matrix"
 
 import type { CheckPace } from "../assert/pace.ts"
+import { lintReport, withLint } from "../lint/index.ts"
 import { addUsage, cacheLine, modelLine, type Usage } from "../record/usage.ts"
 import { type ErrorClass, exitCodeOf, notJudged } from "../support/codes.ts"
 import { type CatalogEntry, catalogOf } from "./catalog.ts"
@@ -30,6 +31,7 @@ import {
   type RunCommandOptions,
   type RunContext,
   tellReporters,
+  type TrialFindings,
 } from "./reporting.ts"
 import type { TrialReport } from "./tasks.ts"
 import { type TrialTimings, timingsLine } from "./timings.ts"
@@ -88,7 +90,7 @@ function judgingLine(test: CatalogEntry): string {
  * inconclusive, infrastructure) makes the trial `not-judged` rather than `failed`.
  */
 function outcomeOf(report: TrialReport, fault: PlannedFault | null): RunOutcome {
-  const { errorClass, usage: _usage, timings: _timings, pace: _pace, ...rest } = report
+  const { errorClass, usage: _usage, timings: _timings, pace: _pace, lint: _lint, ...rest } = report
   const unjudged = report.status === "failed" && errorClass !== undefined && notJudged(errorClass)
 
   return unjudged
@@ -139,6 +141,8 @@ function trialRunner(crew: Crew, run: MatrixRun) {
  */
 function keepTrialFacts(run: MatrixRun, fault: PlannedFault | null, report: TrialReport): void {
   if (report.usage !== undefined) run.usages.push(report.usage)
+  if (report.lint !== undefined)
+    run.lint.push({ trial: fault?.label ?? "clean", findings: report.lint })
 
   if (fault !== null) {
     if (report.timings !== undefined) run.timings.push(report.timings)
@@ -337,6 +341,8 @@ interface MatrixRun {
   readonly timings: TrialTimings[]
   /** The clean trial's check timings, once it passed: they pace every faulted trial. */
   readonly pace: { current: CheckPace | undefined }
+  /** Each trial's integration lint findings. */
+  readonly lint: TrialFindings[]
 }
 
 /** Runs the trials; tells the reporters when the run stopped without a result. */
@@ -356,7 +362,11 @@ async function trialsOrAbort(run: MatrixRun): Promise<{ result: FaultMatrixResul
 
     if (timeLine !== undefined) run.write(timeLine)
 
-    return outcome
+    const findings = run.lint.flatMap((trial) => trial.findings)
+
+    for (const line of lintReport(findings)) run.write(line)
+
+    return { ...outcome, code: withLint(outcome.code, findings, run.loaded.config.lint) }
   } catch (error) {
     const aborted = {
       ...run.context,
@@ -382,6 +392,7 @@ function reportMatrix(
     result,
     durationMs: Date.now() - run.began,
     reportPath,
+    ...(run.lint.length > 0 && { lint: run.lint }),
   } as const
 
   return tellReporters(run.reporters, (r) => r.matrixFinished?.(report), run.write)
@@ -406,6 +417,7 @@ export async function runMatrix(
       configPath: loaded.path,
       record: recording,
       updateScreenshots: options.updateScreenshots ?? false,
+      ...(options.lint !== undefined && { lint: options.lint }),
     },
   })
   const run: MatrixRun = {
@@ -423,6 +435,7 @@ export async function runMatrix(
     usages: [],
     timings: [],
     pace: { current: undefined },
+    lint: [],
   }
 
   await tellReporters(run.reporters, (r) => r.started?.(run.context), write)

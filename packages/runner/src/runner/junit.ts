@@ -7,6 +7,7 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import { dirname, isAbsolute, join, relative } from "node:path"
 
+import { distinctFindings, findingPlace, type LintFinding } from "../lint/index.ts"
 import type { MatrixRunReport, Reporter, TestRunReport } from "./reporting.ts"
 import type { TestReport } from "./tasks.ts"
 
@@ -70,7 +71,26 @@ export function testRunXml(run: TestRunReport): string {
       `<testsuite name="${escapeXml(file.file)}" tests="1" errors="1"><testcase classname="${escapeXml(file.file)}" name="load"><error message="${escapeXml(file.error)}"/></testcase></testsuite>`,
   )
 
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<testsuites name="danwo" time="${seconds(run.durationMs)}">${[...suites, ...broken].join("")}</testsuites>\n`
+  const findings = run.reports.flatMap((r) => r.attempts.flatMap((a) => a.lint ?? []))
+
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<testsuites name="danwo" time="${seconds(run.durationMs)}">${[...suites, ...broken, lintSuite(findings)].join("")}</testsuites>\n`
+}
+
+/**
+ * The integration lint's findings as a suite of their own, a case per distinct finding with the
+ * finding as output: they do not fail the run unless the config's `failOn` says so.
+ */
+function lintSuite(findings: readonly LintFinding[]): string {
+  const distinct = distinctFindings(findings)
+
+  if (distinct.length === 0) return ""
+
+  const cases = distinct.map(
+    (f) =>
+      `<testcase classname="integration lint" name="${escapeXml(`${f.severity} ${f.rule}`)}"><system-out>${escapeXml(`${f.message}\n${findingPlace(f)}\n${f.hint}`)}</system-out></testcase>`,
+  )
+
+  return `<testsuite name="integration lint" tests="${cases.length}" failures="0">${cases.join("")}</testsuite>`
 }
 
 /** The XML for a `danwo matrix` run: one suite, a case per run. */
@@ -90,8 +110,9 @@ export function matrixRunXml(run: MatrixRunReport): string {
     return `${open}<skipped message="${escapeXml(`${outcome.status}: ${outcome.error ?? ""}`)}"/></testcase>`
   })
   const failures = outcomes.filter((outcome) => outcome.status === "failed").length
+  const lint = lintSuite((run.lint ?? []).flatMap((trial) => trial.findings))
 
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<testsuites name="danwo matrix" time="${seconds(run.durationMs)}"><testsuite name="${escapeXml(run.testId)}" tests="${cases.length}" failures="${failures}">${cases.join("")}</testsuite></testsuites>\n`
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<testsuites name="danwo matrix" time="${seconds(run.durationMs)}"><testsuite name="${escapeXml(run.testId)}" tests="${cases.length}" failures="${failures}">${cases.join("")}</testsuite>${lint}</testsuites>\n`
 }
 
 /** Writes a JUnit XML file when a run finishes; `--reporter junit` on the command line. */

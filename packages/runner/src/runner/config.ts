@@ -8,6 +8,7 @@ import type { LanguageModel } from "ai"
 
 import type { Budgets } from "../agent/budget.ts"
 import type { ReadinessMode } from "../browser/readiness.ts"
+import type { LintConfig } from "../lint/index.ts"
 import type { RelocationPolicy } from "../replay/policy.ts"
 import type { EffectsSetting, SessionSecret } from "../session.ts"
 import { DanwoError } from "../support/codes.ts"
@@ -111,6 +112,12 @@ export interface DanwoConfig {
    * need no rule; a change no rule or import explains selects every test.
    */
   readonly impact?: ImpactConfig
+  /**
+   * Integration lint over every run's provider calls and webhooks: per-rule levels by id
+   * (`"stripe/idempotency-key": "error" | "warn" | "info" | "off"`) and which findings fail the
+   * run (`failOn`, default `never`). `false` turns it off.
+   */
+  readonly lint?: LintConfig | false
   /** Fault catalogue for `danwo matrix`. */
   readonly matrix?: {
     /** Default `defaultOutboundFaults`: each provider's faults by host, plain HTTP failures elsewhere. */

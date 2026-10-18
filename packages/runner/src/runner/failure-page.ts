@@ -5,6 +5,7 @@
  * from a flight record, which is redacted already; every part is size-capped so the page stays
  * cheap to read.
  */
+import { findingPlace } from "../lint/index.ts"
 import { effectNotes, effectsOf } from "../record/effect-notes.ts"
 import { dollars, stepCost } from "../record/usage.ts"
 import type { FlightRecord, RecordedExchange, RecordedStep } from "./record.ts"
@@ -212,10 +213,28 @@ function effectSection(steps: readonly RecordedStep[]): string[] {
   return noted.length === 0 ? [] : ["## Effects", "", ...noted, ""]
 }
 
+/** What the integration lint found in the run, worst first. */
+function lintSection(record: FlightRecord): string[] {
+  const findings = record.lint ?? []
+
+  if (findings.length === 0) return []
+
+  return [
+    "## Integration lint",
+    "",
+    ...findings.flatMap((finding) => [
+      `- **${finding.severity}** \`${finding.rule}\`: ${cell(finding.message)} (${cell(findingPlace(finding) || "the run")})`,
+      `  - ${cell(finding.hint)} See \`${finding.docs}\`.`,
+    ]),
+    "",
+  ]
+}
+
 /** The Markdown failure page of one run's record; `screen` is its screen-at-failure text. */
 export function failurePage(record: FlightRecord, screen?: string): string {
   return [
     ...headerLines(record),
+    ...lintSection(record),
     ...stepLines(record.steps),
     ...effectSection(record.steps),
     ...screenLines(screen, record),

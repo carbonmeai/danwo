@@ -7,6 +7,7 @@ import type { PlannedFault, ServiceDelivery } from "@danwo/matrix"
 import type { Exchange } from "@danwo/proxy"
 
 import type { CheckPace } from "../assert/pace.ts"
+import type { LintFinding } from "../lint/index.ts"
 import type { Usage } from "../record/usage.ts"
 import type { ReplayDivergence } from "../session.ts"
 import type { ErrorClass } from "../support/codes.ts"
@@ -24,6 +25,8 @@ export interface WorkerStart {
   readonly record: RecordSettings | undefined
   /** Rewrite every `toHaveScreenshot` baseline instead of comparing with it. */
   readonly updateScreenshots: boolean
+  /** `--lint` / `--no-lint`; absent follows the config (on unless it says `lint: false`). */
+  readonly lint?: boolean
 }
 
 /** `danwo test`: the selected tests of one file, run in declaration order. */
@@ -58,6 +61,8 @@ export interface AttemptReport {
   readonly record?: string | undefined
   /** How its agent steps used the replay cache and the model. */
   readonly usage?: Usage
+  /** What the integration lint found in the attempt. */
+  readonly lint?: readonly LintFinding[]
 }
 
 /**
@@ -102,6 +107,8 @@ export interface TrialReport {
   readonly timings?: TrialTimings
   /** For a passing clean trial: how long each of its checks took, by `checkKey`. */
   readonly pace?: Readonly<Record<string, number>>
+  /** What the integration lint found in the trial. */
+  readonly lint?: readonly LintFinding[]
 }
 
 /** What a worker answers, by the name the parent calls it with. */

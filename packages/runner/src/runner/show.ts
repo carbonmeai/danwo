@@ -4,7 +4,7 @@ import { basename, join, relative } from "node:path"
 import { loadConfig } from "./config.ts"
 import { failurePage } from "./failure-page.ts"
 import { runsDir } from "./record.ts"
-import { findRun, loadRecords } from "./report.ts"
+import { findRun, loadRecords, noRun } from "./report.ts"
 import { flakyIds, lastRunPath, readResults } from "./results.ts"
 
 export interface ShowRunOptions {
@@ -56,11 +56,7 @@ export async function showRun(options: ShowRunOptions = {}): Promise<number> {
   const loaded = await loadConfig(cwd, options.config)
   const run = await findRun(runsDir(loaded.root), options.runId)
 
-  if (run === undefined) {
-    write(options.runId ? `no recorded run ${options.runId}` : "no recorded runs yet")
-
-    return 1
-  }
+  if (run === undefined) return noRun(write, options.runId)
 
   if (options.format === "md") {
     write(await failurePages(loaded.root, run))

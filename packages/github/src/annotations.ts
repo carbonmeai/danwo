@@ -5,7 +5,7 @@
 import { isAbsolute, relative, resolve, sep } from "node:path"
 
 import type { RunOutcome } from "@danwo/matrix"
-import type { MatrixRunReport, TestReport, TestRunReport } from "@danwo/runner/runner"
+import type { LintFinding, MatrixRunReport, TestReport, TestRunReport } from "@danwo/runner/runner"
 import { redactCredentials } from "@danwo/runner/runner"
 
 import type { Annotation } from "./checks.ts"
@@ -58,8 +58,49 @@ function testAnnotation(base: PathBase, report: TestReport): Annotation | undefi
   }
 }
 
-/** Annotations for `danwo test`: failing and flaky tests, and files that could not run. */
+/**
+ * Warning annotations for integration lint findings, once per rule and message, on the test line
+ * the finding happened at (the test file's first line when the step had none).
+ */
+function lintAnnotations(
+  base: PathBase,
+  findings: readonly { readonly finding: LintFinding; readonly file: string }[],
+): Annotation[] {
+  const seen = new Set<string>()
+
+  return findings.flatMap(({ finding, file }) => {
+    const key = `${finding.rule} ${finding.message}`
+
+    if (seen.has(key)) return []
+    seen.add(key)
+
+    const source = finding.evidence.source ?? { file, line: 1 }
+
+    return [
+      {
+        path: repoPath(base, source.file),
+        start_line: source.line,
+        end_line: source.line,
+        annotation_level: "warning",
+        title: `integration lint: ${finding.rule}`,
+        message: shown(`${finding.message}\n${finding.hint}`),
+      },
+    ]
+  })
+}
+
+/** Annotations for `danwo test`: failing and flaky tests, files that could not run, lint findings. */
 export function testAnnotations(base: PathBase, run: TestRunReport): Annotation[] {
+  const findings = run.reports.flatMap((report) =>
+    report.attempts.flatMap((attempt) =>
+      (attempt.lint ?? []).map((finding) => ({ finding, file: fileOfTestId(report.id) })),
+    ),
+  )
+
+  return [...failureAnnotations(base, run), ...lintAnnotations(base, findings)]
+}
+
+function failureAnnotations(base: PathBase, run: TestRunReport): Annotation[] {
   const tests = run.reports
     .filter((report) => FAILED.has(report.status) || report.status === "flaky")
     .map((report) => testAnnotation(base, report))
@@ -96,9 +137,14 @@ function outcomeAnnotation(base: PathBase, file: string, outcome: RunOutcome): A
   }
 }
 
-/** Annotations for `danwo matrix`: every run that did not pass, the clean run included. */
+/** Annotations for `danwo matrix`: every run that did not pass, the clean run included, and lint. */
 export function matrixAnnotations(base: PathBase, run: MatrixRunReport): Annotation[] {
-  return [run.result.clean, ...run.result.runs]
+  const failures = [run.result.clean, ...run.result.runs]
     .filter((outcome) => outcome.status !== "passed")
     .map((outcome) => outcomeAnnotation(base, run.file, outcome))
+  const findings = (run.lint ?? []).flatMap((trial) =>
+    trial.findings.map((finding) => ({ finding, file: run.file })),
+  )
+
+  return [...failures, ...lintAnnotations(base, findings)]
 }

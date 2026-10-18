@@ -5,6 +5,7 @@
  * network.
  */
 import type { ScreenshotEvent } from "../assert/screenshot.ts"
+import { findingPlace } from "../lint/index.ts"
 import { effectNotes, effectsOf } from "../record/effect-notes.ts"
 import { dollars, type Spent, tokensText, usageOf } from "../record/usage.ts"
 import type { FlightRecord, RecordedExchange, RecordedStep } from "./record.ts"
@@ -218,6 +219,21 @@ function deliveriesBlock(loaded: Loaded): string {
   return `<h4>Webhook deliveries</h4><table><tbody>${rows}</tbody></table>`
 }
 
+function lintBlock(record: FlightRecord): string {
+  const findings = record.lint ?? []
+
+  if (findings.length === 0) return ""
+
+  const rows = findings
+    .map(
+      (f) =>
+        `<tr><td><span class="fault">${escape(f.severity)}</span></td><td><code>${escape(f.rule)}</code></td><td>${escape(f.message)}<br><span class="dim">${escape(findingPlace(f) || "the run")} · ${escape(f.hint)}</span></td></tr>`,
+    )
+    .join("")
+
+  return `<h4>Integration lint</h4><table><tbody>${rows}</tbody></table>`
+}
+
 function stateBlock(record: FlightRecord): string {
   const services = Object.entries(record.state)
 
@@ -230,7 +246,7 @@ function section(loaded: Loaded): string {
   const { record } = loaded
   const failed = record.status !== "passed"
 
-  return `<section id="${escape(loaded.dir)}" class="${failed ? "failed" : "passed"}"><h3><span class="badge">${escape(record.status)}</span> ${escape(record.test)} <span class="dim">— ${escape(runTitle(record))}</span></h3><p class="dim">${escape(record.startedAt)} · ${record.durationMs} ms · <code>${escape(loaded.dir)}</code></p>${errorBlock(record)}${failureBlock(loaded)}${stepsBlock(loaded)}${appLogBlock(loaded)}${exchangesBlock(loaded)}${deliveriesBlock(loaded)}${stateBlock(record)}</section>`
+  return `<section id="${escape(loaded.dir)}" class="${failed ? "failed" : "passed"}"><h3><span class="badge">${escape(record.status)}</span> ${escape(record.test)} <span class="dim">— ${escape(runTitle(record))}</span></h3><p class="dim">${escape(record.startedAt)} · ${record.durationMs} ms · <code>${escape(loaded.dir)}</code></p>${errorBlock(record)}${lintBlock(record)}${failureBlock(loaded)}${stepsBlock(loaded)}${appLogBlock(loaded)}${exchangesBlock(loaded)}${deliveriesBlock(loaded)}${stateBlock(record)}</section>`
 }
 
 const STYLE = `

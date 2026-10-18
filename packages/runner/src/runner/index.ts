@@ -87,6 +87,18 @@ export type { ImpactConfig, ImpactEntry, ImpactIndex } from "./impact.ts"
 export { junit, type JunitOptions } from "./junit.ts"
 export { inCi } from "./ci.ts"
 export { showRun, type ShowRunOptions } from "./show.ts"
+export { lintRun, type LintRunOptions } from "./lint-command.ts"
+export {
+  distinctFindings,
+  type LintConfig,
+  type LintEvidence,
+  type LintFinding,
+  type LintRule,
+  LINT_RULES,
+  type LintSeverity,
+  type RuleLevel,
+} from "../lint/index.ts"
+export type { TrialFindings } from "./reporting.ts"
 export { type CacheAction, type CacheCommandOptions, runCache } from "./cache-command.ts"
 export { type ErrorCodeRow, errorCodeTable, exitCodeForError } from "../support/codes.ts"
 export { CACHE_OUTCOMES, type CacheOutcome } from "../record/steps.ts"

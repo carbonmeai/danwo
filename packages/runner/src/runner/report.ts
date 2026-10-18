@@ -81,6 +81,13 @@ async function pruneRuns(runsDir: string): Promise<void> {
   await Promise.all(runs.slice(KEEP_RUNS).map((dir) => rm(dir, { recursive: true, force: true })))
 }
 
+/** Says a command found no run to read (the named one, or any); resolves to its exit code, 1. */
+export function noRun(write: (line: string) => void, runId: string | undefined): number {
+  write(runId ? `no recorded run ${runId}` : "no recorded runs yet")
+
+  return 1
+}
+
 /** The newest run directory under `runsDir`, or the one named `runId`; undefined when absent. */
 export async function findRun(runsDir: string, runId?: string): Promise<string | undefined> {
   const runs = (await children(runsDir)).toSorted()

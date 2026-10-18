@@ -5,6 +5,7 @@
  */
 import type { FaultMatrixResult } from "@danwo/matrix"
 
+import type { LintFinding } from "../lint/index.ts"
 import type { RecordMode } from "./record.ts"
 import type { TestReport } from "./tasks.ts"
 
@@ -41,6 +42,14 @@ export interface MatrixRunReport extends RunContext {
   readonly result: FaultMatrixResult
   readonly durationMs: number
   readonly reportPath: string | undefined
+  /** What the integration lint found, by the trial it was found in. */
+  readonly lint?: readonly TrialFindings[]
+}
+
+/** A matrix trial's lint findings, with the trial's label (`clean` for the clean run). */
+export interface TrialFindings {
+  readonly trial: string
+  readonly findings: readonly LintFinding[]
 }
 
 export interface Reporter {
@@ -63,6 +72,8 @@ export interface RunCommandOptions {
   readonly updateScreenshots?: boolean
   /** Reporters besides the config's, e.g. from `--reporter`. */
   readonly reporters?: readonly Reporter[]
+  /** `--lint` / `--no-lint`: run the integration lint; absent follows the config (on by default). */
+  readonly lint?: boolean
   readonly write?: (line: string) => void
 }
 

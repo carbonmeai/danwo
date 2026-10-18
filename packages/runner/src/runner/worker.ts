@@ -17,6 +17,7 @@ import type { Browser } from "playwright-core"
 
 import { type CheckPace, paceOf } from "../assert/pace.ts"
 import { launchBrowser } from "../browser/index.ts"
+import { type LintConfig, type LintFinding, lint } from "../lint/index.ts"
 import { usageOf } from "../record/usage.ts"
 import { type DeclaredTest, type FileDeclarations, suiteHooks } from "../tests/registry.ts"
 import { resultOf, worthRetrying } from "../tests/retry.ts"
@@ -32,6 +33,9 @@ import {
   finishRecord,
   type FlightRecord,
   markEvidence,
+  recordEvidence,
+  type RecordExtras,
+  type RecordInput,
   type RecordSettings,
 } from "./record.ts"
 import { SessionKeeper } from "./sessions.ts"
@@ -61,6 +65,8 @@ interface Bench {
   readonly updateScreenshots: boolean
   /** Saved sessions, kept across this worker's tests until the environment resets. */
   readonly sessions: SessionKeeper
+  /** The integration lint's settings; undefined when the run does not lint. */
+  readonly lint: LintConfig | undefined
 }
 
 let bench: Bench | undefined
@@ -138,6 +144,26 @@ function baselineDir(file: string, titlePath: readonly string[]): string {
   return join(dirname(file), "__screenshots__", basename(file), name || "test")
 }
 
+/**
+ * Lints a run when the run lints: gathers its redacted evidence once, so the record (when kept)
+ * reuses it rather than redacting everything again.
+ */
+function inspect(input: RecordInput): RecordExtras {
+  const config = benchOrFail().lint
+
+  if (config === undefined) return {}
+
+  const evidence = recordEvidence(input)
+  const subject = { run: input.run, status: input.status, stopped: input.stopped, ...evidence }
+
+  return { evidence, lint: lint(subject, config) }
+}
+
+/** A report's `lint` field: the findings, when there are any. */
+function lintOf(extras: RecordExtras): { lint?: readonly LintFinding[] } {
+  return extras.lint !== undefined && extras.lint.length > 0 ? { lint: extras.lint } : {}
+}
+
 /** Keeps or drops a run's flight record; the directory relative to the cwd when kept. */
 function keepRecord(
   recordDir: string | undefined,
@@ -175,20 +201,22 @@ async function runTest(
       replay,
       `attempt-${n}`,
     )
+    const input: RecordInput = {
+      test: id,
+      run: { kind: "test", attempt: n },
+      status: result.status,
+      error: result.error,
+      stopped: result.stopped,
+      divergence: result.divergence,
+      notes: result.notes,
+      durationMs: result.durationMs,
+      flight: result.flight,
+      env,
+      mark,
+    }
+    const inspected = inspect(input)
     const record = await keepRecord(recordDir, result.status !== "passed", () =>
-      buildRecord({
-        test: id,
-        run: { kind: "test", attempt: n },
-        status: result.status,
-        error: result.error,
-        stopped: result.stopped,
-        divergence: result.divergence,
-        notes: result.notes,
-        durationMs: result.durationMs,
-        flight: result.flight,
-        env,
-        mark,
-      }),
+      buildRecord(input, inspected),
     )
 
     attempts.push({
@@ -197,6 +225,7 @@ async function runTest(
       durationMs: result.durationMs,
       record,
       usage: usageOf(result.flight.session.steps()),
+      ...lintOf(inspected),
     })
 
     if (result.status === "passed") impact = attemptImpact(result, mark)
@@ -355,22 +384,25 @@ async function runTrial(
     await env.proxy.settled().catch(() => undefined)
   })
 
-  const report = { ...trialReport(result, env, mark), timings, ...cleanPace(task, result) }
+  const verdict = { ...trialReport(result, env, mark), timings, ...cleanPace(task, result) }
+  const input: RecordInput = {
+    test: task.testId,
+    run: { kind: "matrix", fault: task.fault },
+    status: verdict.status,
+    error: result.error,
+    stopped: result.stopped,
+    divergence: result.divergence,
+    notes: [...verdict.notes, ...result.notes],
+    durationMs: result.durationMs,
+    flight: result.flight,
+    env,
+    mark,
+  }
+  const inspected = inspect(input)
+  const report = { ...verdict, ...lintOf(inspected) }
   const record = await timed(timings, "close", () =>
     keepRecord(recordDir, trialNeedsRecord(report, task.fault), () =>
-      buildRecord({
-        test: task.testId,
-        run: { kind: "matrix", fault: task.fault },
-        status: report.status,
-        error: result.error,
-        stopped: result.stopped,
-        divergence: result.divergence,
-        notes: [...report.notes, ...result.notes],
-        durationMs: result.durationMs,
-        flight: result.flight,
-        env,
-        mark,
-      }),
+      buildRecord(input, inspected),
     ),
   )
 
@@ -414,6 +446,17 @@ async function trial(task: TrialTask): Promise<TrialReport> {
   }
 }
 
+/** The lint settings a run uses: the flag wins, then the config; on by default. */
+function lintSettings(
+  config: LintConfig | false | undefined,
+  flag: boolean | undefined,
+): LintConfig | undefined {
+  if (flag === false) return undefined
+  if (config === false) return flag === true ? {} : undefined
+
+  return config ?? {}
+}
+
 const calls: WorkerCalls = {
   async start(start: WorkerStart) {
     const loaded = await loadConfig(start.cwd, start.configPath)
@@ -427,6 +470,7 @@ const calls: WorkerCalls = {
       recording,
       updateScreenshots: start.updateScreenshots,
       sessions: new SessionKeeper(),
+      lint: lintSettings(loaded.config.lint, start.lint),
     }
   },
   testFile,
