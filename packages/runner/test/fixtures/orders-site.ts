@@ -15,7 +15,7 @@ const HOME = `<!doctype html><title>Orders</title><main>
       const done = document.createElement("h2")
       done.textContent = "Payment received"
       document.querySelector("main").append(done)
-    }, 400)
+    }, 2000)
   })
   document.getElementById("charge").addEventListener("click", async () => {
     const res = await fetch("/api/charge", { method: "POST" })

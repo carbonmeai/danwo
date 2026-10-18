@@ -72,7 +72,7 @@ function silent() {
 
 const PAY = scripted([(view) => ["click", { ref: ref(view, "button", "Pay") }]])
 
-describe("agent.waitFor", () => {
+describe("agent.waitFor", { timeout: 20_000 }, () => {
   it("polls the judge until the condition holds, then replays by its evidence with no model", async () => {
     const judge = paymentJudge()
 
@@ -129,7 +129,7 @@ describe("agent.waitFor", () => {
   })
 })
 
-describe("agent.assert with poll", () => {
+describe("agent.assert with poll", { timeout: 20_000 }, () => {
   it("asks again until the claim holds, where a single look fails", async () => {
     await withSession({ model: scripted([]), judge: paymentJudge() }, async (session) => {
       await session.screen.getByRole("button", { name: "Pay" }).click()
@@ -138,7 +138,7 @@ describe("agent.assert with poll", () => {
         code: "CLAIM_FAILED",
       })
       await session.agent.assert("the payment went through", {
-        poll: { timeout: 3_000, interval: 100 },
+        poll: { timeout: 8_000, interval: 100 },
       })
     })
   })
