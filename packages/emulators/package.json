@@ -19,6 +19,9 @@
     "@aws-sdk/s3-request-presigner": "3.1152.0",
     "@azure/msal-node": "7.1.0",
     "@bachs/sdk": "1.0.0",
+    "@clerk/backend": "3.25.0",
+    "@clerk/clerk-js": "6.39.1",
+    "@clerk/express": "2.1.80",
     "@microsoft/microsoft-graph-client": "3.0.7",
     "@microsoft/microsoft-graph-types": "2.43.1",
     "@octokit/auth-app": "8.3.1",
@@ -36,6 +39,7 @@
     "paystack-sdk": "4.2.1",
     "resend": "6.34.1",
     "stripe": "23.0.0",
+    "svix": "2.8.0",
     "twilio": "6.2.0",
     "zod": "4.6.1"
   }
