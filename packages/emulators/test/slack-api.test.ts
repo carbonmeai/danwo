@@ -41,6 +41,16 @@ describe("auth", () => {
     expect(await slackError(clientFor(emulator).auth.test())).toMatchObject({ error: "not_authed" })
   })
 
+  it("echoes api.test without a token, failing with the error it is given", async () => {
+    const client = clientFor(emulator)
+
+    expect(await client.api.test({ foo: "bar" })).toMatchObject({ ok: true, args: { foo: "bar" } })
+    expect(await slackError(client.api.test({ error: "my_error" }))).toMatchObject({
+      ok: false,
+      error: "my_error",
+    })
+  })
+
   it("answers a method it does not know with unknown_method", async () => {
     expect((await slackError(bot().apiCall("im.history", {}))).error).toBe("unknown_method")
   })

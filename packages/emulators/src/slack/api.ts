@@ -30,11 +30,26 @@ export function apiError(c: Context, error: SlackApiError): Response {
   return c.json({ ok: false, error: error.error, ...error.extra })
 }
 
+/**
+ * `api.test`: needs no token and echoes its arguments, failing with the `error` argument when one
+ * is given, so an app can check its error handling.
+ */
+function apiTest(c: Context, args: Args): Response {
+  const { token: _token, ...echoed } = args
+  const error = echoed["error"]
+
+  return typeof error === "string" && error !== ""
+    ? c.json({ ok: false, error, args: echoed })
+    : c.json({ ok: true, args: echoed })
+}
+
 /** Runs one Web API method: authenticate, check scopes, then the method itself. */
 async function call(c: Context, context: SlackRouteContext, methods: Methods): Promise<Response> {
-  const method = methods[c.req.param("method")]
+  const name = c.req.param("method")
+  const method = methods[name]
   const args = await readArgs(c)
 
+  if (name === "api.test") return apiTest(c, args)
   if (!method) throw new SlackApiError("unknown_method")
 
   const token = authenticate(context.slack, tokenOf(c, args), context.clock)
