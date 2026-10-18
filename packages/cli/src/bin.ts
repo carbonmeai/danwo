@@ -350,6 +350,44 @@ program
   })
 
 program
+  .command("fidelity")
+  .description(
+    "check the emulators against the real providers' sandboxes (with DANWO_FIDELITY_* credentials) or the committed goldens",
+  )
+  .argument("[providers...]", "providers to check (default: all)")
+  .option(
+    "--update-golden",
+    "keep the sandbox's (or the API description's) structure as the new golden",
+  )
+  .option(
+    "--from-openapi [file]",
+    "make goldens from API descriptions: a file for one provider, or each provider's published one",
+  )
+  .option("--offline", "compare against the goldens even when credentials are set")
+  .option("--root <dir>", "the danwo repository holding fidelity/ (default: the current folder)")
+  .action(
+    async (
+      providers: string[],
+      options: {
+        updateGolden?: boolean
+        fromOpenapi?: string | true
+        offline?: boolean
+        root?: string
+      },
+    ) => {
+      const { fidelityCommand } = await import("@danwo/fidelity")
+
+      process.exitCode = await fidelityCommand({
+        providers,
+        root: options.root ?? process.cwd(),
+        ...(options.updateGolden !== undefined && { updateGolden: options.updateGolden }),
+        ...(options.fromOpenapi !== undefined && { fromOpenapi: options.fromOpenapi }),
+        ...(options.offline !== undefined && { offline: options.offline }),
+      })
+    },
+  )
+
+program
   .command("guide")
   .description("list task guides, or print one")
   .argument("[topic]", "a guide's topic; without one, the list")

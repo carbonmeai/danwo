@@ -15,6 +15,7 @@
     "@danwo/dashboard": "workspace:*",
     "@danwo/device": "workspace:*",
     "@danwo/expo": "workspace:*",
+    "@danwo/fidelity": "workspace:*",
     "@danwo/github": "workspace:*",
     "@danwo/mcp": "workspace:*",
     "@danwo/recorder": "workspace:*",
