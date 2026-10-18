@@ -50,7 +50,9 @@ export interface OutboundCall {
  * - `reset`: drop the connection before the handler sees the request;
  * - `reset-after`: let the handler process it, then drop the connection, so the side effect
  *   happens but the client never sees the response;
- * - `delay`: wait, then answer normally.
+ * - `delay`: wait, then answer normally;
+ * - `emulate`: let the route's handler answer, told through `EMULATE_HEADER` to misbehave in a way
+ *   only it can shape, such as a model refusing or a stream cut short.
  */
 export type OutboundFault =
   | {
@@ -62,6 +64,10 @@ export type OutboundFault =
   | { readonly kind: "reset" }
   | { readonly kind: "reset-after" }
   | { readonly kind: "delay"; readonly ms: number }
+  | { readonly kind: "emulate"; readonly behaviour: string }
+
+/** The request header that carries an `emulate` fault's behaviour to the route's handler. */
+export const EMULATE_HEADER = "x-danwo-emulate"
 
 export type OutboundFaultRule = (call: OutboundCall) => OutboundFault | undefined
 
@@ -72,6 +78,8 @@ export function describeOutboundFault(fault: OutboundFault): string {
       return `status ${fault.status}`
     case "delay":
       return `delay ${fault.ms}ms`
+    case "emulate":
+      return fault.behaviour
     default:
       return fault.kind
   }
@@ -166,7 +174,7 @@ function fromFetchHeaders(headers: Headers): MockttpHeaders {
   return out
 }
 
-async function callHandler(handler: Handler, req: CompletedRequest) {
+async function callHandler(handler: Handler, req: CompletedRequest, behaviour?: string) {
   const hasBody = req.method !== "GET" && req.method !== "HEAD"
   /*
    * mockttp decodes gzip, deflate, br and zstd; for an encoding it does not know (S3's
@@ -178,6 +186,8 @@ async function callHandler(handler: Handler, req: CompletedRequest) {
 
   if (decoded) headers.delete("content-encoding")
   headers.delete("content-length")
+  if (behaviour !== undefined) headers.set(EMULATE_HEADER, behaviour)
+
   const response = await handler(
     new Request(req.url, {
       method: req.method,
@@ -216,6 +226,8 @@ async function answerUnder(
       await new Promise((resolve) => setTimeout(resolve, fault.ms))
 
       return callHandler(handler, req)
+    case "emulate":
+      return callHandler(handler, req, fault.behaviour)
     default:
       return callHandler(handler, req)
   }

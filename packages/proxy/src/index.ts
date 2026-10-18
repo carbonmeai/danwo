@@ -1,6 +1,7 @@
 // Routing proxy: provider routing, fault injection, HAR capture.
 export {
   describeOutboundFault,
+  EMULATE_HEADER,
   type Exchange,
   type Handler,
   hostMatches,
