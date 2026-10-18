@@ -33,6 +33,7 @@ afterAll(async () => {
     fixture("slack-bot"),
     fixture("github-bot"),
     fixture("sms-app"),
+    fixture("flutterwave-shop"),
     fixture("sessions"),
     fixture("visual"),
     SHOP,
@@ -495,6 +496,42 @@ describe("danwo matrix", () => {
 
     expect(html).toContain("POST verify.twilio.com")
     expect(html).not.toContain("7e57ab1e7e57ab1e7e57ab1e7e57ab1e")
+  }, 300_000)
+
+  it("faults Flutterwave Standard end to end, and a careful shop credits each payment once", async () => {
+    const { code, out } = await danwo(fixture("flutterwave-shop"), ["matrix", "tests/buy.danwo.ts"])
+
+    expect(out).toContain("PASS  clean run")
+    expect(out).toContain("PASS  reset-after on POST api.flutterwave.com/v3/payments")
+    expect(out).toContain("PASS  status 500 on POST checkout.flutterwave.com/v3/hosted/pay/:id/otp")
+    expect(out).toContain("PASS  status 200 on GET api.flutterwave.com/v3/transactions/:id/verify")
+    expect(out).toContain("PASS  duplicate on flutterwave webhook charge.completed")
+    expect(out).toContain("PASS  forged on flutterwave webhook charge.completed")
+    expect(out).toContain("faults: 26 passed")
+    expect(code).toBe(0)
+  }, 300_000)
+
+  it("catches a shop that credits a charge.completed webhook twice when Flutterwave sends it twice", async () => {
+    const { code, out } = await danwo(
+      fixture("flutterwave-shop"),
+      ["matrix", "tests/buy.danwo.ts"],
+      {
+        FLW_BUG: "no-dedupe",
+      },
+    )
+
+    // A forged webhook fails the verif-hash check; only the repeated real one credits twice.
+    expect(out).toContain("FAIL  duplicate on flutterwave webhook charge.completed")
+    expect(out).toContain("PASS  forged on flutterwave webhook charge.completed")
+    expect(out).toContain("invariant: expected 1000 to be less than or equal to 500")
+    expect(out).toContain("faults: 25 passed, 1 failed")
+    expect(code).toBe(1)
+
+    const report = /report: (\S+report\.html)/.exec(out)?.[1] ?? ""
+    const html = await readFile(join(fixture("flutterwave-shop"), report), "utf8")
+
+    expect(html).toContain("POST api.flutterwave.com/v3/payments")
+    expect(html).not.toMatch(/5150515051505150515051505150|flutterwave-shop-hash/)
   }, 300_000)
 
   it("faults a GitHub bot's issues webhook and a deduplicating bot comments at most once", async () => {
