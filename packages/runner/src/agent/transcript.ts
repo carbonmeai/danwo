@@ -30,10 +30,25 @@ function stubbed(text: string): string {
   return at < 0 ? text : `${text.slice(0, at)}${STUB}`
 }
 
+/** What an older screenshot becomes once the conversation is compacted. */
+const IMAGE_STUB = "(an earlier screenshot, left out)"
+
 /** The message with its page views stubbed. */
 function withoutViews(message: ModelMessage): ModelMessage {
   if (message.role === "user" && typeof message.content === "string")
     return { ...message, content: stubbed(message.content) }
+
+  if (message.role === "user" && typeof message.content !== "string")
+    return {
+      ...message,
+      content: message.content.map((part) =>
+        part.type === "image" || part.type === "file"
+          ? { type: "text" as const, text: IMAGE_STUB }
+          : part.type === "text"
+            ? { ...part, text: stubbed(part.text) }
+            : part,
+      ),
+    }
 
   if (message.role !== "tool") return message
 
@@ -47,9 +62,19 @@ function withoutViews(message: ModelMessage): ModelMessage {
   }
 }
 
-/** Characters of text a message carries. */
+/** A screenshot counts as this many characters against the budget, about 1.5k tokens. */
+const IMAGE_SIZE = 6_000
+
+/** Characters of text a message carries; a screenshot counts as `IMAGE_SIZE`. */
 function sizeOf(message: ModelMessage): number {
-  return JSON.stringify(message.content).length
+  if (typeof message.content === "string") return message.content.length
+
+  return message.content.reduce(
+    (sum, part) =>
+      sum +
+      (part.type === "image" || part.type === "file" ? IMAGE_SIZE : JSON.stringify(part).length),
+    0,
+  )
 }
 
 export class Transcript {

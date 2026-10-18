@@ -16,6 +16,24 @@ const target = z.object({
   nth: z.number().int().nonnegative().optional(),
   /** The part of the page it sat in, e.g. `form "Billing"`; helps find it again if it moved. */
   section: z.string().optional(),
+  /**
+   * The frames it sits in, outermost first, each as a CSS selector of its `<iframe>` within the
+   * document around it, e.g. `iframe[title="Card"]`; absent for the page itself.
+   */
+  frame: z.array(z.string()).min(1).optional(),
+})
+
+/**
+ * A place on the page found by how it looks, for actions taken on a screenshot (see
+ * vision/visual.ts): a gray patch of the screen around the point, the element it sat in and where
+ * in that element as fractions of its box, and where on the screen it was.
+ */
+const visual = z.object({
+  description: z.string(),
+  /** A PNG, base64, of the screen around the point; secret fields painted over. */
+  patch: z.string(),
+  point: z.object({ x: z.number(), y: z.number() }),
+  anchor: z.object({ css: z.string(), at: z.object({ x: z.number(), y: z.number() }) }).optional(),
 })
 
 /** An email address as recorded: as written, or the param it came from. */
@@ -73,6 +91,11 @@ const action = z.discriminatedUnion("kind", [
     networkIdle: z.boolean().optional(),
     ms: z.number().optional(),
   }),
+  /** Actions taken on a screenshot, each at a place found again by how it looks. */
+  z.object({ kind: z.literal("click_at"), visual, opensTab }),
+  z.object({ kind: z.literal("type_at"), visual, input }),
+  z.object({ kind: z.literal("drag_at"), visual, to: visual }),
+  z.object({ kind: z.literal("scroll_at"), visual, direction: z.enum(["up", "down"]) }),
 ])
 
 /**
@@ -119,6 +142,7 @@ export type RecordedInput = z.infer<typeof input>
 export type RecordedAddress = z.infer<typeof address>
 export type FromMail = z.infer<typeof fromMail>
 export type Target = z.infer<typeof target>
+export type VisualTarget = z.infer<typeof visual>
 
 /** A recording of one `agent.extract` step: where each field of the result was read. */
 export const extractTraceSchema = z.object({

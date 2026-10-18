@@ -8,12 +8,21 @@ import type { Page } from "playwright-core"
 import type { Tabs } from "../browser/tabs.ts"
 import type { MailDesk, MailOrigin } from "../mail/desk.ts"
 import { embedsValue, paramSecret, type Params, paramTyped } from "../replay/params.ts"
-import { describeTarget, type Target } from "../replay/target.ts"
+import { describeTarget, locatorFor, type Target } from "../replay/target.ts"
 import type { FromMail, RecordedAction, RecordedAddress, RecordedInput } from "../replay/trace.ts"
 import { checkSecretField } from "../secrets/fields.ts"
 import type { SecretVault } from "../secrets/index.ts"
+import type { VisionDesk } from "../vision/desk.ts"
 import { filePaths, type Files } from "./files.ts"
 import { type Aftermath, type Operation, operate, scroll, waitFor, watched } from "./operate.ts"
+import {
+  clickAt,
+  dragAt,
+  lookNow,
+  scrollAt,
+  typeAt,
+  type VisionPerformContext,
+} from "./perform-vision.ts"
 import { type ToolInput, toolInputs, type ToolName } from "./tools.ts"
 
 export interface PerformContext {
@@ -29,6 +38,8 @@ export interface PerformContext {
   readonly ready: () => Promise<void>
   /** Mail the app sent, as the emulators caught it. */
   readonly mail: MailDesk
+  /** The step's vision, when it may look at the page as an image. */
+  readonly vision?: VisionDesk | undefined
 }
 
 export interface Performed {
@@ -39,6 +50,8 @@ export interface Performed {
    * there is nothing to replay (reading mail changes nothing on the page).
    */
   readonly recorded: RecordedAction | null | undefined
+  /** A screenshot for the model, with what it shows in words (from `look`). */
+  readonly image?: { readonly png: Buffer; readonly text: string }
 }
 
 /** The tools that act on the page: every tool but `done`. */
@@ -174,12 +187,22 @@ async function fillSecret(
   await checkSecretField(context.tabs.page.getByRef(input.ref), secret, context.timeout)
 
   const value = await context.vault.reveal(secret)
+  const performed = await onElement(
+    context,
+    input.ref,
+    { kind: "fill", text: value },
+    (target) => ({
+      kind: "fill",
+      target,
+      input: { secret: secret.name },
+    }),
+  )
 
-  return onElement(context, input.ref, { kind: "fill", text: value }, (target) => ({
-    kind: "fill",
-    target,
-    input: { secret: secret.name },
-  }))
+  /* The field now shows a secret: screenshots and stored patches paint it over from here on. */
+  if (performed.recorded?.kind === "fill")
+    context.vision?.spots.add(locatorFor(context.tabs.page, performed.recorded.target))
+
+  return performed
 }
 
 function upload(context: PerformContext, input: ToolInput<"upload_file">): Promise<Performed> {
@@ -377,6 +400,19 @@ async function pressKey(context: PerformContext, input: ToolInput<"press">): Pro
   }
 }
 
+/** What the vision actions take of the step. */
+function visionContext(context: PerformContext): VisionPerformContext {
+  return {
+    tabs: context.tabs,
+    vision: context.vision,
+    vault: context.vault,
+    timeout: context.timeout,
+    ready: context.ready,
+    typed: (text) => typedInput(context, text),
+    secret: (name) => paramSecret(context.params, name) ?? context.vault.handle(name),
+  }
+}
+
 type Handler<Name extends Call["name"]> = (
   input: ToolInput<Name>,
   context: PerformContext,
@@ -422,6 +458,11 @@ const handlers: { readonly [Name in Call["name"]]: Handler<Name> } = {
   wait_for: (input, context) => waitUntil(context, input),
   read_mail: (input, context) => readMail(context, input),
   open_mail: (input, context) => openMail(context, input),
+  look: (_input, context) => lookNow(visionContext(context)),
+  click_at: (input, context) => clickAt(visionContext(context), input),
+  type_at: (input, context) => typeAt(visionContext(context), input),
+  drag_at: (input, context) => dragAt(visionContext(context), input),
+  scroll_at: (input, context) => scrollAt(visionContext(context), input),
 }
 
 /** Carries out `call` on the active tab. */

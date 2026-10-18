@@ -5,7 +5,14 @@
  * schema. What was read where is recorded as targets, so a replay reads the same elements again
  * with no model call.
  */
-import { generateText, type LanguageModel, type ModelMessage, type ToolCallPart, tool } from "ai"
+import {
+  generateText,
+  type LanguageModel,
+  type ModelMessage,
+  type ToolCallPart,
+  tool,
+  type UserContent,
+} from "ai"
 import type { Locator, Page } from "playwright-core"
 import { z } from "zod"
 
@@ -14,6 +21,9 @@ import { callCost, type CallCost } from "../model/resolve.ts"
 import { describe, describeTarget, type Target } from "../replay/target.ts"
 import { viewTabs, viewText } from "../snapshot/view.ts"
 import { DanwoError } from "../support/codes.ts"
+import type { VisionDesk } from "../vision/desk.ts"
+import { EXTRACT_VISION_GUIDE } from "../vision/prompts.ts"
+import { hasGaps, visualGaps } from "../vision/screen.ts"
 import { EXTRACT_PROMPT } from "./prompts.ts"
 
 /** How a field's element is read: its text, a number in its text, or whether it is on. */
@@ -43,6 +53,19 @@ const readInput = z.object({
 
 const failInput = z.object({ reason: z.string() })
 
+/** Values read off the screenshot, for what the text view does not show. */
+const screenInput = z.object({
+  fields: z
+    .array(
+      z.object({
+        path: z.string().describe("Where the value goes, e.g. `balance` or `items[0].name`."),
+        value: z.union([z.string(), z.number(), z.boolean()]),
+        where: z.string().describe('Where on the screenshot it is, e.g. "the bar labelled March".'),
+      }),
+    )
+    .min(1),
+})
+
 const extractTools = {
   read: tool({
     description:
@@ -53,6 +76,16 @@ const extractTools = {
   fail: tool({
     description: "Give up: the page does not show what was asked for. Say why.",
     inputSchema: failInput,
+    outputSchema: z.string(),
+  }),
+}
+
+const visionTools = {
+  ...extractTools,
+  read_screen: tool({
+    description:
+      "Give values only the screenshot shows (a canvas, a chart, a frame the view cannot list), as you read them, and where each is.",
+    inputSchema: screenInput,
     outputSchema: z.string(),
   }),
 }
@@ -171,6 +204,11 @@ export interface ExtractContext {
   readonly redact: (text: string) => string
   readonly signal?: AbortSignal | undefined
   readonly onModelCall: (cost: CallCost) => void
+  /**
+   * The step's vision: `always` shows a screenshot and offers `read_screen`; `auto` does when the
+   * page has parts the text view misses.
+   */
+  readonly vision?: { readonly mode: "auto" | "always"; readonly desk: VisionDesk } | undefined
 }
 
 export interface Extracted<T> {
@@ -208,11 +246,24 @@ async function sourcesOf(page: Page, tree: string, call: ReadCall): Promise<Fiel
   return sources
 }
 
+/** A call the extractor made: where to read values, or values it read off the screenshot. */
+type ExtractCall =
+  | { readonly id: string; readonly kind: "read"; readonly input: ReadCall }
+  | {
+      readonly id: string
+      readonly kind: "read_screen"
+      readonly input: z.infer<typeof screenInput>
+    }
+
+type Attempt<T> = { value: T; sources: FieldSource[] | null } | { problem: string }
+
 class ExtractLoop<T> {
   private readonly messages: ModelMessage[] = []
   private modelCalls = 0
   private readonly context: ExtractContext
   private readonly schema: z.ZodType<T>
+  /** Whether the extractor is shown a screenshot and may read values off it. */
+  private sees = false
 
   constructor(context: ExtractContext, schema: z.ZodType<T>) {
     this.context = context
@@ -222,14 +273,15 @@ class ExtractLoop<T> {
   async run(instruction: string): Promise<Extracted<T>> {
     let view = await viewTabs(this.context.tabs, this.context.redact)
 
+    this.sees = await this.wantsScreen(view.tree)
     this.messages.push({
       role: "user",
-      content: firstMessage(instruction, this.schema, viewText(view)),
+      content: await this.opening(firstMessage(instruction, this.schema, viewText(view))),
     })
 
     for (let turn = 0; turn < MAX_TURNS; turn++) {
       const call = await this.ask(instruction)
-      const outcome = await this.tryRead(view.tree, call.input)
+      const outcome = await this.attempt(view.tree, call)
 
       if ("value" in outcome) return { ...outcome, modelCalls: this.modelCalls }
 
@@ -240,7 +292,7 @@ class ExtractLoop<T> {
           {
             type: "tool-result",
             toolCallId: call.id,
-            toolName: "read",
+            toolName: call.kind,
             output: {
               type: "text",
               value: `That did not work: ${outcome.problem}\n\nThe page now:\n${viewText(view)}`,
@@ -253,10 +305,48 @@ class ExtractLoop<T> {
     throw new ExtractFailed(instruction, `no valid result within ${MAX_TURNS} tries`)
   }
 
-  private async tryRead(
-    tree: string,
-    input: ReadCall,
-  ): Promise<{ value: T; sources: FieldSource[] | null } | { problem: string }> {
+  /** Whether to show a screenshot: always with vision always on, and on `auto` when the text misses parts. */
+  private async wantsScreen(tree: string): Promise<boolean> {
+    const vision = this.context.vision
+
+    if (vision === undefined) return false
+    if (vision.mode === "always") return true
+
+    return hasGaps(await visualGaps(this.context.tabs.page, tree))
+  }
+
+  /** The first message: the text, with a screenshot when the extractor sees one. */
+  private async opening(text: string): Promise<UserContent> {
+    const desk = this.context.vision?.desk
+
+    if (!this.sees || desk === undefined) return text
+
+    const seen = await desk.look(this.context.tabs.page)
+
+    return [
+      { type: "text", text: `${text}\n\n${desk.describe(seen)}` },
+      { type: "file", data: seen.png, mediaType: "image/png" },
+    ]
+  }
+
+  private attempt(tree: string, call: ExtractCall): Promise<Attempt<T>> | Attempt<T> {
+    return call.kind === "read" ? this.tryRead(tree, call.input) : this.tryScreen(call.input)
+  }
+
+  /** Values read off the screenshot, checked by the schema; they leave nothing to replay. */
+  private tryScreen(input: z.infer<typeof screenInput>): Attempt<T> {
+    let root: unknown = {}
+
+    for (const field of input.fields) root = withPath(root, pathKeys(field.path), field.value)
+
+    const parsed = this.schema.safeParse(root)
+
+    return parsed.success
+      ? { value: parsed.data, sources: null }
+      : { problem: z.prettifyError(parsed.error) }
+  }
+
+  private async tryRead(tree: string, input: ReadCall): Promise<Attempt<T>> {
     const page = this.context.tabs.page
 
     try {
@@ -273,12 +363,12 @@ class ExtractLoop<T> {
   }
 
   /** One model turn; resolves with its read call, or throws when it gives up or answers wrong. */
-  private async ask(instruction: string): Promise<{ id: string; input: ReadCall }> {
+  private async ask(instruction: string): Promise<ExtractCall> {
     const result = await generateText({
       model: this.context.model,
-      system: EXTRACT_PROMPT,
+      system: this.sees ? `${EXTRACT_PROMPT}\n${EXTRACT_VISION_GUIDE}` : EXTRACT_PROMPT,
       messages: this.messages,
-      tools: extractTools,
+      tools: this.sees ? visionTools : extractTools,
       toolChoice: "required",
       ...(this.context.signal && { abortSignal: this.context.signal }),
     })
@@ -296,15 +386,30 @@ class ExtractLoop<T> {
     return this.parse(instruction, call)
   }
 
-  private parse(instruction: string, call: ToolCallPart | undefined) {
+  private parse(instruction: string, call: ToolCallPart | undefined): ExtractCall {
     if (call?.toolName === "fail") this.gaveUp(instruction, call.input)
 
-    const read = readInput.safeParse(call?.toolName === "read" ? call.input : undefined)
+    const parsed = call === undefined ? undefined : this.parseRead(call)
 
-    if (call === undefined || !read.success)
+    if (parsed === undefined)
       throw new ExtractFailed(instruction, "the model did not say where to read the result")
 
-    return { id: call.toolCallId, input: read.data }
+    return parsed
+  }
+
+  /** A `read` call, or a `read_screen` one when the extractor sees a screenshot; undefined if neither. */
+  private parseRead(call: ToolCallPart): ExtractCall | undefined {
+    if (this.sees && call.toolName === "read_screen") {
+      const screen = screenInput.safeParse(call.input)
+
+      return screen.success
+        ? { id: call.toolCallId, kind: "read_screen", input: screen.data }
+        : undefined
+    }
+
+    const read = readInput.safeParse(call.toolName === "read" ? call.input : undefined)
+
+    return read.success ? { id: call.toolCallId, kind: "read", input: read.data } : undefined
   }
 
   private gaveUp(instruction: string, input: unknown): never {

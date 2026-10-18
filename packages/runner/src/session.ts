@@ -23,6 +23,7 @@ import { type CacheMode, ReplayStore } from "./replay/index.ts"
 import { type RelocationPolicy, relocationOf } from "./replay/policy.ts"
 import { type Secret, SecretVault, type SessionSecret } from "./secrets/index.ts"
 import { DanwoError } from "./support/codes.ts"
+import { type VisionSetting, visionModelOf, visionModeOf } from "./vision/desk.ts"
 
 export type { ReplayDivergence } from "./agent/index.ts"
 
@@ -95,6 +96,15 @@ interface ModelOptions {
   readonly judge?: LanguageModel
   /** Show the judge a screenshot of the page besides its text (default false: text only). */
   readonly judgeScreenshot?: boolean
+  /**
+   * When the agent may see the page as an image: `auto` (default, unless the model is known to
+   * take no images) offers a screenshot with numbered marks when the text view misses something
+   * (a canvas, an unnamed button, a frame it cannot list), and the judge sees one then too;
+   * `always` shows one with every view; `off` never. `{ mode, model }` names a model of its own
+   * for reading screenshots. Actions taken on a screenshot replay by finding their place by how it
+   * looks, with no model call.
+   */
+  readonly vision?: VisionSetting
   /**
    * Limits on what the agent spends, per `agent.act` step and over the whole session: turns, model
    * calls, dollars and wall time. Default 25 turns a step and no other limit. A step that runs out
@@ -503,6 +513,10 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
     model: options.model,
     judge: options.judge,
     ...(options.judgeScreenshot !== undefined && { judgeScreenshot: options.judgeScreenshot }),
+    vision: {
+      mode: visionModeOf(options.vision, options.model),
+      model: visionModelOf(options.vision),
+    },
     ...(options.budget !== undefined && { budgets: options.budget }),
     ...(options.transcriptBudget !== undefined && { transcriptBudget: options.transcriptBudget }),
     context: options.agentContext,

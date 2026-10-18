@@ -338,6 +338,7 @@ function agentOptions(config: DanwoConfig): Partial<WebSessionOptions> {
     ...(config.secrets !== undefined && { secrets: config.secrets }),
     ...(config.budget !== undefined && { budget: config.budget }),
     ...(config.judgeScreenshot !== undefined && { judgeScreenshot: config.judgeScreenshot }),
+    ...(config.vision !== undefined && { vision: config.vision }),
   }
 }
 

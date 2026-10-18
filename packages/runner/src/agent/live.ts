@@ -5,7 +5,13 @@
  * transcript.ts). The loop stops when the model calls `done`, when the step's or test's budget is
  * spent, or when the agent keeps going round in circles after being warned once.
  */
-import { generateText, type LanguageModel, type ModelMessage, type ToolCallPart } from "ai"
+import {
+  generateText,
+  type LanguageModel,
+  type ModelMessage,
+  type ToolCallPart,
+  type UserContent,
+} from "ai"
 
 import type { Tabs } from "../browser/tabs.ts"
 import type { MailDesk } from "../mail/desk.ts"
@@ -13,15 +19,18 @@ import { callCost, type CallCost } from "../model/resolve.ts"
 import { type Params, shownParams } from "../replay/params.ts"
 import type { RecordedAction } from "../replay/trace.ts"
 import type { SecretVault } from "../secrets/index.ts"
-import { viewTabs, viewText } from "../snapshot/view.ts"
+import { type PageView, viewTabs, viewText } from "../snapshot/view.ts"
 import { DanwoError } from "../support/codes.ts"
+import type { VisionDesk } from "../vision/desk.ts"
+import { VISION_GUIDE } from "../vision/prompts.ts"
+import { gapsLine, hasGaps, visualGaps } from "../vision/screen.ts"
 import type { Spends } from "./budget.ts"
 import { AgentStepFailed } from "./errors.ts"
 import type { Files } from "./files.ts"
 import { LoopGuard } from "./guard.ts"
 import { type Call, parseCall, perform } from "./perform.ts"
 import { ACTOR_PROMPT } from "./prompts.ts"
-import { agentTools } from "./tools.ts"
+import { toolsFor } from "./tools.ts"
 import { Transcript, VIEW_MARK } from "./transcript.ts"
 
 /** No single action on an element waits longer than this, whatever the session's timeout. */
@@ -61,6 +70,11 @@ export interface LiveContext {
   readonly appFailure?: () => Error | undefined
   /** Mail the app sent, as the emulators caught it. */
   readonly mail: MailDesk
+  /**
+   * The step's vision when it may look at the page as an image: `auto` offers the tools and says
+   * when the text view misses something, `always` also shows a screenshot with every view.
+   */
+  readonly vision?: { readonly mode: "auto" | "always"; readonly desk: VisionDesk } | undefined
   /** Called for every model call and every action, for the step's record. */
   readonly onModelCall: (cost: CallCost) => void
   readonly onAction: (label: string) => void
@@ -100,6 +114,18 @@ interface Turn {
 interface Outcome {
   readonly text: string
   readonly failed: boolean
+  /** A screenshot the action produced for the model. */
+  readonly image?: { readonly png: Buffer; readonly text: string }
+}
+
+/** A user message showing a screenshot, with what it shows in words. */
+function imageMessage(image: { readonly png: Buffer; readonly text: string }): ModelMessage {
+  const content: UserContent = [
+    { type: "text", text: image.text },
+    { type: "file", data: image.png, mediaType: "image/png" },
+  ]
+
+  return { role: "user", content }
 }
 
 class Loop {
@@ -126,8 +152,9 @@ class Loop {
 
     this.transcript.push({
       role: "user",
-      content: firstMessage(instruction, this.live, viewText(view)),
+      content: firstMessage(instruction, this.live, await this.viewFor(view)),
     })
+    await this.showScreen([])
 
     for (;;) {
       this.live.spends.check()
@@ -154,10 +181,45 @@ class Loop {
       view = await this.look()
       this.transcript.push({
         role: "tool",
-        content: this.resultsWithView(calls, outcomes, viewText(view)),
+        content: this.resultsWithView(
+          calls,
+          outcomes.map((outcome) => outcome.text),
+          await this.viewFor(view),
+        ),
       })
+      await this.showScreen(outcomes)
       this.transcript.compactIfOver()
     }
+  }
+
+  /** The view as the model reads it; with vision on, a note of what the text leaves out. */
+  private async viewFor(view: PageView): Promise<string> {
+    const text = viewText(view)
+
+    if (this.live.vision === undefined || this.live.tabs.dialog !== undefined) return text
+
+    const gaps = await visualGaps(this.live.tabs.page, view.tree)
+
+    return hasGaps(gaps) ? `${text}\n\n${gapsLine(gaps)}` : text
+  }
+
+  /**
+   * Shows the screenshots the turn's actions took; with vision always on, a fresh look at the page
+   * when no action took one.
+   */
+  private async showScreen(outcomes: readonly Outcome[]): Promise<void> {
+    const images = outcomes.flatMap((outcome) =>
+      outcome.image === undefined ? [] : [outcome.image],
+    )
+    const vision = this.live.vision
+
+    if (images.length === 0 && vision?.mode === "always" && this.live.tabs.dialog === undefined) {
+      const seen = await vision.desk.look(this.live.tabs.page)
+
+      images.push({ png: seen.png, text: vision.desk.describe(seen) })
+    }
+
+    for (const image of images) this.transcript.push(imageMessage(image))
   }
 
   /**
@@ -178,11 +240,12 @@ class Loop {
   }
 
   private async ask(): Promise<Turn> {
+    const vision = this.live.vision !== undefined
     const result = await generateText({
       model: this.live.model,
-      system: ACTOR_PROMPT,
+      system: vision ? `${ACTOR_PROMPT}\n${VISION_GUIDE}` : ACTOR_PROMPT,
       messages: this.transcript.forModel(),
-      tools: agentTools,
+      tools: toolsFor(vision),
       toolChoice: "required",
       ...(this.live.signal && { abortSignal: this.live.signal }),
     }).catch((error: unknown) => {
@@ -214,8 +277,8 @@ class Loop {
     return { calls, response: result.response.messages }
   }
 
-  private async carryOut(calls: readonly ToolCallPart[], tree: string): Promise<string[]> {
-    const texts: string[] = []
+  private async carryOut(calls: readonly ToolCallPart[], tree: string): Promise<Outcome[]> {
+    const outcomes: Outcome[] = []
     const parsed = calls.map((raw) => parseCall(raw.toolName, raw.input))
     const problems = parsed.flatMap((one) => ("problem" in one ? [one.problem] : []))
 
@@ -233,10 +296,13 @@ class Loop {
             }
           : await this.act(one.call, tree)
 
-      texts.push(this.guarded(JSON.stringify(raw.input) + raw.toolName, outcome))
+      outcomes.push({
+        ...outcome,
+        text: this.guarded(JSON.stringify(raw.input) + raw.toolName, outcome),
+      })
     }
 
-    return texts
+    return outcomes
   }
 
   /** The outcome as the model is told it, with the guard's warning when the agent is stuck. */
@@ -251,13 +317,22 @@ class Loop {
   private async act(call: Call, tree: string): Promise<Outcome> {
     try {
       const timeout = Math.min(this.live.timeout, ACTION_CAP_MS)
-      const performed = await perform(call, { ...this.live, timeout, tree })
+      const performed = await perform(call, {
+        ...this.live,
+        timeout,
+        tree,
+        vision: this.live.vision?.desk,
+      })
 
       this.live.onAction(`${call.name} ${this.live.vault.redact(JSON.stringify(call.input))}`)
       if (performed.recorded === null) this.replayable = false
       else if (performed.recorded !== undefined) this.recorded.push(performed.recorded)
 
-      return { text: performed.outcome, failed: false }
+      return {
+        text: performed.outcome,
+        failed: false,
+        ...(performed.image !== undefined && { image: performed.image }),
+      }
     } catch (error) {
       const message = error instanceof Error ? (error.message.split("\n")[0] ?? "") : String(error)
 

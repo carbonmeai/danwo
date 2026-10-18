@@ -2,6 +2,7 @@
 import type { z } from "zod"
 
 import type { Params } from "../replay/params.ts"
+import type { VisionChoice } from "../vision/desk.ts"
 import type { Budget } from "./budget.ts"
 
 /** Options of `agent.act`. */
@@ -21,6 +22,12 @@ export interface ActOptions {
    * it (default true, unless the session turned effects off). `false` replays its actions only.
    */
   readonly effects?: boolean
+  /**
+   * Whether the step may see the page as an image, over the session's `vision`: `true` shows a
+   * screenshot with every view, `"auto"` offers it when the text view misses something, `false`
+   * keeps to the text view. Actions on a screenshot replay by finding their place by how it looks.
+   */
+  readonly vision?: VisionChoice
 }
 
 /** What `agent.act` resolves with. */
@@ -37,6 +44,13 @@ export interface ActResult {
 export interface ExtractOptions {
   /** Values the instruction names in braces, as for `act`. */
   readonly params?: Params
+  /**
+   * Whether values may be read off a screenshot when the text view does not show them (a canvas,
+   * a chart): `true` always offers it, `"auto"` when the page has such parts, `false` never. Values
+   * read off a screenshot are checked by the schema, and the step then needs the model again on
+   * every run, since what an image shows cannot be read back without one.
+   */
+  readonly vision?: VisionChoice
 }
 
 /** How long to keep looking, and how often; `true` takes the session's assertion timeout. */
@@ -46,6 +60,11 @@ export type PollOption = boolean | { readonly timeout?: number; readonly interva
 export interface AssertOptions {
   /** Ask the judge again until the claim holds or time runs out, instead of once. */
   readonly poll?: PollOption
+  /**
+   * Whether the judge also sees a screenshot: `true` always, `"auto"` when the page has parts the
+   * text view misses (a canvas, unnamed buttons, unlisted frames), `false` never.
+   */
+  readonly vision?: VisionChoice
 }
 
 /** Options of `agent.waitFor`. */

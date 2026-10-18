@@ -12,6 +12,7 @@ import type { RelocationPolicy } from "../replay/policy.ts"
 import type { EffectsSetting, SessionSecret } from "../session.ts"
 import { DanwoError } from "../support/codes.ts"
 import type { SessionArgs, SessionDefinition } from "../tests/types.ts"
+import type { VisionSetting } from "../vision/desk.ts"
 import type { EnvironmentContext, WorkerEnvironment } from "./environment.ts"
 import type { ImpactConfig } from "./impact.ts"
 import type { RecordMode } from "./record.ts"
@@ -42,6 +43,12 @@ export interface DanwoConfig {
   readonly budget?: Budgets
   /** Show the judge of `agent.assert` a screenshot besides the page's text (default false). */
   readonly judgeScreenshot?: boolean
+  /**
+   * When the agent may see the page as an image: `auto` (default) when the text view misses
+   * something (a canvas, an unnamed button, a frame it cannot list), `always`, or `off`.
+   * `{ mode, model }` names a model of its own for reading screenshots.
+   */
+  readonly vision?: VisionSetting
   /** The replay cache; relative to the config file. */
   readonly cache?: { readonly dir: string }
   /** Values the model never sees; tests pass `secret(name)`. */

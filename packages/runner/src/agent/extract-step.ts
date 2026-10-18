@@ -15,6 +15,7 @@ import type { ReplayStore, StepKey } from "../replay/store.ts"
 import { findTarget, type Target } from "../replay/target.ts"
 import type { ExtractTrace } from "../replay/trace.ts"
 import {
+  type ExtractContext,
   ExtractFailed,
   extractLive,
   type FieldSource,
@@ -38,6 +39,8 @@ export interface ExtractStepContext {
   /** Finds a recorded target on the active tab; exact by default. */
   readonly find?: TargetFinder
   readonly onModelCall: (cost: CallCost) => void
+  /** The step's vision, when values may be read off a screenshot. */
+  readonly vision?: ExtractContext["vision"]
   readonly onAction: (label: string) => void
   /** A recorded element was found somewhere else. */
   readonly onRelocated: (from: Target, to: Target) => void
@@ -127,6 +130,7 @@ export async function extractStep<T>(
     redact: context.redact,
     signal: context.signal,
     onModelCall: context.onModelCall,
+    vision: context.vision,
   })
 
   await keep(key, instruction, live.sources, context)

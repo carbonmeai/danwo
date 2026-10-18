@@ -2,8 +2,10 @@
  * A recorded action's target, described the way a person would point at it (test id, role and
  * name, or exact text) so a replay finds the same element again on a fresh page. A replay matches
  * exactly: if the description no longer picks out one element, the recording no longer applies.
+ * An element inside frames (a payment widget's iframe, from another origin or not) is described
+ * within its frame, with the frames it sits in named by their `<iframe>` elements.
  */
-import type { Locator, Page } from "playwright-core"
+import type { ElementHandle, Frame, FrameLocator, Locator, Page } from "playwright-core"
 
 import { type RefLine, refLine, refSection } from "../snapshot/view.ts"
 import type { Target } from "./trace.ts"
@@ -23,12 +25,26 @@ function exactText(text: string): RegExp {
   return new RegExp(`^\\s*${text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`)
 }
 
+/** Where a target's element is looked for: the page, or the frames it sits in. */
+type Scope = Page | FrameLocator
+
+/** The scope of `target` on `page`: the page, or its frames entered one after another. */
+function scopeOf(page: Page, target: Target): Scope {
+  let scope: Scope = page
+
+  for (const selector of target.frame ?? []) scope = scope.frameLocator(selector)
+
+  return scope
+}
+
 /** Every element `target` describes, before choosing among them. */
 function candidates(page: Page, target: Target): Locator | undefined {
-  if (target.testId !== undefined) return page.getByTestId(target.testId)
+  const scope = scopeOf(page, target)
+
+  if (target.testId !== undefined) return scope.getByTestId(target.testId)
 
   if (target.role !== undefined && isRoleName(target.role)) {
-    const byRole = page.getByRole(target.role, {
+    const byRole = scope.getByRole(target.role, {
       ...(target.name !== undefined && { name: target.name, exact: true }),
     })
 
@@ -37,9 +53,65 @@ function candidates(page: Page, target: Target): Locator | undefined {
       : byRole
   }
 
-  if (target.text !== undefined) return page.getByText(target.text, { exact: true })
+  if (target.text !== undefined) return scope.getByText(target.text, { exact: true })
 
   return undefined
+}
+
+/** What of an `<iframe>` element can name it; runs in the page. */
+function frameAttributes(node: Element) {
+  return {
+    id: node.id,
+    title: node.getAttribute("title"),
+    name: node.getAttribute("name"),
+    src: node.getAttribute("src"),
+  }
+}
+
+/** Selectors that might name a frame's `<iframe>`, most telling first. */
+function frameChoices(attributes: ReturnType<typeof frameAttributes>, base: string): string[] {
+  const src = attributes.src === null ? null : URL.parse(attributes.src, base)
+
+  return [
+    attributes.id === "" ? undefined : `iframe[id=${JSON.stringify(attributes.id)}]`,
+    attributes.title === null ? undefined : `iframe[title=${JSON.stringify(attributes.title)}]`,
+    attributes.name === null ? undefined : `iframe[name=${JSON.stringify(attributes.name)}]`,
+    src === null ? undefined : `iframe[src^=${JSON.stringify(`${src.origin}${src.pathname}`)}]`,
+  ].filter((choice) => choice !== undefined)
+}
+
+/** A selector of the `<iframe>` element of `frame` that picks out only it in its parent document. */
+async function frameSelector(frame: Frame): Promise<string | undefined> {
+  const parent = frame.parentFrame()
+  const element = await frame.frameElement().catch(() => undefined)
+
+  if (parent === null || element === undefined) return undefined
+
+  const attributes = await element.evaluate(frameAttributes)
+
+  for (const choice of frameChoices(attributes, parent.url()))
+    if ((await parent.locator(choice).count()) === 1) return choice
+
+  return undefined
+}
+
+/**
+ * The frames `element` sits in, outermost first, as selectors of their `<iframe>` elements; an
+ * empty list on the page itself, undefined when a frame cannot be singled out.
+ */
+async function framesOf(element: ElementHandle): Promise<string[] | undefined> {
+  const chain: string[] = []
+  let frame = await element.ownerFrame()
+
+  while (frame !== null && frame.parentFrame() !== null) {
+    const selector = await frameSelector(frame)
+
+    if (selector === undefined) return undefined
+    chain.unshift(selector)
+    frame = frame.parentFrame()
+  }
+
+  return chain
 }
 
 /** Where in `matches` the element of `ref` sits, when there are several. */
@@ -99,8 +171,14 @@ export async function describeTarget(
 ): Promise<Target | undefined> {
   const element = page.getByRef(ref)
   const testId = await element.getAttribute("data-testid", { timeout: 1_000 }).catch(() => null)
+  const handle = await element.elementHandle({ timeout: 1_000 }).catch(() => null)
+  const frames = handle === null ? [] : await framesOf(handle)
 
-  return singleOut(page, baseTarget(refLine(tree, ref), testId, refSection(tree, ref)), element)
+  if (frames === undefined) return undefined
+
+  const base = baseTarget(refLine(tree, ref), testId, refSection(tree, ref))
+
+  return singleOut(page, frames.length > 0 ? { ...base, frame: frames } : base, element)
 }
 
 /** Why a target could not be found again. */
@@ -151,6 +229,15 @@ export function locatorFor(page: Page, target: Target): Locator {
 
 /** The target as locator code, for records and messages: `getByRole("button", name: "Save")`. */
 export function describe(target: Target): string {
+  const frames = (target.frame ?? []).map(
+    (selector) => `frameLocator(${JSON.stringify(selector)}).`,
+  )
+
+  return `${frames.join("")}${describeIn(target)}`
+}
+
+/** The target as locator code within its frame. */
+function describeIn(target: Target): string {
   const at = target.nth === undefined ? "" : `.nth(${target.nth})`
 
   if (target.testId !== undefined) return `getByTestId(${JSON.stringify(target.testId)})${at}`

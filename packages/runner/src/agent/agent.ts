@@ -33,6 +33,8 @@ import { describe } from "../replay/target.ts"
 import type { Trace } from "../replay/trace.ts"
 import type { SecretVault } from "../secrets/index.ts"
 import { DanwoError } from "../support/codes.ts"
+import { type VisionChoice, VisionDesk, visionFor, type VisionMode } from "../vision/desk.ts"
+import { SecretSpots } from "../vision/screen.ts"
 import { type Budget, type Budgets, DEFAULT_STEP_BUDGET, Spend, Spends } from "./budget.ts"
 import { type BackendMark, EffectWatch, markOf } from "./effect-watch.ts"
 import { AgentStepFailed } from "./errors.ts"
@@ -120,6 +122,11 @@ export interface AgentOptions {
   readonly effects?: { readonly enabled: boolean; readonly ignore: readonly RegExp[] }
   /** The backend's history, which a step's backend effect is read from. */
   readonly activity?: () => BackendActivity
+  /**
+   * When steps may see the page as an image (default `auto`), and the model that places described
+   * targets on a screenshot (default the agent's model).
+   */
+  readonly vision?: { readonly mode: VisionMode; readonly model?: LanguageModel | undefined }
 }
 
 /** One `act` call: which step it is, what it says, and what it may use and spend. */
@@ -131,6 +138,8 @@ interface ActCall {
   readonly budget: Budget | undefined
   /** Whether its replay must have its recording's effects. */
   readonly effects: boolean
+  /** Whether it may see the page as an image. */
+  readonly vision: VisionMode
 }
 
 /** How replaying a step's recording went: how many actions, or why it did not replay. */
@@ -146,11 +155,32 @@ class SessionAgent implements Agent {
   private readonly spent: Spend
   /** Where the backend's history stood when the session began; earlier events are not its own. */
   private readonly sessionMark: BackendMark
+  /** Fields secrets went into, painted over in every screenshot of the session. */
+  private readonly spots = new SecretSpots()
+  /** The session's looks at the page as an image, and its marks. */
+  private readonly desk: VisionDesk
 
   constructor(options: AgentOptions) {
     this.options = options
     this.spent = new Spend(options.budgets?.test ?? {}, "test")
     this.sessionMark = markOf(options.activity)
+    this.desk = new VisionDesk({
+      spots: this.spots,
+      model: () => this.requireModel(options.vision?.model ?? options.model),
+      redact: options.vault.redact,
+      signal: options.signal,
+      onModelCall: (cost) => this.noteCall(cost),
+    })
+  }
+
+  /** The session's vision mode, over which a call's own choice goes. */
+  private get visionMode(): VisionMode {
+    return this.options.vision?.mode ?? "auto"
+  }
+
+  /** A step's vision as its loop takes it: none when off. */
+  private visionOf(mode: VisionMode) {
+    return mode === "off" ? undefined : { mode, desk: this.desk }
   }
 
   diverged(): ReplayDivergence | undefined {
@@ -167,6 +197,7 @@ class SessionAgent implements Agent {
       files: this.filesOf(options),
       budget: options.budget,
       effects: options.effects ?? true,
+      vision: visionFor(this.visionMode, options.vision),
     }
 
     return this.options.steps.run("agent", "agent.act", label, () => this.step(call))
@@ -213,6 +244,7 @@ class SessionAgent implements Agent {
         signal: this.options.signal,
         model: () => this.requireModel(this.options.model),
         onModelCall: (cost) => this.noteCall(cost),
+        vision: this.visionOf(visionFor(this.visionMode, options.vision)),
         onAction: (label) => steps.event({ kind: "action", at: now(), label }),
         onRelocated: (from, to) =>
           steps.event({ kind: "relocated", at: now(), from: describe(from), to: describe(to) }),
@@ -240,7 +272,7 @@ class SessionAgent implements Agent {
       () => {
         this.spent.check()
 
-        return judge(claim, this.judgeContext(JUDGE_PROMPT), poll)
+        return judge(claim, this.judgeContext(JUDGE_PROMPT, options.vision), poll)
       },
       { verifies: true },
     )
@@ -286,18 +318,30 @@ class SessionAgent implements Agent {
     return steps.run("agent", "agent.waitFor", vault.redact(condition), body, { verifies: true })
   }
 
-  /** The judge as a step calls it, told its job by `system`. */
-  private judgeContext(system: string): JudgeContext {
+  /** The judge as a step calls it, told its job by `system`, seeing a screenshot as `vision` says. */
+  private judgeContext(system: string, vision?: VisionChoice): JudgeContext {
     return {
       model: this.requireModel(this.options.judge ?? this.options.model),
       system,
       tabs: this.options.tabs,
       redact: this.options.vault.redact,
       vocabulary: this.options.context,
-      screenshot: this.options.judgeScreenshot ?? false,
+      screenshot: this.judgeSees(vision),
+      spots: this.spots,
       signal: this.options.signal,
       onModelCall: (cost) => this.noteCall(cost),
     }
+  }
+
+  /** Whether the judge gets a screenshot: the session's `judgeScreenshot`, else by vision. */
+  private judgeSees(vision: VisionChoice | undefined): boolean | "auto" {
+    if (this.options.judgeScreenshot === true) return true
+
+    const mode = visionFor(this.visionMode, vision)
+
+    if (mode === "off") return false
+
+    return mode === "always" ? true : "auto"
   }
 
   /**
@@ -421,7 +465,11 @@ class SessionAgent implements Agent {
 
     this.noteMoves(key, outcome)
 
-    return { ok: true, actions: trace.actions.length, relocated: outcome.moved.length > 0 }
+    return {
+      ok: true,
+      actions: trace.actions.length,
+      relocated: outcome.moved.length + outcome.movedPlaces.length > 0,
+    }
   }
 
   /** Compares the replay's effects with the recording's and notes how; why they differ, if they do. */
@@ -442,15 +490,14 @@ class SessionAgent implements Agent {
   private noteMoves(key: StepKey, outcome: ReplayOutcome): void {
     const { steps, store } = this.options
 
-    for (const move of outcome.moved)
-      steps.event({
-        kind: "relocated",
-        at: new Date().toISOString(),
-        from: describe(move.from),
-        to: describe(move.to),
-      })
+    const moves = [
+      ...outcome.moved.map((move) => ({ from: describe(move.from), to: describe(move.to) })),
+      ...outcome.movedPlaces.map((move) => ({ from: move.from, to: move.to })),
+    ]
 
-    if (outcome.moved.length > 0) store?.stage(key, steps.next - 1, outcome.trace)
+    for (const move of moves) steps.event({ kind: "relocated", at: now(), ...move })
+
+    if (moves.length > 0) store?.stage(key, steps.next - 1, outcome.trace)
   }
 
   /** How the replay went; otherwise why it did not. */
@@ -470,6 +517,7 @@ class SessionAgent implements Agent {
         timeout: this.options.actionTimeout,
         ready: this.options.ready,
         mail: this.options.mail,
+        spots: this.spots,
         onAction: (label) =>
           this.options.steps.event({ kind: "action", at: new Date().toISOString(), label }),
       })
@@ -530,6 +578,7 @@ class SessionAgent implements Agent {
       transcriptBudget: this.options.transcriptBudget,
       ready: this.options.ready,
       mail: this.options.mail,
+      vision: this.visionOf(call.vision),
       ...(appErrors !== undefined &&
         mark !== undefined && { appFailure: () => appErrors.since(mark) }),
       onModelCall: (cost) => steps.event({ kind: "model", at: now(), ...cost }),

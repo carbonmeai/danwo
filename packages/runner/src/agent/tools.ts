@@ -8,6 +8,14 @@ import { z } from "zod"
 
 const ref = z.string().describe('The element\'s ref from the latest page view, e.g. "e12".')
 
+/** A place on the latest screenshot: a mark, or x and y, and always what is there. */
+const spot = {
+  mark: z.number().int().positive().optional().describe("A mark number from the latest look."),
+  x: z.number().optional().describe("Screenshot pixels from the left, when no mark fits."),
+  y: z.number().optional().describe("Screenshot pixels from the top, when no mark fits."),
+  description: z.string().describe('What is there, e.g. "the green Pay button".'),
+}
+
 /** What each tool takes; the runner parses every call against these. */
 export const toolInputs = {
   click: z.object({ ref }),
@@ -46,6 +54,15 @@ export const toolInputs = {
       .describe("For a link: a word in its text or URL, when the mail has several."),
   }),
   open_mail: z.object({ to: z.string().describe("The email address the app wrote to.") }),
+  look: z.object({}),
+  click_at: z.object(spot),
+  type_at: z.object({
+    ...spot,
+    text: z.string().optional().describe("What to type."),
+    secret: z.string().optional().describe("Or a secret's name, to type the secret."),
+  }),
+  drag_at: z.object({ from: z.object(spot), to: z.object(spot) }),
+  scroll_at: z.object({ ...spot, direction: z.enum(["up", "down"]) }),
   done: z.object({ status: z.enum(["passed", "failed"]), summary: z.string() }),
 }
 
@@ -81,6 +98,12 @@ const descriptions: Record<ToolName, string> = {
     "Read the newest email or text message the app sent to `to` (an email address or a phone number): its one-time code, or a link (the first, or the one `match` names). Use what it gives you with fill or navigate.",
   open_mail:
     "Show the newest email the app sent to `to` in the current tab, to read it or click a link in it.",
+  look: "See the page as a screenshot with numbered marks over what can be clicked, for what the text view does not show.",
+  click_at: "Click a place on the latest screenshot: a mark, or x and y.",
+  type_at:
+    "Click a place on the latest screenshot, then type `text` (or the secret named `secret`) there.",
+  drag_at: "Drag from one place on the latest screenshot to another.",
+  scroll_at: "Scroll up or down with the pointer over a place on the latest screenshot.",
   done: "End the step: `passed` once the instruction is carried out, `failed` when it cannot be. Say why in `summary`.",
 }
 
@@ -90,7 +113,7 @@ function offer<Input>(name: ToolName, inputSchema: z.ZodType<Input>) {
 }
 
 /** The tools as the model is offered them. */
-export const agentTools = {
+const agentTools = {
   click: offer("click", toolInputs.click),
   fill: offer("fill", toolInputs.fill),
   fill_secret: offer("fill_secret", toolInputs.fill_secret),
@@ -109,4 +132,18 @@ export const agentTools = {
   read_mail: offer("read_mail", toolInputs.read_mail),
   open_mail: offer("open_mail", toolInputs.open_mail),
   done: offer("done", toolInputs.done),
+}
+
+/** The tools that work on the page as an image; offered only when the step may use vision. */
+const visionTools = {
+  look: offer("look", toolInputs.look),
+  click_at: offer("click_at", toolInputs.click_at),
+  type_at: offer("type_at", toolInputs.type_at),
+  drag_at: offer("drag_at", toolInputs.drag_at),
+  scroll_at: offer("scroll_at", toolInputs.scroll_at),
+}
+
+/** The tools a step is offered: with the vision tools when it may use vision. */
+export function toolsFor(vision: boolean) {
+  return vision ? { ...agentTools, ...visionTools } : agentTools
 }

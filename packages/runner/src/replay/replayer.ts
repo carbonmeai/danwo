@@ -18,7 +18,9 @@ import type { Tabs } from "../browser/tabs.ts"
 import type { MailDesk } from "../mail/desk.ts"
 import { checkSecretField } from "../secrets/fields.ts"
 import type { SecretVault } from "../secrets/index.ts"
+import type { SecretSpots } from "../vision/screen.ts"
 import { paramSecret, type Params, paramText } from "./params.ts"
+import { type VisionReplayContext, visionReplays } from "./replay-vision.ts"
 import { routeOf } from "./route.ts"
 import { describe, findTarget, locatorFor, type Target } from "./target.ts"
 import type { FromMail, RecordedAction, RecordedAddress, RecordedInput, Trace } from "./trace.ts"
@@ -64,6 +66,8 @@ export interface ReplayContext {
   readonly ready: () => Promise<void>
   /** Mail the app sent, where values a recording took from mail are read again. */
   readonly mail: MailDesk
+  /** Fields secrets went into, painted over in the screenshots places are looked for on. */
+  readonly spots?: SecretSpots
 }
 
 /** The handle of a recorded secret: the step's param of that name, else the session's secret. */
@@ -182,6 +186,10 @@ interface Replayed {
   readonly after?: Aftermath
   /** Recorded targets that were found somewhere else, with where. */
   readonly moved: readonly { readonly from: Target; readonly to: Target }[]
+  /** The action as it is now, when a place it acts at was found somewhere else on the screen. */
+  readonly revised?: RecordedAction
+  /** Places found somewhere else on the screen, described for the step's record. */
+  readonly movedPlaces?: readonly { readonly from: string; readonly to: string }[]
 }
 
 function moves(found: readonly { recorded: Target; located: Located }[]) {
@@ -339,6 +347,33 @@ const pageActions: { readonly [Kind in RecordedAction["kind"]]?: OnPage<Kind> } 
   dialog: async (action, context) => ({ label: await answered(action, context), moved: [] }),
   drag: dragged,
   wait: waited,
+  click_at: async (action, context) => ({
+    ...(await visionReplays.click_at(action, onScreen(context))),
+    moved: [],
+  }),
+  type_at: async (action, context) => ({
+    ...(await visionReplays.type_at(action, onScreen(context))),
+    moved: [],
+  }),
+  drag_at: async (action, context) => ({
+    ...(await visionReplays.drag_at(action, onScreen(context))),
+    moved: [],
+  }),
+  scroll_at: async (action, context) => ({
+    ...(await visionReplays.scroll_at(action, onScreen(context))),
+    moved: [],
+  }),
+}
+
+/** What replaying an action taken on a screenshot needs; it may search for moved places when relocating. */
+function onScreen(context: ReplayContext): VisionReplayContext {
+  return {
+    tabs: context.tabs,
+    timeout: Math.min(context.timeout, FIND_MS),
+    relocate: context.find !== undefined,
+    spots: context.spots,
+    text: (input) => inputText(input, context),
+  }
 }
 
 function onPage(action: RecordedAction, context: ReplayContext): Promise<Replayed> {
@@ -384,13 +419,29 @@ export interface ReplayOutcome {
   readonly trace: Trace
   /** Targets found somewhere other than recorded, in action order. */
   readonly moved: readonly { readonly action: number; readonly from: Target; readonly to: Target }[]
+  /** Places on the screen found somewhere other than recorded, described, in action order. */
+  readonly movedPlaces: readonly {
+    readonly action: number
+    readonly from: string
+    readonly to: string
+  }[]
+}
+
+/** What replaying every action came to: moved targets, moved places, and revised actions. */
+interface Replays {
+  readonly moved: ReplayOutcome["moved"]
+  readonly movedPlaces: ReplayOutcome["movedPlaces"]
+  readonly revised: ReadonlyMap<number, RecordedAction>
 }
 
 /** The recording with each moved target replaced by where it was found. */
-function retarget(trace: Trace, moved: ReplayOutcome["moved"]): Trace {
-  if (moved.length === 0) return trace
+function retarget(trace: Trace, replays: Replays): Trace {
+  const { moved, revised } = replays
 
-  const actions = trace.actions.map((action, index) => {
+  if (moved.length === 0 && revised.size === 0) return trace
+
+  const actions = trace.actions.map((original, index) => {
+    const action = revised.get(index) ?? original
     let updated: RecordedAction = action
 
     for (const move of moved.filter((entry) => entry.action === index)) {
@@ -434,25 +485,29 @@ async function replayStep(trace: Trace, index: number, context: ReplayContext): 
   }
 }
 
-async function replayAll(trace: Trace, context: ReplayContext): Promise<ReplayOutcome["moved"]> {
+async function replayAll(trace: Trace, context: ReplayContext): Promise<Replays> {
   const moved: { action: number; from: Target; to: Target }[] = []
+  const movedPlaces: { action: number; from: string; to: string }[] = []
+  const revised = new Map<number, RecordedAction>()
 
   for (let index = 0; index < trace.actions.length; index++) {
     const done = await replayStep(trace, index, context)
 
     moved.push(...done.moved.map((move) => ({ action: index, ...move })))
+    movedPlaces.push(...(done.movedPlaces ?? []).map((move) => ({ action: index, ...move })))
+    if (done.revised !== undefined) revised.set(index, done.revised)
   }
 
-  return moved
+  return { moved, movedPlaces, revised }
 }
 
 /** Replays `trace`; throws ReplayMismatch at the first action or end route that no longer matches. */
 export async function replay(trace: Trace, context: ReplayContext): Promise<ReplayOutcome> {
-  const moved = await context.tabs.holdingDialogs(() => replayAll(trace, context))
+  const replays = await context.tabs.holdingDialogs(() => replayAll(trace, context))
   const at = await reachRoute(context, trace.endRoute)
 
   if (at !== undefined)
     throw new ReplayMismatch(trace.actions.length, `ended on ${at}, not ${trace.endRoute}`)
 
-  return { trace: retarget(trace, moved), moved }
+  return { trace: retarget(trace, replays), moved: replays.moved, movedPlaces: replays.movedPlaces }
 }

@@ -180,6 +180,9 @@ export type {
   ReadinessMode,
   Screen,
   SessionMail,
+  VisionChoice,
+  VisionMode,
+  VisionSetting,
   VisualOptions,
   WaitForOptions,
 } from "@danwo/runner/runner"
