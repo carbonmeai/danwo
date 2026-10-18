@@ -107,6 +107,17 @@ describe("planRaceFaults", () => {
     expect(planRaceFaults(clean([], [delivery(1, "a"), delivery(2, "a")]))).toEqual([])
   })
 
+  it("does not reorder webhooks sent far apart, such as either side of a time jump", () => {
+    const later = {
+      ...delivery(2, "customer.subscription.updated"),
+      at: new Date(15 * 86_400_000).toISOString(),
+    }
+
+    expect(
+      planRaceFaults(clean([], [delivery(1, "customer.subscription.created"), later])),
+    ).toEqual([])
+  })
+
   it("holds only the calls slow-then-retry applies to", () => {
     const exchanges = [
       call("POST", "api.stripe.com", "/v1/checkout/sessions", "server"),

@@ -119,6 +119,17 @@ function firstDeliveries(deliveries: readonly ServiceDelivery[]): ServiceDeliver
 }
 
 /**
+ * How close by the emulator's clock two webhooks must have been sent to be swapped. Webhooks further
+ * apart, such as either side of a time jump, cannot be held for one another within a trial.
+ */
+const REORDER_WINDOW_MS = 60_000
+
+/** Whether `second` was sent soon enough after `first` for the two to arrive the other way round. */
+function closeEnough(first: ServiceDelivery, second: ServiceDelivery): boolean {
+  return Date.parse(second.at) - Date.parse(first.at) <= REORDER_WINDOW_MS
+}
+
+/**
  * Each pair of webhooks one endpoint got one after the other with different topics, delivered
  * the other way round: the first is held back until the second has been delivered.
  */
@@ -130,7 +141,12 @@ function reorders(clean: RunOutcome): PlannedFault[] {
   return firsts.flatMap((first, at) => {
     const second = firsts.slice(at + 1).find((d) => d.endpointId === first.endpointId)
 
-    if (second === undefined || second.topic === first.topic || second.service !== first.service)
+    if (
+      second === undefined ||
+      second.topic === first.topic ||
+      second.service !== first.service ||
+      !closeEnough(first, second)
+    )
       return []
 
     const service = first.service === undefined ? "" : `${first.service} `
