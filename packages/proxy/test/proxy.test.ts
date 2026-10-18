@@ -33,6 +33,10 @@ import {
   slackWorkspace,
   stripe,
   listeningPort,
+  seedTwilio,
+  twilio,
+  TWILIO_HOSTS,
+  twilioInbox,
 } from "@danwo/emulators"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { z } from "zod"
@@ -51,6 +55,7 @@ const GRAPH_SYNC_APP = fileURLToPath(new URL("./fixtures/graph-sync-app.ts", imp
 const PUBSUB_VERIFY_APP = fileURLToPath(new URL("./fixtures/pubsub-verify-app.ts", import.meta.url))
 const SLACK_APP = fileURLToPath(new URL("./fixtures/slack-app.ts", import.meta.url))
 const GITHUB_BOT_APP = fileURLToPath(new URL("./fixtures/github-bot-app.ts", import.meta.url))
+const TWILIO_VERIFY_APP = fileURLToPath(new URL("./fixtures/twilio-verify-app.ts", import.meta.url))
 
 let other: Server
 let otherUrl: string
@@ -853,6 +858,66 @@ describe("routing an unmodified Slack app", () => {
         new Set(["slack.com"]),
       )
     } finally {
+      await proxy.stop()
+      await emulator.close()
+    }
+  })
+})
+
+const VerifyOutput = z.union([
+  z.object({ sent: z.string() }),
+  z.object({ wrong: z.string(), right: z.string() }),
+])
+
+describe("routing an unmodified Twilio Verify app", () => {
+  it("texts a code through Verify, refuses a wrong one and approves the one the phone got", async () => {
+    const account = "REDACTED-TEST-VALUE"
+    const service = "REDACTED-TEST-VALUE"
+    const phone = "+14155550123"
+    const emulator = createEmulator(twilio)
+
+    seedTwilio(emulator.store, {
+      accounts: [{ sid: account, authToken: "5ca1ab1e5ca1ab1e5ca1ab1e5ca1ab1e" }],
+      verifyServices: [{ sid: service, friendlyName: "Danwo Shop" }],
+    })
+
+    const proxy = await startProxy({
+      routes: [{ hosts: [...TWILIO_HOSTS], handler: emulator.fetch }],
+      unmatched: "block",
+    })
+    const child = spawn(process.execPath, [TWILIO_VERIFY_APP], {
+      env: {
+        ...proxy.env(),
+        TWILIO_ACCOUNT_SID: account,
+        TWILIO_AUTH_TOKEN: "5ca1ab1e5ca1ab1e5ca1ab1e5ca1ab1e",
+        VERIFY_SERVICE: service,
+        PHONE: phone,
+      },
+      cwd: fileURLToPath(new URL("..", import.meta.url)),
+      stdio: ["pipe", "pipe", "inherit"],
+    })
+    const lines = createInterface({ input: child.stdout })[Symbol.asyncIterator]()
+    const next = async () => VerifyOutput.parse(JSON.parse(String((await lines.next()).value)))
+
+    try {
+      expect(await next()).toEqual({ sent: "pending" })
+
+      const code = twilioInbox(emulator).latest(phone)?.code() ?? ""
+
+      expect(code).toMatch(/^\d{6}$/)
+      child.stdin.write(`${code}\n`)
+      expect(await next()).toEqual({ wrong: "pending", right: "approved" })
+
+      await proxy.settled()
+      expect(
+        proxy.exchanges().map((e) => `${e.disposition} ${e.method} ${e.host}${e.path} ${e.status}`),
+      ).toEqual([
+        `routed POST verify.twilio.com/v2/Services/${service}/Verifications 201`,
+        `routed POST verify.twilio.com/v2/Services/${service}/VerificationCheck 200`,
+        `routed POST verify.twilio.com/v2/Services/${service}/VerificationCheck 200`,
+      ])
+    } finally {
+      child.kill()
       await proxy.stop()
       await emulator.close()
     }
