@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "instruction": "buy the cart: continue to payment, approve it, and pay on the payment page",
+  "recordedAt": "2026-10-18T14:57:22.815Z",
+  "actions": [
+    {
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Continue to payment",
+        "section": "main"
+      }
+    },
+    {
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Approve payment",
+        "section": "main"
+      }
+    },
+    {
+      "kind": "click",
+      "target": {
+        "testId": "checkout-pay",
+        "role": "button",
+        "name": "Pay $24.00",
+        "section": "main"
+      }
+    }
+  ],
+  "endRoute": "app/orders/:id",
+  "effects": {
+    "page": {
+      "appeared": [
+        "status: \"Credits: 1000\"",
+        "strong: Paid"
+      ],
+      "vanished": [
+        "heading \"Checkout\"",
+        "button \"Continue to payment\"",
+        "columnheader \"Item\"",
+        "columnheader \"Qty\"",
+        "columnheader \"Price\"",
+        "cell \"Pro seat\"",
+        "cell \"2\"",
+        "cell \"$12.00\"",
+        "strong: $24.00"
+      ]
+    },
+    "backend": [
+      "GET 127.0.0.1/orders/:id",
+      "GET checkout.stripe.com/checkout/:id",
+      "POST 127.0.0.1/checkout/confirm",
+      "POST 127.0.0.1/checkout/pay",
+      "POST api.stripe.com/v1/checkout/sessions",
+      "POST checkout.stripe.com/checkout/:id/complete",
+      "webhook checkout.session.completed"
+    ]
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › orders [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "act",
+    "step": 0,
+    "instruction": "buy the cart: continue to payment, approve it, and pay on the payment page",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

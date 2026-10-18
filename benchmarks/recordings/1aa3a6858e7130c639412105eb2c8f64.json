@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "instruction": "notify the team",
+  "recordedAt": "2026-10-18T15:00:52.958Z",
+  "actions": [
+    {
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Notify the team",
+        "section": "main"
+      }
+    }
+  ],
+  "endRoute": "app/team",
+  "effects": {
+    "page": {
+      "appeared": [
+        "status: Team notified"
+      ],
+      "vanished": []
+    },
+    "backend": [
+      "GET 127.0.0.1/team",
+      "POST 127.0.0.1/team/notify",
+      "POST slack.com/api/chat.postMessage"
+    ]
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/mixed.danwo.ts › team [mixed]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "act",
+    "step": 0,
+    "instruction": "notify the team",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

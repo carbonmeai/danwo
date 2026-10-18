@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "kind": "extract",
+  "instruction": "the upload confirmation message",
+  "recordedAt": "2026-10-18T14:58:30.638Z",
+  "fields": [
+    {
+      "path": "message",
+      "target": {
+        "role": "status",
+        "text": "Uploaded notes.txt (49 bytes)",
+        "section": "main"
+      },
+      "as": "text"
+    }
+  ],
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › upload [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "extract",
+    "step": 2,
+    "instruction": "the upload confirmation message",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

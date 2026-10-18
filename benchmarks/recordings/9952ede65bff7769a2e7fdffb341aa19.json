@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "kind": "wait",
+  "instruction": "the page says the settings were saved",
+  "recordedAt": "2026-10-18T14:57:43.051Z",
+  "evidence": {
+    "text": "Settings saved"
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › settings [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "wait",
+    "step": 4,
+    "instruction": "the page says the settings were saved",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

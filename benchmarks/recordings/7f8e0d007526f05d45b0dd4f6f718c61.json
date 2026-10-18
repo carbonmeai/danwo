@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "kind": "wait",
+  "instruction": "the order status says Paid",
+  "recordedAt": "2026-10-18T14:57:24.446Z",
+  "evidence": {
+    "text": "Paid"
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › orders [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "wait",
+    "step": 1,
+    "instruction": "the order status says Paid",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

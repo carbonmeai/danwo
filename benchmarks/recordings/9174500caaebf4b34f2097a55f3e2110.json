@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "kind": "wait",
+  "instruction": "an error says the email address is not valid",
+  "recordedAt": "2026-10-18T14:57:34.861Z",
+  "evidence": {
+    "text": "Enter a valid email address"
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › settings [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "wait",
+    "step": 1,
+    "instruction": "an error says the email address is not valid",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

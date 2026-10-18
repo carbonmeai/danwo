@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "instruction": "sign up with the email {email}, then enter the code emailed to it",
+  "recordedAt": "2026-10-18T14:59:35.913Z",
+  "actions": [
+    {
+      "kind": "fill",
+      "target": {
+        "role": "textbox",
+        "name": "Email",
+        "section": "main"
+      },
+      "input": {
+        "param": "email"
+      }
+    },
+    {
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Send code",
+        "section": "main"
+      }
+    },
+    {
+      "kind": "fill",
+      "target": {
+        "role": "textbox",
+        "name": "Code",
+        "section": "main"
+      },
+      "input": {
+        "mail": {
+          "to": {
+            "param": "email"
+          },
+          "kind": "code"
+        }
+      }
+    },
+    {
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Verify",
+        "section": "main"
+      }
+    }
+  ],
+  "endRoute": "app/signup/verify",
+  "effects": {
+    "page": {
+      "appeared": [
+        "heading \"Welcome\""
+      ],
+      "vanished": [
+        "heading \"Sign up\"",
+        "button \"Send code\"",
+        "textbox \"Email\""
+      ]
+    },
+    "backend": [
+      "POST 127.0.0.1/signup",
+      "POST 127.0.0.1/signup/verify",
+      "POST api.resend.com/emails"
+    ]
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/mixed.danwo.ts › signup [mixed]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "act",
+    "step": 0,
+    "instruction": "sign up with the email {email}, then enter the code emailed to it",
+    "params": {
+      "email": "text:mo@bench.test"
+    },
+    "policy": "similar-v1"
+  }
+}

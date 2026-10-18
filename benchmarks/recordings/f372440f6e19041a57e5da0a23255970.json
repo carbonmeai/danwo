@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "kind": "extract",
+  "instruction": "the confirmation message shown after signing up",
+  "recordedAt": "2026-10-18T14:56:54.030Z",
+  "fields": [
+    {
+      "path": "message",
+      "target": {
+        "role": "status",
+        "text": "Signed up as kai@bench.test",
+        "section": "main"
+      },
+      "as": "text"
+    }
+  ],
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › signup [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "extract",
+    "step": 2,
+    "instruction": "the confirmation message shown after signing up",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

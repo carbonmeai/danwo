@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "kind": "wait",
+  "instruction": "the status line reads exactly: Ready: 42 rows",
+  "recordedAt": "2026-10-18T14:59:01.044Z",
+  "evidence": {
+    "text": "Ready: 42 rows"
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › report [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "wait",
+    "step": 1,
+    "instruction": "the status line reads exactly: Ready: 42 rows",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

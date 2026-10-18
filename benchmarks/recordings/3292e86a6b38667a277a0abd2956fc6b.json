@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "kind": "wait",
+  "instruction": "the page says the email is subscribed",
+  "recordedAt": "2026-10-18T14:58:39.078Z",
+  "evidence": {
+    "text": "Subscribed: news@bench.test"
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › newsletter [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "wait",
+    "step": 1,
+    "instruction": "the page says the email is subscribed",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

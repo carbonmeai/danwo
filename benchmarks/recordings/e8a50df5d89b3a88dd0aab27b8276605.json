@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "instruction": "delete the Borealis project and confirm the deletion",
+  "recordedAt": "2026-10-18T14:58:17.558Z",
+  "actions": [
+    {
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Delete Borealis",
+        "section": "list \"Projects\""
+      }
+    },
+    {
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Delete project",
+        "section": "dialog"
+      }
+    }
+  ],
+  "endRoute": "app/projects",
+  "effects": {
+    "page": {
+      "appeared": [
+        "status: 2 projects"
+      ],
+      "vanished": [
+        "status: 3 projects",
+        "button \"Delete Borealis\""
+      ]
+    },
+    "backend": [
+      "GET 127.0.0.1/projects",
+      "POST 127.0.0.1/projects/delete"
+    ]
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › projects [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "act",
+    "step": 0,
+    "instruction": "delete the Borealis project and confirm the deletion",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

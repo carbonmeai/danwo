@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "instruction": "press the green Approve button drawn on the board",
+  "recordedAt": "2026-10-18T15:00:48.704Z",
+  "actions": [
+    {
+      "kind": "click_at",
+      "visual": {
+        "description": "green Approve button on canvas",
+        "patch": "iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAEbElEQVR4AdXBPWhTWwDA8X/PvS23vfmyUIitpBjbZritgxrbxcWlgtTBwUGcHF2CQ6GxgnS3QxcdSkFcCm7iIn5U6VBIh4o2JlgokdtmSKW5jVRIGm7y3gEPhKA+33vDe+f360ilUk00JtCcQHMCzQk0J9CcQHMCzQk0J9CcQHMCzQk0J9CcQHMCzQk0J9CcQHMCzZl8Fw6HSafTSDs7O2SzWSYnJ+nu7ubw8JBcLsfy8jJSOBwmnU4j7ezskM1mmZycpLu7m8PDQ3K5HMvLyyh3794lEAhQr9d5+vQpV65cIRQKsba2xpMnTzBNkxs3bhCPxwmFQvi+z5cvX1hbW2N1dZVwOEw6nUaq1Wrcu3cPxeS7rq4uLMtCisfjDA8PowSDQcbHxwkEAiwuLtLV1YVlWUjxeJzh4WGUYDDI+Pg4gUCAxcVFpEgkgmmaWJbF9evXEUIg9fT0IITgzp079Pb2ohiGQTQa5erVq/T09PD8+XMky7KwLIuTJ09SKBSQBD9gGAa+75PP5ymVSiiO45BIJGhlGAa+75PP5ymVSiiO45BIJGgnhKBUKpHP59na2uLmzZv09vYiHR0d8erVK96/f49y6dIlTpw4wcePH1EmJiZQTH5iYWEB13WRpqenGRgYQBodHWV1dZVWCwsLuK6LND09zcDAANLo6CifPn2i1bNnz3j9+jXK5cuXUR4+fEihUEC6desWIyMjSGfOnOHFixecPXsWKZFIIDmOg+AHqtUqruuirK+vo8RiMVpVq1Vc10VZX19HicVitHv79i1KR0cHtm0j+b5PoVBA+fDhA8qpU6colUp8+/YNKRKJ0NnZyfnz5xGJRIJ2vu/TqlaroZimSSvf92lVq9VQTNOkne/7KKZp8jO1Wg2ls7MT6d27dyjnzp1jaGgIcfHiRdrZtk0wGEQZGxtDKRaLtLJtm2AwiDI2NoZSLBb5lXq9TrVaRTIMg1AohDIyMoLy+fNnpJcvX6JMTExg2zbm0NAQPzIzM8PKygrRaBTHcVC2t7dpNzMzw8rKCtFoFMdxULa3t/krpVKJwcFBpNu3b/P48WOOHz9OMplEyWazSJVKhYODAyKRCIODg0jCMAxOnz5NO9u2mZqaIplMopTLZTKZDO1s22ZqaopkMolSLpfJZDL8lUePHnF0dIR07NgxUqkU165dQ9na2iKXy6FkMhlaCf504cIFWnmex8bGBq329vaYn5+nned5bGxs0Gpvb4/5+XmUZrPJz3iex/379ymXyzSbTZR6vU42m+XBgwe0evPmDa06UqlUkz/19fUxOzuL5Hkec3NzCCHo7++nWCzSbDZR+vr6mJ2dRfI8j7m5OYQQ9Pf3UywWaTab/FOxWIyvX79ycHDA7zD5hUajwe7uLr+j0Wiwu7vLv+W6Ln+HQHMm3+3v77O0tIRUqVT4lf39fZaWlpAqlQr/JZPvGo0Gm5ub/I5Go8Hm5ib/BwLNCTQn0JxAcwLNCTQn0JxAcwLNCTQn0JxAcwLN/QH44JKIJmEPQAAAAABJRU5ErkJggg==",
+        "point": {
+          "x": 233,
+          "y": 259
+        },
+        "anchor": {
+          "css": "[data-testid=\"board\"]",
+          "at": {
+            "x": 0.5,
+            "y": 0.49907178217821785
+          }
+        }
+      }
+    }
+  ],
+  "endRoute": "app/approve",
+  "effects": {
+    "page": {
+      "appeared": [
+        "status: Approved"
+      ],
+      "vanished": [
+        "status: Waiting for approval"
+      ]
+    },
+    "backend": [
+      "GET 127.0.0.1/approve",
+      "POST 127.0.0.1/approve"
+    ]
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/mixed.danwo.ts › approve [mixed]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "act",
+    "step": 0,
+    "instruction": "press the green Approve button drawn on the board",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "kind": "wait",
+  "instruction": "the page says Approved",
+  "recordedAt": "2026-10-18T14:58:47.362Z",
+  "evidence": {
+    "text": "Approved"
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › approve [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "wait",
+    "step": 1,
+    "instruction": "the page says Approved",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

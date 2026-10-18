@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "kind": "wait",
+  "instruction": "the page says the file was uploaded",
+  "recordedAt": "2026-10-18T14:58:26.612Z",
+  "evidence": {
+    "text": "Uploaded notes.txt"
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › upload [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "wait",
+    "step": 1,
+    "instruction": "the page says the file was uploaded",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "instruction": "type {email} into the Email field and press Save settings",
+  "recordedAt": "2026-10-18T14:57:33.154Z",
+  "actions": [
+    {
+      "kind": "fill",
+      "target": {
+        "role": "textbox",
+        "name": "Email",
+        "section": "main"
+      },
+      "input": {
+        "param": "email"
+      }
+    },
+    {
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Save settings",
+        "section": "main"
+      }
+    }
+  ],
+  "endRoute": "app/settings",
+  "effects": {
+    "page": {
+      "appeared": [
+        "alert: Enter a valid email address"
+      ],
+      "vanished": []
+    },
+    "backend": [
+      "POST 127.0.0.1/settings"
+    ]
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › settings [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "act",
+    "step": 0,
+    "instruction": "type {email} into the Email field and press Save settings",
+    "params": {
+      "email": "text:ada-at-lovelace"
+    },
+    "policy": "similar-v1"
+  }
+}

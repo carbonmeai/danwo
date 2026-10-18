@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "kind": "extract",
+  "instruction": "the error message next to the email field",
+  "recordedAt": "2026-10-18T14:57:36.488Z",
+  "fields": [
+    {
+      "path": "error",
+      "target": {
+        "role": "alert",
+        "text": "Enter a valid email address",
+        "section": "main"
+      },
+      "as": "text"
+    }
+  ],
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › settings [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "extract",
+    "step": 2,
+    "instruction": "the error message next to the email field",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

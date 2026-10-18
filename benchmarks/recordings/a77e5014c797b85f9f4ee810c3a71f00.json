@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "instruction": "subscribe to the newsletter with the email {email} in the sign-up widget",
+  "recordedAt": "2026-10-18T15:00:42.002Z",
+  "actions": [
+    {
+      "kind": "fill",
+      "target": {
+        "role": "textbox",
+        "name": "Your email",
+        "section": "main",
+        "frame": [
+          "iframe[title=\"Newsletter sign-up\"]"
+        ]
+      },
+      "input": {
+        "param": "email"
+      }
+    },
+    {
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Subscribe",
+        "section": "main",
+        "frame": [
+          "iframe[title=\"Newsletter sign-up\"]"
+        ]
+      }
+    }
+  ],
+  "endRoute": "app/newsletter",
+  "effects": {
+    "page": {
+      "appeared": [],
+      "vanished": []
+    },
+    "backend": [
+      "GET 127.0.0.1/newsletter",
+      "GET localhost/widget",
+      "POST 127.0.0.1/newsletter/subscribe"
+    ]
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/mixed.danwo.ts › newsletter [mixed]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "act",
+    "step": 0,
+    "instruction": "subscribe to the newsletter with the email {email} in the sign-up widget",
+    "params": {
+      "email": "text:news@bench.test"
+    },
+    "policy": "similar-v1"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "kind": "extract",
+  "instruction": "the message saying whether settings were saved",
+  "recordedAt": "2026-10-18T14:57:47.952Z",
+  "fields": [
+    {
+      "path": "message",
+      "target": {
+        "role": "status",
+        "text": "Settings saved",
+        "section": "main"
+      },
+      "as": "text"
+    }
+  ],
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › settings [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "extract",
+    "step": 5,
+    "instruction": "the message saying whether settings were saved",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

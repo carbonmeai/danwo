@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "kind": "wait",
+  "instruction": "the table is on its last page",
+  "recordedAt": "2026-10-18T14:57:57.043Z",
+  "evidence": {
+    "text": "Page 3 of 3"
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › products [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "wait",
+    "step": 1,
+    "instruction": "the table is on its last page",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "kind": "wait",
+  "instruction": "the page says there are 2 projects",
+  "recordedAt": "2026-10-18T14:58:18.873Z",
+  "evidence": {
+    "text": "2 projects"
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › projects [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "wait",
+    "step": 1,
+    "instruction": "the page says there are 2 projects",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

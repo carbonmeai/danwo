@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "instruction": "go to the last page of the product table using the Next button",
+  "recordedAt": "2026-10-18T14:57:55.526Z",
+  "actions": [
+    {
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Next",
+        "section": "main"
+      }
+    },
+    {
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Next",
+        "section": "main"
+      }
+    }
+  ],
+  "endRoute": "app/products",
+  "effects": {
+    "page": {
+      "appeared": [
+        "status: Page 3 of 3 · 30 products",
+        "cell \"Product 21\"",
+        "cell \"$67\"",
+        "cell \"Product 22\"",
+        "cell \"$14\"",
+        "cell \"Product 23\"",
+        "cell \"$51\"",
+        "cell \"Product 24\"",
+        "cell \"$88\"",
+        "cell \"Product 25\""
+      ],
+      "vanished": [
+        "status: Page 1 of 3 · 30 products",
+        "cell \"Product 01\"",
+        "cell \"$47\"",
+        "cell \"Product 02\"",
+        "cell \"$84\"",
+        "cell \"Product 03\"",
+        "cell \"$31\"",
+        "cell \"Product 04\"",
+        "cell \"$68\"",
+        "cell \"Product 05\""
+      ]
+    },
+    "backend": []
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › products [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "act",
+    "step": 0,
+    "instruction": "go to the last page of the product table using the Next button",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

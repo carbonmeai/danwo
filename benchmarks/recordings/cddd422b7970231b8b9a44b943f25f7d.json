@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "kind": "wait",
+  "instruction": "the page says the team was notified",
+  "recordedAt": "2026-10-18T14:58:53.388Z",
+  "evidence": {
+    "text": "Team notified"
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › team [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "wait",
+    "step": 1,
+    "instruction": "the page says the team was notified",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

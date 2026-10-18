@@ -1,0 +1,99 @@
+{
+  "date": "2026-10-18",
+  "model": "anthropic/claude-sonnet-5.5",
+  "live": true,
+  "styles": [
+    {
+      "style": "locators",
+      "scenarios": 11,
+      "passed": 10,
+      "skipped": 1,
+      "falseFailures": 0,
+      "passRate": 1,
+      "bugsCaught": 4,
+      "bugsRun": 4,
+      "catchRate": 1,
+      "firstRun": {
+        "calls": 0,
+        "usd": 0,
+        "msPerTest": 1695
+      }
+    },
+    {
+      "style": "agent",
+      "scenarios": 11,
+      "passed": 11,
+      "skipped": 0,
+      "falseFailures": 0,
+      "passRate": 1,
+      "bugsCaught": 4,
+      "bugsRun": 4,
+      "catchRate": 1,
+      "firstRun": {
+        "calls": 60,
+        "usd": 0.3978711,
+        "msPerTest": 12803
+      },
+      "replay": {
+        "calls": 0,
+        "passed": 11,
+        "msPerTest": 1779
+      }
+    },
+    {
+      "style": "mixed",
+      "scenarios": 11,
+      "passed": 11,
+      "skipped": 0,
+      "falseFailures": 0,
+      "passRate": 1,
+      "bugsCaught": 4,
+      "bugsRun": 4,
+      "catchRate": 1,
+      "firstRun": {
+        "calls": 40,
+        "usd": 0.3238284,
+        "msPerTest": 8478
+      },
+      "replay": {
+        "calls": 0,
+        "passed": 11,
+        "msPerTest": 1323
+      }
+    }
+  ],
+  "matrix": {
+    "bugs": 5,
+    "caught": 5,
+    "catchRate": 1,
+    "falseFailures": 0,
+    "byBug": [
+      {
+        "bug": "no-dedupe",
+        "caught": true,
+        "how": "1 faulted run(s) failed"
+      },
+      {
+        "bug": "no-idempotency",
+        "caught": true,
+        "how": "1 faulted run(s) failed and 1 lint error(s)"
+      },
+      {
+        "bug": "fulfil-on-redirect",
+        "caught": true,
+        "how": "1 faulted run(s) failed"
+      },
+      {
+        "bug": "no-verify",
+        "caught": true,
+        "how": "1 lint error(s)"
+      },
+      {
+        "bug": "raw-429",
+        "caught": true,
+        "how": "1 faulted run(s) failed"
+      }
+    ]
+  },
+  "wallMs": 719767
+}

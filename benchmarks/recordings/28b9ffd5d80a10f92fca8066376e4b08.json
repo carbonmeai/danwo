@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "kind": "extract",
+  "instruction": "the status of the order in the orders table",
+  "recordedAt": "2026-10-18T14:57:26.441Z",
+  "fields": [
+    {
+      "path": "status",
+      "target": {
+        "role": "cell",
+        "name": "Paid",
+        "section": "table \"Orders\""
+      },
+      "as": "text"
+    }
+  ],
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › orders [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "extract",
+    "step": 2,
+    "instruction": "the status of the order in the orders table",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

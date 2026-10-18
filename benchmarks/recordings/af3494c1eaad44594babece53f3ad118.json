@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "instruction": "filter the products by {category}",
+  "recordedAt": "2026-10-18T15:00:23.020Z",
+  "actions": [
+    {
+      "kind": "fill",
+      "target": {
+        "role": "textbox",
+        "name": "Filter",
+        "section": "main"
+      },
+      "input": {
+        "param": "category"
+      }
+    }
+  ],
+  "endRoute": "app/products",
+  "effects": {
+    "page": {
+      "appeared": [
+        "status: Page 1 of 1 · 10 products",
+        "cell \"Product 01\"",
+        "cell \"$47\"",
+        "cell \"Product 04\"",
+        "cell \"$68\"",
+        "cell \"Product 07\"",
+        "cell \"$89\"",
+        "cell \"Product 10\"",
+        "cell \"Software\"",
+        "cell \"$20\""
+      ],
+      "vanished": [
+        "status: Page 3 of 3 · 30 products",
+        "cell \"Product 21\"",
+        "cell \"Hardware\"",
+        "cell \"$67\"",
+        "cell \"Product 23\"",
+        "cell \"Services\"",
+        "cell \"$51\"",
+        "cell \"Product 24\"",
+        "cell \"$88\"",
+        "cell \"Product 26\""
+      ]
+    },
+    "backend": []
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/mixed.danwo.ts › products [mixed]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "act",
+    "step": 1,
+    "instruction": "filter the products by {category}",
+    "params": {
+      "category": "text:software"
+    },
+    "policy": "similar-v1"
+  }
+}

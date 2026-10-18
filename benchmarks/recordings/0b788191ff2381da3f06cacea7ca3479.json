@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "kind": "wait",
+  "instruction": "the page confirms the sign-up",
+  "recordedAt": "2026-10-18T14:56:51.647Z",
+  "evidence": {
+    "text": "Signed up as"
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › signup [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "wait",
+    "step": 1,
+    "instruction": "the page confirms the sign-up",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "instruction": "attach the file named notes and upload it",
+  "recordedAt": "2026-10-18T15:00:35.587Z",
+  "actions": [
+    {
+      "kind": "upload",
+      "target": {
+        "role": "button",
+        "name": "Attachment",
+        "section": "main"
+      },
+      "files": [
+        "notes"
+      ]
+    },
+    {
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Upload file",
+        "section": "main"
+      }
+    }
+  ],
+  "endRoute": "app/upload",
+  "effects": {
+    "page": {
+      "appeared": [
+        "status: Uploaded notes.txt (49 bytes)"
+      ],
+      "vanished": []
+    },
+    "backend": [
+      "GET 127.0.0.1/upload",
+      "POST 127.0.0.1/upload"
+    ]
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/mixed.danwo.ts › upload [mixed]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "act",
+    "step": 0,
+    "instruction": "attach the file named notes and upload it",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "instruction": "generate the report",
+  "recordedAt": "2026-10-18T14:58:59.705Z",
+  "actions": [
+    {
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Generate report",
+        "section": "main"
+      }
+    },
+    {
+      "kind": "wait",
+      "text": "ready",
+      "ms": 8000
+    }
+  ],
+  "endRoute": "app/report",
+  "effects": {
+    "page": {
+      "appeared": [
+        "status: \"Ready: 42 rows\""
+      ],
+      "vanished": [
+        "status: No report yet"
+      ]
+    },
+    "backend": [
+      "GET 127.0.0.1/report/data"
+    ]
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › report [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "act",
+    "step": 0,
+    "instruction": "generate the report",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}
