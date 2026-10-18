@@ -95,23 +95,29 @@ export function sendLive(request: Request): Promise<Response> {
   return fetch(request)
 }
 
-/**
- * The process environment plus `.env.fidelity` from `cwd`, if present (process values win). The
- * file holds sandbox credentials and stays out of git.
- */
-export function fidelityEnvironment(cwd: string): Record<string, string | undefined> {
-  const fromFile: Record<string, string> = {}
+/** The `NAME=value` lines of an env file in `cwd`, or nothing when there is no such file. */
+function envFile(cwd: string, name: string): Record<string, string> {
+  const values: Record<string, string> = {}
 
   try {
-    for (const line of readFileSync(join(cwd, ".env.fidelity"), "utf8").split("\n")) {
+    for (const line of readFileSync(join(cwd, name), "utf8").split("\n")) {
       const match = /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line)
 
       if (match?.[1] !== undefined && match[2] !== undefined)
-        fromFile[match[1]] = match[2].replace(/^["']|["']$/g, "")
+        values[match[1]] = match[2].replace(/^["']|["']$/g, "")
     }
   } catch {
-    /* No file: the process environment alone. */
+    /* No file: nothing from it. */
   }
 
-  return { ...fromFile, ...process.env }
+  return values
+}
+
+/**
+ * The process environment over `.env.fidelity` over `.env`, all from `cwd` when present. The files
+ * hold sandbox credentials and stay out of git; `.env` is read for the keys a project already
+ * keeps there, such as its AI Gateway key.
+ */
+export function fidelityEnvironment(cwd: string): Record<string, string | undefined> {
+  return { ...envFile(cwd, ".env"), ...envFile(cwd, ".env.fidelity"), ...process.env }
 }

@@ -7,7 +7,7 @@
 import { redactCredentials } from "@danwo/runner"
 
 import type { DifferenceKind } from "./compare.ts"
-import { type Json, type Shape, type ShapeOptions, shapeOf } from "./shape.ts"
+import { asJsonObject, type Json, type Shape, type ShapeOptions, shapeOf } from "./shape.ts"
 
 /** Where a scenario's requests go: the emulator, or the provider's sandbox. */
 export interface Target {
@@ -39,6 +39,11 @@ export interface StepDoc {
 
 export interface StepOptions extends ShapeOptions {
   readonly doc?: StepDoc
+  /**
+   * The answer is a stream of server-sent events, each a JSON object with a `type`: its body is
+   * read as one list of events per type, in the order the types first appear.
+   */
+  readonly events?: boolean
 }
 
 /** A value a scenario derived from answers. Facts never hold an id, a time or a secret. */
@@ -93,12 +98,8 @@ export interface Scenario {
   run(context: ScenarioContext): Promise<void>
 }
 
-/** Parses an answer's body after taking credentials out of it, so nothing secret is ever shaped. */
-async function readBody(response: Response): Promise<Json> {
-  const text = redactCredentials(await response.text())
-
-  if (text.trim() === "") return null
-
+/** Parses JSON text, or keeps the text when it is not JSON. */
+function parseJson(text: string): Json {
   try {
     const parsed: Json = JSON.parse(text)
 
@@ -106,6 +107,38 @@ async function readBody(response: Response): Promise<Json> {
   } catch {
     return text
   }
+}
+
+/** An event's `type`, or `data` for a payload that names none. */
+function eventType(event: Json): string {
+  const type = asJsonObject(event)?.["type"]
+
+  return typeof type === "string" ? type : "data"
+}
+
+/** A server-sent event stream's `data:` payloads, as lists of events keyed by their `type`. */
+function eventsByType(text: string): Json {
+  const byType: Record<string, Json[]> = {}
+
+  for (const line of text.split("\n")) {
+    if (!line.startsWith("data:")) continue
+
+    const event = parseJson(line.slice(5).trim())
+    const type = eventType(event)
+
+    byType[type] = [...(byType[type] ?? []), event]
+  }
+
+  return byType
+}
+
+/** Parses an answer's body after taking credentials out of it, so nothing secret is ever shaped. */
+async function readBody(response: Response, events: boolean): Promise<Json> {
+  const text = redactCredentials(await response.text())
+
+  if (text.trim() === "") return null
+
+  return events ? eventsByType(text) : parseJson(text)
 }
 
 function errorText(error: unknown): string {
@@ -122,8 +155,8 @@ export async function runScenario(scenario: Scenario, target: Target): Promise<S
     unique: Date.now().toString(36),
     async step(name, request, options = {}) {
       const response = await target.send(request)
-      const body = await readBody(response)
-      const { doc, ...shapeOptions } = options
+      const { doc, events = false, ...shapeOptions } = options
+      const body = await readBody(response, events && response.ok)
 
       steps.push({
         step: name,
