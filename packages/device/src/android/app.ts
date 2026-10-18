@@ -3,7 +3,7 @@
  * state for each attempt (`pm clear` keeps the device's CA, proxy and driver session, which a
  * snapshot load would not), and its log read back for the flight recorder.
  */
-import type { DeviceLogLine } from "@danwo/runner/runner"
+import type { DeviceLogLine, DeviceStart } from "@danwo/runner/runner"
 
 import type { Adb } from "../adb.ts"
 
@@ -17,11 +17,13 @@ export interface AppOptions {
   readonly activity?: string
   /** Runtime permissions granted before each launch. Default: notifications. */
   readonly permissions?: readonly string[]
+  /** How long a launched app may take to come to the front before it is launched again. Default 10 s. */
+  readonly launchWaitMs?: number
 }
 
 const DEFAULT_PERMISSIONS = ["android.permission.POST_NOTIFICATIONS"]
 /** How long a launched app may take to come to the front, and how often that is checked. */
-const LAUNCH_TIMEOUT_MS = 20_000
+const LAUNCH_WAIT_MS = 10_000
 const LAUNCH_POLL_MS = 200
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -75,6 +77,10 @@ export class AndroidApp {
     this.options = options
   }
 
+  private get launchWait(): number {
+    return this.options.launchWaitMs ?? LAUNCH_WAIT_MS
+  }
+
   get package(): string {
     return this.options.package
   }
@@ -100,8 +106,10 @@ export class AndroidApp {
   /**
    * Data cleared, permissions granted, then launched and in front. A browser an earlier attempt
    * left open (a Custom Tab it never came back from) is stopped first, so nothing covers the app.
+   * Right after a data clear Android can drop a launch; then the app is stopped and launched once
+   * more, and the result says so.
    */
-  async start(): Promise<void> {
+  async start(): Promise<DeviceStart> {
     await this.adb.shell(`pm clear ${this.package}`)
 
     for (const browser of BROWSERS) {
@@ -114,25 +122,42 @@ export class AndroidApp {
 
     await this.adb.shell("logcat -c").catch(() => undefined)
     this.logsAfter = Date.now() / 1000
-    await this.adb.shell(`am start -n ${await this.launcher()}`)
-    await this.waitInFront()
+
+    const launch = `am start -n ${await this.launcher()}`
+
+    await this.adb.shell(launch)
+
+    const first = await this.waitInFront()
+
+    if (first === this.package) return { relaunched: undefined }
+
+    await this.adb.shell(`am force-stop ${this.package}`)
+    await this.adb.shell(launch)
+
+    const second = await this.waitInFront()
+
+    if (second !== this.package) {
+      throw new Error(
+        `${this.package} did not come to the front after two launches (in front: ${second || "nothing"})`,
+      )
+    }
+
+    return {
+      relaunched: `not in front ${this.launchWait} ms after launch (in front: ${first || "nothing"}); stopped and launched again`,
+    }
   }
 
-  /** Waits until the app is the activity in front, which a launch only asks for. */
-  private async waitInFront(): Promise<void> {
-    const deadline = Date.now() + LAUNCH_TIMEOUT_MS
-    let front = await this.foreground()
+  /** Waits for the app to be the activity in front; the package in front when it gives up. */
+  private async waitInFront(): Promise<string> {
+    const deadline = Date.now() + this.launchWait
+    let front = (await this.foreground()).package
 
-    while (front.package !== this.package) {
-      if (Date.now() >= deadline) {
-        throw new Error(
-          `${this.package} did not come to the front within ${LAUNCH_TIMEOUT_MS} ms (in front: ${front.package || "nothing"})`,
-        )
-      }
-
+    while (front !== this.package && Date.now() < deadline) {
       await sleep(LAUNCH_POLL_MS)
-      front = await this.foreground()
+      front = (await this.foreground()).package
     }
+
+    return front
   }
 
   /** Opens `url` with the device's handler for it: the app for its own scheme, else the browser. */

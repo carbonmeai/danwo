@@ -51,6 +51,12 @@ export interface DeviceLogLine {
   readonly text: string
 }
 
+/** How a start went. */
+export interface DeviceStart {
+  /** Why the app had to be launched a second time, when it did. */
+  readonly relaunched: string | undefined
+}
+
 /** A device an attempt drives instead of a browser. */
 export interface DeviceTarget {
   readonly platform: "android"
@@ -59,7 +65,7 @@ export interface DeviceTarget {
   /** The app's link scheme, e.g. `danwoshop`; `app.open(path)` opens `<scheme>://<path>`. */
   readonly scheme?: string | undefined
   /** The app back to a fresh install's state and in front: data cleared, permissions granted, launched. */
-  startApp(): Promise<void>
+  startApp(): Promise<DeviceStart>
   /** Opens `url` (a deep link, or a web page in the device's browser). */
   openLink(url: string): Promise<void>
   /** Reads the screen. */

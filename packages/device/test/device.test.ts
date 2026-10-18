@@ -136,8 +136,7 @@ describe("the app", () => {
       package: "com.danwo.shopmobile",
     })
 
-    await app.start()
-
+    expect(await app.start()).toEqual({ relaunched: undefined })
     expect(commands).toEqual([
       "shell pm clear com.danwo.shopmobile",
       "shell am force-stop com.android.chrome",
@@ -148,6 +147,36 @@ describe("the app", () => {
       "shell cmd package resolve-activity --brief com.danwo.shopmobile",
       "shell am start -n com.danwo.shopmobile/.MainActivity",
       "shell dumpsys activity activities",
+    ])
+  })
+
+  it("stops and launches the app once more when the first launch did not bring it up", async () => {
+    let front = "com.android.launcher3"
+    const { commands, exec } = fakeAdb({
+      "resolve-activity": "com.danwo.shopmobile/.MainActivity",
+    })
+    const app = new AndroidApp(
+      new Adb(TOOLS.adb, "emulator-5554", async (file, args, options) => {
+        const command = args.join(" ")
+
+        if (command.includes("force-stop com.danwo.shopmobile")) front = "com.danwo.shopmobile"
+
+        if (command.includes("dumpsys activity")) {
+          return `topResumedActivity=ActivityRecord{1 u0 ${front}/.Main t3}`
+        }
+
+        return exec(file, args, options)
+      }),
+      { package: "com.danwo.shopmobile", launchWaitMs: 300 },
+    )
+
+    expect((await app.start()).relaunched).toMatch(
+      /^not in front 300 ms after launch \(in front: com.android.launcher3\); stopped and launched again$/,
+    )
+    expect(commands.slice(-3)).toEqual([
+      "shell am start -n com.danwo.shopmobile/.MainActivity",
+      "shell am force-stop com.danwo.shopmobile",
+      "shell am start -n com.danwo.shopmobile/.MainActivity",
     ])
   })
 

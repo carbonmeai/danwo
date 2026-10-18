@@ -237,8 +237,23 @@ export async function openDeviceSession(
   const flight = deviceFlight(target, reader, steps, vault, options)
 
   onStep = (index) => flight.onStep(index)
+
+  /* A relaunch is kept in the record, next to the step it happened in. */
+  const start = async () => {
+    const { relaunched } = await target.startApp()
+
+    if (relaunched !== undefined) {
+      steps.appLog({
+        at: new Date().toISOString(),
+        level: "warn",
+        source: "device-log",
+        text: `danwo: ${target.app} ${relaunched}`,
+      })
+    }
+  }
+
   await steps.run("app", "app.start", target.app, async () => {
-    await target.startApp()
+    await start()
     await ready()
   })
 
@@ -251,7 +266,7 @@ export async function openDeviceSession(
       baseUrl: options.baseUrl ?? "",
       open: (path) =>
         steps.run("app", "app.open", path ?? target.app, async () => {
-          if (path === undefined) await target.startApp()
+          if (path === undefined) await start()
           else
             await target.openLink(
               target.scheme ? `${target.scheme}://${path.replace(/^\//, "")}` : path,

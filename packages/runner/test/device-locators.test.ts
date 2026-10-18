@@ -68,9 +68,14 @@ class FakeDevice implements DeviceTarget {
   /** What a tap does to the screen, by ref. */
   readonly onTap = new Map<string, () => void>()
 
+  /** A start the test can make need a second launch. */
+  relaunch: string | undefined
+
   async startApp() {
     this.acts.push("start")
     this.screen = HOME
+
+    return { relaunched: this.relaunch }
   }
 
   async openLink(url: string) {
@@ -402,6 +407,17 @@ describe("a device attempt's flight record", () => {
     expect(session.flight.appLog().map((line) => line.source)).toContain("device-log")
     expect(session.flight.screenshots().size).toBe(0)
     expect(session.flight.redact("hunter2")).not.toContain("hunter2")
+    await session.close()
+
+    const relaunched = new FakeDevice()
+
+    relaunched.relaunch = "not in front; stopped and launched again"
+
+    const again = await open(relaunched)
+
+    expect(again.flight.appLog().map((line) => line.text)).toContain(
+      "danwo: com.danwo.shopmobile not in front; stopped and launched again",
+    )
     await session.close()
   })
 })

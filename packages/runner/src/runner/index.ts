@@ -25,6 +25,7 @@ export type {
   DeviceLogLine,
   DeviceNode,
   DeviceScreenReading,
+  DeviceStart,
   DeviceTarget,
 } from "../device/types.ts"
 export {

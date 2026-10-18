@@ -6,7 +6,12 @@
 import { join } from "node:path"
 
 import type { Proxy } from "@danwo/proxy"
-import type { DeviceForeground, DeviceScreenReading, DeviceTarget } from "@danwo/runner/runner"
+import type {
+  DeviceForeground,
+  DeviceScreenReading,
+  DeviceStart,
+  DeviceTarget,
+} from "@danwo/runner/runner"
 
 import type { Exec } from "../adb.ts"
 import { AgentDeviceDriver } from "../agent-device.ts"
@@ -95,7 +100,7 @@ export class AndroidDevice implements DeviceTarget {
     return this.emulator.adb.serial
   }
 
-  startApp(): Promise<void> {
+  startApp(): Promise<DeviceStart> {
     return this.application.start()
   }
 
