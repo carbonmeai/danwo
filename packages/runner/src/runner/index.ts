@@ -83,7 +83,19 @@ export { createRedactor, type Redactor } from "./redact.ts"
 export { runTests, type RunTestsOptions } from "./test-command.ts"
 export { mergeReports, type MergeReportsOptions } from "./merge-command.ts"
 export { explainImpact, type ImpactCommandOptions } from "./impact-command.ts"
-export type { ImpactConfig, ImpactEntry, ImpactIndex } from "./impact.ts"
+export { type ImpactConfig, type ImpactEntry, type ImpactIndex, readImpactIndex } from "./impact.ts"
+export {
+  historyDir,
+  type HistoryAttempt,
+  type HistoryError,
+  type HistoryTest,
+  type HistoryTrial,
+  type MatrixHistory,
+  type RunHistory,
+  type TestHistory,
+} from "./history.ts"
+export type { Usage } from "../record/usage.ts"
+export { effectNotes, effectsOf } from "../record/effect-notes.ts"
 export { junit, type JunitOptions } from "./junit.ts"
 export { inCi } from "./ci.ts"
 export { showRun, type ShowRunOptions } from "./show.ts"

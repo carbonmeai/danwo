@@ -25,6 +25,7 @@ import { type CatalogEntry, catalogOf } from "./catalog.ts"
 import { type DanwoConfig, type LoadedConfig, loadConfig } from "./config.ts"
 import { Crew } from "./crew.ts"
 import { DEFAULT_WEBHOOK_FAULTS, defaultOutboundFaults } from "./faults.ts"
+import { historyReporter } from "./history.ts"
 import { closeRecording, openRecording } from "./recording.ts"
 import {
   type Reporter,
@@ -392,6 +393,7 @@ function reportMatrix(
     result,
     durationMs: Date.now() - run.began,
     reportPath,
+    usage: addUsage(run.usages),
     ...(run.lint.length > 0 && { lint: run.lint }),
   } as const
 
@@ -426,7 +428,11 @@ export async function runMatrix(
     test,
     crew,
     cacheDir: cache.dir,
-    reporters: [...(loaded.config.reporters ?? []), ...(options.reporters ?? [])],
+    reporters: [
+      historyReporter(),
+      ...(loaded.config.reporters ?? []),
+      ...(options.reporters ?? []),
+    ],
     context: { kind: "matrix", root: loaded.root, cwd },
     began: Date.now(),
     write,

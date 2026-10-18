@@ -7,6 +7,7 @@ import { ciDefaults, inCi, parseShard, type Shard, shardFiles, shardLabel } from
 import { type LoadedConfig, loadConfig } from "./config.ts"
 import { Crew } from "./crew.ts"
 import { changedFiles } from "./git-changes.ts"
+import { historyReporter } from "./history.ts"
 import { chooseByChanges } from "./impact-command.ts"
 import { updateImpactIndex } from "./impact.ts"
 import { closeRecording, openRecording } from "./recording.ts"
@@ -236,7 +237,11 @@ async function executeRun(input: RunInput): Promise<number> {
   const { loaded, options, cwd, write } = input
   const { tasks, size } = planRun(loaded, options, input.ci, input.entries)
   const recording = openRecording(loaded, options.record)
-  const reporters = [...(loaded.config.reporters ?? []), ...(options.reporters ?? [])]
+  const reporters = [
+    historyReporter(),
+    ...(loaded.config.reporters ?? []),
+    ...(options.reporters ?? []),
+  ]
   const context = { kind: "test", root: loaded.root, cwd } as const
   const began = Date.now()
   const reports: TestReport[] = []

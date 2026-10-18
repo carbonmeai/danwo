@@ -6,6 +6,7 @@
 import type { FaultMatrixResult } from "@danwo/matrix"
 
 import type { LintFinding } from "../lint/index.ts"
+import type { Usage } from "../record/usage.ts"
 import type { RecordMode } from "./record.ts"
 import type { TestReport } from "./tasks.ts"
 
@@ -30,6 +31,8 @@ export interface TestRunReport extends RunContext {
   readonly durationMs: number
   /** The run's HTML report, relative to `cwd`, when one was written. */
   readonly reportPath: string | undefined
+  /** The run's flight-record folder name under `.danwo/runs`, when it recorded. */
+  readonly run?: string
 }
 
 /** `danwo matrix` once every trial finished. */
@@ -42,6 +45,8 @@ export interface MatrixRunReport extends RunContext {
   readonly result: FaultMatrixResult
   readonly durationMs: number
   readonly reportPath: string | undefined
+  /** How the trials' agent steps used the replay cache and the model, added up. */
+  readonly usage?: Usage
   /** What the integration lint found, by the trial it was found in. */
   readonly lint?: readonly TrialFindings[]
 }

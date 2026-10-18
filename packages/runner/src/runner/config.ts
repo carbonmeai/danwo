@@ -192,7 +192,7 @@ export async function loadConfig(cwd: string, explicit?: string): Promise<Loaded
   if (path === undefined) return { config: {}, path: undefined, root: cwd }
   if (!existsSync(path)) throw new DanwoError("CONFIG_INVALID", `config file not found: ${path}`)
 
-  const module: { default?: unknown } = await import(pathToFileURL(path).href)
+  const module: { default?: unknown } = await import(/* @vite-ignore */ pathToFileURL(path).href)
 
   if (!isConfig(module.default)) {
     throw new DanwoError(
