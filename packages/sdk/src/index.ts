@@ -107,6 +107,17 @@ export interface BachsFixtures {
   readonly settle: () => Promise<void>
 }
 
+/** Fixtures an `llmEnvironment()` or `llmService()` contributes. */
+export interface LlmFixtures {
+  /**
+   * The model API emulator: read the app's model calls with `llmCalls(llm)` and script more replies
+   * with `llmScripts(llm).add(...)`.
+   */
+  readonly llm: Emulator
+  readonly proxy: Proxy
+  readonly settle: () => Promise<void>
+}
+
 /** Fixtures a `twilioEnvironment()` or `twilioService()` contributes. */
 export interface TwilioFixtures {
   /**
@@ -163,6 +174,10 @@ export {
   googleEnvironment,
   type GoogleOptions,
   googleService,
+  type LlmEnvironment,
+  llmEnvironment,
+  type LlmOptions,
+  llmService,
   type MicrosoftEnvironment,
   microsoftEnvironment,
   type MicrosoftOptions,
@@ -277,6 +292,17 @@ export {
   type MicrosoftSeedFile,
   type MicrosoftSeedMessage,
   microsoftSignIns,
+  type LlmCall,
+  type LlmCalls,
+  llmCalls,
+  type LlmMatchInput,
+  type LlmRecordOptions,
+  type LlmReply,
+  type LlmScript,
+  type LlmScripts,
+  llmScripts,
+  type LlmSeedConfig,
+  type LlmToolCall,
   type OneDrive,
   oneDrive,
   type OutlookCalendar,

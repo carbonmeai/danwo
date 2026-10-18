@@ -151,6 +151,7 @@ export {
   type BachsOptions,
   bachsService,
 } from "./oauth.ts"
+export { type LlmEnvironment, llmEnvironment, type LlmOptions, llmService } from "./llm.ts"
 export {
   type S3Environment,
   s3Environment,

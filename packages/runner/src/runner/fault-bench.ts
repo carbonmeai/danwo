@@ -1,4 +1,4 @@
-import type { WebhookFault } from "@danwo/emulators"
+import { LLM_BEHAVIOURS, type WebhookFault } from "@danwo/emulators"
 /**
  * Faults armed by name (from a live session, a test, or a matrix trial), in the words `danwo
  * matrix` reports them:
@@ -17,6 +17,7 @@ type NamedOutboundFault =
   | { readonly kind: "reset" }
   | { readonly kind: "reset-after" }
   | { readonly kind: "delay"; readonly ms: number }
+  | { readonly kind: "emulate"; readonly behaviour: string }
 
 export type NamedFault =
   | {
@@ -43,6 +44,7 @@ const WEBHOOK = /^(?:(\S+) )?webhook (\S+)$/
 export const FAULT_FORMS = [
   "status <code> on <METHOD> <host><path>   e.g. status 500 on POST api.stripe.com/v1/checkout/sessions",
   "reset | reset-after | delay <ms>ms on <METHOD> <host><path>",
+  `${LLM_BEHAVIOURS.join(" | ")} on <METHOD> <model API host><path>   e.g. refusal on POST api.openai.com/v1/chat/completions`,
   "duplicate | forged | delay <ms>ms | stale <seconds>s on [<service> ]webhook <topic>   e.g. duplicate on webhook checkout.session.completed",
   "append #<n> to fault the n-th matching call or delivery instead of the next one",
 ]
@@ -58,6 +60,8 @@ function outboundFault(spec: string, label: string): NamedOutboundFault {
   if (status !== undefined) return { kind: "status", status: Number(status) }
   if (delay !== undefined) return { kind: "delay", ms: Number(delay) }
   if (spec === "reset" || spec === "reset-after") return { kind: spec }
+  if (LLM_BEHAVIOURS.some((behaviour) => behaviour === spec))
+    return { kind: "emulate", behaviour: spec }
 
   throw unknownFault(label)
 }

@@ -49,6 +49,9 @@ const TOKEN_PATTERNS: readonly [RegExp, string][] = [
   [/([?&]upload_id=)[^&#\s"']+/g, `$1${REDACTED}`],
   /* Flutterwave secret, public and encryption keys, test and live. */
   [/\b(FLW(?:SECK|PUBK)(?:_TEST)?-?)[A-Za-z0-9]+(?:-X)?/g, `$1${REDACTED}`],
+  /* OpenAI project, service-account and legacy keys; Anthropic keys; AI Gateway keys. */
+  [/\b(sk-(?:ant-[a-z]+\d*-|proj-|svcacct-|admin-)?)[A-Za-z0-9_-]{16,}/g, `$1${REDACTED}`],
+  [/\b(vck_)[A-Za-z0-9_-]{8,}/g, `$1${REDACTED}`],
 ]
 
 /** `text` with every credential-shaped value replaced. */

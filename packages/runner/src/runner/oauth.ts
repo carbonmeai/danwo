@@ -144,7 +144,8 @@ export type TwilioEnvironment = OAuthEnvironment<"twilio">
 /** What `flutterwaveEnvironment()` starts: the Flutterwave emulator behind its own proxy. */
 export type FlutterwaveEnvironment = OAuthEnvironment<"flutterwave">
 
-interface Provider<Config> {
+/** A provider's emulator, the hosts it answers and how a seed is applied to it. */
+export interface Provider<Config> {
   readonly name: string
   readonly definition: EmulatorDefinition
   readonly hosts: readonly string[]
@@ -169,7 +170,7 @@ function seedNow<Config>(seed: Seed<Config> | undefined): Config | undefined {
  * proxy). Its pushes, events and webhooks go out on a manual clock, so `settle` plays them to the
  * end and `danwo matrix` can fault them.
  */
-function oauthService<Config>(
+export function oauthService<Config>(
   provider: Provider<Config>,
   seed: Seed<Config> | undefined,
 ): OAuthService {
@@ -202,7 +203,8 @@ function oauthService<Config>(
   }
 }
 
-async function oauthEnvironment<Name extends string>(
+/** A provider's service started on its own proxy, with its emulator under `name` in the fixtures. */
+export async function oauthEnvironment<Name extends string>(
   name: Name,
   service: OAuthService,
   options: { readonly unmatched?: "passthrough" | "block" },
