@@ -197,7 +197,21 @@ export function transactionRoutes(context: PaystackRouteContext, payments: Payst
   app.get("/transaction/verify/:reference", (c) => {
     const transaction = paystack.transactions.get(c.req.param("reference"))
 
-    if (transaction === undefined) return fail(c, 404, "Transaction reference not found")
+    // Paystack answers an unknown reference as a validation error, not as a missing resource.
+    if (transaction === undefined)
+      return c.json(
+        {
+          status: false,
+          message: "Transaction reference not found",
+          meta: {
+            nextStep:
+              "Ensure that you're passing the reference of a transaction that exists on this integration",
+          },
+          type: "validation_error",
+          code: "transaction_not_found",
+        },
+        400,
+      )
 
     return ok(c, "Verification successful", transaction)
   })

@@ -226,6 +226,7 @@ describe("Paystack transactions", () => {
     const noEmail = await call("POST", "https://api.paystack.co/transaction/initialize", {
       amount: 100,
     })
+    const missing = await call("GET", "https://api.paystack.co/transaction/verify/order-none")
 
     expect([again.status, await again.json()]).toEqual([
       400,
@@ -236,6 +237,10 @@ describe("Paystack transactions", () => {
       { status: false, message: "Invalid key" },
     ])
     expect(noEmail.status).toBe(400)
+    expect([missing.status, await missing.json()]).toMatchObject([
+      400,
+      { status: false, type: "validation_error", code: "transaction_not_found" },
+    ])
   })
 
   it("charges a saved authorization, lists with paging, totals and fetches by id", async () => {
