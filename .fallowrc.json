@@ -45,6 +45,8 @@
   "rules": {
     "unused-dependencies": "warn"
   },
+  "ignorePatterns": ["examples/shop-mobile/app/**"],
+  "usedClassMembers": [{ "implements": "Locator", "members": ["getBy*"] }],
   "dynamicallyLoaded": [
     "**/danwo.config.ts",
     "**/*.danwo.ts",
