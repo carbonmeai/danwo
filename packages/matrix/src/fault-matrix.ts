@@ -4,6 +4,7 @@ import {
   WebhookDispatcher,
   type WebhookFault,
 } from "@danwo/emulators"
+import type { DataCall, DataProxy } from "@danwo/infra"
 import {
   describeOutboundFault,
   type Exchange,
@@ -12,6 +13,14 @@ import {
   type Proxy,
 } from "@danwo/proxy"
 import { Data, Effect, Result } from "effect"
+
+import {
+  applyDataFault,
+  type DataFaultCatalogue,
+  dataCallsOf,
+  type DataPlannedFault,
+  planDataFaults,
+} from "./data-faults.ts"
 
 /**
  * Webhook delivery a run's faults can land on: one dispatcher, or several keyed by service name
@@ -27,12 +36,14 @@ export interface RunEnvironment {
   readonly proxy: Proxy
   /** Absent when no service delivers webhooks: the run then gets outbound faults only. */
   readonly webhooks?: RunWebhooks | undefined
+  /** Proxies in front of the app's own database and cache: their calls get data faults. */
+  readonly data?: readonly DataProxy[] | undefined
   /** Facts about the run worth showing next to its verdict (e.g. where a replay diverged). */
   notes?(): readonly string[]
   close(): Promise<void>
 }
 
-/** One fault, placed on one outbound call or one webhook of the clean run. */
+/** One fault, placed on one outbound call, webhook or data call of the clean run. */
 export type PlannedFault =
   | {
       readonly target: "outbound"
@@ -55,6 +66,7 @@ export type PlannedFault =
       readonly fault: WebhookFault
       readonly label: string
     }
+  | DataPlannedFault
   | RaceFault
 
 /**
@@ -100,6 +112,8 @@ export interface RunOutcome {
   readonly error: string | null
   readonly exchanges: readonly Exchange[]
   readonly deliveries: readonly ServiceDelivery[]
+  /** The statements and commands the app sent its own database and cache, through data proxies. */
+  readonly dataCalls?: readonly DataCall[] | undefined
   /** The environment's `notes()` after the journey. */
   readonly notes: readonly string[]
   /** Where the run's flight record was kept, when one was. */
@@ -131,6 +145,8 @@ export interface FaultMatrixOptions<E extends RunEnvironment> {
   readonly outboundFaults: (call: OutboundCall) => readonly OutboundFault[]
   /** Faults to try on each webhook the clean run delivered. */
   readonly webhookFaults: readonly WebhookFault[]
+  /** Faults to try on each call the app made to its own database or cache (default: none). */
+  readonly dataFaults?: DataFaultCatalogue
   /**
    * How many faulted runs at once (default 1). Only for environments that isolate each run (own
    * ports, own database); the clean run always runs alone first. Results keep the plan's order.
@@ -199,9 +215,12 @@ export function clearWebhookFaults(webhooks: RunWebhooks | undefined): void {
   for (const [, dispatcher] of webhookSources(webhooks)) dispatcher.setFault(undefined)
 }
 
-/** Sets the proxy's or the webhook dispatcher's fault rule so `planned` fires on its call or delivery. */
+/**
+ * Sets the proxy's, the webhook dispatcher's or the data proxy's fault rule so `planned` fires on
+ * its call or delivery.
+ */
 export function applyFault(
-  env: Pick<RunEnvironment, "proxy" | "webhooks">,
+  env: Pick<RunEnvironment, "proxy" | "webhooks" | "data">,
   planned: PlannedFault | null,
 ): void {
   if (planned?.target === "outbound") {
@@ -219,6 +238,8 @@ export function applyFault(
     })
   } else if (planned?.target === "webhook") {
     applyWebhookFault(env.webhooks, planned)
+  } else if (planned?.target === "data") {
+    applyDataFault(env.data, planned)
   }
 }
 
@@ -249,6 +270,7 @@ export function faultFired(outcome: RunOutcome): boolean {
   if (fault === null) return true
   if (fault.target === "outbound") return outcome.exchanges.some((item) => item.fault !== null)
   if (fault.target === "webhook") return outcome.deliveries.some((item) => item.fault !== null)
+  if (fault.target === "data") return (outcome.dataCalls ?? []).some((item) => item.fault !== null)
 
   return outcome.fired === true
 }
@@ -257,6 +279,7 @@ export function faultFired(outcome: RunOutcome): boolean {
 const MISSED: Readonly<Record<PlannedFault["target"], string>> = {
   outbound: "no call",
   webhook: "no delivery",
+  data: "no database or cache call",
   page: "no request",
   users: "no second user",
   redirect: "no redirect with a webhook pending",
@@ -311,6 +334,7 @@ function runOnce<E extends RunEnvironment>(
           error: Result.isSuccess(journey) ? null : message(journey.failure.cause),
           exchanges: env.proxy.exchanges(),
           deliveries: deliveriesOf(env.webhooks),
+          dataCalls: dataCallsOf(env.data),
           notes: env.notes?.() ?? [],
         }
 
@@ -432,15 +456,17 @@ function runLengths(routes: readonly (string | undefined)[]): number[] {
 }
 
 /**
- * Turns a clean run into a fault plan: every routed call × each outbound fault, and every webhook
- * delivered (first attempt, per topic occurrence) × each webhook fault. A poll gets faults on its
- * first call only: how many times it repeats depends on timing, so a fault on a later repeat may
- * fall on a call the next run never makes.
+ * Turns a clean run into a fault plan: every routed call × each outbound fault, every webhook
+ * delivered (first attempt, per topic occurrence) × each webhook fault, and every call to the
+ * app's own database or cache × each data fault. A poll gets faults on its first call only: how
+ * many times it repeats depends on timing, so a fault on a later repeat may fall on a call the
+ * next run never makes.
  */
 export function planFaults(
   clean: RunOutcome,
   outboundFaults: FaultMatrixOptions<RunEnvironment>["outboundFaults"],
   webhookFaults: readonly WebhookFault[],
+  dataFaults?: DataFaultCatalogue,
 ): PlannedFault[] {
   const plan: PlannedFault[] = []
   const routed = clean.exchanges.filter((e) => e.disposition === "routed")
@@ -469,6 +495,7 @@ export function planFaults(
   })
 
   plan.push(...planWebhookFaults(clean.deliveries, webhookFaults))
+  if (dataFaults !== undefined) plan.push(...planDataFaults(clean.dataCalls ?? [], dataFaults))
 
   return plan
 }
@@ -485,7 +512,12 @@ export function runFaultMatrix<E extends RunEnvironment>(
     const clean = yield* runOnce(options, null)
 
     if (clean.status !== "passed") return { clean, runs: [] }
-    const plan = planFaults(clean, options.outboundFaults, options.webhookFaults)
+    const plan = planFaults(
+      clean,
+      options.outboundFaults,
+      options.webhookFaults,
+      options.dataFaults,
+    )
     const runs = yield* Effect.forEach(plan, (planned) => rerunWhileInvalid(options, planned), {
       concurrency: Math.max(1, Math.floor(options.concurrency ?? 1)),
     })

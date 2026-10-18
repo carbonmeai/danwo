@@ -397,6 +397,27 @@ export {
   type WorkerDatabaseOptions,
 } from "@danwo/data"
 /**
+ * Fault proxies in front of the app's own database and cache: the app connects through
+ * `proxy.url(realUrl)`, the environment lists them under `data`, and `danwo matrix` faults the
+ * statements and commands its tests send.
+ */
+export {
+  type DataCall,
+  type DataCallStart,
+  type DataFault,
+  type DataFaultRule,
+  type DataProxy,
+  defaultDataFaults,
+  pgError,
+  POSTGRES_ERRORS,
+  type PostgresProxyOptions,
+  REDIS_ERRORS,
+  redisError,
+  type RedisProxyOptions,
+  startPostgresProxy,
+  startRedisProxy,
+} from "@danwo/infra"
+/**
  * Clerk: a development instance's Backend API, its Frontend API serving ClerkJS and `<SignIn/>`,
  * and its Account Portal; `clerkMail` reads its emailed codes as a session's mail source.
  */

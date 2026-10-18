@@ -226,6 +226,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@danwo/emulators": "workspace:*",
+        "@danwo/infra": "workspace:*",
         "@danwo/proxy": "workspace:*",
         "effect": "4.0.5",
       },
@@ -314,6 +315,7 @@
       "dependencies": {
         "@ai-sdk/provider": "4.0.26",
         "@danwo/emulators": "workspace:*",
+        "@danwo/infra": "workspace:*",
         "@danwo/matrix": "workspace:*",
         "@danwo/proxy": "workspace:*",
         "@vitest/expect": "5.0.3",
@@ -336,6 +338,7 @@
       "dependencies": {
         "@danwo/data": "workspace:*",
         "@danwo/emulators": "workspace:*",
+        "@danwo/infra": "workspace:*",
         "@danwo/proxy": "workspace:*",
         "@danwo/runner": "workspace:*",
       },

@@ -21,6 +21,14 @@ export {
   webhookSources,
 } from "./fault-matrix.ts"
 export {
+  applyDataFault,
+  clearDataFaults,
+  type DataFaultCatalogue,
+  dataCallsOf,
+  type DataPlannedFault,
+  planDataFaults,
+} from "./data-faults.ts"
+export {
   appRoute,
   planRaceFaults,
   type RaceCall,

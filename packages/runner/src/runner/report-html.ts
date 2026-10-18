@@ -219,6 +219,21 @@ function deliveriesBlock(loaded: Loaded): string {
   return `<h4>Webhook deliveries</h4><table><tbody>${rows}</tbody></table>`
 }
 
+function dataCallsBlock(loaded: Loaded): string {
+  const { dataCalls = [], startedAt } = loaded.record
+
+  if (dataCalls.length === 0) return ""
+
+  const rows = dataCalls
+    .map(
+      (c) =>
+        `<tr><td class="dim">${offset(c.startedAt, startedAt)}</td><td>${escape(c.service)} <code>${escape(c.operation)}</code>${c.inTransaction ? ' <span class="dim">in transaction</span>' : ""}</td><td>${escape(c.error ?? c.outcome)}</td><td>${c.durationMs === null ? "" : `${c.durationMs} ms`}</td><td>${c.fault ? `<span class="fault">${escape(c.fault)}</span>` : ""}</td></tr>`,
+    )
+    .join("")
+
+  return `<h4>Database and cache calls</h4><table><tbody>${rows}</tbody></table>`
+}
+
 function lintBlock(record: FlightRecord): string {
   const findings = record.lint ?? []
 
@@ -246,7 +261,7 @@ function section(loaded: Loaded): string {
   const { record } = loaded
   const failed = record.status !== "passed"
 
-  return `<section id="${escape(loaded.dir)}" class="${failed ? "failed" : "passed"}"><h3><span class="badge">${escape(record.status)}</span> ${escape(record.test)} <span class="dim">— ${escape(runTitle(record))}</span></h3><p class="dim">${escape(record.startedAt)} · ${record.durationMs} ms · <code>${escape(loaded.dir)}</code></p>${errorBlock(record)}${lintBlock(record)}${failureBlock(loaded)}${stepsBlock(loaded)}${appLogBlock(loaded)}${exchangesBlock(loaded)}${deliveriesBlock(loaded)}${stateBlock(record)}</section>`
+  return `<section id="${escape(loaded.dir)}" class="${failed ? "failed" : "passed"}"><h3><span class="badge">${escape(record.status)}</span> ${escape(record.test)} <span class="dim">— ${escape(runTitle(record))}</span></h3><p class="dim">${escape(record.startedAt)} · ${record.durationMs} ms · <code>${escape(loaded.dir)}</code></p>${errorBlock(record)}${lintBlock(record)}${failureBlock(loaded)}${stepsBlock(loaded)}${appLogBlock(loaded)}${exchangesBlock(loaded)}${deliveriesBlock(loaded)}${dataCallsBlock(loaded)}${stateBlock(record)}</section>`
 }
 
 const STYLE = `

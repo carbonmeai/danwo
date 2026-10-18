@@ -7,7 +7,8 @@ import { randomBytes } from "node:crypto"
 import { mkdir, rm, writeFile } from "node:fs/promises"
 import { join, relative } from "node:path"
 
-import { deliveriesOf, type PlannedFault, type ServiceDelivery } from "@danwo/matrix"
+import type { DataCall } from "@danwo/infra"
+import { dataCallsOf, deliveriesOf, type PlannedFault, type ServiceDelivery } from "@danwo/matrix"
 import type { CapturedMessage, Exchange } from "@danwo/proxy"
 
 import type { LintFinding } from "../lint/index.ts"
@@ -66,6 +67,8 @@ export interface FlightRecord {
   /** Calls through the proxy during the run, bodies capped and redacted. */
   readonly exchanges: readonly RecordedExchange[]
   readonly deliveries: readonly ServiceDelivery[]
+  /** Statements and commands the app sent its own database and cache, through data proxies. */
+  readonly dataCalls?: readonly DataCall[]
   /** Emulator state when the run ended, by service: what an invariant read from. */
   readonly state: Readonly<Record<string, unknown>>
   /** What the integration lint found in the run. */
@@ -73,7 +76,7 @@ export interface FlightRecord {
 }
 
 /** The parts of a record the integration lint reads, redacted as the record keeps them. */
-export type RecordEvidence = Pick<FlightRecord, "steps" | "exchanges" | "deliveries">
+export type RecordEvidence = Pick<FlightRecord, "steps" | "exchanges" | "deliveries" | "dataCalls">
 
 const RUNS_DIR = join(".danwo", "runs")
 
@@ -113,12 +116,15 @@ export function attemptDir(settings: RecordSettings, testId: string, name: strin
 export interface EvidenceMark {
   readonly exchanges: number
   readonly deliveries: number
+  /** Each data proxy's calls so far, in the environment's order. */
+  readonly data?: readonly number[]
 }
 
 export function markEvidence(env: WorkerEnvironment | undefined): EvidenceMark {
   return {
     exchanges: env?.proxy?.exchanges().length ?? 0,
     deliveries: deliveriesOf(env?.webhooks).length,
+    data: (env?.data ?? []).map((proxy) => proxy.calls().length),
   }
 }
 
@@ -156,7 +162,15 @@ export function recordEvidence(input: RecordInput): RecordEvidence {
       .slice(input.mark.exchanges)
       .map((exchange) => redactExchange(exchange, redactor)),
     deliveries: deliveriesOf(input.env?.webhooks).slice(input.mark.deliveries),
+    ...dataEvidence(input, redactor),
   }
+}
+
+/** The run's data calls, when the environment has data proxies. */
+function dataEvidence(input: RecordInput, redactor: Redactor): Pick<RecordEvidence, "dataCalls"> {
+  if (input.env?.data === undefined) return {}
+
+  return { dataCalls: redactor.deep(dataCallsOf(input.env.data, input.mark.data)) }
 }
 
 /** What the record adds to its evidence when the run was linted. */

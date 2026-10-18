@@ -26,7 +26,7 @@ import { type ErrorClass, exitCodeOf, notJudged } from "../support/codes.ts"
 import { type CatalogEntry, catalogOf } from "./catalog.ts"
 import { type DanwoConfig, type LoadedConfig, loadConfig } from "./config.ts"
 import { Crew } from "./crew.ts"
-import { DEFAULT_WEBHOOK_FAULTS, defaultOutboundFaults } from "./faults.ts"
+import { DEFAULT_WEBHOOK_FAULTS, defaultDataFaults, defaultOutboundFaults } from "./faults.ts"
 import { historyReporter } from "./history.ts"
 import { racePlan } from "./races.ts"
 import { closeRecording, openRecording } from "./recording.ts"
@@ -274,6 +274,7 @@ function planAll(clean: RunOutcome, setup: TrialsSetup): PlannedFault[] {
       clean,
       matrix?.outboundFaults ?? defaultOutboundFaults,
       matrix?.webhookFaults ?? DEFAULT_WEBHOOK_FAULTS,
+      matrix?.dataFaults ?? defaultDataFaults,
     ),
     ...planRaceFaults(clean, racePlan(matrix, setup.test, setup.races())),
   ]

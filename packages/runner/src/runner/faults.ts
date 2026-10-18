@@ -92,3 +92,6 @@ export const DEFAULT_WEBHOOK_FAULTS: readonly WebhookFault[] = [
   { kind: "forged" },
   { kind: "stale", seconds: 3600 },
 ]
+
+/** Data faults when the config names none: by the protocol each data proxy speaks. */
+export { defaultDataFaults } from "@danwo/infra"

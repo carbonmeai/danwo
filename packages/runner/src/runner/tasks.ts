@@ -3,6 +3,7 @@
  * boundary. Two kinds of task exist. A test file runs its selected tests, each with its retries,
  * for `danwo test`. A trial runs one test once, clean or with one planned fault, for `danwo matrix`.
  */
+import type { DataCall } from "@danwo/infra"
 import type { PlannedFault, RaceEvidence, ServiceDelivery } from "@danwo/matrix"
 import type { Exchange } from "@danwo/proxy"
 
@@ -93,6 +94,8 @@ export interface TrialReport {
   /** Calls through the proxy, without bodies: the flight record keeps those. */
   readonly exchanges: readonly Exchange[]
   readonly deliveries: readonly ServiceDelivery[]
+  /** Calls to the app's own database and cache, when the environment has data proxies. */
+  readonly dataCalls?: readonly DataCall[]
   readonly divergence: ReplayDivergence | undefined
   readonly notes: readonly string[]
   /** The trial's flight record directory, relative to the cwd, when it was kept. */

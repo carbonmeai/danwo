@@ -1,3 +1,4 @@
+import type { DataProxy } from "@danwo/infra"
 import type { RunWebhooks } from "@danwo/matrix"
 import type { Proxy } from "@danwo/proxy"
 
@@ -20,6 +21,12 @@ export interface WorkerEnvironment {
    * (`{ stripe, resend }`). Without it the matrix plans outbound faults only.
    */
   readonly webhooks?: RunWebhooks | undefined
+  /**
+   * Proxies in front of the app's own database and cache, e.g. `startPostgresProxy(…)`: the app
+   * connects through them, and `danwo matrix` faults the statements and commands its tests send
+   * (a lost COMMIT reply, a serialization failure, a cache that answers OOM).
+   */
+  readonly data?: readonly DataProxy[] | undefined
   /**
    * A mobile device the worker's tests run on instead of a browser, e.g. `androidDevice()` from
    * @danwo/device: each attempt resets and launches the app on it, and `screen`, `app` and `expect`

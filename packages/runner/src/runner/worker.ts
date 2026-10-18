@@ -7,7 +7,9 @@ import { basename, dirname, join } from "node:path"
 
 import {
   applyFault,
+  clearDataFaults,
   clearWebhookFaults,
+  dataCallsOf,
   deliveriesOf,
   faultFired,
   type RunOutcome,
@@ -352,6 +354,7 @@ function trialReport(
       .slice(mark.exchanges)
       .map(({ request: _q, response: _r, ...call }) => call),
     deliveries: deliveriesOf(env.webhooks).slice(mark.deliveries),
+    ...(env.data !== undefined && { dataCalls: dataCallsOf(env.data, mark.data) }),
     divergence: result.divergence,
     notes: [...(stop === undefined ? [] : [stop]), ...(env.notes?.() ?? [])],
   }
@@ -541,6 +544,7 @@ async function trial(task: TrialTask): Promise<TrialReport> {
   } finally {
     env.proxy.setFault(undefined)
     clearWebhookFaults(env.webhooks)
+    clearDataFaults(env.data)
   }
 }
 

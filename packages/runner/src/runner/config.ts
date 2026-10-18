@@ -3,6 +3,7 @@ import { dirname, join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 
 import type { WebhookFault } from "@danwo/emulators"
+import type { DataFaultCatalogue } from "@danwo/matrix"
 import type { OutboundCall, OutboundFault } from "@danwo/proxy"
 import type { LanguageModel } from "ai"
 
@@ -123,6 +124,13 @@ export interface DanwoConfig {
     /** Default `defaultOutboundFaults`: each provider's faults by host, plain HTTP failures elsewhere. */
     readonly outboundFaults?: (call: OutboundCall) => readonly OutboundFault[]
     readonly webhookFaults?: readonly WebhookFault[]
+    /**
+     * Faults on the app's own data calls, through the environment's `data` proxies. Default
+     * `defaultDataFaults`: writes lost before or after the server ran them, slow, or failing to
+     * serialize; COMMITs lost or failing; BEGINs meeting a database that is down or full; cache
+     * commands lost, slow, or answered OOM, READONLY or LOADING.
+     */
+    readonly dataFaults?: DataFaultCatalogue
     /** Runs a faulted run again up to this many times while its fault never fires (default 0). */
     readonly rerunInvalid?: number
     /** Worker processes for `danwo matrix`; default `workers`, else one per core (at most 8). */

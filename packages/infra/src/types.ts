@@ -81,7 +81,7 @@ export interface DataProxy {
   url(upstreamUrl: string): string
   /** Every call since the proxy started or was last cleared, in the order they were sent. */
   calls(): readonly DataCall[]
-  /** The rule faulting calls from now on; undefined turns faults off. */
+  /** The rule faulting calls from now on; undefined turns faults off and ends any outage. */
   setFault(rule?: DataFaultRule): void
   /** Forgets the calls and the fault rule, and ends any `down` window. */
   clear(): void

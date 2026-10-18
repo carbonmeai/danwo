@@ -13,6 +13,7 @@
   "dependencies": {
     "@danwo/data": "workspace:*",
     "@danwo/emulators": "workspace:*",
+    "@danwo/infra": "workspace:*",
     "@danwo/proxy": "workspace:*",
     "@danwo/runner": "workspace:*"
   }

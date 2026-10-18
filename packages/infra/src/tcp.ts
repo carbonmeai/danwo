@@ -120,6 +120,7 @@ class TcpDataProxy implements DataProxy {
 
   setFault(rule?: DataFaultRule): void {
     this.rule = rule
+    if (rule === undefined) this.down = undefined
   }
 
   clear(): void {

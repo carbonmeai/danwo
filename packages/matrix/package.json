@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@danwo/emulators": "workspace:*",
+    "@danwo/infra": "workspace:*",
     "@danwo/proxy": "workspace:*",
     "effect": "4.0.5"
   },
