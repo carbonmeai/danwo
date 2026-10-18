@@ -114,3 +114,25 @@ export function faultGrid(trials: readonly HistoryTrial[]): FaultGrid {
     cells,
   }
 }
+
+/** A run of grid rows that share a kind, as the grid groups them. */
+export interface GridGroup {
+  readonly kind: GridRow["kind"]
+  readonly title: string
+  readonly rows: readonly GridRow[]
+}
+
+const GROUP_TITLES: Readonly<Record<GridRow["kind"], string>> = {
+  call: "Provider calls",
+  webhook: "Webhooks",
+  race: "Races and timing",
+}
+
+/** The grid's rows grouped by kind: calls, then webhooks, then races, each in first-seen order. */
+export function gridGroups(grid: FaultGrid): GridGroup[] {
+  return (["call", "webhook", "race"] as const).flatMap((kind) => {
+    const rows = grid.rows.filter((row) => row.kind === kind)
+
+    return rows.length === 0 ? [] : [{ kind, title: GROUP_TITLES[kind], rows }]
+  })
+}

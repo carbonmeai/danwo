@@ -15,6 +15,7 @@ import {
   redactCredentials,
 } from "@danwo/runner/runner"
 
+import { type EffectLine, effectDiff } from "./effects.ts"
 import { insideArea, isVersioned, readJson } from "./files.ts"
 import { type Timeline, timelineOf } from "./timeline.ts"
 
@@ -33,6 +34,8 @@ export interface StepView {
   /** Expected vs observed effects, as lines, when the step compared them. */
   readonly effects?: readonly string[]
   readonly effectResult?: string
+  /** What the recording expected against what the replay did, line by line. */
+  readonly effectDiff?: readonly EffectLine[]
 }
 
 /** Everything the attempt page renders. */
@@ -82,7 +85,11 @@ function stepView(step: RecordedStep): StepView {
     ...(step.cache && { cache: step.cache.mode }),
     ...(detail !== undefined && { cacheDetail: detail }),
     ...(step.screenshot !== undefined && { screenshot: step.screenshot }),
-    ...(effects && { effects: effectNotes(effects), effectResult: effects.result }),
+    ...(effects && {
+      effects: effectNotes(effects),
+      effectResult: effects.result,
+      effectDiff: effectDiff(effects),
+    }),
   }
 }
 

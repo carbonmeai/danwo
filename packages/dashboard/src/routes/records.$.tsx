@@ -1,53 +1,40 @@
 import type { RecordedExchange } from "@danwo/runner/runner"
 import { Box, Grid, HStack, Stack, styled } from "@danwo/ui/jsx"
-import { type ColumnDef, DataGrid } from "@danwo/ui/primitives/data-grid"
 import { MarkdownDocument } from "@danwo/ui/primitives/markdown"
-import { createFileRoute } from "@tanstack/react-router"
-import { useEffect, useState, type ReactNode } from "react"
+import { createFileRoute, Link } from "@tanstack/react-router"
+import { useEffect, useRef, useState } from "react"
 
 import { fetchRecord, fetchScreenshot } from "../api.ts"
-import { duration, when } from "../components/format.ts"
-import { Empty, PageTitle, StatusBadge } from "../components/status.tsx"
+import { ago, duration, when } from "../components/format.ts"
+import { useListKeys } from "../components/keys.ts"
+import {
+  Empty,
+  Ident,
+  KeyHint,
+  PageTitle,
+  Panel,
+  Section,
+  StatusBadge,
+} from "../components/status.tsx"
+import type { EffectLine } from "../data/effects.ts"
 import type { RecordView, StepView } from "../data/records.ts"
+import { lanesOf, type Timeline, type TimelineItem } from "../data/timeline.ts"
 
 export const Route = createFileRoute("/records/$")({
   loader: ({ params }) => fetchRecord({ data: params._splat ?? "" }),
   component: RecordPage,
 })
 
-/** A titled section of the record page. */
-function Section({
-  title,
-  count,
-  children,
-}: {
-  readonly title: string
-  readonly count?: number
-  readonly children: ReactNode
-}) {
-  return (
-    <Stack as="section" gap="3" mt="8" aria-label={title}>
-      <styled.h2 fontSize="2" fontWeight="semibold">
-        {title}
-        {count === undefined ? null : (
-          <styled.span color="text.secondary" fontWeight="normal">
-            {" "}
-            ({count})
-          </styled.span>
-        )}
-      </styled.h2>
-      {children}
-    </Stack>
-  )
-}
-
 const Pre = styled("pre", {
   base: {
     fontFamily: "mono",
-    fontSize: "0.5",
+    fontSize: "1",
+    lineHeight: "1.6",
     whiteSpace: "pre-wrap",
     wordBreak: "break-word",
-    bg: "background.muted",
+    bg: "signal.raised",
+    borderWidth: "1px",
+    borderColor: "signal.rule",
     p: "3",
     rounded: "md",
     maxH: "24rem",
@@ -55,51 +42,218 @@ const Pre = styled("pre", {
   },
 })
 
-const stepColumns: ColumnDef<StepView>[] = [
-  { header: "#", accessorKey: "index", size: 50 },
-  { header: "Step", accessorKey: "label" },
-  {
-    header: "Status",
-    accessorKey: "status",
-    size: 110,
-    cell: (c) => <StatusBadge status={c.row.original.status} />,
-  },
-  {
-    header: "Cache",
-    accessorKey: "cache",
-    size: 120,
-    cell: (c) => (c.row.original.cache ? <StatusBadge status={c.row.original.cache} /> : "–"),
-  },
-  {
-    header: "Time",
-    accessorKey: "durationMs",
-    size: 90,
-    cell: (c) => duration(c.row.original.durationMs),
-  },
-  { header: "Source", accessorKey: "source", size: 200, cell: (c) => c.row.original.source ?? "" },
-]
+/** Screenshots already fetched, by record folder and file, shared by thumbnails and the big view. */
+const shots = new Map<string, Promise<string>>()
 
-/** The screenshot taken after a step, loaded when the step is picked. */
-function Screenshot({ dir, file }: { readonly dir: string; readonly file: string }) {
+function screenshot(dir: string, file: string): Promise<string> {
+  const key = `${dir}\n${file}`
+  const known = shots.get(key)
+
+  if (known) return known
+
+  const loading = fetchScreenshot({ data: { dir, file } })
+
+  shots.set(key, loading)
+
+  return loading
+}
+
+/** A step's screenshot as a data URL, fetched once the element scrolls near the viewport. */
+function useShot(dir: string, file: string | undefined, lazy: boolean) {
   const [src, setSrc] = useState<string>()
+  const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    if (file === undefined) return
+
     let live = true
+    const load = () =>
+      void screenshot(dir, file).then((url) => {
+        if (live) setSrc(url)
+      })
 
     setSrc(undefined)
-    void fetchScreenshot({ data: { dir, file } }).then((url) => {
-      if (live) setSrc(url)
-    })
+
+    if (!lazy || typeof IntersectionObserver === "undefined") {
+      load()
+
+      return () => {
+        live = false
+      }
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          observer.disconnect()
+          load()
+        }
+      },
+      { rootMargin: "200px" },
+    )
+
+    if (ref.current) observer.observe(ref.current)
 
     return () => {
       live = false
+      observer.disconnect()
     }
-  }, [dir, file])
+  }, [dir, file, lazy])
+
+  return { src, ref }
+}
+
+function Thumb({ dir, step }: { readonly dir: string; readonly step: StepView }) {
+  const { src, ref } = useShot(dir, step.screenshot, true)
+
+  return (
+    <Box
+      ref={ref}
+      w="5rem"
+      h="3.25rem"
+      flexShrink="0"
+      rounded="sm"
+      overflow="hidden"
+      bg="signal.raised"
+      borderWidth="1px"
+      borderColor="signal.rule"
+    >
+      {src ? (
+        <styled.img
+          src={src}
+          alt={`After step ${step.index}`}
+          w="full"
+          h="full"
+          objectFit="cover"
+          objectPosition="top"
+        />
+      ) : null}
+    </Box>
+  )
+}
+
+/** The cache outcome, as the badge words it. */
+const CACHE_WORDS: Readonly<Record<string, string>> = {
+  replayed: "replayed",
+  relocated: "relocated",
+  "handed-off": "handed off",
+  missed: "model ran",
+  stale: "stale",
+  diverged: "diverged",
+  off: "no cache",
+}
+
+const CacheTag = styled("span", {
+  base: {
+    fontSize: "1",
+    px: "1.5",
+    rounded: "sm",
+    borderWidth: "1px",
+    whiteSpace: "nowrap",
+    lineHeight: "1.4",
+  },
+  variants: {
+    tone: {
+      hit: { borderColor: "verdict.passed.solid", color: "verdict.passed.fg" },
+      partial: { borderColor: "verdict.flaky.solid", color: "verdict.flaky.fg" },
+      miss: { borderColor: "signal.ruleStrong", color: "signal.quiet" },
+      bad: { borderColor: "verdict.failed.solid", color: "verdict.failed.fg" },
+    },
+  },
+})
+
+function cacheTone(mode: string): "hit" | "partial" | "miss" | "bad" {
+  if (mode === "replayed") return "hit"
+  if (mode === "relocated" || mode === "handed-off" || mode === "stale") return "partial"
+
+  return mode === "diverged" ? "bad" : "miss"
+}
+
+function Cache({ mode }: { readonly mode: string }) {
+  return (
+    <CacheTag
+      tone={cacheTone(mode)}
+      data-cache={mode}
+      title="How the replay cache answered this step"
+    >
+      {CACHE_WORDS[mode] ?? mode}
+    </CacheTag>
+  )
+}
+
+const SEEN: Readonly<Record<EffectLine["seen"], { mark: string; word: string; color: string }>> = {
+  both: { mark: " ", word: "as recorded", color: "signal.quiet" },
+  expected: { mark: "−", word: "missing", color: "verdict.failed.fg" },
+  observed: { mark: "+", word: "new", color: "verdict.flaky.fg" },
+}
+
+/** The effects the recording expected against what the replay did. */
+function EffectsDiff({ lines }: { readonly lines: readonly EffectLine[] }) {
+  if (lines.length === 0)
+    return (
+      <Box color="signal.quiet" fontSize="1.5">
+        Neither the recording nor the replay changed anything.
+      </Box>
+    )
+
+  return (
+    <styled.ul
+      aria-label="Effects"
+      fontFamily="mono"
+      fontSize="1"
+      rounded="md"
+      borderWidth="1px"
+      borderColor="signal.rule"
+      overflow="hidden"
+    >
+      {lines.map((line) => {
+        const seen = SEEN[line.seen]
+
+        return (
+          <styled.li
+            key={`${line.area} ${line.text}`}
+            display="grid"
+            gridTemplateColumns="1.25rem 4.5rem minmax(0, 1fr) auto"
+            gap="2"
+            px="2"
+            py="1"
+            borderBottomWidth="1px"
+            borderColor="signal.rule"
+            bg={
+              line.seen === "expected"
+                ? "verdict.failed.bg"
+                : line.seen === "observed"
+                  ? "verdict.flaky.bg"
+                  : undefined
+            }
+            _last={{ borderBottomWidth: "0" }}
+          >
+            <styled.span color={seen.color} aria-hidden="true">
+              {seen.mark}
+            </styled.span>
+            <styled.span color="signal.quiet">{line.area}</styled.span>
+            <styled.span overflowWrap="anywhere">{line.text}</styled.span>
+            <styled.span color={seen.color} fontFamily="sans">
+              {seen.word}
+            </styled.span>
+          </styled.li>
+        )
+      })}
+    </styled.ul>
+  )
+}
+
+function Shot({ dir, file }: { readonly dir: string; readonly file: string }) {
+  const { src } = useShot(dir, file, false)
 
   return src === undefined ? (
-    <Box color="text.secondary" fontSize="1">
-      Loading screenshot…
-    </Box>
+    <Box
+      h="12rem"
+      rounded="md"
+      bg="signal.raised"
+      animation="pulsate"
+      aria-label="Loading the screenshot"
+    />
   ) : (
     <styled.img
       src={src}
@@ -107,100 +261,422 @@ function Screenshot({ dir, file }: { readonly dir: string; readonly file: string
       maxW="full"
       rounded="md"
       borderWidth="1px"
-      borderColor="border.subtle"
+      borderColor="signal.rule"
     />
   )
 }
 
 function StepDetail({ dir, step }: { readonly dir: string; readonly step: StepView }) {
   return (
-    <Stack
-      gap="3"
-      p="4"
-      rounded="md"
-      borderWidth="1px"
-      borderColor="border.subtle"
-      data-step={step.index}
-    >
-      <HStack gap="2" flexWrap="wrap">
-        <styled.span fontWeight="medium">
-          #{step.index} {step.label}
-        </styled.span>
-        <StatusBadge status={step.status} />
-        {step.cache ? <StatusBadge status={step.cache} /> : null}
-      </HStack>
-      {step.cacheDetail ? (
-        <Box color="text.secondary" fontSize="1">
-          {step.cacheDetail}
-        </Box>
-      ) : null}
-      {step.error ? <Pre>{step.error}</Pre> : null}
-      {step.effects ? (
-        <Stack gap="1">
-          <HStack gap="2" fontSize="1">
-            <span>Effects</span>
-            {step.effectResult ? <StatusBadge status={step.effectResult} /> : null}
+    <Panel p="5" data-step={step.index} position={{ lg: "sticky" }} top="20">
+      <Stack gap="4">
+        <Stack gap="2">
+          <HStack gap="2" flexWrap="wrap">
+            <StatusBadge status={step.status} />
+            {step.cache ? <Cache mode={step.cache} /> : null}
+            <styled.span color="signal.quiet" fontSize="1">
+              {duration(step.durationMs)}
+            </styled.span>
           </HStack>
-          <Pre>{step.effects.join("\n")}</Pre>
+          <styled.h3 fontSize="3" fontWeight="600" overflowWrap="anywhere">
+            Step {step.index}: {step.label}
+          </styled.h3>
+          <HStack gap="3" color="signal.quiet" fontSize="1" flexWrap="wrap">
+            <Ident>{step.api}</Ident>
+            {step.source ? <Ident>{step.source}</Ident> : null}
+          </HStack>
         </Stack>
-      ) : null}
-      {step.screenshot ? <Screenshot dir={dir} file={step.screenshot} /> : null}
-    </Stack>
+        {step.cacheDetail ? (
+          <Box color="signal.quiet" fontSize="1.5">
+            Replay cache: {step.cacheDetail}
+          </Box>
+        ) : null}
+        {step.error ? <Pre color="verdict.failed.fg">{step.error}</Pre> : null}
+        {step.effectDiff ? (
+          <Stack gap="2">
+            <HStack gap="2" fontSize="1.5" fontWeight="500">
+              <span>Effects</span>
+              {step.effectResult ? <StatusBadge status={step.effectResult} /> : null}
+            </HStack>
+            {step.effects?.[0] ? (
+              <Box color="signal.quiet" fontSize="1">
+                {step.effects[0]}
+              </Box>
+            ) : null}
+            <EffectsDiff lines={step.effectDiff} />
+          </Stack>
+        ) : null}
+        {step.screenshot ? <Shot dir={dir} file={step.screenshot} /> : null}
+      </Stack>
+    </Panel>
   )
 }
 
 function Steps({ view }: { readonly view: RecordView }) {
   const failedStep = view.steps.find((s) => s.status !== "passed")
   const [picked, setPicked] = useState<StepView | undefined>(failedStep ?? view.steps.at(-1))
+  const list = useRef<HTMLOListElement>(null)
+  const current = useListKeys(list, view.steps.length)
+  const longest = Math.max(...view.steps.map((s) => s.durationMs), 1)
 
-  if (view.steps.length === 0) return <Box color="text.secondary">This run recorded no steps.</Box>
+  useEffect(() => {
+    const step = view.steps[current]
+
+    if (step) setPicked(step)
+  }, [current, view.steps])
+
+  if (view.steps.length === 0) return <Box color="signal.quiet">This run recorded no steps.</Box>
 
   return (
-    <Grid gridTemplateColumns={{ base: "1fr", lg: "3fr 2fr" }} gap="4" alignItems="start">
-      <DataGrid
-        data={view.steps}
-        columns={stepColumns}
-        getRowId={(s) => String(s.index)}
-        onRowClick={setPicked}
-        height="32rem"
-      />
+    <Grid
+      gridTemplateColumns={{ base: "1fr", lg: "minmax(0, 3fr) minmax(0, 2fr)" }}
+      gap="5"
+      alignItems="start"
+    >
+      <Panel overflow="hidden">
+        <styled.ol ref={list} aria-label="Step list">
+          {view.steps.map((step) => (
+            <styled.li
+              key={step.index}
+              data-row
+              data-picked={step === picked || undefined}
+              borderBottomWidth="1px"
+              borderColor="signal.rule"
+              _last={{ borderBottomWidth: "0" }}
+              css={{
+                "&[data-picked]": {
+                  bg: "signal.accentSoft",
+                  boxShadow: "inset 3px 0 0 {colors.signal.accent}",
+                },
+              }}
+            >
+              <styled.button
+                type="button"
+                onClick={() => setPicked(step)}
+                aria-pressed={step === picked}
+                display="grid"
+                gridTemplateColumns="2rem auto minmax(0, 1fr) auto"
+                gap="3"
+                alignItems="center"
+                w="full"
+                textAlign="left"
+                px="4"
+                py="2.5"
+                cursor="pointer"
+                _hover={{ bg: "signal.raised" }}
+              >
+                <styled.span color="signal.quiet" fontSize="1" textAlign="right">
+                  {step.index}
+                </styled.span>
+                {step.screenshot ? <Thumb dir={view.dir} step={step} /> : <Box w="5rem" />}
+                <Stack gap="1.5" minW="0">
+                  <styled.span
+                    fontWeight="500"
+                    overflow="hidden"
+                    textOverflow="ellipsis"
+                    whiteSpace="nowrap"
+                  >
+                    {step.label}
+                  </styled.span>
+                  <HStack gap="2">
+                    <Box flex="1" h="1" bg="signal.raised" rounded="full" maxW="12rem">
+                      <Box
+                        h="full"
+                        rounded="full"
+                        bg={step.status === "passed" ? "signal.ruleStrong" : "verdict.failed.solid"}
+                        style={{ width: `${Math.max((step.durationMs / longest) * 100, 2)}%` }}
+                      />
+                    </Box>
+                    <styled.span color="signal.quiet" fontSize="1">
+                      {duration(step.durationMs)}
+                    </styled.span>
+                  </HStack>
+                </Stack>
+                <HStack gap="2" justify="flex-end">
+                  {step.cache ? <Cache mode={step.cache} /> : null}
+                  {step.status === "passed" ? null : <StatusBadge status={step.status} />}
+                </HStack>
+              </styled.button>
+            </styled.li>
+          ))}
+        </styled.ol>
+      </Panel>
       {picked ? <StepDetail dir={view.dir} step={picked} /> : null}
     </Grid>
   )
 }
 
+/** The colour an HTTP status or outcome reads in. */
+function statusColor(item: Pick<TimelineItem, "outcome" | "bad">): string {
+  const code = Number(item.outcome)
+
+  if (!Number.isFinite(code)) return item.bad ? "verdict.failed.fg" : "signal.quiet"
+  if (code >= 500) return "verdict.failed.fg"
+  if (code >= 400) return "verdict.flaky.fg"
+
+  return code >= 300 ? "signal.quiet" : "verdict.passed.fg"
+}
+
+function KindMark({ kind }: { readonly kind: TimelineItem["kind"] }) {
+  const words = { step: "Step", call: "Call", webhook: "Webhook" }
+
+  return (
+    <styled.span
+      fontSize="1"
+      color={kind === "step" ? "signal.ink" : "signal.accent"}
+      fontWeight="500"
+      w="4.5rem"
+      flexShrink="0"
+    >
+      {words[kind]}
+    </styled.span>
+  )
+}
+
+/** One call, webhook or step on the waterfall's track, with a diamond where a fault landed. */
+function Bar({ item, span }: { readonly item: TimelineItem; readonly span: number }) {
+  return (
+    <>
+      <Box
+        position="absolute"
+        top={item.kind === "step" ? "0" : "1"}
+        bottom={item.kind === "step" ? "0" : "1"}
+        rounded="sm"
+        bg={
+          item.bad
+            ? "verdict.failed.solid"
+            : item.kind === "step"
+              ? "signal.ruleStrong"
+              : item.kind === "call"
+                ? "signal.accent"
+                : "signal.accentSoft"
+        }
+        borderWidth={item.kind === "webhook" && !item.bad ? "1.5px" : "0"}
+        borderColor="signal.accent"
+        style={{
+          left: `${(item.startMs / span) * 100}%`,
+          width: `max(3px, ${(item.durationMs / span) * 100}%)`,
+        }}
+      />
+      {item.fault ? (
+        <Box
+          position="absolute"
+          top="50%"
+          w="2.5"
+          h="2.5"
+          bg="verdict.failed.solid"
+          borderWidth="2px"
+          borderColor="signal.panel"
+          aria-label={`Fault: ${item.fault}`}
+          role="img"
+          style={{
+            left: `${(item.startMs / span) * 100}%`,
+            transform: "translate(-50%, -50%) rotate(45deg)",
+          }}
+        />
+      ) : null}
+    </>
+  )
+}
+
+/** Steps, provider calls and webhooks on one clock, with faults marked where they landed. */
+function Waterfall({ timeline }: { readonly timeline: Timeline }) {
+  const span = Math.max(timeline.spanMs, 1)
+  const ticks = [0, 0.25, 0.5, 0.75, 1]
+
+  return (
+    <Panel p="4" overflowX="auto">
+      <Box minW="44rem">
+        <Grid
+          gridTemplateColumns="minmax(16rem, 2fr) minmax(0, 5fr) 5rem"
+          columnGap="4"
+          alignItems="center"
+        >
+          <Box />
+          <Box position="relative" h="5" color="signal.faint" fontSize="1">
+            {ticks.map((tick) => (
+              <styled.span
+                key={tick}
+                position="absolute"
+                whiteSpace="nowrap"
+                style={{
+                  left: `${tick * 100}%`,
+                  transform: `translateX(${tick === 1 ? "-100%" : tick === 0 ? "0" : "-50%"})`,
+                }}
+              >
+                {duration(tick * span)}
+              </styled.span>
+            ))}
+          </Box>
+          <Box />
+        </Grid>
+        <styled.ol aria-label="Timeline">
+          {lanesOf(timeline.items).map((lane, i) => {
+            const bad = lane.items.find((item) => item.bad)
+            const shown = bad ?? lane.items[0]
+            const faults = lane.items.flatMap((item) => (item.fault ? [item.fault] : []))
+
+            return (
+              <Grid
+                as="li"
+                key={`${lane.kind}-${i}`}
+                gridTemplateColumns="minmax(16rem, 2fr) minmax(0, 5fr) 5rem"
+                columnGap="4"
+                alignItems="center"
+                py="1"
+                borderTopWidth={lane.kind === "step" && i > 0 ? "1px" : "0"}
+                borderColor="signal.rule"
+                data-kind={lane.kind}
+                title={faults.length > 0 ? `Fault: ${faults.join(", ")}` : lane.label}
+              >
+                <HStack gap="2" minW="0" pl={lane.kind === "step" ? "0" : "3"}>
+                  <KindMark kind={lane.kind} />
+                  <styled.span
+                    fontFamily={lane.kind === "step" ? "sans" : "mono"}
+                    fontSize={lane.kind === "step" ? "1.5" : "1"}
+                    fontWeight={lane.kind === "step" ? "500" : "400"}
+                    overflow="hidden"
+                    textOverflow="ellipsis"
+                    whiteSpace="nowrap"
+                  >
+                    {lane.label}
+                  </styled.span>
+                  {lane.items.length > 1 ? (
+                    <styled.span color="signal.quiet" fontSize="1" flexShrink="0">
+                      ×{lane.items.length}
+                    </styled.span>
+                  ) : null}
+                </HStack>
+                <Box position="relative" h="4" bg="signal.raised" rounded="sm">
+                  {ticks.slice(1, -1).map((tick) => (
+                    <Box
+                      key={tick}
+                      position="absolute"
+                      top="0"
+                      bottom="0"
+                      w="1px"
+                      bg="signal.rule"
+                      style={{ left: `${tick * 100}%` }}
+                    />
+                  ))}
+                  {lane.items.map((item, j) => (
+                    <Bar key={j} item={item} span={span} />
+                  ))}
+                </Box>
+                <styled.span
+                  fontSize="1"
+                  fontWeight="500"
+                  textAlign="right"
+                  color={shown ? statusColor(shown) : "signal.quiet"}
+                  whiteSpace="nowrap"
+                >
+                  {lane.kind === "step"
+                    ? duration(shown?.durationMs ?? 0)
+                    : bad
+                      ? bad.outcome
+                      : (shown?.outcome ?? "")}
+                </styled.span>
+              </Grid>
+            )
+          })}
+        </styled.ol>
+      </Box>
+    </Panel>
+  )
+}
+
 function Exchange({ exchange }: { readonly exchange: RecordedExchange }) {
+  const outcome = exchange.aborted ? "aborted" : String(exchange.status ?? "no answer")
+
   return (
     <styled.details
       borderBottomWidth="1px"
-      borderColor="border.subtle"
-      py="2"
+      borderColor="signal.rule"
+      _last={{ borderBottomWidth: "0" }}
       data-exchange={exchange.id}
     >
-      <styled.summary cursor="pointer" fontSize="1" display="flex" gap="2" alignItems="center">
-        <styled.span fontFamily="mono">
+      <styled.summary
+        cursor="pointer"
+        display="grid"
+        gridTemplateColumns="4rem minmax(0, 1fr) auto"
+        gap="3"
+        alignItems="center"
+        px="4"
+        py="2.5"
+        _hover={{ bg: "signal.raised" }}
+      >
+        <styled.span
+          fontWeight="600"
+          fontSize="1"
+          fontFamily="mono"
+          color={statusColor({ outcome, bad: exchange.aborted || (exchange.status ?? 500) >= 400 })}
+        >
+          {outcome}
+        </styled.span>
+        <Ident fontSize="1" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
           {exchange.method} {exchange.host}
           {exchange.path}
-        </styled.span>
-        <span>→ {exchange.aborted ? "aborted" : (exchange.status ?? "no answer")}</span>
-        {exchange.fault ? <StatusBadge status="failed" /> : null}
-        {exchange.fault ? <styled.span color="brand.error.11">{exchange.fault}</styled.span> : null}
+        </Ident>
+        <HStack gap="2" justify="flex-end">
+          {exchange.fault ? (
+            <styled.span fontSize="1" color="verdict.failed.fg" fontWeight="500">
+              fault: {exchange.fault}
+            </styled.span>
+          ) : null}
+          {exchange.durationMs === undefined || exchange.durationMs === null ? null : (
+            <styled.span color="signal.quiet" fontSize="1">
+              {duration(exchange.durationMs)}
+            </styled.span>
+          )}
+        </HStack>
       </styled.summary>
-      <Grid gridTemplateColumns={{ base: "1fr", md: "1fr 1fr" }} gap="3" mt="2">
+      <Grid gridTemplateColumns={{ base: "1fr", md: "1fr 1fr" }} gap="3" px="4" pb="4">
         <Stack gap="1">
-          <Box fontSize="0.5" color="text.secondary">
+          <Box fontSize="1" color="signal.quiet">
             Request
           </Box>
           <Pre>{JSON.stringify(exchange.request ?? {}, null, 2)}</Pre>
         </Stack>
         <Stack gap="1">
-          <Box fontSize="0.5" color="text.secondary">
+          <Box fontSize="1" color="signal.quiet">
             Response
           </Box>
           <Pre>{JSON.stringify(exchange.response ?? {}, null, 2)}</Pre>
         </Stack>
       </Grid>
     </styled.details>
+  )
+}
+
+const FIRST_CALLS = 12
+
+/** The calls, faulted and failed ones first, the rest folded away past the first few. */
+function Calls({ exchanges }: { readonly exchanges: readonly RecordedExchange[] }) {
+  const [all, setAll] = useState(false)
+  const shown = all ? exchanges : exchanges.slice(0, FIRST_CALLS)
+
+  return (
+    <Panel overflow="hidden">
+      {shown.map((exchange) => (
+        <Exchange key={exchange.id} exchange={exchange} />
+      ))}
+      {exchanges.length > FIRST_CALLS ? (
+        <styled.button
+          type="button"
+          w="full"
+          py="2.5"
+          color="signal.accent"
+          fontSize="1.5"
+          cursor="pointer"
+          borderTopWidth="1px"
+          borderColor="signal.rule"
+          _hover={{ bg: "signal.raised" }}
+          onClick={() => setAll(!all)}
+        >
+          {all ? "Show fewer" : `Show all ${exchanges.length} calls`}
+        </styled.button>
+      ) : null}
+    </Panel>
   )
 }
 
@@ -213,6 +689,39 @@ function runName(view: RecordView): string {
   return run.fault ? run.fault.label : "clean run"
 }
 
+/** Copies the Markdown failure page, to paste into an issue or an agent's prompt. */
+function CopyPage({ text }: { readonly text: string }) {
+  const [copied, setCopied] = useState(false)
+
+  return (
+    <styled.button
+      type="button"
+      h="9"
+      px="3.5"
+      rounded="md"
+      fontSize="1.5"
+      fontWeight="500"
+      bg="signal.ink"
+      color="signal.panel"
+      cursor="pointer"
+      _hover={{ opacity: 0.9 }}
+      onClick={() =>
+        void navigator.clipboard.writeText(text).then(() => {
+          setCopied(true)
+          setTimeout(() => setCopied(false), 2_000)
+        })
+      }
+    >
+      <span aria-live="polite">{copied ? "Copied" : "Copy failure page"}</span>
+    </styled.button>
+  )
+}
+
+const LEVEL_COLOR: Readonly<Record<string, string>> = {
+  error: "verdict.failed.fg",
+  warn: "verdict.flaky.fg",
+}
+
 function RecordPage() {
   const view = Route.useLoaderData()
 
@@ -220,7 +729,12 @@ function RecordPage() {
     return (
       <Empty
         title="No such record"
-        hint="Records are pruned with their run; the latest 20 runs are kept."
+        hint={
+          <>
+            Records are pruned with their run; the latest 20 runs keep theirs.{" "}
+            <Link to="/">See all runs</Link>
+          </>
+        }
       />
     )
 
@@ -230,87 +744,206 @@ function RecordPage() {
   return (
     <>
       <PageTitle
-        title={`${record.test} · ${runName(view)}`}
+        title={record.test}
         detail={
-          <HStack gap="2">
+          <HStack gap="2" flexWrap="wrap">
             <StatusBadge status={record.status} />
+            <Ident>{runName(view)}</Ident>
             <span>
-              {when(record.startedAt)} · {duration(record.durationMs)}
+              started{" "}
+              <time
+                dateTime={record.startedAt}
+                title={when(record.startedAt)}
+                suppressHydrationWarning
+              >
+                {ago(record.startedAt)}
+              </time>
+              , took {duration(record.durationMs)}
             </span>
           </HStack>
         }
+        actions={view.page ? <CopyPage text={view.page} /> : <KeyHint />}
       />
-      {record.error ? <Pre>{`${record.error.code}: ${record.error.message}`}</Pre> : null}
-      {record.stopped ? (
-        <Box mt="2" fontSize="1">
-          Body stopped at {record.stopped}
-        </Box>
+      {record.error || record.stopped || record.divergence ? (
+        <Panel
+          p="5"
+          borderLeftWidth="4px"
+          borderLeftColor="verdict.failed.solid"
+          aria-label="What went wrong"
+        >
+          <Stack gap="2">
+            {record.error ? (
+              <>
+                <Ident color="verdict.failed.fg" fontWeight="500">
+                  {record.error.code}
+                </Ident>
+                <styled.p fontSize="3" fontWeight="500" overflowWrap="anywhere">
+                  {record.error.message}
+                </styled.p>
+              </>
+            ) : null}
+            {record.stopped && !record.notes.some((note) => note.includes(record.stopped ?? "")) ? (
+              <Box fontSize="1.5" color="signal.quiet">
+                {record.stopped}
+              </Box>
+            ) : null}
+            {record.divergence ? (
+              <Box fontSize="1.5" color="signal.quiet">
+                The replay diverged at agent step {record.divergence.step + 1} (
+                {record.divergence.instruction}): {record.divergence.reason}
+              </Box>
+            ) : null}
+            {record.notes.map((note) => (
+              <Box key={note} fontSize="1.5" color="signal.quiet">
+                {note}
+              </Box>
+            ))}
+          </Stack>
+        </Panel>
       ) : null}
-      {record.divergence ? (
-        <Box mt="2" fontSize="1">
-          Replay diverged at agent step {record.divergence.step + 1} (
-          {record.divergence.instruction}): {record.divergence.reason}
-        </Box>
-      ) : null}
-      {record.notes.map((note) => (
-        <Box key={note} mt="1" fontSize="1" color="text.secondary">
-          {note}
-        </Box>
-      ))}
       <Section title="Steps" count={view.steps.length}>
         <Steps view={view} />
+      </Section>
+      <Section title="Timeline" aside={<TimelineLegend />}>
+        {view.timeline.items.length === 0 ? (
+          <Box color="signal.quiet">Nothing was timed in this run.</Box>
+        ) : (
+          <Waterfall timeline={view.timeline} />
+        )}
+      </Section>
+      <Section title="Provider calls" count={record.exchanges.length}>
+        {record.exchanges.length === 0 ? (
+          <Box color="signal.quiet">No calls went through the proxy.</Box>
+        ) : (
+          <Calls exchanges={record.exchanges} />
+        )}
+      </Section>
+      <Section title="Webhooks" count={record.deliveries.length}>
+        {record.deliveries.length === 0 ? (
+          <Box color="signal.quiet">No webhook deliveries.</Box>
+        ) : (
+          <Panel overflow="hidden">
+            {record.deliveries.map((d, i) => {
+              const outcome = d.status === null ? (d.error ?? "no answer") : String(d.status)
+
+              return (
+                <Grid
+                  key={`${d.topic}-${i}`}
+                  gridTemplateColumns="4rem minmax(0, 1fr) auto"
+                  gap="3"
+                  px="4"
+                  py="2.5"
+                  alignItems="center"
+                  borderBottomWidth="1px"
+                  borderColor="signal.rule"
+                  _last={{ borderBottomWidth: "0" }}
+                >
+                  <styled.span
+                    fontWeight="600"
+                    fontSize="1"
+                    fontFamily="mono"
+                    color={statusColor({ outcome, bad: d.status === null || d.status >= 400 })}
+                  >
+                    {outcome}
+                  </styled.span>
+                  <Ident fontSize="1">
+                    {d.service ? `${d.service} ` : ""}
+                    {d.topic}
+                    {d.attempt > 1 ? `, attempt ${d.attempt}` : ""}
+                  </Ident>
+                  {d.fault ? (
+                    <styled.span fontSize="1" color="verdict.failed.fg" fontWeight="500">
+                      fault: {d.fault}
+                    </styled.span>
+                  ) : (
+                    <span />
+                  )}
+                </Grid>
+              )
+            })}
+          </Panel>
+        )}
+      </Section>
+      <Section title="Console" count={logs.length}>
+        {logs.length === 0 ? (
+          <Box color="signal.quiet">No errors or warnings.</Box>
+        ) : (
+          <Pre>
+            {logs.map((log, i) => (
+              <styled.span key={i} display="block" color={LEVEL_COLOR[log.level]}>
+                {`step ${log.step}  ${log.level.padEnd(5)}  ${log.text}`}
+              </styled.span>
+            ))}
+          </Pre>
+        )}
       </Section>
       {view.screen ? (
         <Section title="Screen at failure">
           <Pre>{view.screen}</Pre>
         </Section>
       ) : null}
-      <Section title="Console" count={logs.length}>
-        {logs.length === 0 ? (
-          <Box color="text.secondary" fontSize="1">
-            No errors or warnings.
-          </Box>
-        ) : (
-          <Pre>{logs.map((log) => `[${log.level}] step ${log.step}: ${log.text}`).join("\n")}</Pre>
-        )}
-      </Section>
-      <Section title="Network" count={record.exchanges.length}>
-        {record.exchanges.length === 0 ? (
-          <Box color="text.secondary" fontSize="1">
-            No calls went through the proxy.
-          </Box>
-        ) : (
-          <Box>
-            {record.exchanges.map((exchange) => (
-              <Exchange key={exchange.id} exchange={exchange} />
-            ))}
-          </Box>
-        )}
-      </Section>
-      <Section title="Webhooks" count={record.deliveries.length}>
-        {record.deliveries.length === 0 ? (
-          <Box color="text.secondary" fontSize="1">
-            No webhook deliveries.
-          </Box>
-        ) : (
-          <Pre>
-            {record.deliveries
-              .map(
-                (d) =>
-                  `${d.service ? `${d.service} ` : ""}${d.topic} attempt ${d.attempt} → ${d.status ?? d.error ?? "no answer"}${d.fault ? ` [fault: ${d.fault}]` : ""}`,
-              )
-              .join("\n")}
-          </Pre>
-        )}
-      </Section>
       <Section title="Emulator state">
-        <Pre>{view.state}</Pre>
+        <styled.details>
+          <styled.summary
+            cursor="pointer"
+            color="signal.accent"
+            fontSize="1.5"
+            mb="2"
+            w="fit-content"
+          >
+            What the providers held when the run ended
+          </styled.summary>
+          <Pre>{view.state}</Pre>
+        </styled.details>
       </Section>
       {view.page ? (
-        <Section title="Failure page">
-          <MarkdownDocument text={view.page} />
+        <Section title="Failure page" aside={<CopyPage text={view.page} />}>
+          <Panel px={{ base: "5", md: "8" }} py="6" maxW="56rem">
+            <MarkdownDocument text={view.page} />
+          </Panel>
         </Section>
       ) : null}
     </>
+  )
+}
+
+function TimelineLegend() {
+  const entries: readonly [string, string][] = [
+    ["Step", "signal.ruleStrong"],
+    ["Provider call", "signal.accent"],
+    ["Failed", "verdict.failed.solid"],
+  ]
+
+  return (
+    <HStack
+      as="ul"
+      aria-label="Timeline legend"
+      gap="4"
+      fontSize="1"
+      color="signal.quiet"
+      flexWrap="wrap"
+    >
+      {entries.map(([label, color]) => (
+        <HStack as="li" key={label} gap="1.5">
+          <Box w="3" h="2" rounded="sm" bg={color} />
+          {label}
+        </HStack>
+      ))}
+      <HStack as="li" gap="1.5">
+        <Box
+          w="3"
+          h="2"
+          rounded="sm"
+          bg="signal.accentSoft"
+          borderWidth="1.5px"
+          borderColor="signal.accent"
+        />
+        Webhook
+      </HStack>
+      <HStack as="li" gap="1.5">
+        <Box w="2" h="2" bg="verdict.failed.solid" transform="rotate(45deg)" />
+        Fault
+      </HStack>
+    </HStack>
   )
 }

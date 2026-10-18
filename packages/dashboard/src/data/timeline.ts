@@ -48,6 +48,43 @@ function stepAt(
   return steps.find((step) => at >= step.start && at <= step.end)?.index
 }
 
+/** One row of the waterfall: a step, or every call or webhook with the same label under a step. */
+export interface Lane {
+  readonly kind: TimelineItem["kind"]
+  readonly label: string
+  readonly items: readonly TimelineItem[]
+}
+
+/**
+ * The timeline as waterfall rows. Each step starts a row, and the calls and webhooks after it that
+ * share a label share a row, so a page polling one endpoint reads as one row of ticks.
+ */
+export function lanesOf(items: readonly TimelineItem[]): Lane[] {
+  const lanes: { kind: TimelineItem["kind"]; label: string; items: TimelineItem[] }[] = []
+  let block = new Map<string, (typeof lanes)[number]>()
+
+  for (const item of items) {
+    if (item.kind === "step") {
+      lanes.push({ kind: "step", label: item.label, items: [item] })
+      block = new Map()
+      continue
+    }
+
+    const key = `${item.kind} ${item.label}`
+    const lane = block.get(key)
+
+    if (lane) lane.items.push(item)
+    else {
+      const fresh = { kind: item.kind, label: item.label, items: [item] }
+
+      block.set(key, fresh)
+      lanes.push(fresh)
+    }
+  }
+
+  return lanes
+}
+
 /** Every step, call and webhook of a record on one clock, in the order they started. */
 export function timelineOf(record: Parts): Timeline {
   const origin = millis(record.startedAt) ?? 0
@@ -90,7 +127,8 @@ export function timelineOf(record: Parts): Timeline {
         label: `${delivery.service ? `${delivery.service} ` : ""}${delivery.topic}${delivery.attempt > 1 ? ` (attempt ${delivery.attempt})` : ""}`,
         startMs: start - origin,
         durationMs: delivery.durationMs,
-        outcome: delivery.status === null ? (delivery.error ?? "no answer") : String(delivery.status),
+        outcome:
+          delivery.status === null ? (delivery.error ?? "no answer") : String(delivery.status),
         bad: statusBad(delivery.status),
         ...(delivery.fault ? { fault: delivery.fault } : {}),
         ...(step !== undefined && { step }),
