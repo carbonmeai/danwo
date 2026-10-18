@@ -40,3 +40,54 @@ jobs:
 - Narrow the matrix in pull requests with `--faults` and run it in full on a schedule.
 - Exit codes: 1 a test failed, 2 configuration, 3 infrastructure (browser, environment, model
   provider), 130 interrupted.
+
+## CI defaults
+
+With `CI` set (every hosted CI sets it), or `--ci`, `danwo test` retries a failing test once, reads
+the replay cache without writing to it, and refuses `.only` with exit 2, naming the file and line.
+The config's `retries` and `--retries` still win. `--max-failures n` starts no new test file once
+`n` tests failed.
+
+## Flaky tests and reruns
+
+A test that fails and then passes on a retry is flaky: it passes the run, and the summary, the
+GitHub check (a warning annotation) and `danwo show --format md` all say so. `danwo test
+--last-failed` reruns only what failed in the latest run and merges into it, so a test that failed
+there and passes now is reported once, as flaky.
+
+## Sharding
+
+Split the suite across machines with `--shard i/n`; each machine runs every `n`th test file and
+keeps its results in `.danwo/results/`. Gather those files on one machine and join them:
+
+```yaml
+- run: npx danwo test --shard ${{ matrix.shard }}/4
+- uses: actions/upload-artifact@v4
+  with: { name: "results-${{ matrix.shard }}", path: .danwo/results }
+# in a later job, after downloading every results-* artifact into .danwo/results:
+- run: npx danwo merge-reports --reporter github
+```
+
+`--reporter junit` writes `.danwo/junit.xml` for GitLab, Jenkins, CircleCI or Buildkite.
+
+## Only the tests a change affects
+
+`danwo test --changed --since origin/main` runs the tests the change can affect. A test is
+selected when the change touches its file or a file it imports; for the app's own source, map
+globs to what tests touch in the config:
+
+```ts
+impact: {
+  rules: {
+    "src/billing/**": ["api.stripe.com"],
+    "app/routes/checkout/**": ["/checkout"],
+    "src/webhooks.ts": ["webhook checkout.session.completed"],
+  },
+}
+```
+
+Every passing test records the pages it visited and the provider calls and webhooks behind it in
+`.danwo/impact.json` (sorted, no timestamps or secrets; commit it with `!.danwo/impact.json` in
+`.gitignore` so CI has it). A change nothing explains (a lockfile, the config, an unmapped file)
+runs everything; Markdown and `docs/` run nothing. `danwo impact <files…>` explains a selection,
+and names the `danwo matrix` runs worth doing for selected tests with an invariant.

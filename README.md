@@ -160,6 +160,25 @@ steps:
 The summary links to the `danwo-runs` artifact and names each failure's flight record in it. In a
 config, add `reporters: [github({ artifact: "my-runs" })]` with `github` from `@danwo/github`.
 
+## CI
+
+- **Defaults with `CI` set** (or `--ci`): one retry, a read-only replay cache, and `.only` refused
+  with exit 2 naming the file and line. `--max-failures n` stops starting test files after `n`
+  failed tests.
+- **Flaky tests**: a test that fails then passes is reported once as flaky, in the summary, the
+  GitHub check and `danwo show --format md`. `danwo test --last-failed` reruns what failed in the
+  latest run and merges into it.
+- **Sharding**: `danwo test --shard i/n` on each machine, then `danwo merge-reports` (with
+  `--reporter github` or `--reporter junit`) over the gathered `.danwo/results/shard-*.json`.
+- **JUnit**: `--reporter junit` writes `.danwo/junit.xml` for CI systems other than GitHub.
+- **Change impact**: `danwo test --changed --since origin/main` runs the tests a change can affect:
+  through the test files and what they import, and through the config's `impact.rules`, which map
+  the app's own source globs to the pages, hosts, calls and webhooks tests touched (recorded per
+  test in `.danwo/impact.json`). Unmapped changes run everything; docs run nothing. `danwo impact
+  <files…>` explains the selection.
+
+`danwo guide ci` has the details and a sharded workflow.
+
 ## Coding agents (MCP)
 
 `danwo mcp` serves the project in the current folder to a coding agent over MCP (stdio).
