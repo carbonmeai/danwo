@@ -22,7 +22,9 @@
   "devDependencies": {
     "@aws-sdk/client-s3": "3.1152.0",
     "@danwo/sdk": "workspace:*",
+    "@types/pg": "8.23.1",
     "openid-client": "6.8.8",
+    "pg": "8.23.1",
     "twilio": "6.2.0",
     "zod": "4.6.1"
   }
