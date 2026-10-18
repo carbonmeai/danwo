@@ -83,6 +83,8 @@ export interface TestHistory extends HistoryBase {
 
 export interface MatrixHistory extends HistoryBase {
   readonly kind: "matrix"
+  /** What judged the faulted trials: the test's invariant, or its body passing under every fault. */
+  readonly judgedBy?: "invariant" | "body"
   /** What the integration lint found across the trials, counted by rule. */
   readonly lint?: readonly HistoryLint[]
   readonly testId: string
@@ -221,6 +223,7 @@ function matrixHistory(run: MatrixRunReport): MatrixHistory {
     file: run.file,
     clean: trialOf(run, run.result.clean),
     trials: run.result.runs.map((outcome) => trialOf(run, outcome)),
+    ...(run.judgedBy !== undefined && { judgedBy: run.judgedBy }),
     ...(run.lint?.length && { lint: lintCounts(run.lint.flatMap((trial) => trial.findings)) }),
   }
 }

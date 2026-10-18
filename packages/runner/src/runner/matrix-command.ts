@@ -421,6 +421,7 @@ function reportMatrix(
     durationMs: Date.now() - run.began,
     reportPath,
     usage: addUsage(run.usages),
+    judgedBy: run.test.invariant ? "invariant" : "body",
     ...(run.lint.length > 0 && { lint: run.lint }),
   } as const
 

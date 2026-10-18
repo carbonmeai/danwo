@@ -47,6 +47,10 @@ export interface MatrixRunReport extends RunContext {
   readonly reportPath: string | undefined
   /** How the trials' agent steps used the replay cache and the model, added up. */
   readonly usage?: Usage
+  /**
+   * What judged the faulted trials: the test's invariant, or its body passing under every fault.
+   */
+  readonly judgedBy?: "invariant" | "body"
   /** What the integration lint found, by the trial it was found in. */
   readonly lint?: readonly TrialFindings[]
 }
