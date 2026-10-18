@@ -22,7 +22,7 @@ function failureOf(
   if (printed !== "") return printed.slice(-2000)
   if (error.killed === true) return `timed out (${String(error.signal)})`
 
-  return error.code === undefined ? error.message : `exited ${String(error.code)}`
+  return typeof error.code === "number" ? `exited ${error.code}` : error.message
 }
 
 /** The real `exec`: the program's stdout, or an error carrying what it printed. */

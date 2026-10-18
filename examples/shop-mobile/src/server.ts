@@ -90,14 +90,17 @@ async function answer(req: IncomingMessage): Promise<Answer> {
     .catch(failed)
 }
 
-const server = createServer(async (req, res) => {
-  const { status, body } = await answer(req)
-
-  res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body))
+const server = createServer((req, res) => {
+  void answer(req).then(({ status, body }) => {
+    res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body))
+  })
 })
 
-server.listen(Number(process.env.PORT ?? 0), "127.0.0.1", () => {
-  const { port } = server.address() as AddressInfo
+/** The port a listening server is on. */
+function portOf(address: string | AddressInfo | null): number {
+  return typeof address === "object" && address !== null ? address.port : 0
+}
 
-  process.stdout.write(`listening ${port}\n`)
+server.listen(Number(process.env.PORT ?? 0), "127.0.0.1", () => {
+  process.stdout.write(`listening ${portOf(server.address())}\n`)
 })
