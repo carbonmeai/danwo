@@ -15,3 +15,4 @@ playwright-report/
 .local/
 .claude/worktrees/
 .work-*/
+benchmarks/results/*-replay.*
