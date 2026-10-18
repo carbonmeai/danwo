@@ -47,7 +47,7 @@ from `@danwo/expo` does the same. Ship store builds without it.
 ## The config
 
 ```ts
-import { withAndroidDevice } from "@danwo/device"
+import { ANDROID_BACKGROUND_HOSTS, withAndroidDevice } from "@danwo/device"
 import { buildAndroid } from "@danwo/expo"
 import { defineConfig, startServices, stripeService } from "@danwo/sdk"
 
@@ -56,7 +56,9 @@ export default defineConfig({
   readiness: { mode: "page+backend", settle: true },
   async environment() {
     const build = await buildAndroid({ project: "app" })
-    const services = await startServices([stripeService({ seed }), backendRoute])
+    const services = await startServices([stripeService({ seed }), backendRoute], {
+      blocked: ANDROID_BACKGROUND_HOSTS,
+    })
     // …start the backend with services.proxy.env()…
 
     return withAndroidDevice(
@@ -78,6 +80,10 @@ export default defineConfig({
 4. turns off animations and the captive-portal probe;
 5. routes the device's traffic through the proxy with `adb reverse` and a proxy setting;
 6. installs the APK.
+
+`ANDROID_BACKGROUND_HOSTS` blocks the emulator's own traffic at the proxy: Chrome's sync and
+optimization hints, safe browsing and Play services check-ins. Chrome on the device also runs with
+background networking off. That traffic is never routed, so `danwo matrix` plans no faults on it.
 
 Closing the environment removes the proxy setting and the reverse rules, and shuts down an emulator
 it booted. Give the app's backend a host such as `shop.danwo.test` that the proxy routes to it, so
