@@ -43,7 +43,7 @@ export interface AwsEnvironment {
   readonly endpoint: string
   readonly proxy: Proxy
   /** Moves the app's clock and the emulator's time forward by `ms`; see `time.travel`. */
-  travel(ms: number): Promise<void>
+  readonly travel: (ms: number) => Promise<void>
   /** MiniStack wiped (unless `reset: false`), proxy log and fault rules cleared. */
   reset(): Promise<void>
   /** Fixtures for tests: `aws`, `proxy`, `settle`. */

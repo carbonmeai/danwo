@@ -1,13 +1,17 @@
 import { once } from "node:events"
+import { mkdtemp, rm } from "node:fs/promises"
 import { createServer, type Server } from "node:http"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import { listeningPort } from "@danwo/emulators"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
-import { openWebSession } from "../src/session.ts"
 import { startServices } from "../src/runner/services.ts"
 import { stripeService } from "../src/runner/stripe.ts"
+import { openWebSession } from "../src/session.ts"
 import { describeSpan, spanMs, timeMachineOf } from "../src/time/index.ts"
+import { scripted } from "./fixtures/scripted.ts"
 
 const DAY = 86_400_000
 
@@ -117,4 +121,42 @@ describe("a session's time", () => {
       await session.close()
     }
   }, 60_000)
+})
+
+describe("the agent's travel_time", () => {
+  it("moves time when the step allows it, and a replay travels the same way with no model", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "danwo-time-"))
+    const cache = { dir, mode: "read-write", journey: "time" } as const
+    const wait = scripted([() => ["travel_time", { days: 3 }]])
+
+    try {
+      for (const model of [wait, scripted([])]) {
+        const services = await startServices([stripeService()])
+        const session = await openWebSession({
+          baseUrl: siteUrl,
+          time: timeMachineOf(services),
+          model,
+          cache,
+        })
+
+        try {
+          await session.app.open("/")
+
+          const result = await session.agent.act("wait until three days have passed", {
+            time: true,
+          })
+
+          await session.expect(session.screen.getByRole("heading")).toHaveText(/\d+/)
+
+          expect(services.proxy.clock.offset()).toBe(3 * DAY)
+          expect(result.modelCalls).toBe(model === wait ? 2 : 0)
+        } finally {
+          await session.close()
+          await services.close()
+        }
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 120_000)
 })

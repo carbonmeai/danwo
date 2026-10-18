@@ -149,13 +149,45 @@ export function keptEmulator(
 }
 
 /**
+ * What a service backed by one emulator on a manual clock does besides answering its hosts: its
+ * state for the flight recorder, settling, time travel, reset (`reseed` applies its seed again),
+ * snapshot and restore, close.
+ */
+export function emulatorLifecycle(emulator: Emulator, clock: ManualClock, reseed: () => void) {
+  return {
+    state: () => emulator.snapshot(),
+    settle: () => settleWebhooks(emulator, clock),
+    travel: (ms: number) => travelEmulator(emulator, clock, ms),
+    async reset() {
+      emulator.reset()
+      clock.restart(new Date())
+      reseed()
+    },
+    ...keptEmulator(emulator, clock),
+    close: () => emulator.close(),
+  }
+}
+
+/** The lifecycle a single-service environment hands on from its started `services`. */
+export function servicesLifecycle(services: Services) {
+  return {
+    settle: () => services.settle(),
+    travel: (ms: number) => services.travel(ms),
+    reset: () => services.reset(),
+    snapshot: () => services.snapshot(),
+    restore: () => services.restore(),
+    close: () => services.close(),
+  }
+}
+
+/**
  * How far ahead `settle` plays an emulator's clock: far enough for every provider's webhook
  * retries, short of business events such as renewals, which only time travel reaches.
  */
 const SETTLE_HORIZON_MS = 24 * 60 * 60 * 1000
 
 /** Plays pending webhook deliveries and retries of `emulator` on `clock`, up to a day ahead. */
-export async function settleWebhooks(emulator: Emulator, clock: ManualClock): Promise<void> {
+async function settleWebhooks(emulator: Emulator, clock: ManualClock): Promise<void> {
   let left = SETTLE_HORIZON_MS
 
   for (let i = 0; i < 100; i++) {
@@ -179,12 +211,11 @@ const MAX_TRAVEL_STEPS = 10_000
  * Moves `clock` forward by `ms` one due callback at a time, letting `emulator`'s deliveries land
  * after each, so a renewal's webhook reaches the app before the next renewal falls due.
  */
-export async function travelEmulator(
-  emulator: Emulator,
-  clock: ManualClock,
-  ms: number,
-): Promise<void> {
+async function travelEmulator(emulator: Emulator, clock: ManualClock, ms: number): Promise<void> {
   let left = ms
+
+  /* The apps' clocks jump at once, so what is signed on the way carries their new time. */
+  clock.travelled(ms)
 
   for (let step = 0; step < MAX_TRAVEL_STEPS; step++) {
     await emulator.webhooks?.idle()

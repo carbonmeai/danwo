@@ -237,6 +237,8 @@ export type {
   ReadinessMode,
   Screen,
   SessionMail,
+  SessionTime,
+  Span,
   VisionChoice,
   VisionMode,
   VisionSetting,

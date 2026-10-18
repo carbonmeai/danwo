@@ -116,6 +116,7 @@ export { type ErrorCodeRow, errorCodeTable, exitCodeForError } from "../support/
 export { CACHE_OUTCOMES, type CacheOutcome } from "../record/steps.ts"
 export type { RelocationPolicy } from "../replay/policy.ts"
 export type { VisionChoice, VisionMode, VisionSetting } from "../vision/desk.ts"
+export type { SessionTime, Span } from "../time/index.ts"
 export type { Budget, Budgets } from "../agent/budget.ts"
 export type { ErrorClass, ErrorCode } from "../support/codes.ts"
 export {

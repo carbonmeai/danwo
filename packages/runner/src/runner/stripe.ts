@@ -8,13 +8,7 @@ import {
 } from "@danwo/emulators"
 import type { Proxy } from "@danwo/proxy"
 
-import {
-  keptEmulator,
-  type Service,
-  settleWebhooks,
-  travelEmulator,
-  startServices,
-} from "./services.ts"
+import { emulatorLifecycle, type Service, servicesLifecycle, startServices } from "./services.ts"
 
 /** Options of `stripeService()` and `stripeEnvironment()`. */
 export interface StripeOptions {
@@ -35,7 +29,7 @@ export interface StripeEnvironment {
   /** Plays every pending webhook delivery and retry to the end on the manual clock. */
   readonly settle: () => Promise<void>
   /** Moves the app's clock and the emulator's time forward by `ms`; see `time.travel`. */
-  travel(ms: number): Promise<void>
+  readonly travel: (ms: number) => Promise<void>
   /** Emulator back to its seed, proxy log and fault rules cleared. */
   reset(): Promise<void>
   /** Keeps the emulator's state now (right after a reset), for `restore`. */
@@ -60,6 +54,7 @@ export function stripeService(options: StripeOptions = {}): StripeService {
   const emulator = createEmulator(stripe, {
     clock: clock.clock,
     timer: clock.timer,
+    wallClock: clock.wall,
     baseUrl: "https://checkout.stripe.com",
   })
 
@@ -80,16 +75,7 @@ export function stripeService(options: StripeOptions = {}): StripeService {
     routes: [{ hosts: ["api.stripe.com", "checkout.stripe.com"], handler: emulator.fetch }],
     fixtures: { stripe: emulator },
     webhooks: emulator.webhooks,
-    state: () => emulator.snapshot(),
-    settle: () => settleWebhooks(emulator, clock),
-    travel: (ms) => travelEmulator(emulator, clock, ms),
-    async reset() {
-      emulator.reset()
-      clock.restart(new Date())
-      seed()
-    },
-    ...keptEmulator(emulator, clock),
-    close: () => emulator.close(),
+    ...emulatorLifecycle(emulator, clock, seed),
   }
 }
 
@@ -104,18 +90,13 @@ export async function stripeEnvironment(
   const service = stripeService(options)
   const services = await startServices([service], options)
   const { proxy } = services
-  const settle = () => services.settle()
+  const lifecycle = servicesLifecycle(services)
 
   return {
     emulator: service.emulator,
     proxy,
     clock: service.clock,
-    settle,
-    travel: (ms: number) => services.travel(ms),
-    reset: () => services.reset(),
-    snapshot: () => services.snapshot(),
-    restore: () => services.restore(),
-    fixtures: { stripe: service.emulator, proxy, settle },
-    close: () => services.close(),
+    ...lifecycle,
+    fixtures: { stripe: service.emulator, proxy, settle: lifecycle.settle },
   }
 }

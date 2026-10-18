@@ -39,11 +39,10 @@ import {
 import type { Proxy } from "@danwo/proxy"
 
 import {
-  keptEmulator,
+  emulatorLifecycle,
   type Service,
   type Services,
-  settleWebhooks,
-  travelEmulator,
+  servicesLifecycle,
   startServices,
 } from "./services.ts"
 
@@ -116,7 +115,7 @@ export interface OAuthEnvironment<Name extends string> {
   /** Plays every pending push notification and retry to the end. */
   readonly settle: () => Promise<void>
   /** Moves the app's clock and the emulator's time forward by `ms`; see `time.travel`. */
-  travel(ms: number): Promise<void>
+  readonly travel: (ms: number) => Promise<void>
   /** Emulator back to its seed, proxy log and fault rules cleared. */
   reset(): Promise<void>
   /** Keeps the emulator's state now (right after a reset), for `restore`. */
@@ -178,7 +177,11 @@ export function oauthService<Config>(
   seed: Seed<Config> | undefined,
 ): OAuthService {
   const clock = new ManualClock(new Date())
-  const emulator = createEmulator(provider.definition, { clock: clock.clock, timer: clock.timer })
+  const emulator = createEmulator(provider.definition, {
+    clock: clock.clock,
+    timer: clock.timer,
+    wallClock: clock.wall,
+  })
 
   const apply = () => {
     const config = seedNow(seed)
@@ -195,16 +198,7 @@ export function oauthService<Config>(
     routes: [{ hosts: provider.hosts, handler: emulator.fetch }],
     fixtures: { [provider.name]: emulator },
     webhooks: emulator.webhooks,
-    state: () => emulator.snapshot(),
-    settle: () => settleWebhooks(emulator, clock),
-    travel: (ms) => travelEmulator(emulator, clock, ms),
-    async reset() {
-      emulator.reset()
-      clock.restart(new Date())
-      apply()
-    },
-    ...keptEmulator(emulator, clock),
-    close: () => emulator.close(),
+    ...emulatorLifecycle(emulator, clock, apply),
   }
 }
 
@@ -216,7 +210,8 @@ export async function oauthEnvironment<Name extends string>(
 ): Promise<OAuthEnvironment<Name>> {
   const services = await startServices([service], options)
   const { proxy } = services
-  const settle = () => services.settle()
+  const lifecycle = servicesLifecycle(services)
+  const { settle } = lifecycle
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the mapped key is `name` itself, which TypeScript can't see through a computed property
   const fixtures = { [name]: service.emulator, proxy, settle } as OAuthEnvironment<Name>["fixtures"]
 
@@ -224,13 +219,8 @@ export async function oauthEnvironment<Name extends string>(
     emulator: service.emulator,
     proxy,
     webhooks: services.webhooks,
-    settle,
-    travel: (ms: number) => services.travel(ms),
-    reset: () => services.reset(),
-    snapshot: () => services.snapshot(),
-    restore: () => services.restore(),
+    ...lifecycle,
     fixtures,
-    close: () => services.close(),
   }
 }
 
