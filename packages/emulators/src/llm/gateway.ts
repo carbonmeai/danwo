@@ -10,7 +10,7 @@ import type {
   LanguageModelV4Usage,
 } from "@ai-sdk/provider"
 
-import type { LlmReply, LlmUsage } from "./entities.ts"
+import type { LlmPrice, LlmReply, LlmUsage } from "./entities.ts"
 import { argumentsText } from "./usage.ts"
 import { deltas, llmId, messageText, sse } from "./wire.ts"
 
@@ -43,11 +43,58 @@ function usage(counts: LlmUsage): LanguageModelV4Usage {
   }
 }
 
-/** The gateway's cost metadata, when the model has a price. */
-function metadata(cost: number | null) {
-  return cost === null
-    ? {}
-    : { providerMetadata: { gateway: { cost: cost.toFixed(8), marketCost: cost.toFixed(8) } } }
+/** Dollars the way the gateway writes them: a decimal string. */
+function dollars(amount: number): string {
+  return amount.toFixed(8)
+}
+
+/** How the gateway routed a call: the model asked for and the provider that answered it. */
+function routing(model: string) {
+  const upstream = upstreamOf(model)
+
+  return { originalModelId: model, resolvedProvider: upstream, finalProvider: upstream }
+}
+
+/**
+ * The gateway's metadata for a call: its routing, a generation id, and its cost split into
+ * inference (input and output) and the gateway's surcharge, which the emulator never adds. A
+ * model with no price costs nothing.
+ */
+function metadata(counts: LlmUsage, model: string, price: LlmPrice | undefined) {
+  const input = (counts.input * (price?.input ?? 0)) / 1_000_000
+  const output = (counts.output * (price?.output ?? 0)) / 1_000_000
+  const cost = dollars(input + output)
+
+  return {
+    [upstreamOf(model)]: {},
+    gateway: {
+      routing: routing(model),
+      cost,
+      marketCost: cost,
+      surchargeCost: dollars(0),
+      gatewayCost: cost,
+      inferenceCost: cost,
+      inputInferenceCost: dollars(input),
+      outputInferenceCost: dollars(output),
+      generationId: llmId("gen_"),
+    },
+  }
+}
+
+/** The gateway's metadata for an embedding call, which it does not split by input and output. */
+export function embeddingMetadata(tokens: number, model: string, price: LlmPrice | undefined) {
+  const cost = dollars((tokens * (price?.input ?? 0)) / 1_000_000)
+
+  return {
+    gateway: {
+      routing: routing(model),
+      cost,
+      marketCost: cost,
+      surchargeCost: dollars(0),
+      gatewayCost: cost,
+      generationId: llmId("gen_"),
+    },
+  }
 }
 
 /** The reply as content items, each carrying the upstream provider's (empty) metadata for it. */
@@ -73,14 +120,14 @@ export function gatewayResult(
   reply: LlmReply,
   counts: LlmUsage,
   model: string,
-  cost: number | null,
+  price: LlmPrice | undefined,
 ): LanguageModelV4GenerateResult {
   return {
     content: content(reply, upstreamOf(model)),
     finishReason: finishReason(reply),
     usage: usage(counts),
+    providerMetadata: metadata(counts, model, price),
     warnings: [],
-    ...metadata(cost),
   } satisfies LanguageModelV4GenerateResult
 }
 

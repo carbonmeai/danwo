@@ -5,10 +5,12 @@ import { bodyOf, onlyFor, send } from "../context.ts"
 import { defaultDimensions, embed, inputsOf } from "../embeddings.ts"
 import { gatewayResult, gatewayStream } from "../gateway.ts"
 import { gatewayRequest } from "../requests.ts"
+import { llmStore } from "../store.ts"
 import { tokensIn } from "../usage.ts"
 
 export function gatewayRoutes(emulator: EmulatorContext): void {
   const { app } = emulator
+  const priceOf = (model: string) => llmStore(emulator.store).settings().prices[model]
 
   app.post("/v4/ai/language-model", async (c) => {
     onlyFor(c, "gateway")
@@ -17,7 +19,7 @@ export function gatewayRoutes(emulator: EmulatorContext): void {
     const stream = c.req.header("ai-language-model-streaming") === "true"
     const request = gatewayRequest(await bodyOf(c), model, stream)
     const answered = await answer(emulator, c, "language-model", request)
-    const whole = gatewayResult(answered.reply, answered.usage, model, answered.cost)
+    const whole = gatewayResult(answered.reply, answered.usage, model, priceOf(model))
 
     return send(c, answered, stream, whole, () => gatewayStream(whole, model))
   })
