@@ -1,0 +1,23 @@
+{
+  "name": "@danwo/skill",
+  "version": "0.0.0",
+  "private": true,
+  "description": "What coding agents read about danwo: the shipped skill, task guides and the generated capability spec.",
+  "files": [
+    "src",
+    "guides",
+    "skill"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@danwo/core": "workspace:*",
+    "@danwo/emulators": "workspace:*",
+    "@danwo/proxy": "workspace:*",
+    "@danwo/runner": "workspace:*",
+    "@danwo/sdk": "workspace:*",
+    "oxc-parser": "0.154.0"
+  }
+}
