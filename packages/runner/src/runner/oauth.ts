@@ -16,9 +16,13 @@ import {
   microsoft,
   type MicrosoftSeedConfig,
   seedFlutterwave,
+  PAYSTACK_HOSTS,
+  paystack,
+  type PaystackSeedConfig,
   seedGithub,
   seedGoogle,
   seedMicrosoft,
+  seedPaystack,
   seedSlack,
   seedTwilio,
   SLACK_HOSTS,
@@ -68,6 +72,12 @@ export interface GithubOptions {
   readonly seed?: Seed<GithubSeedConfig>
 }
 
+/** Options of `paystackService()` and `paystackEnvironment()`. */
+export interface PaystackOptions {
+  /** Integrations (secret key, webhook and callback URLs, balance), bank accounts, customers and plans. */
+  readonly seed?: Seed<PaystackSeedConfig>
+}
+
 /** Options of `twilioService()` and `twilioEnvironment()`. */
 export interface TwilioOptions {
   /** Accounts, API keys, numbers (with the app's SMS URL), Verify services and unreachable phones. */
@@ -115,6 +125,8 @@ export type MicrosoftEnvironment = OAuthEnvironment<"microsoft">
 export type SlackEnvironment = OAuthEnvironment<"slack">
 /** What `githubEnvironment()` starts: the GitHub emulator behind its own proxy. */
 export type GithubEnvironment = OAuthEnvironment<"github">
+/** What `paystackEnvironment()` starts: the Paystack emulator behind its own proxy. */
+export type PaystackEnvironment = OAuthEnvironment<"paystack">
 /** What `twilioEnvironment()` starts: the Twilio emulator behind its own proxy. */
 export type TwilioEnvironment = OAuthEnvironment<"twilio">
 /** What `flutterwaveEnvironment()` starts: the Flutterwave emulator behind its own proxy. */
@@ -325,4 +337,27 @@ export function flutterwaveEnvironment(
   options: FlutterwaveOptions & { readonly unmatched?: "passthrough" | "block" } = {},
 ): Promise<FlutterwaveEnvironment> {
   return oauthEnvironment("flutterwave", flutterwaveService(options), options)
+}
+
+const PAYSTACK: Provider<PaystackSeedConfig> = {
+  name: "paystack",
+  definition: paystack,
+  hosts: PAYSTACK_HOSTS,
+  apply: (emulator, config) => seedPaystack(emulator.store, config),
+}
+
+/**
+ * Paystack for `startServices`: the API and the hosted payment page the customer's browser opens,
+ * with events, transfers, refunds and subscription renewals on a manual clock that `settle` plays
+ * to the end; gives tests the `paystack` fixture. Read what was paid with `paystackLedger(paystack)`.
+ */
+export function paystackService(options: PaystackOptions = {}): OAuthService {
+  return oauthService(PAYSTACK, options.seed)
+}
+
+/** A worker-scoped Paystack emulator behind its own proxy; combine services with `startServices`. */
+export function paystackEnvironment(
+  options: PaystackOptions & { readonly unmatched?: "passthrough" | "block" } = {},
+): Promise<PaystackEnvironment> {
+  return oauthEnvironment("paystack", paystackService(options), options)
 }

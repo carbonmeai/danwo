@@ -259,6 +259,27 @@ describe("flight recorder redaction", () => {
     })
   })
 
+  it("hides Paystack secret and public keys, wherever they sit, and event signatures", () => {
+    expect(
+      redactor.value({
+        id: "REDACTED-TEST-VALUE",
+        publicKey: "pk_test_0123456789abcdef",
+        authorization: { authorization_code: "AUTH_reusable" },
+        reference: "order-1",
+      }),
+    ).toEqual({
+      id: "sk_test_[redacted]",
+      publicKey: "pk_test_[redacted]",
+      // A saved card's authorization charges it again, so the whole object is hidden.
+      authorization: "[redacted]",
+      reference: "order-1",
+    })
+    expect(redactor.headers({ "x-paystack-signature": "9f86d0", accept: "*/*" })).toEqual({
+      "x-paystack-signature": "[redacted]",
+      accept: "*/*",
+    })
+  })
+
   it("clips long strings and long lists in recorded state", () => {
     const value = z.object({ blob: z.string(), items: z.array(z.unknown()) }).parse(
       redactor.value({

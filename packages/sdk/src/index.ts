@@ -110,6 +110,17 @@ export interface TwilioFixtures {
   readonly settle: () => Promise<void>
 }
 
+/** Fixtures a `paystackEnvironment()` or `paystackService()` contributes. */
+export interface PaystackFixtures {
+  /**
+   * The Paystack emulator: read what was paid with `paystackLedger(paystack)` and send money to a
+   * dedicated account with `paystackBank(paystack).transferTo(number, amount)`.
+   */
+  readonly paystack: Emulator
+  readonly proxy: Proxy
+  readonly settle: () => Promise<void>
+}
+
 /** `test` typed with danwo's fixtures; the same runtime function as the runner's. */
 export const test: TestAPI<DanwoFixtures> =
   baseTest.extend<Omit<DanwoFixtures, keyof TestFixtures>>()
@@ -149,6 +160,10 @@ export {
   type MicrosoftOptions,
   microsoftService,
   MINISTACK_IMAGE,
+  type PaystackEnvironment,
+  paystackEnvironment,
+  type PaystackOptions,
+  paystackService,
   type S3Environment,
   s3Environment,
   type S3Options,
@@ -257,6 +272,11 @@ export {
   type OutlookMessage,
   outlookCalendar,
   outlookMailbox,
+  type PaystackBank,
+  paystackBank,
+  type PaystackLedger,
+  paystackLedger,
+  type PaystackSeedConfig,
   type PubSubSeedSubscription,
   revokeGoogleAccess,
   revokeMicrosoftSessions,

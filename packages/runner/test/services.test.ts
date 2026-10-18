@@ -7,18 +7,21 @@ import {
   googleSignIns,
   listeningPort,
   outlookMailbox,
+  paystackLedger,
   s3Objects,
   slackWorkspace,
   twilioInbox,
   twilioPhone,
 } from "@danwo/emulators"
 import { describe, expect, it } from "vitest"
+import { z } from "zod"
 
 import { defaultOutboundFaults } from "../src/runner/faults.ts"
 import {
   githubService,
   googleService,
   microsoftService,
+  paystackService,
   slackService,
   twilioService,
 } from "../src/runner/oauth.ts"
@@ -390,5 +393,62 @@ describe("twilioService", () => {
     })
 
     expect(faults.some((f) => f.kind === "status" && f.body?.includes("20429"))).toBe(true)
+  })
+})
+
+/** The faults the default catalogue plans for a POST to `host` and `path`. */
+function faultsAt(host: string, path: string) {
+  return defaultOutboundFaults({ method: "POST", host, path, index: 0 })
+}
+
+describe("paystackService", () => {
+  const SECRET = "REDACTED-TEST-VALUE"
+
+  it("joins Stripe behind one proxy, plays signed events on settle, and reseeds on reset", async () => {
+    const app = await receiver()
+    const paystack = paystackService({
+      seed: () => ({ integrations: [{ secretKey: SECRET, webhookUrl: `${app.url}/paystack` }] }),
+    })
+    const services = await startServices([stripeService(), paystack])
+
+    try {
+      expect(Object.keys(services.webhooks ?? {}).toSorted()).toEqual(["paystack", "stripe"])
+
+      const started = await paystack.emulator.fetch(
+        new Request("https://api.paystack.co/transaction/initialize", {
+          method: "POST",
+          headers: { authorization: `Bearer ${SECRET}`, "content-type": "application/json" },
+          body: JSON.stringify({ email: "ada@shop.test", amount: 500_000 }),
+        }),
+      )
+      const page = z
+        .object({ data: z.object({ authorization_url: z.string() }) })
+        .parse(await started.json()).data
+
+      await paystack.emulator.fetch(
+        new Request(`${page.authorization_url}/card`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ number: "4084084084084081", expiry: "12/30", cvv: "408" }),
+        }),
+      )
+      await services.settle()
+
+      expect(app.received.map((r) => r.headers["x-paystack-signature"] !== undefined)).toEqual([
+        true,
+      ])
+      expect(paystackLedger(paystack.emulator).paidTotal("ada@shop.test")).toBe(500_000)
+
+      await services.reset()
+      expect(paystackLedger(paystack.emulator).transactions()).toEqual([])
+    } finally {
+      await services.close()
+      app.close()
+    }
+  })
+
+  it("gives Paystack's API its faults and leaves the hosted page alone", () => {
+    expect(faultsAt("api.paystack.co", "/transaction/initialize").length).toBeGreaterThan(0)
+    expect(faultsAt("checkout.paystack.com", "/abc/card")).toEqual([])
   })
 })
