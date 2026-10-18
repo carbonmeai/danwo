@@ -1,0 +1,18 @@
+{
+  "name": "@danwo/infra",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Fault proxies for the app's own data stores (Postgres, Redis) for danwo matrix.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1",
+    "ioredis": "6.0.0",
+    "pg": "8.23.1"
+  }
+}
