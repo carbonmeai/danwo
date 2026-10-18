@@ -32,6 +32,7 @@ afterAll(async () => {
     fixture("integration"),
     fixture("slack-bot"),
     fixture("github-bot"),
+    fixture("sms-app"),
     fixture("sessions"),
     fixture("visual"),
     SHOP,
@@ -459,6 +460,41 @@ describe("danwo matrix", () => {
 
     expect(html).toContain("POST slack.com/api/chat.postMessage")
     expect(html).not.toMatch(/REDACTED-TEST-VALUE|mention-bot-signing-secret/)
+  }, 300_000)
+
+  it("faults Twilio Verify, messages and status callbacks, and a careful app counts each welcome once", async () => {
+    const { code, out } = await danwo(fixture("sms-app"), ["matrix", "tests/verify.danwo.ts"])
+
+    expect(out).toContain("PASS  clean run")
+    expect(out).toContain(
+      "PASS  status 429 on POST verify.twilio.com/v2/Services/:id/Verifications",
+    )
+    expect(out).toContain(
+      "PASS  reset-after on POST api.twilio.com/2010-04-01/Accounts/:id/Messages.json",
+    )
+    expect(out).toContain("PASS  duplicate on twilio webhook message.status /twilio/status #2")
+    expect(out).toContain("PASS  forged on twilio webhook message.status /twilio/status #2")
+    expect(out).toContain("faults: 26 passed")
+    expect(code).toBe(0)
+  }, 300_000)
+
+  it("catches an app that counts a delivered status callback twice when Twilio sends it twice", async () => {
+    const { code, out } = await danwo(fixture("sms-app"), ["matrix", "tests/verify.danwo.ts"], {
+      SMS_BUG: "no-dedupe",
+    })
+
+    // A forged callback fails the app's signature check; only the repeated "delivered" double counts.
+    expect(out).toContain("FAIL  duplicate on twilio webhook message.status /twilio/status #2")
+    expect(out).toContain("PASS  forged on twilio webhook message.status /twilio/status #2")
+    expect(out).toContain("invariant: expected 2 to be less than or equal to 1")
+    expect(out).toContain("faults: 25 passed, 1 failed")
+    expect(code).toBe(1)
+
+    const report = /report: (\S+report\.html)/.exec(out)?.[1] ?? ""
+    const html = await readFile(join(fixture("sms-app"), report), "utf8")
+
+    expect(html).toContain("POST verify.twilio.com")
+    expect(html).not.toContain("7e57ab1e7e57ab1e7e57ab1e7e57ab1e")
   }, 300_000)
 
   it("faults a GitHub bot's issues webhook and a deduplicating bot comments at most once", async () => {
