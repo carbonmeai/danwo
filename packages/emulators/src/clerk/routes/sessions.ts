@@ -1,7 +1,7 @@
 import type { SessionJSON } from "@clerk/backend"
 
 import type { App } from "../../http.ts"
-import { bodyOf } from "../backend-auth.ts"
+import { bodyOf, pageOf } from "../backend-auth.ts"
 import { type ClerkContext, now } from "../context.ts"
 import { ClerkFailure, invalidParameter, notFound, str } from "../helpers.ts"
 import { endSession, isLive, newClient, sessionClaims, startSession } from "../sessions.ts"
@@ -60,7 +60,11 @@ function readRoutes(app: App, context: ClerkContext): void {
     if (c.req.query("user_id") === undefined && c.req.query("client_id") === undefined)
       throw invalidParameter("user_id", "Either user_id or client_id is required.")
 
-    return c.json(listed(context, (name) => c.req.query(name)))
+    const sessions = listed(context, (name) => c.req.query(name))
+    const { limit, offset } = pageOf(c)
+    const page = sessions.slice(offset, offset + limit)
+
+    return c.json(c.req.query("paginated") === "true" ? { data: page, total_count: sessions.length } : page)
   })
   app.get("/v1/sessions/:id", (c) => c.json(sessionOf(context, c.req.param("id"))))
 }
