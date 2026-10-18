@@ -24,6 +24,7 @@
     "@bachs/sdk": "1.0.0",
     "@danwo/sdk": "workspace:*",
     "@types/pg": "8.23.1",
+    "openai": "7.38.0",
     "openid-client": "6.8.8",
     "pg": "8.23.1",
     "twilio": "6.2.0",
