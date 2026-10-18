@@ -393,22 +393,42 @@ function planWebhookFaults(
 
 const READS = new Set(["GET", "HEAD"])
 
+/** How many times in a row the same read must come before it counts as a poll. */
+const POLL_MIN_RUN = 3
+
 /**
- * Where each routed call stands in a poll: the same read (GET or HEAD, same route) made several
- * times in a row, such as an app asking for a balance every second. `first` starts one, `repeat`
- * continues it, `none` is any other call.
+ * Where each routed call stands in a poll: the same read (GET or HEAD, same route) made at least
+ * three times in a row, such as an app asking for a balance every second. `first` starts one,
+ * `repeat` continues it, `none` is any other call. Two reads in a row are not a poll: an app that
+ * fetches signing keys at sign-in and again for an API call does two different things.
  */
 export function pollPositions(
   calls: readonly Pick<OutboundCall, "method" | "host" | "path">[],
 ): ("first" | "repeat" | "none")[] {
   const routes = calls.map((call) => (READS.has(call.method) ? routeOf(call) : undefined))
+  const runs = runLengths(routes)
 
   return routes.map((route, index) => {
-    if (route === undefined) return "none"
-    if (routes[index - 1] === route) return "repeat"
+    if (route === undefined || (runs[index] ?? 0) < POLL_MIN_RUN) return "none"
 
-    return routes[index + 1] === route ? "first" : "none"
+    return routes[index - 1] === route ? "repeat" : "first"
   })
+}
+
+/** For each position, the length of the run of equal, defined routes it belongs to. */
+function runLengths(routes: readonly (string | undefined)[]): number[] {
+  const lengths: number[] = []
+  let start = 0
+
+  for (let index = 1; index <= routes.length; index++) {
+    if (index < routes.length && routes[index] !== undefined && routes[index] === routes[start])
+      continue
+
+    for (let at = start; at < index; at++) lengths.push(index - start)
+    start = index
+  }
+
+  return lengths
 }
 
 /**

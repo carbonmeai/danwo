@@ -36,20 +36,30 @@ const ONE_FAULT = (): OutboundFault[] => [{ kind: "status", status: 500 }]
 const NO_WEBHOOK_FAULTS: readonly WebhookFault[] = []
 
 describe("polls in a fault plan", () => {
-  it("finds a read repeated back to back, whatever its query", () => {
+  it("finds a read repeated three or more times in a row, whatever its query", () => {
     expect(
       pollPositions([
         { method: "GET", host: "shop.test", path: "/credits?user=u1" },
         { method: "POST", host: "shop.test", path: "/checkout" },
         { method: "GET", host: "shop.test", path: "/credits?user=u1" },
         { method: "GET", host: "shop.test", path: "/credits?user=u1&t=2" },
+        { method: "GET", host: "shop.test", path: "/credits?t=3" },
         { method: "HEAD", host: "shop.test", path: "/credits" },
         { method: "GET", host: "shop.test", path: "/orders/1" },
         { method: "GET", host: "shop.test", path: "/orders/2" },
         { method: "POST", host: "shop.test", path: "/checkout" },
         { method: "POST", host: "shop.test", path: "/checkout" },
       ]),
-    ).toEqual(["none", "none", "first", "repeat", "none", "first", "repeat", "none", "none"])
+    ).toEqual(["none", "none", "first", "repeat", "repeat", "none", "none", "none", "none", "none"])
+  })
+
+  it("keeps two fetches of the same keys apart, since sign-in and an API call use them for different things", () => {
+    expect(
+      pollPositions([
+        { method: "GET", host: "acme.us.auth0.com", path: "/.well-known/jwks.json" },
+        { method: "GET", host: "acme.us.auth0.com", path: "/.well-known/jwks.json" },
+      ]),
+    ).toEqual(["none", "none"])
   })
 
   it("plans a poll's faults on its first call only, and names it a poll", () => {
