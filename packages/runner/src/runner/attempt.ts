@@ -29,6 +29,7 @@ import {
 import type { AttemptStatus } from "../tests/retry.ts"
 import { isSkipSignal } from "../tests/skip.ts"
 import type { StoredBody } from "../tests/types.ts"
+import { timeMachineOf } from "../time/index.ts"
 import { backendOf } from "./backend.ts"
 import type { DanwoConfig } from "./config.ts"
 import type { WorkerEnvironment } from "./environment.ts"
@@ -366,6 +367,7 @@ function readinessOptions(
     ...(setting !== undefined && { readiness: setting }),
     ...(backend && { backend }),
     ...(env?.mail && { mail: env.mail }),
+    time: timeMachineOf(env),
   }
 }
 
@@ -439,6 +441,7 @@ function builtInFixtures(session: WebSession, env: WorkerEnvironment | undefined
     expect: session.expect,
     secret: (name: string) => session.secret(name),
     mail: session.mail,
+    time: session.time,
     platform: "web" as const,
     ...env?.fixtures,
   }

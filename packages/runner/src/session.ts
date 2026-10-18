@@ -23,6 +23,13 @@ import { type CacheMode, ReplayStore } from "./replay/index.ts"
 import { type RelocationPolicy, relocationOf } from "./replay/policy.ts"
 import { type Secret, SecretVault, type SessionSecret } from "./secrets/index.ts"
 import { DanwoError } from "./support/codes.ts"
+import {
+  type SessionTime,
+  sessionTime,
+  showTime,
+  type TimeMachine,
+  timeMachineOf,
+} from "./time/index.ts"
 import { type VisionSetting, visionModelOf, visionModeOf } from "./vision/desk.ts"
 
 export type { ReplayDivergence } from "./agent/index.ts"
@@ -66,6 +73,11 @@ interface ReadinessSettings {
    * failing (default false). A live `agent.act` stops at the first failure; see browser/app-errors.ts.
    */
   readonly appErrors?: AppErrorOptions
+  /**
+   * What moves time behind the app for `time.travel`: the environment's services and the apps'
+   * clocks (see time/index.ts). Without it, travelling moves the page's clock alone.
+   */
+  readonly time?: TimeMachine
 }
 
 /** The browser behind the run's proxy. */
@@ -262,6 +274,8 @@ export interface WebSession {
   readonly flight: SessionFlight
   /** The context's cookies, localStorage and IndexedDB now, to start another context from. */
   browserState(): Promise<BrowserState>
+  /** Time travel: moves the app, the emulators and the page forward together. */
+  readonly time: SessionTime
   /** Ends the attempt and closes the browser. */
   close(): Promise<void>
 }
@@ -495,9 +509,16 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
   })
 
   const ready = readyStep(readinessOf(options), tabs, steps)
+  const machine = options.time ?? timeMachineOf(undefined)
+
+  await showTime(context, machine)
   const desk = new MailDesk(options.mail ?? [])
   const agent = createAgent({
     ready,
+    travel: async (ms) => {
+      await machine.travel(ms)
+      await showTime(context, machine)
+    },
     appErrors,
     mail: desk,
     ...effectsOptions(options),
@@ -547,6 +568,12 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
     flight,
     app: appOf(tabs, steps, { baseUrl: options.baseUrl, loadTimeout: settings.loadTimeout, ready }),
     browserState: () => context.storageState({ indexedDB: true }),
+    time: sessionTime(
+      machine,
+      context,
+      (label, act) => steps.run("app", "time.travel", label, act),
+      ready,
+    ),
     async close() {
       if (closed) return
       closed = true

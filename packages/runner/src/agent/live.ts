@@ -75,6 +75,8 @@ export interface LiveContext {
    * when the text view misses something, `always` also shows a screenshot with every view.
    */
   readonly vision?: { readonly mode: "auto" | "always"; readonly desk: VisionDesk } | undefined
+  /** Moves time forward, when the step may travel in time. */
+  readonly travel?: ((ms: number) => Promise<void>) | undefined
   /** Called for every model call and every action, for the step's record. */
   readonly onModelCall: (cost: CallCost) => void
   readonly onAction: (label: string) => void
@@ -245,7 +247,7 @@ class Loop {
       model: this.live.model,
       system: vision ? `${ACTOR_PROMPT}\n${VISION_GUIDE}` : ACTOR_PROMPT,
       messages: this.transcript.forModel(),
-      tools: toolsFor(vision),
+      tools: toolsFor(vision, this.live.travel !== undefined),
       toolChoice: "required",
       ...(this.live.signal && { abortSignal: this.live.signal }),
     }).catch((error: unknown) => {

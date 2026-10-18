@@ -88,6 +88,12 @@ export class ManualClock {
     this.queue = []
   }
 
+  /** Drops every scheduled callback and sets the time to `now`, as a fresh clock would start. */
+  restart(now: Date): void {
+    this.queue = []
+    this.nowMs = now.getTime()
+  }
+
   /** Milliseconds until the next scheduled callback, or undefined if none. */
   nextIn(): number | undefined {
     const next = this.queue.reduce<number | undefined>(

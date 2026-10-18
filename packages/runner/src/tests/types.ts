@@ -7,12 +7,18 @@ import type { Expect } from "../assert/index.ts"
 import type { App } from "../browser/index.ts"
 import type { Screen } from "../locate/index.ts"
 import type { Secret } from "../secrets/index.ts"
+import type { SessionTime } from "../time/index.ts"
 
 /** What every test body, hook and invariant receives before environment and extended fixtures. */
 export interface TestFixtures {
   readonly agent: Agent
   readonly screen: Screen
   readonly app: App
+  /**
+   * Time travel: `await time.travel({ days: 30 })` moves the app's clock, every emulator's clock
+   * (renewals, retries and expiries run as they fall due) and the page's clock forward together.
+   */
+  readonly time: SessionTime
   readonly platform: "web"
 }
 

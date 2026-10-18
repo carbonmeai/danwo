@@ -42,6 +42,8 @@ export interface AwsFixture {
 export interface AwsEnvironment {
   readonly endpoint: string
   readonly proxy: Proxy
+  /** Moves the app's clock and the emulator's time forward by `ms`; see `time.travel`. */
+  travel(ms: number): Promise<void>
   /** MiniStack wiped (unless `reset: false`), proxy log and fault rules cleared. */
   reset(): Promise<void>
   /** Fixtures for tests: `aws`, `proxy`, `settle`. */
@@ -144,6 +146,7 @@ export async function awsEnvironment(
   return {
     endpoint: service.endpoint,
     proxy,
+    travel: (ms: number) => services.travel(ms),
     reset: () => services.reset(),
     fixtures: { aws: { endpoint: service.endpoint }, proxy, settle },
     close: () => services.close(),

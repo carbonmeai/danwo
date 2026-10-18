@@ -12,6 +12,7 @@ import { describeTarget, locatorFor, type Target } from "../replay/target.ts"
 import type { FromMail, RecordedAction, RecordedAddress, RecordedInput } from "../replay/trace.ts"
 import { checkSecretField } from "../secrets/fields.ts"
 import type { SecretVault } from "../secrets/index.ts"
+import { describeSpan, spanMs } from "../time/index.ts"
 import type { VisionDesk } from "../vision/desk.ts"
 import { filePaths, type Files } from "./files.ts"
 import { type Aftermath, type Operation, operate, scroll, waitFor, watched } from "./operate.ts"
@@ -40,6 +41,8 @@ export interface PerformContext {
   readonly mail: MailDesk
   /** The step's vision, when it may look at the page as an image. */
   readonly vision?: VisionDesk | undefined
+  /** Moves time forward, when the step may travel in time. */
+  readonly travel?: ((ms: number) => Promise<void>) | undefined
 }
 
 export interface Performed {
@@ -326,6 +329,24 @@ async function goBack(context: PerformContext): Promise<Performed> {
   return { outcome: "done", recorded: { kind: "back" } }
 }
 
+async function travelTime(
+  context: PerformContext,
+  input: ToolInput<"travel_time">,
+): Promise<Performed> {
+  if (context.travel === undefined)
+    return { outcome: "failed: this step may not travel in time", recorded: undefined }
+
+  const ms = spanMs(input)
+
+  await context.travel(ms)
+  await context.ready()
+
+  return {
+    outcome: `moved time forward ${describeSpan(ms)}`,
+    recorded: { kind: "travel_time", ms },
+  }
+}
+
 function switchTab(context: PerformContext, tab: number): Performed {
   context.tabs.switchTo(tab)
 
@@ -454,6 +475,7 @@ const handlers: { readonly [Name in Call["name"]]: Handler<Name> } = {
   scroll: (input, context) => scrollPage(context, input),
   navigate: (input, context) => navigateTo(context, input.url),
   back: (_input, context) => goBack(context),
+  travel_time: (input, context) => travelTime(context, input),
   switch_tab: (input, context) => switchTab(context, input.tab),
   wait_for: (input, context) => waitUntil(context, input),
   read_mail: (input, context) => readMail(context, input),

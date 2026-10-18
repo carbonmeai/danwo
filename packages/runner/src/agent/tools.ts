@@ -63,6 +63,11 @@ export const toolInputs = {
   }),
   drag_at: z.object({ from: z.object(spot), to: z.object(spot) }),
   scroll_at: z.object({ ...spot, direction: z.enum(["up", "down"]) }),
+  travel_time: z.object({
+    days: z.number().nonnegative().optional(),
+    hours: z.number().nonnegative().optional(),
+    minutes: z.number().nonnegative().optional(),
+  }),
   done: z.object({ status: z.enum(["passed", "failed"]), summary: z.string() }),
 }
 
@@ -104,6 +109,8 @@ const descriptions: Record<ToolName, string> = {
     "Click a place on the latest screenshot, then type `text` (or the secret named `secret`) there.",
   drag_at: "Drag from one place on the latest screenshot to another.",
   scroll_at: "Scroll up or down with the pointer over a place on the latest screenshot.",
+  travel_time:
+    "Move time forward for the app, its third-party services and the browser, e.g. to the day a trial ends. Renewals, retries and expiries that fall due on the way happen in order.",
   done: "End the step: `passed` once the instruction is carried out, `failed` when it cannot be. Say why in `summary`.",
 }
 
@@ -143,7 +150,14 @@ const visionTools = {
   scroll_at: offer("scroll_at", toolInputs.scroll_at),
 }
 
-/** The tools a step is offered: with the vision tools when it may use vision. */
-export function toolsFor(vision: boolean) {
-  return vision ? { ...agentTools, ...visionTools } : agentTools
+/** Offered only when the step may travel in time. */
+const timeTools = { travel_time: offer("travel_time", toolInputs.travel_time) }
+
+/** The tools a step is offered: with the vision tools and the time tool when it may use them. */
+export function toolsFor(vision: boolean, time = false) {
+  return {
+    ...agentTools,
+    ...(vision ? visionTools : {}),
+    ...(time ? timeTools : {}),
+  }
 }

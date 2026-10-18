@@ -43,6 +43,7 @@ import {
   type Service,
   type Services,
   settleWebhooks,
+  travelEmulator,
   startServices,
 } from "./services.ts"
 
@@ -114,6 +115,8 @@ export interface OAuthEnvironment<Name extends string> {
   readonly webhooks: Services["webhooks"]
   /** Plays every pending push notification and retry to the end. */
   readonly settle: () => Promise<void>
+  /** Moves the app's clock and the emulator's time forward by `ms`; see `time.travel`. */
+  travel(ms: number): Promise<void>
   /** Emulator back to its seed, proxy log and fault rules cleared. */
   reset(): Promise<void>
   /** Keeps the emulator's state now (right after a reset), for `restore`. */
@@ -194,8 +197,10 @@ export function oauthService<Config>(
     webhooks: emulator.webhooks,
     state: () => emulator.snapshot(),
     settle: () => settleWebhooks(emulator, clock),
+    travel: (ms) => travelEmulator(emulator, clock, ms),
     async reset() {
       emulator.reset()
+      clock.restart(new Date())
       apply()
     },
     ...keptEmulator(emulator, clock),
@@ -220,6 +225,7 @@ export async function oauthEnvironment<Name extends string>(
     proxy,
     webhooks: services.webhooks,
     settle,
+    travel: (ms: number) => services.travel(ms),
     reset: () => services.reset(),
     snapshot: () => services.snapshot(),
     restore: () => services.restore(),

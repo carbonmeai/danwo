@@ -28,6 +28,11 @@ export interface ActOptions {
    * keeps to the text view. Actions on a screenshot replay by finding their place by how it looks.
    */
   readonly vision?: VisionChoice
+  /**
+   * Whether the step may move time forward with the `travel_time` tool (default false), e.g. "wait
+   * until the trial ends". Each move is recorded, so a replay travels the same way.
+   */
+  readonly time?: boolean
 }
 
 /** What `agent.act` resolves with. */

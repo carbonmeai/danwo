@@ -32,6 +32,8 @@ export interface S3Service extends Service {
 export interface S3Environment {
   readonly emulator: Emulator
   readonly proxy: Proxy
+  /** Moves the app's clock and the emulator's time forward by `ms`; see `time.travel`. */
+  travel(ms: number): Promise<void>
   /** Emulator back to its seed, proxy log and fault rules cleared. */
   reset(): Promise<void>
   /** Keeps the emulator's state now (right after a reset), for `restore`. */
@@ -93,6 +95,7 @@ export async function s3Environment(
   return {
     emulator: service.emulator,
     proxy,
+    travel: (ms: number) => services.travel(ms),
     reset: () => services.reset(),
     snapshot: () => services.snapshot(),
     restore: () => services.restore(),

@@ -28,6 +28,13 @@ export interface WorkerEnvironment {
   readonly mail?: readonly MailSource[]
   /** Lets pending background work finish (e.g. webhook deliveries on a manual clock) before a matrix run's evidence is read. */
   settle?(): Promise<void>
+  /**
+   * Moves time forward by `ms` for everything behind the app: the apps' clocks (through the
+   * proxy) and every emulator's clock, running renewals, retries and expiries as they fall due.
+   * The service environments (`stripeEnvironment`, `startServices`…) provide it; without it,
+   * `time.travel` moves only the apps' clocks and the browser's.
+   */
+  travel?(ms: number): Promise<void>
   /** Back to a clean state between `danwo matrix` runs (emulators, app state, fault rules). */
   reset?(): Promise<void>
   /**

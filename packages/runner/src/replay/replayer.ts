@@ -68,6 +68,8 @@ export interface ReplayContext {
   readonly mail: MailDesk
   /** Fields secrets went into, painted over in the screenshots places are looked for on. */
   readonly spots?: SecretSpots
+  /** Moves time forward, for recordings that travelled in time. */
+  readonly travel?: ((ms: number) => Promise<void>) | undefined
 }
 
 /** The handle of a recorded secret: the step's param of that name, else the session's secret. */
@@ -333,6 +335,13 @@ const pageActions: { readonly [Kind in RecordedAction["kind"]]?: OnPage<Kind> } 
       throw new Error(`no mail to ${to} arrived`)
 
     return { label: "open mail", moved: [] }
+  },
+  travel_time: async (action, context) => {
+    if (context.travel === undefined) throw new Error("this session cannot travel in time")
+
+    await context.travel(action.ms)
+
+    return { label: `travel ${action.ms} ms`, moved: [] }
   },
   back: async (_action, context) => {
     await context.tabs.page.goBack({ timeout: context.timeout })

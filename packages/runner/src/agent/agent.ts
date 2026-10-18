@@ -127,6 +127,8 @@ export interface AgentOptions {
    * targets on a screenshot (default the agent's model).
    */
   readonly vision?: { readonly mode: VisionMode; readonly model?: LanguageModel | undefined }
+  /** Moves time forward for the app, its services and the page (the session's `time`). */
+  readonly travel?: (ms: number) => Promise<void>
 }
 
 /** One `act` call: which step it is, what it says, and what it may use and spend. */
@@ -140,6 +142,8 @@ interface ActCall {
   readonly effects: boolean
   /** Whether it may see the page as an image. */
   readonly vision: VisionMode
+  /** Whether it may move time forward. */
+  readonly time: boolean
 }
 
 /** How replaying a step's recording went: how many actions, or why it did not replay. */
@@ -198,6 +202,7 @@ class SessionAgent implements Agent {
       budget: options.budget,
       effects: options.effects ?? true,
       vision: visionFor(this.visionMode, options.vision),
+      time: options.time === true,
     }
 
     return this.options.steps.run("agent", "agent.act", label, () => this.step(call))
@@ -518,6 +523,7 @@ class SessionAgent implements Agent {
         ready: this.options.ready,
         mail: this.options.mail,
         spots: this.spots,
+        travel: this.options.travel,
         onAction: (label) =>
           this.options.steps.event({ kind: "action", at: new Date().toISOString(), label }),
       })
@@ -579,6 +585,7 @@ class SessionAgent implements Agent {
       ready: this.options.ready,
       mail: this.options.mail,
       vision: this.visionOf(call.vision),
+      travel: call.time ? this.options.travel : undefined,
       ...(appErrors !== undefined &&
         mark !== undefined && { appFailure: () => appErrors.since(mark) }),
       onModelCall: (cost) => steps.event({ kind: "model", at: now(), ...cost }),

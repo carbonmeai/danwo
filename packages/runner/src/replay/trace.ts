@@ -82,6 +82,8 @@ const action = z.discriminatedUnion("kind", [
   /** The newest mail to an address, shown in the active tab. */
   z.object({ kind: z.literal("open_mail"), to: address }),
   z.object({ kind: z.literal("back") }),
+  /** Time moved forward for the app, its services and the page. */
+  z.object({ kind: z.literal("travel_time"), ms: z.number().nonnegative() }),
   z.object({ kind: z.literal("switch_tab"), tab: z.number().int().nonnegative() }),
   z.object({
     kind: z.literal("wait"),

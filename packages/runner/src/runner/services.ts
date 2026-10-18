@@ -17,6 +17,11 @@ export interface Service {
   /** What the flight recorder keeps of this service when a run ends (an emulator's snapshot). */
   state?(): unknown
   settle?(): Promise<void>
+  /**
+   * Moves the service's time forward by `ms`, running what falls due on the way in order
+   * (renewals, retries, expiries) and letting each step's deliveries land before the next.
+   */
+  travel?(ms: number): Promise<void>
   reset?(): Promise<void>
   /** Keeps the state it is in now (just reset), for `restore` to return to. */
   snapshot?(): Promise<void>
@@ -36,7 +41,9 @@ export interface Services {
   state(): Readonly<Record<string, unknown>>
   /** Lets every service's background work finish. */
   settle(): Promise<void>
-  /** Every service back to its seed; proxy log and fault rules cleared. */
+  /** Moves the apps' clocks (through the proxy) and every service's time forward by `ms`. */
+  travel(ms: number): Promise<void>
+  /** Every service back to its seed; proxy log, fault rules and the apps' clock offset cleared. */
   reset(): Promise<void>
   /** Keeps every service's state now, for `restore`. */
   snapshot(): Promise<void>
@@ -63,10 +70,16 @@ export async function startServices(
     for (const service of services) await service.settle?.()
   }
 
-  const clearRun = () => {
+  const clearRun = async () => {
     proxy.clear()
     proxy.setFault(undefined)
     clearWebhookFaults(webhooks)
+    await proxy.clock.setOffset(0)
+  }
+
+  const travel = async (ms: number) => {
+    await proxy.clock.setOffset(proxy.clock.offset() + ms)
+    for (const service of services) await service.travel?.(ms)
   }
 
   return {
@@ -77,12 +90,13 @@ export async function startServices(
       proxy,
       settle,
     },
+    travel,
     state: () =>
       Object.fromEntries(services.flatMap((s) => (s.state ? [[s.name, s.state()] as const] : []))),
     settle,
     async reset() {
       for (const service of services) await service.reset?.()
-      clearRun()
+      await clearRun()
     },
     async snapshot() {
       for (const service of services) await service.snapshot?.()
@@ -93,7 +107,7 @@ export async function startServices(
         else await service.reset?.()
       }
 
-      clearRun()
+      await clearRun()
     },
     async close() {
       await proxy.stop()
@@ -128,25 +142,61 @@ export function keptEmulator(
       if (kept === undefined) throw new Error("restore() before snapshot()")
 
       emulator.webhooks?.reset()
-      clock?.cancelAll()
+      clock?.restart(new Date())
       emulator.restore(kept)
     },
   }
 }
 
-/** Plays every pending webhook delivery and retry of `emulator` to the end on `clock`. */
+/**
+ * How far ahead `settle` plays an emulator's clock: far enough for every provider's webhook
+ * retries, short of business events such as renewals, which only time travel reaches.
+ */
+const SETTLE_HORIZON_MS = 24 * 60 * 60 * 1000
+
+/** Plays pending webhook deliveries and retries of `emulator` on `clock`, up to a day ahead. */
 export async function settleWebhooks(emulator: Emulator, clock: ManualClock): Promise<void> {
+  let left = SETTLE_HORIZON_MS
+
   for (let i = 0; i < 100; i++) {
     await emulator.webhooks?.idle()
 
     const next = clock.nextIn()
 
-    if (next === undefined) {
-      return
-    }
+    if (next === undefined || next > left) return
 
     clock.advance(next)
+    left -= next
   }
 
   throw new Error("webhook deliveries did not settle")
+}
+
+/** Most pieces of due work one travel runs, so a bad loop cannot hang the run. */
+const MAX_TRAVEL_STEPS = 10_000
+
+/**
+ * Moves `clock` forward by `ms` one due callback at a time, letting `emulator`'s deliveries land
+ * after each, so a renewal's webhook reaches the app before the next renewal falls due.
+ */
+export async function travelEmulator(
+  emulator: Emulator,
+  clock: ManualClock,
+  ms: number,
+): Promise<void> {
+  let left = ms
+
+  for (let step = 0; step < MAX_TRAVEL_STEPS; step++) {
+    await emulator.webhooks?.idle()
+
+    const next = clock.nextIn()
+
+    if (next === undefined || next > left) break
+
+    clock.advance(next)
+    left -= next
+  }
+
+  clock.advance(left)
+  await emulator.webhooks?.idle()
 }
