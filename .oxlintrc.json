@@ -57,5 +57,19 @@
     ]
   },
   "ignorePatterns": ["node_modules", "dist", "coverage"],
-  "jsPlugins": ["@stylistic/eslint-plugin"]
+  "jsPlugins": ["@stylistic/eslint-plugin"],
+  "overrides": [
+    {
+      "files": ["packages/ui/src/**"],
+      "rules": {
+        "eslint/no-underscore-dangle": "off",
+        "typescript/no-generated-empty-object-type": "off",
+        "typescript/no-unsafe-type-assertion": "off",
+        "typescript/consistent-return": "off",
+        "typescript/unbound-method": "off",
+        "unicorn/consistent-function-scoping": "off",
+        "vitest/require-mock-type-parameters": "off"
+      }
+    }
+  ]
 }

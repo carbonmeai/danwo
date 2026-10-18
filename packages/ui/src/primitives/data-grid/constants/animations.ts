@@ -1,0 +1,1 @@
+export const GRID_ANIMATION_DURATION = 0.3

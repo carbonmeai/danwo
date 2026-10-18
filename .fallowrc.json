@@ -1,16 +1,36 @@
 {
   "$schema": "./node_modules/fallow/schema.json",
-  "entry": ["src/index.{ts,tsx,js,jsx}", "src/main.{ts,tsx,js,jsx}"],
+  "entry": [
+    "src/index.{ts,tsx,js,jsx}",
+    "src/main.{ts,tsx,js,jsx}",
+    "packages/ui/src/{blocks,hooks,icons,illustrations,primitives,theme}/**/*.{ts,tsx}",
+    "packages/ui/{panda.config,source-alias}.ts"
+  ],
   "workspaces": {
     "patterns": ["packages/*", "examples/*"]
   },
   "health": {
     "maxCyclomatic": 10,
-    "maxCognitive": 15
+    "maxCognitive": 15,
+    "thresholdOverrides": [
+      {
+        "files": ["packages/ui/src/**"],
+        "maxCyclomatic": 30,
+        "maxCognitive": 32,
+        "maxCrap": 1000,
+        "reason": "Design-system components carried over whole: many small prop branches, exercised through the dashboard's browser tests rather than unit coverage."
+      }
+    ]
   },
   "duplicates": {
     "minOccurrences": 2,
-    "ignore": ["packages/*/test/fixtures/**/app.ts", "packages/*/test/fixtures/*-app.ts"]
+    "ignore": [
+      "packages/*/test/fixtures/**/app.ts",
+      "packages/*/test/fixtures/*-app.ts",
+      "packages/ui/src/icons/**",
+      "packages/ui/src/illustrations/**",
+      "packages/ui/src/primitives/dropdown-menu/**"
+    ]
   },
   "rules": {
     "unused-dependencies": "warn"
@@ -23,5 +43,6 @@
     "packages/*/test/fixtures/**",
     "packages/recorder/src/page-script.ts"
   ],
-  "ignoreDependencies": ["@danwo/example-shop"]
+  "ignoreDependencies": ["@danwo/example-shop"],
+  "publicPackages": ["@danwo/ui"]
 }

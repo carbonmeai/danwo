@@ -12,5 +12,6 @@
   ],
   "compilerOptions": {
     "allowJs": true
-  }
+  },
+  "exclude": ["packages/ui", "packages/dashboard"]
 }
