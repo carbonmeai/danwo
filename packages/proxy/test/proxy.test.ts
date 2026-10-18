@@ -19,6 +19,9 @@ import {
   MICROSOFT_HOSTS,
   microsoft,
   outlookMailbox,
+  PAYSTACK_HOSTS,
+  paystack,
+  paystackLedger,
   resend,
   resendInbox,
   s3,
@@ -26,6 +29,7 @@ import {
   s3Objects,
   seedGoogle,
   seedMicrosoft,
+  seedPaystack,
   seedS3,
   seedSlack,
   SLACK_HOSTS,
@@ -56,6 +60,7 @@ const PUBSUB_VERIFY_APP = fileURLToPath(new URL("./fixtures/pubsub-verify-app.ts
 const SLACK_APP = fileURLToPath(new URL("./fixtures/slack-app.ts", import.meta.url))
 const GITHUB_BOT_APP = fileURLToPath(new URL("./fixtures/github-bot-app.ts", import.meta.url))
 const TWILIO_VERIFY_APP = fileURLToPath(new URL("./fixtures/twilio-verify-app.ts", import.meta.url))
+const PAYSTACK_APP = fileURLToPath(new URL("./fixtures/paystack-app.ts", import.meta.url))
 
 let other: Server
 let otherUrl: string
@@ -915,6 +920,74 @@ describe("routing an unmodified Twilio Verify app", () => {
         `routed POST verify.twilio.com/v2/Services/${service}/Verifications 201`,
         `routed POST verify.twilio.com/v2/Services/${service}/VerificationCheck 200`,
         `routed POST verify.twilio.com/v2/Services/${service}/VerificationCheck 200`,
+      ])
+    } finally {
+      child.kill()
+      await proxy.stop()
+      await emulator.close()
+    }
+  })
+})
+
+const PaystackOutput = z.union([
+  z.object({ ready: z.boolean() }),
+  z.object({ link: z.string(), reference: z.string() }),
+  z.object({ verified: z.string() }),
+  z.object({ event: z.string(), valid: z.boolean() }),
+])
+
+describe("routing an unmodified Paystack app", () => {
+  it("initializes through the proxy, is paid on the hosted page, verifies and trusts a signed charge.success", async () => {
+    const secret = "REDACTED-TEST-VALUE"
+    const port = await freePort()
+    const emulator = createEmulator(paystack)
+
+    seedPaystack(emulator.store, {
+      integrations: [{ secretKey: secret, webhookUrl: `http://127.0.0.1:${port}/webhook` }],
+    })
+
+    const proxy = await startProxy({
+      routes: [{ hosts: [...PAYSTACK_HOSTS], handler: emulator.fetch }],
+      unmatched: "block",
+    })
+    const child = spawn(process.execPath, [PAYSTACK_APP], {
+      env: { ...proxy.env(), PAYSTACK_SECRET_KEY: secret, PORT: String(port) },
+      cwd: fileURLToPath(new URL("..", import.meta.url)),
+      stdio: ["pipe", "pipe", "inherit"],
+    })
+    const lines = createInterface({ input: child.stdout })[Symbol.asyncIterator]()
+    const next = async () => PaystackOutput.parse(JSON.parse(String((await lines.next()).value)))
+
+    try {
+      expect(await next()).toEqual({ ready: true })
+      child.stdin.write("start\n")
+
+      const started = z.object({ link: z.string(), reference: z.string() }).parse(await next())
+      /* The customer's browser: pay on the hosted page, then follow the redirect to the app. */
+      const paid = await emulator.fetch(
+        new Request(`${started.link}/card`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ number: "4084084084084081", expiry: "12/30", cvv: "408" }),
+          redirect: "manual",
+        }),
+      )
+
+      await fetch(paid.headers.get("location") ?? "")
+      await emulator.webhooks?.idle()
+
+      // The event and the customer's return race each other, as they do against Paystack.
+      expect([await next(), await next()]).toEqual(
+        expect.arrayContaining([{ verified: "success" }, { event: "charge.success", valid: true }]),
+      )
+      expect(paystackLedger(emulator).transaction(started.reference)?.status).toBe("success")
+
+      await proxy.settled()
+      expect(
+        proxy.exchanges().map((e) => `${e.disposition} ${e.method} ${e.host}${e.path}`),
+      ).toEqual([
+        "routed POST api.paystack.co/transaction/initialize",
+        `routed GET api.paystack.co/transaction/verify/${started.reference}`,
       ])
     } finally {
       child.kill()
