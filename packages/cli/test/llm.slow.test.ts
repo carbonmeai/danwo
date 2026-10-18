@@ -45,7 +45,7 @@ describe("danwo matrix on an assistant that calls a model", () => {
     expect(out).toContain("PASS  status 429 on POST api.openai.com/v1/chat/completions")
     expect(out).toContain("PASS  malformed-tool-call on POST api.openai.com/v1/chat/completions")
     expect(out).toContain("PASS  stream-cut on POST api.openai.com/v1/chat/completions #2")
-    expect(out).toContain("faults: 26 passed")
+    expect(out).toContain("faults: 27 passed")
     expect(code).toBe(0)
   }, 300_000)
 
@@ -72,7 +72,9 @@ describe("danwo matrix on an assistant that calls a model", () => {
     expect(out).toContain("FAIL  status 429 on POST api.openai.com/v1/chat/completions #2")
     expect(out).toContain("PASS  status 429 on POST api.openai.com/v1/chat/completions\n")
     expect(out).toContain("invariant: expected 2 to be less than or equal to 1")
-    expect(out).toContain("faults: 18 passed, 8 failed")
+    // Asking twice at once refunds twice too: the same missing guard.
+    expect(out).toContain("FAIL  double-submit on POST /ask")
+    expect(out).toContain("faults: 18 passed, 9 failed")
     expect(code).toBe(1)
   }, 300_000)
 })

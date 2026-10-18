@@ -257,7 +257,8 @@ describe("danwo test with saved sessions", () => {
     // The invariant also checks the trial's fresh app was signed into exactly once.
     expect(out).toContain("PASS  clean run")
     expect(out).toContain("PASS  status 503 on PUT danwo-notes.t3.storage.dev/notes/:id")
-    expect(out).toContain("faults: 4 passed")
+    expect(out).toContain("PASS  double-submit on POST /notes")
+    expect(out).toContain("faults: 5 passed")
     expect(code).toBe(0)
   }, 180_000)
 })
@@ -332,7 +333,7 @@ describe("danwo matrix", () => {
 
     expect(out).toContain("FAIL  duplicate on webhook checkout.session.completed")
     expect(out).toContain("invariant: expected 1000 to be 500")
-    expect(out).toContain("faults: 14 passed, 1 failed")
+    expect(out).toContain("faults: 17 passed, 1 failed")
     expect(code).toBe(1)
 
     // Only the failed run is kept, and the run's report shows why it failed.
@@ -352,7 +353,7 @@ describe("danwo matrix", () => {
     // The GitHub check: failed, with the duplicate annotated in the test file, and no secrets.
     expect(bodyOf(fake, 0)?.name).toBe("danwo matrix")
     expect(bodyOf(fake, -1)?.conclusion).toBe("failure")
-    expect(bodyOf(fake, -1)?.output?.title).toBe("faults: 14 passed · 1 failed")
+    expect(bodyOf(fake, -1)?.output?.title).toBe("faults: 17 passed · 1 failed")
     expect(bodyOf(fake, -1)?.output?.annotations).toEqual([
       expect.objectContaining({
         path: "examples/shop/tests/buy-credits.danwo.ts",
@@ -407,7 +408,7 @@ describe("danwo matrix", () => {
     expect(out).toContain(
       "PASS  forged on google webhook pubsub:projects/inbox-sync/subscriptions/gmail-push",
     )
-    expect(out).toContain("faults: 24 passed")
+    expect(out).toContain("faults: 26 passed")
     expect(code).toBe(0)
   }, 300_000)
 
@@ -425,7 +426,9 @@ describe("danwo matrix", () => {
       "FAIL  forged on google webhook pubsub:projects/inbox-sync/subscriptions/gmail-push",
     )
     expect(out).toContain("invariant: expected 2 to be 1")
-    expect(out).toContain("faults: 22 passed, 2 failed")
+    // Sending a message twice at once lists it twice too: the same missing dedupe.
+    expect(out).toContain("FAIL  double-submit on POST /send")
+    expect(out).toContain("faults: 23 passed, 3 failed")
     expect(code).toBe(1)
 
     const report = /report: (\S+report\.html)/.exec(out)?.[1] ?? ""
@@ -477,7 +480,7 @@ describe("danwo matrix", () => {
     )
     expect(out).toContain("PASS  duplicate on twilio webhook message.status /twilio/status #2")
     expect(out).toContain("PASS  forged on twilio webhook message.status /twilio/status #2")
-    expect(out).toContain("faults: 26 passed")
+    expect(out).toContain("faults: 28 passed")
     expect(code).toBe(0)
   }, 300_000)
 
@@ -490,7 +493,7 @@ describe("danwo matrix", () => {
     expect(out).toContain("FAIL  duplicate on twilio webhook message.status /twilio/status #2")
     expect(out).toContain("PASS  forged on twilio webhook message.status /twilio/status #2")
     expect(out).toContain("invariant: expected 2 to be less than or equal to 1")
-    expect(out).toContain("faults: 25 passed, 1 failed")
+    expect(out).toContain("faults: 27 passed, 1 failed")
     expect(code).toBe(1)
 
     const report = /report: (\S+report\.html)/.exec(out)?.[1] ?? ""
@@ -509,7 +512,7 @@ describe("danwo matrix", () => {
     expect(out).toContain("PASS  status 200 on GET api.flutterwave.com/v3/transactions/:id/verify")
     expect(out).toContain("PASS  duplicate on flutterwave webhook charge.completed")
     expect(out).toContain("PASS  forged on flutterwave webhook charge.completed")
-    expect(out).toContain("faults: 26 passed")
+    expect(out).toContain("faults: 29 passed")
     expect(code).toBe(0)
   }, 300_000)
 
@@ -526,7 +529,7 @@ describe("danwo matrix", () => {
     expect(out).toContain("FAIL  duplicate on flutterwave webhook charge.completed")
     expect(out).toContain("PASS  forged on flutterwave webhook charge.completed")
     expect(out).toContain("invariant: expected 1000 to be less than or equal to 500")
-    expect(out).toContain("faults: 25 passed, 1 failed")
+    expect(out).toContain("faults: 28 passed, 1 failed")
     expect(code).toBe(1)
 
     const report = /report: (\S+report\.html)/.exec(out)?.[1] ?? ""
@@ -559,7 +562,9 @@ describe("danwo matrix", () => {
     expect(out).toContain("PASS  status 200 on GET api.paystack.co/transaction/verify/:id")
     expect(out).toContain("PASS  duplicate on paystack webhook charge.success")
     expect(out).toContain("PASS  forged on paystack webhook charge.success")
-    expect(out).toContain("faults: 14 passed")
+    // The hosted page's path carries its own access code, so the held return is found by host.
+    expect(out).toContain("PASS  webhooks before redirect from checkout.paystack.com")
+    expect(out).toContain("faults: 17 passed")
     expect(code).toBe(0)
   }, 300_000)
 
@@ -576,7 +581,7 @@ describe("danwo matrix", () => {
     expect(out).toContain(
       'invariant: expect(getByRole("status")).toHaveText("Credits: 500") failed',
     )
-    expect(out).toContain("faults: 13 passed, 1 failed")
+    expect(out).toContain("faults: 16 passed, 1 failed")
     expect(code).toBe(1)
 
     const report = /report: (\S+report\.html)/.exec(out)?.[1] ?? ""
@@ -595,7 +600,7 @@ describe("danwo matrix", () => {
     expect(out).toContain("PASS  duplicate on bachs webhook collection.succeeded")
     expect(out).toContain("PASS  delay 600000ms on bachs webhook collection.succeeded")
     expect(out).toContain("PASS  forged on bachs webhook collection.succeeded")
-    expect(out).toContain("faults: 10 passed")
+    expect(out).toContain("faults: 13 passed")
     expect(code).toBe(0)
   }, 300_000)
 
@@ -614,7 +619,7 @@ describe("danwo matrix", () => {
     expect(out).toContain(
       'invariant: expect(getByRole("status")).toHaveText("Credits: 500") failed',
     )
-    expect(out).toContain("faults: 9 passed, 1 failed")
+    expect(out).toContain("faults: 12 passed, 1 failed")
     expect(code).toBe(1)
 
     const report = /report: (\S+report\.html)/.exec(out)?.[1] ?? ""
