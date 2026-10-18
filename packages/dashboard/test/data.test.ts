@@ -151,7 +151,11 @@ describe("runs", () => {
   })
 
   it("lists nothing for a project that never ran", async () => {
-    expect(await listRuns(root)).toEqual({ rows: [], total: 0 })
+    expect(await listRuns(root)).toMatchObject({
+      rows: [],
+      total: 0,
+      health: { window: 0, passRate: null },
+    })
   })
 })
 
