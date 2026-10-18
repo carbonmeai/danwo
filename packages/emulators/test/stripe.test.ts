@@ -518,7 +518,9 @@ describe("refunds and deleted customers", () => {
       payment_intent: pi.id,
     })
     await expect(s.refunds.retrieve(refund.id)).resolves.toMatchObject({ id: refund.id })
-    await expect(s.charges.retrieve(String(refund.charge))).resolves.toMatchObject({
+    const charge = typeof refund.charge === "string" ? refund.charge : (refund.charge?.id ?? "")
+
+    await expect(s.charges.retrieve(charge)).resolves.toMatchObject({
       refunded: true,
       amount_refunded: 2000,
     })
