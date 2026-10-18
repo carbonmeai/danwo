@@ -92,10 +92,11 @@ export interface GithubFixtures {
 export const test: TestAPI<DanwoFixtures> =
   baseTest.extend<Omit<DanwoFixtures, keyof TestFixtures>>()
 
-/*
- * The registry's functions never use `this`; it destructures them the same way.
- * oxlint-disable-next-line typescript/unbound-method
+/**
+ * `test.describe` and the hooks, for files that import them by name. The registry's functions
+ * never use `this`, so they work taken off `test`.
  */
+// oxlint-disable-next-line typescript/unbound-method
 export const { describe, beforeEach, afterEach, beforeAll, afterAll } = test
 
 export {

@@ -40,6 +40,7 @@ export interface OutlookMessage {
   readonly attachments: ReadonlyArray<{ readonly name: string; readonly size: number }>
 }
 
+/** What `outlookMailbox(emulator, user)` reads and does: a user's Outlook mail. */
 export interface OutlookMailbox {
   /** Messages newest first; only those in `folder` (a well-known name or id) when given. */
   messages(folder?: string): OutlookMessage[]
@@ -108,6 +109,7 @@ export interface CalendarEntry {
   readonly showAs: string
 }
 
+/** What `outlookCalendar(emulator, user)` reads: a user's Outlook calendar events. */
 export interface OutlookCalendar {
   /** Occurrences between two instants, series expanded, earliest first. */
   between(from: string, to: string): CalendarEntry[]
@@ -156,6 +158,7 @@ export interface DriveEntry {
   readonly size: number
 }
 
+/** What `oneDrive(emulator, user)` reads: a user's OneDrive files. */
 export interface OneDrive {
   /** Every file and folder, by path. */
   list(): DriveEntry[]

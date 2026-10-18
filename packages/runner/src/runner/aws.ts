@@ -10,6 +10,7 @@ const run = promisify(execFile)
 /** The MiniStack image `docker: true` runs; MiniStack is MIT-licensed (ministack.org). */
 export const MINISTACK_IMAGE = "ministackorg/ministack:1.5.28"
 
+/** Options of `awsService()` and `awsEnvironment()`: where MiniStack runs and what it answers. */
 export interface AwsOptions {
   /**
    * A MiniStack (or LocalStack) the user runs, e.g. `http://127.0.0.1:4566`. Ignored when `docker`
@@ -37,6 +38,7 @@ export interface AwsFixture {
   readonly endpoint: string
 }
 
+/** What `awsEnvironment()` starts: AWS hosts sent to MiniStack through its own proxy. */
 export interface AwsEnvironment {
   readonly endpoint: string
   readonly proxy: Proxy

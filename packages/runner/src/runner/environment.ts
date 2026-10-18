@@ -40,6 +40,7 @@ export interface WorkerEnvironment {
   close(): Promise<void>
 }
 
+/** What a config's `environment()` is called with, once per worker. */
 export interface EnvironmentContext {
   /** 0-based worker slot; use it to keep ports and data apart between workers. */
   readonly workerIndex: number

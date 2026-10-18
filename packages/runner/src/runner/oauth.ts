@@ -30,21 +30,25 @@ import { type Service, type Services, settleWebhooks, startServices } from "./se
  */
 export type Seed<Config> = Config | (() => Config | undefined)
 
+/** Options of `googleService()` and `googleEnvironment()`. */
 export interface GoogleOptions {
   /** OAuth clients, users, and their Gmail, Calendar, Drive and Pub/Sub push data. */
   readonly seed?: Seed<GoogleSeedConfig>
 }
 
+/** Options of `microsoftService()` and `microsoftEnvironment()`. */
 export interface MicrosoftOptions {
   /** Registrations, users, and their Outlook mail, calendar events and OneDrive files. */
   readonly seed?: Seed<MicrosoftSeedConfig>
 }
 
+/** Options of `slackService()` and `slackEnvironment()`. */
 export interface SlackOptions {
   /** The team, users, channels, apps and installs; app URLs for events, commands and interactivity. */
   readonly seed?: Seed<SlackSeedConfig>
 }
 
+/** Options of `githubService()` and `githubEnvironment()`. */
 export interface GithubOptions {
   /** Users, orgs, repos, OAuth and GitHub Apps, installations and repository webhooks. */
   readonly seed?: Seed<GithubSeedConfig>
@@ -73,9 +77,13 @@ export interface OAuthEnvironment<Name extends string> {
   close(): Promise<void>
 }
 
+/** What `googleEnvironment()` starts: the Google emulator behind its own proxy. */
 export type GoogleEnvironment = OAuthEnvironment<"google">
+/** What `microsoftEnvironment()` starts: the Microsoft emulator behind its own proxy. */
 export type MicrosoftEnvironment = OAuthEnvironment<"microsoft">
+/** What `slackEnvironment()` starts: the Slack emulator behind its own proxy. */
 export type SlackEnvironment = OAuthEnvironment<"slack">
+/** What `githubEnvironment()` starts: the GitHub emulator behind its own proxy. */
 export type GithubEnvironment = OAuthEnvironment<"github">
 
 interface Provider<Config> {

@@ -16,6 +16,7 @@ import type { EnvironmentContext, WorkerEnvironment } from "./environment.ts"
 import type { RecordMode } from "./record.ts"
 import type { Reporter } from "./reporting.ts"
 
+/** What `danwo.config.ts` default-exports; every key is optional. */
 export interface DanwoConfig {
   /** Where test files are found, relative to the config file; default the config's folder. */
   readonly testDir?: string
@@ -106,6 +107,7 @@ export interface DanwoConfig {
   }
 }
 
+/** Types a project's config; returns it unchanged. */
 export function defineConfig(config: DanwoConfig): DanwoConfig {
   return config
 }

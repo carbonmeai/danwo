@@ -35,6 +35,7 @@ export function isStoredBody(value: unknown): value is StoredBody {
   return typeof value === "function"
 }
 
+/** Options of one test: `test(title, options, body)`. */
 export interface TestOptions {
   /** Extra attempts after a failure; overrides the config's `retries`. */
   readonly retries?: number
@@ -116,6 +117,7 @@ export interface DescribeCall {
   readonly only: (title: string, body: () => void) => void
 }
 
+/** `test`: declares a test (`test(title, body)`), with `only`, `skip`, `describe`, the hooks, `use`, `session` and `extend` on it. */
 export interface TestAPI<F = TestFixtures> extends Declare<F> {
   readonly only: Declare<F>
   readonly skip: SkipCall<F>

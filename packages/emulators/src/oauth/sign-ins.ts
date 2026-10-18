@@ -13,6 +13,7 @@ export interface SignIn {
   readonly createdAt: string
 }
 
+/** Who signed in to which OAuth client, as `googleSignIns` and `microsoftSignIns` read it. */
 export interface SignIns {
   /** Sign-ins, newest first; only those for `clientId` when given. */
   list(clientId?: string): SignIn[]

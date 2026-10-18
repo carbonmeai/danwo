@@ -17,6 +17,7 @@ export interface InboxEmail {
   links(): string[]
 }
 
+/** What `resendInbox(emulator)` reads: the mail the app sent through Resend. */
 export interface ResendInbox {
   /** Accepted emails, newest first; only those addressed to `to` (to, cc or bcc) when given. */
   list(to?: string): InboxEmail[]

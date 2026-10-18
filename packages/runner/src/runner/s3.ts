@@ -12,6 +12,7 @@ import { type Service, startServices } from "./services.ts"
 
 const DEFAULT_ENDPOINTS = [...TIGRIS_ENDPOINTS, "s3.amazonaws.com", "s3.us-east-1.amazonaws.com"]
 
+/** Options of `s3Service()` and `s3Environment()`: buckets to seed and endpoints to answer. */
 export interface S3Options {
   /** Buckets (and objects) to create on start and after every reset. */
   readonly seed?: S3SeedConfig
@@ -27,6 +28,7 @@ export interface S3Service extends Service {
   readonly emulator: Emulator
 }
 
+/** What `s3Environment()` starts: the S3 emulator behind its own proxy. */
 export interface S3Environment {
   readonly emulator: Emulator
   readonly proxy: Proxy

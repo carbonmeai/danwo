@@ -4,6 +4,7 @@ import type { z } from "zod"
 import type { Params } from "../replay/params.ts"
 import type { Budget } from "./budget.ts"
 
+/** Options of `agent.act`. */
 export interface ActOptions {
   /** Values the instruction names in braces, e.g. `{ params: { email: unique("ada@x.test") } }`. */
   readonly params?: Params
@@ -22,6 +23,7 @@ export interface ActOptions {
   readonly effects?: boolean
 }
 
+/** What `agent.act` resolves with. */
 export interface ActResult {
   /** What the step did, in the agent's words (or the replay's). */
   readonly summary: string
@@ -31,6 +33,7 @@ export interface ActResult {
   readonly actions: number
 }
 
+/** Options of `agent.extract`. */
 export interface ExtractOptions {
   /** Values the instruction names in braces, as for `act`. */
   readonly params?: Params
@@ -39,11 +42,13 @@ export interface ExtractOptions {
 /** How long to keep looking, and how often; `true` takes the session's assertion timeout. */
 export type PollOption = boolean | { readonly timeout?: number; readonly interval?: number }
 
+/** Options of `agent.assert`. */
 export interface AssertOptions {
   /** Ask the judge again until the claim holds or time runs out, instead of once. */
   readonly poll?: PollOption
 }
 
+/** Options of `agent.waitFor`. */
 export interface WaitForOptions {
   /** How long to wait, in milliseconds; default 30 000. */
   readonly timeout?: number
@@ -53,6 +58,7 @@ export interface WaitForOptions {
   readonly params?: Params
 }
 
+/** The `agent` fixture: steps and claims in plain language, replayed from recordings when it can. */
 export interface Agent {
   /** Carries out `instruction` on the page, replaying a recording of it when there is one. */
   act(instruction: string, options?: ActOptions): Promise<ActResult>

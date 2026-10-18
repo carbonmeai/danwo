@@ -10,6 +10,7 @@ import type { Proxy } from "@danwo/proxy"
 
 import { type Service, settleWebhooks, startServices } from "./services.ts"
 
+/** Options of `stripeService()` and `stripeEnvironment()`. */
 export interface StripeOptions {
   /** Runs on start and after every reset; a function, so it can use values only known later (the app's webhook URL). */
   readonly seed?: () => StripeSeedConfig | undefined
@@ -20,6 +21,7 @@ export interface StripeService extends Service {
   readonly clock: ManualClock
 }
 
+/** What `stripeEnvironment()` starts: the Stripe emulator behind its own proxy, on a manual clock. */
 export interface StripeEnvironment {
   readonly emulator: Emulator
   readonly proxy: Proxy

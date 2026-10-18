@@ -26,6 +26,7 @@ export type IncomingMail = Omit<Composition, "bcc" | "messageIdHeader" | "refere
   readonly labelIds?: readonly string[]
 }
 
+/** What `gmailMailbox(emulator, user)` reads and does: a user's Gmail messages. */
 export interface GmailMailbox {
   /** Messages, newest first; only those with `labelId` when given. */
   messages(labelId?: string): GmailMessage[]
@@ -144,6 +145,7 @@ export interface GoogleCalendar {
   expireSyncTokens(): void
 }
 
+/** A user's Google Calendar in the emulator: read events, and change them as if from elsewhere. */
 export function googleCalendar(
   emulator: Pick<Emulator, "store" | "outbox">,
   email: string,
@@ -176,6 +178,7 @@ export interface GoogleDrive {
   remove(fileId: string): void
 }
 
+/** A user's Google Drive in the emulator: read files, and change them as if from elsewhere. */
 export function googleDrive(
   emulator: Pick<Emulator, "store" | "outbox">,
   email: string,

@@ -17,6 +17,7 @@ export interface StoredObject {
   text(): string
 }
 
+/** What `s3Objects(emulator)` reads: the buckets and objects the app stored. */
 export interface S3Objects {
   /** Bucket names, in creation order. */
   buckets(): string[]

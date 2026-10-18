@@ -104,6 +104,23 @@ export function exitCodeForError(error: unknown): number {
   return exitCodeOf([classOf(codeOf(error))])
 }
 
+/** One row of the code table: a code, its class, the exit code it gives and what it means. */
+export interface ErrorCodeRow {
+  readonly code: ErrorCode
+  readonly class: ErrorClass
+  readonly exit: number
+  readonly meaning: string
+}
+
+/** Every error code with its class, exit code and meaning, in the table's order. */
+export function errorCodeTable(): readonly ErrorCodeRow[] {
+  return CODES.filter(isErrorCode).map((code) => {
+    const [kind, meaning] = ERROR_CODES[code]
+
+    return { code, class: kind, exit: EXIT[kind], meaning }
+  })
+}
+
 /** Whether a failure of this class says nothing about the app: the run could not be judged. */
 export function notJudged(kind: ErrorClass): boolean {
   return kind === "blocked" || kind === "inconclusive" || kind === "infra"
