@@ -1,6 +1,6 @@
 ---
 name: danwo
-description: Write, run and fix danwo tests (`*.danwo.ts`) that drive a web app through its UI while emulated providers (Stripe, Resend, S3, Google, Microsoft, Slack, GitHub) run behind it, and check invariants under the fault matrix. Use when the user asks to test a user journey, verify a UI change in the running app, reproduce a bug, debug a failing danwo test, or check how the app handles provider failures and duplicate webhooks.
+description: Write, run and fix danwo tests (`*.danwo.ts`) that drive a web app through its UI while emulated providers (Stripe, Resend, S3, Google, Microsoft, Slack, GitHub, Twilio) run behind it, and check invariants under the fault matrix. Use when the user asks to test a user journey, verify a UI change in the running app, reproduce a bug, debug a failing danwo test, or check how the app handles provider failures and duplicate webhooks.
 ---
 
 # danwo

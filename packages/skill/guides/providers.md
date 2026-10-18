@@ -1,7 +1,7 @@
 # Emulating a provider
 
-danwo runs fake Stripe, Resend, S3 and Tigris, Google, Microsoft, Slack and GitHub behind an
-egress proxy, so the app talks to the real hostnames, unchanged, and tests can read and fault
+danwo runs fake Stripe, Resend, S3 and Tigris, Google, Microsoft, Slack, GitHub and Twilio behind
+an egress proxy, so the app talks to the real hostnames, unchanged, and tests can read and fault
 what it did.
 
 ## The environment
@@ -73,5 +73,5 @@ composes services behind one proxy; its result has `fixtures`, `webhooks` (keyed
 Type the fixtures with `test.extend<StripeFixtures>()` and read the emulators in tests and
 invariants: `resendInbox`, `s3Objects`, `gmailMailbox`, `googleCalendar`, `googleDrive`,
 `outlookMailbox`, `outlookCalendar`, `oneDrive`, `graphSubscriptions`, `slackWorkspace`,
-`githubRepo`, and the `*SignIns` helpers. `danwo spec --topic emulators` lists them with their
+`githubRepo`, `twilioInbox` (and `twilioPhone` to text the app), and the `*SignIns` helpers. `danwo spec --topic emulators` lists them with their
 signatures, and `--topic environments` the seed shapes.

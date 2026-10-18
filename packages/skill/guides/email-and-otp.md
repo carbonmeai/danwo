@@ -6,7 +6,8 @@ the values come from the emulators instead of from the screen.
 ## Where mail lands
 
 Return the mail sources from the environment, e.g. `mail: [resendMail(resend)]` (also
-`gmailMail(google)` and `outlookMail(microsoft)`). Tests then get a `mail` fixture:
+`gmailMail(google)`, `outlookMail(microsoft)`, and `twilioSms(twilio)` for texted codes, where the
+address is the phone number). Tests then get a `mail` fixture:
 
 ```ts
 await screen.getByLabel("Email").fill(email)

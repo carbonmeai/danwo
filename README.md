@@ -10,7 +10,7 @@ It drives the app through its UI like a user, while third-party services the app
 
 - **`danwo test`**: tests in `*.danwo.ts` files with `test`, `describe`, hooks, fixtures and invariants, run in parallel workers. Steps use locators (`screen.getByRole(...)`) or an AI agent (`agent.act`, `agent.assert`, `agent.extract`) whose verified steps replay with zero model calls.
 - **`danwo matrix`**: reruns a test once per planned fault (provider errors, dropped connections, slow responses, duplicate, late, forged or stale webhooks) and judges each run by the test's invariant.
-- **Emulators**: Stripe, Resend, S3 and Tigris, Google (sign-in, Gmail, Calendar, Drive), Microsoft (sign-in, Outlook mail and calendar, OneDrive, Graph change notifications), Slack and GitHub, each checked against the official SDK. Other AWS services can be forwarded to MiniStack.
+- **Emulators**: Stripe, Resend, S3 and Tigris, Google (sign-in, Gmail, Calendar, Drive), Microsoft (sign-in, Outlook mail and calendar, OneDrive, Graph change notifications), Slack, GitHub and Twilio (messages, status callbacks, incoming texts, Verify), each checked against the official SDK. Other AWS services can be forwarded to MiniStack.
 - **Egress proxy**: routes real provider hostnames to emulators, logs every exchange and applies faults.
 - **Flight recorder**: for failed runs, an offline HTML report with steps, screenshots, network exchanges, webhook deliveries and emulator state, with secrets redacted.
 - **Visual checks**: `toHaveScreenshot` with baselines and masks.
