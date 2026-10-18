@@ -4,6 +4,9 @@
  *
  * Env: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, PORT (0 picks one; the chosen port is printed as
  * `listening <port>`). SHOP_BUG=no-dedupe turns off webhook de-duplication, a bug to catch.
+ * SHOP_TEST_RESET=1 adds `POST /__test/reset`, which empties the shop's books: the in-memory
+ * counterpart of restoring a template database, so a test environment can start each run afresh
+ * without restarting the app.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
 import { text as readText } from "node:stream/consumers"
@@ -184,6 +187,14 @@ const ROUTES: Record<string, Route> = {
   "POST /webhooks/stripe": (req, res) => webhook(req, res),
   "GET /credits": (_req, res, url) =>
     send(res, 200, { credits: credits.get(url.searchParams.get("user") ?? "") ?? 0 }),
+  ...(process.env.SHOP_TEST_RESET === "1" && { "POST /__test/reset": emptyBooks }),
+}
+
+/** Forgets every credit and handled event. */
+function emptyBooks(_req: IncomingMessage, res: ServerResponse): void {
+  credits.clear()
+  handledEvents.clear()
+  send(res, 200, { reset: true })
 }
 
 const server = createServer((req, res) => {

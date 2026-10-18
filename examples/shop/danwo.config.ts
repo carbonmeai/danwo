@@ -35,6 +35,7 @@ export default defineConfig({
           ...process.env,
           STRIPE_SECRET_KEY: "sk_test_danwo_example",
           STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET,
+          SHOP_TEST_RESET: "1",
         }),
       )
       await stripe.reset()
@@ -53,6 +54,16 @@ export default defineConfig({
       async reset() {
         await shop?.stop()
         await start()
+      },
+      /*
+       * `danwo matrix` resets once per worker, keeps this snapshot, and restores it before every
+       * later run: the emulator's store comes back from memory and the shop empties its books,
+       * so no run restarts the app.
+       */
+      snapshot: () => stripe.snapshot(),
+      async restore() {
+        await stripe.restore()
+        await fetch(`${shop?.url ?? ""}/__test/reset`, { method: "POST" })
       },
       async close() {
         await shop?.stop()
