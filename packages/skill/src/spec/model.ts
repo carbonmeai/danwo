@@ -33,12 +33,9 @@ export interface SpecMember {
 }
 
 /** One thing the spec describes: an export, a config key's interface, an error code, a command. */
-export interface SpecEntry {
-  readonly name: string
+export interface SpecEntry extends SpecMember {
   /** `function`, `value`, `interface`, `type`, `class`, or what the section lists (`code`, `command`…). */
   readonly kind: string
-  readonly signature: string
-  readonly doc: string
   readonly members: readonly SpecMember[]
 }
 
@@ -54,20 +51,22 @@ export interface Spec {
   readonly sections: readonly SpecSection[]
 }
 
-/** A command's positional argument, as the CLI defines it. */
-export interface CliArgument {
-  readonly name: string
-  readonly required: boolean
-  readonly variadic: boolean
+/** What every command parameter carries: what it does and, when it is a closed set, its values. */
+interface CliParameter {
   readonly description: string
   readonly choices: readonly string[]
 }
 
+/** A command's positional argument, as the CLI defines it. */
+export interface CliArgument extends CliParameter {
+  readonly name: string
+  readonly required: boolean
+  readonly variadic: boolean
+}
+
 /** A command's option, as the CLI defines it. */
-export interface CliOption {
+export interface CliOption extends CliParameter {
   readonly flags: string
-  readonly description: string
-  readonly choices: readonly string[]
   readonly default: string | undefined
 }
 

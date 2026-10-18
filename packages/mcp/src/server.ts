@@ -147,6 +147,16 @@ function registerContext(server: McpServer, project: Project): void {
 }
 
 /** The server for one project, not yet connected to a transport. */
+/** The tools and resources that work on the project, registered in the order clients list them. */
+const PROJECT_TOOLS = [
+  registerTestTools,
+  registerMatrixTool,
+  registerRunTools,
+  registerInspectTool,
+  registerScaffoldTool,
+  registerContext,
+]
+
 export function createDanwoServer(options: DanwoServerOptions): McpServer {
   const project = new Project(options.cwd, options.config)
   const server = new McpServer({ name: "danwo", version: options.version ?? "0.0.0" })
@@ -161,12 +171,7 @@ export function createDanwoServer(options: DanwoServerOptions): McpServer {
   }
 
   registerSessionTools(server, sessions)
-  registerTestTools(server, project)
-  registerMatrixTool(server, project)
-  registerRunTools(server, project)
-  registerInspectTool(server, project)
-  registerScaffoldTool(server, project)
-  registerContext(server, project)
+  for (const registerProjectTools of PROJECT_TOOLS) registerProjectTools(server, project)
   registerReference(server, options.commands)
 
   return server

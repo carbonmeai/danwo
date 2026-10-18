@@ -24,36 +24,35 @@ interface Probe {
   readonly path: string
 }
 
-/** A write and, where reads fault differently, a read for each provider. */
-const PROBES: readonly Probe[] = [
-  { provider: "Stripe", method: "POST", host: "api.stripe.com", path: "/v1/checkout/sessions" },
-  { provider: "Stripe", method: "GET", host: "api.stripe.com", path: "/v1/customers/cus_a1" },
-  { provider: "Resend", method: "POST", host: "api.resend.com", path: "/emails" },
-  { provider: "S3 and Tigris", method: "PUT", host: "t3.storage.dev", path: "/media/a.png" },
-  { provider: "S3 and Tigris", method: "GET", host: "t3.storage.dev", path: "/media/a.png" },
-  { provider: "Google", method: "POST", host: "oauth2.googleapis.com", path: "/token" },
-  {
-    provider: "Google",
-    method: "GET",
-    host: "gmail.googleapis.com",
-    path: "/gmail/v1/users/me/history",
-  },
-  {
-    provider: "Microsoft",
-    method: "POST",
-    host: "login.microsoftonline.com",
-    path: "/common/oauth2/v2.0/token",
-  },
-  { provider: "Microsoft", method: "GET", host: "graph.microsoft.com", path: "/v1.0/me/messages" },
-  { provider: "Slack", method: "POST", host: "slack.com", path: "/api/chat.postMessage" },
-  {
-    provider: "GitHub",
-    method: "POST",
-    host: "api.github.com",
-    path: "/repos/acme/app/issues/1/comments",
-  },
-  { provider: "any other host", method: "POST", host: "api.example.test", path: "/v1/orders" },
+/**
+ * A write and, where reads fault differently, a read for each provider, as
+ * `provider | METHOD host/path`.
+ */
+const PROBE_LINES = [
+  "Stripe | POST api.stripe.com/v1/checkout/sessions",
+  "Stripe | GET api.stripe.com/v1/customers/cus_a1",
+  "Resend | POST api.resend.com/emails",
+  "S3 and Tigris | PUT t3.storage.dev/media/a.png",
+  "S3 and Tigris | GET t3.storage.dev/media/a.png",
+  "Google | POST oauth2.googleapis.com/token",
+  "Google | GET gmail.googleapis.com/gmail/v1/users/me/history",
+  "Microsoft | POST login.microsoftonline.com/common/oauth2/v2.0/token",
+  "Microsoft | GET graph.microsoft.com/v1.0/me/messages",
+  "Slack | POST slack.com/api/chat.postMessage",
+  "GitHub | POST api.github.com/repos/acme/app/issues/1/comments",
+  "any other host | POST api.example.test/v1/orders",
 ]
+
+/** One probe line read into its parts. */
+function probeOf(line: string): Probe {
+  const [provider = "", call = ""] = line.split(" | ")
+  const [method = "", target = ""] = call.split(" ")
+  const slash = target.indexOf("/")
+
+  return { provider, method, host: target.slice(0, slash), path: target.slice(slash) }
+}
+
+const PROBES: readonly Probe[] = PROBE_LINES.map(probeOf)
 
 /** Webhook deliveries the vocabulary is shown for: one unnamed sender, one named service. */
 const DELIVERIES: readonly (readonly [string | undefined, string])[] = [
