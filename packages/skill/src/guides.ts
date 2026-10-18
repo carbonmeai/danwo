@@ -25,6 +25,7 @@ const ORDER = [
   "llm",
   "email-and-otp",
   "sessions",
+  "time",
   "secrets",
   "debugging",
   "dashboard",

@@ -19,6 +19,7 @@ describe("danwo guide", () => {
       "llm",
       "email-and-otp",
       "sessions",
+      "time",
       "secrets",
       "debugging",
       "dashboard",

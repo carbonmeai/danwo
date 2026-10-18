@@ -61,6 +61,7 @@ describe("the server", () => {
       "danwo://guide/providers",
       "danwo://guide/secrets",
       "danwo://guide/sessions",
+      "danwo://guide/time",
       "danwo://runs/latest",
       "danwo://spec",
     ])

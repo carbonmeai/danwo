@@ -17,6 +17,7 @@ It drives the app through its UI like a user, while third-party services the app
 - **Flight recorder**: for failed runs, an offline HTML report with steps, screenshots, network exchanges, webhook deliveries and emulator state, with secrets redacted.
 - **Visual checks**: `toHaveScreenshot` with baselines and masks.
 - **Saved sessions**: sign in once per worker and start every test that names the session from that browser state (cookies, localStorage, IndexedDB); it is set up again when the environment resets or its check fails.
+- **Time travel**: `time.travel({ days: 30 })` moves the app's clock, every emulator's clock and the page's clock together, so trials end, subscriptions renew and retries run in seconds; faults still apply to what falls due afterwards. See `danwo guide time`.
 - **`danwo record`**: use the app in a browser and get a test: a locator line per action, what each action caused behind the app, and an invariant drafted from it.
 
 ## Packages
@@ -131,6 +132,30 @@ no name, a widget in a frame it cannot list) it looks at a screenshot with numbe
 there; each such action replays with no model call by finding its place by how it looks. Set
 `vision: "auto" | "always" | "off"` in the config (default `auto`), or `{ mode, model }` for a model
 of its own that places described targets. `act`, `assert` and `extract` take `{ vision }` per call.
+
+## Time travel
+
+```ts
+test("a trial turns into a paid plan", async ({ app, screen, expect, time, settle }) => {
+  // …start the trial…
+  await time.travel({ days: 15 })
+  await settle()
+  await app.open("/account")
+  await expect(screen.getByRole("status")).toHaveText("Plan: active")
+})
+```
+
+What moves:
+
+- **The app's clock.** Node and Bun apps started with `proxy.env()` run their `Date` ahead by the
+  travelled offset, through the proxy's preload. Their timers stay on real time, so sockets,
+  retries and pools keep working.
+- **The emulators' clocks.** They play renewals, retries and expiries in order, each step's
+  webhooks landing before the next.
+- **The page's clock.** It jumps too.
+
+Time only moves forward, and each jump is a step in the flight record. `danwo matrix` faults the
+webhooks that fall due after a jump like any other.
 
 ## Saved sessions
 
