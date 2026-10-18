@@ -52,6 +52,7 @@
       },
       "devDependencies": {
         "@aws-sdk/client-s3": "3.1152.0",
+        "@bachs/sdk": "1.0.0",
         "@danwo/sdk": "workspace:*",
         "@types/pg": "8.23.1",
         "openid-client": "6.8.8",
@@ -97,6 +98,7 @@
         "@aws-sdk/s3-presigned-post": "3.1152.0",
         "@aws-sdk/s3-request-presigner": "3.1152.0",
         "@azure/msal-node": "7.1.0",
+        "@bachs/sdk": "1.0.0",
         "@microsoft/microsoft-graph-client": "3.0.7",
         "@microsoft/microsoft-graph-types": "2.43.1",
         "@octokit/auth-app": "8.3.1",
@@ -174,6 +176,7 @@
         "@aws-sdk/client-s3": "3.1152.0",
         "@aws-sdk/s3-request-presigner": "3.1152.0",
         "@azure/msal-node": "7.1.0",
+        "@bachs/sdk": "1.0.0",
         "@danwo/emulators": "workspace:*",
         "google-auth-library": "11.3.1",
         "resend": "6.34.1",
@@ -298,6 +301,8 @@
     "@azure/msal-node": ["@azure/msal-node@7.1.0", "", { "dependencies": { "@azure/msal-common": "16.14.2", "jsonwebtoken": "^9.0.0" } }, "sha512-s1O6hSY/C/dmqykTmmeHY6GhSkDuY8N1gxyhuLyaCwbY7N+UBvU2Wu4flas7+NxZiAPcXNPVpgt3n/HP/5yL+w=="],
 
     "@babel/runtime": ["@babel/runtime@7.29.10", "", {}, "sha512-NpugTzbKgGrNe45Ui32cN8vCFFMxVtP/9rtfwv0nP5FRDAjvYBxJcLVpYA9mr1jxP6cnIT7x9LUzuDTbWYYNRA=="],
+
+    "@bachs/sdk": ["@bachs/sdk@1.0.0", "", {}, "sha512-GvF7kW++0uP3iXVqgKPkkG92oQEqiWzr3NKExleLXtaxP4LBqzLFuKfL9Tjjsx7BdJsSkf74jaE2OXCXc2wzvQ=="],
 
     "@cacheable/memory": ["@cacheable/memory@2.2.0", "", { "dependencies": { "@cacheable/utils": "^2.5.0", "@keyv/bigmap": "^1.3.1", "hookified": "^1.15.1", "keyv": "^5.6.0" } }, "sha512-CTLKqLItRCEixEAewD3/j9DB3/o96gpTPD4eJ1v+DGOlxZRZncRQkGYqqnAGCscYd6RNeXfGeiuCphsPtqyIfQ=="],
 

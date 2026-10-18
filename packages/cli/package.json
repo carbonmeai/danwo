@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "3.1152.0",
+    "@bachs/sdk": "1.0.0",
     "@danwo/sdk": "workspace:*",
     "@types/pg": "8.23.1",
     "openid-client": "6.8.8",

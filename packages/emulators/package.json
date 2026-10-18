@@ -16,6 +16,7 @@
     "@aws-sdk/s3-presigned-post": "3.1152.0",
     "@aws-sdk/s3-request-presigner": "3.1152.0",
     "@azure/msal-node": "7.1.0",
+    "@bachs/sdk": "1.0.0",
     "@microsoft/microsoft-graph-client": "3.0.7",
     "@microsoft/microsoft-graph-types": "2.43.1",
     "@octokit/auth-app": "8.3.1",
