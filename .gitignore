@@ -14,3 +14,4 @@ test-results/
 playwright-report/
 .local/
 .claude/worktrees/
+.work-*/
