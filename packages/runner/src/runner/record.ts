@@ -10,7 +10,9 @@ import { join, relative } from "node:path"
 import { deliveriesOf, type PlannedFault, type ServiceDelivery } from "@danwo/matrix"
 import type { CapturedMessage, Exchange } from "@danwo/proxy"
 
+import type { LintFinding } from "../lint/index.ts"
 import type { AppLogRecord, FailureEvidence, StepRecord } from "../record/index.ts"
+import { type CredentialKind, credentialKind, sentByBrowser } from "../secrets/index.ts"
 import type { ReplayDivergence } from "../session.ts"
 import type { TestError } from "../support/errors.ts"
 import type { AttemptFlight } from "./attempt.ts"
@@ -34,6 +36,10 @@ export type RecordedStep = StepRecord & {
 export type RecordedExchange = Omit<Exchange, "request" | "response"> & {
   readonly request?: CapturedMessage
   readonly response?: CapturedMessage
+  /** Who sent the call: the browser (a page's own request) or a server (the app). */
+  readonly origin?: "page" | "server"
+  /** The kind of credential it carried, by shape; the credential itself is redacted. */
+  readonly credential?: CredentialKind
 }
 
 export interface FlightRecord {
@@ -59,7 +65,12 @@ export interface FlightRecord {
   readonly deliveries: readonly ServiceDelivery[]
   /** Emulator state when the run ended, by service: what an invariant read from. */
   readonly state: Readonly<Record<string, unknown>>
+  /** What the integration lint found in the run. */
+  readonly lint?: readonly LintFinding[]
 }
+
+/** The parts of a record the integration lint reads, redacted as the record keeps them. */
+export type RecordEvidence = Pick<FlightRecord, "steps" | "exchanges" | "deliveries">
 
 const RUNS_DIR = join(".danwo", "runs")
 
@@ -123,11 +134,38 @@ export interface RecordInput {
   readonly mark: EvidenceMark
 }
 
-/** Builds the redacted record of one run from the session's flight and the environment's evidence. */
-export function buildRecord(input: RecordInput): FlightRecord {
-  const redactor = createRedactor((text) => input.flight.session.redact(text))
-  const since = input.flight.startedAt
+function redactorOf(input: Pick<RecordInput, "flight">): Redactor {
+  return createRedactor((text) => input.flight.session.redact(text))
+}
+
+/** A run's steps, calls and deliveries, redacted as its record keeps them. */
+export function recordEvidence(input: RecordInput): RecordEvidence {
+  const redactor = redactorOf(input)
   const screenshots = input.flight.session.screenshots()
+
+  return {
+    steps: redactor.deep(input.flight.session.steps()).map((step) => {
+      const screenshot = screenshots.get(step.index)
+
+      return screenshot === undefined ? step : { ...step, screenshot }
+    }),
+    exchanges: (input.env?.proxy?.exchanges() ?? [])
+      .slice(input.mark.exchanges)
+      .map((exchange) => redactExchange(exchange, redactor)),
+    deliveries: deliveriesOf(input.env?.webhooks).slice(input.mark.deliveries),
+  }
+}
+
+/** What the record adds to its evidence when the run was linted. */
+export interface RecordExtras {
+  /** The run's evidence when it was already gathered (for the lint), so it is not redone. */
+  readonly evidence?: RecordEvidence
+  readonly lint?: readonly LintFinding[]
+}
+
+/** Builds the redacted record of one run from the session's flight and the environment's evidence. */
+export function buildRecord(input: RecordInput, extras: RecordExtras = {}): FlightRecord {
+  const redactor = redactorOf(input)
 
   return {
     version: 1,
@@ -139,20 +177,13 @@ export function buildRecord(input: RecordInput): FlightRecord {
     stopped: redactor.deep(input.stopped),
     divergence: redactor.deep(input.divergence),
     notes: input.notes.map((note) => redactor.text(note)),
-    startedAt: since,
+    startedAt: input.flight.startedAt,
     durationMs: input.durationMs,
-    steps: redactor.deep(input.flight.session.steps()).map((step) => {
-      const screenshot = screenshots.get(step.index)
-
-      return screenshot === undefined ? step : { ...step, screenshot }
-    }),
+    ...(extras.evidence ?? recordEvidence(input)),
     appLog: redactor.deep(input.flight.session.appLog()),
     failure: redactor.deep(input.flight.failure),
-    exchanges: (input.env?.proxy?.exchanges() ?? [])
-      .slice(input.mark.exchanges)
-      .map((exchange) => redactExchange(exchange, redactor)),
-    deliveries: deliveriesOf(input.env?.webhooks).slice(input.mark.deliveries),
     state: environmentState(input.env, redactor),
+    ...(extras.lint !== undefined && extras.lint.length > 0 && { lint: extras.lint }),
   }
 }
 
@@ -178,10 +209,13 @@ function redactedPath(host: string, path: string, redactor: Redactor): string {
 /** An exchange as a flight record keeps it: path, headers and bodies redacted. */
 export function redactExchange(exchange: Exchange, redactor: Redactor): RecordedExchange {
   const { request, response, ...rest } = exchange
+  const credential = request && credentialKind(request.headers)
 
   return {
     ...rest,
     path: redactedPath(rest.host, rest.path, redactor),
+    ...(request && { origin: sentByBrowser(request.headers) ? "page" : "server" }),
+    ...(credential && { credential }),
     ...(request && { request: redactMessage(request, redactor) }),
     ...(response && { response: redactMessage(response, redactor) }),
   }

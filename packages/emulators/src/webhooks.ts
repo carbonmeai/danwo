@@ -91,7 +91,10 @@ export interface DeliveryAttempt {
   readonly endpointId: string
   /** 1 for the first attempt. */
   readonly attempt: number
+  /** When it was sent by the emulator's clock (which a test may hold or move). */
   readonly at: string
+  /** When it was sent by the wall clock: what lines it up with the run's steps and calls. */
+  readonly sentAt?: string
   /** HTTP status, or null when the request did not complete (refused, timed out). */
   readonly status: number | null
   readonly error: string | null
@@ -336,6 +339,7 @@ export class WebhookDispatcher {
     const { clock, policy } = this.options
     const generation = this.generation
     const at = clock()
+    const sentAt = new Date().toISOString()
     const body = encodeBody(message.body)
     const headers = this.signed(endpoint, body, Math.floor(at.getTime() / 1000), mode)
     const started = performance.now()
@@ -350,6 +354,7 @@ export class WebhookDispatcher {
       endpointId: endpoint.id,
       attempt,
       at: at.toISOString(),
+      sentAt,
       status,
       error,
       durationMs: Math.round(performance.now() - started),
