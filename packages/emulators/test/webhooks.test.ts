@@ -229,3 +229,42 @@ describe("delivery", () => {
 function seedEndpoint(events: string[], url = receiver.url): void {
   seedStripe(emulator.store, { webhookEndpoints: [{ url, events, secret: SECRET }] })
 }
+
+describe("a webhook held until another one lands", () => {
+  it("delivers the two events the other way round", async () => {
+    seedEndpoint(["customer.created", "customer.updated"])
+    emulator.webhooks?.setFault((message) =>
+      message.topic === "customer.created"
+        ? { kind: "after", topic: "customer.updated" }
+        : undefined,
+    )
+
+    const created = await client().customers.create({ email: "ada@danwo.test" })
+
+    await deliver()
+    expect(receiver.received).toEqual([])
+
+    await client().customers.update(created.id, { name: "Ada" })
+    await deliver()
+    await deliver()
+
+    expect(receiver.received.map((r) => r.event.type)).toEqual([
+      "customer.updated",
+      "customer.created",
+    ])
+    expect(emulator.webhooks?.attempts().map((a) => a.fault)).toEqual([
+      null,
+      "after customer.updated",
+    ])
+  })
+
+  it("never sends a message held for a topic that never comes", async () => {
+    seedEndpoint(["customer.created"])
+    emulator.webhooks?.setFault(() => ({ kind: "after", topic: "customer.deleted" }))
+
+    await client().customers.create({ email: "ada@danwo.test" })
+    await deliver(60_000)
+
+    expect(receiver.received).toEqual([])
+  })
+})

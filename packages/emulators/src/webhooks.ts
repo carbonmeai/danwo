@@ -51,13 +51,17 @@ export interface DeliveryPolicy {
  * - `duplicate`: deliver it twice;
  * - `delay`: hold the first attempt back (which also reorders it after later events);
  * - `forged`: also send a copy signed with the wrong secret, as an attacker would;
- * - `stale`: sign the first attempt as if made `seconds` ago; retries are signed normally.
+ * - `stale`: sign the first attempt as if made `seconds` ago; retries are signed normally;
+ * - `after`: hold it back until a message on `topic` has been delivered to the same endpoint, so
+ *   two events arrive in the opposite order to the one they were sent in. A message held for a
+ *   topic that never comes is never sent.
  */
 export type WebhookFault =
   | { readonly kind: "duplicate" }
   | { readonly kind: "delay"; readonly ms: number }
   | { readonly kind: "forged" }
   | { readonly kind: "stale"; readonly seconds: number }
+  | { readonly kind: "after"; readonly topic: string }
 
 export type WebhookFaultRule = (
   message: OutboxMessage,
@@ -71,6 +75,8 @@ export function describeWebhookFault(fault: WebhookFault): string {
       return `delay ${fault.ms}ms`
     case "stale":
       return `stale ${fault.seconds}s`
+    case "after":
+      return `after ${fault.topic}`
     default:
       return fault.kind
   }
@@ -84,6 +90,40 @@ interface AttemptMode {
 }
 
 const NORMAL: AttemptMode = { signing: "normal", retry: true, fault: null }
+
+/** The first attempts a message gets under `fault`: when each is sent, and how. */
+function firstAttempts(
+  fault: Exclude<WebhookFault, { kind: "after" }> | undefined,
+): readonly { readonly delayMs: number; readonly mode: AttemptMode }[] {
+  const label = fault ? describeWebhookFault(fault) : null
+
+  switch (fault?.kind) {
+    case "duplicate":
+      return [
+        { delayMs: 0, mode: NORMAL },
+        { delayMs: 0, mode: { ...NORMAL, fault: label } },
+      ]
+    case "delay":
+      return [{ delayMs: fault.ms, mode: { ...NORMAL, fault: label } }]
+    case "forged":
+      return [
+        { delayMs: 0, mode: { signing: "forged", retry: false, fault: label } },
+        { delayMs: 0, mode: NORMAL },
+      ]
+    case "stale":
+      return [{ delayMs: 0, mode: { signing: fault.seconds, retry: true, fault: label } }]
+    default:
+      return [{ delayMs: 0, mode: NORMAL }]
+  }
+}
+
+/** A message an `after` fault holds back until `topic` has been delivered to its endpoint. */
+interface Held {
+  readonly message: OutboxMessage
+  readonly endpoint: WebhookEndpoint
+  readonly topic: string
+  readonly label: string
+}
 
 export interface DeliveryAttempt {
   readonly messageId: number
@@ -142,6 +182,7 @@ export class WebhookDispatcher {
   /** Bumped on reset, so attempts already in flight do not schedule retries for old messages. */
   private generation = 0
   private faultRule: WebhookFaultRule | undefined
+  private held: Held[] = []
 
   constructor(options: WebhookDispatcherOptions) {
     this.options = options
@@ -173,6 +214,7 @@ export class WebhookDispatcher {
   reset(): void {
     this.generation++
     this.cancelPending()
+    this.held = []
     this.log.length = 0
   }
 
@@ -203,34 +245,27 @@ export class WebhookDispatcher {
 
   private enqueue(message: OutboxMessage, endpoint: WebhookEndpoint): void {
     const fault = this.faultRule?.(message, endpoint)
-    const label = fault ? describeWebhookFault(fault) : null
 
-    switch (fault?.kind) {
-      case "duplicate":
-        this.schedule(message, endpoint, 1, 0, NORMAL)
-        this.schedule(message, endpoint, 1, 0, { ...NORMAL, fault: label })
+    if (fault?.kind === "after") {
+      const label = describeWebhookFault(fault)
 
-        return
-      case "delay":
-        this.schedule(message, endpoint, 1, fault.ms, { ...NORMAL, fault: label })
+      this.held = [...this.held, { message, endpoint, topic: fault.topic, label }]
 
-        return
-      case "forged":
-        this.schedule(message, endpoint, 1, 0, { signing: "forged", retry: false, fault: label })
-        this.schedule(message, endpoint, 1, 0, NORMAL)
-
-        return
-      case "stale":
-        this.schedule(message, endpoint, 1, 0, {
-          signing: fault.seconds,
-          retry: true,
-          fault: label,
-        })
-
-        return
-      default:
-        this.schedule(message, endpoint, 1, 0, NORMAL)
+      return
     }
+
+    for (const { delayMs, mode } of firstAttempts(fault))
+      this.schedule(message, endpoint, 1, delayMs, mode)
+  }
+
+  /** Sends every message held back for `topic` at `endpoint`, now that `topic` was delivered there. */
+  private release(topic: string, endpoint: WebhookEndpoint): void {
+    const due = this.held.filter((h) => h.topic === topic && h.endpoint.id === endpoint.id)
+
+    if (due.length === 0) return
+
+    this.held = this.held.filter((h) => !due.includes(h))
+    for (const h of due) this.schedule(h.message, h.endpoint, 1, 0, { ...NORMAL, fault: h.label })
   }
 
   private schedule(
@@ -361,6 +396,7 @@ export class WebhookDispatcher {
       delivered,
       fault: mode.fault,
     })
+    if (delivered) this.release(message.topic, endpoint)
 
     return delivered
   }
