@@ -1,0 +1,22 @@
+{
+  "name": "@danwo/example-shop-mobile",
+  "version": "0.0.0",
+  "private": true,
+  "description": "An Expo app that buys credits through Stripe Checkout in a Custom Tab; danwo tests it on an Android emulator.",
+  "type": "module",
+  "scripts": {
+    "build:android": "danwo build-android app",
+    "test:e2e": "danwo test",
+    "matrix": "danwo matrix tests/buy-credits.danwo.ts"
+  },
+  "dependencies": {
+    "stripe": "23.0.0"
+  },
+  "devDependencies": {
+    "@danwo/cli": "workspace:*",
+    "@danwo/device": "workspace:*",
+    "@danwo/expo": "workspace:*",
+    "@danwo/proxy": "workspace:*",
+    "@danwo/sdk": "workspace:*"
+  }
+}

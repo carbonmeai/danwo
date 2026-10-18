@@ -1,0 +1,19 @@
+{
+  "name": "app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The shop's Android app: buys credits through Stripe Checkout in a Custom Tab. Built with `danwo build-android`; not part of the bun workspace.",
+  "main": "index.ts",
+  "dependencies": {
+    "expo": "58.0.14",
+    "expo-linking": "58.0.13",
+    "expo-status-bar": "58.0.3",
+    "expo-web-browser": "58.0.6",
+    "react": "19.3.0",
+    "react-native": "0.88.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "typescript": "6.0.3"
+  }
+}
