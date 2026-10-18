@@ -131,19 +131,23 @@ export function gatewayResult(
   } satisfies LanguageModelV4GenerateResult
 }
 
-/** One content item's stream parts: text in pieces, or a tool call's input in pieces. */
+/**
+ * One content item's stream parts: text in pieces, its start and end carrying the item's provider
+ * metadata, or a tool call's input in pieces.
+ */
 function contentParts(item: Content): LanguageModelV4StreamPart[] {
   if (item.type === "text") {
     const id = llmId("txt_")
+    const providerMetadata = item.providerMetadata ?? {}
 
     return [
-      { type: "text-start", id },
+      { type: "text-start", id, providerMetadata },
       ...deltas(item.text).map((delta): LanguageModelV4StreamPart => ({
         type: "text-delta",
         id,
         delta,
       })),
-      { type: "text-end", id },
+      { type: "text-end", id, providerMetadata },
     ]
   }
 
@@ -161,11 +165,15 @@ function contentParts(item: Content): LanguageModelV4StreamPart[] {
   ]
 }
 
-/** A generate result as its stream of parts, for a call to `model`. */
-export function gatewayStream(whole: LanguageModelV4GenerateResult, model: string): string[] {
+/** A generate result as its stream of parts, for a call to `model` answered at `now`. */
+export function gatewayStream(
+  whole: LanguageModelV4GenerateResult,
+  model: string,
+  now: Date,
+): string[] {
   const parts: LanguageModelV4StreamPart[] = [
     { type: "stream-start", warnings: [] },
-    { type: "response-metadata", id: llmId("gen_"), modelId: model },
+    { type: "response-metadata", id: llmId("gen_"), timestamp: now, modelId: model },
     ...whole.content.flatMap(contentParts),
     {
       type: "finish",

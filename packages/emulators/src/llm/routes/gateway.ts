@@ -9,7 +9,7 @@ import { llmStore } from "../store.ts"
 import { tokensIn } from "../usage.ts"
 
 export function gatewayRoutes(emulator: EmulatorContext): void {
-  const { app } = emulator
+  const { app, clock } = emulator
   const priceOf = (model: string) => llmStore(emulator.store).settings().prices[model]
 
   app.post("/v4/ai/language-model", async (c) => {
@@ -21,7 +21,7 @@ export function gatewayRoutes(emulator: EmulatorContext): void {
     const answered = await answer(emulator, c, "language-model", request)
     const whole = gatewayResult(answered.reply, answered.usage, model, priceOf(model))
 
-    return send(c, answered, stream, whole, () => gatewayStream(whole, model))
+    return send(c, answered, stream, whole, () => gatewayStream(whole, model, clock()))
   })
 
   app.post("/v4/ai/embedding-model", async (c) => {
