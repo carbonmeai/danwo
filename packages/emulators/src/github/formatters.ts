@@ -153,6 +153,8 @@ function repoSettings(repo: GithubRepoRecord) {
     has_wiki: true,
     has_pages: false,
     has_discussions: false,
+    has_pull_requests: true,
+    pull_request_creation_policy: "all",
     forks_count: 0,
     archived: repo.archived,
     disabled: false,
