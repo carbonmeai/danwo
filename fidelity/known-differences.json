@@ -1,0 +1,55 @@
+[
+  {
+    "provider": "stripe",
+    "scenario": "errors: missing object, missing parameter, bad key",
+    "step": "call with an invalid key",
+    "kind": "status-mismatch",
+    "reason": "The emulator accepts any well-formed test key, since it cannot know which keys the real account issued; only missing and live keys are refused."
+  },
+  {
+    "provider": "stripe",
+    "path": "type",
+    "kind": "extra-field",
+    "scenario": "products and prices: one-off and recurring",
+    "step": "create product",
+    "reason": "The pinned stripe SDK's types still declare Product.type, so the emulator returns it to satisfy its type checks; the API no longer does."
+  },
+  {
+    "provider": "stripe",
+    "path": "recurring.trial_period_days",
+    "kind": "extra-field",
+    "reason": "Declared by the pinned stripe SDK's Price.Recurring type, so the emulator keeps it as null; the API dropped it."
+  },
+  {
+    "provider": "stripe",
+    "path": "data[].recurring.trial_period_days",
+    "kind": "extra-field",
+    "reason": "Declared by the pinned stripe SDK's Price.Recurring type, so the emulator keeps it as null; the API dropped it."
+  },
+  {
+    "provider": "stripe",
+    "path": "source",
+    "kind": "extra-field",
+    "reason": "The pinned stripe SDK's PaymentIntent type still declares source, so the emulator returns it as null; the API dropped it."
+  },
+  {
+    "provider": "stripe",
+    "path": "latest_charge.source",
+    "kind": "extra-field",
+    "reason": "The pinned stripe SDK's Charge type still declares source, so the emulator returns it as null; the API dropped it."
+  },
+  {
+    "provider": "resend",
+    "step": "retrieve email",
+    "path": "tags",
+    "kind": "extra-field",
+    "reason": "The resend SDK's email type declares tags and the API returns them; the published API description leaves the field out."
+  },
+  {
+    "provider": "resend",
+    "step": "retrieve email",
+    "path": "scheduled_at",
+    "kind": "extra-field",
+    "reason": "The resend SDK's email type declares scheduled_at and the API returns it; the published API description leaves the field out."
+  }
+]
