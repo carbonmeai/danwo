@@ -3,7 +3,7 @@ import type { EmulatorContext } from "../../define.ts"
 import { answer } from "../answer.ts"
 import { bodyOf, onlyFor, send } from "../context.ts"
 import { defaultDimensions, embed, inputsOf } from "../embeddings.ts"
-import { gatewayResult, gatewayStream } from "../gateway.ts"
+import { embeddingMetadata, gatewayResult, gatewayStream } from "../gateway.ts"
 import { gatewayRequest } from "../requests.ts"
 import { llmStore } from "../store.ts"
 import { tokensIn } from "../usage.ts"
@@ -31,10 +31,13 @@ export function gatewayRoutes(emulator: EmulatorContext): void {
     const body = await bodyOf(c)
     const values = inputsOf(body.values)
     const size = typeof body.dimensions === "number" ? body.dimensions : defaultDimensions(model)
+    const tokens = tokensIn(values.join("\n"))
 
     return c.json({
       embeddings: values.map((text) => embed(text, size)),
-      usage: { tokens: tokensIn(values.join("\n")) },
+      warnings: [],
+      usage: { tokens },
+      providerMetadata: embeddingMetadata(tokens, model, priceOf(model)),
     })
   })
 }
