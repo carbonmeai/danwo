@@ -99,5 +99,17 @@
     "path": "permissions",
     "kind": "extra-field",
     "reason": "The emulator answers every caller as the repository's admin; GitHub leaves permissions out for anonymous callers."
+  },
+  {
+    "provider": "gateway",
+    "path": "providerMetadata.gateway.providerAllowlistCost",
+    "kind": "missing-field",
+    "reason": "The gateway prices a team's provider allowlist only for accounts that have one set up; the emulator has no account settings, so it leaves the field out."
+  },
+  {
+    "provider": "gateway",
+    "path": "finish[].providerMetadata.gateway.providerAllowlistCost",
+    "kind": "missing-field",
+    "reason": "The streamed form of the same account-specific allowlist cost: left out for the same reason."
   }
 ]
