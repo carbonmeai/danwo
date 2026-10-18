@@ -25,7 +25,7 @@ It drives the app through its UI like a user, while third-party services the app
 | `@danwo/cli`        | `danwo test`, `matrix`, `record`, `show`, `mcp`, `init`, `spec`, `guide` |
 | `@danwo/recorder`   | Writes tests: records someone using the app; locators and the writer     |
 | `@danwo/runner`     | Browser sessions, the agent, replay, workers and the flight recorder     |
-| `@danwo/core`       | The fault matrix                                                         |
+| `@danwo/matrix`     | The fault matrix                                                         |
 | `@danwo/data`       | Snapshots of the app's Postgres, SQLite and Redis for fast matrix trials |
 | `@danwo/proxy`      | The egress proxy                                                         |
 | `@danwo/emulators`  | Provider emulators                                                       |

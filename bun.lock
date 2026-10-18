@@ -61,19 +61,6 @@
         "zod": "4.6.1",
       },
     },
-    "packages/core": {
-      "name": "@danwo/core",
-      "version": "0.0.0",
-      "dependencies": {
-        "@danwo/emulators": "workspace:*",
-        "@danwo/proxy": "workspace:*",
-        "effect": "4.0.5",
-      },
-      "devDependencies": {
-        "@danwo/example-shop": "workspace:*",
-        "zod": "4.6.1",
-      },
-    },
     "packages/data": {
       "name": "@danwo/data",
       "version": "0.0.0",
@@ -121,7 +108,7 @@
       "name": "@danwo/github",
       "version": "0.0.0",
       "dependencies": {
-        "@danwo/core": "workspace:*",
+        "@danwo/matrix": "workspace:*",
         "@danwo/runner": "workspace:*",
       },
       "devDependencies": {
@@ -129,12 +116,25 @@
         "zod": "4.6.1",
       },
     },
+    "packages/matrix": {
+      "name": "@danwo/matrix",
+      "version": "0.0.0",
+      "dependencies": {
+        "@danwo/emulators": "workspace:*",
+        "@danwo/proxy": "workspace:*",
+        "effect": "4.0.5",
+      },
+      "devDependencies": {
+        "@danwo/example-shop": "workspace:*",
+        "zod": "4.6.1",
+      },
+    },
     "packages/mcp": {
       "name": "@danwo/mcp",
       "version": "0.0.0",
       "dependencies": {
-        "@danwo/core": "workspace:*",
         "@danwo/emulators": "workspace:*",
+        "@danwo/matrix": "workspace:*",
         "@danwo/proxy": "workspace:*",
         "@danwo/recorder": "workspace:*",
         "@danwo/runner": "workspace:*",
@@ -154,8 +154,8 @@
         "danwo-playwright": "./bin/danwo-playwright.mjs",
       },
       "dependencies": {
-        "@danwo/core": "workspace:*",
         "@danwo/emulators": "workspace:*",
+        "@danwo/matrix": "workspace:*",
         "@danwo/proxy": "workspace:*",
         "@danwo/runner": "workspace:*",
       },
@@ -203,8 +203,8 @@
       "version": "0.0.0",
       "dependencies": {
         "@ai-sdk/provider": "4.0.26",
-        "@danwo/core": "workspace:*",
         "@danwo/emulators": "workspace:*",
+        "@danwo/matrix": "workspace:*",
         "@danwo/proxy": "workspace:*",
         "@vitest/expect": "5.0.3",
         "ai": "7.0.143",
@@ -234,8 +234,8 @@
       "name": "@danwo/skill",
       "version": "0.0.0",
       "dependencies": {
-        "@danwo/core": "workspace:*",
         "@danwo/emulators": "workspace:*",
+        "@danwo/matrix": "workspace:*",
         "@danwo/proxy": "workspace:*",
         "@danwo/runner": "workspace:*",
         "@danwo/sdk": "workspace:*",
@@ -310,8 +310,6 @@
 
     "@danwo/cli": ["@danwo/cli@workspace:packages/cli"],
 
-    "@danwo/core": ["@danwo/core@workspace:packages/core"],
-
     "@danwo/data": ["@danwo/data@workspace:packages/data"],
 
     "@danwo/emulators": ["@danwo/emulators@workspace:packages/emulators"],
@@ -321,6 +319,8 @@
     "@danwo/example-shop-playwright": ["@danwo/example-shop-playwright@workspace:examples/shop-playwright"],
 
     "@danwo/github": ["@danwo/github@workspace:packages/github"],
+
+    "@danwo/matrix": ["@danwo/matrix@workspace:packages/matrix"],
 
     "@danwo/mcp": ["@danwo/mcp@workspace:packages/mcp"],
 

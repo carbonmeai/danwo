@@ -1,5 +1,5 @@
 {
-  "name": "@danwo/core",
+  "name": "@danwo/matrix",
   "version": "0.0.0",
   "private": true,
   "description": "Effect engine: runs, environments, fidelity tiers, oracles, verdicts.",

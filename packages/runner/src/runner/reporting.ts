@@ -3,7 +3,7 @@
  * run starts and gets the whole result when it ends. Reporting never decides a run: a reporter
  * that throws is printed as a warning and the run's exit code stands.
  */
-import type { FaultMatrixResult } from "@danwo/core"
+import type { FaultMatrixResult } from "@danwo/matrix"
 
 import type { RecordMode } from "./record.ts"
 import type { TestReport } from "./tasks.ts"

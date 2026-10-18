@@ -15,7 +15,7 @@ import {
   type PlannedFault,
   planFaults,
   type RunOutcome,
-} from "@danwo/core"
+} from "@danwo/matrix"
 
 import type { CheckPace } from "../assert/pace.ts"
 import { addUsage, cacheLine, modelLine, type Usage } from "../record/usage.ts"

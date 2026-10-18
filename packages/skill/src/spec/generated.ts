@@ -2,7 +2,7 @@
  * The spec's sections that come from tables in the code rather than from declarations: the fault
  * vocabulary (planned the way `danwo matrix` plans it), error codes, cache outcomes and commands.
  */
-import { planFaults, type RunOutcome, type ServiceDelivery } from "@danwo/core"
+import { planFaults, type RunOutcome, type ServiceDelivery } from "@danwo/matrix"
 import type { Exchange } from "@danwo/proxy"
 import {
   CACHE_OUTCOMES,

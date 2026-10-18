@@ -1,3 +1,4 @@
+import type { WebhookFault } from "@danwo/emulators"
 /**
  * Faults armed by name (from a live session, a test, or a matrix trial), in the words `danwo
  * matrix` reports them:
@@ -5,8 +6,7 @@
  * `duplicate on webhook checkout.session.completed`, `stale 3600s on google webhook …`. An armed
  * fault fires once, on the next matching call or delivery (or the n-th, with a ` #n` suffix).
  */
-import { routeOf, type RunWebhooks, webhookSources } from "@danwo/core"
-import type { WebhookFault } from "@danwo/emulators"
+import { routeOf, type RunWebhooks, webhookSources } from "@danwo/matrix"
 import type { OutboundCall, OutboundFault, Proxy } from "@danwo/proxy"
 
 import { defaultOutboundFaults } from "./faults.ts"

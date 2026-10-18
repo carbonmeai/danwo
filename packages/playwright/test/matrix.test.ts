@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import type { PlannedFault } from "@danwo/core"
+import type { PlannedFault } from "@danwo/matrix"
 import { describe, expect, it } from "vitest"
 
 import { startWorkerSetup } from "../src/environment.ts"

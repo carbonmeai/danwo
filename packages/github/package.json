@@ -11,7 +11,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@danwo/core": "workspace:*",
+    "@danwo/matrix": "workspace:*",
     "@danwo/runner": "workspace:*"
   },
   "devDependencies": {

@@ -1,4 +1,4 @@
-import type { RunWebhooks } from "@danwo/core"
+import type { RunWebhooks } from "@danwo/matrix"
 import type { Proxy } from "@danwo/proxy"
 
 import type { MailSource } from "../mail/index.ts"

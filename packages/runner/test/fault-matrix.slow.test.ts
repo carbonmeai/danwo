@@ -5,17 +5,17 @@ import { join } from "node:path"
 
 import type { LanguageModelV4CallOptions, LanguageModelV4GenerateResult } from "@ai-sdk/provider"
 import {
-  formatMatrix,
-  type FaultMatrixResult,
-  type RunEnvironment,
-  runFaultMatrix,
-} from "@danwo/core"
-import {
   describeWebhookFault,
   ManualClock,
   stripeOutboundFaults,
   type WebhookDispatcher,
 } from "@danwo/emulators"
+import {
+  formatMatrix,
+  type FaultMatrixResult,
+  type RunEnvironment,
+  runFaultMatrix,
+} from "@danwo/matrix"
 import { describeOutboundFault, type Proxy } from "@danwo/proxy"
 import { MockLanguageModelV4 } from "ai/test"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"

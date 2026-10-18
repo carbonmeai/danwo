@@ -7,7 +7,7 @@ import { randomBytes } from "node:crypto"
 import { mkdir, rm, writeFile } from "node:fs/promises"
 import { join, relative } from "node:path"
 
-import { deliveriesOf, type PlannedFault, type ServiceDelivery } from "@danwo/core"
+import { deliveriesOf, type PlannedFault, type ServiceDelivery } from "@danwo/matrix"
 import type { CapturedMessage, Exchange } from "@danwo/proxy"
 
 import type { AppLogRecord, FailureEvidence, StepRecord } from "../record/index.ts"

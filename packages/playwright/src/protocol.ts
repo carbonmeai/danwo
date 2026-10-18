@@ -3,7 +3,7 @@
  * nothing else with: the matrix sets two environment variables, the fixture appends one JSON line
  * per test to the outcome file.
  */
-import type { ServiceDelivery } from "@danwo/core"
+import type { ServiceDelivery } from "@danwo/matrix"
 import type { Exchange } from "@danwo/proxy"
 import { z } from "@danwo/runner/runner"
 

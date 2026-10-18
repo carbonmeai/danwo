@@ -7,7 +7,7 @@ import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { formatMatrix, type RunOutcome } from "@danwo/core"
+import { formatMatrix, type RunOutcome } from "@danwo/matrix"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { addUsage, cacheLine, modelLine, usageOf } from "../src/record/usage.ts"

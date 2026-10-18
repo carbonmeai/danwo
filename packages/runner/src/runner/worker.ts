@@ -11,7 +11,7 @@ import {
   deliveriesOf,
   faultFired,
   type RunOutcome,
-} from "@danwo/core"
+} from "@danwo/matrix"
 import type { Proxy } from "@danwo/proxy"
 import type { Browser } from "playwright-core"
 

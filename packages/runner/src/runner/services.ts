@@ -1,5 +1,5 @@
-import { clearWebhookFaults } from "@danwo/core"
 import type { Emulator, ManualClock, StoreSnapshot, WebhookDispatcher } from "@danwo/emulators"
+import { clearWebhookFaults } from "@danwo/matrix"
 import { type Proxy, type Route, startProxy } from "@danwo/proxy"
 
 /**

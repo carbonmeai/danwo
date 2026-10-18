@@ -9,7 +9,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, join, matchesGlob, relative, resolve } from "node:path"
 
-import { routeOf, type ServiceDelivery } from "@danwo/core"
+import { routeOf, type ServiceDelivery } from "@danwo/matrix"
 import type { Exchange } from "@danwo/proxy"
 
 import type { AppLogRecord } from "../record/index.ts"

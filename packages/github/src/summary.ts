@@ -2,7 +2,7 @@
  * A run's summary in Markdown: the counts, a row per failing test or per fault, and where the
  * flight records are. It is the check run's output and the job summary alike.
  */
-import type { RunOutcome } from "@danwo/core"
+import type { RunOutcome } from "@danwo/matrix"
 import type { MatrixRunReport, TestReport, TestRunReport } from "@danwo/runner/runner"
 
 import { fileOfTestId, shown } from "./annotations.ts"

@@ -4,7 +4,7 @@
  */
 import { isAbsolute, relative, resolve, sep } from "node:path"
 
-import type { RunOutcome } from "@danwo/core"
+import type { RunOutcome } from "@danwo/matrix"
 import type { MatrixRunReport, TestReport, TestRunReport } from "@danwo/runner/runner"
 import { redactCredentials } from "@danwo/runner/runner"
 

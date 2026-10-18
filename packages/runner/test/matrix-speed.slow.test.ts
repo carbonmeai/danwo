@@ -3,7 +3,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import type { FaultMatrixResult } from "@danwo/core"
+import type { FaultMatrixResult } from "@danwo/matrix"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { runMatrix } from "../src/runner/matrix-command.ts"

@@ -16,8 +16,8 @@
   },
   "dependencies": {
     "@ai-sdk/provider": "4.0.26",
-    "@danwo/core": "workspace:*",
     "@danwo/emulators": "workspace:*",
+    "@danwo/matrix": "workspace:*",
     "@danwo/proxy": "workspace:*",
     "@vitest/expect": "5.0.3",
     "ai": "7.0.143",

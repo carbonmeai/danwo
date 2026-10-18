@@ -1,3 +1,4 @@
+import type { WebhookDispatcher } from "@danwo/emulators"
 /**
  * The backend side of readiness, from a worker's environment: the app's calls through the proxy
  * have all finished, and no webhook delivery is in flight. A delivery the app's call caused may
@@ -5,8 +6,7 @@
  * round sees nothing new. With `settle`, the environment's own settling (webhooks on a manual
  * clock, retries) runs as part of it.
  */
-import { type RunWebhooks, routeOf, webhookSources } from "@danwo/core"
-import type { WebhookDispatcher } from "@danwo/emulators"
+import { type RunWebhooks, routeOf, webhookSources } from "@danwo/matrix"
 import type { Proxy } from "@danwo/proxy"
 
 import type { Backend, BackendActivity, BackendEvent } from "../browser/readiness.ts"

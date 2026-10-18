@@ -16,7 +16,7 @@ import {
   type PlannedFault,
   planFaults,
   type RunOutcome,
-} from "@danwo/core"
+} from "@danwo/matrix"
 import { DEFAULT_WEBHOOK_FAULTS, defaultOutboundFaults, loadConfig } from "@danwo/runner/runner"
 
 import { readOutcomes, type TestOutcome } from "./protocol.ts"

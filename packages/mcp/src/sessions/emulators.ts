@@ -3,7 +3,7 @@
  * what the app sent through the proxy and got back, and the webhooks delivered to it. Everything
  * is redacted the way the flight recorder redacts it.
  */
-import { deliveriesOf, routeOf } from "@danwo/core"
+import { deliveriesOf, routeOf } from "@danwo/matrix"
 import type { Exchange } from "@danwo/proxy"
 import { environmentState, type Redactor, type WorkerEnvironment } from "@danwo/runner/runner"
 

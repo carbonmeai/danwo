@@ -3,7 +3,7 @@
  * boundary. Two kinds of task exist. A test file runs its selected tests, each with its retries,
  * for `danwo test`. A trial runs one test once, clean or with one planned fault, for `danwo matrix`.
  */
-import type { PlannedFault, ServiceDelivery } from "@danwo/core"
+import type { PlannedFault, ServiceDelivery } from "@danwo/matrix"
 import type { Exchange } from "@danwo/proxy"
 
 import type { CheckPace } from "../assert/pace.ts"

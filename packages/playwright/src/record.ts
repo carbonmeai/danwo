@@ -5,7 +5,7 @@
  */
 import { writeFile } from "node:fs/promises"
 
-import { deliveriesOf } from "@danwo/core"
+import { deliveriesOf } from "@danwo/matrix"
 import {
   createRedactor,
   environmentState,

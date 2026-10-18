@@ -8,7 +8,7 @@ import { appendFile } from "node:fs/promises"
 import { dirname, relative } from "node:path"
 import { stripVTControlCharacters } from "node:util"
 
-import type { ServiceDelivery } from "@danwo/core"
+import type { ServiceDelivery } from "@danwo/matrix"
 import type { Exchange, Proxy } from "@danwo/proxy"
 import { launchBrowser } from "@danwo/runner"
 import { FaultBench, type NamedFault } from "@danwo/runner/runner"
