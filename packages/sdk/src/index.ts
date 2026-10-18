@@ -46,6 +46,18 @@ export interface AwsFixtures {
   readonly settle: () => Promise<void>
 }
 
+/** Fixtures an `auth0Environment()` or `auth0Service()` contributes. */
+export interface Auth0Fixtures {
+  /**
+   * The Auth0 emulator: read users, logins, live refresh tokens and verification emails with
+   * `auth0Tenant(auth0)`, block a user with `auth0Tenant(auth0).block(email)`, and compute an
+   * MFA code with `auth0OtpAt(secret, time)`.
+   */
+  readonly auth0: Emulator
+  readonly proxy: Proxy
+  readonly settle: () => Promise<void>
+}
+
 /** Fixtures a `googleEnvironment()` or `googleService()` contributes. */
 export interface GoogleFixtures {
   /**
@@ -152,6 +164,10 @@ export const test: TestAPI<DanwoFixtures> =
 export const { describe, beforeEach, afterEach, beforeAll, afterAll } = test
 
 export {
+  type Auth0Environment,
+  auth0Environment,
+  type Auth0Options,
+  auth0Service,
   type AwsEnvironment,
   awsEnvironment,
   type AwsFixture,
@@ -255,6 +271,17 @@ export { z } from "@danwo/runner/runner"
 /** A JUnit XML reporter for CI systems other than GitHub, and the config's change-impact rules. */
 export { type ImpactConfig, junit, type JunitOptions } from "@danwo/runner/runner"
 export {
+  type Auth0LoginView,
+  auth0OtpAt,
+  type Auth0SeedApi,
+  type Auth0SeedClient,
+  type Auth0SeedConfig,
+  type Auth0SeedRole,
+  type Auth0SeedTenant,
+  type Auth0SeedUser,
+  type Auth0Tenant,
+  auth0Tenant,
+  type Auth0UserView,
   type CalendarEntry,
   type CalendarSeedEvent,
   type Emulator,

@@ -136,6 +136,10 @@ export {
   MINISTACK_IMAGE,
 } from "./aws.ts"
 export {
+  type Auth0Environment,
+  auth0Environment,
+  type Auth0Options,
+  auth0Service,
   type FlutterwaveEnvironment,
   flutterwaveEnvironment,
   type FlutterwaveOptions,

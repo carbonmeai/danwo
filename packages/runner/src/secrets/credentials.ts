@@ -1,7 +1,7 @@
 /**
  * Credentials recognisable by their shape alone, wherever they appear in text: provider API keys
  * and signing secrets, bearer and basic credentials, AWS keys and signatures, OAuth codes and
- * tokens, Slack and GitHub tokens, Flutterwave keys, PEM private keys, and URLs that work as bearer tokens (upload
+ * tokens, Auth0 tickets, Slack and GitHub tokens, Flutterwave keys, PEM private keys, and URLs that work as bearer tokens (upload
  * sessions, pre-authenticated downloads, Slack webhook and response URLs).
  * Values a session was given are redacted by its vault; these catch the ones it never was.
  */
@@ -38,6 +38,12 @@ const TOKEN_PATTERNS: readonly [RegExp, string][] = [
    */
   [/(graph\.microsoft\.com\/(?:up|download)\/)[^\s"'?#/]+/g, `$1${REDACTED}`],
   [/(hooks\.slack\.com\/)[^\s"'?#]+/g, `$1${REDACTED}`],
+  /* Auth0's verification and password-change tickets, and the ID token a logout link carries. */
+  [
+    /(\/u\/(?:email-verification|reset-verify|password-reset)\?(?:[^#\s"']*&)?ticket=)[^&#\s"']+/g,
+    `$1${REDACTED}`,
+  ],
+  [/([?&]id_token_hint=)[^&#\s"']+/g, `$1${REDACTED}`],
   /* Bachs portal session URLs sign the customer in; recovery links let anyone replace the card. */
   [/((?:portal\.bachs\.io\/s|checkout\.bachs\.io\/recover)\/)[^\s"'?#/]+/g, `$1${REDACTED}`],
   /* Slack bot, user, refresh and app tokens; GitHub's OAuth, App, refresh and personal tokens. */

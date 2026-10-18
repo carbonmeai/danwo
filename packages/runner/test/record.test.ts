@@ -229,6 +229,23 @@ describe("flight recorder redaction", () => {
     })
   })
 
+  it("hides Auth0 client secrets, refresh tokens, verification tickets and logout hints", () => {
+    expect(redactor.text("https://acme.us.auth0.com/u/email-verification?ticket=Tk-123abc#")).toBe(
+      "https://acme.us.auth0.com/u/email-verification?ticket=[redacted]#",
+    )
+    expect(
+      redactor.text("https://acme.us.auth0.com/oidc/logout?id_token_hint=abc.def&state=s1"),
+    ).toBe("https://acme.us.auth0.com/oidc/logout?id_token_hint=[redacted]&state=s1")
+    expect(
+      redactor.body(
+        "grant_type=refresh_token&client_id=web&client_secret=shh&refresh_token=v1.opaque",
+        "application/x-www-form-urlencoded",
+      ),
+    ).toBe(
+      "grant_type=refresh_token&client_id=web&client_secret=[redacted]&refresh_token=[redacted]",
+    )
+  })
+
   it("hides Flutterwave keys, the webhook secret hash and its signature", () => {
     expect(
       redactor.text(

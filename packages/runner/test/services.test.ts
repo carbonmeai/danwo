@@ -2,6 +2,7 @@ import { once } from "node:events"
 import { createServer, type IncomingHttpHeaders } from "node:http"
 
 import {
+  auth0Tenant,
   type Emulator,
   githubRepo,
   googleSignIns,
@@ -18,6 +19,7 @@ import { z } from "zod"
 
 import { defaultOutboundFaults } from "../src/runner/faults.ts"
 import {
+  auth0Service,
   githubService,
   googleService,
   microsoftService,
@@ -450,5 +452,91 @@ describe("paystackService", () => {
   it("gives Paystack's API its faults and leaves the hosted page alone", () => {
     expect(faultsAt("api.paystack.co", "/transaction/initialize").length).toBeGreaterThan(0)
     expect(faultsAt("checkout.paystack.com", "/abc/card")).toEqual([])
+  })
+})
+
+describe("auth0Service", () => {
+  const tenant = {
+    domain: "acme.us.auth0.com",
+    custom_domains: ["login.acme.test"],
+    clients: [
+      {
+        client_id: "web",
+        client_secret: "web-secret",
+        name: "Web",
+        callbacks: ["https://app.danwo.test/callback"],
+      },
+    ],
+    connections: [
+      { name: "google-oauth2", client_id: CLIENT.client_id, client_secret: CLIENT.client_secret },
+    ],
+  }
+
+  it("answers tenant and custom domains and hands social logins to the Google service", async () => {
+    const google = googleService({
+      seed: {
+        users: [{ email: "ada@danwo.test", name: "Ada Lovelace" }],
+        oauth_clients: [{ ...CLIENT, redirect_uris: ["https://acme.us.auth0.com/login/callback"] }],
+      },
+    })
+    const auth0 = auth0Service({ seed: { tenants: [tenant] }, social: [google] })
+    const services = await startServices([auth0, google])
+
+    try {
+      expect(Object.keys(services.fixtures).toSorted()).toEqual([
+        "auth0",
+        "google",
+        "proxy",
+        "settle",
+      ])
+      expect(auth0.routes[0]?.hosts).toEqual(
+        expect.arrayContaining(["*.auth0.com", "login.acme.test"]),
+      )
+
+      const authorize = new URL("https://acme.us.auth0.com/authorize")
+
+      authorize.search = new URLSearchParams({
+        client_id: "web",
+        redirect_uri: "https://app.danwo.test/callback",
+        response_type: "code",
+        scope: "openid email",
+      }).toString()
+
+      const toLogin = await auth0.emulator.fetch(new Request(authorize, { redirect: "manual" }))
+      const state = new URL(toLogin.headers.get("location") ?? "", authorize).searchParams.get(
+        "state",
+      )
+      const toGoogle = await auth0.emulator.fetch(
+        new Request(
+          `https://acme.us.auth0.com/authorize/social?state=${state}&connection=google-oauth2`,
+        ),
+      )
+      const chooser = new URL(toGoogle.headers.get("location") ?? "")
+      const page = await (await google.emulator.fetch(new Request(chooser))).text()
+      const field = (name: string) =>
+        new RegExp(`name="${name}" value="([^"]+)"`).exec(page)?.[1] ?? ""
+      const picked = await google.emulator.fetch(
+        new Request("https://accounts.google.com/o/oauth2/v2/auth/callback", {
+          method: "POST",
+          body: new URLSearchParams({ request: field("request"), user: field("user") }),
+        }),
+      )
+      const back = await auth0.emulator.fetch(new Request(picked.headers.get("location") ?? ""))
+
+      expect(new URL(back.headers.get("location") ?? "").searchParams.get("code")).toBeTruthy()
+      expect(auth0Tenant(auth0.emulator).user("ada@danwo.test")?.user_id).toMatch(
+        /^google-oauth2\|/,
+      )
+    } finally {
+      await services.close()
+    }
+  })
+
+  it("gives tenant domains Auth0's faults and leaves the login pages alone", () => {
+    expect(faultsAt("acme.us.auth0.com", "/oauth/token").map((f) => f.kind)).toContain(
+      "reset-after",
+    )
+    expect(faultsAt("acme.eu.auth0.com", "/api/v2/users").length).toBeGreaterThan(0)
+    expect(faultsAt("acme.us.auth0.com", "/u/login")).toEqual([])
   })
 })

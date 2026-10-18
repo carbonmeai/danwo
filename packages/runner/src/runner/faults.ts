@@ -1,4 +1,5 @@
 import {
+  auth0OutboundFaults,
   FLUTTERWAVE_HOSTS,
   flutterwaveOutboundFaults,
   BACHS_HOSTS,
@@ -7,6 +8,7 @@ import {
   githubOutboundFaults,
   GOOGLE_HOSTS,
   googleOutboundFaults,
+  isAuth0Host,
   isS3Host,
   LLM_HOSTS,
   llmOutboundFaults,
@@ -47,6 +49,14 @@ function hostsOf(hosts: readonly string[], catalogue: Catalogue): Array<[string,
   return hosts.map((host) => [host, catalogue])
 }
 
+/** The catalogue for providers known by a host pattern rather than a list: S3 buckets and Auth0 tenants. */
+function catalogueByPattern(host: string): Catalogue | undefined {
+  if (isS3Host(host)) return s3OutboundFaults
+  if (isAuth0Host(host)) return auth0OutboundFaults
+
+  return undefined
+}
+
 /** Failures any HTTP API can meet, for hosts danwo has no provider-shaped catalogue for. */
 function genericOutboundFaults(call: OutboundCall): readonly OutboundFault[] {
   const faults: readonly OutboundFault[] = [
@@ -62,12 +72,12 @@ function genericOutboundFaults(call: OutboundCall): readonly OutboundFault[] {
 
 /**
  * `danwo matrix`'s default fault catalogue: each call gets its provider's faults by host (Stripe,
- * Resend, S3 and Tigris, Google, Microsoft, Slack, GitHub, Twilio, Flutterwave, Paystack, Bachs and
+ * Resend, S3 and Tigris, Auth0, Google, Microsoft, Slack, GitHub, Twilio, Flutterwave, Paystack, Bachs and
  * the model APIs, with error bodies their SDKs parse),
  * and any other routed host (an outside endpoint such as MiniStack) gets plain HTTP failures.
  */
 export function defaultOutboundFaults(call: OutboundCall): readonly OutboundFault[] {
-  const catalogue = BY_HOST.get(call.host) ?? (isS3Host(call.host) ? s3OutboundFaults : undefined)
+  const catalogue = BY_HOST.get(call.host) ?? catalogueByPattern(call.host)
 
   return catalogue ? catalogue(call) : genericOutboundFaults(call)
 }

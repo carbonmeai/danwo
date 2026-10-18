@@ -1,7 +1,11 @@
 import {
+  AUTH0_HOSTS,
+  auth0,
+  type Auth0SeedConfig,
   BACHS_HOSTS,
   bachs,
   type BachsSeedConfig,
+  connectAuth0Upstream,
   createEmulator,
   type Emulator,
   type EmulatorDefinition,
@@ -22,6 +26,7 @@ import {
   PAYSTACK_HOSTS,
   paystack,
   type PaystackSeedConfig,
+  seedAuth0,
   seedBachs,
   seedGithub,
   seedGoogle,
@@ -36,7 +41,7 @@ import {
   TWILIO_HOSTS,
   type TwilioSeedConfig,
 } from "@danwo/emulators"
-import type { Proxy } from "@danwo/proxy"
+import { hostMatches, type Proxy } from "@danwo/proxy"
 
 import {
   emulatorLifecycle,
@@ -94,6 +99,22 @@ export interface FlutterwaveOptions {
   readonly seed?: Seed<FlutterwaveSeedConfig>
 }
 
+/** Options of `auth0Service()` and `auth0Environment()`. */
+export interface Auth0Options {
+  /** Tenants with their applications, APIs, roles, organizations, users and social connections. */
+  readonly seed?: Seed<Auth0SeedConfig>
+  /**
+   * Custom domains to answer besides `*.auth0.com` and the regional domains. A seed given as a
+   * value adds its tenants' `custom_domains` on its own; list them here when the seed is a function.
+   */
+  readonly customDomains?: readonly string[]
+  /**
+   * The Google, GitHub or Microsoft services the login page's social buttons hand off to: the
+   * tenant exchanges the code and reads the profile on their emulators.
+   */
+  readonly social?: readonly OAuthService[]
+}
+
 /** Options of `bachsService()` and `bachsEnvironment()`. */
 export interface BachsOptions {
   /** Products, customers, webhook endpoints (the app's URL), balances, payout destinations. */
@@ -139,6 +160,8 @@ export type SlackEnvironment = OAuthEnvironment<"slack">
 export type GithubEnvironment = OAuthEnvironment<"github">
 /** What `paystackEnvironment()` starts: the Paystack emulator behind its own proxy. */
 export type PaystackEnvironment = OAuthEnvironment<"paystack">
+/** What `auth0Environment()` starts: the Auth0 emulator behind its own proxy. */
+export type Auth0Environment = OAuthEnvironment<"auth0">
 /** What `bachsEnvironment()` starts: the Bachs emulator behind its own proxy. */
 export type BachsEnvironment = OAuthEnvironment<"bachs">
 /** What `twilioEnvironment()` starts: the Twilio emulator behind its own proxy. */
@@ -394,4 +417,54 @@ export function bachsEnvironment(
   options: BachsOptions & { readonly unmatched?: "passthrough" | "block" } = {},
 ): Promise<BachsEnvironment> {
   return oauthEnvironment("bachs", bachsService(options), options)
+}
+
+/** The custom domains a seed's tenants answer on, when the seed is a value. */
+function customDomainsOf(seed: Seed<Auth0SeedConfig> | undefined): string[] {
+  if (seed === undefined || isDeferred(seed)) return []
+
+  return (seed.tenants ?? []).flatMap((tenant) => tenant.custom_domains ?? [])
+}
+
+/** Sends a tenant's call to a social provider to whichever of `services` answers its host. */
+function socialUpstream(services: readonly OAuthService[]) {
+  return async (request: Request): Promise<Response> => {
+    const host = new URL(request.url).hostname
+    const route = services
+      .flatMap((service) => service.routes)
+      .find((found) => found.hosts.some((pattern) => hostMatches(pattern, host)))
+
+    if (route && "handler" in route) return route.handler(request)
+
+    return new Response(`no social service answers ${host}`, { status: 502 })
+  }
+}
+
+/**
+ * Auth0 for `startServices`: Universal Login (the browser logs in, signs up and passes MFA on the
+ * tenant's domain through the same proxy), the authentication API's grants, OIDC discovery and
+ * keys, logout and the Management API v2; gives tests the `auth0` fixture. Read users, logins and
+ * verification emails with `auth0Tenant(auth0)`.
+ */
+export function auth0Service(options: Auth0Options = {}): OAuthService {
+  const service = oauthService(
+    {
+      name: "auth0",
+      definition: auth0,
+      hosts: [...AUTH0_HOSTS, ...(options.customDomains ?? []), ...customDomainsOf(options.seed)],
+      apply: (emulator, config) => seedAuth0(emulator.store, config),
+    },
+    options.seed,
+  )
+
+  if (options.social?.length) connectAuth0Upstream(service.emulator, socialUpstream(options.social))
+
+  return service
+}
+
+/** A worker-scoped Auth0 emulator behind its own proxy; combine services with `startServices`. */
+export function auth0Environment(
+  options: Auth0Options & { readonly unmatched?: "passthrough" | "block" } = {},
+): Promise<Auth0Environment> {
+  return oauthEnvironment("auth0", auth0Service(options), options)
 }
