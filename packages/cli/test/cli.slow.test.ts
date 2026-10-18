@@ -29,6 +29,7 @@ afterAll(async () => {
     fixture("invariant"),
     fixture("uploads"),
     fixture("signin"),
+    fixture("auth0-orders"),
     fixture("integration"),
     fixture("slack-bot"),
     fixture("github-bot"),
@@ -391,6 +392,35 @@ describe("danwo matrix", () => {
     expect(out).toContain("faults: 6 passed")
     expect(code).toBe(0)
   }, 180_000)
+
+  it("logs in on Auth0's hosted page and refuses tokens it can't verify when the keys are down", async () => {
+    const { code, out } = await danwo(fixture("auth0-orders"), ["matrix", "tests/orders.danwo.ts"])
+
+    expect(out).toContain("PASS  clean run")
+    expect(out).toContain("PASS  status 403 on POST acme.us.auth0.com/oauth/token")
+    expect(out).toContain("PASS  reset-after on POST acme.us.auth0.com/oauth/token")
+    expect(out).toContain("PASS  status 503 on GET acme.us.auth0.com/.well-known/jwks.json #2")
+    // The browser's Universal Login pages are never faulted.
+    expect(out).not.toContain("/u/login")
+    expect(out).toContain("faults: 13 passed")
+    expect(code).toBe(0)
+  }, 300_000)
+
+  it("catches an orders API that trusts a forged token when Auth0's keys can't be fetched", async () => {
+    const { code, out } = await danwo(
+      fixture("auth0-orders"),
+      ["matrix", "tests/orders.danwo.ts", "--faults", "jwks"],
+      { AUTH0_BUG: "fail-open" },
+    )
+
+    // Only the forged token's check meets the outage; Ada's own token is genuine either way.
+    expect(out).toContain("PASS  status 500 on GET acme.us.auth0.com/.well-known/jwks.json\n")
+    expect(out).toContain("FAIL  status 500 on GET acme.us.auth0.com/.well-known/jwks.json #2")
+    expect(out).toContain("FAIL  reset on GET acme.us.auth0.com/.well-known/jwks.json #2")
+    expect(out).toContain("invariant: expected [ Array(1) ] to deeply equal []")
+    expect(out).toContain("faults: 3 passed, 3 failed")
+    expect(code).toBe(1)
+  }, 300_000)
 
   it("faults Gmail's push like a webhook, and a deduplicating integration survives it", async () => {
     const { code, out } = await danwo(fixture("integration"), [
