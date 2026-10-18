@@ -473,7 +473,7 @@ function readinessOf(options: WebSessionOptions): Readiness {
 }
 
 /** The next check's timeout under `pace`, keyed as the step recorder will record that check. */
-function pacer(pace: CheckPace, steps: StepRecorder, redact: (text: string) => string) {
+export function pacer(pace: CheckPace, steps: StepRecorder, redact: (text: string) => string) {
   return (api: string, label: string, fallback: number) =>
     pacedTimeout(pace, checkKey(steps.next, api, redact(label)), fallback)
 }

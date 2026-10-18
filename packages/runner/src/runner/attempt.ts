@@ -431,6 +431,7 @@ function openOnDevice(setup: AttemptSetup, device: DeviceTarget, timeout: number
     time: timeMachineOf(env),
     ...(setup.recordDir !== undefined && { artifactsDir: setup.recordDir, stepScreenshots: true }),
     actionTimeout: Math.min(timeout, DEVICE_ACTION_MS),
+    ...(setup.checkPace && { checkPace: setup.checkPace }),
   })
 }
 

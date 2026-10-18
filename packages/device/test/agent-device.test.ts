@@ -58,7 +58,7 @@ describe("the agent-device driver", () => {
     expect(calls).toEqual([
       "open com.danwo.shopmobile",
       "fill",
-      "close shutdown=true",
+      "close shutdown=false",
       "open com.danwo.shopmobile",
       "fill",
     ])

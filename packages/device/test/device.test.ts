@@ -179,18 +179,26 @@ describe("the app", () => {
       package: "com.danwo.shopmobile",
     })
 
+    const reset = [
+      "shell pm clear com.danwo.shopmobile",
+      "am force-stop com.android.chrome 2>/dev/null",
+      "am force-stop org.chromium.chrome 2>/dev/null",
+      "am force-stop com.chrome.beta 2>/dev/null",
+      "pm grant com.danwo.shopmobile android.permission.POST_NOTIFICATIONS 2>/dev/null",
+      "logcat -c",
+      "am start -n com.danwo.shopmobile/.MainActivity",
+    ].join("; ")
+
     expect(await app.start()).toEqual({ relaunched: undefined })
     expect(commands).toEqual([
-      "shell pm clear com.danwo.shopmobile",
-      "shell am force-stop com.android.chrome",
-      "shell am force-stop org.chromium.chrome",
-      "shell am force-stop com.chrome.beta",
-      "shell pm grant com.danwo.shopmobile android.permission.POST_NOTIFICATIONS",
-      "shell logcat -c",
       "shell cmd package resolve-activity --brief com.danwo.shopmobile",
-      "shell am start -n com.danwo.shopmobile/.MainActivity",
+      reset,
       "shell dumpsys activity activities",
     ])
+
+    /* The launcher is looked up once: the next attempt's start is one shell and one check. */
+    await app.start()
+    expect(commands.slice(3)).toEqual([reset, "shell dumpsys activity activities"])
   })
 
   it("stops and launches the app once more when the first launch did not bring it up", async () => {
@@ -216,8 +224,8 @@ describe("the app", () => {
     expect((await app.start()).relaunched).toMatch(
       /^not in front 300 ms after launch \(in front: com.android.launcher3\); stopped and launched again$/,
     )
-    expect(commands.slice(-3)).toEqual([
-      "shell am start -n com.danwo.shopmobile/.MainActivity",
+    expect(commands.at(-3)).toMatch(/; am start -n com.danwo.shopmobile\/.MainActivity$/)
+    expect(commands.slice(-2)).toEqual([
       "shell am force-stop com.danwo.shopmobile",
       "shell am start -n com.danwo.shopmobile/.MainActivity",
     ])

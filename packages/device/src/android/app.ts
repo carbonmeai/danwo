@@ -69,6 +69,8 @@ export function parseLogcat(output: string, after: number): DeviceLogLine[] {
 /** The app on one device. */
 export class AndroidApp {
   private logsAfter = 0
+  /** The launcher activity, found once per worker. */
+  private component: string | undefined
   private readonly adb: Adb
   readonly options: AppOptions
 
@@ -94,6 +96,12 @@ export class AndroidApp {
   private async launcher(): Promise<string> {
     if (this.options.activity !== undefined) return `${this.package}/${this.options.activity}`
 
+    this.component ??= await this.resolveLauncher()
+
+    return this.component
+  }
+
+  private async resolveLauncher(): Promise<string> {
     const resolved = await this.adb.shell(`cmd package resolve-activity --brief ${this.package}`)
     const component = resolved.split("\n").at(-1)?.trim() ?? ""
 
@@ -110,22 +118,22 @@ export class AndroidApp {
    * more, and the result says so.
    */
   async start(): Promise<DeviceStart> {
-    await this.adb.shell(`pm clear ${this.package}`)
-
-    for (const browser of BROWSERS) {
-      await this.adb.shell(`am force-stop ${browser}`).catch(() => undefined)
-    }
-
-    for (const permission of this.options.permissions ?? DEFAULT_PERMISSIONS) {
-      await this.adb.shell(`pm grant ${this.package} ${permission}`).catch(() => undefined)
-    }
-
-    await this.adb.shell("logcat -c").catch(() => undefined)
-    this.logsAfter = Date.now() / 1000
-
     const launch = `am start -n ${await this.launcher()}`
+    /*
+     * One shell for the whole reset: each adb round trip costs a few hundred milliseconds on a
+     * busy machine. A browser or permission that is not there must not stop the rest.
+     */
+    const reset = [
+      `pm clear ${this.package}`,
+      ...[...BROWSERS].map((browser) => `am force-stop ${browser} 2>/dev/null`),
+      ...(this.options.permissions ?? DEFAULT_PERMISSIONS).map(
+        (permission) => `pm grant ${this.package} ${permission} 2>/dev/null`,
+      ),
+      "logcat -c",
+    ]
 
-    await this.adb.shell(launch)
+    this.logsAfter = Date.now() / 1000
+    await this.adb.shell(`${reset.join("; ")}; ${launch}`)
 
     const first = await this.waitInFront()
 

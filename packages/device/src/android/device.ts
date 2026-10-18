@@ -71,6 +71,8 @@ export class AndroidDevice implements DeviceTarget {
   private readonly application: AndroidApp
   private readonly driver: DeviceDriver
   private readonly options: AndroidDeviceOptions
+  /** Screenshots taken so far, for unique file names on the device. */
+  private shots = 0
 
   constructor(parts: {
     readonly emulator: RunningEmulator
@@ -145,8 +147,25 @@ export class AndroidDevice implements DeviceTarget {
     return this.application.back()
   }
 
-  screenshot(path: string): Promise<boolean> {
-    return this.driver.screenshot(path)
+  /**
+   * A PNG of the screen, taken by the device and pulled with adb: it does not queue behind the
+   * driver's calls, so a step's screenshot never slows the next step's reading. The driver takes
+   * it when adb cannot.
+   */
+  async screenshot(path: string): Promise<boolean> {
+    const remote = `/data/local/tmp/danwo-shot-${++this.shots}.png`
+    const adb = this.emulator.adb
+
+    try {
+      await adb.shell(`screencap -p ${remote}`)
+      await adb.run(["pull", remote, path])
+
+      return true
+    } catch {
+      return this.driver.screenshot(path)
+    } finally {
+      await adb.shell(`rm -f ${remote}`).catch(() => undefined)
+    }
   }
 
   logs(): ReturnType<AndroidApp["logs"]> {

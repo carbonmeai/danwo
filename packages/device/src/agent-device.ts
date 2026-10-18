@@ -1,7 +1,8 @@
 /**
  * `DeviceDriver` over agent-device's Node client, in-process. Its daemon always keeps its state in
  * the run's own directory (never `~/.agent-device`), so a stray daemon can never take the session;
- * its update check is off, so a run makes no network calls of its own.
+ * its update check is off, so a run makes no network calls of its own. Actions skip the driver's own
+ * wait for the screen to settle: the runner waits for the app and its services after every action.
  */
 import { mkdir } from "node:fs/promises"
 
@@ -86,7 +87,7 @@ export class AgentDeviceDriver implements DeviceDriver {
 
       this.recoveries++
       await this.client?.sessions
-        .close({ shutdown: true, signal: AbortSignal.timeout(CLOSE_MS) })
+        .close({ shutdown: false, signal: AbortSignal.timeout(CLOSE_MS) })
         .catch(() => undefined)
       await this.open(this.app)
 
@@ -103,13 +104,15 @@ export class AgentDeviceDriver implements DeviceDriver {
   }
 
   async tap(ref: string): Promise<void> {
-    await this.recovering((signal) => this.session.interactions.press({ ...target(ref), signal }))
+    await this.recovering((signal) =>
+      this.session.interactions.press({ ...target(ref), settle: false, signal }),
+    )
   }
 
   async fill(ref: string, text: string): Promise<void> {
     await this.recovering((signal) =>
       // oxlint-disable-next-line unicorn/no-array-fill-with-reference-type -- the driver's fill, not Array#fill
-      this.session.interactions.fill({ ...target(ref), text, signal }),
+      this.session.interactions.fill({ ...target(ref), text, settle: false, signal }),
     )
   }
 

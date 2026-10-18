@@ -9,6 +9,7 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import type { Agent } from "../agent/index.ts"
+import type { CheckPace } from "../assert/pace.ts"
 import type { Backend } from "../browser/readiness.ts"
 import type { SessionFlight } from "../flight.ts"
 import { LocatorError } from "../locate/failure.ts"
@@ -17,7 +18,7 @@ import type { MailSource } from "../mail/index.ts"
 import type { FailureEvidence } from "../record/index.ts"
 import { StepRecorder } from "../record/index.ts"
 import { redactCredentials, SecretVault, type SessionSecret } from "../secrets/index.ts"
-import type { SessionMail, WebSession } from "../session.ts"
+import { pacer, type SessionMail, type WebSession } from "../session.ts"
 import { DanwoError } from "../support/codes.ts"
 import { sessionTime, type TimeMachine, timeMachineOf } from "../time/index.ts"
 import { deviceExpect } from "./expect.ts"
@@ -40,6 +41,8 @@ export interface DeviceSessionOptions {
   readonly stepScreenshots?: boolean
   readonly actionTimeout?: number
   readonly assertionTimeout?: number
+  /** Check timeouts from this check's earlier passing runs, as on the web. */
+  readonly checkPace?: CheckPace
 }
 
 /** A device session: a web session's handles, on a device. */
@@ -233,6 +236,7 @@ export async function openDeviceSession(
     actionTimeout: options.actionTimeout ?? DEFAULT_ACTION_MS,
     assertionTimeout: options.assertionTimeout ?? DEFAULT_ASSERTION_MS,
     ready,
+    ...(options.checkPace && { checkTimeout: pacer(options.checkPace, steps, vault.redact) }),
   }
   const flight = deviceFlight(target, reader, steps, vault, options)
 

@@ -4,6 +4,7 @@ import { join } from "node:path"
 
 import { afterEach, describe, expect, it } from "vitest"
 
+import { type CheckPace, checkKey } from "../src/assert/pace.ts"
 import { DeviceLocator } from "../src/device/locator.ts"
 import { resolveChain, textMatches } from "../src/device/match.ts"
 import { type DeviceSession, openDeviceSession } from "../src/device/session.ts"
@@ -126,7 +127,7 @@ afterEach(async () => {
 
 async function open(
   device: FakeDevice,
-  extra: { artifactsDir?: string } = {},
+  extra: { artifactsDir?: string; assertionTimeout?: number; checkPace?: CheckPace } = {},
 ): Promise<DeviceSession> {
   return openDeviceSession(device, {
     baseUrl: "http://127.0.0.1:1",
@@ -362,6 +363,20 @@ describe("expect on a device", () => {
       "Android yet",
     )
     check(1 + 1).toBe(2)
+  })
+
+  it("waits for a check about as long as it took in the paced run", async () => {
+    const device = new FakeDevice()
+    const label = 'getByTestId("credits") toHaveText("Credits: 1000")'
+    /* Step 0 is the app's start; the check is step 1. */
+    const { screen, expect: check } = await open(device, {
+      assertionTimeout: 10_000,
+      checkPace: { took: { [checkKey(1, "expect.toHaveText", label)]: 50 }, floorMs: 100 },
+    })
+
+    await expect(check(screen.getByTestId("credits")).toHaveText("Credits: 1000")).rejects.toThrow(
+      "failed after 650 ms",
+    )
   })
 
   it("checks a field's value", async () => {

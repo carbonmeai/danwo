@@ -135,12 +135,15 @@ function deviceAssertions(locator: DeviceLocator, negate = false): LocatorAssert
   const check = (name: string, args: string, judge: Judge, options?: AssertOptions) => {
     const not = negate ? "not." : ""
     const call = `expect(${locator.text}).${not}${name}(${args})`
-    const timeout = options?.timeout ?? locator.context.assertionTimeout
+    const api = `expect.${not}${name}`
+    const label = `${locator.text} ${not}${name}(${args})`
+    const normal = options?.timeout ?? locator.context.assertionTimeout
+    const timeout = locator.context.checkTimeout?.(api, label, normal) ?? normal
 
     return locator.context.steps.run(
       "assertion",
-      `expect.${not}${name}`,
-      `${locator.text} ${not}${name}(${args})`,
+      api,
+      label,
       () => hold(locator, call, judge, negate, timeout),
       { verifies: true },
     )

@@ -31,6 +31,8 @@ export interface DeviceContext {
   readonly assertionTimeout: number
   /** Waits for the app and the services behind it to settle after an action. */
   readonly ready: () => Promise<void>
+  /** A check's timeout from its earlier passing runs; the given one without a pace. */
+  readonly checkTimeout?: (api: string, label: string, fallback: number) => number
 }
 
 /** How often a locator reads the screen again while waiting. */
