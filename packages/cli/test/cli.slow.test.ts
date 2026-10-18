@@ -611,7 +611,9 @@ describe("danwo matrix", () => {
     // A forged delivery fails the SDK's signature check; only the repeated event grants twice.
     expect(out).toContain("FAIL  duplicate on bachs webhook collection.succeeded")
     expect(out).toContain("PASS  forged on bachs webhook collection.succeeded")
-    expect(out).toContain("invariant: expected 'Credits: 1000' to be 'Credits: 500'")
+    expect(out).toContain(
+      'invariant: expect(getByRole("status")).toHaveText("Credits: 500") failed',
+    )
     expect(out).toContain("faults: 9 passed, 1 failed")
     expect(code).toBe(1)
 
