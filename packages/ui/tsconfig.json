@@ -13,6 +13,6 @@
     "resolveJsonModule": true,
     "types": ["node", "vite/client"]
   },
-  "include": ["src", "panda.config.ts", "source-alias.ts"],
+  "include": ["src", "panda.config.ts", "source-alias.ts", "vitest.config.ts"],
   "exclude": ["styled-system", "node_modules", "dist"]
 }
