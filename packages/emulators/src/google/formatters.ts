@@ -17,6 +17,7 @@ export function discoveryDocument(): ServerMetadata {
   return {
     issuer: GOOGLE_ISSUER,
     authorization_endpoint: GOOGLE_ENDPOINTS.authorization,
+    device_authorization_endpoint: "https://oauth2.googleapis.com/device/code",
     token_endpoint: GOOGLE_ENDPOINTS.token,
     userinfo_endpoint: GOOGLE_ENDPOINTS.userinfo,
     revocation_endpoint: GOOGLE_ENDPOINTS.revocation,
@@ -31,6 +32,7 @@ export function discoveryDocument(): ServerMetadata {
       "code token id_token",
       "none",
     ],
+    response_modes_supported: ["query", "fragment", "form_post"],
     subject_types_supported: ["public"],
     id_token_signing_alg_values_supported: ["RS256"],
     scopes_supported: ["openid", "email", "profile"],
