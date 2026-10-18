@@ -52,6 +52,9 @@ export interface OutboundCall {
  * - `reset-after`: let the handler process it, then drop the connection, so the side effect
  *   happens but the client never sees the response;
  * - `delay`: wait, then answer normally;
+ * - `slow-then-retry`: hold the request back for up to `ms`, or until the client gives up on it,
+ *   then let the handler process it anyway, so a client that timed out and retried races its own
+ *   first request: both reach the provider;
  * - `emulate`: let the route's handler answer, told through `EMULATE_HEADER` to misbehave in a way
  *   only it can shape, such as a model refusing or a stream cut short.
  */
@@ -65,20 +68,39 @@ export type OutboundFault =
   | { readonly kind: "reset" }
   | { readonly kind: "reset-after" }
   | { readonly kind: "delay"; readonly ms: number }
+  | { readonly kind: "slow-then-retry"; readonly ms: number }
   | { readonly kind: "emulate"; readonly behaviour: string }
+
+/**
+ * Not a fault a plan names but one a run arms in-process: let the handler answer, then keep the
+ * answer back until `until` resolves, so something else lands first (a provider's webhook before
+ * the redirect that follows a payment). `until` sees the answer, so it can let one through at once.
+ */
+export interface AnswerHold {
+  readonly kind: "hold"
+  readonly until: (answer: HeldAnswer) => Promise<void>
+}
+
+/** What a held call answered: its status and where it sends the client, if anywhere. */
+export interface HeldAnswer {
+  readonly status: number
+  readonly location: string | undefined
+}
 
 /** The request header that carries an `emulate` fault's behaviour to the route's handler. */
 export const EMULATE_HEADER = "x-danwo-emulate"
 
-export type OutboundFaultRule = (call: OutboundCall) => OutboundFault | undefined
+export type OutboundFaultRule = (call: OutboundCall) => OutboundFault | AnswerHold | undefined
 
 /** A short label for a fault, for logs and reports. */
-export function describeOutboundFault(fault: OutboundFault): string {
+export function describeOutboundFault(fault: OutboundFault | AnswerHold): string {
   switch (fault.kind) {
     case "status":
       return `status ${fault.status}`
     case "delay":
       return `delay ${fault.ms}ms`
+    case "slow-then-retry":
+      return `slow-then-retry ${fault.ms}ms`
     case "emulate":
       return fault.behaviour
     default:
@@ -97,6 +119,11 @@ export interface Exchange {
   readonly startedAt: string
   /** Unique within the proxy's run. */
   readonly id: string
+  /**
+   * Who sent it: `browser` when its user agent is a browser's, otherwise `server` (the app's own
+   * backend, or another program the run started). Always set by the proxy.
+   */
+  readonly client?: "browser" | "server"
   /** The fault injected into this exchange, if any. */
   fault: string | null
   /** Null until the response is sent, and for aborted requests. */
@@ -207,34 +234,87 @@ async function callHandler(handler: Handler, req: CompletedRequest, behaviour?: 
   }
 }
 
-/** Answers a request the way `fault` says, or through its handler when there is no fault. */
+/** The handler's answer, kept back until `until` resolves. */
+async function answerAfter(handler: Handler, req: CompletedRequest, until: AnswerHold["until"]) {
+  const answer = await callHandler(handler, req)
+  const location = answer.headers.location
+
+  await until({
+    status: answer.statusCode,
+    location: Array.isArray(location) ? location[0] : location,
+  })
+
+  return answer
+}
+
+/** Resolves after `ms`, or as soon as `gaveUp` does: the client stopped waiting. */
+function holdBack(ms: number, gaveUp: Promise<void>): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  return Promise.race([
+    new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, ms)
+    }),
+    gaveUp,
+  ]).finally(() => clearTimeout(timer))
+}
+
+/**
+ * Answers a request the way `fault` says, or through its handler when there is no fault. `gaveUp`
+ * resolves when the client aborts the request.
+ */
 async function answerUnder(
-  fault: OutboundFault | undefined,
+  fault: OutboundFault | AnswerHold | undefined,
+  handler: Handler,
+  req: CompletedRequest,
+  gaveUp: Promise<void>,
+) {
+  if (fault === undefined) return callHandler(handler, req)
+  if (fault.kind === "status")
+    return {
+      statusCode: fault.status,
+      headers: { "content-type": "application/json", ...fault.headers },
+      body: fault.body ?? "",
+    }
+  if (fault.kind === "reset" || fault.kind === "reset-after")
+    return answerReset(fault, handler, req)
+  if (fault.kind === "emulate") return callHandler(handler, req, fault.behaviour)
+
+  return answerLate(fault, handler, req, gaveUp)
+}
+
+/** Drops the connection; `reset-after` lets the handler process the request first. */
+async function answerReset(
+  fault: Extract<OutboundFault, { kind: "reset" | "reset-after" }>,
   handler: Handler,
   req: CompletedRequest,
 ) {
-  switch (fault?.kind) {
-    case "status":
-      return {
-        statusCode: fault.status,
-        headers: { "content-type": "application/json", ...fault.headers },
-        body: fault.body ?? "",
-      }
-    case "reset":
-      return "reset" as const
-    case "reset-after":
-      await callHandler(handler, req)
+  if (fault.kind === "reset-after") await callHandler(handler, req)
 
-      return "reset" as const
-    case "delay":
-      await new Promise((resolve) => setTimeout(resolve, fault.ms))
+  return "reset" as const
+}
 
-      return callHandler(handler, req)
-    case "emulate":
-      return callHandler(handler, req, fault.behaviour)
-    default:
-      return callHandler(handler, req)
-  }
+/** The faults that answer normally, only later: after a wait, a hold-up, or something else lands. */
+async function answerLate(
+  fault: Extract<OutboundFault, { kind: "delay" | "slow-then-retry" }> | AnswerHold,
+  handler: Handler,
+  req: CompletedRequest,
+  gaveUp: Promise<void>,
+) {
+  if (fault.kind === "hold") return answerAfter(handler, req, fault.until)
+
+  await (fault.kind === "delay"
+    ? new Promise((resolve) => setTimeout(resolve, fault.ms))
+    : holdBack(fault.ms, gaveUp))
+
+  return callHandler(handler, req)
+}
+
+/** Whether a request's user agent is a browser's rather than a server-side HTTP client's. */
+function clientOf(userAgent: string | string[] | undefined): "browser" | "server" {
+  const agent = Array.isArray(userAgent) ? userAgent.join(" ") : (userAgent ?? "")
+
+  return agent.includes("Mozilla/") ? "browser" : "server"
 }
 
 /**
@@ -263,6 +343,13 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   // The route handler can run before the exchange is logged; hold its fault label until then.
   const faultLabels = new Map<string, string>()
 
+  // Requests a fault holds back, waiting to hear whether their client gives up on them.
+  const giveUps = new Map<string, () => void>()
+
+  function gaveUp(id: string): Promise<void> {
+    return new Promise((resolve) => giveUps.set(id, resolve))
+  }
+
   function labelFault(id: string, label: string): void {
     const exchange = log.get(id)
 
@@ -281,7 +368,11 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
 
     if (fault) labelFault(req.id, describeOutboundFault(fault))
 
-    return answerUnder(fault, handler, req)
+    try {
+      return await answerUnder(fault, handler, req, gaveUp(req.id))
+    } finally {
+      giveUps.delete(req.id)
+    }
   }
 
   /*
@@ -357,6 +448,7 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
           ? "blocked"
           : "passthrough",
       startedAt: new Date(req.timingEvents.startTime).toISOString(),
+      client: clientOf(req.headers["user-agent"]),
       status: null,
       durationMs: null,
       aborted: false,
@@ -395,6 +487,7 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
     const exchange = log.get(req.id)
 
     if (exchange) exchange.aborted = true
+    giveUps.get(req.id)?.()
     notify()
   })
 
