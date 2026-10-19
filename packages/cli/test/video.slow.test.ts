@@ -81,66 +81,79 @@ afterAll(async () => {
 const BROKEN_ID = "tests/broken.danwo.ts › shows a heading the shop does not have"
 const CHECKOUT_ID = "tests/buy-credits.danwo.ts › buys 500 credits through Stripe Checkout"
 
+/** The newest run's record of `id`; fails the test when the run kept none. */
+async function kept(id: string): Promise<{ dir: string; record: FlightRecord }> {
+  const found = (await newestRecords()).get(id)
+
+  if (found === undefined) throw new Error(`the newest run kept no record of ${id}`)
+
+  return found
+}
+
+/** A record's first video, with its file's path; fails the test when it kept none. */
+function filmOf(found: { dir: string; record: FlightRecord }) {
+  const video = found.record.videos?.[0]
+
+  if (video === undefined) throw new Error(`${found.record.test} kept no video`)
+
+  return { video, file: join(found.dir, video.file) }
+}
+
 describe("video in the flight record", () => {
   it("films a failed test, with every step and call inside the video", async () => {
     await danwo(["test"])
 
-    const { dir, record } = (await newestRecords()).get(BROKEN_ID) ?? {}
-    const video = record?.videos?.[0]
+    const found = await kept(BROKEN_ID)
+    const { video, file } = filmOf(found)
+    const length = (await probedMs(file)) ?? video.durationMs
+    const steps = video.marks.filter((mark) => mark.kind === "step")
 
     expect(video).toMatchObject({ file: "video/tab-1.webm", tab: 1 })
-
-    const file = join(dir ?? "", video?.file ?? "")
-
     expect((await stat(file)).size).toBeGreaterThan(1_000)
-    expect(existsSync(join(dir ?? "", "video", "raw"))).toBe(false)
+    expect(existsSync(join(found.dir, "video", "raw"))).toBe(false)
+    expect(steps.map((mark) => mark.id)).toEqual(found.record.steps.map((s) => String(s.index)))
+    expect(video.marks.some((mark) => mark.kind === "call")).toBe(true)
 
-    const length = (await probedMs(file)) ?? video?.durationMs ?? 0
-    const steps = video?.marks.filter((mark) => mark.kind === "step") ?? []
-
-    expect(steps.map((mark) => mark.id)).toEqual(record?.steps.map((step) => String(step.index)))
-    expect(video?.marks.some((mark) => mark.kind === "call")).toBe(true)
-
-    for (const mark of video?.marks ?? []) {
+    for (const mark of video.marks) {
       expect(mark.startMs, mark.label).toBeGreaterThanOrEqual(0)
       expect(mark.endMs, mark.label).toBeLessThanOrEqual(length)
     }
 
-    const report = await readFile(join(dir ?? "", "..", "..", "report.html"), "utf8")
-
-    expect(report).toContain('<video class="film"')
+    expect(await readFile(join(found.dir, "..", "..", "report.html"), "utf8")).toContain(
+      '<video class="film"',
+    )
   })
 
   it("keeps a passing run's record without video under retain-on-failure, with it under on", async () => {
     await danwo(["test", "--record", "always", "--grep", "buys 500 credits"])
 
-    const plain = (await newestRecords()).get(CHECKOUT_ID)
+    const plain = await kept(CHECKOUT_ID)
 
-    expect(plain?.record.status).toBe("passed")
-    expect(plain?.record.videos).toBeUndefined()
-    expect(existsSync(join(plain?.dir ?? "", "video"))).toBe(false)
+    expect(plain.record.status).toBe("passed")
+    expect(plain.record.videos).toBeUndefined()
+    expect(existsSync(join(plain.dir, "video"))).toBe(false)
 
     await danwo(["test", "--record", "always", "--video", "on", "--grep", "buys 500 credits"])
 
-    const filmed = (await newestRecords()).get(CHECKOUT_ID)
-    const video = filmed?.record.videos?.[0]
-    const webhook = video?.marks.find((mark) => mark.kind === "webhook")
+    const filmed = await kept(CHECKOUT_ID)
+    const { video, file } = filmOf(filmed)
+    const webhook = video.marks.find((mark) => mark.kind === "webhook")
 
-    expect(video?.marks.filter((mark) => mark.kind === "step")).toHaveLength(
-      filmed?.record.steps.length ?? -1,
+    expect(video.marks.filter((mark) => mark.kind === "step")).toHaveLength(
+      filmed.record.steps.length,
     )
     expect(webhook?.label).toContain("checkout.session.completed")
     expect(webhook?.startMs).toBeGreaterThan(0)
-    expect(existsSync(join(filmed?.dir ?? "", video?.file ?? "missing"))).toBe(true)
+    expect(existsSync(file)).toBe(true)
   })
 
   it("films nothing with --video off", async () => {
     await danwo(["test", "--video", "off", "--grep", "heading the shop"])
 
-    const { dir, record } = (await newestRecords()).get(BROKEN_ID) ?? {}
+    const { dir, record } = await kept(BROKEN_ID)
 
-    expect(record?.status).toBe("failed")
-    expect(record?.videos).toBeUndefined()
-    expect(existsSync(join(dir ?? "", "video"))).toBe(false)
+    expect(record.status).toBe("failed")
+    expect(record.videos).toBeUndefined()
+    expect(existsSync(join(dir, "video"))).toBe(false)
   })
 })
