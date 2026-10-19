@@ -85,15 +85,27 @@ const catalogue: Scenario = {
   },
 }
 
+/*
+ * A whole page shapes every item together, so accounts in different states (active with tokens,
+ * expired, mid-link) merge into one shape; a one-item page checks the cursor to the next.
+ */
 const project: Scenario = {
   name: "project: auth configs and connected accounts",
   async run(context) {
-    await context.step("list auth configs", call(context, "/auth_configs?limit=1"), {
-      maps: ["items"],
+    await context.step("list auth configs", call(context, "/auth_configs?limit=50"), {
+      maps: ["items[].credentials"],
       doc: { operation: "get /api/v3.1/auth_configs", status: 200 },
     })
-    await context.step("list connected accounts", call(context, "/connected_accounts?limit=1"), {
-      maps: ["items"],
+    await context.step("page auth configs", call(context, "/auth_configs?limit=1"), {
+      maps: ["items[]"],
+      doc: { operation: "get /api/v3.1/auth_configs", status: 200 },
+    })
+    await context.step("list connected accounts", call(context, "/connected_accounts?limit=50"), {
+      maps: ["items[].data", "items[].state.val"],
+      doc: { operation: "get /api/v3.1/connected_accounts", status: 200 },
+    })
+    await context.step("page connected accounts", call(context, "/connected_accounts?limit=1"), {
+      maps: ["items[]"],
       doc: { operation: "get /api/v3.1/connected_accounts", status: 200 },
     })
   },
@@ -107,10 +119,20 @@ export const composioFidelity: FidelityProvider = {
     { name: KEY, description: "a Composio project API key (ak_…); runs only read", optional: true },
   ],
   scenarios: [errors, catalogue, project],
-  /* Only the stand-in key is the project's, so an unknown key is refused as the live API refuses it. */
+  /*
+   * Only the stand-in key is the project's, so an unknown key is refused as the live API refuses it.
+   * Two auth configs and two accounts give a one-item page a next page, as a project in use has.
+   */
   emulator: () =>
     emulatorTarget(composio, { key: "ak_danwo_fidelity" }, (emulator) =>
-      seedComposio(emulator.store, { apiKeys: ["ak_danwo_fidelity"] }),
+      seedComposio(emulator.store, {
+        apiKeys: ["ak_danwo_fidelity"],
+        authConfigs: [{ toolkit: "gmail" }, { toolkit: "github" }],
+        connectedAccounts: [
+          { userId: "fidelity-user-1", toolkit: "gmail" },
+          { userId: "fidelity-user-2", toolkit: "github", status: "EXPIRED" },
+        ],
+      }),
     ),
   live(env) {
     const key = env[KEY]?.trim()
