@@ -28,7 +28,7 @@ const OPTIONS = {
 }
 
 /** The Frontend API's host, encoded in the publishable key (`pk_test_` + base64 of `host$`). */
-export function frontendHost(publishableKey: string): string {
+function frontendHost(publishableKey: string): string {
   const encoded = publishableKey.replace(/^pk_(test|live)_/, "")
 
   return Buffer.from(encoded, "base64").toString("utf8").replace(/\$$/, "")

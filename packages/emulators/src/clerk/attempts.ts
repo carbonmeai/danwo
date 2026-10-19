@@ -18,10 +18,10 @@ export const CODE_LIFETIME_MS = 10 * 60 * 1000
  * The code development instances accept for Clerk's test addresses (`…+clerk_test@…`): no mail is
  * sent for them, as Clerk sends none.
  */
-export const TEST_CODE = "424242"
+const TEST_CODE = "424242"
 
 /** Whether `address` is one of Clerk's test addresses. */
-export function isTestAddress(address: string): boolean {
+function isTestAddress(address: string): boolean {
   return /\+clerk_test@/i.test(address)
 }
 

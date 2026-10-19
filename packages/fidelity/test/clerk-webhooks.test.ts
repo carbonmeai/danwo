@@ -71,8 +71,8 @@ class Receiver {
       const event = await verifyWebhook(new Request(this.url, { method: "POST", headers, body }), {
         signingSecret: SECRET,
       })
-      const parsed: unknown = JSON.parse(body.toString("utf8"))
-      const data = asJsonObject(parsed as Json)?.["data"] ?? null
+      const parsed: Json = JSON.parse(body.toString("utf8"))
+      const data = asJsonObject(parsed)?.["data"] ?? null
 
       this.events.push({ type: event.type, data })
       res.statusCode = 200
@@ -136,6 +136,11 @@ async function liveShape(scenario: string, step: string) {
   return recorded.shape
 }
 
+/** The membership the live scenario added: a plain member, as the golden recorded it. */
+function plainMember(data: Json): boolean {
+  return asJsonObject(data)?.["role"] === "org:member"
+}
+
 const USERS = "users: create, read, list, update, ban, delete"
 const ORGANIZATIONS = "organizations: create, members, invitations, delete"
 
@@ -173,8 +178,6 @@ describe("Clerk webhooks against the live Backend API shapes", () => {
     await backend("DELETE", `/users/${user}`)
     await backend("DELETE", `/users/${member}`)
 
-    /** The membership the scenario added: a plain member, as the golden recorded it. */
-    const plainMember = (data: Json) => asJsonObject(data)?.["role"] === "org:member"
     const cases: [string, string, string, ((data: Json) => boolean)?][] = [
       ["user.created", USERS, "create user (user)"],
       ["user.deleted", USERS, "delete user"],

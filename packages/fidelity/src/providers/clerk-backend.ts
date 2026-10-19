@@ -41,7 +41,7 @@ export function backend(
 }
 
 /** A string field of an answer's top-level object. */
-export function idOf(answer: Answer, name = "id"): string {
+function idOf(answer: Answer, name = "id"): string {
   const value = asJsonObject(answer.body)?.[name]
 
   if (typeof value !== "string") throw new Error(`expected the answer to have a string ${name}`)

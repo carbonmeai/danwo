@@ -7,7 +7,7 @@ import type { AttemptRecord } from "./store.ts"
 const ABANDON_AFTER_MS = 24 * 60 * 60 * 1000
 
 /** A verification's `object`: `verification_otp` for an emailed code, else named for its strategy. */
-export function verificationObject(strategy: string): string {
+function verificationObject(strategy: string): string {
   return strategy === "email_code" ? "verification_otp" : `verification_${strategy}`
 }
 

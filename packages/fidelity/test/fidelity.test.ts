@@ -141,6 +141,14 @@ describe("skipping", () => {
   })
 })
 
+/** A Clerk instance's two keys, as a live run reads them. */
+function clerkKeys(secret: string, publishable: string) {
+  return {
+    DANWO_FIDELITY_CLERK_SECRET_KEY: secret,
+    DANWO_FIDELITY_CLERK_PUBLISHABLE_KEY: publishable,
+  }
+}
+
 describe("credentials", () => {
   it("refuses live Stripe keys and runs without credentials offline", () => {
     const stripe = FIDELITY_PROVIDERS.find((provider) => provider.name === "stripe")
@@ -165,15 +173,15 @@ describe("credentials", () => {
 
   it("refuses a live Clerk key and needs both of a development instance's keys", () => {
     const clerk = FIDELITY_PROVIDERS.find((provider) => provider.name === "clerk")
-    const keys = (secret: string, publishable: string) => ({
-      DANWO_FIDELITY_CLERK_SECRET_KEY: secret,
-      DANWO_FIDELITY_CLERK_PUBLISHABLE_KEY: publishable,
-    })
 
-    expect(() => clerk?.live(keys("sk_live_abc", "pk_test_abc"))).toThrow(LiveCredentialRefused)
-    expect(() => clerk?.live(keys("sk_test_abc", "pk_live_abc"))).toThrow(LiveCredentialRefused)
+    expect(() => clerk?.live(clerkKeys("sk_live_abc", "pk_test_abc"))).toThrow(
+      LiveCredentialRefused,
+    )
+    expect(() => clerk?.live(clerkKeys("sk_test_abc", "pk_live_abc"))).toThrow(
+      LiveCredentialRefused,
+    )
     expect(clerk?.live({ DANWO_FIDELITY_CLERK_SECRET_KEY: "sk_test_abc" })).toBeUndefined()
-    expect(clerk?.live(keys("sk_test_abc", "pk_test_abc"))?.kind).toBe("live")
+    expect(clerk?.live(clerkKeys("sk_test_abc", "pk_test_abc"))?.kind).toBe("live")
   })
 
   it("calls public endpoints only when opted in", () => {

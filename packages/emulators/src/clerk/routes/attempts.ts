@@ -123,27 +123,31 @@ function attemptFirstFactor(
   )
 }
 
+/**
+ * Refuses an identifier no user has. Clerk keeps the failed sign-in on the client, waiting for an
+ * identifier it knows, so the error's client shows it.
+ */
+function refuseUnknown(context: ClerkContext, request: BrowserRequest): never {
+  const unknown = newAttempt(context, "sign_in", {
+    clientId: request.client.id,
+    identifier: "",
+    userId: null,
+    password: null,
+  })
+
+  context.clerk.attempts.change(unknown.id, { status: "needs_identifier" })
+  track(context, request, unknown)
+
+  throw formError("form_identifier_not_found", "identifier", "Couldn't find your account.")
+}
+
 /** `POST /v1/client/sign_ins`: finds the account, and checks a password sent along with it. */
 async function createSignIn(c: Context, context: ClerkContext): Promise<Response> {
   const request = browserRequest(c, context)
   const body = await bodyOf(c)
   const identifier = str(body.identifier) ?? ""
-  const user = userByEmail(context, identifier)
+  const user = userByEmail(context, identifier) ?? refuseUnknown(context, request)
 
-  if (!user) {
-    /* Clerk keeps the failed sign-in on the client, waiting for an identifier it knows. */
-    const unknown = newAttempt(context, "sign_in", {
-      clientId: request.client.id,
-      identifier: "",
-      userId: null,
-      password: null,
-    })
-
-    context.clerk.attempts.change(unknown.id, { status: "needs_identifier" })
-    track(context, request, unknown)
-
-    throw formError("form_identifier_not_found", "identifier", "Couldn't find your account.")
-  }
   if (user.banned)
     throw new ClerkFailure(
       403,
