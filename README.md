@@ -5,11 +5,14 @@
   </picture>
 </h1>
 
-An open-source QA platform for the agentic era, with a cloud offering and a self-hosted version.
+**dánwò** (`danwo`) is an open-source testing framework that drives your app through its UI like a user, and then checks everything that happened behind it.
 
-Coding agents made writing code cheap; verifying it is now the bottleneck. danwo answers one question per change: **what did this break, and how sure are we?**
+Coding agents made writing code cheap; verifying it is now the bottleneck. A test that clicks "Pay" and sees "Thank you" proves little: was the card charged once, did the webhook arrive, was the email sent, does the ledger add up? danwo answers one question per change: **what did this break, and how sure are we?**
 
-It drives the app through its UI like a user, while third-party services the app calls are emulated behind an egress proxy, so the app needs no code changes. Every run can be replayed deterministically, broken on purpose with a fault matrix, and explained by a flight recorder.
+- **It drives the app** in a browser or on an Android device, with locators, plain-English agent steps, or both. Agent steps are recorded once and replayed after that with no model calls.
+- **It emulates the services behind the app.** Stripe, Resend, S3, Google, Microsoft, Slack, GitHub, Clerk, Auth0, Composio, the model APIs and more answer from local emulators behind an egress proxy, so the app needs no code changes and no sandbox keys. Each emulator is checked against the real API.
+- **It breaks the run on purpose.** `danwo matrix` records one clean run, then replays it once per fault the app could meet: declined cards, 500s, timeouts, duplicate or forged webhooks, double-submits, lost database commits, time jumps. An invariant judges every trial.
+- **It explains every run.** A flight record keeps the video, each step, every provider call and webhook, the database statements and the emulators' state, with secrets redacted, in a dashboard, a GitHub Check and a pull request comment, and over MCP for coding agents.
 
 ## Quickstart
 
@@ -478,6 +481,14 @@ bun run check       # format, lint, fallow, typecheck, unit tests
 bun run test:slow   # browser and CLI tests
 ```
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md). To report a security problem, see [SECURITY.md](SECURITY.md).
+
 ## Status
 
 Early. APIs will change.
+
+## License
+
+The code is licensed under the [Apache License 2.0](LICENSE). The dánwò name and logo in [`brand/`](brand/) are not covered by that licence; see [TRADEMARKS.md](TRADEMARKS.md).
