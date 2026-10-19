@@ -3,6 +3,7 @@ import { Box, HStack, Stack, styled } from "@danwo/ui/jsx"
 import { type KeyboardEvent, type PointerEvent, useRef, useState } from "react"
 
 import { Button, segment, SegmentTrack } from "../../components/controls.tsx"
+import { useCopied } from "../../components/copy-link.tsx"
 import { clock, frameAt, type Replay, type ReplayMark, stepAt } from "./record-replay.ts"
 import type { Playback } from "./use-playback.ts"
 import { useScreenshot } from "./use-screenshot.ts"
@@ -177,7 +178,7 @@ function Still({
 
 /** Copies a link that opens this record with the player at this moment. */
 function CopyMoment({ playback }: { readonly playback: Playback }) {
-  const [copied, setCopied] = useState(false)
+  const [copied, copy] = useCopied()
 
   return (
     <Button
@@ -190,10 +191,7 @@ function CopyMoment({ playback }: { readonly playback: Playback }) {
 
         url.hash = ""
         url.searchParams.set("t", ((playback.ms - playback.startMs) / 1000).toFixed(1))
-        void navigator.clipboard.writeText(url.href).then(() => {
-          setCopied(true)
-          setTimeout(() => setCopied(false), 2_000)
-        })
+        copy(url.href)
       }}
     >
       {copied ? <Icons.copyCheck size={14} /> : <Icons.copyLink size={14} />}
