@@ -12,6 +12,7 @@ import { dollars, duration, percent } from "../../lib/format.ts"
 import { CacheTrend } from "./cache-trend.tsx"
 import { FlakyTests } from "./flaky-tests.tsx"
 import type { Insights, TestInsight } from "./insights-data.ts"
+import { type TableOrder, TestTable } from "./test-table.tsx"
 
 const TOP = 10
 
@@ -65,7 +66,14 @@ function InsightCards({ insights }: { readonly insights: Insights }) {
 }
 
 /** Which tests flip, which are slow, what they cost the model, and what the lint found. */
-export function InsightsPage({ insights }: { readonly insights: Insights }) {
+export function InsightsPage({
+  insights,
+  sorting = { sort: "flake", ascending: false },
+}: {
+  readonly insights: Insights
+  /** How the table of every test is sorted. */
+  readonly sorting?: TableOrder
+}) {
   if (insights.runs === 0)
     return (
       <Page crumbs={["Insights"]} title="Insights">
@@ -90,6 +98,9 @@ export function InsightsPage({ insights }: { readonly insights: Insights }) {
       <InsightCards insights={insights} />
       <Section title="Flaky tests" count={insights.flaky.length}>
         <FlakyTests insights={insights} />
+      </Section>
+      <Section title="Every test" count={insights.breakdown.length} bare>
+        <TestTable rows={insights.breakdown} sorting={sorting} />
       </Section>
       <Grid gridTemplateColumns={{ base: "1fr", lg: "1fr 1fr" }} columnGap="2">
         <Section title="Slowest tests">

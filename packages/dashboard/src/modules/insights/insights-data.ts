@@ -6,6 +6,7 @@ import type { HistoryLint, HistoryTest, RunHistory, TestHistory } from "@danwo/r
 
 import { cacheHitRate } from "../runs/run-trend.ts"
 import { loadHistory } from "../runs/runs-data.ts"
+import { type TestBreakdown, testBreakdown } from "./test-breakdown.ts"
 
 /** One test's record over the runs that ran it. */
 export interface TestInsight {
@@ -56,6 +57,8 @@ export interface Insights {
   readonly history: Readonly<Record<string, readonly Outcome[]>>
   readonly cache: readonly CachePoint[]
   readonly lint: readonly LintRule[]
+  /** Every test, one row each: runs, pass and flake rates, time, spend, the faults that break it. */
+  readonly breakdown: readonly TestBreakdown[]
 }
 
 interface Seen {
@@ -183,6 +186,7 @@ export async function getInsights(root: string, limit = 50): Promise<Insights> {
     ),
     cache: cacheTrend(history),
     lint: lintRules(history),
+    breakdown: testBreakdown(history),
     slowest: all.toSorted((a, b) => b.averageMs - a.averageMs).slice(0, limit),
     costliest: all
       .filter((t) => t.costUsd > 0 || t.modelCalls > 0)
