@@ -42,7 +42,7 @@ await lines.next()
 const checkout = await bachs.checkoutSessions.create(
   {
     pricing: { currency: "USD", amount: "29.00" },
-    customer: { email: "jane@example.com", name: "Jane Doe" },
+    customer: { email: "jane@danwo-shop.com", name: "Jane Doe" },
     reference: "order_1042",
     success_url: "https://shop.example.com/thanks",
   },

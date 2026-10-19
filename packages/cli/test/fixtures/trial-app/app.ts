@@ -56,7 +56,7 @@ async function startTrial(response: ServerResponse): Promise<void> {
     const checkout = await bachs.checkoutSessions.create(
       {
         product_cart: [{ product_id: product, quantity: 1 }],
-        customer: { email: "ada@danwo.test", name: "Ada" },
+        customer: { email: "ada@danwo-shop.com", name: "Ada" },
         success_url: `${base}/account`,
         cancel_url: `${base}/`,
       },

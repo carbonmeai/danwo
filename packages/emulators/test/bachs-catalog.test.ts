@@ -112,7 +112,7 @@ describe("Bachs products", () => {
 
     const sale = await bachs.call("POST", "/v1/checkout-sessions", {
       product_cart: [{ product_id: plan.id }],
-      customer: { email: "ada@danwo.test", name: "Ada" },
+      customer: { email: "ada@danwo-shop.com", name: "Ada" },
     })
 
     expect(await sale.json()).toMatchObject({ error_code: "PRODUCT_ARCHIVED" })
@@ -129,7 +129,7 @@ describe("Bachs customers", () => {
   it("creates, finds and updates customers, and announces both", async () => {
     const created = await (
       await bachs.call("POST", "/v1/customers", {
-        email: "jane@example.com",
+        email: "jane@danwo-shop.com",
         name: "Jane Doe",
         metadata: { user_id: "usr_1" },
         billing_address: { line1: "40 Yaba Road", country: "NG" },
@@ -137,7 +137,7 @@ describe("Bachs customers", () => {
     ).json()
 
     expect(created).toMatchObject({
-      email: "jane@example.com",
+      email: "jane@danwo-shop.com",
       billing_address: { line1: "40 Yaba Road", city: null, country: "NG" },
     })
 
@@ -157,17 +157,61 @@ describe("Bachs customers", () => {
       name: "Jane A. Doe",
       billing_address: { line1: "1 Main St", country: "GH" },
     })
-    expect((await bachs.call("POST", "/v1/customers", { email: "jane@example.com" })).status).toBe(
-      409,
-    )
+    expect(
+      (await bachs.call("POST", "/v1/customers", { email: "jane@danwo-shop.com" })).status,
+    ).toBe(409)
 
     await bachs.pass(0)
     expect(bachs.types()).toEqual(["customer.created", "customer.updated"])
   })
 
+  it("refuses emails that are malformed, special-use or reserved for documentation", async () => {
+    const create = async (email?: string) =>
+      (await bachs.call("POST", "/v1/customers", { email, name: "Probe" })).json()
+
+    expect(await create()).toEqual({
+      detail: "Missing required field(s): email",
+      error_code: "VALIDATION_ERROR",
+      errors: [{ field: "email", message: "Field required", type: "missing" }],
+    })
+    expect(await create("nope")).toEqual({
+      detail: "value is not a valid email address: An email address must have an @-sign.",
+      error_code: "VALIDATION_ERROR",
+    })
+    expect(await create("ada@danwo.test")).toEqual({
+      detail:
+        "value is not a valid email address: The part after the @-sign is a special-use or reserved name that cannot be used with email.",
+      error_code: "VALIDATION_ERROR",
+    })
+    expect(await create("ada@localhost")).toMatchObject({
+      detail:
+        "value is not a valid email address: The part after the @-sign is not valid. It should have a period.",
+    })
+
+    for (const email of ["jane@example.com", "jane@mail.example.org", "jane@shop.example"])
+      expect(await create(email)).toEqual({
+        detail: `'${email}' cannot receive mail — its domain accepts none. Receipts and payment notices would not arrive.`,
+        error_code: "EMAIL_NOT_DELIVERABLE",
+      })
+
+    const ebook = await bachs.client.products.create({
+      name: "Ebook",
+      price: { currency: "USD", amount: "29.00" },
+    })
+    const sale = await bachs.call("POST", "/v1/checkout-sessions", {
+      product_cart: [{ product_id: ebook.id }],
+      customer: { email: "ada@shop.local" },
+    })
+
+    expect(await sale.json()).toMatchObject({
+      error_code: "VALIDATION_ERROR",
+      detail: expect.stringContaining("special-use"),
+    })
+  })
+
   it("mints a portal session whose URL opens the customer's billing page", async () => {
     const created = await (
-      await bachs.call("POST", "/v1/customers", { email: "jane@example.com" })
+      await bachs.call("POST", "/v1/customers", { email: "jane@danwo-shop.com" })
     ).json()
     const session = await bachs.client.customerPortal.createSession(String(created["customer_id"]))
 
@@ -176,7 +220,7 @@ describe("Bachs customers", () => {
 
     const page = await bachs.emulator.fetch(new Request(session.url))
 
-    expect(await page.text()).toContain("Signed in as jane@example.com")
+    expect(await page.text()).toContain("Signed in as jane@danwo-shop.com")
   })
 })
 

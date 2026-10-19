@@ -27,7 +27,7 @@ async function plan(name: string, amount: string, trialDays?: number): Promise<s
 async function subscribe(product: string, card?: string): Promise<string> {
   const checkout = await bachs.client.checkoutSessions.create({
     product_cart: [{ product_id: product, quantity: 1 }],
-    customer: { email: "jane@example.com", name: "Jane Doe" },
+    customer: { email: "jane@danwo-shop.com", name: "Jane Doe" },
     metadata: { plan: "pro" },
   })
 
@@ -116,7 +116,7 @@ describe("Bachs subscriptions", () => {
     expect(await bachs.client.subscriptions.get(id)).toMatchObject({ status: "past_due" })
     expect(bachs.types()).toContain("invoice.payment_failed")
 
-    const [email] = ledger.recoveryEmails("jane@example.com")
+    const [email] = ledger.recoveryEmails("jane@danwo-shop.com")
 
     expect(email?.link).toMatch(/^https:\/\/checkout\.bachs\.io\/recover\//)
 

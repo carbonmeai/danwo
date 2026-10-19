@@ -38,7 +38,7 @@ async function buy(response: ServerResponse): Promise<void> {
     const checkout = await bachs.checkoutSessions.create(
       {
         pricing: { currency: "USD", amount: "5.00" },
-        customer: { email: "ada@danwo.test", name: "Ada" },
+        customer: { email: "ada@danwo-shop.com", name: "Ada" },
         reference: `order_${orders}`,
         success_url: `${base}/done`,
         cancel_url: `${base}/`,

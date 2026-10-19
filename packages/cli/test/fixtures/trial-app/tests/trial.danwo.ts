@@ -43,7 +43,7 @@ test("a trial turns into a paid plan, and a card that stops working ends access"
   await app.open("/account")
   await expect(screen.getByRole("status")).toHaveText("Plan: canceled")
   await expect(screen.getByTestId("access")).toHaveText("Access: revoked")
-  expect(ledger.recoveryEmails("ada@danwo.test").length).toBeGreaterThan(0)
+  expect(ledger.recoveryEmails("ada@danwo-shop.com").length).toBeGreaterThan(0)
 }).invariant(async ({ app, bachs, settle, expect }) => {
   /*
    * Whichever way the run went: one receipt per paid invoice, never more, and no access without a

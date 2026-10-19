@@ -1,6 +1,7 @@
 import { isRecord } from "../../json.ts"
 import type { BachsContext } from "../context.ts"
 import { matchOrCreateCustomer } from "../customers.ts"
+import { checkEmail } from "../emails.ts"
 import type { CheckoutLine, CheckoutSession, Customer, Product } from "../entities.ts"
 import { checkoutObject, createdCheckoutObject } from "../formatters.ts"
 import {
@@ -88,16 +89,17 @@ function linesOf(context: BachsContext, body: Record<string, unknown>): Checkout
   return lines
 }
 
-/** A new customer's email from a checkout's `customer`, refusing a malformed one. */
+/** A new customer's email from a checkout's `customer`, refusing one Bachs would not keep. */
 function emailOf(value: Record<string, unknown>): string {
   const email = text(value, "email")
 
-  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+  if (!email)
     invalid("customer.email must be a valid email", {
       field: "customer.email",
       message: "Invalid email",
       type: "value_error",
     })
+  checkEmail(email)
 
   return email
 }

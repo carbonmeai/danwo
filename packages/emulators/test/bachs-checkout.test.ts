@@ -24,7 +24,7 @@ afterEach(async () => {
 function buyEbook(extra: Record<string, unknown> = {}) {
   return bachs.client.checkoutSessions.create({
     product_cart: [{ product_id: ebook, quantity: 1 }],
-    customer: { email: "jane@example.com", name: "Jane Doe" },
+    customer: { email: "jane@danwo-shop.com", name: "Jane Doe" },
     success_url: "https://shop.example.com/thanks",
     cancel_url: "https://shop.example.com/cart",
     reference: "order_1042",
@@ -82,7 +82,7 @@ describe("Bachs checkout", () => {
       reference: "order_1042",
       status: "SUCCEEDED",
       amount: "29.00",
-      customer: { email: "jane@example.com" },
+      customer: { email: "jane@danwo-shop.com" },
       product_cart: [{ product_id: ebook, quantity: 1 }],
     })
     expect(collected?.headers["x-bachs-signature-v2"]).toMatch(/^t=\d+,v1=[0-9a-f]{64}$/)
@@ -112,20 +112,20 @@ describe("Bachs checkout", () => {
 
     expect(await missing.text()).toContain("Enter your email address.")
 
-    await bachs.pay(guest.checkout_url, { email: "guest@example.com", name: "Guest" })
+    await bachs.pay(guest.checkout_url, { email: "guest@danwo-shop.com", name: "Guest" })
     await bachs.pass(1000)
 
     const checkout = await bachs.client.checkoutSessions.get(guest.checkout_id)
 
     expect(checkout.customer).toBeNull()
-    expect(checkout.customer_details).toEqual({ email: "guest@example.com", name: "Guest" })
+    expect(checkout.customer_details).toEqual({ email: "guest@danwo-shop.com", name: "Guest" })
     expect(bachs.types()).not.toContain("customer.created")
   })
 
   it("charges a raw amount, or the buyer's choice within a custom price's bounds", async () => {
     const raw = await bachs.client.checkoutSessions.create({
       pricing: { currency: "NGN", amount: "75000.00" },
-      customer: { email: "a@example.com", name: "A" },
+      customer: { email: "a@danwo-shop.com", name: "A" },
     })
 
     await bachs.pay(raw.checkout_url)
@@ -142,7 +142,7 @@ describe("Bachs checkout", () => {
           pricing: { price_type: "custom", preset_amount: "10.00", minimum_amount: "5.00" },
         },
       ],
-      customer: { email: "b@example.com", name: "B" },
+      customer: { email: "b@danwo-shop.com", name: "B" },
     })
     const tooLow = await bachs.pay(tip.checkout_url, { amount: "2.00" })
 
@@ -233,7 +233,7 @@ describe("Bachs payments and refunds", () => {
     expect(list.items[0]).toMatchObject({
       status: "succeeded",
       amount: "29.00",
-      customer_email: "jane@example.com",
+      customer_email: "jane@danwo-shop.com",
     })
 
     const payment = await bachs.client.payments.get(charge)

@@ -1,6 +1,7 @@
 import { isRecord } from "../../json.ts"
 import type { BachsContext } from "../context.ts"
 import { createCustomer, customerByEmail } from "../customers.ts"
+import { checkEmail } from "../emails.ts"
 import type { BillingAddress, Customer } from "../entities.ts"
 import { customerObject } from "../formatters.ts"
 import {
@@ -57,7 +58,10 @@ function customerChanges(body: Record<string, unknown>): Changes<Customer> {
   const phone = text(body, "phone_number")
 
   if (name !== undefined) changes.name = name
-  if (email !== undefined) changes.email = email
+  if (email !== undefined) {
+    checkEmail(email)
+    changes.email = email
+  }
   if (phone !== undefined) changes.phoneNumber = phone
   if ("metadata" in body) changes.metadata = metadataOf(body["metadata"]) ?? {}
   if ("billing_address" in body) changes.billingAddress = addressOf(body["billing_address"])
@@ -83,12 +87,13 @@ export function customerRoutes(context: BachsContext): void {
     const body = await bodyOf(c)
     const email = text(body, "email")
 
-    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+    if (!email)
       invalid("Missing required field(s): email", {
         field: "email",
-        message: "A valid email is required",
-        type: "value_error",
+        message: "Field required",
+        type: "missing",
       })
+    checkEmail(email)
     if (customerByEmail(context, email))
       throw new BachsFailure(409, "CONFLICT", "A customer with this email already exists")
 
