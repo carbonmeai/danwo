@@ -80,6 +80,14 @@ function channelsOf(fields: Record<string, unknown>): readonly string[] {
     : ["card", "bank_transfer", "ussd"]
 }
 
+/** The answer to an initialize call that cannot go ahead: its problem, or an unknown currency. */
+function refuseInitialize(c: Context, problem: string | undefined): Response {
+  if (problem === undefined)
+    return fail(c, 400, "No active channel to process transaction. Please contact merchant")
+
+  return fail(c, 400, problem, problem === INVALID_AMOUNT ? PROBLEMS.invalidAmount : undefined)
+}
+
 async function initialize(
   c: Context,
   context: PaystackRouteContext,
@@ -90,10 +98,7 @@ async function initialize(
   const problem = initializeProblem(context, fields)
   const currency = currencyOf(fields, integration.currency === "GHS" ? "GHS" : "NGN")
 
-  if (problem !== undefined)
-    return fail(c, 400, problem, problem === INVALID_AMOUNT ? PROBLEMS.invalidAmount : undefined)
-  if (currency === undefined)
-    return fail(c, 400, "No active channel to process transaction. Please contact merchant")
+  if (problem !== undefined || currency === undefined) return refuseInitialize(c, problem)
 
   const planCode = text(fields, "plan")
   const { transaction, extra } = payments.start({
