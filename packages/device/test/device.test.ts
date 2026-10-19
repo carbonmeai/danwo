@@ -8,10 +8,11 @@ import { describe, expect, it } from "vitest"
 
 import { AndroidApp, parseLogcat, topActivity } from "../src/android/app.ts"
 import { androidCaFileName, subjectDer } from "../src/android/ca.ts"
-import { bootArgs } from "../src/android/emulator.ts"
+import { bootArgs, useEmulator } from "../src/android/emulator.ts"
 import {
   Adb,
   AndroidBinder,
+  androidWorkers,
   type DeviceDriver,
   deviceDoctor,
   deviceNodes,
@@ -201,6 +202,19 @@ describe("the app", () => {
     expect(commands.slice(3)).toEqual([reset, "shell dumpsys activity activities"])
   })
 
+  it("disables any other app that opens the app's links", async () => {
+    const { commands, exec } = fakeAdb({
+      "query-activities":
+        "priority=0 preferredOrder=0\ncom.danwo.spike/.MainActivity\ncom.danwo.shopmobile/.MainActivity",
+    })
+    const app = new AndroidApp(new Adb(TOOLS.adb, "emulator-5554", exec), {
+      package: "com.danwo.shopmobile",
+    })
+
+    expect(await app.claimScheme("danwoshop")).toEqual(["com.danwo.spike"])
+    expect(commands.at(-1)).toBe("shell pm disable-user --user 0 com.danwo.spike")
+  })
+
   it("stops and launches the app once more when the first launch did not bring it up", async () => {
     let front = "com.android.launcher3"
     const { commands, exec } = fakeAdb({
@@ -263,7 +277,7 @@ describe("the app", () => {
 })
 
 describe("the emulator's command line", () => {
-  it("boots headless without saving over the AVD's snapshots, cold or from a snapshot", () => {
+  it("boots headless and read-only without saving over the AVD's snapshots, cold or from a snapshot", () => {
     expect(bootArgs("danwo_spike", 5556, undefined)).toEqual([
       "-avd",
       "danwo_spike",
@@ -274,6 +288,7 @@ describe("the emulator's command line", () => {
       "-no-boot-anim",
       "-gpu",
       "swiftshader_indirect",
+      "-read-only",
       "-no-snapshot-save",
       "-no-snapshot-load",
     ])
@@ -281,6 +296,53 @@ describe("the emulator's command line", () => {
       "-snapshot",
       "danwo_clean",
     ])
+  })
+})
+
+/** Two emulators running: worker 0's and worker 1's ports, the second on another AVD. */
+const FLEET: Readonly<Record<string, string>> = {
+  devices: "List of devices attached\nemulator-5554\tdevice\nemulator-5556\tdevice\n",
+  "-s emulator-5554 emu avd name": "danwo_spike\nOK",
+  "-s emulator-5556 emu avd name": "other_avd\nOK",
+  boot_completed: "1",
+}
+
+/** An `Exec` answering for the two emulators, by serial. */
+const fleet: Exec = async (_file, args) => {
+  const command = args.join(" ")
+  const key = Object.keys(FLEET).find((each) => command.includes(each))
+
+  return key === undefined ? "" : (FLEET[key] ?? "")
+}
+
+describe("an emulator per worker", () => {
+  it("uses the emulator on the worker's own port", async () => {
+    const emulator = await useEmulator(TOOLS, { avd: "danwo_spike", worker: 0 }, fleet)
+
+    expect(emulator.adb.serial).toBe("emulator-5554")
+    expect(emulator.booted).toBe(false)
+  })
+
+  it("never takes another worker's emulator, and names an AVD that holds its port", async () => {
+    await expect(useEmulator(TOOLS, { avd: "danwo_spike", worker: 1 }, fleet)).rejects.toThrow(
+      "emulator-5556 runs other_avd, not danwo_spike",
+    )
+  })
+})
+
+describe("how many emulators fit", () => {
+  const roomy = { memoryMb: 32_768, cores: 12, load: 2, emulatorMb: 4096 }
+
+  it("fits as many as half the memory and a pair of cores each allow, up to the most asked", () => {
+    expect(androidWorkers({ machine: roomy })).toBe(3)
+    expect(androidWorkers({ machine: roomy, max: 2 })).toBe(2)
+    expect(androidWorkers({ machine: { ...roomy, memoryMb: 16_384 } })).toBe(1)
+    expect(androidWorkers({ machine: { ...roomy, cores: 4 } })).toBe(2)
+  })
+
+  it("falls back to one on a machine that is short of memory or already busy", () => {
+    expect(androidWorkers({ machine: { ...roomy, memoryMb: 4096 } })).toBe(1)
+    expect(androidWorkers({ machine: { ...roomy, load: 14 } })).toBe(1)
   })
 })
 

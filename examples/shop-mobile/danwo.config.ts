@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url"
 
-import { ANDROID_BACKGROUND_HOSTS, withAndroidDevice } from "@danwo/device"
+import { ANDROID_BACKGROUND_HOSTS, androidWorkers, withAndroidDevice } from "@danwo/device"
 import { buildAndroid } from "@danwo/expo"
 import { forwardTo } from "@danwo/proxy"
 import { defineConfig, type Service, startServices, stripeService } from "@danwo/sdk"
@@ -11,11 +11,12 @@ const WEBHOOK_SECRET = "whsec_danwo_example"
 /** The host the app calls; the proxy routes it to the shop's server on this machine. */
 const SHOP_HOST = "shop.danwo.test"
 const APP = fileURLToPath(new URL("./app", import.meta.url))
+const AVD = process.env.DANWO_AVD ?? "danwo_spike"
 
 export default defineConfig({
   testDir: "tests",
-  /* One emulator, so one worker. */
-  workers: 1,
+  /* Each worker boots its own emulator: as many as this machine has room for, at most three. */
+  workers: androidWorkers({ avd: AVD }),
   timeout: 120_000,
   readiness: { mode: "page+backend", settle: true },
   /*
@@ -24,7 +25,7 @@ export default defineConfig({
    * test starts the app afresh (data cleared, permissions granted); `danwo matrix` restores the
    * services between runs.
    */
-  async environment() {
+  async environment({ workerIndex }) {
     /* Built once; an unchanged app reuses its kept APK. */
     const build = await buildAndroid({ project: APP })
     let shop: Shop | undefined
@@ -93,7 +94,12 @@ export default defineConfig({
         },
       },
       {
-        avd: process.env.DANWO_AVD ?? "danwo_spike",
+        avd: AVD,
+        worker: workerIndex,
+        /* A saved snapshot boots in seconds; without one the emulator boots cold. */
+        ...(process.env.DANWO_AVD_SNAPSHOT !== undefined && {
+          snapshot: process.env.DANWO_AVD_SNAPSHOT,
+        }),
         app: { package: "com.danwo.shopmobile", apk: build.apk, scheme: "danwoshop" },
       },
     )

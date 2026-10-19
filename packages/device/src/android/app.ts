@@ -93,6 +93,27 @@ export class AndroidApp {
       await this.adb.run(["install", "-r", "-g", this.options.apk], 240_000)
   }
 
+  /**
+   * Leaves the app the only one that opens `scheme` links: any other app on the device that claims
+   * them (an older build under another package, kept in a snapshot) is disabled, or a link back
+   * from the browser stops at an "Open with" chooser. Returns the packages it disabled.
+   */
+  async claimScheme(scheme: string): Promise<string[]> {
+    const handlers = await this.adb.shell(
+      `cmd package query-activities --brief -a android.intent.action.VIEW -d ${scheme}://`,
+    )
+    const others = new Set(
+      handlers
+        .split("\n")
+        .map((line) => /^\s*([\w.]+)\/[\w.$]+\s*$/.exec(line)?.[1])
+        .filter((name): name is string => name !== undefined && name !== this.package),
+    )
+
+    for (const other of others) await this.adb.shell(`pm disable-user --user 0 ${other}`)
+
+    return [...others]
+  }
+
   private async launcher(): Promise<string> {
     if (this.options.activity !== undefined) return `${this.package}/${this.options.activity}`
 

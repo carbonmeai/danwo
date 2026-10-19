@@ -1,6 +1,7 @@
 export { Adb, type Exec } from "./adb.ts"
 export { type AgentDeviceOptions, AgentDeviceDriver } from "./agent-device.ts"
 export { AndroidApp, type AppOptions } from "./android/app.ts"
+export { type AndroidWorkersOptions, androidWorkers } from "./android/capacity.ts"
 export { AndroidBinder, type BindOptions, DEVICE_PROXY_PORT } from "./android/binder.ts"
 export { ANDROID_BACKGROUND_HOSTS } from "./android/background.ts"
 export { androidCaFileName } from "./android/ca.ts"

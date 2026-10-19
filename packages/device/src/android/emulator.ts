@@ -2,8 +2,15 @@
  * The worker's emulator: one already running (by serial, or the one running the asked AVD), or one
  * booted headless for the worker and shut down when it closes. Booting from a saved snapshot of the
  * AVD is faster than a cold boot; the binder redoes what a snapshot cannot keep.
+ *
+ * Workers run side by side on one AVD: worker n has the console port 5554 + 2n (so the serial
+ * `emulator-<port>`), and each boot is read-only, which lets several instances share the AVD's
+ * disk images and snapshots without writing to them.
  */
 import { spawn } from "node:child_process"
+import { closeSync, openSync, readFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import { Adb, type Exec, execProgram } from "../adb.ts"
 import type { AndroidTools } from "../toolchain.ts"
@@ -16,8 +23,10 @@ export interface EmulatorOptions {
   readonly serial?: string
   /** A snapshot of the AVD to boot from instead of a cold boot. */
   readonly snapshot?: string
-  /** The console port to boot on (even, 5554–5682); the first free one by default. */
+  /** The console port to boot on (even, 5554–5682); the worker's, else the first free one. */
   readonly port?: number
+  /** The worker this emulator is for (0-based): its console port is 5554 + 2 × worker. */
+  readonly worker?: number
   /** How long a boot may take. Default 180 s. */
   readonly bootTimeoutMs?: number
 }
@@ -61,6 +70,10 @@ async function findRunning(
 ): Promise<Adb | undefined> {
   if (options.serial !== undefined) return new Adb(tools.adb, options.serial, exec)
 
+  const port = portOf(options)
+
+  if (port !== undefined) return findOnPort(tools, options, port, exec)
+
   for (const serial of await runningSerials(tools.adb, exec)) {
     const adb = new Adb(tools.adb, serial, exec)
 
@@ -68,6 +81,39 @@ async function findRunning(
   }
 
   return undefined
+}
+
+/** The port the options pin: asked for, or the worker's. */
+function portOf(options: EmulatorOptions): number | undefined {
+  if (options.port !== undefined) return options.port
+  if (options.worker === undefined) return undefined
+
+  const port = FIRST_PORT + 2 * options.worker
+
+  if (port > LAST_PORT) throw new Error(`no emulator port for worker ${options.worker}`)
+
+  return port
+}
+
+/** The emulator on `port`, when it runs the asked AVD; an error when another AVD holds the port. */
+async function findOnPort(
+  tools: AndroidTools,
+  options: EmulatorOptions,
+  port: number,
+  exec: Exec,
+): Promise<Adb | undefined> {
+  const serial = `emulator-${port}`
+
+  if (!(await runningSerials(tools.adb, exec)).includes(serial)) return undefined
+
+  const adb = new Adb(tools.adb, serial, exec)
+  const avd = await avdOf(adb)
+
+  if (options.avd !== undefined && avd !== options.avd) {
+    throw new Error(`${serial} runs ${avd || "another AVD"}, not ${options.avd}`)
+  }
+
+  return adb
 }
 
 /** Waits for Android to finish booting. */
@@ -97,7 +143,10 @@ async function freePort(tools: AndroidTools, exec: Exec): Promise<number> {
   throw new Error("no free emulator port between 5554 and 5682")
 }
 
-/** The emulator's command line: headless, quiet, and never saving over the AVD's snapshots. */
+/**
+ * The emulator's command line: headless, quiet, read-only (so other workers can boot the same AVD)
+ * and never saving over the AVD's snapshots.
+ */
 export function bootArgs(avd: string, port: number, snapshot: string | undefined): string[] {
   return [
     "-avd",
@@ -109,6 +158,7 @@ export function bootArgs(avd: string, port: number, snapshot: string | undefined
     "-no-boot-anim",
     "-gpu",
     "swiftshader_indirect",
+    "-read-only",
     "-no-snapshot-save",
     ...(snapshot === undefined ? ["-no-snapshot-load"] : ["-snapshot", snapshot]),
   ]
@@ -120,17 +170,42 @@ async function boot(tools: AndroidTools, options: EmulatorOptions, exec: Exec): 
     throw new Error("no emulator is running: name an AVD to boot (`avd`), or start one")
   }
 
-  const port = options.port ?? (await freePort(tools, exec))
+  const port = portOf(options) ?? (await freePort(tools, exec))
+  /* A file rather than a pipe: the emulator keeps running after this worker, and the file says why a boot failed. */
+  const log = join(tmpdir(), `danwo-emulator-${port}.log`)
+  const output = openSync(log, "w")
   const child = spawn(tools.emulator, bootArgs(options.avd, port, options.snapshot), {
     detached: true,
-    stdio: "ignore",
+    stdio: ["ignore", output, output],
   })
 
-  child.unref()
+  closeSync(output)
 
+  const exited = new Promise<never>((_, reject) => {
+    child.once("exit", (code) => {
+      const said = readFileSync(log, "utf8")
+      const error = said
+        .split("\n")
+        .findLast((line) => line.includes("ERROR"))
+        ?.trim()
+
+      reject(
+        new Error(
+          `the emulator for ${options.avd} on port ${port} exited (${code}) before it booted${error === undefined ? "" : `: ${error}`}`,
+        ),
+      )
+    })
+  })
   const adb = new Adb(tools.adb, `emulator-${port}`, exec)
 
-  await waitForBoot(adb, options.bootTimeoutMs ?? 180_000)
+  exited.catch(() => undefined)
+
+  try {
+    await Promise.race([waitForBoot(adb, options.bootTimeoutMs ?? 180_000), exited])
+  } finally {
+    child.removeAllListeners("exit")
+    child.unref()
+  }
 
   return adb
 }

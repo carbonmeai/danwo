@@ -202,6 +202,7 @@ export async function androidDevice(options: AndroidDeviceOptions): Promise<Andr
     const app = new AndroidApp(adb, options.app)
 
     await app.install()
+    if (options.app.scheme !== undefined) await app.claimScheme(options.app.scheme)
 
     const stateDir = options.stateDir ?? join(process.cwd(), ".danwo", "device", adb.serial)
     const driver =
