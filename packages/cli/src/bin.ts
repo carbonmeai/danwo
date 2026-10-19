@@ -25,14 +25,21 @@ import { Argument, Command, InvalidArgumentError, Option } from "commander"
 
 import { cliCommands } from "./commands.ts"
 
+/** What `--reporter` and `--no-pr-comment` set. */
+interface ReporterFlags {
+  readonly reporter?: string[] | undefined
+  /** `false` with `--no-pr-comment`. */
+  readonly prComment?: boolean | undefined
+}
+
 /** Reporters by the names `--reporter` takes; the console's list output always runs. */
-const REPORTERS: Readonly<Record<string, () => Reporter>> = {
-  github: () => github(),
+const REPORTERS: Readonly<Record<string, (flags: ReporterFlags) => Reporter>> = {
+  github: (flags) => github(flags.prComment === false ? { prComment: false } : {}),
   junit: () => junit(),
 }
 
 /** The reporters named by `--reporter`, comma-separated or repeated. */
-function reportersOf(names: readonly string[] | undefined): Reporter[] {
+function reportersOf({ reporter: names, ...flags }: ReporterFlags): Reporter[] {
   return (names ?? [])
     .flatMap((name) => name.split(","))
     .map((name) => name.trim())
@@ -44,7 +51,7 @@ function reportersOf(names: readonly string[] | undefined): Reporter[] {
         throw new InvalidArgumentError(`unknown reporter "${name}" (known: list, github, junit)`)
       }
 
-      return make()
+      return make(flags)
     })
 }
 
@@ -79,14 +86,21 @@ function withLintOptions(command: Command): Command {
 const reporterOption = () =>
   new Option(
     "--reporter <names...>",
-    "reporters besides the console's list: github (a check run and job summary in GitHub Actions), junit (.danwo/junit.xml)",
+    "reporters besides the console's list: github (a check run, a pull request comment and the job summary in GitHub Actions), junit (.danwo/junit.xml)",
   )
+
+/** `--reporter`, and `--no-pr-comment` for the github reporter. */
+function withReporterOptions(command: Command): Command {
+  return command
+    .addOption(reporterOption())
+    .option("--no-pr-comment", "github reporter: no pull request comment, only the check run")
+}
 
 const program = new Command()
   .name("danwo")
   .description("Drive your app like a user, judge the layers below, and run the fault matrix.")
 
-withLintOptions(program.command("test"))
+withReporterOptions(withLintOptions(program.command("test")))
   .description("run test files in worker processes")
   .argument("[patterns...]", "file paths or substrings narrowing the config's testMatch")
   .option("-w, --workers <n>", "worker processes", integerAtLeast(1))
@@ -105,13 +119,13 @@ withLintOptions(program.command("test"))
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .addOption(recordOption())
   .addOption(updateOption())
-  .addOption(reporterOption())
   .action(
     async (
       patterns: string[],
       {
         updateSnapshots,
         reporter,
+        prComment,
         ...options
       }: {
         workers?: number
@@ -127,19 +141,20 @@ withLintOptions(program.command("test"))
         record?: RecordMode
         updateSnapshots?: boolean
         reporter?: string[]
+        prComment?: boolean
         lint?: boolean
       },
     ) => {
       process.exitCode = await runTests({
         patterns,
         ...options,
-        reporters: reportersOf(reporter),
+        reporters: reportersOf({ reporter, prComment }),
         ...(updateSnapshots && { updateScreenshots: true }),
       })
     },
   )
 
-withLintOptions(program.command("matrix"))
+withReporterOptions(withLintOptions(program.command("matrix")))
   .description("record a clean run of one test, then replay it once per planned fault")
   .argument("<file>", "test file")
   .option("-g, --grep <regexp>", "selects the test when the file has several")
@@ -154,13 +169,13 @@ withLintOptions(program.command("matrix"))
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .addOption(recordOption())
   .addOption(updateOption())
-  .addOption(reporterOption())
   .action(
     async (
       file: string,
       {
         updateSnapshots,
         reporter,
+        prComment,
         ...options
       }: {
         grep?: string
@@ -172,27 +187,26 @@ withLintOptions(program.command("matrix"))
         record?: RecordMode
         updateSnapshots?: boolean
         reporter?: string[]
+        prComment?: boolean
         lint?: boolean
       },
     ) => {
       const update = updateSnapshots ? { updateScreenshots: true } : {}
-      const reporters = reportersOf(reporter)
+      const reporters = reportersOf({ reporter, prComment })
 
       process.exitCode = (await runMatrix({ file, ...options, reporters, ...update })).code
     },
   )
 
-program
-  .command("merge-reports")
+withReporterOptions(program.command("merge-reports"))
   .description("join the results of a split run (danwo test --shard i/n) into one report")
   .argument("[files...]", "results files (default: .danwo/results/shard-*.json)")
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
-  .addOption(reporterOption())
-  .action(async (files: string[], options: { config?: string; reporter?: string[] }) => {
+  .action(async (files: string[], options: { config?: string } & ReporterFlags) => {
     process.exitCode = await mergeReports({
       files,
       ...(options.config !== undefined && { config: options.config }),
-      reporters: reportersOf(options.reporter),
+      reporters: reportersOf(options),
     })
   })
 
