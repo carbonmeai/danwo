@@ -3,6 +3,7 @@ import { createServer, type IncomingHttpHeaders } from "node:http"
 
 import {
   auth0Tenant,
+  clerkInstance,
   type Emulator,
   githubRepo,
   googleSignIns,
@@ -11,12 +12,14 @@ import {
   paystackLedger,
   s3Objects,
   slackWorkspace,
+  stableClerkId,
   twilioInbox,
   twilioPhone,
 } from "@danwo/emulators"
 import { describe, expect, it } from "vitest"
 import { z } from "zod"
 
+import { clerkService } from "../src/runner/clerk.ts"
 import { defaultOutboundFaults } from "../src/runner/faults.ts"
 import {
   auth0Service,
@@ -538,5 +541,48 @@ describe("auth0Service", () => {
     )
     expect(faultsAt("acme.eu.auth0.com", "/api/v2/users").length).toBeGreaterThan(0)
     expect(faultsAt("acme.us.auth0.com", "/u/login")).toEqual([])
+  })
+})
+
+describe("clerkService", () => {
+  it("delivers svix-signed user webhooks on settle and hands its codes to the mail fixture", async () => {
+    const hooks = await receiver()
+    const clerk = clerkService({
+      seed: {
+        webhooks: [{ endpoint: `${hooks.url}/clerk` }],
+        users: [{ email: "ada@danwo.test" }],
+      },
+    })
+    const services = await startServices([clerk])
+
+    try {
+      const created = await clerk.emulator.fetch(
+        new Request("https://api.clerk.com/v1/users", {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${clerkInstance(clerk.emulator).instance.secretKey}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ email_address: ["grace@danwo.test"] }),
+        }),
+      )
+
+      expect(created.status).toBe(200)
+      await services.settle()
+
+      const types = hooks.received.map(
+        (r) => z.object({ type: z.string() }).parse(JSON.parse(r.body)).type,
+      )
+
+      expect(types).toEqual(["user.created"])
+      expect(hooks.received[0]?.headers["svix-signature"]).toMatch(/^v1,/)
+      expect(services.mail).toHaveLength(1)
+      expect(clerkInstance(clerk.emulator).user("ada@danwo.test")?.id).toBe(
+        stableClerkId("user", "ada@danwo.test"),
+      )
+    } finally {
+      await services.close()
+      hooks.close()
+    }
   })
 })

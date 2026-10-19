@@ -133,6 +133,8 @@ export interface OAuthEnvironment<Name extends string> {
   readonly proxy: Proxy
   /** Its push notifications, by service name, for `danwo matrix` to fault. */
   readonly webhooks: Services["webhooks"]
+  /** Where the mail it sends lands, for the `mail` fixture (Clerk's codes). */
+  readonly mail?: Services["mail"]
   /** Plays every pending push notification and retry to the end. */
   readonly settle: () => Promise<void>
   /** Moves the app's clock and the emulator's time forward by `ms`; see `time.travel`. */
@@ -242,6 +244,7 @@ export async function oauthEnvironment<Name extends string>(
     emulator: service.emulator,
     proxy,
     webhooks: services.webhooks,
+    ...(services.mail && { mail: services.mail }),
     ...lifecycle,
     fixtures,
   }

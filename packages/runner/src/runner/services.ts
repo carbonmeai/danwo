@@ -2,6 +2,8 @@ import type { Emulator, ManualClock, StoreSnapshot, WebhookDispatcher } from "@d
 import { clearWebhookFaults } from "@danwo/matrix"
 import { type Proxy, type Route, startProxy } from "@danwo/proxy"
 
+import type { MailSource } from "../mail/index.ts"
+
 /**
  * One faked third party behind the worker's proxy: the hosts it answers (an emulator in-process
  * or an outside endpoint such as MiniStack), the fixtures it gives tests, and how it settles and
@@ -16,6 +18,8 @@ export interface Service {
   readonly webhooks?: WebhookDispatcher | undefined
   /** Hears of the proxy once it runs, for a service that reads the calls made through it. */
   attach?(proxy: Proxy): void
+  /** Where mail this service sends lands (Clerk's codes, Resend's emails), for the `mail` fixture. */
+  readonly mail?: readonly MailSource[]
   /** What the flight recorder keeps of this service when a run ends (an emulator's snapshot). */
   state?(): unknown
   settle?(): Promise<void>
@@ -64,6 +68,8 @@ export interface Services {
   readonly webhooks: Readonly<Record<string, WebhookDispatcher>> | undefined
   /** Every service's fixtures, plus `proxy` and `settle`. */
   readonly fixtures: Readonly<Record<string, unknown>>
+  /** Every service's mail sources, so the `mail` fixture and the agent read what they send. */
+  readonly mail?: readonly MailSource[]
   /** Every service's `state()`, by service name. */
   state(): Readonly<Record<string, unknown>>
   /** Lets every service's background work finish. */
@@ -91,6 +97,7 @@ export async function startServices(
 
   for (const service of services) service.attach?.(proxy)
   const webhooks = webhooksByService(services)
+  const mail = services.flatMap((s) => s.mail ?? [])
 
   const settle = async () => {
     for (const service of services) await service.settle?.()
@@ -116,6 +123,7 @@ export async function startServices(
       proxy,
       settle,
     },
+    ...(mail.length > 0 && { mail }),
     travel,
     state: () =>
       Object.fromEntries(services.flatMap((s) => (s.state ? [[s.name, s.state()] as const] : []))),
