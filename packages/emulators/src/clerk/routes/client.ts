@@ -8,7 +8,7 @@ import { environmentJson } from "../environment.ts"
 import { browserClient, browserSession } from "../frontend-json.ts"
 import { devBrowserFor } from "../handshake.ts"
 import { ClerkFailure, stableClerkId, str } from "../helpers.ts"
-import { endSession, isLive, sessionClaims } from "../sessions.ts"
+import { endSession, isLive, sessionClaims, sessionHeader } from "../sessions.ts"
 import { templateClaims } from "../templates.ts"
 
 /**
@@ -31,7 +31,7 @@ function token(c: Context, context: ClerkContext, template: string | undefined):
   const base = sessionClaims(context, session, request.azp)
   const claims = template === undefined ? base : templateClaims(context, template, session, base)
 
-  return c.json({ object: "token", jwt: signingKeyOf(context).sign(claims) })
+  return c.json({ object: "token", jwt: signingKeyOf(context).sign(claims, sessionHeader(claims)) })
 }
 
 /** Ends every session on the client, as signing out of all of them does. */

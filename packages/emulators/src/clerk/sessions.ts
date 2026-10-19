@@ -21,6 +21,7 @@ export function newClient(context: ClerkContext): ClientRecord {
       last_active_session_id: null,
       sign_in_id: null,
       sign_up_id: null,
+      last_authentication_strategy: null,
       created_at: at,
       updated_at: at,
     },
@@ -52,6 +53,7 @@ export function startSession(
     null,
   )
 
+  context.clerk.users.change(userId, { last_active_at: at })
   context.clerk.clients.change(client.id, {
     session_ids: [...client.session_ids, session.id],
     last_active_session_id: session.id,
@@ -115,7 +117,7 @@ function organizationClaim(context: ClerkContext, session: SessionJSON) {
 
   if (!org || !membership) return {}
 
-  return { o: { id: org.id, rol: membership.role.replace(/^org:/, ""), slg: org.slug } }
+  return { v: 2, o: { id: org.id, rol: membership.role.replace(/^org:/, ""), slg: org.slug } }
 }
 
 /** The claims of a session token: who, which session, which app, and a minute of validity. */
@@ -137,14 +139,26 @@ export function sessionClaims(
     sid: session.id,
     sts: "active",
     sub: session.user_id,
-    v: 2,
     ...organizationClaim(context, session),
   }
 }
 
+/**
+ * The header fields Clerk adds to a session token: the client attestation tag and the time the
+ * token's session was first issued.
+ */
+export function sessionHeader(claims: Record<string, unknown>): Record<string, unknown> {
+  return { cat: CLIENT_ATTESTATION, oiat: claims["iat"] }
+}
+
+/** The client attestation tag Clerk's development instances put in session token headers. */
+const CLIENT_ATTESTATION = "cl_B7d4PD111AAA"
+
 /** A signed session token for a live session. */
 export function sessionToken(context: ClerkContext, session: SessionJSON, azp?: string): string {
-  return signingKeyOf(context).sign(sessionClaims(context, session, azp))
+  const claims = sessionClaims(context, session, azp)
+
+  return signingKeyOf(context).sign(claims, sessionHeader(claims))
 }
 
 /** The client's active session, if it still has a live one. */

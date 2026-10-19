@@ -23,7 +23,8 @@ export interface SigningKey {
   readonly jwk: PublicJwk
   /** The public key as PEM, for endpoints that serve certificates by key id. */
   readonly pem: string
-  sign(claims: Record<string, unknown>): string
+  /** Signs `claims`; `header` adds fields to the JWT header (Clerk adds `cat` and `oiat`). */
+  sign(claims: Record<string, unknown>, header?: Record<string, unknown>): string
 }
 
 const base64url = (value: string | Buffer) => Buffer.from(value).toString("base64url")
@@ -57,8 +58,8 @@ export function createSigningKey(privatePem?: string): SigningKey {
     kid,
     jwk: publicJwk(publicKey, kid),
     pem,
-    sign(claims) {
-      const header = base64url(JSON.stringify({ alg: "RS256", kid, typ: "JWT" }))
+    sign(claims, extra = {}) {
+      const header = base64url(JSON.stringify({ alg: "RS256", kid, typ: "JWT", ...extra }))
       const payload = base64url(JSON.stringify(claims))
       const signature = createSign("RSA-SHA256").update(`${header}.${payload}`).sign(privateKey)
 
