@@ -73,6 +73,30 @@ describe("live provider keys", () => {
     expect(warnings.join("\n")).not.toContain("abcdefgh")
   })
 
+  it("knows Gemini, Perplexity and Bedrock keys, emulated by the model API service", async () => {
+    const env = {
+      GEMINI_API_KEY: "REDACTED-TEST-VALUE",
+      PERPLEXITY_API_KEY: "pplx-danwoEmulatedKey000000000000",
+      AWS_BEARER_TOKEN_BEDROCK: "REDACTED-TEST-VALUE",
+    }
+    const check = {
+      app: "api",
+      cwd: undefined,
+      env,
+      overridden: new Set<string>(),
+      passthrough: true,
+    }
+    const unemulated = await liveKeyWarnings({ ...check, services: new Set() })
+    const emulated = await liveKeyWarnings({ ...check, services: new Set(["llm"]) })
+
+    expect(unemulated.map((warning) => /live (\w+) key/.exec(warning)?.[1])).toEqual([
+      "gemini",
+      "perplexity",
+      "bedrock",
+    ])
+    expect(emulated).toEqual([])
+  })
+
   it("stays quiet when unrouted hosts are blocked", async () => {
     const warnings = await liveKeyWarnings({
       app: "api",

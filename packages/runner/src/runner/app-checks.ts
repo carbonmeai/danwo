@@ -102,7 +102,10 @@ const LIVE_KEYS: readonly KeyShape[] = [
   { provider: "flutterwave", value: /^FLWSECK-(?!.*_TEST)/ },
   { provider: "composio", value: /^ak_[A-Za-z0-9_-]{12,}$/, name: /COMPOSIO/i },
   { provider: "nylas", value: /^nyk_v0_[A-Za-z0-9_-]{16,}$/, name: /NYLAS/i },
+  { provider: "gemini", value: /^AIza[0-9A-Za-z_-]{35}$/, name: /GEMINI|GENERATIVE_AI|GOOGLE_AI/i },
   { provider: "google", value: /^AIza[0-9A-Za-z_-]{35}$/ },
+  { provider: "perplexity", value: /^pplx-[A-Za-z0-9]{20,}$/ },
+  { provider: "bedrock", value: /^ABSK[A-Za-z0-9+/=]{20,}$/ },
   { provider: "twilio", value: /^SK[0-9a-fA-F]{32}$/, name: /TWILIO/i },
 ]
 
@@ -110,6 +113,9 @@ const LIVE_KEYS: readonly KeyShape[] = [
 const EMULATED_BY: Readonly<Record<string, readonly string[]>> = {
   openai: ["llm"],
   anthropic: ["llm"],
+  gemini: ["llm"],
+  perplexity: ["llm"],
+  bedrock: ["llm"],
   aws: ["s3", "aws", "ministack"],
 }
 
