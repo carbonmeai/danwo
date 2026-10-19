@@ -36,7 +36,7 @@ It drives the app through its UI like a user, while third-party services the app
 | `@danwo/proxy`      | The egress proxy                                                                                                                |
 | `@danwo/emulators`  | Provider emulators                                                                                                              |
 | `@danwo/fidelity`   | Checks the emulators against the real providers by structure                                                                    |
-| `@danwo/github`     | Reports runs to GitHub from Actions: a check run and job summary                                                                |
+| `@danwo/github`     | Reports runs to GitHub from Actions: a check run, a pull request comment and the job summary                                    |
 | `@danwo/skill`      | The coding-agent skill, task guides and the generated capability spec                                                           |
 | `@danwo/mcp`        | An MCP server for coding agents: run, explain and write danwo tests                                                             |
 | `@danwo/playwright` | danwo's environments, faults, invariants and matrix for Playwright Test                                                         |
@@ -218,7 +218,7 @@ The setup runs once per worker; its agent steps record and replay like any other
 of the environment (each `danwo matrix` trial) drops the kept state. The flight record notes
 whether a test's session was created, reused or renewed; the state itself is never recorded.
 
-## GitHub Checks
+## GitHub Checks and the pull request comment
 
 In GitHub Actions, `--reporter github` turns a run into a check run on the commit (the pull
 request's head on `pull_request` events). The check carries pass/fail counts, a row per failing
@@ -226,9 +226,19 @@ test or fault, and an annotation on the test file line each failure went through
 goes to the job summary. Outside Actions, or when the token may not write checks, the reporter says
 so and the run's exit code is unchanged.
 
+On a pull request the reporter also keeps one comment up to date: the headline counts, duration,
+model spend and commit; a row per test; each failure folded with its failing step, error class,
+last provider calls, faults and flight record; flaky tests folded away; and a section per
+`danwo matrix` test with its invariant's verdict and the faults that broke it. Every run edits the
+same comment, sections from older commits are dropped, and shards leave it to `danwo merge-reports`.
+Test names link to `DANWO_REPORT_URL` when the report is published. Turn it off with
+`--no-pr-comment`, `DANWO_PR_COMMENT=off` or `github({ prComment: false })`; it needs
+`pull-requests: write`.
+
 ```yaml
 permissions:
   checks: write
+  pull-requests: write
   contents: read
 
 steps:

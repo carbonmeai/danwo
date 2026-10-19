@@ -1,11 +1,12 @@
-# CI and the GitHub check
+# CI, the GitHub check and the pull request comment
 
 Run danwo in GitHub Actions and get a check run on the pull request, with an annotation on each
-failing test line.
+failing test line, and one comment on the pull request that every run keeps up to date.
 
 ```yaml
 permissions:
   checks: write
+  pull-requests: write
   contents: read
 
 jobs:
@@ -35,6 +36,29 @@ jobs:
   to the job summary, and it names each failure's flight record in the uploaded artifact.
 - Without a token, or when the token may not write checks, the reporter says so and the run's
   exit code is unchanged.
+
+## The pull request comment
+
+On a `pull_request` event the github reporter also posts one comment on the pull request and edits
+it on every later run, so the conversation never fills with copies. It has:
+
+- `danwo test`'s headline (passed, failed, flaky, not judged), duration, model spend and commit;
+- a row per test with its duration and retries, failures first; each test name links to
+  `DANWO_REPORT_URL` when the report or dashboard is published there;
+- each failure folded: the failing step, the error and its class, the last provider calls and any
+  faults injected into them, and its flight record in the uploaded artifact;
+- flaky tests folded away;
+- a section per `danwo matrix` test: whether its invariant held under every fault, and a row per
+  fault that broke it.
+
+A run replaces its own section and keeps the others for the same commit; sections from an older
+commit are dropped. A shard (`--shard i/n`) leaves the comment alone and `danwo merge-reports`
+posts the whole run once. The comment stays under GitHub's size limit, cut between entries with a
+note.
+
+Turn it off with `--no-pr-comment`, `DANWO_PR_COMMENT=off`, or `github({ prComment: false })` in
+the config. Without `pull-requests: write` the reporter says so once and keeps the check.
+
 - Commit the replay cache (`cache.dir`) so CI replays recorded agent steps without model calls;
   give CI a model key only if recordings may be missing.
 - Narrow the matrix in pull requests with `--faults` and run it in full on a schedule.
