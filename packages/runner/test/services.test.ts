@@ -34,6 +34,11 @@ import { s3Service } from "../src/runner/s3.ts"
 import { startServices } from "../src/runner/services.ts"
 import { stripeService } from "../src/runner/stripe.ts"
 
+/** The default catalogue's faults for a POST to `host` at `path`. */
+function postFaults(host: string, path: string) {
+  return defaultOutboundFaults({ method: "POST", host, path, index: 0 })
+}
+
 describe("startServices", () => {
   it("puts several services behind one proxy and resets them together", async () => {
     const stripe = stripeService()
@@ -333,6 +338,25 @@ describe("slackService and githubService", () => {
 
     expect(slackFaults.some((f) => f.kind === "status" && f.status === 429)).toBe(true)
     expect(githubFaults.some((f) => f.kind === "status" && f.status === 403)).toBe(true)
+  })
+
+  it("gives Gemini, Perplexity and Bedrock hosts the model API faults, in each one's own shape", () => {
+    const gemini = postFaults(
+      "generativelanguage.googleapis.com",
+      "/v1beta/models/m:generateContent",
+    ).find((f) => f.kind === "status" && f.status === 429)
+    const bedrock = postFaults("bedrock-runtime.eu-west-1.amazonaws.com", "/model/m/converse").find(
+      (f) => f.kind === "status" && f.status === 429,
+    )
+    const perplexity = postFaults("api.perplexity.ai", "/v1/agent")
+
+    expect(gemini?.kind === "status" && JSON.parse(gemini.body ?? "{}")).toMatchObject({
+      error: { code: 429, status: "RESOURCE_EXHAUSTED" },
+    })
+    expect(bedrock?.kind === "status" && bedrock.headers?.["x-amzn-errortype"]).toBe(
+      "ThrottlingException",
+    )
+    expect(perplexity.some((f) => f.kind === "emulate" && f.behaviour === "stream-cut")).toBe(true)
   })
 })
 
