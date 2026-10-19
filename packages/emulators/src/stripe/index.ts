@@ -17,7 +17,8 @@ import {
 import { newId, stripeError, unix } from "./helpers.ts"
 import { stripeIdempotency } from "./idempotency.ts"
 import { stripeRequests } from "./requests.ts"
-import { stripeResolver } from "./resolve.ts"
+import { stripeIncludes, stripeResolver } from "./resolve.ts"
+import { billingPortalRoutes } from "./routes/billing-portal.ts"
 import { chargeRoutes } from "./routes/charges.ts"
 import { checkoutSessionRoutes } from "./routes/checkout-sessions.ts"
 import { customerSessionRoutes } from "./routes/customer-sessions.ts"
@@ -29,9 +30,12 @@ import { paymentMethodRoutes } from "./routes/payment-methods.ts"
 import { priceRoutes } from "./routes/prices.ts"
 import { productRoutes } from "./routes/products.ts"
 import { refundRoutes } from "./routes/refunds.ts"
+import { setupIntentRoutes } from "./routes/setup-intents.ts"
+import { subscriptionRoutes } from "./routes/subscriptions.ts"
 import { webhookEndpointRoutes } from "./routes/webhook-endpoints.ts"
 import { STRIPE_SANDBOX_DELIVERY, stripeWebhookHeaders } from "./signature.ts"
 import { stripeStore } from "./store.ts"
+import { runDue } from "./subscribing.ts"
 
 export type * from "./entities.ts"
 export { STRIPE_API_VERSION } from "./events.ts"
@@ -44,11 +48,18 @@ export type SeedProduct = { name: string; metadata?: Record<string, string> } & 
   Record<"id" | "description", string>
 >
 
-/** A seeded price names its product by `product_name`, which must be seeded too. */
+/**
+ * A seeded price names its product by `product_name`, which must be seeded too. `recurring`
+ * makes it a subscription price; `lookup_key` lets an app find it by a name of its own, as a
+ * `plans` table that stores lookup keys does.
+ */
 export type SeedPrice = Pick<Price, "currency"> & {
   product_name: string
   unit_amount: number
   id?: string
+  lookup_key?: string
+  nickname?: string
+  recurring?: { interval: "day" | "week" | "month" | "year"; interval_count?: number }
 }
 
 /** A webhook endpoint; without a `secret`, a random signing secret. */
@@ -117,10 +128,15 @@ function seedPrices(objects: StripeObjects, created: number, prices: readonly Se
         currency: price.currency,
         unitAmount: price.unit_amount,
         active: true,
-        nickname: null,
-        lookupKey: null,
+        nickname: price.nickname ?? null,
+        lookupKey: price.lookup_key ?? null,
         taxBehavior: "unspecified",
-        recurring: null,
+        recurring: price.recurring
+          ? {
+              interval: price.recurring.interval,
+              interval_count: price.recurring.interval_count ?? 1,
+            }
+          : null,
         metadata: {},
       }),
       null,
@@ -204,6 +220,9 @@ function routes(context: StripeRouteContext): void {
     checkoutSessionRoutes,
     customerSessionRoutes,
     invoiceRoutes,
+    subscriptionRoutes,
+    setupIntentRoutes,
+    billingPortalRoutes,
     paymentMethodConfigurationRoutes,
     webhookEndpointRoutes,
   ])
@@ -242,8 +261,18 @@ export const stripe = defineEmulator({
     app.use(stripeRequests())
     app.use(stripeApiKey())
     app.use(stripeIdempotency(context.store, context.clock))
-    app.use(stripeExpand(stripeResolver(objects)))
-    routes({ app, objects, events, baseUrl: context.baseUrl, clock: context.clock })
+    app.use(stripeExpand(stripeResolver(objects), stripeIncludes(objects)))
+
+    const wakeAt = (at: Date) => {
+      context.timer.setTimeout(
+        () => runDue(billing),
+        Math.max(0, at.getTime() - context.clock().getTime()),
+      )
+    }
+
+    const billing = { app, objects, events, baseUrl: context.baseUrl, clock: context.clock, wakeAt }
+
+    routes(billing)
   },
   seed: seedDefaults,
   webhooks: ({ store }) => ({

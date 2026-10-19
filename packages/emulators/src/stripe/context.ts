@@ -11,4 +11,6 @@ export interface StripeRouteContext {
   /** The emulator's origin, for the URLs of hosted pages. */
   readonly baseUrl: string
   readonly clock: Clock
+  /** Makes sure due billing work (renewals, trial ends, expiries) runs by `at` on the clock. */
+  readonly wakeAt: (at: Date) => void
 }

@@ -19,12 +19,27 @@ import {
   textOrNull,
   unix,
 } from "../helpers.ts"
+import { invoiceOfIntent, markPaid } from "../invoicing.ts"
 import {
   type AutomaticPaymentMethods,
+  chargeIntent,
   createIntent,
   type IntentFields,
-  payIntent,
 } from "../payments.ts"
+import { invoicePaid } from "../subscribing.ts"
+
+/**
+ * When a confirmed intent collects an open invoice (a subscription's first payment, confirmed
+ * by the app's page with the invoice's `confirmation_secret`), the invoice is paid and its
+ * subscription becomes active.
+ */
+function settleInvoiceOf(context: StripeRouteContext, intent: PaymentIntent): void {
+  const invoice = invoiceOfIntent(context, intent)
+
+  if (invoice?.status !== "open") return
+
+  invoicePaid(context, markPaid(context, invoice, intent))
+}
 
 type FutureUsage = "off_session" | "on_session" | null
 type CancelReason = "duplicate" | "fraudulent" | "requested_by_customer" | "abandoned"
@@ -134,7 +149,13 @@ export function paymentIntentRoutes(context: StripeRouteContext): void {
 
     if (!method) return noSuch(c, "PaymentMethod", wanted, "payment_method")
 
-    return c.json(payIntent(context, intent, method))
+    const charged = chargeIntent(context, intent, method)
+
+    if (charged.status === "succeeded") settleInvoiceOf(context, charged)
+    if (charged.status === "requires_payment_method")
+      return stripeError(c, 402, "card_error", "Your card was declined.", "card_declined")
+
+    return c.json(charged)
   }
 
   app.post("/v1/payment_intents", async (c) => {

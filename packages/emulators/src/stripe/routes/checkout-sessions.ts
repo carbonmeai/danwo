@@ -2,6 +2,7 @@ import type { Context } from "../../http.ts"
 import { isOneOf } from "../../json.ts"
 import { CHECKOUT_TEST_CARD, paymentMethodFor } from "../cards.ts"
 import { messagePage, renderPayPage } from "../checkout-page.ts"
+import { subscribeSession, subscriptionPlan } from "../checkout-subscription.ts"
 import type { StripeRouteContext } from "../context.ts"
 import type { CheckoutSession, Invoice, SessionLine, SessionPlan } from "../entities.ts"
 import { checkoutSessionObject, invoiceObject } from "../formatters.ts"
@@ -181,7 +182,12 @@ async function createSession(c: Context, context: StripeRouteContext): Promise<R
   if ("fault" in lines) return refuse(c, lines.fault)
   if (mode !== "setup" && lines.length === 0) return badParam(c, "line_items")
 
-  const plan: SessionPlan = { lines, intent: intentPlan(params), invoice: invoicePlan(params) }
+  const plan: SessionPlan = {
+    lines,
+    intent: intentPlan(params),
+    invoice: invoicePlan(params),
+    ...(mode === "subscription" && { subscription: subscriptionPlan(params) }),
+  }
 
   return c.json(context.objects.checkoutSessions.add(newSession(context, params, mode, plan), plan))
 }
@@ -307,9 +313,11 @@ function paySession(
   const plan = context.objects.checkoutSessions.extra(session.id)
   const email = payerEmail(context, session, typed)
   const payment =
-    plan && session.mode !== "setup"
-      ? chargeSession(context, session, plan, email)
-      : { payment_status: "no_payment_required" as const }
+    plan && session.mode === "subscription"
+      ? subscribeSession(context, session, plan, email)
+      : plan && session.mode !== "setup"
+        ? chargeSession(context, session, plan, email)
+        : { payment_status: "no_payment_required" as const }
   const completed = context.objects.checkoutSessions.change(session.id, {
     ...payment,
     status: "complete",

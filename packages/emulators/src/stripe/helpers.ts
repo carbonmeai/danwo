@@ -181,6 +181,13 @@ export async function readParams(c: Context): Promise<Tree> {
   return nestPairs(new URLSearchParams(await c.req.text()))
 }
 
+/** The id of an expandable field: the id itself, or the expanded object's; empty when unset. */
+export function idOf(value: string | { readonly id?: string } | null | undefined): string {
+  if (typeof value === "string") return value
+
+  return value?.id ?? ""
+}
+
 /** A text parameter; an empty string counts as given. */
 export function text(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined

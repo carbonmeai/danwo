@@ -35,6 +35,53 @@ const TEST_CARDS: Readonly<Record<string, CardDetails>> = {
     country: "US",
     ...EXPIRY,
   }),
+  /** Declined everywhere: saving it fails, and so does any charge (`4000000000000002`). */
+  pm_card_chargeDeclined: cardDetails({
+    brand: "visa",
+    last4: "0002",
+    funding: "credit",
+    country: "US",
+    ...EXPIRY,
+  }),
+  /** Saves fine, but every charge to it is declined (`4000000000000341`): a failed renewal. */
+  pm_card_chargeCustomerFail: cardDetails({
+    brand: "visa",
+    last4: "0341",
+    funding: "credit",
+    country: "US",
+    ...EXPIRY,
+  }),
+  /** Asks for 3D Secure on every setup and charge (`4000002760003184`). */
+  pm_card_authenticationRequired: cardDetails({
+    brand: "visa",
+    last4: "3184",
+    funding: "credit",
+    country: "US",
+    ...EXPIRY,
+  }),
+}
+
+/**
+ * What a card does when it is saved or charged: approved, declined, declined only when charged
+ * (it saves fine), or held for 3D Secure authentication.
+ */
+export type CardOutcome = "approved" | "declined" | "declined_on_charge" | "authenticate"
+
+/** How Stripe's test cards behave, by their last four digits. */
+const OUTCOMES: Readonly<Record<string, CardOutcome>> = {
+  "0002": "declined",
+  "0341": "declined_on_charge",
+  "3184": "authenticate",
+  "3155": "authenticate",
+}
+
+/** What saving (`setup`) or charging a payment method does, by its test card. */
+export function cardOutcome(method: PaymentMethod, use: "setup" | "charge"): CardOutcome {
+  const outcome = OUTCOMES[method.card?.last4 ?? ""] ?? "approved"
+
+  if (outcome === "declined_on_charge") return use === "charge" ? "declined" : "approved"
+
+  return outcome
 }
 
 /** The card a Checkout payment uses: Stripe's Visa test card. */

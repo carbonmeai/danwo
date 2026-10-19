@@ -5,6 +5,12 @@ import { readParams, stripeError } from "./helpers.ts"
 /** Finds a formatted object by its Stripe id, or `undefined` if the id is unknown. */
 export type Resolve = (id: string) => object | undefined
 
+/**
+ * A field an object shows only when expanded (an invoice's `payments`), or `undefined` when
+ * `key` is not one of its includable fields.
+ */
+export type Include = (target: Record<string, unknown>, key: string) => unknown
+
 /** `expand` from the query (`expand[]=a`, `expand[0]=a`) or a form/JSON body (`expand[0]=a`). */
 async function expandPaths(
   request: { url: string; method: string },
@@ -35,15 +41,34 @@ function expandedValue(target: Record<string, unknown>, key: string, resolve: Re
   return target[key]
 }
 
+/** How paths are expanded: ids by `resolve`, includable fields by `include`. */
+interface Expanders {
+  readonly resolve: Resolve
+  readonly include: Include
+}
+
+/** Adds `key` to `target` when it is a field the object shows only expanded; false otherwise. */
+function included(target: Record<string, unknown>, key: string, include: Include): boolean {
+  const value = include(target, key)
+
+  if (value === undefined) return false
+  target[key] = value
+
+  return true
+}
+
 /** Expands one dotted path in place. Returns false if the path does not name an expandable id. */
-function expandPath(target: unknown, segments: string[], resolve: Resolve): boolean {
+function expandPath(target: unknown, segments: string[], expanders: Expanders): boolean {
   const [head, ...rest] = segments
 
   if (head === undefined || !isRecord(target)) return false
   if (head === "data" && Array.isArray(target.data))
-    return target.data.every((item) => expandPath(item, rest, resolve))
+    return target.data.every((item) => expandPath(item, rest, expanders))
 
-  return head in target && expandField(target, head, rest, resolve)
+  return (
+    (head in target || included(target, head, expanders.include)) &&
+    expandField(target, head, rest, expanders)
+  )
 }
 
 /** Expands `key` of `target`, then the rest of the path inside it. */
@@ -51,14 +76,14 @@ function expandField(
   target: Record<string, unknown>,
   key: string,
   rest: string[],
-  resolve: Resolve,
+  expanders: Expanders,
 ): boolean {
-  const value = expandedValue(target, key, resolve)
+  const value = expandedValue(target, key, expanders.resolve)
 
   if (value === undefined) return false
   if (rest.length === 0) return isRecord(value) || value === null
 
-  return value === null || expandPath(value, rest, resolve)
+  return value === null || expandPath(value, rest, expanders)
 }
 
 /**
@@ -66,7 +91,9 @@ function expandField(
  * replaced by the full object, through nested paths (`payment_intent.payment_method`) and lists
  * (`data.customer`). Up to four levels, as in Stripe.
  */
-export function stripeExpand(resolve: Resolve): Middleware {
+export function stripeExpand(resolve: Resolve, include: Include = () => undefined): Middleware {
+  const expanders = { resolve, include }
+
   return async (c, next) => {
     const response = await next()
 
@@ -81,7 +108,7 @@ export function stripeExpand(resolve: Resolve): Middleware {
     for (const path of paths) {
       const segments = path.split(".")
 
-      if (segments.length > 4 || !expandPath(body, segments, resolve))
+      if (segments.length > 4 || !expandPath(body, segments, expanders))
         return stripeError(
           c,
           400,

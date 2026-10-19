@@ -1,12 +1,14 @@
 import { objectTable, type ObjectTable } from "../objects.ts"
 import type { Store } from "../store.ts"
 import type {
+  BillingPortalSession,
   Charge,
   CheckoutSession,
   Customer,
   DeletedCustomer,
   EndpointSecret,
   Invoice,
+  InvoiceIncludes,
   PaymentIntent,
   PaymentMethod,
   PaymentMethodConfiguration,
@@ -14,7 +16,10 @@ import type {
   Product,
   Refund,
   SessionPlan,
+  SetupIntent,
   StripeWebhookEndpoint,
+  Subscription,
+  SubscriptionState,
 } from "./entities.ts"
 
 type Kind = <T extends { id: string }, X = null>(name: string) => ObjectTable<T, X>
@@ -39,6 +44,17 @@ function payments(kind: Kind) {
     paymentMethods: kind<PaymentMethod>("payment_methods"),
     checkoutSessions: kind<CheckoutSession, SessionPlan>("checkout_sessions"),
     invoices: kind<Invoice>("invoices"),
+    /** What each invoice shows when expanded (`payments`, `confirmation_secret`), by invoice id. */
+    invoiceIncludes: kind<InvoiceIncludes>("invoice_includes"),
+  }
+}
+
+/** Recurring billing: subscriptions, the setups that save cards for them, and portal sessions. */
+function billing(kind: Kind) {
+  return {
+    subscriptions: kind<Subscription, SubscriptionState>("subscriptions"),
+    setupIntents: kind<SetupIntent>("setup_intents"),
+    portalSessions: kind<BillingPortalSession>("billing_portal_sessions"),
   }
 }
 
@@ -54,7 +70,7 @@ function settings(kind: Kind) {
 export function stripeStore(store: Store) {
   const kind: Kind = (name) => objectTable(store, `stripe.${name}`)
 
-  return { ...catalog(kind), ...payments(kind), ...settings(kind) }
+  return { ...catalog(kind), ...payments(kind), ...billing(kind), ...settings(kind) }
 }
 
 /** Every kind of object the Stripe emulator keeps. */

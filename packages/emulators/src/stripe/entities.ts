@@ -24,6 +24,35 @@ export type Invoice = Json<Stripe.Invoice>
 export type PaymentMethodConfiguration = Json<Stripe.PaymentMethodConfiguration>
 export type StripeWebhookEndpoint = Json<Stripe.WebhookEndpoint>
 export type CardDetails = Json<Stripe.PaymentMethod.Card>
+export type SetupIntent = Json<Stripe.SetupIntent>
+export type SubscriptionItem = Json<Stripe.SubscriptionItem>
+export type Plan = Json<Stripe.Plan>
+export type BillingPortalSession = Json<Stripe.BillingPortal.Session>
+
+/**
+ * A subscription as the API answers it: the SDK's type plus the legacy single-plan fields Stripe
+ * still sends (`plan`, `quantity`, from the first item).
+ */
+export type Subscription = Json<Stripe.Subscription> & {
+  plan: Plan | null
+  quantity: number | null
+}
+
+/** What the emulator keeps about a subscription beyond what the API shows. */
+export interface SubscriptionState {
+  /** Whether `customer.subscription.trial_will_end` went out for the current trial. */
+  trialNoticeSent: boolean
+}
+
+/**
+ * What an invoice shows only when a request expands it: its payments, and the client secret of
+ * the PaymentIntent that collects it.
+ */
+export interface InvoiceIncludes {
+  readonly id: string
+  payments: Json<Stripe.ApiList<Stripe.InvoicePayment>>
+  confirmation_secret: { client_secret: string; type: "payment_intent" } | null
+}
 
 /** How a payment method shows up in Checkout under a payment method configuration. */
 export type DisplayPreference = "on" | "off" | "none"
@@ -49,6 +78,11 @@ export interface SessionPlan {
     readonly description: string | null
     readonly metadata: Record<string, string>
   } | null
+  /** A subscription-mode session's `subscription_data`. */
+  readonly subscription?: {
+    readonly trialDays: number | null
+    readonly metadata: Record<string, string>
+  }
 }
 
 /** A webhook endpoint keeps its signing secret, which the API shows only once. */
