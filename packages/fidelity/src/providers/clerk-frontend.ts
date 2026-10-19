@@ -23,7 +23,8 @@ const TEST_CODE = "424242"
 
 const OPTIONS = {
   literals: [...CLERK_LITERALS, "response.status", "**.sign_in.status", "**.sign_up.status"],
-  maps: ["**.public_metadata", "**.unsafe_metadata", "**.private_metadata"],
+  /** Metadata, and the social providers, which each instance turns on for itself. */
+  maps: ["**.public_metadata", "**.unsafe_metadata", "**.private_metadata", "user_settings.social"],
 }
 
 /** The Frontend API's host, encoded in the publishable key (`pk_test_` + base64 of `host$`). */
