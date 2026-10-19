@@ -319,8 +319,33 @@ The page loads ClerkJS and `<SignIn/>` from the Frontend API host
 does from Clerk. The emulator serves the app's own installed `@clerk/clerk-js` and `@clerk/ui`
 when their major version fits, and otherwise downloads the published (MIT) build once from a
 public npm CDN into `~/.cache/danwo/clerk`. Sign-in works with a password or an emailed code;
-return `mail: [clerkMail(clerk.emulator)]` from the environment so `mail.code(email)` reads the
-codes. Session tokens are RS256 JWTs with Clerk's claims, valid 60 seconds.
+`clerkService` hands its codes to the `mail` fixture (`startServices` collects every service's
+mail sources), so `mail.code(email)` and the agent read them. Session tokens are RS256 JWTs with
+Clerk's claims, valid 60 seconds.
+
+**Ids that survive resets.** Seeded users get ids derived from their email address
+(`stableClerkId("user", email)`), organizations from their slug or name, and memberships from
+both, so they are the same on every run and after every reset, and match the rows an app's own
+database was seeded with. Give `id` on a seeded user or organization to pick it yourself.
+
+**Webhooks.** Seed `webhooks: [{ endpoint, events?, secret? }]` and the emulator sends Clerk's
+events there, signed the Svix way (`svix-id`, `svix-timestamp`, `svix-signature`) so
+`verifyWebhook` from `@clerk/backend/webhooks` (or `svix`) accepts them: `user.created`,
+`user.updated`, `user.deleted`, `session.created`, `session.ended`, `session.removed`,
+`session.revoked`, `organization.created`, `organization.updated`, `organization.deleted` and
+`organizationMembership.created`, `.updated` and `.deleted`. Users made by the Backend API and by
+sign-up send `user.created`. Without a `secret`, the endpoint's secret is derived from the
+instance and the endpoint, the same on every run: `clerkInstance(clerk).webhookSecret()` reads it.
+Seeded records send nothing unless the seed sets `announce: true`; then they arrive as if just
+made, for apps that create their own rows from `user.created`. Deliveries go through the shared
+webhook dispatcher, so `danwo matrix` duplicates, delays, forges and replays them stale.
+
+**Verifying tokens offline.** Apps that check session tokens with a public key instead of the
+Backend API (`CLERK_PEM_PUBLIC_KEY`, `CLERK_JWT_KEY`, `jwtKey`) get it from
+`clerkInstance(clerk).publicKeyPem()`; `env()` returns that and every key variable the SDKs read.
+Seed `instance.signingKey` (a PKCS#8 PEM) to keep one key across runs, and `instance.origin` (the
+app's origin) to put it in the `azp` of tokens the Backend API mints, so `authorizedParties`
+checks pass for those too; tokens minted for the browser carry its `Origin`.
 
 In tests, `clerkInstance(clerk)` reads users, sessions and codes, and
 `revokeSessions(email)` signs a user out everywhere mid-test: the next token refresh is refused
@@ -329,8 +354,8 @@ and the next handshake signs the app out. `danwo matrix` faults the Backend API 
 reset) and ClerkJS's token refresh (500, 503). Recordings redact `sk_test_` keys, session
 tokens, Clerk cookies, dev browser tokens and handshake nonces.
 
-Not emulated: social and enterprise sign-in, phone codes, passkeys, MFA, waitlists, billing and
-Clerk's webhooks.
+Not emulated: social and enterprise sign-in, phone codes, passkeys, MFA, waitlists, billing,
+and the `email.*`, `sms.*`, invitation, role, permission and billing webhooks.
 
 ## Composio
 
