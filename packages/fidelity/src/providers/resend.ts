@@ -6,7 +6,7 @@
 import { resend } from "@danwo/emulators"
 
 import { type FidelityProvider, requiredCredentials } from "../provider.ts"
-import type { Scenario, ScenarioContext, StepDoc } from "../scenario.ts"
+import type { Answer, Scenario, ScenarioContext, StepDoc, StepOptions } from "../scenario.ts"
 import { asJsonObject, type Json } from "../shape.ts"
 import { bearerRequest, emulatorTarget, liveTarget } from "../target.ts"
 
@@ -42,6 +42,24 @@ function call(
   return bearerRequest(context.target, method, `${API}${path}`, body, headers)
 }
 
+/**
+ * A read step. A sending-only key gets 401 `restricted_api_key` on every read, which says nothing
+ * about the emulator, so the scenario is skipped with a note on the key it needs instead.
+ */
+async function read(
+  context: ScenarioContext,
+  name: string,
+  request: Request,
+  options: StepOptions,
+): Promise<Answer> {
+  const answer = await context.step(name, request, options)
+
+  if (answer.status === 401 && asJsonObject(answer.body)?.["name"] === "restricted_api_key")
+    context.skip("the key can only send; use a full-access Resend key to check reads")
+
+  return answer
+}
+
 function email(context: ScenarioContext, subject: string): Record<string, unknown> {
   return {
     from: SENDER,
@@ -70,7 +88,7 @@ const sendAndRead: Scenario = {
       },
     )
 
-    await context.step("retrieve email", call(context, "GET", `/emails/${idOf(sent.body)}`), {
+    await read(context, "retrieve email", call(context, "GET", `/emails/${idOf(sent.body)}`), {
       doc: { operation: "get /emails/{email_id}", status: 200, literals: { object: "email" } },
     })
   },
@@ -141,7 +159,7 @@ const errors: Scenario = {
 const domains: Scenario = {
   name: "domains: list",
   async run(context) {
-    await context.step("list domains", call(context, "GET", "/domains"), {
+    await read(context, "list domains", call(context, "GET", "/domains"), {
       doc: { operation: "get /domains", status: 200 },
     })
   },
