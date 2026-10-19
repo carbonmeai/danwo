@@ -333,7 +333,7 @@ const payments: Scenario = {
       call(context, "POST", "/v1/payment_intents", {
         amount: 2000,
         currency: "usd",
-        payment_method_types: ["card"],
+        automatic_payment_methods: { enabled: true, allow_redirects: "never" },
       }),
       {
         literals: ["status"],
@@ -394,7 +394,11 @@ const checkout: Scenario = {
         line_items: [
           {
             quantity: 1,
-            price_data: { currency: "usd", unit_amount: 500, product_data: { name: "Credits" } },
+            price_data: {
+              currency: "usd",
+              unit_amount: 500,
+              product_data: { name: "Credits", tax_code: "txcd_10000000" },
+            },
           },
         ],
       }),
