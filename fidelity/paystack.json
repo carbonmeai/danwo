@@ -1,7 +1,7 @@
 {
   "provider": "paystack",
-  "source": "openapi",
-  "recorded": "2026-10-18",
+  "source": "live",
+  "recorded": "2026-10-19",
   "scenarios": {
     "transactions: initialize and verify": {
       "steps": [
@@ -13,7 +13,7 @@
         {
           "step": "verify the unpaid transaction",
           "status": 200,
-          "shape": "52caec038fe9"
+          "shape": "ef3e1970d64c"
         }
       ],
       "facts": []
@@ -23,12 +23,12 @@
         {
           "step": "create a customer",
           "status": 200,
-          "shape": "defeb8cb49e3"
+          "shape": "43345764b071"
         },
         {
           "step": "fetch the customer",
           "status": 200,
-          "shape": "defeb8cb49e3"
+          "shape": "2111b5c9a827"
         }
       ],
       "facts": []
@@ -38,7 +38,7 @@
         {
           "step": "list banks",
           "status": 200,
-          "shape": "8244904fc191"
+          "shape": "2e14d6a224da"
         }
       ],
       "facts": []
@@ -48,22 +48,23 @@
         {
           "step": "verify an unknown reference",
           "status": 400,
-          "shape": "049dd12f2305"
+          "shape": "093d1a97769e"
         },
         {
           "step": "call with a bad key",
           "status": 401,
-          "shape": "049dd12f2305"
+          "shape": "093d1a97769e"
         }
       ],
       "facts": []
     }
   },
   "shapes": {
-    "049dd12f2305": {"t":"object","keys":{"status":{"t":"literal","v":false},"message":{"t":"string"},"meta":{"t":"object","keys":{},"open":true},"type":{"t":"string"},"code":{"t":"string"},"data":{"t":"union","of":[{"t":"object","keys":{},"open":true},{"t":"null"}]}},"optional":["meta","type","code","data"]},
+    "093d1a97769e": {"t":"object","keys":{"status":{"t":"literal","v":false},"message":{"t":"string"},"meta":{"t":"object","keys":{"nextStep":{"t":"string"}}},"type":{"t":"string"},"code":{"t":"string"}}},
+    "2111b5c9a827": {"t":"object","keys":{"status":{"t":"literal","v":true},"message":{"t":"string"},"data":{"t":"object","keys":{"transactions":{"t":"array","of":null},"subscriptions":{"t":"array","of":null},"authorizations":{"t":"array","of":null},"first_name":{"t":"string"},"last_name":{"t":"null"},"email":{"t":"string"},"phone":{"t":"null"},"metadata":{"t":"null"},"domain":{"t":"string"},"customer_code":{"t":"string"},"risk_action":{"t":"string"},"id":{"t":"number"},"integration":{"t":"number"},"createdAt":{"t":"string"},"updatedAt":{"t":"string"},"created_at":{"t":"string"},"updated_at":{"t":"string"},"total_transactions":{"t":"number"},"total_transaction_value":{"t":"array","of":null},"dedicated_account":{"t":"null"},"dedicated_accounts":{"t":"array","of":null},"identified":{"t":"boolean"},"identifications":{"t":"null"}}}}},
     "29729520b05a": {"t":"object","keys":{"status":{"t":"literal","v":true},"message":{"t":"string"},"data":{"t":"object","keys":{"authorization_url":{"t":"string"},"access_code":{"t":"string"},"reference":{"t":"string"}}}}},
-    "52caec038fe9": {"t":"object","keys":{"status":{"t":"literal","v":true},"message":{"t":"string"},"data":{"t":"object","keys":{"id":{"t":"number"},"domain":{"t":"string"},"status":{"t":"string"},"reference":{"t":"string"},"amount":{"t":"number"},"currency":{"t":"string"},"channel":{"t":"string"},"created_at":{"t":"string"},"customer":{"t":"object","keys":{"id":{"t":"number"},"email":{"t":"string"},"customer_code":{"t":"string"}},"open":true},"metadata":{"t":"union","of":[{"t":"object","keys":{},"open":true},{"t":"null"}]}},"open":true}}},
-    "8244904fc191": {"t":"object","keys":{"status":{"t":"literal","v":true},"message":{"t":"string"},"data":{"t":"array","of":{"t":"object","keys":{"id":{"t":"number"},"name":{"t":"string"},"slug":{"t":"string"},"code":{"t":"string"},"active":{"t":"boolean"},"country":{"t":"string"},"currency":{"t":"string"},"type":{"t":"string"}},"open":true}},"meta":{"t":"object","keys":{"next":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"previous":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"perPage":{"t":"number"}},"optional":["next","previous","perPage"],"open":true}},"optional":["meta"]},
-    "defeb8cb49e3": {"t":"object","keys":{"status":{"t":"literal","v":true},"message":{"t":"string"},"data":{"t":"object","keys":{"id":{"t":"number"},"email":{"t":"string"},"customer_code":{"t":"string"},"integration":{"t":"number"},"domain":{"t":"string"},"createdAt":{"t":"string"},"updatedAt":{"t":"string"}},"open":true}}}
+    "2e14d6a224da": {"t":"object","keys":{"status":{"t":"literal","v":true},"message":{"t":"string"},"data":{"t":"array","of":{"t":"object","keys":{"id":{"t":"number"},"name":{"t":"string"},"slug":{"t":"string"},"code":{"t":"string"},"longcode":{"t":"string"},"gateway":{"t":"union","of":[{"t":"null"},{"t":"string"}]},"pay_with_bank":{"t":"boolean"},"supports_transfer":{"t":"boolean"},"available_for_direct_debit":{"t":"boolean"},"active":{"t":"boolean"},"country":{"t":"string"},"currency":{"t":"string"},"type":{"t":"string"},"is_deleted":{"t":"boolean"},"createdAt":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"updatedAt":{"t":"string"}}}}}},
+    "43345764b071": {"t":"object","keys":{"status":{"t":"literal","v":true},"message":{"t":"string"},"data":{"t":"object","keys":{"transactions":{"t":"array","of":null},"subscriptions":{"t":"array","of":null},"authorizations":{"t":"array","of":null},"email":{"t":"string"},"first_name":{"t":"string"},"integration":{"t":"number"},"domain":{"t":"string"},"customer_code":{"t":"string"},"risk_action":{"t":"string"},"id":{"t":"number"},"createdAt":{"t":"string"},"updatedAt":{"t":"string"},"identified":{"t":"boolean"},"identifications":{"t":"null"}}}}},
+    "ef3e1970d64c": {"t":"object","keys":{"status":{"t":"literal","v":true},"message":{"t":"string"},"data":{"t":"object","keys":{"id":{"t":"number"},"domain":{"t":"string"},"status":{"t":"string"},"reference":{"t":"string"},"receipt_number":{"t":"null"},"amount":{"t":"number"},"message":{"t":"null"},"gateway_response":{"t":"string"},"gateway_response_code":{"t":"null"},"response_code":{"t":"null"},"paid_at":{"t":"null"},"created_at":{"t":"string"},"channel":{"t":"string"},"currency":{"t":"string"},"ip_address":{"t":"string"},"metadata":{"t":"string"},"log":{"t":"null"},"fees":{"t":"null"},"fees_split":{"t":"null"},"authorization":{"t":"object","keys":{}},"customer":{"t":"object","keys":{"id":{"t":"number"},"first_name":{"t":"null"},"last_name":{"t":"null"},"email":{"t":"string"},"customer_code":{"t":"string"},"phone":{"t":"null"},"metadata":{"t":"null"},"risk_action":{"t":"string"},"international_format_phone":{"t":"null"}}},"plan":{"t":"null"},"split":{"t":"object","keys":{}},"order_id":{"t":"null"},"paidAt":{"t":"null"},"createdAt":{"t":"string"},"requested_amount":{"t":"number"},"pos_transaction_data":{"t":"null"},"source":{"t":"null"},"fees_breakdown":{"t":"null"},"connect":{"t":"null"},"transaction_date":{"t":"string"},"plan_object":{"t":"object","keys":{}},"subaccount":{"t":"object","keys":{}}}}}}
   }
 }

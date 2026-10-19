@@ -35,7 +35,8 @@ const TRANSACTION = partialObject({
   channel: str,
   created_at: str,
   customer: partialObject({ id: num, email: str, customer_code: str }),
-  metadata: nullable(map),
+  // An empty string when the transaction was started with no metadata.
+  metadata: { anyOf: [map, str] },
 })
 
 const CUSTOMER = partialObject({

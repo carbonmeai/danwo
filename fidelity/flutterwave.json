@@ -1,7 +1,7 @@
 {
   "provider": "flutterwave",
-  "source": "openapi",
-  "recorded": "2026-10-18",
+  "source": "live",
+  "recorded": "2026-10-19",
   "scenarios": {
     "payments: hosted link": {
       "steps": [
@@ -18,7 +18,7 @@
         {
           "step": "list Nigerian banks",
           "status": 200,
-          "shape": "1da89d581c77"
+          "shape": "92bc2da67691"
         }
       ],
       "facts": []
@@ -28,20 +28,20 @@
         {
           "step": "call without a key",
           "status": 401,
-          "shape": "60706079db1a"
+          "shape": "2a49e408ba2d"
         },
         {
           "step": "call with a bad key",
           "status": 401,
-          "shape": "60706079db1a"
+          "shape": "2a49e408ba2d"
         }
       ],
       "facts": []
     }
   },
   "shapes": {
-    "1da89d581c77": {"t":"object","keys":{"status":{"t":"literal","v":"success"},"message":{"t":"string"},"data":{"t":"array","of":{"t":"object","keys":{"id":{"t":"number"},"code":{"t":"string"},"name":{"t":"string"}},"open":true}}}},
+    "2a49e408ba2d": {"t":"object","keys":{"status":{"t":"literal","v":"error"},"message":{"t":"string"},"data":{"t":"null"}}},
     "47bbecb8c107": {"t":"object","keys":{"status":{"t":"literal","v":"success"},"message":{"t":"string"},"data":{"t":"object","keys":{"link":{"t":"string"}}}}},
-    "60706079db1a": {"t":"object","keys":{"status":{"t":"literal","v":"error"},"message":{"t":"string"},"data":{"t":"union","of":[{"t":"any"},{"t":"null"}]}},"optional":["data"]}
+    "92bc2da67691": {"t":"object","keys":{"status":{"t":"literal","v":"success"},"message":{"t":"string"},"data":{"t":"array","of":{"t":"object","keys":{"id":{"t":"number"},"code":{"t":"string"},"name":{"t":"string"}}}}}}
   }
 }

@@ -1,7 +1,7 @@
 {
   "provider": "github",
   "source": "live",
-  "recorded": "2026-10-18",
+  "recorded": "2026-10-19",
   "scenarios": {
     "repos: public repository": {
       "steps": [
