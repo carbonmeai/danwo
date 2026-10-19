@@ -20,7 +20,7 @@ import { userRoutes } from "./routes/users.ts"
 import { clerkScripts } from "./scripts.ts"
 import { instanceFrom } from "./seed.ts"
 import { clerkStore, INSTANCE } from "./store.ts"
-import { clerkEndpoints, ClerkEvents, clerkWebhookHeaders } from "./webhooks.ts"
+import { clerkCustomHeaders, clerkEndpoints, ClerkEvents, clerkWebhookHeaders } from "./webhooks.ts"
 
 export { clerkOutboundFaults } from "./faults.ts"
 export { CLERK_HOSTS, isClerkHost } from "./helpers.ts"
@@ -158,7 +158,7 @@ export const clerk = defineEmulator({
   webhooks: ({ store, clock, wallClock }) => ({
     endpoints: () => clerkEndpoints(store),
     sign: signedOnWallClock(clock, wallClock, ({ endpoint, body, timestamp }) =>
-      clerkWebhookHeaders(endpoint.secret, body, timestamp),
+      clerkWebhookHeaders(endpoint.secret, body, timestamp, clerkCustomHeaders(store, endpoint.id)),
     ),
     policy: SVIX_DELIVERY,
   }),

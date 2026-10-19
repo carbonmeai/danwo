@@ -13,7 +13,7 @@ const SECRET = `whsec_${Buffer.from("clerk-webhook-test-secret-32b!!!").toString
 
 /** An app's Clerk webhook route: verifies each delivery with `@clerk/backend`'s `verifyWebhook`. */
 class Receiver {
-  readonly received: { type: string; data: Record<string, unknown> }[] = []
+  readonly received: { type: string; data: Record<string, unknown>; headers: Headers }[] = []
   readonly rejected: number[] = []
   readonly server: Server = createServer((req, res) => void this.handle(req, res))
   url = ""
@@ -48,7 +48,7 @@ class Receiver {
         { signingSecret: SECRET },
       )
 
-      this.received.push({ type: event.type, data: { ...event.data } })
+      this.received.push({ type: event.type, data: { ...event.data }, headers })
       res.statusCode = 200
     } catch {
       this.rejected.push(Date.now())
@@ -114,6 +114,24 @@ describe("Clerk webhooks", () => {
       user: { id: user.id },
     })
     expect(receiver.received.at(-1)?.data).toEqual({ object: "user", id: user.id, deleted: true })
+  })
+
+  it("sends an endpoint's custom headers with every delivery, without replacing Svix's", async () => {
+    bed = clerkTestbed({
+      webhooks: [
+        {
+          endpoint: receiver.url,
+          secret: SECRET,
+          headers: { "primus-token": "shared-token", "svix-id": "not-used" },
+        },
+      ],
+    })
+
+    await bed.client.users.createUser({ emailAddress: ["ada@danwo.test"] })
+
+    await vi.waitFor(() => expect(receiver.received).toHaveLength(1))
+    expect(receiver.received[0]?.headers.get("primus-token")).toBe("shared-token")
+    expect(receiver.received[0]?.headers.get("svix-id")).toMatch(/^msg_/)
   })
 
   it("only sends an endpoint the events it subscribes to", async () => {

@@ -48,12 +48,15 @@ export interface ClerkSeedTemplate {
  * `svix-signature`). `secret` is the `whsec_` signing secret the app verifies with
  * (`CLERK_WEBHOOK_SIGNING_SECRET`); when not given, one derived from the instance and the
  * endpoint, the same on every run (read it with `clerkInstance(clerk).webhookSecret()`).
- * `events` limits the event types it gets; every event when not given.
+ * `events` limits the event types it gets; every event when not given. `headers` are sent with
+ * every delivery, as a Svix endpoint's custom headers are (an app that also checks a shared
+ * token of its own).
  */
 export interface ClerkSeedWebhook {
   readonly endpoint: string
   readonly events?: readonly string[]
   readonly secret?: string
+  readonly headers?: Readonly<Record<string, string>>
 }
 
 /** A Clerk emulator's seed: the instance, and the users, organizations and JWT templates it starts with. */
@@ -203,6 +206,7 @@ function seedWebhooks(context: ClerkContext, webhooks: readonly ClerkSeedWebhook
         events: hook.events ?? [],
         secret: hook.secret ?? defaultWebhookSecret(slug, hook.endpoint),
         enabled: true,
+        ...(hook.headers !== undefined && { headers: hook.headers }),
       },
       null,
     )

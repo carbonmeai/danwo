@@ -138,6 +138,8 @@ export interface ClerkWebhookRecord {
   readonly events: readonly string[]
   readonly secret: string
   readonly enabled: boolean
+  /** Custom headers sent with every delivery, as a Svix endpoint can be set to add. */
+  readonly headers?: Readonly<Record<string, string>>
 }
 
 /** Where the emulator's webhooks go. */
@@ -153,11 +155,23 @@ export function clerkEndpoints(store: Store): WebhookEndpoint[] {
     }))
 }
 
-/** The headers of one delivery: Svix's, as Clerk sends them (`svix-id`, `svix-timestamp`, `svix-signature`). */
+/**
+ * The headers of one delivery: the endpoint's custom headers, then Svix's as Clerk sends them
+ * (`svix-id`, `svix-timestamp`, `svix-signature`), which a custom header cannot replace.
+ */
 export function clerkWebhookHeaders(
   secret: string,
   body: string,
   timestamp: number,
+  custom: Readonly<Record<string, string>> = {},
 ): Record<string, string> {
-  return svixHeaders(secret, body, timestamp, "svix")
+  return { ...custom, ...svixHeaders(secret, body, timestamp, "svix") }
+}
+
+/** The custom headers of the endpoint a delivery goes to, if it has any. */
+export function clerkCustomHeaders(
+  store: Store,
+  endpointId: string,
+): Readonly<Record<string, string>> {
+  return clerkStore(store).webhooks.get(endpointId)?.headers ?? {}
 }
