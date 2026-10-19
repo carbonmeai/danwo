@@ -169,8 +169,12 @@ export const paystackFidelity: FidelityProvider = {
   credentials: [{ name: KEY, description: "a Paystack test secret key (sk_test_…)" }],
   scenarios: [transactions, customers, banks, errors],
   emulator: () =>
+    /* The two stable customers already exist in the sandbox after its first run, so here too. */
     emulatorTarget(paystack, { key: EMULATOR_KEY }, (emulator) =>
-      seedPaystack(emulator.store, { integrations: [{ secretKey: EMULATOR_KEY }] }),
+      seedPaystack(emulator.store, {
+        integrations: [{ secretKey: EMULATOR_KEY }],
+        customers: [{ email: CUSTOMER_EMAIL, firstName: "Fidelity" }, { email: PAYMENTS_EMAIL }],
+      }),
     ),
   live(env) {
     const key = requiredCredentials(this, env)?.[KEY]

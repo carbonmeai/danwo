@@ -8,7 +8,7 @@ import { stripe } from "@danwo/emulators"
 
 import { type FidelityProvider, refuseLive, requiredCredentials } from "../provider.ts"
 import type { Answer, Scenario, ScenarioContext } from "../scenario.ts"
-import { asJsonObject, isJsonArray, readJson } from "../shape.ts"
+import { asJsonObject, isJsonArray } from "../shape.ts"
 import { credential, emulatorTarget, formBody, liveTarget } from "../target.ts"
 import { stripeBillingScenarios } from "./stripe-billing.ts"
 import { stripeSweep } from "./stripe-sweep.ts"
@@ -74,7 +74,7 @@ function email(context: ScenarioContext): string {
 function settled(status: number, body: string): boolean {
   return (
     status === 400 &&
-    /resource_missing|already|has been canceled|status of (succeeded|canceled|expired)|unexpected_state/i.test(
+    /resource_missing|already|has been canceled|status of (succeeded|canceled|expired)|unexpected_state|can be expired/i.test(
       body,
     )
   )
@@ -102,41 +102,6 @@ function archivePrice(context: ScenarioContext, created: Answer): void {
   const id = field(created, "id")
 
   made(context, "price", id, "POST", `/v1/prices/${id}`, { active: false })
-}
-
-/** The product ids of a Checkout Session's line items, from its line items list. */
-async function lineItemProducts(context: ScenarioContext, session: string): Promise<string[]> {
-  const answer = await context.target.send(
-    call(context, "GET", `/v1/checkout/sessions/${session}/line_items`, { limit: 10 }),
-  )
-  const data = asJsonObject(await readJson(answer))?.["data"]
-
-  if (data === undefined || !isJsonArray(data)) return []
-
-  return data.flatMap((item) => {
-    const product = asJsonObject(asJsonObject(item)?.["price"])?.["product"]
-
-    return typeof product === "string" ? [product] : []
-  })
-}
-
-/** Archives the products a Checkout Session's inline `product_data` made. */
-function archiveInlineProducts(context: ScenarioContext, session: string): void {
-  context.created({
-    kind: "product (inline)",
-    id: session,
-    async undo() {
-      let last = new Response(null, { status: 204 })
-
-      for (const product of await lineItemProducts(context, session))
-        last = await context.target.send(
-          call(context, "POST", `/v1/products/${product}`, { active: false }),
-        )
-
-      return last
-    },
-    settled,
-  })
 }
 
 async function createCustomer(context: ScenarioContext, step = "create customer"): Promise<string> {
@@ -473,7 +438,7 @@ const checkout: Scenario = {
             price_data: {
               currency: "usd",
               unit_amount: 500,
-              product_data: { name: `${context.tag} credits`, tax_code: "txcd_10000000" },
+              product_data: { name: "Credits", tax_code: "txcd_10000000" },
             },
           },
         ],
@@ -489,7 +454,6 @@ const checkout: Scenario = {
     )
     const id = field(created, "id")
 
-    archiveInlineProducts(context, id)
     made(context, "checkout session", id, "POST", `/v1/checkout/sessions/${id}/expire`)
     await context.step(
       "retrieve checkout session",
@@ -571,7 +535,7 @@ export const stripeFidelity: FidelityProvider = {
     ...stripeBillingScenarios({ call, field, made }),
   ],
   leaves:
-    "payment intents, refunds and expired Checkout Sessions stay in the test-mode history; Stripe has no API to delete them",
+    "payment intents, refunds, expired Checkout Sessions and the products Stripe makes for inline line items stay in the test-mode history; Stripe has no API to delete them",
   sweep: stripeSweep(call),
   emulator: () => emulatorTarget(stripe, { key: "sk_test_danwo_fidelity" }),
   live(env) {
