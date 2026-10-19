@@ -55,6 +55,17 @@ async function project(): Promise<void> {
 let dashboard: Dashboard
 let session: WebSession
 
+/**
+ * Opens a dashboard page and waits until React has hydrated it, so a click lands on a live
+ * control rather than the server's HTML; a busy machine can take seconds to get there.
+ */
+async function open(path: string): Promise<void> {
+  await session.app.open(path)
+  await session.expect(session.screen.getByTestId("dashboard-ready")).toHaveCount(1, {
+    timeout: 60_000,
+  })
+}
+
 beforeAll(async () => {
   await project()
   dashboard = await startDashboard({ root: WORK, port: 0 })
@@ -65,13 +76,13 @@ afterAll(async () => {
   await session?.close()
   await dashboard?.close()
   await rm(WORK, { recursive: true, force: true })
-})
+}, 120_000)
 
 describe("danwo serve", () => {
   it("opens on the overview, and lists the test run and the matrix run", async () => {
-    const { app, screen, expect } = session
+    const { screen, expect } = session
 
-    await app.open("/")
+    await open("/")
     await expect(screen.getByRole("heading", { name: "Overview" })).toBeVisible({ timeout: 60_000 })
     await expect(screen.getByRole("region", { name: "Breaks under faults" })).toContainText(
       "duplicate on webhook checkout.session.completed",
@@ -83,9 +94,9 @@ describe("danwo serve", () => {
   })
 
   it("lists every test in the library with what the matrix made of it", async () => {
-    const { app, screen, expect } = session
+    const { screen, expect } = session
 
-    await app.open("/tests")
+    await open("/tests")
 
     const tests = screen.getByRole("table", { name: "Tests" })
 
@@ -98,9 +109,9 @@ describe("danwo serve", () => {
   })
 
   it("opens a failed test's recording over the page, and closes it with Esc", async () => {
-    const { app, screen, expect } = session
+    const { screen, expect } = session
 
-    await app.open("/runs")
+    await open("/runs")
     await screen.getByRole("link", { name: "3 tests" }).click()
     await screen
       .getByRole("row")
@@ -122,9 +133,9 @@ describe("danwo serve", () => {
   })
 
   it("shows the matrix as a grid of faults, the duplicate webhook failed", async () => {
-    const { app, screen, expect } = session
+    const { screen, expect } = session
 
-    await app.open("/runs?kind=matrix")
+    await open("/runs?kind=matrix")
     await screen.getByRole("link", { name: /buys 500 credits/ }).click()
     await expect(
       screen.getByRole("button", {
@@ -143,9 +154,9 @@ describe("danwo serve", () => {
   })
 
   it("replays a failed test's video, seeking it from a step and from a link", async () => {
-    const { app, screen, expect } = session
+    const { screen, expect } = session
 
-    await app.open("/runs")
+    await open("/runs")
     await screen.getByRole("link", { name: "3 tests" }).click()
     await screen
       .getByRole("row")
@@ -170,14 +181,14 @@ describe("danwo serve", () => {
 
     const dir = `.danwo/runs/${decodeURIComponent(src.replace(/^\/media\/|\/video\/tab-1\.webm$/g, ""))}`
 
-    await app.open(`/records/${dir}?t=0.5`)
+    await open(`/records/${dir}?t=0.5`)
     await expect(seek).toHaveAttribute("aria-valuetext", "0:00.5", { timeout: 30_000 })
   })
 
   it("runs a matrix from the dashboard and shows it live until it becomes the run's page", async () => {
-    const { app, screen, expect } = session
+    const { screen, expect } = session
 
-    await app.open("/runs?kind=matrix")
+    await open("/runs?kind=matrix")
     await screen.getByRole("link", { name: /buys 500 credits/ }).click()
     await screen.getByRole("button", { name: "Run the matrix" }).click()
     await screen.getByRole("textbox", { name: "Only faults containing" }).fill("on POST /buy")
@@ -193,31 +204,31 @@ describe("danwo serve", () => {
   })
 
   it("reruns one test from its run and opens the new run", async () => {
-    const { app, screen, expect } = session
+    const { screen, expect } = session
 
-    await app.open("/runs")
+    await open("/runs")
     await screen.getByRole("link", { name: "3 tests" }).click()
     await screen.getByRole("button", { name: /Rerun tests\/storefront\.danwo\.ts/ }).click()
     await expect(screen.getByRole("heading", { name: "1 test" })).toBeVisible({ timeout: 60_000 })
-    await app.open("/runs")
+    await open("/runs")
     await expect(screen.getByRole("link", { name: "1 test" })).toBeVisible()
   })
 
   it("shows the impact index, the insights, the matrix and the settings", async () => {
-    const { app, screen, expect } = session
+    const { screen, expect } = session
 
-    await app.open("/impact")
+    await open("/impact")
     await expect(screen.getByText("api.stripe.com").first()).toBeVisible({ timeout: 30_000 })
-    await app.open("/insights?sort=faults")
+    await open("/insights?sort=faults")
     await expect(screen.getByRole("heading", { name: "Slowest tests" })).toBeVisible()
-    await app.open("/matrix")
+    await open("/matrix")
     await expect(
       screen
         .getByRole("table", { name: "Tests under the matrix" })
         .getByRole("row")
         .filter({ hasText: "buys 500 credits" }),
     ).toContainText(/held|broke under/)
-    await app.open("/settings")
+    await open("/settings")
     await expect(screen.getByText("danwo.config.ts", { exact: true })).toBeVisible()
   })
 })

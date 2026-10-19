@@ -1,6 +1,8 @@
 import { ThemeProvider } from "@danwo/ui/primitives/theme"
 import { Toaster } from "@danwo/ui/primitives/toast/toaster"
+import { Span } from "@danwo/ui/primitives/typography"
 import { createRootRoute, HeadContent, Link, Outlet, Scripts } from "@tanstack/react-router"
+import { useEffect, useState } from "react"
 
 import { Empty } from "../components/empty-state.tsx"
 import { Page } from "../components/page.tsx"
@@ -56,6 +58,11 @@ export const Route = createRootRoute({
 function RootComponent() {
   const project = Route.useLoaderData()
 
+  /** Marks the page once React has hydrated it, so a script driving the page knows clicks land. */
+  const [hydrated, setHydrated] = useState(false)
+
+  useEffect(() => setHydrated(true), [])
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -68,6 +75,7 @@ function RootComponent() {
           </AppShell>
           <Toaster position="bottom-right" />
         </ThemeProvider>
+        {hydrated ? <Span data-testid="dashboard-ready" srOnly /> : null}
         <Scripts />
       </body>
     </html>
