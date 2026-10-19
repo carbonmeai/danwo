@@ -4,6 +4,7 @@ import type { App } from "../http.ts"
 import type { Outbox } from "../outbox.ts"
 import type { Clock, Collection, Entity, Store } from "../store.ts"
 import { listPage, newId, noSuch, unix } from "./helpers.ts"
+import { currentRequest, type StripeRequest } from "./requests.ts"
 import type { StripeStore } from "./store.ts"
 
 /** The API version events are rendered with: the one the `stripe` SDK we test against pins. */
@@ -18,8 +19,16 @@ export interface StripeEvent {
   data: { object: object }
   livemode: false
   pending_webhooks: number
-  request: { id: null; idempotency_key: null }
+  request: { id: string | null; idempotency_key: string | null }
   type: string
+}
+
+/**
+ * The call an event came from, as the event shows it. Events the emulator raises on its own, such
+ * as a settlement on the clock, came from no call and show nulls.
+ */
+function requestOf(request: StripeRequest | undefined): StripeEvent["request"] {
+  return { id: request?.id ?? null, idempotency_key: request?.idempotencyKey ?? null }
 }
 
 interface EventRow extends Entity {
@@ -52,7 +61,7 @@ export class StripeEvents {
       data: { object: structuredClone(object) },
       livemode: false,
       pending_webhooks: this.subscribers(type),
-      request: { id: null, idempotency_key: null },
+      request: requestOf(currentRequest()),
       type,
     }
 

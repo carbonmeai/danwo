@@ -1,10 +1,11 @@
 /**
  * The API request being answered, as Stripe names it: every call gets a `req_` id, which error
- * bodies link to and events created by that call carry with the call's idempotency key. Events
- * that happen outside a call (a webhook-driven settlement, a renewal on the clock) carry neither.
+ * bodies link to and events created by that call carry with the call's idempotency key. A POST
+ * sent without a key gets one made up for it, as Stripe does. Events that happen outside a call
+ * (a webhook-driven settlement, a renewal on the clock) carry neither.
  */
 import { AsyncLocalStorage } from "node:async_hooks"
-import { randomBytes } from "node:crypto"
+import { randomBytes, randomUUID } from "node:crypto"
 
 import type { Middleware } from "../http.ts"
 
@@ -35,7 +36,8 @@ export function stripeRequests(): Middleware {
 
     const request: StripeRequest = {
       id: requestId(),
-      idempotencyKey: c.req.header("Idempotency-Key") ?? null,
+      idempotencyKey:
+        c.req.header("Idempotency-Key") ?? (c.req.method === "POST" ? randomUUID() : null),
     }
 
     return current.run(request, next)
