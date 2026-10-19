@@ -1,7 +1,7 @@
 {
   "provider": "resend",
-  "source": "openapi",
-  "recorded": "2026-10-18",
+  "source": "live",
+  "recorded": "2026-10-19",
   "scenarios": {
     "emails: send and read back": {
       "steps": [
@@ -23,7 +23,7 @@
         {
           "step": "send a batch of two",
           "status": 200,
-          "shape": "49d6e9cd4b02"
+          "shape": "718c8dd96555"
         }
       ],
       "facts": [
@@ -38,12 +38,12 @@
         {
           "step": "send with an idempotency key",
           "status": 200,
-          "shape": "291b10481a0e"
+          "shape": "1613cf70d1cd"
         },
         {
           "step": "retry the same send",
           "status": 200,
-          "shape": "291b10481a0e"
+          "shape": "1613cf70d1cd"
         }
       ],
       "facts": [
@@ -58,12 +58,12 @@
         {
           "step": "send without a recipient",
           "status": 422,
-          "shape": "93823217d9a5"
+          "shape": "7ba28361e7a5"
         },
         {
           "step": "call without a key",
           "status": 401,
-          "shape": "b40292748ec2"
+          "shape": "df2e5dac7791"
         }
       ],
       "facts": []
@@ -80,11 +80,12 @@
     }
   },
   "shapes": {
+    "1613cf70d1cd": {"t":"object","keys":{"id":{"t":"string"}}},
     "291b10481a0e": {"t":"object","keys":{"id":{"t":"union","of":[{"t":"string"},{"t":"null"}]}},"optional":["id"]},
-    "49d6e9cd4b02": {"t":"object","keys":{"data":{"t":"union","of":[{"t":"array","of":{"t":"object","keys":{"id":{"t":"union","of":[{"t":"string"},{"t":"null"}]}},"optional":["id"]}},{"t":"null"}]}},"optional":["data"]},
-    "93823217d9a5": {"t":"object","keys":{"statusCode":{"t":"literal","v":422},"name":{"t":"literal","v":"missing_required_field"},"message":{"t":"union","of":[{"t":"string"},{"t":"null"}]}}},
-    "b40292748ec2": {"t":"object","keys":{"statusCode":{"t":"literal","v":401},"name":{"t":"literal","v":"missing_api_key"},"message":{"t":"union","of":[{"t":"string"},{"t":"null"}]}}},
+    "718c8dd96555": {"t":"object","keys":{"data":{"t":"array","of":{"t":"object","keys":{"id":{"t":"string"}}}}}},
+    "7ba28361e7a5": {"t":"object","keys":{"message":{"t":"string"},"name":{"t":"literal","v":"missing_required_field"},"statusCode":{"t":"literal","v":422}}},
     "b5d8a34c6d36": {"t":"object","keys":{"object":{"t":"literal","v":"email"},"id":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"message_id":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"to":{"t":"union","of":[{"t":"array","of":{"t":"string"}},{"t":"null"}]},"from":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"created_at":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"subject":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"html":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"text":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"bcc":{"t":"union","of":[{"t":"array","of":{"t":"string"}},{"t":"null"}]},"cc":{"t":"union","of":[{"t":"array","of":{"t":"string"}},{"t":"null"}]},"reply_to":{"t":"union","of":[{"t":"array","of":{"t":"string"}},{"t":"null"}]},"last_event":{"t":"union","of":[{"t":"string"},{"t":"null"}]}},"optional":["object","id","message_id","to","from","created_at","subject","html","text","bcc","cc","reply_to","last_event"]},
-    "cf38585b5b32": {"t":"object","keys":{"object":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"has_more":{"t":"union","of":[{"t":"boolean"},{"t":"null"}]},"data":{"t":"union","of":[{"t":"array","of":{"t":"object","keys":{"id":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"name":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"status":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"created_at":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"region":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"open_tracking":{"t":"union","of":[{"t":"boolean"},{"t":"null"}]},"click_tracking":{"t":"union","of":[{"t":"boolean"},{"t":"null"}]},"capabilities":{"t":"union","of":[{"t":"any"},{"t":"null"}]}},"optional":["id","name","status","created_at","region","open_tracking","click_tracking","capabilities"]}},{"t":"null"}]}},"optional":["object","has_more","data"]}
+    "cf38585b5b32": {"t":"object","keys":{"object":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"has_more":{"t":"union","of":[{"t":"boolean"},{"t":"null"}]},"data":{"t":"union","of":[{"t":"array","of":{"t":"object","keys":{"id":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"name":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"status":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"created_at":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"region":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"open_tracking":{"t":"union","of":[{"t":"boolean"},{"t":"null"}]},"click_tracking":{"t":"union","of":[{"t":"boolean"},{"t":"null"}]},"capabilities":{"t":"union","of":[{"t":"any"},{"t":"null"}]}},"optional":["id","name","status","created_at","region","open_tracking","click_tracking","capabilities"]}},{"t":"null"}]}},"optional":["object","has_more","data"]},
+    "df2e5dac7791": {"t":"object","keys":{"statusCode":{"t":"literal","v":401},"message":{"t":"string"},"name":{"t":"literal","v":"missing_api_key"}}}
   }
 }
