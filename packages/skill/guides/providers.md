@@ -1,6 +1,6 @@
 # Emulating a provider
 
-danwo runs fake Stripe, Resend, S3 and Tigris, Auth0, Google, Microsoft, Slack, GitHub, Twilio and Composio behind
+danwo runs fake Stripe, Resend, S3 and Tigris, Auth0, Google, Microsoft, Slack, GitHub, Twilio, Composio, Nylas, Nango and Unipile behind
 an egress proxy, so the app talks to the real hostnames, unchanged, and tests can read and fault
 what it did.
 
@@ -216,14 +216,16 @@ instead, so its setup survives. An environment with neither keeps whatever state
 composes services behind one proxy; its result has `fixtures`, `webhooks` (keyed by service),
 `settle`, `reset` and `close` merged. Single-provider shortcuts: `stripeEnvironment`,
 `s3Environment`, `auth0Environment`, `googleEnvironment`, `microsoftEnvironment`, `slackEnvironment`,
-`githubEnvironment`, `composioEnvironment`, `awsEnvironment` (MiniStack for other AWS services).
+`githubEnvironment`, `composioEnvironment`, `nylasEnvironment`, `nangoEnvironment`,
+`unipileEnvironment`, `awsEnvironment` (MiniStack for other AWS services).
 
 ## Reading what happened
 
 Type the fixtures with `test.extend<StripeFixtures>()` and read the emulators in tests and
 invariants: `resendInbox`, `s3Objects`, `auth0Tenant`, `gmailMailbox`, `googleCalendar`, `googleDrive`,
 `outlookMailbox`, `outlookCalendar`, `oneDrive`, `graphSubscriptions`, `slackWorkspace`,
-`githubRepo`, `twilioInbox` (and `twilioPhone` to text the app), `composioProject`, and the `*SignIns` helpers. `danwo spec --topic emulators` lists them with their
+`githubRepo`, `twilioInbox` (and `twilioPhone` to text the app), `composioProject`,
+`nylasApplication`, `nangoProject`, `unipileWorkspace`, and the `*SignIns` helpers. `danwo spec --topic emulators` lists them with their
 signatures, and `--topic environments` the seed shapes.
 
 ## Auth0
@@ -401,3 +403,78 @@ callback are pages and are left alone. Recordings redact `ak_` and `uak_` keys.
 Not emulated: Tool Router sessions and MCP servers, files, custom tools defined in code, poll
 triggers watching the backend on their own (fire them with `fire`), V1 and V2 webhook payloads,
 and the exact error codes beyond the two key errors, which are approximations.
+
+## Nylas, Nango and Unipile
+
+Apps that reach their users' mailboxes, calendars, CRMs and LinkedIn or WhatsApp inboxes through a
+connector platform get each one emulated on its real hosts, for the app's server and the browser's
+hosted connect pages alike. Their own SDKs (`nylas`, `@nylas/connect`, `@nangohq/node`,
+`@nangohq/frontend`, `unipile-node-sdk`) work against them unchanged.
+
+```ts
+stackEnvironment({
+  services: [
+    nylasService({
+      seed: {
+        apiKeys: [key],
+        grants: [{ id: GRANT, email: "rep@sales.test" }],
+        webhooks: [{ url, secret }],
+      },
+    }),
+    nangoService({
+      seed: {
+        secretKeys: [secret],
+        integrations: [{ key: "hubspot" }],
+        connections: [{ integration: "hubspot", connectionId: "rep-1" }],
+        webhook: { url },
+      },
+    }),
+    unipileService({
+      seed: {
+        tokens: [token],
+        accounts: [{ id: "acc_rep", type: "LINKEDIN", name: "Rep", username: "rep" }],
+      },
+    }),
+  ],
+  apps: [
+    { name: "app", command: "node app.ts", url, env: { UNIPILE_DSN: "api8.unipile.com:13851" } },
+  ],
+})
+```
+
+- **Nylas v3** (`api.us.nylas.com`, `api.eu.nylas.com`): hosted auth (`/v3/connect/auth`, the
+  token exchange with the API key or a PKCE verifier as `@nylas/connect` sends, token info,
+  revoke) and grants; messages, threads, drafts, folders and attachments; calendars, events and
+  free/busy; contacts; the scheduler's configurations, availability and bookings; webhooks signed
+  with `X-Nylas-Signature`. Mail sent between two seeded grants lands in the other's inbox. Seed
+  grant ids to match the app's database; they survive resets. `nylasApplication(nylas)` reads
+  grants, mail and events, delivers mail from outside (`receive`) and expires a grant (`expire`,
+  which sends `grant.expired`).
+- **Nango** (`api.nango.dev`, with the Connect UI on `connect.nango.dev`): integrations, connect
+  and reconnect sessions, the Connect UI the frontend SDK opens (it answers the `ready` /
+  `session_token` handshake and posts `connect` back), connections whose tokens refresh on the
+  emulator's clock, the proxy, actions and records, and `auth` webhooks signed with both
+  `X-Nango-Signature` and `X-Nango-Hmac-Sha256`. Proxied calls answer from the seeded `proxy`
+  answers, or go to a backend emulator: `nangoService({ backends: [...] })` with the Google,
+  Microsoft, Slack or GitHub service forwards a connection's calls with its access token, so seed
+  the connection with a token that emulator issued. `nangoProject(nango)` reads connections and
+  every proxied call and action, and `revoke` makes a connection's next refresh fail with Nango's
+  refresh error and an `auth` webhook.
+- **Unipile** (every `*.unipile.com` DSN, and the hosted auth pages on `account.unipile.com`):
+  hosted auth links that notify the link's `notify_url` and send the browser to the success URL;
+  LinkedIn, WhatsApp and mail accounts; the owner's and other profiles; chats, messages and
+  attendees; mail; and webhooks for `messaging`, `email` and `account_status`, each delivered with
+  the headers its subscription named (Unipile signs nothing). Answers match the shapes the SDK
+  validates with `validateRequestPayload`. `unipileWorkspace(unipile)` lets a lead message the
+  account (`receive`, which sends `message_received`), delivers mail (`receiveEmail`) and
+  disconnects an account (`disconnect`, which sends `CREDENTIALS`).
+
+`danwo matrix` faults all three on their sends and writes (rate limits, the provider's own
+refusals, a revoked or disconnected account, slow answers, dropped connections, a dropped answer
+after the provider acted) and their reads with rate limits and server errors; the hosted pages are
+left alone. Recordings redact `nyk_` keys, the tokens Nylas hands out and Nango session tokens.
+
+Not emulated: Nylas's notetakers, smart compose and ICS, and Nylas grants backed by the Google or
+Microsoft emulators; Nango's syncs running on their own and its MCP endpoints; Unipile's posts
+beyond empty lists, invitations, attachments and calendar. Error codes beyond the key errors are
+approximations.
