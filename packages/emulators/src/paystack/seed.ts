@@ -68,6 +68,9 @@ const BANKS: ReadonlyArray<readonly [name: string, slug: string, code: string]> 
   ["Test Bank", "test-bank", "001"],
 ]
 
+/** When the default banks were added: fixed, so every reset lists them the same. */
+const BANKS_ADDED = "2016-07-14T10:04:29.000Z"
+
 /** The default banks, applied with every reset. */
 export function seedBanks(store: Store): void {
   const paystack = paystackStore(store)
@@ -78,10 +81,18 @@ export function seedBanks(store: Store): void {
       name,
       slug,
       code,
+      longcode: code,
+      gateway: null,
+      pay_with_bank: false,
+      supports_transfer: true,
+      available_for_direct_debit: false,
+      active: true,
       country: "Nigeria",
       currency: "NGN",
       type: "nuban",
-      active: true,
+      is_deleted: false,
+      createdAt: BANKS_ADDED,
+      updatedAt: BANKS_ADDED,
     }
 
     paystack.banks.add(bank, null)

@@ -1,6 +1,7 @@
 import type { Context } from "../../http.ts"
 import { requireIntegration } from "../auth.ts"
 import type { PaystackRouteContext } from "../context.ts"
+import type { Bank } from "../entities.ts"
 import { dedicatedObject } from "../formatters.ts"
 import { accountNumber, fail, nextId, ok, text } from "../helpers.ts"
 import { PROBLEMS } from "../problems.ts"
@@ -45,6 +46,50 @@ async function createDedicated(c: Context, context: PaystackRouteContext): Promi
   return ok(c, "NUBAN successfully created", account)
 }
 
+/** A cursor naming the bank a page starts after or ends before, opaque as Paystack's are. */
+function cursorOf(bank: Bank | undefined): string | null {
+  return bank === undefined ? null : Buffer.from(`bank:${bank.id}`).toString("base64")
+}
+
+/** The bank id a cursor names; undefined for none or one the emulator did not give. */
+function idOf(cursor: string | undefined): number | undefined {
+  const match = /^bank:(\d+)$/.exec(Buffer.from(cursor ?? "", "base64").toString())
+
+  return match ? Number(match[1]) : undefined
+}
+
+/**
+ * One page of banks, as listing with `use_cursor=true` answers: `perPage` banks after the `next`
+ * cursor, or before the `previous` one, with the cursors for the pages either side. Without
+ * `use_cursor`, Paystack lists every bank at once with no `meta`.
+ */
+function cursorPage(c: Context, banks: readonly Bank[]): [Bank[], { meta: object }] {
+  const perPage = Math.min(Math.max(Number(c.req.query("perPage")) || 50, 1), 100)
+  const after = idOf(c.req.query("next"))
+  const before = idOf(c.req.query("previous"))
+  const start =
+    before === undefined
+      ? banks.findIndex((bank) => after === undefined || bank.id > after)
+      : Math.max(
+          banks.findIndex((bank) => bank.id >= before),
+          0,
+        ) - perPage
+  const from = Math.max(start === -1 ? banks.length : start, 0)
+  const page = banks.slice(from, from + perPage)
+  const last = page.at(-1)
+
+  return [
+    page,
+    {
+      meta: {
+        next: last !== undefined && last !== banks.at(-1) ? cursorOf(last) : null,
+        previous: from > 0 ? cursorOf(page[0]) : null,
+        perPage,
+      },
+    },
+  ]
+}
+
 /** Banks, account name resolution, and dedicated virtual accounts. */
 export function bankRoutes(context: PaystackRouteContext): void {
   const { app, paystack } = context
@@ -57,7 +102,9 @@ export function bankRoutes(context: PaystackRouteContext): void {
       (bank) => currency === undefined || bank.currency === currency,
     )
 
-    return ok(c, "Banks retrieved", banks, { meta: { next: null, previous: null, perPage: 50 } })
+    return c.req.query("use_cursor") === "true"
+      ? ok(c, "Banks retrieved", ...cursorPage(c, banks))
+      : ok(c, "Banks retrieved", banks)
   })
 
   app.get("/bank/resolve", (c) => {

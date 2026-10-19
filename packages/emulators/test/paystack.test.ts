@@ -134,6 +134,16 @@ function field(data: Record<string, unknown>, name: string): string {
   return typeof value === "string" ? value : ""
 }
 
+/** The banks a bank list answered with. */
+function banks(body: Record<string, unknown>): Record<string, unknown>[] {
+  return (Array.isArray(body["data"]) ? body["data"] : []).map((bank) => asRecord(bank) ?? {})
+}
+
+/** The names of the banks a bank list answered with, in order. */
+function names(body: Record<string, unknown>): unknown[] {
+  return banks(body).map((bank) => bank["name"])
+}
+
 const CARD = { number: "4084 0840 8408 4081", expiry: "12/30", cvv: "408" }
 
 describe("Paystack transactions", () => {
@@ -352,6 +362,36 @@ async function recipient(accountNumber: string, bankCode: string, key = SECRET):
 }
 
 describe("Paystack transfers, refunds and dedicated accounts", () => {
+  it("lists every bank at once, and pages them by cursor only when asked", async () => {
+    const all = asRecord(await (await call("GET", "https://api.paystack.co/bank")).json()) ?? {}
+    const first =
+      asRecord(
+        await (await call("GET", "https://api.paystack.co/bank?use_cursor=true&perPage=3")).json(),
+      ) ?? {}
+    const cursor = asRecord(first["meta"])?.["next"]
+    const second =
+      asRecord(
+        await (
+          await call(
+            "GET",
+            `https://api.paystack.co/bank?use_cursor=true&perPage=3&next=${String(cursor)}`,
+          )
+        ).json(),
+      ) ?? {}
+
+    expect("meta" in all).toBe(false)
+    expect(names(all)).toHaveLength(8)
+    expect(banks(all)[0]).toMatchObject({
+      longcode: "044",
+      supports_transfer: true,
+      is_deleted: false,
+    })
+    expect(names(first)).toEqual(names(all).slice(0, 3))
+    expect(first["meta"]).toMatchObject({ previous: null, perPage: 3 })
+    expect(names(second)).toEqual(names(all).slice(3, 6))
+    expect(asRecord(second["meta"])?.["previous"]).toEqual(expect.any(String))
+  })
+
   it("resolves account names, and settles transfers to success or failure on the clock", async () => {
     const resolved = await call(
       "GET",

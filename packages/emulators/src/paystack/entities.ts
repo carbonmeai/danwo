@@ -236,10 +236,18 @@ export interface Bank {
   readonly name: string
   readonly slug: string
   readonly code: string
+  readonly longcode: string
+  readonly gateway: string | null
+  readonly pay_with_bank: boolean
+  readonly supports_transfer: boolean
+  readonly available_for_direct_debit: boolean
+  readonly active: boolean
   readonly country: string
   readonly currency: string
   readonly type: string
-  readonly active: boolean
+  readonly is_deleted: boolean
+  readonly createdAt: string
+  readonly updatedAt: string
 }
 
 /** A bank account number reserved for one customer; money sent to it pays the integration. */
