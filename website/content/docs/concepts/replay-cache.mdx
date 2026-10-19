@@ -1,0 +1,36 @@
+---
+title: The replay cache
+description: Agent steps are recorded the first time they pass and replayed after that, with no model calls.
+---
+
+The first time an agent step passes, danwo records what the model did: which elements it acted on,
+found again by what they were (role, name, label, text), and what it checked. The next run replays
+that recording with no model call, so reruns are fast, free and give the same answer every time.
+
+## What a replay can come to
+
+Each run prints a `cache:` line with what happened to every agent step:
+
+| Outcome      | What happened                                                                |
+| ------------ | ---------------------------------------------------------------------------- |
+| `replayed`   | The recording replayed as recorded, with no model.                           |
+| `relocated`  | The recording replayed, with an element found somewhere other than recorded. |
+| `handed-off` | The replay started, stopped matching, and the model took the step over.      |
+| `missed`     | There was no recording, so the model ran.                                    |
+| `stale`      | A recording of this step exists under another key, so it was not used.       |
+| `diverged`   | Under strict replay, the recording no longer replays.                        |
+| `off`        | The session has no cache.                                                    |
+
+The [cache outcomes reference](/docs/reference/cache) has the exact wording `danwo spec` prints.
+
+## In CI
+
+Commit the cache directory (`cache.dir` in the config) so CI replays recorded steps without model
+calls. Under `--ci`, danwo reads the cache without writing to it, so a step that no longer replays
+fails the run instead of quietly asking the model. See [CI and GitHub](/docs/tools/ci).
+
+## Managing recordings
+
+`danwo cache ls` lists recordings, `danwo cache stats` counts them, and
+`danwo cache clear` resets them. A step whose page changed is handed back to the model and
+recorded afresh.

@@ -4,11 +4,12 @@
   "workspaces": [
     "packages/*",
     "examples/*",
-    "benchmarks"
+    "benchmarks",
+    "website"
   ],
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/ui && tsc --noEmit -p packages/dashboard",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/ui && tsc --noEmit -p packages/dashboard && tsc --noEmit -p website",
     "ui:codegen": "bun run --cwd packages/ui lib",
     "test": "vitest run --project unit --project ui",
     "lint": "oxlint --type-aware --deny-warnings",
@@ -20,7 +21,10 @@
     "test:all": "vitest run",
     "fallow": "fallow",
     "plain-js": "node scripts/plain-js.ts",
-    "bench": "bun run --cwd benchmarks bench"
+    "bench": "bun run --cwd benchmarks bench",
+    "website:dev": "bun run --cwd website dev",
+    "website:build": "bun run --cwd website build",
+    "website:preview": "bun run --cwd website preview"
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "5.10.0",

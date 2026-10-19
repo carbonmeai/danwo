@@ -79,7 +79,7 @@
       }
     },
     {
-      "files": ["packages/dashboard/src/routes/**"],
+      "files": ["packages/dashboard/src/routes/**", "website/src/routes/**"],
       "rules": {
         "eslint/no-underscore-dangle": [
           "warn",

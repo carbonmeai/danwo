@@ -1,0 +1,45 @@
+---
+title: Introduction
+description: danwo drives your app through its UI like a user, and judges what happened behind it.
+icon: House
+---
+
+Coding agents made writing code cheap; checking it is now the slow part. danwo answers one question
+per change: **what did this break, and how sure are we?**
+
+A danwo test clicks through your web or mobile app with locators, plain-English agent steps, or
+both. While it runs, the third-party services your app calls (Stripe, Resend, Slack, Google, the
+model APIs and more) are answered by emulators behind an egress proxy, so the app keeps calling
+the real hostnames and needs no code changes. Everything the test caused behind the page is
+recorded: provider calls, webhooks, the app's own database statements.
+
+Then danwo breaks it on purpose. `danwo matrix` replays the clean run once per fault the run could
+meet (a declined card, a 500, a duplicate or forged webhook, a double-submitted form, a lost
+`COMMIT`, thirty days passing) and judges each trial by the test's **invariant**: a rule about the
+backend that must hold however the run went.
+
+<Cards>
+  <Card title="Install danwo" href="/docs/installation">
+    Add danwo to a project and set it up for your coding agents.
+  </Card>
+  <Card title="Write a first test" href="/docs/quickstart">
+    A config, one `*.danwo.ts` file, and a run.
+  </Card>
+  <Card title="The fault matrix" href="/docs/concepts/invariants-and-matrix">
+    Write an invariant, then let the matrix try to break it.
+  </Card>
+  <Card title="Providers" href="/docs/providers">
+    The APIs danwo emulates, and what each emulator covers.
+  </Card>
+</Cards>
+
+## What a run gives you
+
+- **Tests that replay without a model.** Verified agent steps are cached as locators; reruns make
+  no model calls and cost nothing.
+- **A flight record of every failure:** the steps with screenshots, the provider waterfall, webhook
+  deliveries, the effects each step had and the emulators' state at the end, with secrets redacted.
+- **An integration lint** over every run, with no invariant to write: unsigned webhooks accepted,
+  money moved without an idempotency key, secret keys in the browser.
+- **Reports where you work:** a dashboard (`danwo serve`), a GitHub check run and pull request
+  comment, and an MCP server so coding agents can run, explain and fix tests.

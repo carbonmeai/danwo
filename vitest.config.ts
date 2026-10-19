@@ -13,7 +13,11 @@ export default defineConfig({
       {
         test: {
           name: "unit",
-          include: ["packages/*/test/**/*.test.ts", "benchmarks/test/**/*.test.ts"],
+          include: [
+            "packages/*/test/**/*.test.ts",
+            "benchmarks/test/**/*.test.ts",
+            "website/test/**/*.test.ts",
+          ],
           exclude: ["**/*.slow.test.ts", "**/node_modules/**"],
         },
       },

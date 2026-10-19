@@ -1,0 +1,139 @@
+@import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+@import "./landing.css";
+
+/* The same type as the dashboard: Inter for text, Geist Mono for code, from the dashboard's files. */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../../../packages/dashboard/public/fonts/InterVariable.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../../../packages/dashboard/public/fonts/InterVariable-Italic.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../../../packages/dashboard/public/fonts/GeistMono-Variable.woff2") format("woff2");
+}
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+/* The docs in the dashboard's grey-on-white colours, light and dark. */
+:root {
+  --color-fd-background: #ffffff;
+  --color-fd-foreground: #0a1217;
+  --color-fd-muted: #f2f2f2;
+  --color-fd-muted-foreground: #6f7579;
+  --color-fd-popover: #ffffff;
+  --color-fd-popover-foreground: #0a1217;
+  --color-fd-card: #f7f7f7;
+  --color-fd-card-foreground: #0a1217;
+  --color-fd-border: #0a121714;
+  --color-fd-primary: #0a1217;
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-secondary: #f2f2f2;
+  --color-fd-secondary-foreground: #0a1217;
+  --color-fd-accent: #0a12170d;
+  --color-fd-accent-foreground: #0a1217;
+  --color-fd-ring: #2a78d6;
+  --color-fd-info: #2a78d6;
+  --color-fd-success: #00c950;
+  --color-fd-warning: #f5a524;
+  --color-fd-error: #e5484d;
+}
+
+.dark {
+  --color-fd-background: #0b0b0c;
+  --color-fd-foreground: #ededed;
+  --color-fd-muted: #161617;
+  --color-fd-muted-foreground: #8e8e8e;
+  --color-fd-popover: #111112;
+  --color-fd-popover-foreground: #ededed;
+  --color-fd-card: #111112;
+  --color-fd-card-foreground: #ededed;
+  --color-fd-border: #e8e8e814;
+  --color-fd-primary: #ededed;
+  --color-fd-primary-foreground: #0b0b0c;
+  --color-fd-secondary: #161617;
+  --color-fd-secondary-foreground: #ededed;
+  --color-fd-accent: #e8e8e80f;
+  --color-fd-accent-foreground: #ededed;
+  --color-fd-ring: #3987e5;
+}
+
+.dark #nd-sidebar {
+  --color-fd-muted: #161617;
+  --color-fd-secondary: #1a1a1b;
+  --color-fd-muted-foreground: #a3a3a6;
+}
+
+#nd-sidebar {
+  background: var(--color-fd-card);
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0 !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}
+
+body {
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Logos drawn for one theme: dark marks on light surfaces, light marks on dark ones. */
+.dark .only-light,
+:root:not(.dark) .only-dark {
+  display: none;
+}
+
+/* The brand in every layout's navigation bar. */
+.danwo-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: -0.015em;
+}
+
+.danwo-glyph {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: #0a1217;
+  box-shadow:
+    inset 0 0 0 1px #ffffff2e,
+    0 1px 2px rgb(0 0 0 / 0.2);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+/* Spec pages: the kind of each entry, under its heading. */
+.prose h2 + p > em:only-child,
+.prose h3 + p > em:only-child {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-fd-muted-foreground);
+}

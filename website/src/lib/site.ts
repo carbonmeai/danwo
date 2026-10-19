@@ -1,0 +1,43 @@
+/**
+ * The website's facts that change with decisions rather than code: where it is hosted, the
+ * repository, the licence wording and the links that are not live yet. Everything that reads
+ * them takes them from here.
+ */
+
+export const SITE = {
+  name: "danwo",
+  /** The address the site is served from; canonical links and the sitemap use it. */
+  url: "https://danwo.dev",
+  tagline: "Drive the UI. Judge everything behind it.",
+  description:
+    "danwo is a testing platform for the agentic era. It drives your web and mobile app like a user while emulated providers record every call, then breaks the run on purpose, once per fault you should survive.",
+  /**
+   * The public repository, as `owner/name`. While it is unset, links to it point at the docs
+   * and the star count is hidden.
+   */
+  repo: undefined as string | undefined,
+  branch: "main",
+  /**
+   * How the site describes the licence. The licence is not decided yet: set `openSource` once it
+   * is, and the pages that say "open source" start saying it.
+   */
+  licence: {
+    openSource: false,
+    /** The words used where the site would otherwise say "open source". */
+    wording: "Self-hosted",
+  },
+  /** Where "Join the waitlist" goes for the cloud version; unset hides the button. */
+  waitlistUrl: undefined as string | undefined,
+  /** Where "Talk to us" goes. */
+  contactUrl: undefined as string | undefined,
+} as const
+
+/** The repository's web address, when it is public. */
+export function repoUrl(): string | undefined {
+  return SITE.repo === undefined ? undefined : `https://github.com/${SITE.repo}`
+}
+
+/** "Open source" when the licence makes danwo open source, else the agreed wording. */
+export function licenceWords(): string {
+  return SITE.licence.openSource ? "Open source" : SITE.licence.wording
+}

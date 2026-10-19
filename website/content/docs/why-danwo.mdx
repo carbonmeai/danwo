@@ -1,0 +1,41 @@
+---
+title: Why danwo
+description: The screen is the easy part. danwo checks what the button did, not only that it worked.
+icon: Scale
+---
+
+Most end-to-end tests, AI-driven or not, stop at the screen: the page said "Thank you", so the test
+passed. The bugs that cost money live behind that page. Did Stripe charge once or twice? Did the
+webhook that arrived twice grant the credits twice? Did the email go out after the provider timed
+out? danwo is built to answer those questions.
+
+## What is different
+
+|                                          | danwo                                                                    | UI-only testing                            |
+| ---------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------ |
+| Drives the UI with locators and an agent | Yes, on web and Android                                                  | Yes                                        |
+| Replays with no model calls              | Always: verified steps are cached as locators                            | Sometimes                                  |
+| Third-party providers                    | Emulated, with real hostnames, state and signed webhooks                 | Real sandboxes, or mocks in the app's code |
+| Judges the backend                       | Invariants over provider calls, webhooks and data                        | Pixels and DOM                             |
+| Fault injection                          | A matrix planned from what the run called                                | No                                         |
+| Races and data faults                    | Double-submits, concurrent users, Postgres and Redis faults, time travel | No                                         |
+| Record of a failure                      | Steps, provider waterfall, effects diff, emulator state                  | Video and DOM                              |
+| Where it runs                            | Your laptop and your CI, with your data                                  | Often a hosted service                     |
+
+## The ideas behind it
+
+**No app code changes.** The app runs as it does in production, pointed at an egress proxy by
+environment variables. The proxy sends provider hostnames to danwo's emulators and everything else
+where it was going. There are no test doubles to keep in sync with the code.
+
+**Emulators, not mocks.** Each emulator keeps state across calls, signs its webhooks the way the
+provider does, and answers with the error shapes the provider's SDK parses. `danwo fidelity` checks
+them against the real APIs, so an emulator that drifts fails a check instead of passing your tests.
+
+**Invariants judge the run, not the script.** A test's body says how a user gets somewhere; its
+invariant says what must be true afterwards, whichever way the run went. That is what lets one
+test be replayed under dozens of faults and still give a meaningful answer for each.
+
+**Deterministic by default.** The agent's choices are recorded the first time and replayed after,
+the emulators run on a clock danwo controls, and faults are applied one at a time. A failure under
+a fault reproduces every time, which is what makes it worth fixing.
