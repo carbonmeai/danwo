@@ -1,8 +1,11 @@
 import type { Clock } from "./store.ts"
 
-/** Schedules callbacks. Emulators take one so a test can run retries without waiting. */
+/**
+ * Schedules callbacks. Emulators take one so a test can run retries without waiting. A
+ * `background` callback (a renewal weeks away) never keeps the process alive on its own.
+ */
 export interface Timer {
-  setTimeout(callback: () => void, ms: number): unknown
+  setTimeout(callback: () => void, ms: number, options?: { readonly background?: boolean }): unknown
   clearTimeout(handle: unknown): void
 }
 
@@ -20,9 +23,22 @@ function isSystemHandle(handle: unknown): handle is SystemHandle {
   )
 }
 
+/** The longest delay a Node timer takes; longer ones are waited out in steps. */
+const LONGEST_TIMEOUT_MS = 2 ** 31 - 1
+
 export const systemTimer: Timer = {
-  setTimeout: (callback, ms): SystemHandle => {
-    const timeout = setTimeout(callback, ms)
+  setTimeout: (callback, ms, options): SystemHandle => {
+    let timeout: ReturnType<typeof setTimeout>
+
+    const wait = (left: number) => {
+      timeout = setTimeout(
+        () => (left > LONGEST_TIMEOUT_MS ? wait(left - LONGEST_TIMEOUT_MS) : callback()),
+        Math.min(left, LONGEST_TIMEOUT_MS),
+      )
+      if (options?.background === true) timeout.unref()
+    }
+
+    wait(ms)
 
     return { cancel: () => clearTimeout(timeout) }
   },

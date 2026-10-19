@@ -1,7 +1,7 @@
 import { defineEmulator, type EmulatorContext } from "../define.ts"
 import { providerErrors } from "../errors.ts"
 import type { Store } from "../store.ts"
-import type { WebhookEndpoint } from "../webhooks.ts"
+import { signedOnWallClock, type WebhookEndpoint } from "../webhooks.ts"
 import { stripeApiKey } from "./auth.ts"
 import type { StripeRouteContext } from "./context.ts"
 import type { DisplayPreference, PaymentMethodConfiguration, Price } from "./entities.ts"
@@ -267,6 +267,7 @@ export const stripe = defineEmulator({
       context.timer.setTimeout(
         () => runDue(billing),
         Math.max(0, at.getTime() - context.clock().getTime()),
+        { background: true },
       )
     }
 
@@ -275,9 +276,11 @@ export const stripe = defineEmulator({
     routes(billing)
   },
   seed: seedDefaults,
-  webhooks: ({ store }) => ({
+  webhooks: ({ store, clock, wallClock }) => ({
     endpoints: () => endpointsOf(store),
-    sign: ({ endpoint, body, timestamp }) => stripeWebhookHeaders(endpoint.secret, body, timestamp),
+    sign: signedOnWallClock(clock, wallClock, ({ endpoint, body, timestamp }) =>
+      stripeWebhookHeaders(endpoint.secret, body, timestamp),
+    ),
     policy: STRIPE_SANDBOX_DELIVERY,
   }),
 })

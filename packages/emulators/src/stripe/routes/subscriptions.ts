@@ -19,6 +19,7 @@ import {
   unix,
 } from "../helpers.ts"
 import {
+  cancellationDetails,
   changeSubscription,
   currentPeriodEnd,
   endSubscription,
@@ -167,6 +168,9 @@ function cancellationUpdates(
       cancel_at_period_end: atEnd,
       cancel_at: atEnd ? currentPeriodEnd(subscription) : null,
       canceled_at: atEnd ? unix(context.clock()) : null,
+      cancellation_details: atEnd
+        ? cancellationDetails("cancellation_requested")
+        : { comment: null, feedback: null, feedback_option: null, reason: null },
     }
 
   return at === undefined ? {} : { cancel_at: at }

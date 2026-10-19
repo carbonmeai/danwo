@@ -134,6 +134,7 @@ export function subscriptionObject(fields: {
       object: "list",
       data: [...fields.items],
       has_more: false,
+      total_count: fields.items.length,
       url: `/v1/subscription_items?subscription=${fields.id}`,
     },
     latest_invoice: null,

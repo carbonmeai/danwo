@@ -20,7 +20,20 @@ export type Refund = Json<Stripe.Refund>
 export type DeletedCustomer = Json<Stripe.DeletedCustomer>
 export type PaymentMethod = Json<Stripe.PaymentMethod>
 export type CheckoutSession = Json<Stripe.Checkout.Session>
-export type Invoice = Json<Stripe.Invoice>
+/** A list as the API answers it: the SDK's list, plus the `total_count` Stripe sends on embedded lists. */
+export interface CountedList<T> {
+  object: "list"
+  data: T[]
+  has_more: boolean
+  total_count: number
+  url: string
+}
+
+/** An invoice line as the API answers it: the line's subscription is on its `parent` now. */
+export type InvoiceLine = Omit<Json<Stripe.InvoiceLineItem>, "subscription">
+
+/** An invoice as the API answers it, its lines counted. */
+export type Invoice = Omit<Json<Stripe.Invoice>, "lines"> & { lines: CountedList<InvoiceLine> }
 export type PaymentMethodConfiguration = Json<Stripe.PaymentMethodConfiguration>
 export type StripeWebhookEndpoint = Json<Stripe.WebhookEndpoint>
 export type CardDetails = Json<Stripe.PaymentMethod.Card>
@@ -33,7 +46,8 @@ export type BillingPortalSession = Json<Stripe.BillingPortal.Session>
  * A subscription as the API answers it: the SDK's type plus the legacy single-plan fields Stripe
  * still sends (`plan`, `quantity`, from the first item).
  */
-export type Subscription = Json<Stripe.Subscription> & {
+export type Subscription = Omit<Json<Stripe.Subscription>, "items"> & {
+  items: CountedList<SubscriptionItem>
   plan: Plan | null
   quantity: number | null
 }

@@ -20,6 +20,19 @@ export type WebhookSigner = (input: {
 }) => Record<string, string>
 
 /**
+ * `sign`, stamping each attempt with the apps' time (`wall`) instead of the emulator's (`clock`),
+ * so a delivery made while time travels or a test holds the clock still verifies against the
+ * app's own clock. An attempt signed in the past (the `stale` fault) stays that far in the past.
+ */
+export function signedOnWallClock(clock: Clock, wall: Clock, sign: WebhookSigner): WebhookSigner {
+  return ({ endpoint, body, timestamp }) => {
+    const pastBy = Math.max(0, Math.floor(clock().getTime() / 1000) - timestamp)
+
+    return sign({ endpoint, body, timestamp: Math.floor(wall().getTime() / 1000) - pastBy })
+  }
+}
+
+/**
  * The request body POSTed for one message, from its JSON. Providers whose notifications carry their
  * meaning in headers send less than the message, e.g. nothing at all.
  */

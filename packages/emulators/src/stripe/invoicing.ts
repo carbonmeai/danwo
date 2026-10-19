@@ -73,6 +73,7 @@ export function openInvoice(
     objects.invoices.change(id, {
       status: "open",
       effective_at: now,
+      webhooks_delivered_at: now,
       status_transitions: { ...draft.status_transitions, finalized_at: now },
     }) ?? draft
 

@@ -3,6 +3,7 @@ import { HttpError } from "../errors.ts"
 import { App, type ErrorHandler, type Middleware } from "../http.ts"
 import { createSigningKey } from "../oauth/jwt.ts"
 import { SVIX_DELIVERY } from "../svix.ts"
+import { signedOnWallClock } from "../webhooks.ts"
 import { backendAuth } from "./backend-auth.ts"
 import { type ClerkContext, instanceOf, registerContext } from "./context.ts"
 import { BAPI_HOST, ClerkFailure, clerkErrorBody } from "./helpers.ts"
@@ -123,9 +124,11 @@ export const clerk = defineEmulator({
   seed: ({ store }) => {
     store.setData(INSTANCE, instanceFrom())
   },
-  webhooks: ({ store }) => ({
+  webhooks: ({ store, clock, wallClock }) => ({
     endpoints: () => clerkEndpoints(store),
-    sign: ({ endpoint, body, timestamp }) => clerkWebhookHeaders(endpoint.secret, body, timestamp),
+    sign: signedOnWallClock(clock, wallClock, ({ endpoint, body, timestamp }) =>
+      clerkWebhookHeaders(endpoint.secret, body, timestamp),
+    ),
     policy: SVIX_DELIVERY,
   }),
 })
