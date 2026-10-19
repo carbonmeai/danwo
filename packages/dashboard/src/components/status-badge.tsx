@@ -1,37 +1,27 @@
-import { Box, HStack, styled } from "@danwo/ui/jsx"
+import { cva, cx } from "@danwo/ui/css"
+import { Box, HStack } from "@danwo/ui/jsx"
+import { Badge } from "@danwo/ui/primitives/badge"
+import type { ComponentProps, ReactNode } from "react"
 
-import { type Share, toneOf, wordOf } from "../lib/verdicts.ts"
+import { type Share, type Tone, toneOf, wordOf } from "../lib/verdicts.ts"
 import { Ident } from "./code.tsx"
 
-/** A soft label in a verdict's colour: 22px tall, rounded, no border. */
-export const Badge = styled("span", {
-  base: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "1.5",
-    h: "22px",
-    px: "2",
-    rounded: "lg",
-    fontSize: "1",
-    fontWeight: "500",
-    whiteSpace: "nowrap",
-    lineHeight: "1",
-  },
-  variants: {
-    tone: {
-      passed: { bg: "verdict.passed.bg", color: "verdict.passed.fg" },
-      failed: { bg: "verdict.failed.bg", color: "verdict.failed.fg" },
-      flaky: { bg: "verdict.flaky.bg", color: "verdict.flaky.fg" },
-      notJudged: { bg: "verdict.notJudged.bg", color: "verdict.notJudged.fg" },
-      invalid: { bg: "verdict.invalid.bg", color: "verdict.invalid.fg" },
-    },
-  },
-  defaultVariants: { tone: "invalid" },
-})
+type BadgeProps = ComponentProps<typeof Badge>
 
-/** A filled swatch in a verdict's colour, for grids, dots and legends. */
-export const Swatch = styled("span", {
-  base: { display: "inline-block", rounded: "sm", flexShrink: "0" },
+/**
+ * The library's soft badge in each verdict's palette, so a failure looks the same on every page.
+ * The palettes are written out per verdict so the style extractor sees each one.
+ */
+const BADGE: Readonly<Record<Tone, (props: BadgeProps) => ReactNode>> = {
+  passed: (props) => <Badge look="soft" size="md" colorPalette="palette.green" {...props} />,
+  failed: (props) => <Badge look="soft" size="md" colorPalette="palette.red" {...props} />,
+  flaky: (props) => <Badge look="soft" size="md" colorPalette="palette.amber" {...props} />,
+  notJudged: (props) => <Badge look="soft" size="md" colorPalette="palette.blue" {...props} />,
+  invalid: (props) => <Badge look="soft" size="md" colorPalette="palette.gray" {...props} />,
+}
+
+/** Each verdict's solid fill, for swatches. */
+const fill = cva({
   variants: {
     tone: {
       passed: { bg: "verdict.passed.solid" },
@@ -43,15 +33,42 @@ export const Swatch = styled("span", {
   },
 })
 
+/** The library's soft badge in a verdict's colour. */
+export function VerdictBadge({
+  tone = "invalid",
+  ...props
+}: BadgeProps & { readonly tone?: Tone | undefined }) {
+  const Shown = BADGE[tone]
+
+  return <Shown gap="1.5" whiteSpace="nowrap" {...props} />
+}
+
+/** A filled swatch in a verdict's colour, for grids, dots and legends. */
+export function Swatch({
+  tone,
+  className,
+  ...props
+}: ComponentProps<typeof Box> & { readonly tone: Tone }) {
+  return (
+    <Box
+      display="inline-block"
+      rounded="sm"
+      flexShrink="0"
+      className={cx(fill({ tone }), className)}
+      {...props}
+    />
+  )
+}
+
 /** A status as a small coloured label with its dot; unknown statuses read neutral. */
 export function StatusBadge({ status }: { readonly status: string }) {
   const tone = toneOf(status)
 
   return (
-    <Badge tone={tone} data-status={status}>
+    <VerdictBadge tone={tone} data-status={status}>
       <Swatch tone={tone} w="1.5" h="1.5" rounded="full" />
       {wordOf(status)}
-    </Badge>
+    </VerdictBadge>
   )
 }
 

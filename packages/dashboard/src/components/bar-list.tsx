@@ -1,4 +1,5 @@
-import { Box, Grid, styled } from "@danwo/ui/jsx"
+import { cva } from "@danwo/ui/css"
+import { Box, Grid } from "@danwo/ui/jsx"
 import type { ReactNode } from "react"
 
 /** One bar of a bar list. */
@@ -11,14 +12,23 @@ export interface Bar {
   readonly tone?: "accent" | "failed" | "flaky" | "quiet"
 }
 
-const FILL = {
-  accent: "series.1",
-  failed: "verdict.failed.solid",
-  flaky: "verdict.flaky.solid",
-  quiet: "series.other",
-} as const
+/** Each tone's fill, as a recipe the style extractor can see. */
+const fill = cva({
+  base: { h: "full", rounded: "full" },
+  variants: {
+    tone: {
+      accent: { bg: "series.1" },
+      failed: { bg: "verdict.failed.solid" },
+      flaky: { bg: "verdict.flaky.solid" },
+      quiet: { bg: "series.other" },
+    },
+  },
+})
 
-/** A ranked list: each name with its value on the right and a thin bar beneath, the largest full width. */
+/**
+ * A ranked list: each name with its value on the right and a thin bar beneath, the largest full
+ * width. The library has no meter, so the bars are drawn here on its tokens.
+ */
 export function BarList({
   bars,
   label,
@@ -29,10 +39,10 @@ export function BarList({
   const top = Math.max(...bars.map((bar) => bar.value), 0) || 1
 
   return (
-    <styled.ol aria-label={label} display="grid" gap="1.5">
+    <Box role="list" aria-label={label} display="grid" gap="1.5">
       {bars.map((bar) => (
         <Grid
-          as="li"
+          role="listitem"
           key={bar.key}
           data-row
           gridTemplateColumns="minmax(0, 1fr) auto"
@@ -49,14 +59,12 @@ export function BarList({
           </Box>
           <Box gridColumn="1 / -1" h="1" bg="surface.track" rounded="full" overflow="hidden">
             <Box
-              h="full"
-              rounded="full"
-              bg={FILL[bar.tone ?? "accent"]}
+              className={fill({ tone: bar.tone ?? "accent" })}
               style={{ width: `${Math.max((bar.value / top) * 100, 1.5)}%` }}
             />
           </Box>
         </Grid>
       ))}
-    </styled.ol>
+    </Box>
   )
 }

@@ -1,9 +1,12 @@
 import type { MatrixHistory } from "@danwo/runner/runner"
-import { Box, Grid, HStack, Stack, styled } from "@danwo/ui/jsx"
+import { Icons } from "@danwo/ui/icons/base"
+import { Box, Grid, HStack, Stack } from "@danwo/ui/jsx"
+import { Button } from "@danwo/ui/primitives/button"
+import { Span, Text } from "@danwo/ui/primitives/typography"
 import { Link } from "@tanstack/react-router"
 
 import { Item, Panel } from "../../components/panel.tsx"
-import { Badge, StatusBadge, VerdictStrip } from "../../components/status-badge.tsx"
+import { StatusBadge, VerdictBadge, VerdictStrip } from "../../components/status-badge.tsx"
 import { invariantSummary, ruleOf } from "./matrix-values.ts"
 
 /** What the matrix asks of the app, and how much of it held. */
@@ -11,22 +14,29 @@ export function InvariantPanel({ run }: { readonly run: MatrixHistory }) {
   const summary = invariantSummary(run)
 
   return (
-    <Panel as="section" aria-label="Invariant" pad="none" px="5" py="18px" mb="2">
+    <Panel role="region" aria-label="Invariant" px="5" py="18px" mb="2">
       <Grid gridTemplateColumns={{ base: "1fr", lg: "minmax(0, 3fr) minmax(0, 2fr)" }} gap="8">
         <Stack gap="2.5">
           <Box color="ink.muted" fontSize="1" fontWeight="500">
             {summary.label}
           </Box>
-          <styled.p fontSize="2" fontWeight="500" lineHeight="1.5" maxW="44rem">
+          <Text fontSize="2" fontWeight="500" lineHeight="1.5" maxW="44rem">
             {ruleOf(run)}
-          </styled.p>
+          </Text>
           <HStack gap="2" color="ink.muted" flexWrap="wrap">
-            <span>The clean run, with no fault:</span>
+            <Span>The clean run, with no fault:</Span>
             <StatusBadge status={run.clean.status} />
             {run.clean.record ? (
-              <Link to="/records/$" params={{ _splat: run.clean.record }} data-link>
-                Open its flight record
-              </Link>
+              <Button asChild variant="ghost" size="sm">
+                <Link
+                  to="."
+                  search={(prev) => ({ ...prev, open: run.clean.record })}
+                  resetScroll={false}
+                >
+                  <Icons.play size={13} />
+                  Watch the clean run
+                </Link>
+              </Button>
             ) : null}
           </HStack>
         </Stack>
@@ -39,17 +49,17 @@ export function InvariantPanel({ run }: { readonly run: MatrixHistory }) {
           py="3.5"
         >
           <HStack gap="2" color="ink.muted" fontSize="1" fontWeight="500">
-            <Badge tone={summary.broke ? "failed" : "passed"}>
+            <VerdictBadge tone={summary.broke ? "failed" : "passed"}>
               {summary.broke ? "Broke" : "Held"}
-            </Badge>
+            </VerdictBadge>
             {run.trials.length} {summary.faults} after the clean run
           </HStack>
-          <styled.p fontSize="5.5" fontWeight="600" letterSpacing="-0.015em" lineHeight="1.3">
+          <Text fontSize="5.5" fontWeight="600" letterSpacing="-0.015em" lineHeight="1.3">
             {summary.headline}
-            <styled.span color="ink.muted" fontSize="2" fontWeight="400" ml="1.5">
+            <Span color="ink.muted" fontSize="2" fontWeight="400" ml="1.5">
               {summary.faults}
-            </styled.span>
-          </styled.p>
+            </Span>
+          </Text>
           <VerdictStrip width="100%" shares={summary.shares} />
         </Item>
       </Grid>

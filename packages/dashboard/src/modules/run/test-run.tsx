@@ -1,42 +1,71 @@
 import type { HistoryTest, TestHistory } from "@danwo/runner/runner"
 import { Icons } from "@danwo/ui/icons/base"
-import { HStack, Stack, styled } from "@danwo/ui/jsx"
+import { HStack, Stack } from "@danwo/ui/jsx"
+import { Button } from "@danwo/ui/primitives/button"
+import {
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@danwo/ui/primitives/table"
+import { Span } from "@danwo/ui/primitives/typography"
 import { Link } from "@tanstack/react-router"
 import { type ReactNode, useEffect, useRef } from "react"
 
 import { Ident } from "../../components/code.tsx"
 import { KeyHint } from "../../components/controls.tsx"
 import { Page } from "../../components/page.tsx"
-import { StatCard, StatCards } from "../../components/panel.tsx"
+import { Panel, StatCard, StatCards } from "../../components/panel.tsx"
 import { StatusBadge, VerdictStrip } from "../../components/status-badge.tsx"
-import { RowPanel, RowTable, Td, Th } from "../../components/table.tsx"
 import { TimeAgo } from "../../components/time-ago.tsx"
 import { dollars, duration } from "../../lib/format.ts"
 import { useListKeys } from "../../lib/list-keys.ts"
 import { RerunFailed, RerunTest } from "../live/run-actions.tsx"
 import { cacheLine, sortedTests, testFigures } from "./run-values.ts"
 
-/** Links to watch a test's kept recordings, one per try that kept one, on the test's page. */
-function RecordingLinks({ test }: { readonly test: HistoryTest }) {
+/** Play buttons that open a test's kept recordings over the page, one per try that kept one. */
+function WatchButtons({ test }: { readonly test: HistoryTest }) {
   const kept = test.attempts.flatMap((attempt, i) =>
     attempt.record ? [{ i, dir: attempt.record }] : [],
   )
 
-  if (kept.length === 0) return <styled.span color="ink.faint">not kept</styled.span>
+  if (kept.length === 0)
+    return (
+      <Span color="ink.faint" fontSize="1">
+        not kept
+      </Span>
+    )
 
   return (
-    <HStack gap="3">
-      {kept.map(({ i, dir }) => (
-        <Link
-          key={dir}
-          to="."
-          search={(prev) => ({ ...prev, open: dir })}
-          resetScroll={false}
-          data-link
-        >
-          {kept.length === 1 && test.attempts.length === 1 ? "Watch" : `Watch try ${i + 1}`}
-        </Link>
-      ))}
+    <HStack gap="0.5">
+      {kept.map(({ i, dir }) => {
+        const label =
+          kept.length === 1 && test.attempts.length === 1 ? "Watch" : `Watch try ${i + 1}`
+
+        return (
+          <Button
+            key={dir}
+            asChild
+            variant="ghost"
+            size={kept.length === 1 ? "icon" : "xs"}
+            tooltipChildren={
+              label === "Watch" ? "Watch the recording" : `Watch the recording of try ${i + 1}`
+            }
+          >
+            <Link
+              to="."
+              search={(prev) => ({ ...prev, open: dir })}
+              resetScroll={false}
+              aria-label={label}
+            >
+              <Icons.play size={14} />
+              {kept.length === 1 ? null : <Span>{i + 1}</Span>}
+            </Link>
+          </Button>
+        )
+      })}
     </HStack>
   )
 }
@@ -46,25 +75,17 @@ function BrokenFiles({ run }: { readonly run: TestHistory }) {
   if (run.brokenFiles.length === 0) return null
 
   return (
-    <Stack
-      gap="1.5"
-      bg="verdict.failed.bg"
-      rounded="14px"
-      px="4"
-      py="3.5"
-      mb="2"
-      aria-label="Files that did not load"
-    >
+    <Panel bg="verdict.failed.bg" gap="1.5" mb="2" aria-label="Files that did not load">
       <HStack gap="2" fontWeight="600" color="verdict.failed.fg">
         <Icons.warn size={14} />
         {run.brokenFiles.length} test {run.brokenFiles.length === 1 ? "file" : "files"} did not load
       </HStack>
       {run.brokenFiles.map((broken) => (
-        <styled.span key={broken.file} color="ink.soft">
+        <Span key={broken.file} color="ink.soft">
           <Ident>{broken.file}</Ident>: {broken.error}
-        </styled.span>
+        </Span>
       ))}
-    </Stack>
+    </Panel>
   )
 }
 
@@ -78,7 +99,6 @@ function TestLine({
   readonly picked: boolean
 }) {
   const error = test.attempts.find((a) => a.error)?.error
-  const kept = test.attempts.findLast((a) => a.record !== undefined)?.record
   const time = test.attempts.reduce((sum, a) => sum + a.durationMs, 0)
   const row = useRef<HTMLTableRowElement>(null)
 
@@ -87,47 +107,40 @@ function TestLine({
   }, [picked])
 
   return (
-    <tr ref={row} data-row data-current={current || undefined} data-picked={picked || undefined}>
-      <Td>
+    <TableRow ref={row} data-row data-state={current || picked ? "selected" : undefined}>
+      <TableCell px="3">
         <StatusBadge status={test.status} />
-      </Td>
-      <Td>
+      </TableCell>
+      <TableCell whiteSpace="normal">
         <Stack gap="1">
-          <Link
-            to={kept === undefined ? "/tests" : "."}
-            search={(prev) => (kept === undefined ? { q: test.id } : { ...prev, open: kept })}
-            resetScroll={kept === undefined}
-            title={kept === undefined ? "Find this test" : "Watch this run of the test"}
-          >
-            <styled.span fontWeight="500" overflowWrap="anywhere">
-              {test.id}
-            </styled.span>
-          </Link>
+          <Span fontWeight="500" overflowWrap="anywhere">
+            {test.id}
+          </Span>
           {error ? (
-            <styled.span color="verdict.failed.fg" fontSize="1" lineClamp="2">
+            <Span color="verdict.failed.fg" fontSize="1" lineClamp="2">
               <Ident>{error.code}</Ident> {error.message}
-            </styled.span>
+            </Span>
           ) : null}
           {test.attempts.length > 1 ? (
-            <styled.span color="ink.muted" fontSize="1">
+            <Span color="ink.muted" fontSize="1">
               {test.attempts.length - 1} {test.attempts.length === 2 ? "retry" : "retries"}
-            </styled.span>
+            </Span>
           ) : null}
         </Stack>
-      </Td>
-      <Td color="ink.muted" display={{ base: "none", lg: "table-cell" }}>
+      </TableCell>
+      <TableCell color="ink.muted" display={{ base: "none", lg: "table-cell" }}>
         {cacheLine(test.attempts.map((a) => a.usage))}
-      </Td>
-      <Td textAlign="right" fontVariantNumeric="tabular-nums" whiteSpace="nowrap">
+      </TableCell>
+      <TableCell textAlign="right" fontVariantNumeric="tabular-nums">
         {duration(time)}
-      </Td>
-      <Td>
-        <RecordingLinks test={test} />
-      </Td>
-      <Td w="6rem">
-        <RerunTest testId={test.id} />
-      </Td>
-    </tr>
+      </TableCell>
+      <TableCell w="8rem">
+        <HStack gap="0.5" justify="flex-end">
+          <WatchButtons test={test} />
+          <RerunTest testId={test.id} compact />
+        </HStack>
+      </TableCell>
+    </TableRow>
   )
 }
 
@@ -190,21 +203,26 @@ export function TestRun({
         />
       </StatCards>
       <BrokenFiles run={run} />
-      <RowPanel overflowX="auto">
-        <RowTable>
-          <thead>
-            <tr>
-              <Th w="8rem">Result</Th>
-              <Th>Test</Th>
-              <Th display={{ base: "none", lg: "table-cell" }}>Replay cache</Th>
-              <Th textAlign="right">Time</Th>
-              <Th>Recording</Th>
-              <Th>
-                <styled.span srOnly>Run again</styled.span>
-              </Th>
-            </tr>
-          </thead>
-          <tbody ref={list}>
+      <Panel px="2" py="1">
+        <TableContainer aria-label="Tests in this run">
+          <TableHeader>
+            <TableRow _hover={{ bg: "transparent" }}>
+              <TableHead w="8rem" px="3" color="ink.muted">
+                Result
+              </TableHead>
+              <TableHead color="ink.muted">Test</TableHead>
+              <TableHead color="ink.muted" display={{ base: "none", lg: "table-cell" }}>
+                Replay cache
+              </TableHead>
+              <TableHead color="ink.muted" textAlign="right">
+                Time
+              </TableHead>
+              <TableHead>
+                <Span srOnly>Watch and run again</Span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody ref={list}>
             {tests.map((test, i) => (
               <TestLine
                 key={test.id}
@@ -213,9 +231,9 @@ export function TestRun({
                 picked={test.id === focus}
               />
             ))}
-          </tbody>
-        </RowTable>
-      </RowPanel>
+          </TableBody>
+        </TableContainer>
+      </Panel>
     </Page>
   )
 }

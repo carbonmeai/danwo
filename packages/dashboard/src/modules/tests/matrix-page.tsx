@@ -1,11 +1,20 @@
-import { HStack, Stack, styled } from "@danwo/ui/jsx"
+import { HStack, Stack } from "@danwo/ui/jsx"
+import {
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@danwo/ui/primitives/table"
+import { Span } from "@danwo/ui/primitives/typography"
 import { Link } from "@tanstack/react-router"
 
 import { Ident } from "../../components/code.tsx"
 import { Empty } from "../../components/empty-state.tsx"
 import { Page } from "../../components/page.tsx"
-import { Badge } from "../../components/status-badge.tsx"
-import { RowPanel, RowTable, Td, Th } from "../../components/table.tsx"
+import { Panel } from "../../components/panel.tsx"
+import { VerdictBadge } from "../../components/status-badge.tsx"
 import { RunMatrix } from "../live/run-actions.tsx"
 import { matrixWords } from "./test-values.ts"
 import type { TestRow } from "./tests-data.ts"
@@ -15,16 +24,33 @@ const ORDER = { broke: 0, "clean-failed": 1, none: 2, held: 3 } as const
 
 /** The faults that broke a test, as chips. */
 function Faults({ row }: { readonly row: TestRow }) {
-  if (row.matrix.kind !== "broke") return <styled.span color="ink.faint">–</styled.span>
+  if (row.matrix.kind !== "broke") return <Span color="ink.faint">–</Span>
 
   return (
     <HStack gap="1.5" flexWrap="wrap">
       {row.matrix.broke.map((fault) => (
-        <Ident key={fault} color="verdict.failed.fg" fontSize="1">
+        <VerdictBadge key={fault} tone="failed" fontFamily="mono">
           {fault}
-        </Ident>
+        </VerdictBadge>
       ))}
     </HStack>
+  )
+}
+
+/** What the latest matrix run made of a test, as a badge that opens it. */
+function Latest({ row }: { readonly row: TestRow }) {
+  if (row.matrix.kind === "none") return <Span color="ink.faint">{matrixWords(row.matrix)}</Span>
+
+  return (
+    <Link to="/runs/$runId" params={{ runId: row.matrix.runId }}>
+      <VerdictBadge tone={row.matrix.kind === "held" ? "passed" : "failed"}>
+        {row.matrix.kind === "held"
+          ? matrixWords(row.matrix)
+          : row.matrix.kind === "broke"
+            ? `broke under ${row.matrix.broke.length} of ${row.matrix.judged}`
+            : "clean run failed"}
+      </VerdictBadge>
+    </Link>
   )
 }
 
@@ -50,59 +76,49 @@ export function MatrixPage({ rows }: { readonly rows: readonly TestRow[] }) {
           command="danwo matrix <test file>"
         />
       ) : (
-        <RowPanel overflowX="auto">
-          <RowTable aria-label="Tests under the matrix">
-            <thead>
-              <tr>
-                <Th>Test</Th>
-                <Th>Latest matrix run</Th>
-                <Th>Broke under</Th>
-                <Th>
-                  <styled.span srOnly>Run the matrix</styled.span>
-                </Th>
-              </tr>
-            </thead>
-            <tbody>
+        <Panel px="2" py="1">
+          <TableContainer aria-label="Tests under the matrix">
+            <TableHeader>
+              <TableRow _hover={{ bg: "transparent" }}>
+                <TableHead px="3" color="ink.muted">
+                  Test
+                </TableHead>
+                <TableHead color="ink.muted">Latest matrix run</TableHead>
+                <TableHead color="ink.muted">Broke under</TableHead>
+                <TableHead>
+                  <Span srOnly>Run the matrix</Span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {sorted.map((row) => (
-                <tr key={row.id} data-row>
-                  <Td minW="16rem">
+                <TableRow key={row.id} data-row>
+                  <TableCell minW="16rem" px="3" whiteSpace="normal">
                     <Stack gap="0.5">
-                      <styled.span fontWeight="500" overflowWrap="anywhere">
+                      <Span fontWeight="500" overflowWrap="anywhere">
                         {row.id}
-                      </styled.span>
+                      </Span>
                       {row.file ? (
                         <Ident color="ink.muted" fontSize="1">
                           {row.file}
                         </Ident>
                       ) : null}
                     </Stack>
-                  </Td>
-                  <Td whiteSpace="nowrap">
-                    {row.matrix.kind === "none" ? (
-                      <styled.span color="ink.faint">{matrixWords(row.matrix)}</styled.span>
-                    ) : (
-                      <Link to="/runs/$runId" params={{ runId: row.matrix.runId }}>
-                        <Badge tone={row.matrix.kind === "held" ? "passed" : "failed"}>
-                          {row.matrix.kind === "held"
-                            ? matrixWords(row.matrix)
-                            : row.matrix.kind === "broke"
-                              ? `broke under ${row.matrix.broke.length} of ${row.matrix.judged}`
-                              : "clean run failed"}
-                        </Badge>
-                      </Link>
-                    )}
-                  </Td>
-                  <Td>
+                  </TableCell>
+                  <TableCell>
+                    <Latest row={row} />
+                  </TableCell>
+                  <TableCell whiteSpace="normal">
                     <Faults row={row} />
-                  </Td>
-                  <Td w="12rem" textAlign="right">
+                  </TableCell>
+                  <TableCell w="12rem" textAlign="right">
                     <RunMatrix testId={row.id} />
-                  </Td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </RowTable>
-        </RowPanel>
+            </TableBody>
+          </TableContainer>
+        </Panel>
       )}
     </Page>
   )

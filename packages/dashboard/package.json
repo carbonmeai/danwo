@@ -28,6 +28,7 @@
     "@vitejs/plugin-react": "6.1.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "recharts": "3.10.1",
     "vite": "8.2.2"
   },
   "devDependencies": {

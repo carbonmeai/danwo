@@ -1,12 +1,13 @@
-import { Box, Stack, styled } from "@danwo/ui/jsx"
+import { Icons } from "@danwo/ui/icons/base"
+import { Box, Stack } from "@danwo/ui/jsx"
+import { Button } from "@danwo/ui/primitives/button"
+import { Span } from "@danwo/ui/primitives/typography"
 import { Link, useRouter } from "@tanstack/react-router"
 import { useEffect, useRef } from "react"
 
 import { Ident } from "../../components/code.tsx"
-import { Button } from "../../components/controls.tsx"
-import { Section } from "../../components/panel.tsx"
+import { ListRow, ListRows, Section } from "../../components/panel.tsx"
 import { StatusBadge } from "../../components/status-badge.tsx"
-import { Row, RowList } from "../../components/table.tsx"
 import { TimeAgo } from "../../components/time-ago.tsx"
 import { dropQueuedFn } from "./live-api.ts"
 import type { ActiveRun } from "./live-data.ts"
@@ -20,48 +21,48 @@ function ActiveLine({ run }: { readonly run: ActiveRun }) {
   const progress = view && progressOf(view)
 
   return (
-    <Row display="flex" alignItems="center" gap="3" flexWrap="wrap" data-live-run={run.id}>
+    <ListRow display="flex" alignItems="center" gap="3" flexWrap="wrap" data-live-run={run.id}>
       <LiveBadge word="running" />
       <Stack gap="0.5" minW="0" flex="1">
         <Link to="/runs/$runId" params={{ runId: run.id }}>
-          <styled.span fontWeight="500" overflowWrap="anywhere">
+          <Span fontWeight="500" overflowWrap="anywhere">
             {run.title}
-          </styled.span>
+          </Span>
         </Link>
-        <styled.span color="ink.muted" fontSize="1">
+        <Span color="ink.muted" fontSize="1">
           {progress
             ? `${progress.done} of ${view.planned} done${progress.failed > 0 ? `, ${progress.failed} failed` : ""}`
             : "starting"}
-        </styled.span>
+        </Span>
       </Stack>
       <Ident fontSize="1" color="ink.soft">
         danwo {run.kind}
       </Ident>
-      <styled.span color="ink.muted" fontSize="1" w="7rem" textAlign="right">
+      <Span color="ink.muted" fontSize="1" w="7rem" textAlign="right">
         <TimeAgo at={run.at} />
-      </styled.span>
-    </Row>
+      </Span>
+    </ListRow>
   )
 }
 
 /** A run the dashboard holds until the project is free. */
 function QueuedLine({ label, position }: { readonly label: string; readonly position: number }) {
   return (
-    <Row display="flex" alignItems="center" gap="3">
+    <ListRow display="flex" alignItems="center" gap="3">
       <StatusBadge status="queued" />
-      <styled.span flex="1" minW="0" overflowWrap="anywhere">
+      <Span flex="1" minW="0" overflowWrap="anywhere">
         {label}
-      </styled.span>
+      </Span>
       <Button
-        type="button"
-        look="ghost"
-        h="7"
+        variant="ghost"
+        size="sm"
         onClick={() => void dropQueuedFn({ data: position })}
         aria-label={`Remove ${label} from the queue`}
       >
+        <Icons.trash size={13} />
         Remove
       </Button>
-    </Row>
+    </ListRow>
   )
 }
 
@@ -98,14 +99,14 @@ export function LiveRuns() {
   return (
     <Box mb="2">
       <Section title="Running now" count={active.length + queued.length}>
-        <RowList aria-label="Runs going">
+        <ListRows aria-label="Runs going">
           {active.map((run) => (
             <ActiveLine key={run.id} run={run} />
           ))}
           {queued.map((label, i) => (
             <QueuedLine key={`${label} ${i}`} label={label} position={i + 1} />
           ))}
-        </RowList>
+        </ListRows>
       </Section>
     </Box>
   )

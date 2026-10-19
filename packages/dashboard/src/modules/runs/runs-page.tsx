@@ -1,6 +1,8 @@
-import { HStack, styled } from "@danwo/ui/jsx"
+import { HStack } from "@danwo/ui/jsx"
+import { Span } from "@danwo/ui/primitives/typography"
 import { useNavigate } from "@tanstack/react-router"
 
+import { ANY, Choice } from "../../components/choice.tsx"
 import { ListFilter } from "../../components/controls.tsx"
 import { Empty } from "../../components/empty-state.tsx"
 import { Page } from "../../components/page.tsx"
@@ -11,22 +13,8 @@ import type { RunFilter, RunKind, RunPage } from "./runs-data.ts"
 import { Pager, RunsTable } from "./runs-table.tsx"
 import { PAGE_SIZE, runText } from "./runs-values.ts"
 
-const Select = styled("select", {
-  base: {
-    h: "8",
-    px: "2.5",
-    rounded: "lg",
-    bg: "surface.hover",
-    color: "ink.strong",
-    fontSize: "1",
-    cursor: "pointer",
-    outline: "none",
-    _focus: { boxShadow: "0 0 0 3px {colors.ring}" },
-  },
-})
-
 /** One of the filter bar's dropdowns, kept in the page's address. */
-function Choice({
+function RunChoice({
   name,
   label,
   value,
@@ -40,30 +28,23 @@ function Choice({
   const navigate = useNavigate()
 
   return (
-    <Select
-      aria-label={label}
-      value={value === undefined ? "" : String(value)}
-      onChange={(event) => {
-        const picked = event.target.value
-
+    <Choice
+      label={label}
+      value={value === undefined ? ANY : String(value)}
+      options={options}
+      onChange={(picked) =>
         void navigate({
           to: "/runs",
           search: (prev) => ({
             ...prev,
             page: undefined,
             day: undefined,
-            [name]: picked === "" ? undefined : name === "days" ? Number(picked) : picked,
+            [name]: picked === ANY ? undefined : name === "days" ? Number(picked) : picked,
           }),
           replace: true,
         })
-      }}
-    >
-      {options.map(([key, word]) => (
-        <option key={key} value={key}>
-          {word}
-        </option>
-      ))}
-    </Select>
+      }
+    />
   )
 }
 
@@ -77,32 +58,32 @@ function FilterBar({
 }) {
   return (
     <HStack gap="2" flexWrap="wrap">
-      <Choice
+      <RunChoice
         name="status"
         label="Status"
         value={filter.status}
         options={[
-          ["", "All statuses"],
+          [ANY, "All statuses"],
           ["passed", "Passed"],
           ["failed", "Had a failure"],
         ]}
       />
-      <Choice
+      <RunChoice
         name="kind"
         label="Kind of run"
         value={filter.kind}
         options={[
-          ["", "Test and matrix runs"],
+          [ANY, "Test and matrix runs"],
           ["test", "Test runs"],
           ["matrix", "Matrix runs"],
         ]}
       />
-      <Choice
+      <RunChoice
         name="days"
         label="When"
         value={filter.days}
         options={[
-          ["", day === undefined ? "All dates" : `On ${day}`],
+          [ANY, day === undefined ? "All dates" : `On ${day}`],
           ["1", "Last 24 hours"],
           ["7", "Last 7 days"],
           ["30", "Last 30 days"],
@@ -166,9 +147,9 @@ export function RunsPage({
       <LiveRuns />
       <HStack justify="space-between" gap="3" mb="3" flexWrap="wrap">
         <FilterBar filter={filter} day={filter.day} />
-        <styled.span color="ink.muted" fontSize="1">
+        <Span color="ink.muted" fontSize="1">
           {total} of {counts.test + counts.matrix} runs
-        </styled.span>
+        </Span>
       </HStack>
       {total === 0 ? (
         <Empty title="No runs match" hint="No run matches these filters." />

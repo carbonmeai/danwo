@@ -1,12 +1,24 @@
-import { Box, Grid, HStack, Stack, styled } from "@danwo/ui/jsx"
+import { Icons } from "@danwo/ui/icons/base"
+import { Box, Grid, HStack, Stack } from "@danwo/ui/jsx"
+import { Button } from "@danwo/ui/primitives/button"
+import { Checkbox } from "@danwo/ui/primitives/checkbox/checkbox"
+import {
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@danwo/ui/primitives/table"
+import { Span } from "@danwo/ui/primitives/typography"
 import { Link } from "@tanstack/react-router"
 import { useState } from "react"
 
 import { ListFilter } from "../../components/controls.tsx"
 import { Empty } from "../../components/empty-state.tsx"
 import { Page } from "../../components/page.tsx"
-import { Badge, StatusBadge } from "../../components/status-badge.tsx"
-import { RowPanel, RowTable, Td, Th } from "../../components/table.tsx"
+import { Panel } from "../../components/panel.tsx"
+import { StatusBadge, VerdictBadge } from "../../components/status-badge.tsx"
 import { TimeAgo } from "../../components/time-ago.tsx"
 import { percent } from "../../lib/format.ts"
 import { useFilter } from "../../lib/list-keys.ts"
@@ -21,41 +33,42 @@ import type { TestRow } from "./tests-data.ts"
 function MatrixChip({ verdict }: { readonly verdict: MatrixVerdict }) {
   if (verdict.kind === "none")
     return (
-      <styled.span color="ink.faint" fontSize="1">
+      <Span color="ink.faint" fontSize="1">
         {matrixWords(verdict)}
-      </styled.span>
+      </Span>
     )
 
   return (
     <Link to="/runs/$runId" params={{ runId: verdict.runId }} title="Open the latest matrix run">
-      <Badge tone={verdict.kind === "held" ? "passed" : "failed"} maxW="16rem">
-        <styled.span overflow="hidden" textOverflow="ellipsis">
+      <VerdictBadge tone={verdict.kind === "held" ? "passed" : "failed"} maxW="16rem">
+        <Span overflow="hidden" textOverflow="ellipsis">
           {matrixWords(verdict)}
-        </styled.span>
-      </Badge>
+        </Span>
+      </VerdictBadge>
     </Link>
   )
 }
 
-/** A test's name: opens its latest recording over the page when one was kept. */
-function TestName({ row }: { readonly row: TestRow }) {
-  const name = (
-    <styled.span fontWeight="500" overflowWrap="anywhere">
-      {row.id.split(" › ").slice(1).join(" › ") || row.id}
-    </styled.span>
-  )
+/** A test's name without its file. */
+function nameOf(row: TestRow): string {
+  return row.id.split(" › ").slice(1).join(" › ") || row.id
+}
 
-  if (row.thumb === undefined) return name
+/** Plays a test's latest recording over the page, when one was kept. */
+function Watch({ row }: { readonly row: TestRow }) {
+  if (row.thumb === undefined) return null
 
   return (
-    <Link
-      to="."
-      search={(prev) => ({ ...prev, open: row.thumb?.dir })}
-      resetScroll={false}
-      title="Watch its latest recording"
-    >
-      {name}
-    </Link>
+    <Button asChild variant="ghost" size="icon" tooltipChildren="Watch its latest recording">
+      <Link
+        to="."
+        search={(prev) => ({ ...prev, open: row.thumb?.dir })}
+        resetScroll={false}
+        aria-label={`Watch ${nameOf(row)}`}
+      >
+        <Icons.play size={14} />
+      </Link>
+    </Button>
   )
 }
 
@@ -70,47 +83,89 @@ function TestRowLine({
   readonly onPick: (picked: boolean) => void
 }) {
   return (
-    <tr data-row data-picked={picked || undefined}>
-      <Td w="2.5rem">
-        <input
-          type="checkbox"
+    <TableRow data-row data-state={picked ? "selected" : undefined}>
+      <TableCell w="2.5rem" px="3">
+        <Checkbox
           checked={picked}
           aria-label={`Pick ${row.id}`}
-          onChange={(event) => onPick(event.target.checked)}
+          onCheckedChange={(checked) => onPick(checked === true)}
         />
-      </Td>
-      <Td w="7rem" display={{ base: "none", md: "table-cell" }}>
+      </TableCell>
+      <TableCell w="7rem" display={{ base: "none", md: "table-cell" }}>
         <TestThumb thumb={row.thumb} />
-      </Td>
-      <Td minW="14rem">
-        <TestName row={row} />
-      </Td>
-      <Td whiteSpace="nowrap">
+      </TableCell>
+      <TableCell minW="14rem" whiteSpace="normal">
+        <Span fontWeight="500" overflowWrap="anywhere">
+          {nameOf(row)}
+        </Span>
+      </TableCell>
+      <TableCell>
         {row.last ? (
           <HStack gap="2">
             <StatusBadge status={row.last.status} />
-            <styled.span color="ink.muted" fontSize="1">
+            <Span color="ink.muted" fontSize="1">
               <TimeAgo at={row.last.at} />
-            </styled.span>
+            </Span>
           </HStack>
         ) : (
-          <styled.span color="ink.faint">never run</styled.span>
+          <Span color="ink.faint">never run</Span>
         )}
-      </Td>
-      <Td
+      </TableCell>
+      <TableCell
         textAlign="right"
         fontVariantNumeric="tabular-nums"
         display={{ base: "none", lg: "table-cell" }}
       >
         {percent(row.passRate)}
-      </Td>
-      <Td display={{ base: "none", lg: "table-cell" }}>
+      </TableCell>
+      <TableCell display={{ base: "none", lg: "table-cell" }}>
         <MatrixChip verdict={row.matrix} />
-      </Td>
-      <Td w="6rem">
-        <RerunTest testId={row.id} />
-      </Td>
-    </tr>
+      </TableCell>
+      <TableCell w="5.5rem">
+        <HStack gap="0.5" justify="flex-end">
+          <Watch row={row} />
+          <RerunTest testId={row.id} compact />
+        </HStack>
+      </TableCell>
+    </TableRow>
+  )
+}
+
+/** One file in the side list: its name and how many tests it holds. */
+function GroupLink({
+  to,
+  label,
+  count,
+  on,
+}: {
+  readonly to: string | undefined
+  readonly label: string
+  readonly count: number
+  readonly on: boolean
+}) {
+  return (
+    <Button
+      asChild
+      variant={on ? "soft" : "ghost"}
+      size="sm"
+      justifyContent="space-between"
+      w="full"
+      fontWeight={on ? "500" : "400"}
+    >
+      <Link
+        to="/tests"
+        search={(prev) => ({ ...prev, file: to })}
+        aria-current={on ? "page" : undefined}
+        replace
+      >
+        <Span overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" title={label}>
+          {label}
+        </Span>
+        <Span color="ink.faint" fontSize="1">
+          {count}
+        </Span>
+      </Link>
+    </Button>
   )
 }
 
@@ -123,56 +178,97 @@ function Groups({
   readonly file: string | undefined
 }) {
   const files = [...new Set(rows.map((row) => row.file ?? "other"))].toSorted()
-  const item = (to: string | undefined, label: string, count: number) => (
-    <Link
-      key={label}
-      to="/tests"
-      search={(prev) => ({ ...prev, file: to })}
-      data-on={file === to || undefined}
-      aria-current={file === to ? "page" : undefined}
-      replace
-    >
-      <HStack
-        justify="space-between"
-        gap="2"
-        h="8"
-        px="2.5"
-        rounded="lg"
-        color="ink.soft"
-        _hover={{ bg: "surface.hover", color: "ink.strong" }}
-        css={{ "[data-on] > &": { bg: "surface.active", color: "ink.strong", fontWeight: "500" } }}
-      >
-        <styled.span overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" title={label}>
-          {label}
-        </styled.span>
-        <styled.span color="ink.faint" fontSize="1">
-          {count}
-        </styled.span>
-      </HStack>
-    </Link>
-  )
 
   return (
     <Stack as="nav" aria-label="Test files" gap="0.5">
-      {item(undefined, "All tests", rows.length)}
-      <styled.span color="ink.muted" fontSize="1" fontWeight="500" px="2.5" pt="3" pb="1">
+      <GroupLink to={undefined} label="All tests" count={rows.length} on={file === undefined} />
+      <Span color="ink.muted" fontSize="1" fontWeight="500" px="2.5" pt="3" pb="1">
         Files
-      </styled.span>
-      {files.map((each) =>
-        item(
-          each,
-          each.replace(/^tests\//, ""),
-          rows.filter((row) => (row.file ?? "other") === each).length,
-        ),
-      )}
+      </Span>
+      {files.map((each) => (
+        <GroupLink
+          key={each}
+          to={each}
+          label={each.replace(/^tests\//, "")}
+          count={rows.filter((row) => (row.file ?? "other") === each).length}
+          on={file === each}
+        />
+      ))}
     </Stack>
+  )
+}
+
+/** The tests shown, in the library's table, picked ones marked. */
+function TestsTable({
+  shown,
+  picked,
+  setPicked,
+}: {
+  readonly shown: readonly TestRow[]
+  readonly picked: ReadonlySet<string>
+  readonly setPicked: (next: ReadonlySet<string>) => void
+}) {
+  const pick = (id: string, on: boolean) => {
+    const next = new Set(picked)
+
+    if (on) next.add(id)
+    else next.delete(id)
+    setPicked(next)
+  }
+
+  return (
+    <Panel px="2" py="1">
+      <TableContainer aria-label="Tests">
+        <TableHeader>
+          <TableRow _hover={{ bg: "transparent" }}>
+            <TableHead px="3">
+              <Checkbox
+                aria-label="Pick every test shown"
+                checked={shown.length > 0 && shown.every((row) => picked.has(row.id))}
+                onCheckedChange={(checked) =>
+                  setPicked(checked === true ? new Set(shown.map((row) => row.id)) : new Set())
+                }
+              />
+            </TableHead>
+            <TableHead display={{ base: "none", md: "table-cell" }}>
+              <Span srOnly>Recording</Span>
+            </TableHead>
+            <TableHead color="ink.muted">Test</TableHead>
+            <TableHead color="ink.muted">Last run</TableHead>
+            <TableHead
+              color="ink.muted"
+              textAlign="right"
+              display={{ base: "none", lg: "table-cell" }}
+            >
+              Pass rate
+            </TableHead>
+            <TableHead color="ink.muted" display={{ base: "none", lg: "table-cell" }}>
+              Matrix
+            </TableHead>
+            <TableHead>
+              <Span srOnly>Actions</Span>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {shown.map((row) => (
+            <TestRowLine
+              key={row.id}
+              row={row}
+              picked={picked.has(row.id)}
+              onPick={(on) => pick(row.id, on)}
+            />
+          ))}
+        </TableBody>
+      </TableContainer>
+    </Panel>
   )
 }
 
 /**
  * The project's test library: its files down the side, its tests in a table with how each did
  * last, how often it passes and what the fault matrix made of it. Pick some and run them, or run
- * the lot; a test's name opens its latest recording over the page.
+ * the lot; the play button opens a test's latest recording over the page.
  */
 export function TestsPage({
   rows,
@@ -186,15 +282,6 @@ export function TestsPage({
   const inFile = file === undefined ? rows : rows.filter((row) => (row.file ?? "other") === file)
   const found = useFilter(inFile, testText, query)
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
-  const pick = (id: string, on: boolean) =>
-    setPicked((before) => {
-      const next = new Set(before)
-
-      if (on) next.add(id)
-      else next.delete(id)
-
-      return next
-    })
 
   if (rows.length === 0)
     return (
@@ -211,7 +298,7 @@ export function TestsPage({
     <Page
       crumbs={["Tests"]}
       title="Tests"
-      detail="Every test in this project. A name opens its latest recording; the matrix column says what the fault matrix made of it."
+      detail="Every test in this project. The play button opens its latest recording; the matrix column says what the fault matrix made of it."
       actions={
         <>
           <ListFilter label="Filter tests" placeholder="Filter tests" filter={found} />
@@ -231,50 +318,7 @@ export function TestsPage({
         {found.shown.length === 0 ? (
           <Empty title="No tests here" hint="No test in this file matches the filter." />
         ) : (
-          <RowPanel overflowX="auto">
-            <RowTable aria-label="Tests">
-              <thead>
-                <tr>
-                  <Th>
-                    <input
-                      type="checkbox"
-                      aria-label="Pick every test shown"
-                      checked={found.shown.every((row) => picked.has(row.id))}
-                      onChange={(event) =>
-                        setPicked(
-                          event.target.checked
-                            ? new Set(found.shown.map((row) => row.id))
-                            : new Set(),
-                        )
-                      }
-                    />
-                  </Th>
-                  <Th display={{ base: "none", md: "table-cell" }}>
-                    <styled.span srOnly>Recording</styled.span>
-                  </Th>
-                  <Th>Test</Th>
-                  <Th>Last run</Th>
-                  <Th textAlign="right" display={{ base: "none", lg: "table-cell" }}>
-                    Pass rate
-                  </Th>
-                  <Th display={{ base: "none", lg: "table-cell" }}>Matrix</Th>
-                  <Th>
-                    <styled.span srOnly>Run again</styled.span>
-                  </Th>
-                </tr>
-              </thead>
-              <tbody>
-                {found.shown.map((row) => (
-                  <TestRowLine
-                    key={row.id}
-                    row={row}
-                    picked={picked.has(row.id)}
-                    onPick={(on) => pick(row.id, on)}
-                  />
-                ))}
-              </tbody>
-            </RowTable>
-          </RowPanel>
+          <TestsTable shown={found.shown} picked={picked} setPicked={setPicked} />
         )}
       </Grid>
     </Page>

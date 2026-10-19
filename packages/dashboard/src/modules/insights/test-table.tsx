@@ -1,11 +1,21 @@
 import { Icons } from "@danwo/ui/icons/base"
-import { Box, HStack, Stack, styled } from "@danwo/ui/jsx"
+import { Box, HStack, Stack } from "@danwo/ui/jsx"
+import { Button } from "@danwo/ui/primitives/button"
+import {
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@danwo/ui/primitives/table"
+import { Span } from "@danwo/ui/primitives/typography"
 import { Link } from "@tanstack/react-router"
 import { useRef } from "react"
 
 import { Ident } from "../../components/code.tsx"
-import { Badge, StatusBadge } from "../../components/status-badge.tsx"
-import { RowPanel, RowTable, Td, Th } from "../../components/table.tsx"
+import { Panel } from "../../components/panel.tsx"
+import { StatusBadge, Swatch, VerdictBadge } from "../../components/status-badge.tsx"
 import { dollars, duration, percent } from "../../lib/format.ts"
 import { useListKeys } from "../../lib/list-keys.ts"
 import { type BreakdownSort, sortBreakdown, type TestBreakdown } from "./test-breakdown.ts"
@@ -45,23 +55,17 @@ function SortHead({
   const ascending = on && !sorting.ascending
 
   return (
-    <Th
+    <TableHead
       textAlign={align}
       display={HIDDEN_BELOW[hideBelow ?? "never"]}
       aria-sort={on ? (sorting.ascending ? "ascending" : "descending") : "none"}
     >
-      <Link
-        to="/insights"
-        search={{ sort, ...(ascending && { dir: "asc" }) }}
-        replace
-        resetScroll={false}
-      >
-        <HStack
-          as="span"
-          gap="1"
-          display="inline-flex"
-          color={on ? "ink.strong" : undefined}
-          _hover={{ color: "ink.strong" }}
+      <Button asChild variant="ghost" size="xs" color={on ? "ink.strong" : "ink.muted"} mx="-1.5">
+        <Link
+          to="/insights"
+          search={{ sort, ...(ascending && { dir: "asc" }) }}
+          replace
+          resetScroll={false}
         >
           {label}
           {on ? (
@@ -70,24 +74,27 @@ function SortHead({
             ) : (
               <Icons.caretDown size={12} />
             )
-          ) : null}
-        </HStack>
-      </Link>
-    </Th>
+          ) : (
+            <Icons.caretUpDown size={12} />
+          )}
+        </Link>
+      </Button>
+    </TableHead>
   )
 }
 
 /** The faults that broke the test under the matrix, the most frequent named. */
 function Breaks({ row }: { readonly row: TestBreakdown }) {
-  if (row.matrixRuns === 0) return <styled.span color="ink.faint">not run</styled.span>
-  if (row.breakingFaults.length === 0) return <Badge tone="passed">held every fault</Badge>
+  if (row.matrixRuns === 0) return <Span color="ink.faint">not run</Span>
+  if (row.breakingFaults.length === 0)
+    return <VerdictBadge tone="passed">held every fault</VerdictBadge>
 
   const rest = row.breakingFaults.length - FAULTS_SHOWN
 
   return (
     <Stack gap="1" alignItems="flex-start">
       {row.breakingFaults.slice(0, FAULTS_SHOWN).map((fault) => (
-        <Badge
+        <VerdictBadge
           key={fault.fault}
           tone="failed"
           maxW="20rem"
@@ -96,12 +103,12 @@ function Breaks({ row }: { readonly row: TestBreakdown }) {
           <Ident overflow="hidden" textOverflow="ellipsis">
             {fault.fault}
           </Ident>
-        </Badge>
+        </VerdictBadge>
       ))}
       {rest > 0 ? (
-        <styled.span color="ink.muted" fontSize="1">
+        <Span color="ink.muted" fontSize="1">
           and {rest} more
-        </styled.span>
+        </Span>
       ) : null}
     </Stack>
   )
@@ -117,11 +124,13 @@ function Rate({
 }) {
   return (
     <Stack gap="1" alignItems="flex-end">
-      <span>{percent(value)}</span>
+      <Span>{percent(value)}</Span>
       <Box w="3.5rem" h="1" rounded="full" bg="surface.track" overflow="hidden" aria-hidden="true">
-        <Box
+        <Swatch
+          tone={tone}
+          display="block"
           h="full"
-          bg={tone === "passed" ? "verdict.passed.solid" : "verdict.flaky.solid"}
+          rounded="none"
           style={{ width: `${Math.round((value ?? 0) * 100)}%` }}
         />
       </Box>
@@ -137,50 +146,50 @@ function BreakdownLine({
   readonly current: boolean
 }) {
   return (
-    <tr data-row data-current={current || undefined}>
-      <Td minW="14rem">
+    <TableRow data-row data-state={current ? "selected" : undefined}>
+      <TableCell minW="14rem" px="3" whiteSpace="normal">
         <Stack gap="1">
           <Link to="/tests" search={{ q: row.id }}>
-            <styled.span fontWeight="500" overflowWrap="anywhere">
+            <Span fontWeight="500" overflowWrap="anywhere">
               {row.id}
-            </styled.span>
+            </Span>
           </Link>
           <HStack gap="2">
             <StatusBadge status={row.lastStatus} />
-            <styled.span color="ink.muted" fontSize="1">
+            <Span color="ink.muted" fontSize="1">
               latest run
-            </styled.span>
+            </Span>
           </HStack>
         </Stack>
-      </Td>
-      <Td textAlign="right" fontVariantNumeric="tabular-nums">
+      </TableCell>
+      <TableCell textAlign="right" fontVariantNumeric="tabular-nums">
         {row.runs}
         {row.matrixRuns > 0 ? (
-          <styled.span display="block" color="ink.muted" fontSize="1">
+          <Span display="block" color="ink.muted" fontSize="1">
             {row.matrixRuns} matrix
-          </styled.span>
+          </Span>
         ) : null}
-      </Td>
-      <Td textAlign="right" fontVariantNumeric="tabular-nums">
+      </TableCell>
+      <TableCell textAlign="right" fontVariantNumeric="tabular-nums">
         <Rate value={row.passRate} tone="passed" />
-      </Td>
-      <Td textAlign="right" fontVariantNumeric="tabular-nums">
+      </TableCell>
+      <TableCell textAlign="right" fontVariantNumeric="tabular-nums">
         <Rate value={row.flakeRate} tone="flaky" />
-      </Td>
-      <Td textAlign="right" fontVariantNumeric="tabular-nums" whiteSpace="nowrap">
+      </TableCell>
+      <TableCell textAlign="right" fontVariantNumeric="tabular-nums">
         {row.medianMs === null ? "–" : duration(row.medianMs)}
-      </Td>
-      <Td
+      </TableCell>
+      <TableCell
         textAlign="right"
         fontVariantNumeric="tabular-nums"
         display={{ base: "none", lg: "table-cell" }}
       >
         {dollars(row.costUsd)}
-      </Td>
-      <Td display={{ base: "none", md: "table-cell" }}>
+      </TableCell>
+      <TableCell display={{ base: "none", md: "table-cell" }} whiteSpace="normal">
         <Breaks row={row} />
-      </Td>
-    </tr>
+      </TableCell>
+    </TableRow>
   )
 }
 
@@ -200,11 +209,13 @@ export function TestTable({
   const current = useListKeys(list, sorted.length)
 
   return (
-    <RowPanel overflowX="auto">
-      <RowTable aria-label="Tests">
-        <thead>
-          <tr>
-            <Th>Test</Th>
+    <Panel px="2" py="1">
+      <TableContainer aria-label="Tests">
+        <TableHeader>
+          <TableRow _hover={{ bg: "transparent" }}>
+            <TableHead px="3" color="ink.muted">
+              Test
+            </TableHead>
             <SortHead sort="runs" sorting={sorting} label="Runs" />
             <SortHead sort="pass" sorting={sorting} label="Pass rate" />
             <SortHead sort="flake" sorting={sorting} label="Flake rate" />
@@ -217,14 +228,14 @@ export function TestTable({
               align="left"
               hideBelow="md"
             />
-          </tr>
-        </thead>
-        <tbody ref={list}>
+          </TableRow>
+        </TableHeader>
+        <TableBody ref={list}>
           {sorted.map((row, i) => (
             <BreakdownLine key={row.id} row={row} current={i === current} />
           ))}
-        </tbody>
-      </RowTable>
-    </RowPanel>
+        </TableBody>
+      </TableContainer>
+    </Panel>
   )
 }

@@ -1,9 +1,17 @@
-import { Icons } from "@danwo/ui/icons/base"
-import { Box, Grid, HStack, Stack, styled } from "@danwo/ui/jsx"
+import { useIsMobile } from "@danwo/ui/hooks/use-mobile"
+import { Box, Stack } from "@danwo/ui/jsx"
+import { Button } from "@danwo/ui/primitives/button"
+import { Dialog, DialogContent, DialogTitle } from "@danwo/ui/primitives/dialog"
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@danwo/ui/primitives/resizable"
+import { TabContent, TabTrigger, Tabs, TabsList } from "@danwo/ui/primitives/tabs"
+import { Text } from "@danwo/ui/primitives/typography"
 import { useNavigate, useRouterState } from "@tanstack/react-router"
 import { type ReactNode, useEffect, useState } from "react"
 
-import { Button, SegmentTrack, segment } from "../../components/controls.tsx"
 import { fetchRecord } from "../record/record-api.ts"
 import type { RecordView } from "../record/record-data.ts"
 import { usePlayback } from "../record/use-playback.ts"
@@ -77,117 +85,105 @@ function useRecord(dir: string | undefined): RecordView | null | undefined {
   return loaded.view
 }
 
-/** The right pane's tabs, kept in the address. */
-function PaneTabs({ pane, matrix }: { readonly pane: Pane; readonly matrix: boolean }) {
+/**
+ * The right pane: the library's tabs, the one open kept in the address, and its body filling what
+ * is left so each pane scrolls inside itself.
+ */
+function EvidencePane({
+  view,
+  pane,
+  playback,
+}: {
+  readonly view: RecordView
+  readonly pane: Pane
+  readonly playback: PaneProps["playback"]
+}) {
   const navigate = useNavigate()
+  const shown = PANES.filter((each) => each !== "matrix" || view.record.run.kind === "matrix")
+  const Body = PANE_BODY[pane]
 
   return (
-    <Box overflowX="auto" maxW="full">
-      <SegmentTrack role="tablist" aria-label="What to look at">
-        {PANES.filter((each) => each !== "matrix" || matrix).map((each) => (
-          <styled.button
-            key={each}
-            type="button"
-            className={segment}
-            role="tab"
-            aria-selected={each === pane}
-            data-on={each === pane || undefined}
-            onClick={() =>
-              void navigate({
-                to: ".",
-                search: (prev: Record<string, unknown>) => ({
-                  ...prev,
-                  pane: each === "replay" ? undefined : each,
-                }),
-                replace: true,
-                resetScroll: false,
-              })
-            }
-          >
-            {PANE_WORDS[each]}
-          </styled.button>
-        ))}
-      </SegmentTrack>
-    </Box>
+    <Tabs
+      value={pane}
+      onValueChange={(next) =>
+        void navigate({
+          to: ".",
+          search: (prev: Record<string, unknown>) => ({
+            ...prev,
+            pane: next === "replay" || !isPane(next) ? undefined : next,
+          }),
+          replace: true,
+          resetScroll: false,
+        })
+      }
+      display="flex"
+      flexDirection="column"
+      h="full"
+      minH="0"
+      p="5"
+      pr="12"
+      gap="4"
+    >
+      <Box overflowX="auto" flexShrink="0">
+        <TabsList aria-label="What to look at">
+          {shown.map((each) => (
+            <TabTrigger key={each} value={each}>
+              {PANE_WORDS[each]}
+            </TabTrigger>
+          ))}
+        </TabsList>
+      </Box>
+      <TabContent value={pane} flex="1" minH="0">
+        <Body view={view} playback={playback} />
+      </TabContent>
+    </Tabs>
   )
 }
 
 /** The two panes over one playback: the transcript on the left, the run's evidence on the right. */
-function Panes({
-  view,
-  pane,
-  onClose,
-}: {
-  readonly view: RecordView
-  readonly pane: Pane
-  readonly onClose: () => void
-}) {
+function Panes({ view, pane }: { readonly view: RecordView; readonly pane: Pane }) {
   const playback = usePlayback(view.replay)
   const playable = view.replay.videos.length > 0 || view.replay.frames.length > 0
   const shared = playable ? playback : undefined
-  const Body = PANE_BODY[pane]
+  const phone = useIsMobile()
 
-  return (
-    <Grid
-      gridTemplateColumns={{ base: "minmax(0, 1fr)", lg: "minmax(20rem, 26rem) minmax(0, 1fr)" }}
-      gridTemplateRows={{ base: "auto minmax(0, 1fr)", lg: "minmax(0, 1fr)" }}
-      h="full"
-      minH="0"
-      gap="0"
-    >
-      <Box minH="0" bg="surface.sidebar" overflow="hidden" display={{ base: "none", lg: "block" }}>
-        <Transcript view={view} playback={shared} />
-      </Box>
-      <Stack gap="4" p="5" minH="0" overflowY="auto">
-        <HStack justify="space-between" gap="3" flexWrap="wrap">
-          <PaneTabs pane={pane} matrix={view.record.run.kind === "matrix"} />
-          <Button type="button" look="ghost" w="8" px="0" aria-label="Close" onClick={onClose}>
-            <Icons.close size={16} />
-          </Button>
-        </HStack>
-        <Box display={{ base: "block", lg: "none" }}>
+  if (phone)
+    return (
+      <Stack gap="0" h="full" minH="0" overflowY="auto">
+        <Box flexShrink="0" maxH="50dvh" overflow="hidden" bg="surface.sidebar">
           <Transcript view={view} playback={shared} />
         </Box>
-        <Body view={view} playback={shared} />
+        <Box flex="1" minH="32rem">
+          <EvidencePane view={view} pane={pane} playback={shared} />
+        </Box>
       </Stack>
-    </Grid>
+    )
+
+  return (
+    <ResizablePanelGroup direction="horizontal" autoSaveId="danwo-overlay">
+      <ResizablePanel defaultSize="28" minSize="18" maxSize="45">
+        <Box h="full" minH="0" bg="surface.sidebar" overflow="hidden">
+          <Transcript view={view} playback={shared} />
+        </Box>
+      </ResizablePanel>
+      <ResizableHandle />
+      <ResizablePanel defaultSize="72" minSize="40">
+        <EvidencePane view={view} pane={pane} playback={shared} />
+      </ResizablePanel>
+    </ResizablePanelGroup>
   )
 }
 
 /**
- * One run of a test, opened over whatever page linked to it (`?open=<record folder>`): its steps
- * on the left with jumps into the replay, and on the right the replay, console, network, provider
- * calls, emulator state, effects and, for a matrix trial, its fault. Esc or the close button goes
- * back to the page beneath.
+ * One run of a test, opened over whatever page linked to it (`?open=<record folder>`) in the
+ * library's dialog: its steps on the left with jumps into the replay, and on the right the replay,
+ * console, network, provider calls, emulator state, effects and, for a matrix trial, its fault.
+ * Esc or the close button goes back to the page beneath.
  */
 export function RecordOverlay() {
   const { open, pane } = useTarget()
   const view = useRecord(open)
   const navigate = useNavigate()
-
-  useEffect(() => {
-    if (open === undefined) return undefined
-
-    const close = (event: KeyboardEvent) => {
-      if (event.key === "Escape")
-        void navigate({
-          to: ".",
-          search: (prev: Record<string, unknown>) => ({
-            ...prev,
-            open: undefined,
-            pane: undefined,
-            t: undefined,
-          }),
-          resetScroll: false,
-        })
-    }
-
-    window.addEventListener("keydown", close)
-
-    return () => window.removeEventListener("keydown", close)
-  }, [open, navigate])
-
-  if (open === undefined) return null
 
   const onClose = () =>
     void navigate({
@@ -202,52 +198,43 @@ export function RecordOverlay() {
     })
 
   return (
-    <Box
-      position="fixed"
-      inset="0"
-      zIndex="30"
-      bg="rgba(10, 18, 23, 0.36)"
-      display="grid"
-      placeItems="center"
-      p={{ base: "0", md: "4" }}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose()
-      }}
-    >
-      <Box
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="overlay-title"
-        w="full"
+    <Dialog open={open !== undefined} onOpenChange={(next) => (next ? undefined : onClose())}>
+      <DialogContent
+        w="calc(100vw - 2rem)"
         maxW="1680px"
         h={{ base: "100dvh", md: "calc(100dvh - 2rem)" }}
-        bg="surface.page"
+        p="0"
+        gap="0"
         rounded={{ base: "0", md: "16px" }}
-        boxShadow="pop"
-        overflow="hidden"
+        bg="surface.page"
+        display="flex"
+        flexDirection="column"
       >
         {view === undefined ? (
-          <Box p="8" color="ink.muted">
-            Loading the recording…
-          </Box>
+          <>
+            <DialogTitle srOnly>Loading the recording</DialogTitle>
+            <Box p="8" color="ink.muted">
+              Loading the recording…
+            </Box>
+          </>
         ) : view === null ? (
           <Stack p="8" gap="3">
-            <styled.h2 id="overlay-title" fontWeight="600">
-              No such recording
-            </styled.h2>
-            <styled.p color="ink.muted">
+            <DialogTitle fontWeight="600">No such recording</DialogTitle>
+            <Text color="ink.muted">
               Recordings are pruned with their run; the latest 20 runs keep theirs.
-            </styled.p>
+            </Text>
             <Box>
-              <Button type="button" onClick={onClose}>
+              <Button variant="soft" size="sm" onClick={onClose}>
                 Close
               </Button>
             </Box>
           </Stack>
         ) : (
-          <Panes key={view.dir} view={view} pane={pane} onClose={onClose} />
+          <Box flex="1" minH="0">
+            <Panes key={view.dir} view={view} pane={pane} />
+          </Box>
         )}
-      </Box>
-    </Box>
+      </DialogContent>
+    </Dialog>
   )
 }

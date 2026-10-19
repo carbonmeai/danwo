@@ -1,5 +1,7 @@
 import type { HistoryTrial } from "@danwo/runner/runner"
+import { Icons } from "@danwo/ui/icons/base"
 import { Box, HStack, Stack } from "@danwo/ui/jsx"
+import { Button } from "@danwo/ui/primitives/button"
 import { Link } from "@tanstack/react-router"
 
 import { Ident } from "../../components/code.tsx"
@@ -44,14 +46,14 @@ export function TrialDetail({ trial }: { readonly trial: HistoryTrial | undefine
         </Box>
       ) : null}
       {trial.record ? (
-        <Link
-          to="."
-          search={(prev) => ({ ...prev, open: trial.record })}
-          resetScroll={false}
-          data-link
-        >
-          Watch this trial's recording
-        </Link>
+        <Box>
+          <Button asChild variant="soft" size="sm">
+            <Link to="." search={(prev) => ({ ...prev, open: trial.record })} resetScroll={false}>
+              <Icons.play size={13} />
+              Watch this trial
+            </Link>
+          </Button>
+        </Box>
       ) : (
         <Box color="ink.faint">No flight record was kept for this trial.</Box>
       )}

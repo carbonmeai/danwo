@@ -1,4 +1,6 @@
-import { Box, Grid, HStack, styled } from "@danwo/ui/jsx"
+import { Box, Grid, HStack } from "@danwo/ui/jsx"
+import { Button } from "@danwo/ui/primitives/button"
+import { Span } from "@danwo/ui/primitives/typography"
 
 import { duration } from "../../lib/format.ts"
 import { type Lane, lanesOf, type Timeline, type TimelineItem } from "./record-timeline.ts"
@@ -8,7 +10,7 @@ const KIND_WORDS = { step: "Step", call: "Call", webhook: "Webhook" } as const
 
 function KindMark({ kind }: { readonly kind: TimelineItem["kind"] }) {
   return (
-    <styled.span
+    <Span
       fontSize="1"
       color={kind === "step" ? "ink.strong" : "ink.muted"}
       fontWeight="500"
@@ -16,7 +18,7 @@ function KindMark({ kind }: { readonly kind: TimelineItem["kind"] }) {
       flexShrink="0"
     >
       {KIND_WORDS[kind]}
-    </styled.span>
+    </Span>
   )
 }
 
@@ -48,26 +50,49 @@ function Bar({
   readonly span: number
   readonly onSeek?: ((ms: number) => void) | undefined
 }) {
+  const place = {
+    left: `${(item.startMs / span) * 100}%`,
+    width: `max(3px, ${(item.durationMs / span) * 100}%)`,
+  }
+  const fill = (
+    <Box
+      position="absolute"
+      inset="0"
+      rounded="2px"
+      bg={item.bad ? "verdict.failed.solid" : BAR_FILL[item.kind]}
+    />
+  )
+
   return (
     <>
-      <Box
-        {...(onSeek && {
-          as: "button",
-          type: "button",
-          cursor: "pointer",
-          "aria-label": seekLabel(item),
-          onClick: () => onSeek(item.startMs),
-        })}
-        position="absolute"
-        top={item.kind === "step" ? "0" : "1"}
-        bottom={item.kind === "step" ? "0" : "1"}
-        rounded="2px"
-        bg={item.bad ? "verdict.failed.solid" : BAR_FILL[item.kind]}
-        style={{
-          left: `${(item.startMs / span) * 100}%`,
-          width: `max(3px, ${(item.durationMs / span) * 100}%)`,
-        }}
-      />
+      {onSeek ? (
+        <Button
+          variant="transparent"
+          size="xs"
+          position="absolute"
+          top={item.kind === "step" ? "0" : "1"}
+          bottom={item.kind === "step" ? "0" : "1"}
+          h="auto"
+          minW="0"
+          px="0"
+          rounded="2px"
+          aria-label={seekLabel(item)}
+          tooltipChildren={seekLabel(item)}
+          style={place}
+          onClick={() => onSeek(item.startMs)}
+        >
+          {fill}
+        </Button>
+      ) : (
+        <Box
+          position="absolute"
+          top={item.kind === "step" ? "0" : "1"}
+          bottom={item.kind === "step" ? "0" : "1"}
+          style={place}
+        >
+          {fill}
+        </Box>
+      )}
       {item.fault ? (
         <Box
           {...(onSeek && { cursor: "pointer", onClick: () => onSeek(item.startMs) })}
@@ -117,18 +142,18 @@ function LaneLabel({ lane }: { readonly lane: Lane }) {
   return (
     <HStack gap="2" minW="0" pl={lane.kind === "step" ? "0" : "3"}>
       <KindMark kind={lane.kind} />
-      <styled.span
+      <Span
         {...LABEL_STYLE[lane.kind]}
         overflow="hidden"
         textOverflow="ellipsis"
         whiteSpace="nowrap"
       >
         {lane.label}
-      </styled.span>
+      </Span>
       {lane.items.length > 1 ? (
-        <styled.span color="ink.muted" fontSize="1" flexShrink="0">
+        <Span color="ink.muted" fontSize="1" flexShrink="0">
           ×{lane.items.length}
-        </styled.span>
+        </Span>
       ) : null}
     </HStack>
   )
@@ -151,7 +176,7 @@ function LaneRow({
 
   return (
     <Grid
-      as="li"
+      role="listitem"
       gridTemplateColumns={LANE_COLUMNS}
       columnGap="4"
       alignItems="center"
@@ -178,15 +203,9 @@ function LaneRow({
         ))}
         <Playhead ms={player.playheadMs} span={span} />
       </Box>
-      <styled.span
-        fontSize="1"
-        fontWeight="500"
-        textAlign="right"
-        color={end.color}
-        whiteSpace="nowrap"
-      >
+      <Span fontSize="1" fontWeight="500" textAlign="right" color={end.color} whiteSpace="nowrap">
         {end.text}
-      </styled.span>
+      </Span>
     </Grid>
   )
 }
@@ -220,13 +239,13 @@ export function Waterfall({
   const span = Math.max(timeline.spanMs, 1)
 
   return (
-    <Box bg="surface.item" rounded="10px" p="4" overflowX="auto">
+    <Box bg="surface.item" rounded="10px" p="4" h="full" minH="0" overflow="auto">
       <Box minW="44rem">
         <Grid gridTemplateColumns={LANE_COLUMNS} columnGap="4" alignItems="center">
           <Box />
           <Box position="relative" h="5" color="ink.faint" fontSize="1">
             {TICKS.map((tick) => (
-              <styled.span
+              <Span
                 key={tick}
                 position="absolute"
                 whiteSpace="nowrap"
@@ -236,12 +255,12 @@ export function Waterfall({
                 }}
               >
                 {duration(tick * span)}
-              </styled.span>
+              </Span>
             ))}
           </Box>
           <Box />
         </Grid>
-        <styled.ol aria-label="Timeline">
+        <Box role="list" aria-label="Timeline">
           {lanesOf(timeline.items).map((lane, i) => (
             <LaneRow
               key={`${lane.kind}-${i}`}
@@ -251,7 +270,7 @@ export function Waterfall({
               player={player}
             />
           ))}
-        </styled.ol>
+        </Box>
       </Box>
     </Box>
   )
@@ -268,7 +287,7 @@ export function TimelineLegend() {
 
   return (
     <HStack
-      as="ul"
+      role="list"
       aria-label="Timeline legend"
       gap="3.5"
       fontSize="1"
@@ -276,12 +295,12 @@ export function TimelineLegend() {
       flexWrap="wrap"
     >
       {entries.map(([label, color]) => (
-        <HStack as="li" key={label} gap="1.5">
+        <HStack role="listitem" key={label} gap="1.5">
           <Box w="2" h="2" rounded="2px" bg={color} />
           {label}
         </HStack>
       ))}
-      <HStack as="li" gap="1.5">
+      <HStack role="listitem" gap="1.5">
         <Box w="2" h="2" bg="verdict.failed.solid" transform="rotate(45deg)" />
         Fault
       </HStack>

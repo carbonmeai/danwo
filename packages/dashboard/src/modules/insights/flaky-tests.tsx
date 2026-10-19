@@ -1,10 +1,10 @@
-import { Box, Grid, HStack, Stack, styled } from "@danwo/ui/jsx"
+import { Box, Grid, HStack, Stack } from "@danwo/ui/jsx"
+import { Span } from "@danwo/ui/primitives/typography"
 import { Link } from "@tanstack/react-router"
 import { useRef } from "react"
 
-import { None } from "../../components/panel.tsx"
+import { ListRow, ListRows, None } from "../../components/panel.tsx"
 import { StatusBadge, Swatch } from "../../components/status-badge.tsx"
-import { Row, RowList } from "../../components/table.tsx"
 import { useListKeys } from "../../lib/list-keys.ts"
 import { toneOf, wordOf } from "../../lib/verdicts.ts"
 import type { Insights, Outcome } from "./insights-data.ts"
@@ -30,7 +30,7 @@ function OutcomeStrip({ outcomes }: { readonly outcomes: readonly Outcome[] }) {
 
 /** The tests that flipped between passing and failing, each with its verdict in every run. */
 export function FlakyTests({ insights }: { readonly insights: Insights }) {
-  const list = useRef<HTMLUListElement>(null)
+  const list = useRef<HTMLDivElement>(null)
   const current = useListKeys(list, insights.flaky.length)
 
   if (insights.flaky.length === 0)
@@ -42,9 +42,14 @@ export function FlakyTests({ insights }: { readonly insights: Insights }) {
     )
 
   return (
-    <RowList ref={list} aria-label="Flaky tests">
+    <ListRows ref={list} aria-label="Flaky tests">
       {insights.flaky.map((test, i) => (
-        <Row key={test.id} data-row data-current={i === current || undefined}>
+        <ListRow
+          key={test.id}
+          data-row
+          bg={i === current ? "surface.itemHover" : "surface.item"}
+          boxShadow={i === current ? "inset 2px 0 0 {colors.ink.strong}" : undefined}
+        >
           <Grid
             gridTemplateColumns={{ base: "1fr", md: "minmax(0, 2fr) minmax(0, 2fr) 9rem" }}
             gap="3"
@@ -52,22 +57,22 @@ export function FlakyTests({ insights }: { readonly insights: Insights }) {
           >
             <Stack gap="0.5" minW="0">
               <Link to="/tests" search={{ q: test.id }}>
-                <styled.span fontWeight="500" overflowWrap="anywhere">
+                <Span fontWeight="500" overflowWrap="anywhere">
                   {test.id}
-                </styled.span>
+                </Span>
               </Link>
-              <styled.span color="ink.muted" fontSize="1">
+              <Span color="ink.muted" fontSize="1">
                 {test.flaky} flaky, {test.failed} failed, {test.flips}{" "}
                 {test.flips === 1 ? "flip" : "flips"} in {test.runs} runs
-              </styled.span>
+              </Span>
             </Stack>
             <OutcomeStrip outcomes={insights.history[test.id] ?? []} />
             <Box justifySelf={{ md: "end" }}>
               <StatusBadge status={test.lastStatus} />
             </Box>
           </Grid>
-        </Row>
+        </ListRow>
       ))}
-    </RowList>
+    </ListRows>
   )
 }

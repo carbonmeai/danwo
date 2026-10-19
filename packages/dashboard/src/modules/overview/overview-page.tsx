@@ -1,32 +1,18 @@
 import { Icons } from "@danwo/ui/icons/base"
-import { Box, Grid, HStack, Stack, styled } from "@danwo/ui/jsx"
+import { Box, Grid, HStack, Stack } from "@danwo/ui/jsx"
+import { Span } from "@danwo/ui/primitives/typography"
 import { Link, useNavigate } from "@tanstack/react-router"
 
-import { Ident } from "../../components/code.tsx"
+import { StackedBars, TrendLine } from "../../components/charts.tsx"
+import { Choice } from "../../components/choice.tsx"
 import { Empty } from "../../components/empty-state.tsx"
 import { Page } from "../../components/page.tsx"
-import { None, Section, StatCard, StatCards } from "../../components/panel.tsx"
-import { Sparkline } from "../../components/sparkline.tsx"
-import { Badge } from "../../components/status-badge.tsx"
-import { Row, RowList } from "../../components/table.tsx"
+import { ListRow, ListRows, None, Section, StatCard, StatCards } from "../../components/panel.tsx"
+import { VerdictBadge } from "../../components/status-badge.tsx"
 import { TimeAgo } from "../../components/time-ago.tsx"
 import { duration, percent } from "../../lib/format.ts"
 import { LiveRuns } from "../live/live-runs.tsx"
 import { type Day, type Figure, type Overview, RANGES, rangeOf } from "./overview-data.ts"
-
-const Select = styled("select", {
-  base: {
-    h: "8",
-    px: "2.5",
-    rounded: "lg",
-    bg: "surface.hover",
-    color: "ink.strong",
-    fontSize: "1",
-    cursor: "pointer",
-    outline: "none",
-    _focus: { boxShadow: "0 0 0 3px {colors.ring}" },
-  },
-})
 
 /** How a figure moved against the window before, with the direction that is good for it. */
 function Change({
@@ -38,66 +24,50 @@ function Change({
   readonly shown: (delta: number) => string
   readonly better: "up" | "down"
 }) {
-  if (figure.now === null || figure.prior === null) return <span>no earlier window to compare</span>
+  if (figure.now === null || figure.prior === null) return <Span>no earlier window to compare</Span>
 
   const delta = figure.now - figure.prior
   const good = delta === 0 || delta > 0 === (better === "up")
 
   return (
-    <span>
-      <styled.span color={good ? "verdict.passed.fg" : "verdict.failed.fg"} fontWeight="500">
+    <Span>
+      <Span color={good ? "verdict.passed.fg" : "verdict.failed.fg"} fontWeight="500">
         {delta > 0 ? "▲" : delta < 0 ? "▼" : "="} {shown(Math.abs(delta))}
-      </styled.span>{" "}
+      </Span>{" "}
       vs prior
-    </span>
+    </Span>
   )
 }
 
 /** Runs per day as stacked bars, passed under failed; a day opens its runs. */
 function RunsPerDay({ days }: { readonly days: readonly Day[] }) {
-  const most = Math.max(1, ...days.map((day) => day.passed + day.failed))
+  const navigate = useNavigate()
 
   return (
     <Box>
-      <HStack gap="4" mb="3" fontSize="1" color="ink.muted">
-        <HStack gap="1.5">
-          <styled.span w="2" h="2" rounded="sm" bg="verdict.passed.solid" /> Passed
-        </HStack>
-        <HStack gap="1.5">
-          <styled.span w="2" h="2" rounded="sm" bg="verdict.failed.solid" /> Had a failure
-        </HStack>
-      </HStack>
-      <HStack gap="1" alignItems="flex-end" h="40" role="list" aria-label="Runs per day">
-        {days.map((day) => {
-          const total = day.passed + day.failed
-
-          return (
-            <Link
-              key={day.day}
-              to="/runs"
-              search={{ day: day.day }}
-              role="listitem"
-              title={`${day.day}: ${day.passed} passed, ${day.failed} with a failure`}
-              aria-label={`${day.day}: ${total} runs`}
-              style={{ flex: 1, height: "100%", display: "flex", alignItems: "flex-end" }}
-            >
-              <Stack
-                gap="0.5"
-                w="full"
-                style={{ height: `${(total / most) * 100}%` }}
-                minH={total > 0 ? "1" : "0"}
-              >
-                <Box bg="verdict.failed.solid" rounded="sm" style={{ flex: day.failed }} />
-                <Box bg="verdict.passed.solid" rounded="sm" style={{ flex: day.passed }} />
-              </Stack>
+      <StackedBars
+        label="Runs per day"
+        height="11rem"
+        points={days.map((day) => ({ label: day.day, passed: day.passed, failed: day.failed }))}
+        series={[
+          { key: "passed", label: "Passed", color: "var(--danwo-colors-verdict-passed-solid)" },
+          {
+            key: "failed",
+            label: "Had a failure",
+            color: "var(--danwo-colors-verdict-failed-solid)",
+          },
+        ]}
+        onPick={(day) => void navigate({ to: "/runs", search: { day } })}
+      />
+      <Box role="list" aria-label="Days" srOnly>
+        {days.map((day) => (
+          <Box role="listitem" key={day.day}>
+            <Link to="/runs" search={{ day: day.day }}>
+              {day.day}: {day.passed} passed, {day.failed} with a failure
             </Link>
-          )
-        })}
-      </HStack>
-      <HStack justify="space-between" mt="2" fontSize="1" color="ink.faint">
-        <span>{days[0]?.day}</span>
-        <span>{days.at(-1)?.day}</span>
-      </HStack>
+          </Box>
+        ))}
+      </Box>
     </Box>
   )
 }
@@ -108,27 +78,87 @@ function DayLine({
   values,
   range,
   color,
+  format,
 }: {
   readonly title: string
   readonly values: readonly (number | null)[]
   readonly range?: readonly [number, number]
   readonly color?: string
+  readonly format: (value: number) => string
 }) {
   return (
     <Section title={title}>
       {values.every((value) => value === null) ? (
         <None>Nothing ran in this window.</None>
       ) : (
-        <Box h="32">
-          <Sparkline
-            label={title}
-            values={values}
-            fluid
-            height={120}
-            {...(range && { range })}
-            {...(color && { color })}
-          />
-        </Box>
+        <TrendLine
+          label={title}
+          values={values}
+          height="8rem"
+          format={format}
+          {...(range && { range })}
+          {...(color && { color })}
+        />
+      )}
+    </Section>
+  )
+}
+
+/** The runs worth a look: the window's failing runs, newest first. */
+function Failing({ overview }: { readonly overview: Overview }) {
+  return (
+    <Section title="Worth a look" count={overview.failing.length}>
+      {overview.failing.length === 0 ? (
+        <None>No run failed in this window.</None>
+      ) : (
+        <ListRows>
+          {overview.failing.map((run) => (
+            <ListRow key={run.id} display="flex" gap="3" alignItems="center">
+              <VerdictBadge tone="failed">{run.failed} failed</VerdictBadge>
+              <Link to="/runs/$runId" params={{ runId: run.id }}>
+                <Span fontWeight="500" overflowWrap="anywhere">
+                  {run.title}
+                </Span>
+              </Link>
+              <Span ml="auto" color="ink.muted" fontSize="1" whiteSpace="nowrap">
+                {run.kind === "matrix" ? "matrix · " : ""}
+                <TimeAgo at={run.startedAt} />
+              </Span>
+            </ListRow>
+          ))}
+        </ListRows>
+      )}
+    </Section>
+  )
+}
+
+/** The tests a fault broke under the matrix in this window, with the faults that did it. */
+function Broken({ overview }: { readonly overview: Overview }) {
+  return (
+    <Section title="Breaks under faults" count={overview.broken.length}>
+      {overview.broken.length === 0 ? (
+        <None>No test broke under the fault matrix in this window.</None>
+      ) : (
+        <ListRows>
+          {overview.broken.map((test) => (
+            <ListRow key={test.id}>
+              <Stack gap="1">
+                <Link to="/runs/$runId" params={{ runId: test.runId }}>
+                  <Span fontWeight="500" overflowWrap="anywhere">
+                    {test.id}
+                  </Span>
+                </Link>
+                <HStack gap="1.5" flexWrap="wrap">
+                  {test.faults.map((fault) => (
+                    <VerdictBadge key={fault} tone="failed" fontFamily="mono">
+                      {fault}
+                    </VerdictBadge>
+                  ))}
+                </HStack>
+              </Stack>
+            </ListRow>
+          ))}
+        </ListRows>
       )}
     </Section>
   )
@@ -140,7 +170,6 @@ function DayLine({
  */
 export function OverviewPage({ overview }: { readonly overview: Overview }) {
   const navigate = useNavigate()
-  const { days } = overview
 
   return (
     <Page
@@ -148,23 +177,14 @@ export function OverviewPage({ overview }: { readonly overview: Overview }) {
       title="Overview"
       detail={`The last ${overview.range} days of danwo test and danwo matrix in this project`}
       actions={
-        <Select
-          aria-label="Date range"
-          value={overview.range}
-          onChange={(event) =>
-            void navigate({
-              to: "/",
-              search: { range: rangeOf(event.target.value) ?? 30 },
-              replace: true,
-            })
+        <Choice
+          label="Date range"
+          value={String(overview.range)}
+          options={RANGES.map((range) => [String(range), `Last ${range} days`] as const)}
+          onChange={(value) =>
+            void navigate({ to: "/", search: { range: rangeOf(value) ?? 30 }, replace: true })
           }
-        >
-          {RANGES.map((range) => (
-            <option key={range} value={range}>
-              Last {range} days
-            </option>
-          ))}
-        </Select>
+        />
       }
     >
       <LiveRuns />
@@ -211,74 +231,30 @@ export function OverviewPage({ overview }: { readonly overview: Overview }) {
           <Section
             title="Runs per day"
             aside={
-              <styled.span color="ink.muted" fontSize="1">
+              <Span color="ink.muted" fontSize="1">
                 A day opens its runs
-              </styled.span>
+              </Span>
             }
           >
-            <RunsPerDay days={days} />
+            <RunsPerDay days={overview.days} />
           </Section>
           <Grid gridTemplateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap="2" mt="2">
             <DayLine
               title="Pass rate trend"
               values={overview.trend.map((run) => run.passRate)}
               range={[0, 1]}
+              format={(value) => percent(value)}
             />
             <DayLine
               title="Run duration"
               values={overview.trend.map((run) => run.durationMs)}
               color="var(--danwo-colors-series-2)"
+              format={duration}
             />
           </Grid>
           <Grid gridTemplateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap="2" mt="2">
-            <Section title="Worth a look" count={overview.failing.length}>
-              {overview.failing.length === 0 ? (
-                <None>No run failed in this window.</None>
-              ) : (
-                <RowList>
-                  {overview.failing.map((run) => (
-                    <Row key={run.id} display="flex" gap="3" alignItems="center">
-                      <Badge tone="failed">{run.failed} failed</Badge>
-                      <Link to="/runs/$runId" params={{ runId: run.id }}>
-                        <styled.span fontWeight="500" overflowWrap="anywhere">
-                          {run.title}
-                        </styled.span>
-                      </Link>
-                      <styled.span ml="auto" color="ink.muted" fontSize="1" whiteSpace="nowrap">
-                        {run.kind === "matrix" ? "matrix · " : ""}
-                        <TimeAgo at={run.startedAt} />
-                      </styled.span>
-                    </Row>
-                  ))}
-                </RowList>
-              )}
-            </Section>
-            <Section title="Breaks under faults" count={overview.broken.length}>
-              {overview.broken.length === 0 ? (
-                <None>No test broke under the fault matrix in this window.</None>
-              ) : (
-                <RowList>
-                  {overview.broken.map((test) => (
-                    <Row key={test.id}>
-                      <Stack gap="1">
-                        <Link to="/runs/$runId" params={{ runId: test.runId }}>
-                          <styled.span fontWeight="500" overflowWrap="anywhere">
-                            {test.id}
-                          </styled.span>
-                        </Link>
-                        <HStack gap="1.5" flexWrap="wrap">
-                          {test.faults.map((fault) => (
-                            <Ident key={fault} color="verdict.failed.fg" fontSize="1">
-                              {fault}
-                            </Ident>
-                          ))}
-                        </HStack>
-                      </Stack>
-                    </Row>
-                  ))}
-                </RowList>
-              )}
-            </Section>
+            <Failing overview={overview} />
+            <Broken overview={overview} />
           </Grid>
         </>
       )}

@@ -1,13 +1,25 @@
-import { Box, HStack, Stack, styled } from "@danwo/ui/jsx"
+import { Icons } from "@danwo/ui/icons/base"
+import { Box, Grid, HStack, Stack } from "@danwo/ui/jsx"
+import { Button } from "@danwo/ui/primitives/button"
+import { Checkbox } from "@danwo/ui/primitives/checkbox/checkbox"
+import { Label } from "@danwo/ui/primitives/label"
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@danwo/ui/primitives/resizable"
+import { TableBody, TableCell, TableHead, TableRow } from "@danwo/ui/primitives/table"
+import { TabTrigger, Tabs, TabsList } from "@danwo/ui/primitives/tabs"
+import { Heading, Span, Text } from "@danwo/ui/primitives/typography"
 import { useState } from "react"
 
 import { Ident, Pre } from "../../components/code.tsx"
-import { Button, SegmentTrack, segment } from "../../components/controls.tsx"
+import { SearchBox } from "../../components/controls.tsx"
 import { useCopied } from "../../components/copy-link.tsx"
 import { None } from "../../components/panel.tsx"
-import { RowTable, Td, Th } from "../../components/table.tsx"
+import { ScrollTable } from "../../components/scroll-table.tsx"
 import { duration } from "../../lib/format.ts"
-import { Calls, Deliveries } from "../record/record-calls.tsx"
+import { CallDetail, CallsTable, DeliveriesTable, NoneHere } from "../record/record-calls.tsx"
 import type { RecordView } from "../record/record-data.ts"
 import { RecordPlayer } from "../record/record-player.tsx"
 import { clock } from "../record/record-replay.ts"
@@ -51,80 +63,130 @@ export interface PaneProps {
   readonly playback: Playback | undefined
 }
 
-const Filter = styled("input", {
-  base: {
-    h: "8",
-    px: "2.5",
-    w: { base: "full", sm: "16rem" },
-    rounded: "lg",
-    bg: "surface.hover",
-    color: "ink.strong",
-    fontSize: "1",
-    outline: "none",
-    _placeholder: { color: "ink.faint" },
-    _focus: { boxShadow: "0 0 0 3px {colors.ring}" },
-  },
-})
+/**
+ * A pane that fills the overlay's right side: a toolbar on top, and beneath it a region that
+ * scrolls on its own or holds a table that does.
+ */
+function PaneFrame({
+  bar,
+  children,
+}: {
+  readonly bar?: React.ReactNode
+  readonly children: React.ReactNode
+}) {
+  return (
+    <Stack gap="3" h="full" minH="0">
+      {bar === undefined ? null : (
+        <HStack gap="2" flexWrap="wrap" flexShrink="0">
+          {bar}
+        </HStack>
+      )}
+      <Box flex="1" minH="0">
+        {children}
+      </Box>
+    </Stack>
+  )
+}
 
 /** The run's video full size, the scrubber under it with every step and fault marked. */
 export function ReplayPane({ view, playback }: PaneProps) {
   if (playback === undefined) return <None>This run kept no video or screenshots to replay.</None>
 
-  return <RecordPlayer dir={view.dir} replay={view.replay} playback={playback} />
+  return (
+    <Box h="full" minH="0" overflowY="auto">
+      <RecordPlayer dir={view.dir} replay={view.replay} playback={playback} />
+    </Box>
+  )
 }
 
 /** The app's console by level, filtered by what is typed, ready to copy. */
 export function ConsolePane({ view }: PaneProps) {
   const [level, setLevel] = useState<ConsoleLevel>("all")
   const [filter, setFilter] = useState("")
-  const [copied, copy] = useCopied()
+  const [, copy] = useCopied("Console copied")
   const lines = consoleLines(view.record.appLog, level, filter)
 
   return (
-    <Stack gap="3" minH="0">
-      <HStack gap="2" flexWrap="wrap">
-        <SegmentTrack role="tablist" aria-label="Log level">
-          {CONSOLE_LEVELS.map((each) => (
-            <styled.button
-              key={each}
-              type="button"
-              className={segment}
-              role="tab"
-              aria-selected={each === level}
-              data-on={each === level || undefined}
-              onClick={() => setLevel(each)}
-            >
-              {LEVEL_WORDS[each]}
-            </styled.button>
-          ))}
-        </SegmentTrack>
-        <Filter
-          type="search"
-          placeholder="Filter the console"
-          aria-label="Filter the console"
-          value={filter}
-          onChange={(event) => setFilter(event.target.value)}
-        />
-        <Button
-          type="button"
-          ml="auto"
-          onClick={() => copy(lines.map((line) => `${line.level} ${line.text}`).join("\n"))}
-        >
-          {copied ? "Copied" : "Copy"}
-        </Button>
-      </HStack>
+    <PaneFrame
+      bar={
+        <>
+          <Tabs value={level} onValueChange={(next) => setLevel(next as ConsoleLevel)}>
+            <TabsList aria-label="Log level">
+              {CONSOLE_LEVELS.map((each) => (
+                <TabTrigger key={each} value={each}>
+                  {LEVEL_WORDS[each]}
+                </TabTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+          <SearchBox
+            label="Filter the console"
+            placeholder="Filter the console"
+            value={filter}
+            onChange={setFilter}
+          />
+          <Button
+            variant="soft"
+            size="sm"
+            ml="auto"
+            onClick={() => copy(lines.map((line) => `${line.level} ${line.text}`).join("\n"))}
+          >
+            <Icons.copy size={13} />
+            Copy
+          </Button>
+        </>
+      }
+    >
       {lines.length === 0 ? (
-        <None>Nothing logged at this level.</None>
+        <NoneHere>Nothing logged at this level.</NoneHere>
       ) : (
-        <Pre bg="surface.item">
-          {lines.map((line, i) => (
-            <styled.span key={i} display="block" color={LEVEL_COLOR[line.level]}>
-              {`step ${line.step + 1}  ${line.level.padEnd(5)}  ${line.text}`}
-            </styled.span>
-          ))}
-        </Pre>
+        <ScrollTable
+          label="Console"
+          head={
+            <TableRow _hover={{ bg: "transparent" }}>
+              <TableHead px="3" color="ink.muted" w="5rem">
+                Step
+              </TableHead>
+              <TableHead px="3" color="ink.muted" w="5rem">
+                Level
+              </TableHead>
+              <TableHead px="3" color="ink.muted">
+                Message
+              </TableHead>
+            </TableRow>
+          }
+        >
+          <TableBody>
+            {lines.map((line, i) => (
+              <TableRow key={i}>
+                <TableCell px="3" color="ink.muted" fontSize="1" verticalAlign="top">
+                  {line.step + 1}
+                </TableCell>
+                <TableCell
+                  px="3"
+                  fontFamily="mono"
+                  fontSize="1"
+                  color={LEVEL_COLOR[line.level]}
+                  verticalAlign="top"
+                >
+                  {line.level}
+                </TableCell>
+                <TableCell
+                  px="3"
+                  fontFamily="mono"
+                  fontSize="1"
+                  whiteSpace="pre-wrap"
+                  overflowWrap="anywhere"
+                  color={LEVEL_COLOR[line.level]}
+                >
+                  {line.text}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </ScrollTable>
       )}
-    </Stack>
+    </PaneFrame>
   )
 }
 
@@ -135,110 +197,183 @@ export function NetworkPane({ view }: PaneProps) {
   const rows = shownRows(networkRows(view.record), filter, assets)
 
   return (
-    <Stack gap="3" minH="0">
-      <HStack gap="3" flexWrap="wrap">
-        <Filter
-          type="search"
-          placeholder="Filter by method, status or URL"
-          aria-label="Filter the network"
-          value={filter}
-          onChange={(event) => setFilter(event.target.value)}
-        />
-        <styled.label
-          display="inline-flex"
-          alignItems="center"
-          gap="1.5"
-          color="ink.soft"
-          fontSize="1"
-        >
-          <input
-            type="checkbox"
-            checked={assets}
-            onChange={(event) => setAssets(event.target.checked)}
+    <PaneFrame
+      bar={
+        <>
+          <SearchBox
+            label="Filter the network"
+            placeholder="Filter by method, status or URL"
+            value={filter}
+            onChange={setFilter}
+            width="18rem"
           />
-          Show static assets
-        </styled.label>
-      </HStack>
+          <HStack gap="2">
+            <Checkbox
+              id="network-assets"
+              checked={assets}
+              onCheckedChange={(checked) => setAssets(checked === true)}
+            />
+            <Label htmlFor="network-assets" fontSize="1" color="ink.soft">
+              Show static assets
+            </Label>
+          </HStack>
+        </>
+      }
+    >
       {rows.length === 0 ? (
-        <None>No calls went through the proxy{assets ? "" : " besides static assets"}.</None>
+        <NoneHere>{`No calls went through the proxy${assets ? "" : " besides static assets"}.`}</NoneHere>
       ) : (
-        <Box overflowX="auto">
-          <RowTable aria-label="Network">
-            <thead>
-              <tr>
-                {["Time", "Name", "Status", "Method", "Type", "Initiator", "Took", "URL"].map(
-                  (head) => (
-                    <Th key={head}>{head}</Th>
-                  ),
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id}>
-                  <Td fontVariantNumeric="tabular-nums">{clock(row.atMs)}</Td>
-                  <Td fontWeight="500">{row.name}</Td>
-                  <Td
-                    color={
-                      row.fault || row.status.startsWith("5") ? "verdict.failed.fg" : undefined
-                    }
+        <ScrollTable
+          label="Network"
+          head={
+            <TableRow _hover={{ bg: "transparent" }}>
+              {["Time", "Name", "Status", "Method", "Type", "Initiator", "Took", "URL"].map(
+                (head) => (
+                  <TableHead key={head} px="3" color="ink.muted">
+                    {head}
+                  </TableHead>
+                ),
+              )}
+            </TableRow>
+          }
+        >
+          <TableBody>
+            {rows.map((row) => (
+              <TableRow key={row.id}>
+                <TableCell px="3" fontVariantNumeric="tabular-nums" color="ink.muted">
+                  {clock(row.atMs)}
+                </TableCell>
+                <TableCell px="3" fontWeight="500">
+                  {row.name}
+                </TableCell>
+                <TableCell
+                  px="3"
+                  color={row.fault || row.status.startsWith("5") ? "verdict.failed.fg" : undefined}
+                >
+                  {row.status}
+                  {row.fault ? <Span ml="1.5">· {row.fault}</Span> : null}
+                </TableCell>
+                <TableCell px="3" fontFamily="mono" fontSize="1">
+                  {row.method}
+                </TableCell>
+                <TableCell px="3" color="ink.muted">
+                  {row.type}
+                </TableCell>
+                <TableCell px="3" color="ink.muted">
+                  {row.initiator}
+                </TableCell>
+                <TableCell px="3" color="ink.muted">
+                  {row.durationMs === null ? "–" : duration(row.durationMs)}
+                </TableCell>
+                <TableCell px="3" maxW="28rem">
+                  <Ident
+                    display="block"
+                    overflow="hidden"
+                    textOverflow="ellipsis"
+                    whiteSpace="nowrap"
+                    title={row.url}
                   >
-                    {row.status}
-                    {row.fault ? <styled.span ml="1.5">· {row.fault}</styled.span> : null}
-                  </Td>
-                  <Td>{row.method}</Td>
-                  <Td color="ink.muted">{row.type}</Td>
-                  <Td color="ink.muted">{row.initiator}</Td>
-                  <Td color="ink.muted" whiteSpace="nowrap">
-                    {row.durationMs === null ? "–" : duration(row.durationMs)}
-                  </Td>
-                  <Td maxW="28rem">
-                    <Ident
-                      display="block"
-                      overflow="hidden"
-                      textOverflow="ellipsis"
-                      whiteSpace="nowrap"
-                      title={row.url}
-                    >
-                      {row.url}
-                    </Ident>
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </RowTable>
-        </Box>
+                    {row.url}
+                  </Ident>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </ScrollTable>
       )}
+    </PaneFrame>
+  )
+}
+
+/** The calls as a table, the picked one's request and response beside it (below on narrow screens). */
+function CallsArea({ exchanges }: { readonly exchanges: RecordView["record"]["exchanges"] }) {
+  const [picked, setPicked] = useState<string>()
+  const call = exchanges.find((exchange) => exchange.id === picked)
+
+  if (exchanges.length === 0) return <NoneHere>No provider calls in this run.</NoneHere>
+
+  return (
+    <Grid
+      h="full"
+      minH="0"
+      gap="2"
+      gridTemplateColumns={call ? { base: "1fr", xl: "minmax(0, 1fr) 24rem" } : "1fr"}
+      gridTemplateRows={
+        call ? { base: "minmax(0, 1fr) minmax(0, 1fr)", xl: "minmax(0, 1fr)" } : "minmax(0, 1fr)"
+      }
+    >
+      <CallsTable exchanges={exchanges} picked={picked} onPick={setPicked} />
+      {call ? <CallDetail exchange={call} onClose={() => setPicked(undefined)} /> : null}
+    </Grid>
+  )
+}
+
+/** The calls and webhooks under the waterfall, one table at a time behind the library's tabs. */
+function ProviderTables({ view }: { readonly view: RecordView }) {
+  const { exchanges, deliveries } = view.record
+  const [table, setTable] = useState<"calls" | "webhooks">("calls")
+
+  return (
+    <Stack gap="2" h="full" minH="0" pt="3">
+      <Tabs value={table} onValueChange={(next) => setTable(next as "calls" | "webhooks")}>
+        <TabsList aria-label="Calls or webhooks">
+          <TabTrigger value="calls" gap="1.5">
+            Calls
+            <Span color="ink.muted">{exchanges.length}</Span>
+          </TabTrigger>
+          <TabTrigger value="webhooks" gap="1.5">
+            Webhooks
+            <Span color="ink.muted">{deliveries.length}</Span>
+          </TabTrigger>
+        </TabsList>
+      </Tabs>
+      <Box flex="1" minH="0">
+        {table === "calls" ? (
+          <CallsArea exchanges={exchanges} />
+        ) : deliveries.length === 0 ? (
+          <NoneHere>No webhooks were delivered in this run.</NoneHere>
+        ) : (
+          <DeliveriesTable deliveries={deliveries} />
+        )}
+      </Box>
     </Stack>
   )
 }
 
-/** Steps, provider calls and webhooks on one clock with the faults marked, then the webhooks. */
+/**
+ * Steps, provider calls and webhooks on one clock with the faults marked, held at the top; the
+ * calls and webhooks as tables beneath, each in its own scroll region, with a handle between.
+ */
 export function ProvidersPane({ view, playback }: PaneProps) {
   return (
-    <Stack gap="4">
-      <HStack justify="flex-end">
-        <TimelineLegend />
-      </HStack>
-      {view.timeline.items.length === 0 ? (
-        <None>Nothing was timed in this run.</None>
-      ) : (
-        <Waterfall
-          timeline={view.timeline}
-          {...(playback && { playheadMs: playback.ms, onSeek: playback.seek })}
-        />
-      )}
-      {view.record.exchanges.length > 0 ? <Calls exchanges={view.record.exchanges} /> : null}
-      {view.record.deliveries.length > 0 ? (
-        <Deliveries deliveries={view.record.deliveries} />
-      ) : null}
-    </Stack>
+    <PaneFrame bar={<TimelineLegend />}>
+      <ResizablePanelGroup direction="vertical" autoSaveId="danwo-providers">
+        <ResizablePanel defaultSize="45" minSize="15">
+          {view.timeline.items.length === 0 ? (
+            <NoneHere>Nothing was timed in this run.</NoneHere>
+          ) : (
+            <Waterfall
+              timeline={view.timeline}
+              {...(playback && { playheadMs: playback.ms, onSeek: playback.seek })}
+            />
+          )}
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize="55" minSize="20">
+          <ProviderTables view={view} />
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    </PaneFrame>
   )
 }
 
 /** What each emulated provider held when the run ended: what an invariant reads. */
 export function StatePane({ view }: PaneProps) {
-  return <Pre bg="surface.item">{view.state}</Pre>
+  return (
+    <Pre bg="surface.item" h="full" maxH="none" overflow="auto" m="0">
+      {view.state}
+    </Pre>
+  )
 }
 
 /** For each step that compared them, what the recording expected against what this run did. */
@@ -256,17 +391,17 @@ export function EffectsPane({ view }: PaneProps) {
     )
 
   return (
-    <Stack gap="4">
+    <Stack gap="4" h="full" minH="0" overflowY="auto">
       {compared.map((step) => (
         <Stack key={step.index} gap="1.5">
-          <styled.h3 fontWeight="600">
+          <Heading as="h3" fontWeight="600">
             {step.index + 1}. {step.label}
-          </styled.h3>
+          </Heading>
           <Pre bg="surface.item">
             {(step.effectDiff ?? []).map((line, i) => (
-              <styled.span key={i} display="block" color={SEEN[line.seen].color}>
+              <Span key={i} display="block" color={SEEN[line.seen].color}>
                 {`${SEEN[line.seen].mark} ${line.area.padEnd(8)} ${line.text}   (${SEEN[line.seen].word})`}
-              </styled.span>
+              </Span>
             ))}
           </Pre>
         </Stack>
@@ -282,8 +417,8 @@ export function MatrixPane({ view }: PaneProps) {
   if (run.kind !== "matrix") return <None>This run was not a matrix trial.</None>
 
   return (
-    <Stack gap="2">
-      <styled.p>
+    <Stack gap="2" h="full" minH="0" overflowY="auto">
+      <Text>
         {run.fault ? (
           <>
             This run replayed the clean recording with one fault injected:{" "}
@@ -292,12 +427,12 @@ export function MatrixPane({ view }: PaneProps) {
         ) : (
           "This was the matrix's clean run: the recording every faulted trial replays."
         )}
-      </styled.p>
-      {view.record.stopped ? <styled.p color="ink.soft">{view.record.stopped}</styled.p> : null}
+      </Text>
+      {view.record.stopped ? <Text color="ink.soft">{view.record.stopped}</Text> : null}
       {view.record.notes.map((note) => (
-        <styled.p key={note} color="ink.muted">
+        <Text key={note} color="ink.muted">
           {note}
-        </styled.p>
+        </Text>
       ))}
     </Stack>
   )

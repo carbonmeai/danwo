@@ -1,7 +1,8 @@
-import { Box, Grid, Stack, styled } from "@danwo/ui/jsx"
+import { Box, Grid, Stack } from "@danwo/ui/jsx"
+import { Span } from "@danwo/ui/primitives/typography"
 
-import { None } from "../../components/panel.tsx"
-import { Sparkline } from "../../components/sparkline.tsx"
+import { TrendLine } from "../../components/charts.tsx"
+import { Item, None } from "../../components/panel.tsx"
 import { percent, when } from "../../lib/format.ts"
 import type { CachePoint } from "./insights-data.ts"
 
@@ -19,38 +20,37 @@ export function CacheTrend({ points }: { readonly points: readonly CachePoint[] 
   const average = points.reduce((sum, p) => sum + p.rate, 0) / points.length
 
   return (
-    <Grid
-      gridTemplateColumns={{ base: "1fr", md: "12rem minmax(0, 1fr)" }}
-      gap="6"
-      alignItems="center"
-      bg="surface.item"
-      rounded="10px"
-      px="4"
-      py="3.5"
-    >
-      <Stack gap="1">
-        <styled.span
-          fontSize="5.5"
-          fontWeight="600"
-          letterSpacing="-0.015em"
-          fontVariantNumeric="tabular-nums"
-        >
-          {percent(last?.rate ?? null)}
-        </styled.span>
-        <styled.span color="ink.muted" fontSize="1">
-          of agent steps replayed in the latest run, {percent(average)} on average
-        </styled.span>
-      </Stack>
-      <Box overflow="hidden">
-        <Sparkline
-          values={points.map((p) => p.rate)}
-          range={[0, 1]}
-          width={640}
-          height={72}
-          fluid
-          label={`Replay cache hit rate per run, from ${when(points[0]?.startedAt ?? "")} to ${when(last?.startedAt ?? "")}`}
-        />
-      </Box>
-    </Grid>
+    <Item px="4" py="3.5">
+      <Grid
+        gridTemplateColumns={{ base: "1fr", md: "12rem minmax(0, 1fr)" }}
+        gap="6"
+        alignItems="center"
+      >
+        <Stack gap="1">
+          <Span
+            fontSize="5.5"
+            fontWeight="600"
+            letterSpacing="-0.015em"
+            fontVariantNumeric="tabular-nums"
+          >
+            {percent(last?.rate ?? null)}
+          </Span>
+          <Span color="ink.muted" fontSize="1">
+            of agent steps replayed in the latest run, {percent(average)} on average
+          </Span>
+        </Stack>
+        <Box overflow="hidden">
+          <TrendLine
+            values={points.map((p) => p.rate)}
+            labels={points.map((p) => when(p.startedAt))}
+            range={[0, 1]}
+            height="5rem"
+            axis={false}
+            format={(value) => percent(value)}
+            label={`Replay cache hit rate per run, from ${when(points[0]?.startedAt ?? "")} to ${when(last?.startedAt ?? "")}`}
+          />
+        </Box>
+      </Grid>
+    </Item>
   )
 }

@@ -1,4 +1,5 @@
 import { ThemeProvider } from "@danwo/ui/primitives/theme"
+import { Toaster } from "@danwo/ui/primitives/toast/toaster"
 import { createRootRoute, HeadContent, Link, Outlet, Scripts } from "@tanstack/react-router"
 
 import { Empty } from "../components/empty-state.tsx"
@@ -68,6 +69,7 @@ function RootComponent() {
           <AppShell project={project.name}>
             <Outlet />
           </AppShell>
+          <Toaster position="bottom-right" />
         </ThemeProvider>
         <Scripts />
       </body>

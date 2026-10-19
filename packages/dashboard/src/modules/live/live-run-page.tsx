@@ -1,14 +1,22 @@
 import type { LiveCall, LiveDelivery, LiveStep } from "@danwo/runner/runner"
 import { Icons } from "@danwo/ui/icons/base"
 import { Box, Grid, HStack, Stack, styled } from "@danwo/ui/jsx"
+import { Heading, Span } from "@danwo/ui/primitives/typography"
 import { Link, useRouter } from "@tanstack/react-router"
 import { useEffect, useState } from "react"
 
 import { Ident } from "../../components/code.tsx"
 import { Page } from "../../components/page.tsx"
-import { Item, None, Section, StatCard, StatCards } from "../../components/panel.tsx"
-import { Badge, StatusBadge, Swatch } from "../../components/status-badge.tsx"
-import { Row, RowList } from "../../components/table.tsx"
+import {
+  Item,
+  ListRow,
+  ListRows,
+  None,
+  Section,
+  StatCard,
+  StatCards,
+} from "../../components/panel.tsx"
+import { StatusBadge, Swatch, VerdictBadge } from "../../components/status-badge.tsx"
 import { TimeAgo } from "../../components/time-ago.tsx"
 import { dollars, duration } from "../../lib/format.ts"
 import { toneOf } from "../../lib/verdicts.ts"
@@ -72,10 +80,10 @@ export function LiveBadge({ word }: { readonly word: string }) {
   if (word !== "running") return <StatusBadge status={word} />
 
   return (
-    <Badge tone="notJudged" data-status="running">
+    <VerdictBadge tone="notJudged" data-status="running">
       <Pulse aria-hidden="true" />
       running
-    </Badge>
+    </VerdictBadge>
   )
 }
 
@@ -87,30 +95,25 @@ function StepMark({ step }: { readonly step: LiveStep }) {
 
 function StepLine({ step }: { readonly step: LiveStep }) {
   return (
-    <Stack as="li" gap="0.5" minW="0">
+    <Stack role="listitem" gap="0.5" minW="0">
       <HStack gap="2" minW="0">
         <StepMark step={step} />
-        <styled.span
-          overflow="hidden"
-          textOverflow="ellipsis"
-          whiteSpace="nowrap"
-          title={step.label}
-        >
+        <Span overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" title={step.label}>
           {step.label}
-        </styled.span>
-        <styled.span ml="auto" color="ink.muted" fontSize="1" fontVariantNumeric="tabular-nums">
+        </Span>
+        <Span ml="auto" color="ink.muted" fontSize="1" fontVariantNumeric="tabular-nums">
           {step.status === "running" ? "…" : duration(step.durationMs)}
-        </styled.span>
+        </Span>
       </HStack>
       {step.actions.length > 0 ? (
-        <styled.span pl="4" color="ink.muted" fontSize="1" lineClamp="2">
+        <Span pl="4" color="ink.muted" fontSize="1" lineClamp="2">
           {step.actions.join(" · ")}
-        </styled.span>
+        </Span>
       ) : null}
       {step.error ? (
-        <styled.span pl="4" color="verdict.failed.fg" fontSize="1" lineClamp="2">
+        <Span pl="4" color="verdict.failed.fg" fontSize="1" lineClamp="2">
           {step.error}
-        </styled.span>
+        </Span>
       ) : null}
     </Stack>
   )
@@ -120,7 +123,7 @@ function CallLine({ call }: { readonly call: LiveCall }) {
   const failed = call.status === null || call.status >= 400
 
   return (
-    <HStack as="li" gap="2" minW="0" fontSize="1">
+    <HStack role="listitem" gap="2" minW="0" fontSize="1">
       <Ident color={failed ? "verdict.failed.fg" : "ink.soft"} w="2.5rem" flexShrink="0">
         {call.status ?? "–"}
       </Ident>
@@ -134,9 +137,9 @@ function CallLine({ call }: { readonly call: LiveCall }) {
         {call.path}
       </Ident>
       {call.fault ? (
-        <Badge tone="flaky" ml="auto" flexShrink="0">
+        <VerdictBadge tone="flaky" ml="auto" flexShrink="0">
           {call.fault}
-        </Badge>
+        </VerdictBadge>
       ) : null}
     </HStack>
   )
@@ -144,7 +147,7 @@ function CallLine({ call }: { readonly call: LiveCall }) {
 
 function DeliveryLine({ delivery }: { readonly delivery: LiveDelivery }) {
   return (
-    <HStack as="li" gap="2" minW="0" fontSize="1">
+    <HStack role="listitem" gap="2" minW="0" fontSize="1">
       <Ident
         color={delivery.delivered ? "ink.soft" : "verdict.failed.fg"}
         w="2.5rem"
@@ -157,9 +160,9 @@ function DeliveryLine({ delivery }: { readonly delivery: LiveDelivery }) {
         {delivery.topic}
       </Ident>
       {delivery.fault ? (
-        <Badge tone="flaky" ml="auto" flexShrink="0">
+        <VerdictBadge tone="flaky" ml="auto" flexShrink="0">
           {delivery.fault}
-        </Badge>
+        </VerdictBadge>
       ) : null}
     </HStack>
   )
@@ -168,9 +171,9 @@ function DeliveryLine({ delivery }: { readonly delivery: LiveDelivery }) {
 /** A small heading over one of an attempt card's lists. */
 function ListHead({ children }: { readonly children: string }) {
   return (
-    <styled.h3 color="ink.muted" fontSize="1" fontWeight="500" mb="1">
+    <Heading as="h3" color="ink.muted" fontSize="1" fontWeight="500" mb="1">
       {children}
-    </styled.h3>
+    </Heading>
   )
 }
 
@@ -182,15 +185,15 @@ function AttemptCard({ attempt, now }: { readonly attempt: LiveAttempt; readonly
     <Item px="4" py="3.5" data-attempt={attempt.key}>
       <HStack gap="2" mb="3" flexWrap="wrap">
         <Pulse aria-hidden="true" />
-        <styled.span fontWeight="500" overflowWrap="anywhere">
+        <Span fontWeight="500" overflowWrap="anywhere">
           {attempt.test}
-        </styled.span>
+        </Span>
         <Ident color="ink.muted" fontSize="1">
           {attempt.attempt}
         </Ident>
-        <styled.span ml="auto" color="ink.muted" fontSize="1" fontVariantNumeric="tabular-nums">
+        <Span ml="auto" color="ink.muted" fontSize="1" fontVariantNumeric="tabular-nums">
           {duration(now - Date.parse(attempt.startedAt))}
-        </styled.span>
+        </Span>
       </HStack>
       <Grid gridTemplateColumns={{ base: "1fr", lg: "minmax(0, 3fr) minmax(0, 2fr)" }} gap="4">
         <Box minW="0">
@@ -198,7 +201,7 @@ function AttemptCard({ attempt, now }: { readonly attempt: LiveAttempt; readonly
           {attempt.steps.length === 0 ? (
             <None>Starting…</None>
           ) : (
-            <Stack as="ol" gap="2" aria-label="Steps so far">
+            <Stack role="list" gap="2" aria-label="Steps so far">
               {attempt.steps.slice(-SHOWN).map((step) => (
                 <StepLine key={step.index} step={step} />
               ))}
@@ -208,7 +211,7 @@ function AttemptCard({ attempt, now }: { readonly attempt: LiveAttempt; readonly
         <Stack gap="3" minW="0">
           <Box>
             <ListHead>{`Provider calls (${attempt.calls.length})`}</ListHead>
-            <Stack as="ul" gap="1" aria-label="Provider calls so far">
+            <Stack role="list" gap="1" aria-label="Provider calls so far">
               {behind.map((call) => (
                 <CallLine key={call.id} call={call} />
               ))}
@@ -217,7 +220,7 @@ function AttemptCard({ attempt, now }: { readonly attempt: LiveAttempt; readonly
           {attempt.deliveries.length > 0 ? (
             <Box>
               <ListHead>{`Webhooks (${attempt.deliveries.length})`}</ListHead>
-              <Stack as="ul" gap="1" aria-label="Webhooks so far">
+              <Stack role="list" gap="1" aria-label="Webhooks so far">
                 {attempt.deliveries.slice(-SHOWN).map((delivery, i) => (
                   <DeliveryLine key={`${delivery.topic} ${i}`} delivery={delivery} />
                 ))}
@@ -235,16 +238,16 @@ function Finished({ view }: { readonly view: LiveView }) {
   if (view.done.length === 0) return <None>Nothing has finished yet.</None>
 
   return (
-    <RowList aria-label="Finished">
+    <ListRows aria-label="Finished">
       {view.done.toReversed().map((item, i) => (
-        <Row key={`${item.name} ${i}`} display="flex" alignItems="center" gap="3">
+        <ListRow key={`${item.name} ${i}`} display="flex" alignItems="center" gap="3">
           <Box w="8rem" flexShrink="0">
             <StatusBadge status={item.status} />
           </Box>
           <Ident overflowWrap="anywhere">{item.name}</Ident>
-        </Row>
+        </ListRow>
       ))}
-    </RowList>
+    </ListRows>
   )
 }
 
@@ -304,10 +307,10 @@ function Stopped() {
         <Icons.warn size={14} />
         This run stopped before it finished
       </HStack>
-      <styled.span color="ink.soft">
+      <Span color="ink.soft">
         Its process went away without a result: it was cancelled, or it crashed. What finished
         before is below.
-      </styled.span>
+      </Span>
     </Stack>
   )
 }

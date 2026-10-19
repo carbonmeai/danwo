@@ -1,11 +1,14 @@
 import type { MatrixHistory } from "@danwo/runner/runner"
+import { Icons } from "@danwo/ui/icons/base"
 import { Box, HStack, Stack } from "@danwo/ui/jsx"
+import { Button } from "@danwo/ui/primitives/button"
+import { Span } from "@danwo/ui/primitives/typography"
 import { Link } from "@tanstack/react-router"
 import { useEffect, useRef } from "react"
 
 import { Ident } from "../../components/code.tsx"
+import { ListRow, ListRows, Panel } from "../../components/panel.tsx"
 import { StatusBadge } from "../../components/status-badge.tsx"
-import { Row, RowList, RowPanel } from "../../components/table.tsx"
 import { useListKeys } from "../../lib/list-keys.ts"
 import { listedTrials } from "./matrix-values.ts"
 
@@ -19,7 +22,7 @@ export function TrialList({
   readonly focus?: string | undefined
 }) {
   const trials = listedTrials(run)
-  const list = useRef<HTMLUListElement>(null)
+  const list = useRef<HTMLDivElement>(null)
   const current = useListKeys(list, trials.length)
 
   useEffect(() => {
@@ -31,18 +34,22 @@ export function TrialList({
   }, [focus])
 
   return (
-    <RowPanel pt="1.5">
-      <RowList ref={list} aria-label="Faults">
+    <Panel px="1.5" py="1.5">
+      <ListRows ref={list} aria-label="Faults">
         {trials.map((trial, i) => (
-          <Row
+          <ListRow
             key={trial.fault}
             data-row
             data-trial={trial.fault}
             data-status={trial.status}
-            data-current={i === current || undefined}
-            data-picked={trial.fault === focus || undefined}
+            bg={i === current || trial.fault === focus ? "surface.itemHover" : "surface.item"}
+            boxShadow={
+              i === current || trial.fault === focus
+                ? "inset 2px 0 0 {colors.ink.strong}"
+                : undefined
+            }
             display="grid"
-            gridTemplateColumns={{ base: "1fr", md: "8rem minmax(0, 1fr) 12rem" }}
+            gridTemplateColumns={{ base: "1fr", md: "8rem minmax(0, 1fr) 14rem" }}
             gap="3"
             alignItems="center"
           >
@@ -65,24 +72,26 @@ export function TrialList({
                 </Box>
               ) : null}
             </Stack>
-            <HStack gap="3" justify={{ md: "flex-end" }} color="ink.muted" fontSize="1">
-              <span>
+            <HStack gap="2" justify={{ md: "flex-end" }} color="ink.muted" fontSize="1">
+              <Span>
                 {trial.calls} calls, {trial.deliveries} webhooks
-              </span>
+              </Span>
               {trial.record ? (
-                <Link
-                  to="."
-                  search={(prev) => ({ ...prev, open: trial.record })}
-                  resetScroll={false}
-                  data-link
-                >
-                  Watch
-                </Link>
+                <Button asChild variant="ghost" size="icon" tooltipChildren="Watch this trial">
+                  <Link
+                    to="."
+                    search={(prev) => ({ ...prev, open: trial.record })}
+                    resetScroll={false}
+                    aria-label="Watch"
+                  >
+                    <Icons.play size={14} />
+                  </Link>
+                </Button>
               ) : null}
             </HStack>
-          </Row>
+          </ListRow>
         ))}
-      </RowList>
-    </RowPanel>
+      </ListRows>
+    </Panel>
   )
 }

@@ -1,11 +1,13 @@
 import type { MatrixHistory } from "@danwo/runner/runner"
-import { HStack, Stack, styled } from "@danwo/ui/jsx"
+import { Icons } from "@danwo/ui/icons/base"
+import { HStack, Stack } from "@danwo/ui/jsx"
+import { TabTrigger, Tabs, TabsList } from "@danwo/ui/primitives/tabs"
+import { Span } from "@danwo/ui/primitives/typography"
 import { Link } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 
 import { BarList } from "../../components/bar-list.tsx"
 import { Command, Ident } from "../../components/code.tsx"
-import { segment, SegmentTrack } from "../../components/controls.tsx"
 import { Empty } from "../../components/empty-state.tsx"
 import { Page } from "../../components/page.tsx"
 import { Section } from "../../components/panel.tsx"
@@ -24,48 +26,41 @@ export type MatrixView = "grid" | "list"
 
 function Legend() {
   return (
-    <HStack as="ul" aria-label="Legend" gap="4" flexWrap="wrap" fontSize="1" color="ink.muted">
+    <HStack role="list" aria-label="Legend" gap="4" flexWrap="wrap" fontSize="1" color="ink.muted">
       {LEGEND.map(([status, meaning]) => (
-        <HStack as="li" key={status} gap="1.5">
+        <HStack role="listitem" key={status} gap="1.5">
           <Swatch tone={toneOf(status)} w="2" h="2" rounded="2px" />
-          <span>
-            <styled.span color="ink.soft" fontWeight="500">
+          <Span>
+            <Span color="ink.soft" fontWeight="500">
               {wordOf(status)}
-            </styled.span>{" "}
+            </Span>{" "}
             {meaning}
-          </span>
+          </Span>
         </HStack>
       ))}
     </HStack>
   )
 }
 
+/** The grid or the list, as the library's tabs; each tab is a link so the view is in the address. */
 function ViewSwitch({ runId, view }: { readonly runId: string; readonly view: MatrixView }) {
   return (
-    <SegmentTrack as="nav" aria-label="View">
-      <Link
-        className={segment}
-        to="/runs/$runId"
-        params={{ runId }}
-        search={{}}
-        data-on={view === "grid" || undefined}
-        aria-pressed={view === "grid"}
-        replace
-      >
-        Grid
-      </Link>
-      <Link
-        className={segment}
-        to="/runs/$runId"
-        params={{ runId }}
-        search={{ view: "list" }}
-        data-on={view === "list" || undefined}
-        aria-pressed={view === "list"}
-        replace
-      >
-        List
-      </Link>
-    </SegmentTrack>
+    <Tabs value={view}>
+      <TabsList aria-label="View">
+        <TabTrigger value="grid" asChild>
+          <Link to="/runs/$runId" params={{ runId }} search={{}} replace>
+            <Icons.grid size={13} />
+            Grid
+          </Link>
+        </TabTrigger>
+        <TabTrigger value="list" asChild>
+          <Link to="/runs/$runId" params={{ runId }} search={{ view: "list" }} replace>
+            <Icons.listBullet size={13} />
+            List
+          </Link>
+        </TabTrigger>
+      </TabsList>
+    </Tabs>
   )
 }
 

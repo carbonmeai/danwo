@@ -1,41 +1,24 @@
 import type { HistoryTrial, MatrixHistory } from "@danwo/runner/runner"
-import { Box, Grid, HStack, styled } from "@danwo/ui/jsx"
+import { Icons } from "@danwo/ui/icons/base"
+import { Box, Grid, HStack } from "@danwo/ui/jsx"
+import { Button } from "@danwo/ui/primitives/button"
+import { Span } from "@danwo/ui/primitives/typography"
 import { Link, useNavigate } from "@tanstack/react-router"
 import { Fragment, useState } from "react"
 
 import { Ident } from "../../components/code.tsx"
 import { Item, Panel } from "../../components/panel.tsx"
+import { Swatch } from "../../components/status-badge.tsx"
 import { toneOf, wordOf } from "../../lib/verdicts.ts"
 import { faultGrid, type GridCell, gridGroups } from "./fault-grid.ts"
 import { TrialDetail } from "./trial-detail.tsx"
 
 const CELL = "2.5rem"
 
-const CellButton = styled("button", {
-  base: {
-    flex: "1",
-    minW: "0",
-    h: "full",
-    rounded: "6px",
-    cursor: "pointer",
-    transition: "box-shadow 120ms",
-    _hover: { boxShadow: "0 0 0 2px {colors.surface.page}, 0 0 0 4px {colors.ink.strong}" },
-    "&[data-picked]": {
-      boxShadow: "0 0 0 2px {colors.surface.page}, 0 0 0 4px {colors.ink.strong}",
-    },
-  },
-  variants: {
-    tone: {
-      passed: { bg: "verdict.passed.solid" },
-      failed: { bg: "verdict.failed.solid" },
-      flaky: { bg: "verdict.flaky.solid" },
-      notJudged: { bg: "verdict.notJudged.solid" },
-      invalid: { bg: "verdict.invalid.solid" },
-    },
-  },
-})
+/** The ring a picked or hovered cell wears. */
+const RING = "0 0 0 2px {colors.surface.page}, 0 0 0 4px {colors.ink.strong}"
 
-/** A cell of the heatmap: one coloured block per trial that landed there. */
+/** A cell of the heatmap: one coloured block per trial that landed there, each a button. */
 function Cell({
   cells,
   picked,
@@ -52,23 +35,43 @@ function Cell({
 
   return (
     <HStack gap="0.5" w={CELL} h={CELL} role="group">
-      {cells.map(({ trial }) => (
-        <CellButton
-          key={trial.fault}
-          type="button"
-          tone={toneOf(trial.status)}
-          data-status={trial.status}
-          data-picked={trial === picked || undefined}
-          aria-label={`${trial.fault ?? "clean run"}: ${wordOf(trial.status)}`}
-          title={`${trial.fault ?? "clean run"}: ${wordOf(trial.status)}`}
-          onMouseEnter={() => onPick(trial)}
-          onFocus={() => onPick(trial)}
-          onClick={() => {
-            if (trial.record) void navigate({ to: "/records/$", params: { _splat: trial.record } })
-            else onPick(trial)
-          }}
-        />
-      ))}
+      {cells.map(({ trial }) => {
+        const words = `${trial.fault ?? "clean run"}: ${wordOf(trial.status)}`
+
+        return (
+          <Button
+            key={trial.fault}
+            variant="transparent"
+            size="icon"
+            flex="1"
+            minW="0"
+            w="auto"
+            h="full"
+            p="0"
+            rounded="6px"
+            transition="box-shadow 120ms"
+            _hover={{ boxShadow: RING }}
+            boxShadow={trial === picked ? RING : undefined}
+            data-status={trial.status}
+            data-picked={trial === picked || undefined}
+            aria-label={words}
+            tooltipChildren={words}
+            onMouseEnter={() => onPick(trial)}
+            onFocus={() => onPick(trial)}
+            onClick={() => {
+              if (trial.record)
+                void navigate({
+                  to: ".",
+                  search: (prev: Record<string, unknown>) => ({ ...prev, open: trial.record }),
+                  resetScroll: false,
+                })
+              else onPick(trial)
+            }}
+          >
+            <Swatch tone={toneOf(trial.status)} w="full" h="full" rounded="6px" />
+          </Button>
+        )
+      })}
     </HStack>
   )
 }
@@ -88,14 +91,14 @@ function ColumnHeads({ columns }: { readonly columns: readonly string[] }) {
           justifyContent="center"
           pb="2"
         >
-          <styled.span
+          <Span
             fontSize="1"
             color="ink.muted"
             whiteSpace="nowrap"
             style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
           >
             {column}
-          </styled.span>
+          </Span>
         </Box>
       ))}
     </Box>
@@ -195,16 +198,18 @@ export function FaultHeatmap({
         <Item p="4">
           <TrialDetail trial={picked} />
           {picked?.fault ? (
-            <Box mt="3" fontSize="1">
-              <Link
-                to="/runs/$runId"
-                params={{ runId: run.id }}
-                search={{ trial: picked.fault }}
-                replace
-                data-link
-              >
-                Link to this trial
-              </Link>
+            <Box mt="3">
+              <Button asChild variant="ghost" size="sm" ml="-1.5">
+                <Link
+                  to="/runs/$runId"
+                  params={{ runId: run.id }}
+                  search={{ trial: picked.fault }}
+                  replace
+                >
+                  <Icons.link size={13} />
+                  Link to this trial
+                </Link>
+              </Button>
             </Box>
           ) : null}
         </Item>

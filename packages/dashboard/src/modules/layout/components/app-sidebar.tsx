@@ -1,5 +1,5 @@
 import { Icons } from "@danwo/ui/icons/base"
-import { Box, HStack, styled } from "@danwo/ui/jsx"
+import { Box, HStack } from "@danwo/ui/jsx"
 import {
   Sidebar,
   SidebarContent,
@@ -13,6 +13,7 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from "@danwo/ui/primitives/sidebar"
+import { Span } from "@danwo/ui/primitives/typography"
 import { Link, useRouterState } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 
@@ -55,7 +56,7 @@ function LiveBadge() {
 
   return (
     <HStack gap="1" color="verdict.notJudged.fg" aria-label={`${live} running`}>
-      <styled.span w="1.5" h="1.5" rounded="full" bg="currentColor" />
+      <Span w="1.5" h="1.5" rounded="full" bg="currentColor" />
       {live}
     </HStack>
   )
@@ -69,7 +70,7 @@ function ProjectName({ name }: { readonly name: string }) {
         <Box flexShrink="0" display="inline-flex">
           <Mark />
         </Box>
-        <styled.span
+        <Span
           fontWeight="600"
           overflow="hidden"
           textOverflow="ellipsis"
@@ -78,7 +79,7 @@ function ProjectName({ name }: { readonly name: string }) {
           css={{ "[data-collapsible=icon] &": { display: "none" } }}
         >
           {name}
-        </styled.span>
+        </Span>
       </HStack>
     </Link>
   )
@@ -161,13 +162,13 @@ export function AppSidebar({ project }: { readonly project: string }) {
           px="1"
           css={{ "[data-collapsible=icon] &": { justifyContent: "center", px: "0" } }}
         >
-          <styled.span
+          <Span
             color="ink.muted"
             fontSize="1"
             css={{ "[data-collapsible=icon] &": { display: "none" } }}
           >
             Theme
-          </styled.span>
+          </Span>
           <ThemeSwitch />
         </HStack>
       </SidebarFooter>

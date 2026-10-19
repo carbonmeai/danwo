@@ -1,8 +1,10 @@
 import { Icons } from "@danwo/ui/icons/base"
 import { Box, HStack, Stack, styled } from "@danwo/ui/jsx"
+import { Button } from "@danwo/ui/primitives/button"
+import { ButtonGroup } from "@danwo/ui/primitives/button-group"
+import { Span } from "@danwo/ui/primitives/typography"
 import { type KeyboardEvent, type PointerEvent, useRef, useState } from "react"
 
-import { Button, segment, SegmentTrack } from "../../components/controls.tsx"
 import { useCopied } from "../../components/copy-link.tsx"
 import { clock, frameAt, type Replay, type ReplayMark, stepAt } from "./record-replay.ts"
 import type { Playback } from "./use-playback.ts"
@@ -178,14 +180,14 @@ function Still({
 
 /** Copies a link that opens this record with the player at this moment. */
 function CopyMoment({ playback }: { readonly playback: Playback }) {
-  const [copied, copy] = useCopied()
+  const [copied, copy] = useCopied("Link to this moment copied")
 
   return (
     <Button
-      type="button"
-      look="ghost"
+      variant="ghost"
+      size="icon"
       aria-label="Copy a link to this moment"
-      title="Copy a link to this moment"
+      tooltipChildren="Copy a link to this moment"
       onClick={() => {
         const url = new URL(window.location.href)
 
@@ -199,21 +201,50 @@ function CopyMoment({ playback }: { readonly playback: Playback }) {
   )
 }
 
+/** A row of toggles as the library's button group, the chosen one pressed. */
+function Toggles<T extends number>({
+  label,
+  values,
+  chosen,
+  words,
+  onChoose,
+}: {
+  readonly label: string
+  readonly values: readonly T[]
+  readonly chosen: T
+  readonly words: (value: T) => string
+  readonly onChoose: (value: T) => void
+}) {
+  return (
+    <ButtonGroup role="group" aria-label={label}>
+      {values.map((value) => (
+        <Button
+          key={value}
+          variant={value === chosen ? "solid" : "soft"}
+          size="xs"
+          aria-pressed={value === chosen}
+          onClick={() => onChoose(value)}
+        >
+          {words(value)}
+        </Button>
+      ))}
+    </ButtonGroup>
+  )
+}
+
 /** Play or pause, the clock, the scrubber, the speed, and a link to the moment. */
 function Controls({ playback, tabs }: { readonly playback: Playback; readonly tabs: number }) {
   return (
     <HStack gap="2" flexWrap="wrap" mt="2.5">
       <Button
-        type="button"
-        look="primary"
-        w="8"
-        px="0"
+        variant="solid"
+        size="icon"
         aria-label={playback.playing ? "Pause" : "Play"}
         onClick={playback.toggle}
       >
         {playback.playing ? <Icons.pause size={14} /> : <Icons.play size={14} />}
       </Button>
-      <styled.span
+      <Span
         fontSize="1"
         color="ink.soft"
         fontVariantNumeric="tabular-nums"
@@ -221,37 +252,23 @@ function Controls({ playback, tabs }: { readonly playback: Playback; readonly ta
         aria-live="off"
       >
         {clock(playback.ms - playback.startMs)} / {clock(playback.endMs - playback.startMs)}
-      </styled.span>
+      </Span>
       <Scrubber playback={playback} />
-      <SegmentTrack role="group" aria-label="Speed">
-        {RATES.map((rate) => (
-          <button
-            key={rate}
-            type="button"
-            className={segment}
-            data-on={playback.rate === rate || undefined}
-            aria-pressed={playback.rate === rate}
-            onClick={() => playback.setRate(rate)}
-          >
-            {rate}×
-          </button>
-        ))}
-      </SegmentTrack>
+      <Toggles
+        label="Speed"
+        values={RATES}
+        chosen={playback.rate as (typeof RATES)[number]}
+        words={(rate) => `${rate}×`}
+        onChoose={playback.setRate}
+      />
       {tabs > 1 ? (
-        <SegmentTrack role="group" aria-label="Tab">
-          {Array.from({ length: tabs }, (_, i) => (
-            <button
-              key={i}
-              type="button"
-              className={segment}
-              data-on={playback.tab === i || undefined}
-              aria-pressed={playback.tab === i}
-              onClick={() => playback.pickTab(i)}
-            >
-              Tab {i + 1}
-            </button>
-          ))}
-        </SegmentTrack>
+        <Toggles
+          label="Tab"
+          values={Array.from({ length: tabs }, (_, i) => i)}
+          chosen={playback.tab}
+          words={(i) => `Tab ${i + 1}`}
+          onChoose={playback.pickTab}
+        />
       ) : null}
       <CopyMoment playback={playback} />
     </HStack>
@@ -267,17 +284,13 @@ function NowLine({ playback }: { readonly playback: Playback }) {
     <HStack gap="2" mt="2" fontSize="1" color="ink.soft" minH="5" aria-live="polite">
       {step ? (
         <>
-          <styled.span color="ink.muted">Step {index}</styled.span>
-          <styled.span
-            fontWeight="500"
-            color={step.bad ? "verdict.failed.fg" : "ink.strong"}
-            truncate
-          >
+          <Span color="ink.muted">Step {index}</Span>
+          <Span fontWeight="500" color={step.bad ? "verdict.failed.fg" : "ink.strong"} truncate>
             {step.label}
-          </styled.span>
+          </Span>
         </>
       ) : (
-        <styled.span color="ink.muted">Before the first step</styled.span>
+        <Span color="ink.muted">Before the first step</Span>
       )}
     </HStack>
   )
