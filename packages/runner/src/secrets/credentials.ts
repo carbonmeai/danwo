@@ -63,6 +63,8 @@ const TOKEN_PATTERNS: readonly [RegExp, string][] = [
   /* OpenAI project, service-account and legacy keys; Anthropic keys; AI Gateway keys. */
   [/\b(sk-(?:ant-[a-z]+\d*-|proj-|svcacct-|admin-)?)[A-Za-z0-9_-]{16,}/g, `$1${REDACTED}`],
   [/\b(vck_)[A-Za-z0-9_-]{8,}/g, `$1${REDACTED}`],
+  /* Composio project and user API keys. */
+  [/\b(u?ak_)[A-Za-z0-9_-]{8,}/g, `$1${REDACTED}`],
 ]
 
 /** `text` with every credential-shaped value replaced. */

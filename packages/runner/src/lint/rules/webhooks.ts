@@ -5,7 +5,7 @@ import { deliveryEvidence, isSuccess, providerOfDelivery } from "../subject.ts"
 import type { LintRule, LintSubject, RuleFinding } from "../types.ts"
 
 /** Providers whose signatures cover a timestamp, so an old delivery can be told apart. */
-const TIMESTAMPED = new Set(["stripe", "slack", "resend", "bachs", "google"])
+const TIMESTAMPED = new Set(["stripe", "slack", "resend", "bachs", "google", "composio"])
 
 function finding(subject: LintSubject, delivery: ServiceDelivery, message: string): RuleFinding {
   return {
@@ -115,7 +115,7 @@ export const acceptsForgedWebhooks: LintRule = {
 export const acceptsStaleWebhooks: LintRule = {
   id: "webhooks/accepts-stale",
   severity: "warning",
-  providers: ["stripe", "slack", "resend", "bachs", "google"],
+  providers: ["stripe", "slack", "resend", "bachs", "google", "composio"],
   summary: "The app accepted a webhook whose signed timestamp was too old to be fresh.",
   hint: "Check the signature's timestamp against a tolerance (Stripe's libraries use 5 minutes), so a captured delivery cannot be replayed later.",
   check: acceptedStale,

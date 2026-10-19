@@ -188,6 +188,12 @@ export {
 } from "./clerk.ts"
 export { type LlmEnvironment, llmEnvironment, type LlmOptions, llmService } from "./llm.ts"
 export {
+  type ComposioEnvironment,
+  composioEnvironment,
+  type ComposioOptions,
+  composioService,
+} from "./composio.ts"
+export {
   type S3Environment,
   s3Environment,
   type S3Options,

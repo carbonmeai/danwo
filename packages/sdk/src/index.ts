@@ -119,6 +119,17 @@ export interface BachsFixtures {
   readonly settle: () => Promise<void>
 }
 
+/** Fixtures a `composioEnvironment()` or `composioService()` contributes. */
+export interface ComposioFixtures {
+  /**
+   * The Composio emulator: read connected accounts and tool runs and fire triggers with
+   * `composioProject(composio)`, and answer tools from the test with `composioTools(composio)`.
+   */
+  readonly composio: Emulator
+  readonly proxy: Proxy
+  readonly settle: () => Promise<void>
+}
+
 /** Fixtures a `clerkEnvironment()` or `clerkService()` contributes. */
 export interface ClerkFixtures {
   /**
@@ -197,6 +208,10 @@ export {
   githubEnvironment,
   type GithubOptions,
   githubService,
+  type ComposioEnvironment,
+  composioEnvironment,
+  type ComposioOptions,
+  composioService,
   type GoogleEnvironment,
   googleEnvironment,
   type GoogleOptions,
@@ -382,6 +397,14 @@ export {
   type BachsLedger,
   bachsLedger,
   type BachsSeedConfig,
+  type ComposioAccountView,
+  type ComposioExecution,
+  type ComposioProject,
+  composioProject,
+  type ComposioSeedConfig,
+  type ComposioToolHandler,
+  type ComposioTools,
+  composioTools,
 } from "@danwo/emulators"
 export {
   type DatabaseSnapshot,
