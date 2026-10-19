@@ -310,6 +310,24 @@ export {
 } from "./llm/index.ts"
 export { seedStripe, stripe, stripeOutboundFaults, type StripeSeedConfig } from "./stripe/index.ts"
 export {
+  connectNovuEmail,
+  NOVU_DEFAULTS,
+  NOVU_HOSTS,
+  type NovuChannel,
+  type NovuEmail,
+  type NovuExecution,
+  type NovuMessage,
+  type NovuProject,
+  type NovuSeedConfig,
+  type NovuSeedSubscriber,
+  type NovuSeedWorkflow,
+  type NovuSubscriber,
+  novu,
+  novuOutboundFaults,
+  novuProject,
+  seedNovu,
+} from "./novu/index.ts"
+export {
   type BeamsDevice,
   type BeamsPublish,
   PUSHER_DEFAULTS,
