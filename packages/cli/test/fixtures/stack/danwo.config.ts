@@ -5,6 +5,7 @@ import { defineConfig, inngestService, stackEnvironment, stripeService } from "@
 import { freePort } from "../app-process.ts"
 
 const here = (file: string) => fileURLToPath(new URL(file, import.meta.url))
+const local = (port: number) => `http://127.0.0.1:${port}`
 
 /**
  * A frontend, an API and a background worker with an Inngest dev server between them, all behind
@@ -16,8 +17,12 @@ export default defineConfig({
   timeout: 30_000,
   readiness: { mode: "page+backend", settle: true },
   async environment() {
-    const [web, api, worker, dev] = await Promise.all([freePort(), freePort(), freePort(), freePort()])
-    const local = (port: number) => `http://127.0.0.1:${port}`
+    const [web, api, worker, dev] = await Promise.all([
+      freePort(),
+      freePort(),
+      freePort(),
+      freePort(),
+    ])
     const inngest = await inngestService({ url: local(dev) })
 
     return stackEnvironment({

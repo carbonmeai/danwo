@@ -28,7 +28,8 @@ async function createTask(req: IncomingMessage, res: ServerResponse): Promise<vo
   for await (const chunk of req) body += String(chunk)
 
   const parsed: unknown = JSON.parse(body || "{}")
-  const title = typeof parsed === "object" && parsed !== null ? String(Reflect.get(parsed, "title")) : ""
+  const title =
+    typeof parsed === "object" && parsed !== null ? String(Reflect.get(parsed, "title")) : ""
   const customer = await stripe.customers.create({ description: title })
 
   await fetch(inngest, {

@@ -45,11 +45,16 @@ socket.onopen = () => socket.send("ping")
 socket.onmessage = (message) => show("live", "live: " + message.data)
 `
 
-createServer((req, res) => {
-  if (req.url === "/@vite/client")
-    return void res.writeHead(200, { "content-type": "text/javascript" }).end("export {}")
-  if (req.url?.startsWith("/src/main.ts"))
-    return void res.writeHead(200, { "content-type": "text/javascript" }).end(MAIN)
+/** What the server sends for a path: the dev client, the page's code, or the page. */
+function served(url: string | undefined): readonly [string, string] {
+  if (url === "/@vite/client") return ["text/javascript", "export {}"]
+  if (url?.startsWith("/src/main.ts")) return ["text/javascript", MAIN]
 
-  res.writeHead(200, { "content-type": "text/html" }).end(PAGE)
+  return ["text/html", PAGE]
+}
+
+createServer((req, res) => {
+  const [type, body] = served(req.url)
+
+  res.writeHead(200, { "content-type": type }).end(body)
 }).listen(Number(process.env.PORT), "127.0.0.1", () => console.log("web listening"))

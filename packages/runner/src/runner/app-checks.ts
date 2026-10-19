@@ -36,9 +36,12 @@ async function processTable(): Promise<readonly ProcessRow[]> {
   }
 }
 
-/** Every process below `root` in `table`, the root left out. */
-function descendants(table: readonly ProcessRow[], root: number): readonly ProcessRow[] {
-  const below: ProcessRow[] = []
+/**
+ * `root` and every process below it in `table`. The root counts: a shell that runs one command
+ * often execs it in its own place.
+ */
+function familyOf(table: readonly ProcessRow[], root: number): readonly ProcessRow[] {
+  const below: ProcessRow[] = table.filter((row) => row.pid === root)
   const parents = new Set([root])
 
   for (let grew = true; grew;) {
@@ -69,7 +72,7 @@ function isNode(command: string): boolean {
  */
 export async function preloadWarnings(app: string, root: number, proxy: Proxy): Promise<string[]> {
   const preloaded = new Set(await proxy.preloaded())
-  const missing = descendants(await processTable(), root).filter(
+  const missing = familyOf(await processTable(), root).filter(
     (row) => isNode(row.command) && !preloaded.has(row.pid),
   )
 
