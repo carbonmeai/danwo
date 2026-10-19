@@ -78,6 +78,51 @@ describe.skipIf(!dockerAvailable())("Postgres snapshots", () => {
     }, 120_000)
   }
 
+  it("restores rows without closing the app's connections, foreign keys and sequences included", async () => {
+    const appUrl = await postgresWorkerDatabase(withDatabase(url, "orders_base"), 8)
+    const app = new Pool({ connectionString: appUrl, max: 1 })
+    /* A pool with no error listener: a closed connection would crash a process that has none. */
+    const errors: unknown[] = []
+
+    app.on("error", (error) => errors.push(error))
+    await app.query(
+      "CREATE TABLE customers (id serial PRIMARY KEY, name text, upper_name text GENERATED ALWAYS AS (upper(name)) STORED)",
+    )
+    await app.query(
+      "CREATE TABLE invoices (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, customer int REFERENCES customers(id))",
+    )
+    await app.query("INSERT INTO customers (name) VALUES ('ada')")
+    await app.query("INSERT INTO invoices (customer) VALUES (1)")
+
+    const held = await app.connect()
+    const db = postgresSnapshot({ url: appUrl, strategy: "rows" })
+
+    try {
+      await db.snapshot()
+      await held.query("INSERT INTO customers (name) VALUES ('grace'), ('alan')")
+      await held.query("INSERT INTO invoices (customer) VALUES (2), (3)")
+      await held.query("DELETE FROM invoices WHERE id = 1")
+
+      await db.restore()
+
+      const customers = await held.query("SELECT id, name, upper_name FROM customers ORDER BY id")
+      const invoices = await held.query("SELECT id, customer FROM invoices ORDER BY id")
+
+      expect(customers.rows).toEqual([{ id: 1, name: "ada", upper_name: "ADA" }])
+      expect(invoices.rows).toEqual([{ id: "1", customer: 1 }])
+
+      /* The sequences are back too: the next rows get the ids they got after the snapshot. */
+      const next = await held.query("INSERT INTO customers (name) VALUES ('grace') RETURNING id")
+
+      expect(next.rows).toEqual([{ id: 2 }])
+      expect(errors).toEqual([])
+    } finally {
+      held.release()
+      await app.end()
+      await db.close()
+    }
+  }, 60_000)
+
   it("gives parallel workers their own databases", async () => {
     const base = withDatabase(url, "orders_base")
     const urls = await Promise.all([0, 1, 2].map((index) => postgresWorkerDatabase(base, index)))

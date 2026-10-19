@@ -13,8 +13,10 @@ import { setTimeout as sleep } from "node:timers/promises"
 
 import type { Client } from "pg"
 
+import { rowsSnapshot } from "./postgres-rows.ts"
+
 /** How a restore brings the database back. */
-export type PostgresRestoreStrategy = "recreate" | "swap"
+export type PostgresRestoreStrategy = "recreate" | "swap" | "rows"
 
 /** Which Postgres database `postgresSnapshot` keeps and brings back, and how. */
 export interface PostgresSnapshotOptions {
@@ -30,7 +32,9 @@ export interface PostgresSnapshotOptions {
    * `recreate` (default) moves the app's database aside and copies the template into its place
    * during the restore, tens of milliseconds for a test-sized database. `swap` keeps a spare copy
    * ready so a restore is two renames, and copies the next spare while the trial runs: it pays
-   * off for large databases and long trials, and costs a second copy on disk.
+   * off for large databases and long trials, and costs a second copy on disk. `rows` closes no
+   * connection: it copies every table's rows aside and back in one transaction, for apps whose
+   * pools treat a closed connection as fatal; it is slower for big databases (postgres-rows.ts).
    */
   readonly strategy?: PostgresRestoreStrategy
   /** Runs after every restore, e.g. to tell the app to drop its pooled connections. */
@@ -316,6 +320,8 @@ function swapping(
  * ```
  */
 export function postgresSnapshot(options: PostgresSnapshotOptions): DatabaseSnapshot {
+  if (options.strategy === "rows") return keptRows(options)
+
   const names = namesOf(options)
   const adminDatabase = options.adminDatabase ?? "postgres"
   const admin = new AdminConnection(options.url, adminDatabase)
@@ -341,6 +347,28 @@ export function postgresSnapshot(options: PostgresSnapshotOptions): DatabaseSnap
       await admin.query(`DROP DATABASE IF EXISTS ${ident(names.template)}`)
       await admin.close()
     },
+  }
+}
+
+/** A `rows` snapshot over a connection of its own to the app's database. */
+function keptRows(options: PostgresSnapshotOptions): DatabaseSnapshot {
+  const url = databaseUrl(options.url, options.database ?? databaseOf(options.url))
+  const rows = rowsSnapshot(async () => {
+    const PgClient = await loadClient()
+    const client = new PgClient({ connectionString: url })
+
+    await client.connect()
+
+    return client
+  })
+
+  return {
+    snapshot: () => rows.snapshot(),
+    async restore() {
+      await rows.restore()
+      await options.onRestore?.()
+    },
+    close: () => rows.close(),
   }
 }
 
