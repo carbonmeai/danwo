@@ -61,18 +61,25 @@ async function subscribe(response: ServerResponse): Promise<void> {
   response.writeHead(303, { location: session.url ?? "/" }).end()
 }
 
+/** The subscription events the app follows the plan's status from. */
+const STATUS_EVENTS = new Set([
+  "customer.subscription.created",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+])
+
 /** Follows the subscription from the events the app listens for, each event once. */
 function apply(event: Stripe.Event): void {
   if (seenEvents.has(event.id)) return
   seenEvents.add(event.id)
 
-  if (
-    event.type === "customer.subscription.created" ||
-    event.type === "customer.subscription.updated" ||
-    event.type === "customer.subscription.deleted"
-  )
-    status = event.data.object.status
-  if (event.type === "invoice.paid") invoices.push(event.data.object.billing_reason ?? "manual")
+  if (STATUS_EVENTS.has(event.type)) status = String(Reflect.get(event.data.object, "status"))
+  if (event.type === "invoice.paid") recordInvoice(event.data.object)
+}
+
+/** Keeps a paid invoice by why it was billed. */
+function recordInvoice(invoice: Stripe.Invoice): void {
+  invoices.push(invoice.billing_reason ?? "manual")
 }
 
 function webhook(raw: Buffer, request: IncomingMessage, response: ServerResponse): void {
@@ -92,24 +99,35 @@ async function body(request: IncomingMessage): Promise<Buffer> {
   return Buffer.concat(chunks)
 }
 
+/** The JSON a test can read the app's state from. */
+function state(response: ServerResponse): void {
+  response
+    .writeHead(200, { "content-type": "application/json" })
+    .end(JSON.stringify({ status, invoices }))
+}
+
+/** The page for every other path: the account once subscribed, else the plan to buy. */
+function pageAt(path: string, response: ServerResponse): void {
+  response
+    .writeHead(200, { "content-type": "text/html" })
+    .end(path === "/account" ? account() : home())
+}
+
+/** What answers each route the app has besides its pages. */
+const ROUTES: Record<string, (request: IncomingMessage, response: ServerResponse) => unknown> = {
+  "POST /subscribe": (_request, response) => subscribe(response),
+  "POST /webhooks/stripe": async (request, response) =>
+    webhook(await body(request), request, response),
+  "GET /state.json": (_request, response) => state(response),
+}
+
 /** Answers one request. */
 async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
   const path = new URL(request.url ?? "/", base).pathname
-  const html = (text: string) => response.writeHead(200, { "content-type": "text/html" }).end(text)
+  const route = ROUTES[`${request.method ?? "GET"} ${path}`]
 
-  if (request.method === "POST" && path === "/subscribe") return subscribe(response)
-  if (request.method === "POST" && path === "/webhooks/stripe")
-    return webhook(await body(request), request, response)
-
-  if (path === "/state.json") {
-    response
-      .writeHead(200, { "content-type": "application/json" })
-      .end(JSON.stringify({ status, invoices }))
-
-    return
-  }
-
-  html(path === "/account" ? account() : home())
+  if (route) await route(request, response)
+  else pageAt(path, response)
 }
 
 createServer((request, response) => void handle(request, response)).listen(
