@@ -67,7 +67,16 @@ export const PLAN: readonly PlannedFolder[] = [
     pages: [
       file("index"),
       file("why-danwo"),
-      file("installation"),
+      {
+        slug: "installation",
+        source: {
+          kind: "readme",
+          heading: "Quickstart",
+          title: "Installation",
+          description:
+            "danwo init sets danwo up in your project: the engine, the model for agent steps, the providers to emulate and the coding agents to teach.",
+        },
+      },
       guide("quickstart", "first-test"),
     ],
   },

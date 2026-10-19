@@ -17,7 +17,11 @@ export default defineConfig({
     tailwindcss(),
     tanstackStart({
       prerender: { enabled: true, crawlLinks: true, failOnError: true },
-      pages: prerenderedPaths().map((path) => ({ path })),
+      pages: [
+        ...prerenderedPaths().map((path) => ({ path })),
+        /* The page static hosts serve for an address with nothing at it. */
+        { path: "/404", prerender: { outputPath: "/404.html" } },
+      ],
     }),
     react(),
   ],
