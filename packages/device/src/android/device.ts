@@ -12,6 +12,7 @@ import type {
   DeviceScreenReading,
   DeviceStart,
   DeviceTarget,
+  ScreenFilm,
   ScrollDirection,
 } from "@danwo/runner/runner"
 
@@ -23,6 +24,7 @@ import { deviceNodes } from "../tree.ts"
 import { AndroidApp, type AppOptions } from "./app.ts"
 import { AndroidBinder } from "./binder.ts"
 import { type EmulatorOptions, type RunningEmulator, useEmulator } from "./emulator.ts"
+import { filmScreen } from "./screen-film.ts"
 
 /** Options of `androidDevice`. */
 export interface AndroidDeviceOptions extends EmulatorOptions {
@@ -258,6 +260,11 @@ export class AndroidDevice implements DeviceTarget {
 
   logs(): ReturnType<AndroidApp["logs"]> {
     return this.application.logs()
+  }
+
+  /** Films the screen with the device's own recorder, pulled to `path` when stopped. */
+  recordScreen(path: string): Promise<ScreenFilm | undefined> {
+    return Promise.resolve(filmScreen(this.emulator.adb, path))
   }
 
   /** Redoes what an adbd restart, a reboot or a snapshot load lost: root, this run's CA, the proxy route. */
