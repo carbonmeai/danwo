@@ -42,13 +42,22 @@ export type ResendSeedConfig = Partial<{
 
 /** Loads `config` into a Resend emulator's store. No events are emitted for seeded data. */
 export function seedResend(store: Store, config: ResendSeedConfig): void {
-  const objects = resendStore(store)
   const createdAt = store.clock().toISOString()
 
   if (config.allowlist) setAllowlist({ store }, config.allowlist)
 
-  for (const domain of config.domains ?? [])
-    objects.domains.add(
+  seedDomains(store, config.domains ?? [], createdAt)
+  seedKeys(store, config.keys ?? [], createdAt)
+  seedWebhooks(store, config.webhooks ?? [], createdAt)
+}
+
+function seedDomains(
+  store: Store,
+  domains: NonNullable<ResendSeedConfig["domains"]>,
+  createdAt: string,
+): void {
+  for (const domain of domains)
+    resendStore(store).domains.add(
       domainObject({
         id: newUuid(),
         name: domain.name,
@@ -57,15 +66,27 @@ export function seedResend(store: Store, config: ResendSeedConfig): void {
       }),
       null,
     )
+}
 
-  for (const key of config.keys ?? [])
-    objects.keys.add(
+function seedKeys(
+  store: Store,
+  keys: NonNullable<ResendSeedConfig["keys"]>,
+  createdAt: string,
+): void {
+  for (const key of keys)
+    resendStore(store).keys.add(
       { id: newUuid(), name: key.name, created_at: createdAt, last_used_at: null },
       { token: key.token, permission: key.permission ?? "full_access" },
     )
+}
 
-  for (const webhook of config.webhooks ?? [])
-    objects.webhooks.add(
+function seedWebhooks(
+  store: Store,
+  webhooks: NonNullable<ResendSeedConfig["webhooks"]>,
+  createdAt: string,
+): void {
+  for (const webhook of webhooks)
+    resendStore(store).webhooks.add(
       {
         object: "webhook",
         id: newUuid(),
