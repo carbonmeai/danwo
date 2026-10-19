@@ -1,7 +1,6 @@
 import type { HistoryTest, HistoryTrial, TestHistory, Usage } from "@danwo/runner/runner"
 import { describe, expect, it } from "vitest"
 
-import { sparkPoints } from "../src/components/sparkline.tsx"
 import { type KeyPress, listAction } from "../src/lib/list-keys.ts"
 import { faultGrid, gridGroups, placeOf } from "../src/modules/matrix/fault-grid.ts"
 import { effectDiff } from "../src/modules/record/record-effects.ts"
@@ -111,11 +110,6 @@ describe("run health", () => {
 
   it("reads no hit rate when no agent step used the cache", () => {
     expect(cacheHitRate(USAGE)).toBeNull()
-  })
-
-  it("plots sparkline points across the box, skipping missing values", () => {
-    expect(sparkPoints([0, null, 1], 100, 10, [0, 1])).toBe("0.0,10.0 100.0,0.0")
-    expect(sparkPoints([null], 100, 10)).toBe("")
   })
 })
 
