@@ -14,6 +14,7 @@ import {
   text,
 } from "../helpers.ts"
 import type { PaystackPayments } from "../payments.ts"
+import { PROBLEMS } from "../problems.ts"
 import type { PaystackStore } from "../store.ts"
 
 /** The integration's transactions, oldest first. */
@@ -24,6 +25,8 @@ export function transactionsOf(paystack: PaystackStore, integration: Integration
       integration.number,
   )
 }
+
+const INVALID_AMOUNT = "Invalid Amount Sent"
 
 /** References may hold letters, digits, `-`, `.` and `=`, as Paystack allows. */
 function validReference(reference: string | undefined): boolean {
@@ -40,9 +43,7 @@ function initializeProblem(
 
   if (!(text(fields, "email") ?? "").includes("@")) return "Invalid Email Address Passed"
   if (plan === undefined)
-    return amountOf(fields) === undefined
-      ? "Invalid Amount Sent"
-      : referenceProblem(context, reference)
+    return amountOf(fields) === undefined ? INVALID_AMOUNT : referenceProblem(context, reference)
   if (context.paystack.plans.get(plan) === undefined) return "Plan not found"
 
   return referenceProblem(context, reference)
@@ -79,8 +80,10 @@ async function initialize(
   const problem = initializeProblem(context, fields)
   const currency = currencyOf(fields, integration.currency === "GHS" ? "GHS" : "NGN")
 
-  if (problem !== undefined) return fail(c, 400, problem)
-  if (currency === undefined) return fail(c, 400, "Currency not supported by merchant")
+  if (problem !== undefined)
+    return fail(c, 400, problem, problem === INVALID_AMOUNT ? PROBLEMS.invalidAmount : undefined)
+  if (currency === undefined)
+    return fail(c, 400, "No active channel to process transaction. Please contact merchant")
 
   const planCode = text(fields, "plan")
   const { transaction, extra } = payments.start({
@@ -164,8 +167,10 @@ async function chargeAuthorization(
   const fields = await bodyOf(c)
   const saved = savedAuthorization(context.paystack, fields)
 
-  if (saved === undefined) return fail(c, 400, "Invalid Authorization Code")
-  if (amountOf(fields) === undefined) return fail(c, 400, "Invalid Amount Sent")
+  if (saved === undefined)
+    return fail(c, 400, "Authorization code is invalid", PROBLEMS.invalidAuthorizationCode)
+  if (amountOf(fields) === undefined)
+    return fail(c, 400, "Invalid Amount Sent", PROBLEMS.invalidAmount)
 
   const { authorization, customer } = saved
 
@@ -199,19 +204,7 @@ export function transactionRoutes(context: PaystackRouteContext, payments: Payst
 
     // Paystack answers an unknown reference as a validation error, not as a missing resource.
     if (transaction === undefined)
-      return c.json(
-        {
-          status: false,
-          message: "Transaction reference not found",
-          meta: {
-            nextStep:
-              "Ensure that you're passing the reference of a transaction that exists on this integration",
-          },
-          type: "validation_error",
-          code: "transaction_not_found",
-        },
-        400,
-      )
+      return fail(c, 400, "Transaction reference not found.", PROBLEMS.transactionNotFound)
 
     return ok(c, "Verification successful", transaction)
   })
@@ -241,6 +234,8 @@ export function transactionRoutes(context: PaystackRouteContext, payments: Payst
       (transaction) => transaction.id === id,
     )
 
-    return found ? ok(c, "Transaction retrieved", found) : fail(c, 404, "Transaction not found")
+    return found
+      ? ok(c, "Transaction retrieved", found)
+      : fail(c, 404, "Transaction not found", PROBLEMS.transactionNotFound)
   })
 }

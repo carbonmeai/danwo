@@ -4,6 +4,7 @@ import type { PaystackRouteContext } from "../context.ts"
 import type { Integration, KnownAccount, Recipient, Transfer } from "../entities.ts"
 import { recipientObject, transferObject } from "../formatters.ts"
 import { amountOf, bodyOf, fail, newReference, nextId, ok, pageOf, text } from "../helpers.ts"
+import { PROBLEMS } from "../problems.ts"
 import { emitEvent } from "../signature.ts"
 
 /** How long a transfer stays pending before the bank answers. */
@@ -78,7 +79,7 @@ async function createRecipient(c: Context, context: PaystackRouteContext): Promi
   const bank = context.paystack.banks.get(text(fields, "bank_code") ?? "")
   const number = text(fields, "account_number") ?? ""
 
-  if (bank === undefined) return fail(c, 400, "Invalid bank code")
+  if (bank === undefined) return fail(c, 400, "Bank is invalid", PROBLEMS.invalidBankCode)
   if (!/^\d{10}$/.test(number)) return fail(c, 400, "Account number is invalid")
 
   const recipient = context.paystack.recipients.add(
@@ -214,7 +215,9 @@ export function transferRoutes(context: PaystackRouteContext): void {
     const reference = c.req.param("reference")
     const transfer = paystack.transfers.where((t) => t.reference === reference)[0]
 
-    return transfer ? ok(c, "Transfer retrieved", transfer) : fail(c, 404, "Transfer not found")
+    return transfer
+      ? ok(c, "Transfer retrieved", transfer)
+      : fail(c, 404, "Transfer ID/code specified is invalid", PROBLEMS.invalidParams)
   })
 
   app.get("/transfer/:code", (c) => {
@@ -222,7 +225,9 @@ export function transferRoutes(context: PaystackRouteContext): void {
     const transfer =
       paystack.transfers.get(key) ?? paystack.transfers.where((t) => String(t.id) === key)[0]
 
-    return transfer ? ok(c, "Transfer retrieved", transfer) : fail(c, 404, "Transfer not found")
+    return transfer
+      ? ok(c, "Transfer retrieved", transfer)
+      : fail(c, 404, "Transfer ID/code specified is invalid", PROBLEMS.invalidParams)
   })
 
   app.get("/balance", (c) => {

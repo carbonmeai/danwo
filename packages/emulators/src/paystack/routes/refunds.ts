@@ -4,6 +4,7 @@ import type { PaystackRouteContext } from "../context.ts"
 import type { Transaction } from "../entities.ts"
 import { refundObject } from "../formatters.ts"
 import { amountOf, bodyOf, fail, nextId, ok, pageOf, text } from "../helpers.ts"
+import { PROBLEMS } from "../problems.ts"
 import { emitEvent } from "../signature.ts"
 import { transactionsOf } from "./transactions.ts"
 
@@ -62,7 +63,8 @@ async function create(c: Context, context: PaystackRouteContext): Promise<Respon
     (t) => t.reference === key || String(t.id) === key,
   )
 
-  if (transaction === undefined) return fail(c, 404, "Transaction not found")
+  if (transaction === undefined)
+    return fail(c, 400, "Transaction not found", PROBLEMS.refundTransactionNotFound)
 
   const already = refundedSoFar(context, transaction)
   const amount = amountOf(fields) ?? transaction.amount - already

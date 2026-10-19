@@ -228,13 +228,21 @@ describe("Paystack transactions", () => {
     })
     const missing = await call("GET", "https://api.paystack.co/transaction/verify/order-none")
 
-    expect([again.status, await again.json()]).toEqual([
+    expect([again.status, await again.json()]).toMatchObject([
       400,
-      { status: false, message: "Duplicate Transaction Reference" },
+      { status: false, message: "Duplicate Transaction Reference", type: "validation_error" },
     ])
     expect([unknown.status, await unknown.json()]).toEqual([
       401,
-      { status: false, message: "Invalid key" },
+      {
+        status: false,
+        message: "Invalid key",
+        meta: {
+          nextStep: "Ensure that you provide the correct authorization key for the request",
+        },
+        type: "validation_error",
+        code: "invalid_Key",
+      },
     ])
     expect(noEmail.status).toBe(400)
     expect([missing.status, await missing.json()]).toMatchObject([

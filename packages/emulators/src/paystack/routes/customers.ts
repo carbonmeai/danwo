@@ -4,6 +4,7 @@ import type { PaystackRouteContext } from "../context.ts"
 import type { Customer, Integration } from "../entities.ts"
 import { bodyOf, fail, metadataOf, ok, pageOf, text } from "../helpers.ts"
 import type { PaystackPayments } from "../payments.ts"
+import { PROBLEMS } from "../problems.ts"
 import type { PaystackStore } from "../store.ts"
 
 /** The integration's customer by email or customer code. */
@@ -45,7 +46,7 @@ async function create(
   const email = text(fields, "email")
 
   if (email === undefined || !email.includes("@"))
-    return fail(c, 400, "Invalid Email Address Passed")
+    return fail(c, 400, '"email" must be a valid email')
 
   const customer = payments.customerFor(integration, email)
   const updated = context.paystack.customers.change(customer.customer_code, {
@@ -75,7 +76,9 @@ export function customerRoutes(context: PaystackRouteContext, payments: Paystack
     (answer: (c: Context, customer: Customer) => Response | Promise<Response>) => (c: Context) => {
       const customer = findCustomer(paystack, requireIntegration(c, paystack), c.req.param("key"))
 
-      return customer === undefined ? fail(c, 404, "Customer not found") : answer(c, customer)
+      return customer === undefined
+        ? fail(c, 404, "Customer not found", PROBLEMS.customerNotFound)
+        : answer(c, customer)
     }
 
   app.get(

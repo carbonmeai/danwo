@@ -3,6 +3,7 @@ import { randomInt } from "node:crypto"
 import type { Context } from "../http.ts"
 import { asRecord } from "../json.ts"
 import type { DataKey, Store } from "../store.ts"
+import { type Problem, problemFor } from "./problems.ts"
 
 /** The hosts the Paystack emulator answers: the REST API and the hosted payment page. */
 export const PAYSTACK_HOSTS = ["api.paystack.co", "checkout.paystack.com"]
@@ -94,9 +95,27 @@ export function ok(c: Context, message: string, data: unknown, extra: object = {
   return c.json({ status: true, message, data, ...extra })
 }
 
-/** A failed answer in Paystack's envelope: `status: false` and a message. */
-export function fail(c: Context, status: number, message: string): Response {
-  return c.json({ status: false, message }, status)
+/**
+ * A failed answer in Paystack's envelope: `status: false`, the message, and the problem's `code`
+ * with its `meta.nextStep`. Refused requests are a `validation_error`; Paystack's own failures an
+ * `api_error`.
+ */
+export function fail(
+  c: Context,
+  status: number,
+  message: string,
+  problem: Problem = problemFor(status),
+): Response {
+  return c.json(
+    {
+      status: false,
+      message,
+      meta: { nextStep: problem.nextStep },
+      type: status >= 500 ? "api_error" : "validation_error",
+      code: problem.code,
+    },
+    status,
+  )
 }
 
 /** A JSON or form body as a record of fields; anything else gives an empty record. */

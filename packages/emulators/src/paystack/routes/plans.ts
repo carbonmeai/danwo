@@ -6,6 +6,7 @@ import { type Integration, INTERVALS, type Plan } from "../entities.ts"
 import { planObject } from "../formatters.ts"
 import { amountOf, bodyOf, currencyOf, fail, nextId, ok, pageOf, text } from "../helpers.ts"
 import type { PaystackPayments } from "../payments.ts"
+import { PROBLEMS } from "../problems.ts"
 import type { PaystackStore } from "../store.ts"
 import { customerInBody } from "./customers.ts"
 
@@ -30,9 +31,9 @@ async function createPlan(c: Context, context: PaystackRouteContext): Promise<Re
   const interval = text(fields, "interval")
   const currency = currencyOf(fields, "NGN")
 
-  if (name === undefined) return fail(c, 400, "Name is required")
-  if (amount === undefined) return fail(c, 400, "Invalid Amount Sent")
-  if (!isOneOf(INTERVALS, interval)) return fail(c, 400, "Invalid interval")
+  if (name === undefined) return fail(c, 400, '"name" is required', PROBLEMS.missingParams)
+  if (amount === undefined) return fail(c, 400, "Invalid Amount Sent", PROBLEMS.invalidAmount)
+  if (!isOneOf(INTERVALS, interval)) return fail(c, 400, "Invalid interval selected")
   if (currency === undefined) return fail(c, 400, "Currency not supported by merchant")
 
   const plan = context.paystack.plans.add(
@@ -71,8 +72,9 @@ async function createSubscription(
         (savedCode === undefined || a.authorization_code === savedCode),
     )
 
-  if (customer === undefined) return fail(c, 404, "Customer not found")
-  if (plan === undefined) return fail(c, 404, "Plan not found")
+  if (customer === undefined) return fail(c, 404, "Customer not found", PROBLEMS.customerNotFound)
+  if (plan === undefined)
+    return fail(c, 404, "Plan ID/code specified is invalid", PROBLEMS.invalidParams)
   if (authorization === undefined) return fail(c, 400, "This customer has no saved authorizations")
 
   return ok(
@@ -120,7 +122,9 @@ export function planRoutes(context: PaystackRouteContext, payments: PaystackPaym
   app.get("/plan/:key", (c) => {
     const plan = findPlan(paystack, requireIntegration(c, paystack), c.req.param("key"))
 
-    return plan ? ok(c, "Plan retrieved", plan) : fail(c, 404, "Plan not found")
+    return plan
+      ? ok(c, "Plan retrieved", plan)
+      : fail(c, 404, "Plan ID/code specified is invalid", PROBLEMS.invalidParams)
   })
 
   app.post("/subscription", (c) => createSubscription(c, context, payments))

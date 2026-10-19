@@ -3,6 +3,7 @@ import { requireIntegration } from "../auth.ts"
 import type { PaystackRouteContext } from "../context.ts"
 import { dedicatedObject } from "../formatters.ts"
 import { accountNumber, fail, nextId, ok, text } from "../helpers.ts"
+import { PROBLEMS } from "../problems.ts"
 import { customerInBody } from "./customers.ts"
 
 /** The banks a dedicated account can be opened at in test mode. */
@@ -22,7 +23,7 @@ async function createDedicated(c: Context, context: PaystackRouteContext): Promi
     .all()
     .find((b) => b.slug === (text(fields, "preferred_bank") ?? "test-bank"))
 
-  if (customer === undefined) return fail(c, 404, "Customer not found")
+  if (customer === undefined) return fail(c, 404, "Customer not found", PROBLEMS.customerNotFound)
   if (bank === undefined) return fail(c, 400, "Preferred bank is not available")
 
   const existing = paystack.dedicated.where(
