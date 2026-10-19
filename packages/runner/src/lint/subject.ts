@@ -20,6 +20,9 @@ const PROVIDER_HOSTS: readonly (readonly [string, readonly string[]])[] = [
   ["google", ["accounts.google.com", "googleapis.com"]],
   ["microsoft", ["login.microsoftonline.com", "graph.microsoft.com"]],
   ["composio", ["composio.dev"]],
+  ["nylas", ["nylas.com"]],
+  ["nango", ["nango.dev"]],
+  ["unipile", ["unipile.com"]],
 ]
 
 /** The provider a host belongs to, if danwo knows it. */

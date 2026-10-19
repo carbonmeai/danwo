@@ -101,6 +101,7 @@ const LIVE_KEYS: readonly KeyShape[] = [
   { provider: "slack", value: /^xox[abprs]-/ },
   { provider: "flutterwave", value: /^FLWSECK-(?!.*_TEST)/ },
   { provider: "composio", value: /^ak_[A-Za-z0-9_-]{12,}$/, name: /COMPOSIO/i },
+  { provider: "nylas", value: /^nyk_v0_[A-Za-z0-9_-]{16,}$/, name: /NYLAS/i },
   { provider: "google", value: /^AIza[0-9A-Za-z_-]{35}$/ },
   { provider: "twilio", value: /^SK[0-9a-fA-F]{32}$/, name: /TWILIO/i },
 ]

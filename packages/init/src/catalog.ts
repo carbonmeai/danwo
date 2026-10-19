@@ -206,6 +206,27 @@ export const PROVIDERS = {
     service: "composioService",
     read: "composioProject(composio)",
   },
+  nylas: {
+    label: "Nylas",
+    packages: ["nylas", "@nylas/"],
+    envNames: ["NYLAS_API_KEY", "NYLAS_CLIENT_ID"],
+    service: "nylasService",
+    read: "nylasApplication(nylas)",
+  },
+  nango: {
+    label: "Nango",
+    packages: ["@nangohq/"],
+    envNames: ["NANGO_SECRET_KEY"],
+    service: "nangoService",
+    read: "nangoProject(nango)",
+  },
+  unipile: {
+    label: "Unipile",
+    packages: ["unipile-node-sdk"],
+    envNames: ["UNIPILE_ACCESS_TOKEN", "UNIPILE_DSN"],
+    service: "unipileService",
+    read: "unipileWorkspace(unipile)",
+  },
   llm: {
     label: "Model APIs (OpenAI, Anthropic, AI Gateway the app calls)",
     packages: ["openai", "@anthropic-ai/sdk", "ai"],
@@ -232,6 +253,9 @@ export const PROVIDER_IDS: readonly ProviderId[] = [
   "auth0",
   "clerk",
   "composio",
+  "nylas",
+  "nango",
+  "unipile",
   "llm",
 ]
 

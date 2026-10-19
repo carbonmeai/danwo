@@ -4,6 +4,7 @@ import { z } from "zod"
 
 import { clerkService } from "../src/runner/clerk.ts"
 import { composioService } from "../src/runner/composio.ts"
+import { nangoService, nylasService, unipileService } from "../src/runner/connectors.ts"
 import { StartingPoint } from "../src/runner/isolation.ts"
 import { llmService } from "../src/runner/llm.ts"
 import {
@@ -458,6 +459,45 @@ const CASES: readonly Case[] = [
         "https://backend.composio.dev/api/v3/auth_configs",
         { toolkit: { slug: "gmail" } },
         { "x-api-key": "ak_danwo_test" },
+      ),
+  },
+  {
+    name: "nylas",
+    make: () =>
+      nylasService({
+        seed: { grants: [{ id: "11111111-1111-4111-8111-111111111111", email: "ada@acme.test" }] },
+      }),
+    change: (e) =>
+      post(
+        e,
+        "https://api.us.nylas.com/v3/grants/11111111-1111-4111-8111-111111111111/messages/send",
+        { to: [{ email: "grace@acme.test" }], subject: "Hi", body: "Hello" },
+        { authorization: "Bearer REDACTED-TEST-VALUE" },
+      ),
+  },
+  {
+    name: "nango",
+    make: () => nangoService({ seed: { integrations: [{ key: "hubspot" }] } }),
+    change: (e) =>
+      post(
+        e,
+        "https://api.nango.dev/connect/sessions",
+        { end_user: { id: "u1" } },
+        { authorization: "Bearer nango-secret" },
+      ),
+  },
+  {
+    name: "unipile",
+    make: () =>
+      unipileService({
+        seed: { accounts: [{ id: "acc", type: "LINKEDIN", name: "Ada", username: "ada" }] },
+      }),
+    change: (e) =>
+      post(
+        e,
+        "https://api8.unipile.com/api/v1/chats",
+        { account_id: "acc", attendees_ids: ["ACoAAgrace"], text: "Hi" },
+        { "x-api-key": "unipile-token" },
       ),
   },
   {

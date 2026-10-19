@@ -11,7 +11,7 @@ import { serve } from "../src/http.ts"
 import {
   connectNangoBackends,
   nango,
-  nangoEnvironment,
+  nangoProject,
   nangoOutboundFaults,
   seedNango,
 } from "../src/nango/index.ts"
@@ -168,7 +168,7 @@ describe("connections and credentials", () => {
 
     expect(Reflect.get(forced.credentials, "access_token")).not.toBe(first)
 
-    nangoEnvironment(emulator).revoke("hubspot", "conn-1")
+    nangoProject(emulator).revoke("hubspot", "conn-1")
 
     const error = await client()
       .getConnection("hubspot", "conn-1")
@@ -186,7 +186,7 @@ describe("connections and credentials", () => {
   it("deletes a connection", async () => {
     await client().deleteConnection("hubspot", "conn-1")
 
-    expect(nangoEnvironment(emulator).connections()).toEqual([])
+    expect(nangoProject(emulator).connections()).toEqual([])
   })
 })
 
@@ -207,7 +207,7 @@ describe("proxy and actions", () => {
 
     expect(output).toEqual({ id: "c2" })
     expect(
-      nangoEnvironment(emulator)
+      nangoProject(emulator)
         .calls()
         .map((c) => `${c.kind} ${c.path}`),
     ).toEqual(["proxy /crm/v3/objects/contacts", "action create-contact"])
@@ -234,7 +234,7 @@ describe("proxy and actions", () => {
 
     /* The token was never issued by the GitHub emulator, so GitHub's own refusal comes back. */
     expect(error).toMatchObject({ response: { status: 401 } })
-    expect(nangoEnvironment(emulator).calls()[0]).toMatchObject({
+    expect(nangoProject(emulator).calls()[0]).toMatchObject({
       integration: "github",
       status: 401,
     })

@@ -232,6 +232,20 @@ export {
   type StackUrls,
 } from "./stack-environment.ts"
 export {
+  type NangoEnvironment,
+  nangoEnvironment,
+  type NangoOptions,
+  nangoService,
+  type NylasEnvironment,
+  nylasEnvironment,
+  type NylasOptions,
+  nylasService,
+  type UnipileEnvironment,
+  unipileEnvironment,
+  type UnipileOptions,
+  unipileService,
+} from "./connectors.ts"
+export {
   RESEND_HOSTS,
   type ResendEnvironment,
   resendEnvironment,

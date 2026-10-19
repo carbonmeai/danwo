@@ -127,6 +127,30 @@ export interface BachsFixtures {
   readonly settle: () => Promise<void>
 }
 
+/** Fixtures a `nylasEnvironment()` or `nylasService()` contributes. */
+export interface NylasFixtures {
+  /** The Nylas emulator: read grants, mail and events and deliver mail with `nylasApplication(nylas)`. */
+  readonly nylas: Emulator
+  readonly proxy: Proxy
+  readonly settle: () => Promise<void>
+}
+
+/** Fixtures a `nangoEnvironment()` or `nangoService()` contributes. */
+export interface NangoFixtures {
+  /** The Nango emulator: read connections and proxied calls, and revoke one, with `nangoProject(nango)`. */
+  readonly nango: Emulator
+  readonly proxy: Proxy
+  readonly settle: () => Promise<void>
+}
+
+/** Fixtures a `unipileEnvironment()` or `unipileService()` contributes. */
+export interface UnipileFixtures {
+  /** The Unipile emulator: read accounts and messages and message the app's users with `unipileWorkspace(unipile)`. */
+  readonly unipile: Emulator
+  readonly proxy: Proxy
+  readonly settle: () => Promise<void>
+}
+
 /** Fixtures a `composioEnvironment()` or `composioService()` contributes. */
 export interface ComposioFixtures {
   /**
@@ -199,10 +223,22 @@ export {
   type AppEnvironmentOptions,
   type ModelPrice,
   priced,
+  type NangoEnvironment,
+  nangoEnvironment,
+  type NangoOptions,
+  nangoService,
+  type NylasEnvironment,
+  nylasEnvironment,
+  type NylasOptions,
+  nylasService,
   type ResendEnvironment,
   resendEnvironment,
   type ResendOptions,
   resendService,
+  type UnipileEnvironment,
+  unipileEnvironment,
+  type UnipileOptions,
+  unipileService,
   type StartedApp,
   startApp,
   type StackApp,
@@ -439,6 +475,17 @@ export {
   type ComposioToolHandler,
   type ComposioTools,
   composioTools,
+  type NangoCall,
+  type NangoConnection,
+  type NangoProject,
+  nangoProject,
+  type NangoSeedConfig,
+  type NylasApplication,
+  nylasApplication,
+  type NylasSeedConfig,
+  type UnipileSeedConfig,
+  type UnipileWorkspace,
+  unipileWorkspace,
 } from "@danwo/emulators"
 export {
   type DatabaseSnapshot,

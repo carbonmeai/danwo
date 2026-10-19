@@ -123,7 +123,7 @@ export function seedNango(store: Store, config: NangoSeedConfig): void {
 }
 
 /** Reading a Nango emulator from a test, and breaking a connection as a revoked app does. */
-export interface NangoEnvironment {
+export interface NangoProject {
   connections(): NangoConnection[]
   connection(integration: string, connectionId: string): NangoConnection
   /** Every proxied call and action run, oldest first. */
@@ -133,7 +133,7 @@ export interface NangoEnvironment {
 }
 
 /** The Nango environment an emulator stands in for. */
-export function nangoEnvironment(emulator: Emulator): NangoEnvironment {
+export function nangoProject(emulator: Emulator): NangoProject {
   const objects = nangoStore(emulator.store)
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- reading registers no routes
   const context = {

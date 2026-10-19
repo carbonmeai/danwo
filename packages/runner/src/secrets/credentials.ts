@@ -65,6 +65,10 @@ const TOKEN_PATTERNS: readonly [RegExp, string][] = [
   [/\b(vck_)[A-Za-z0-9_-]{8,}/g, `$1${REDACTED}`],
   /* Composio project and user API keys. */
   [/\b(u?ak_)[A-Za-z0-9_-]{8,}/g, `$1${REDACTED}`],
+  /* Nylas API keys and the access, refresh and id tokens its hosted auth hands out. */
+  [/\b(nyk_|ny(?:at|rt|id)_)[A-Za-z0-9_-]{8,}/g, `$1${REDACTED}`],
+  /* Nango connect session tokens. */
+  [/\b(nango_connect_session_)[A-Za-z0-9]{8,}/g, `$1${REDACTED}`],
 ]
 
 /** `text` with every credential-shaped value replaced. */
