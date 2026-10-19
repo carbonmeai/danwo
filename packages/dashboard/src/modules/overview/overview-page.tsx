@@ -87,8 +87,8 @@ function RunsPerDay({ days }: { readonly days: readonly Day[] }) {
                 style={{ height: `${(total / most) * 100}%` }}
                 minH={total > 0 ? "1" : "0"}
               >
-                <Box flex={day.failed} bg="verdict.failed.solid" rounded="sm" />
-                <Box flex={day.passed} bg="verdict.passed.solid" rounded="sm" />
+                <Box bg="verdict.failed.solid" rounded="sm" style={{ flex: day.failed }} />
+                <Box bg="verdict.passed.solid" rounded="sm" style={{ flex: day.passed }} />
               </Stack>
             </Link>
           )
@@ -102,7 +102,7 @@ function RunsPerDay({ days }: { readonly days: readonly Day[] }) {
   )
 }
 
-/** A day-by-day line, for the pass rate or the run time. */
+/** A line across the window's runs, oldest on the left: their pass rate or their run time. */
 function DayLine({
   title,
   values,
@@ -221,12 +221,12 @@ export function OverviewPage({ overview }: { readonly overview: Overview }) {
           <Grid gridTemplateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap="2" mt="2">
             <DayLine
               title="Pass rate trend"
-              values={days.map((day) => day.passRate)}
+              values={overview.trend.map((run) => run.passRate)}
               range={[0, 1]}
             />
             <DayLine
               title="Run duration"
-              values={days.map((day) => day.meanMs)}
+              values={overview.trend.map((run) => run.durationMs)}
               color="var(--danwo-colors-series-2)"
             />
           </Grid>

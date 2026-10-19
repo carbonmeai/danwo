@@ -61,9 +61,11 @@ function useRecord(dir: string | undefined): RecordView | null | undefined {
 
     let live = true
 
-    void fetchRecord({ data: dir }).then((view) => {
-      if (live) setLoaded({ dir, view })
-    })
+    void fetchRecord({ data: dir })
+      .catch(() => null)
+      .then((view) => {
+        if (live) setLoaded({ dir, view })
+      })
 
     return () => {
       live = false

@@ -4,7 +4,14 @@ import { Box, styled } from "@danwo/ui/jsx"
 import { useScreenshot } from "../record/use-screenshot.ts"
 import type { Thumb } from "./tests-data.ts"
 
-const FRAME = { w: "24", h: "14", rounded: "md", overflow: "hidden", flexShrink: "0" } as const
+const FRAME = {
+  w: "24",
+  h: "14",
+  rounded: "md",
+  overflow: "hidden",
+  flexShrink: "0",
+  boxShadow: "inset 0 0 0 1px {colors.hairline}",
+} as const
 
 /** A screenshot thumbnail, fetched once its row scrolls near the screen. */
 function Still({ dir, file }: { readonly dir: string; readonly file: string }) {

@@ -1,19 +1,8 @@
-/**
- * Whether a recording was useful to whoever read it, kept in the project's `.danwo/feedback.jsonl`
- * as one line per vote. Nothing leaves the machine.
- */
-import { appendFile, mkdir } from "node:fs/promises"
-import { join } from "node:path"
-
+/** The feedback server function: a vote on a recording, kept in the project's `.danwo` folder. */
 import { createServerFn } from "@tanstack/react-start"
 
-import { danwoDir, insideArea, projectRoot } from "../../lib/project-files.ts"
-
-/** A vote on one recording. */
-interface Feedback {
-  readonly record: string
-  readonly vote: "up" | "down"
-}
+import { projectRoot } from "../../lib/project-files.ts"
+import { type Feedback, keepFeedback } from "./feedback-data.ts"
 
 function feedbackOf(value: unknown): Feedback {
   const record = typeof value === "object" && value !== null ? Reflect.get(value, "record") : null
@@ -23,21 +12,6 @@ function feedbackOf(value: unknown): Feedback {
     throw new Error("feedback needs a record and an up or down vote")
 
   return { record, vote }
-}
-
-/** Appends the vote, refusing a record outside the project's run folders. */
-export async function keepFeedback(
-  root: string,
-  feedback: Feedback,
-  now = new Date(),
-): Promise<void> {
-  insideArea(root, "runs", feedback.record)
-
-  await mkdir(danwoDir(root), { recursive: true })
-  await appendFile(
-    join(danwoDir(root), "feedback.jsonl"),
-    `${JSON.stringify({ at: now.toISOString(), ...feedback })}\n`,
-  )
 }
 
 export const sendFeedback = createServerFn({ method: "POST" })

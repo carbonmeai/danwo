@@ -12,9 +12,10 @@ import { percent } from "../../lib/format.ts"
 import { useFilter } from "../../lib/list-keys.ts"
 import { LiveRuns } from "../live/live-runs.tsx"
 import { RerunTest, RunTests } from "../live/run-actions.tsx"
+import type { MatrixVerdict } from "./matrix-verdict.ts"
 import { TestThumb } from "./test-thumb.tsx"
 import { matrixWords, testText } from "./test-values.ts"
-import type { MatrixVerdict, TestRow } from "./tests-data.ts"
+import type { TestRow } from "./tests-data.ts"
 
 /** What the matrix made of the test, as a chip that opens that matrix run. */
 function MatrixChip({ verdict }: { readonly verdict: MatrixVerdict }) {

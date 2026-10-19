@@ -5,7 +5,7 @@ import type { ReactNode } from "react"
 import { Ident } from "../../components/code.tsx"
 import { Page } from "../../components/page.tsx"
 import { Section } from "../../components/panel.tsx"
-import type { ProjectSettings } from "./settings-api.ts"
+import type { ProjectSettings } from "./settings-data.ts"
 
 /** One fact as a label and its value. */
 function Fact({ label, children }: { readonly label: string; readonly children: ReactNode }) {

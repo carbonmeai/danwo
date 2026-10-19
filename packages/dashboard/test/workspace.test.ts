@@ -12,7 +12,7 @@ import type {
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { launchOf, requestOf } from "../src/modules/live/launch-args.ts"
-import { keepFeedback } from "../src/modules/overlay/feedback-api.ts"
+import { keepFeedback } from "../src/modules/overlay/feedback-data.ts"
 import {
   consoleLines,
   fixPrompt,
@@ -24,9 +24,10 @@ import {
 import { overviewOf, rangeOf } from "../src/modules/overview/overview-data.ts"
 import { type RecordView, getRecord } from "../src/modules/record/record-data.ts"
 import { listRuns } from "../src/modules/runs/runs-data.ts"
-import { settingsOf } from "../src/modules/settings/settings-api.ts"
+import { settingsOf } from "../src/modules/settings/settings-data.ts"
+import { matrixVerdict } from "../src/modules/tests/matrix-verdict.ts"
 import { matrixWords } from "../src/modules/tests/test-values.ts"
-import { listTests, matrixVerdict } from "../src/modules/tests/tests-data.ts"
+import { listTests } from "../src/modules/tests/tests-data.ts"
 
 const NO_USAGE: Usage = {
   cache: {},

@@ -63,18 +63,25 @@ export function warningsOf(record: Record_): Warning[] {
   ]
 
   const diverged = divergenceLine(record)
-
-  return [
+  const all: Warning[] = [
     ...(record.error ? [{ kind: "error" as const, text: record.error.message }] : []),
     ...(record.stopped ? [{ kind: "error" as const, text: record.stopped }] : []),
     ...(diverged ? [{ kind: "note" as const, text: diverged }] : []),
-    ...[...new Set(faults)].map((text) => ({ kind: "fault" as const, text })),
+    ...faults.map((text) => ({ kind: "fault" as const, text })),
     ...(record.lint ?? []).map((finding) => ({
       kind: "lint" as const,
       text: `${finding.rule}: ${finding.message}`,
     })),
     ...record.notes.map((text) => ({ kind: "note" as const, text })),
   ]
+
+  // A note often repeats where the body stopped; each line is pinned once.
+  return all.filter(
+    (warning, i) =>
+      all.findIndex(
+        (other) => other.text.includes(warning.text) || warning.text.includes(other.text),
+      ) === i,
+  )
 }
 
 /** The console's level tabs, as a browser's devtools has them. */

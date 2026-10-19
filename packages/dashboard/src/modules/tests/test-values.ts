@@ -1,5 +1,6 @@
 /** How the tests pages word what they show: what the matrix made of a test, and what a filter reads. */
-import type { MatrixVerdict, TestRow } from "./tests-data.ts"
+import type { MatrixVerdict } from "./matrix-verdict.ts"
+import type { TestRow } from "./tests-data.ts"
 
 /** What the latest matrix run made of a test, in a few words. */
 export function matrixWords(verdict: MatrixVerdict): string {

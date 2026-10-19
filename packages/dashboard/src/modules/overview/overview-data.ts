@@ -5,7 +5,7 @@
  */
 import type { MatrixHistory, RunHistory } from "@danwo/runner/runner"
 
-import { matrixVerdict } from "../tests/tests-data.ts"
+import { matrixVerdict } from "../tests/matrix-verdict.ts"
 
 /** How many days the overview covers. */
 export const RANGES = [7, 30, 90] as const
@@ -56,6 +56,8 @@ export interface Overview {
   readonly failedTests: Figure
   readonly meanMs: Figure
   readonly days: readonly Day[]
+  /** Each run of the window, oldest first: its pass rate and how long it took. */
+  readonly trend: readonly { readonly passRate: number | null; readonly durationMs: number }[]
   readonly failing: readonly FailingRun[]
   readonly broken: readonly BrokenTest[]
 }
@@ -156,6 +158,9 @@ export function overviewOf(runs: readonly RunHistory[], range: Range, now = Date
     failedTests: figure(inWindow, before, failedTestsIn),
     meanMs: figure(inWindow, before, (list) => meanOf(list.map((run) => run.durationMs))),
     days: daysOf(inWindow, range, now),
+    trend: inWindow
+      .toReversed()
+      .map((run) => ({ passRate: passRateOf([run]), durationMs: run.durationMs })),
     failing: inWindow
       .filter((run) => failedIn(run) > 0)
       .slice(0, 5)
