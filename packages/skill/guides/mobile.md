@@ -19,8 +19,8 @@ test("buys 500 credits", async ({ screen, expect, device }) => {
 })
 ```
 
-`examples/shop-mobile` is a complete project: an Expo app, its Node backend, the config and this
-test.
+`examples/shop-mobile` is a complete project: an Expo app, its Node backend, the config, this
+test and the same purchase told to the agent in plain words.
 
 ## Setup
 
@@ -47,14 +47,17 @@ from `@danwo/expo` does the same. Ship store builds without it.
 ## The config
 
 ```ts
-import { ANDROID_BACKGROUND_HOSTS, withAndroidDevice } from "@danwo/device"
+import { ANDROID_BACKGROUND_HOSTS, androidWorkers, withAndroidDevice } from "@danwo/device"
 import { buildAndroid } from "@danwo/expo"
 import { defineConfig, startServices, stripeService } from "@danwo/sdk"
 
 export default defineConfig({
-  workers: 1,
+  /* One emulator per worker, as many as the machine has room for (at most three). */
+  workers: androidWorkers({ avd: "danwo_spike" }),
   readiness: { mode: "page+backend", settle: true },
-  async environment() {
+  cache: { dir: "tests/__recordings__" },
+  model: "anthropic/claude-sonnet-5.5",
+  async environment({ workerIndex }) {
     const build = await buildAndroid({ project: "app" })
     const services = await startServices([stripeService({ seed }), backendRoute], {
       blocked: ANDROID_BACKGROUND_HOSTS,
@@ -65,6 +68,8 @@ export default defineConfig({
       { ...servicesLifecycle, proxy: services.proxy, fixtures: services.fixtures, baseUrl, close },
       {
         avd: "danwo_spike",
+        worker: workerIndex,
+        snapshot: "danwo_clean",
         app: { package: "com.danwo.shopmobile", apk: build.apk, scheme: "danwoshop" },
       },
     )
@@ -79,7 +84,8 @@ export default defineConfig({
 3. prepares Chrome (no first-run screens or notification prompt);
 4. turns off animations and the captive-portal probe;
 5. routes the device's traffic through the proxy with `adb reverse` and a proxy setting;
-6. installs the APK.
+6. installs the APK, and disables any other app that claims its link scheme (an older build kept
+   in a snapshot would put an "Open with" chooser in the way of links back from the browser).
 
 `ANDROID_BACKGROUND_HOSTS` blocks the emulator's own traffic at the proxy: Chrome's sync and
 optimization hints, safe browsing and Play services check-ins. Chrome on the device also runs with
@@ -91,10 +97,29 @@ the build needs no address baked in.
 
 Options:
 
-- `snapshot` boots from a saved AVD snapshot instead of a cold boot. The binder redoes root, the CA
-  and the proxy route.
+- `snapshot` boots from a saved AVD snapshot instead of a cold boot (seconds instead of a minute).
+  The binder redoes root, the CA and the proxy route.
+- `worker` gives each worker its own emulator: worker n uses the console port 5554 + 2n, so the
+  serial `emulator-<port>`, and its own driver state and proxy route. Every boot is read-only, so
+  several instances share one AVD and its snapshots.
 - `serial` uses a running device as it is.
 - `permissions` lists runtime permissions to grant before each launch.
+
+## Parallel emulators
+
+`androidWorkers({ avd, max })` sizes `workers`: an emulator takes its AVD's RAM plus about a gigabyte,
+and two cores. It allows as many as half the memory and the cores fit, at most `max` (default 3),
+and one on a machine already loaded past its cores. `danwo matrix --workers <n>` overrides it.
+
+The shop's matrix of 29 runs, on a 12-core, 32 GB Apple silicon machine:
+
+| Emulators | Wall time | Median trial |
+| --------- | --------- | ------------ |
+| 1         | 160 s     | 4.6 s        |
+| 2         | 103 s     | 5.6 s        |
+| 3         | 95 s      | 7.1 s        |
+
+Two emulators are the sweet spot there; a third mostly slows each trial down.
 
 ## What a test gets
 
@@ -102,10 +127,16 @@ Every attempt starts the app afresh: data cleared, permissions granted, launched
 
 - **`screen`:** `getByTestId` (React Native's `testID`), `getByRole`, `getByLabel`, `getByText`,
   `getByPlaceholder` and `getByDisplayValue` resolve on the accessibility tree. `click` (or `tap`),
-  `fill`, `clear`, `check` and `uncheck` act on the single match. Headers with
-  `accessibilityRole="header"` are headings.
+  `fill`, `clear`, `check`, `uncheck`, `press(key)` and `selectOption(option)` (a spinner or
+  dropdown: it opens the picker and taps the option) act on the single match. Headers with
+  `accessibilityRole="header"` are headings. `getAttribute(name)` takes web names:
+  `data-testid`, `aria-label`, `aria-checked`, `aria-disabled`, `placeholder`, `value`, `role`.
 - **`expect`:** `toBeVisible`, `toBeHidden`, `toHaveText`, `toContainText`, `toHaveValue`,
-  `toBeEnabled`, `toBeDisabled`, `toBeChecked` and `toHaveCount` retry like on the web.
+  `toBeEnabled`, `toBeDisabled`, `toBeChecked`, `toHaveCount` and `toHaveAttribute` retry like on
+  the web; in `danwo matrix` they are paced by the clean run like web checks.
+  `toHaveScreenshot()` compares an element's box, or `expect(screen)` the whole screen without its
+  status bar, with a baseline; password fields and `mask` locators are painted over.
+- **`agent`:** see below.
 - **`app.open(path)`:** opens `<scheme>://<path>`. Without a path it starts the app afresh.
 - **`device`:**
   - `foreground()` says whether a browser such as a Custom Tab is in front, and its URL;
@@ -118,6 +149,49 @@ A Custom Tab is part of the screen: its web page reads through the same locators
 
 Readiness after each action waits for the services behind the app (with `settle`, webhooks are
 played), then for the screen to stop changing.
+
+## The agent
+
+`agent.act`, `agent.extract`, `agent.assert` and `agent.waitFor` work on a device as on the web:
+
+```ts
+const { credits } = await agent.extract("the credits balance", z.object({ credits: z.number() }))
+
+await agent.act("Start buying 500 credits")
+await agent.act("Pay for the credits with the email {email}", {
+  params: { email: "buyer@example.com" },
+})
+await expect(screen.getByTestId("credits")).toHaveText(`Credits: ${credits + 500}`)
+```
+
+The model reads the screen in the page view's format, one line per element with its ref, e.g.
+`- button "Pay $5.00" [ref=e12]`, and says which app or browser page is in front. It acts with
+device tools: `tap`, `fill`, `fill_secret`, `check`, `select`, `press_key`, `scroll` (the screen or
+a list, any direction), `back`, `open_link` and `wait_for`.
+
+Replay follows the web's rules:
+
+- **Recordings.** A step's actions are kept, each on a target a person would write
+  (`getByTestId("buy")`, `getByRole("button", { name: "Pay $5.00" })`), once a later check
+  confirms it. Params are kept by name, secrets by name only. A replay asks no model.
+- **Relocation.** With `similar-v1` (the default) a renamed element is found by role and likeness
+  of its name; with `exact`, never.
+- **Strict stop.** `danwo matrix` replays only: a step that no longer replays stops the agent there,
+  and the invariant judges the state. A step with no recording fails.
+- **Effects.** A replay must change the screen and the services behind it as its recording did.
+  Calls the proxy blocked (the device's background traffic) are not effects.
+
+**Vision.** Icons with no name and pictures of text show only on the screen. With `vision` on
+(`auto` by default) the agent may `look`: a screenshot at half size with numbered marks over what
+can be tapped, password fields and fields a secret went into painted over. It then uses `tap_at`
+or `type_at`. Such an action is recorded as a gray patch of the screen around its point; a replay
+finds the patch where it was or, when it may relocate, where it moved, with no model call. The
+judge of `agent.assert` sees a screenshot too when the screen has unnamed controls.
+
+The shop's agent test, recorded with `anthropic/claude-sonnet-5.5`: 6 model calls, about $0.02 and
+17 s live; replayed, 0 calls and about 6 s. Its matrix runs all 28 faults on two emulators with no
+model call. `DANWO_MODEL=scripted` records with the shop's own scripted model, for machines
+without a model key.
 
 ## The flight record
 
@@ -132,13 +206,11 @@ server's.
 
 ## Limits for now
 
-- **One worker, one emulator.**
 - **Android only.** Flutter apps draw their own widgets, and their accessibility tree is thin.
 - **Pinned apps.** Apps that pin certificates ignore danwo's CA.
 - **Play images.** Google Play system images cannot be rooted.
-- **Locators only.** No agent, replay or vision. `hover`, `press`, `setInputFiles`, `dragTo`,
-  `selectOption`, `getAttribute`, `toHaveAttribute`, `toHaveScreenshot`, `mail.open` and saved
-  sessions say they are not supported on Android yet.
+- **Not yet.** `hover`, `setInputFiles`, `dragTo`, `mail.open`, agent steps that read mail, and
+  saved sessions say they are not supported on Android yet.
 - **Time travel** moves the services and the backend, not the device's clock.
 
 ## CI
@@ -150,5 +222,5 @@ server's.
 The slow test runs only when asked, and skips cleanly without an SDK or AVD:
 
 ```bash
-DANWO_ANDROID=1 DANWO_AVD=<avd> bun run test:slow packages/cli/test/android.slow.test.ts
+DANWO_ANDROID=1 DANWO_AVD=<avd> DANWO_AVD_SNAPSHOT=<snapshot> bun run test:slow packages/cli/test/android.slow.test.ts
 ```

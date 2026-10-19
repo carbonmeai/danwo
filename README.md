@@ -149,7 +149,10 @@ one), roots it, trusts the run's CA, routes its traffic through danwo's proxy wi
 installs the app, and gives each test a fresh launch. Locators resolve on the accessibility tree:
 React Native's `testID`, roles, labels and text. `danwo build-android` makes the release APK of an
 Expo app that trusts user CAs, cached by a hash of its sources; `danwo device doctor` checks the
-machine. Phase one runs one emulator, locators only. See `danwo guide mobile`.
+machine. `agent.act`, `extract`, `assert` and `waitFor` run on the device too, with replay at no
+model calls, relocation, strict stop, effects and a vision fallback on screenshots; each worker
+boots its own emulator from a snapshot, so the fault matrix runs on several at once. See
+`danwo guide mobile`.
 
 ## Vision
 
