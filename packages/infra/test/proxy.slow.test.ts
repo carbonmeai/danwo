@@ -157,7 +157,6 @@ describe.skipIf(!dockerAvailable())("the Postgres fault proxy, against Postgres 
 
     proxy.setFault((call) => (call.verb === "BEGIN" ? { kind: "down", ms: 600 } : undefined))
     await failure(client.query("BEGIN"))
-    proxy.setFault()
     expect(await failure(app())).toMatch(/terminated|ECONNRESET|closed|connect/i)
     await new Promise((resolve) => setTimeout(resolve, 700))
     await (await app()).end()
@@ -169,6 +168,10 @@ describe.skipIf(!dockerAvailable())("the Postgres fault proxy, against Postgres 
     )
     await failure(second.query("BEGIN"))
     expect(await failure(app())).toBe("53300")
+
+    // Turning faults off ends the outage at once, as the matrix does between trials.
+    proxy.setFault()
+    await (await app()).end()
   })
 })
 
