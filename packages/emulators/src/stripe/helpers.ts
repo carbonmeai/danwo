@@ -2,6 +2,7 @@ import { randomInt } from "node:crypto"
 
 import type { Context } from "../http.ts"
 import { asRecord } from "../json.ts"
+import { currentRequest } from "./requests.ts"
 
 export { asRecord }
 
@@ -29,7 +30,26 @@ export function unix(date: Date): number {
 
 type ErrorType = "invalid_request_error" | "card_error" | "api_error" | "idempotency_error"
 
-/** Stripe's error body: `{ error: { type, message, code?, param? } }`. */
+/** Where Stripe documents an error code. */
+function docUrl(code: string): string {
+  return `https://stripe.com/docs/error-codes/${code.replaceAll("_", "-")}`
+}
+
+/** The dashboard log of the call being answered, which every error in a call links to. */
+function requestLogUrl(): { request_log_url: string } | undefined {
+  const request = currentRequest()
+
+  return (
+    request && {
+      request_log_url: `https://dashboard.stripe.com/test/logs/${request.id}?t=${unix(new Date())}`,
+    }
+  )
+}
+
+/**
+ * Stripe's error body: `{ error: { type, message, code?, doc_url?, param?, request_log_url? } }`.
+ * A coded error links to its documentation, and every error in a call links to that call's log.
+ */
 export function stripeError(
   c: Context,
   status: number,
@@ -43,8 +63,9 @@ export function stripeError(
       error: {
         type,
         message,
-        ...(code !== undefined && { code }),
+        ...(code !== undefined && { code, doc_url: docUrl(code) }),
         ...(param !== undefined && { param }),
+        ...requestLogUrl(),
       },
     },
     status,
@@ -52,7 +73,7 @@ export function stripeError(
 }
 
 /** The 404 Stripe answers for an unknown id, e.g. `No such customer: 'cus_123'`. */
-export function noSuch(c: Context, what: string, id: string, param?: string): Response {
+export function noSuch(c: Context, what: string, id: string, param = "id"): Response {
   return stripeError(
     c,
     404,

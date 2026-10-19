@@ -16,6 +16,7 @@ import {
 } from "./formatters.ts"
 import { newId, stripeError, unix } from "./helpers.ts"
 import { stripeIdempotency } from "./idempotency.ts"
+import { stripeRequests } from "./requests.ts"
 import { stripeResolver } from "./resolve.ts"
 import { chargeRoutes } from "./routes/charges.ts"
 import { checkoutSessionRoutes } from "./routes/checkout-sessions.ts"
@@ -238,6 +239,7 @@ export const stripe = defineEmulator({
     app.onError(
       providerErrors((c, status, message) => stripeError(c, status, "api_error", message)),
     )
+    app.use(stripeRequests())
     app.use(stripeApiKey())
     app.use(stripeIdempotency(context.store, context.clock))
     app.use(stripeExpand(stripeResolver(objects)))
