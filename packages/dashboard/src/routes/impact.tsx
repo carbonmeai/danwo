@@ -1,18 +1,10 @@
 import { Box, Grid, HStack, Stack, styled } from "@danwo/ui/jsx"
 import { createFileRoute } from "@tanstack/react-router"
-import { useDeferredValue, useRef, useState } from "react"
+import { useRef } from "react"
 
 import { fetchImpact } from "../api.ts"
-import { useListKeys } from "../components/keys.ts"
-import {
-  Code,
-  Empty,
-  FilterInput,
-  Ident,
-  KeyHint,
-  PageTitle,
-  Panel,
-} from "../components/status.tsx"
+import { useFilter, useListKeys } from "../components/keys.ts"
+import { Code, Empty, Ident, ListFilter, PageTitle, Panel } from "../components/status.tsx"
 import type { ImpactRow } from "../data/impact.ts"
 
 export const Route = createFileRoute("/impact")({
@@ -64,27 +56,19 @@ function Tags({
   )
 }
 
-function matches(row: ImpactRow, query: string): boolean {
-  const haystack = [row.test, ...row.providers, ...row.routes, ...row.webhooks, ...row.calls]
-    .join(" ")
-    .toLowerCase()
-
-  return query
-    .toLowerCase()
-    .split(/\s+/)
-    .every((word) => haystack.includes(word))
+/** What the filter searches in a row: the test and everything it touched. */
+function textOf(row: ImpactRow): string {
+  return [row.test, ...row.providers, ...row.routes, ...row.webhooks, ...row.calls].join(" ")
 }
 
 const Label = styled("div", { base: { color: "signal.quiet", fontSize: "1", mb: "1" } })
 
 function ImpactPage() {
   const rows = Route.useLoaderData()
-  const [query, setQuery] = useState("")
-  const deferred = useDeferredValue(query.trim())
+  const filter = useFilter(rows, textOf)
+  const { shown, deferred } = filter
   const list = useRef<HTMLUListElement>(null)
-  const filter = useRef<HTMLInputElement>(null)
-  const shown = deferred === "" ? rows : rows.filter((row) => matches(row, deferred))
-  const current = useListKeys(list, shown.length, filter)
+  const current = useListKeys(list, shown.length, filter.box)
 
   if (rows.length === 0)
     return (
@@ -112,17 +96,11 @@ function ImpactPage() {
           </>
         }
         actions={
-          <HStack gap="3">
-            <KeyHint />
-            <FilterInput
-              ref={filter}
-              type="search"
-              placeholder="Filter by test, provider or route"
-              aria-label="Filter tests"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </HStack>
+          <ListFilter
+            label="Filter tests"
+            placeholder="Filter by test, provider or route"
+            filter={filter}
+          />
         }
       />
       <Panel overflow="hidden">

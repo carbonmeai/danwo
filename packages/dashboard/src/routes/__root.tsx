@@ -37,7 +37,8 @@ const NavLink = styled(Link, {
     display: "inline-flex",
     alignItems: "center",
     rounded: "md",
-    _hover: { color: "signal.ink", bg: "signal.raised" },
+    textDecoration: "none",
+    _hover: { color: "signal.ink", bg: "signal.raised", textDecoration: "none" },
     "&[data-status=active]": { color: "signal.ink", bg: "signal.raised" },
   },
 })

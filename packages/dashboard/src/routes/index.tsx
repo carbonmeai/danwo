@@ -1,16 +1,15 @@
 import { Box, Grid, HStack, Stack, styled } from "@danwo/ui/jsx"
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { type ReactNode, useDeferredValue, useRef, useState } from "react"
+import { type ReactNode, type RefObject, useRef, useState } from "react"
 
 import { fetchRuns } from "../api.ts"
 import { ago, dollars, duration, percent, when } from "../components/format.ts"
-import { useListKeys } from "../components/keys.ts"
+import { useFilter, useListKeys } from "../components/keys.ts"
 import { Sparkline } from "../components/sparkline.tsx"
 import {
   Empty,
-  FilterInput,
   Ident,
-  KeyHint,
+  ListFilter,
   PageTitle,
   Panel,
   type Share,
@@ -324,7 +323,7 @@ function RunLine({
         color="signal.quiet"
         display={{ base: "none", lg: "table-cell" }}
       >
-        {row.modelCalls > 0 ? `${dollars(row.costUsd)}` : "–"}
+        {row.modelCalls > 0 ? dollars(row.costUsd) : "–"}
       </Td>
       <Td w="9rem" textAlign="right" color="signal.quiet" whiteSpace="nowrap">
         <time dateTime={row.startedAt} title={when(row.startedAt)} suppressHydrationWarning>
@@ -335,28 +334,82 @@ function RunLine({
   )
 }
 
-/** Whether a row matches the filter: its title, command or verdicts contain every word. */
-function matches(row: RunRow, query: string): boolean {
-  const haystack =
-    `${row.title} danwo ${row.kind} ${countLine(row)} ${verdictOf(row)}`.toLowerCase()
+/** What the filter searches in a row: its title, command and verdicts. */
+function textOf(row: RunRow): string {
+  return `${row.title} danwo ${row.kind} ${countLine(row)} ${verdictOf(row)}`
+}
 
-  return query
-    .toLowerCase()
-    .split(/\s+/)
-    .every((word) => haystack.includes(word))
+/** The runs on this page that match the filter, j and k moving through them. */
+function RunsTable({
+  shown,
+  deferred,
+  box,
+}: {
+  readonly shown: readonly RunRow[]
+  readonly deferred: string
+  readonly box: RefObject<HTMLInputElement | null>
+}) {
+  const list = useRef<HTMLTableSectionElement>(null)
+  const current = useListKeys(list, shown.length, box)
+  const [now] = useState(() => Date.now())
+
+  return (
+    <Panel overflow="hidden">
+      <styled.table w="full" borderCollapse="collapse" fontSize="1.5">
+        <thead>
+          <tr>
+            <Th>Result</Th>
+            <Th>What ran</Th>
+            <Th display={{ base: "none", md: "table-cell" }}>Command</Th>
+            <Th textAlign="right">Time</Th>
+            <Th textAlign="right" display={{ base: "none", lg: "table-cell" }}>
+              Spend
+            </Th>
+            <Th textAlign="right">Started</Th>
+          </tr>
+        </thead>
+        <tbody ref={list}>
+          {shown.map((row, i) => (
+            <RunLine key={row.id} row={row} current={i === current} now={now} />
+          ))}
+        </tbody>
+      </styled.table>
+      {shown.length === 0 ? (
+        <Box p="6" color="signal.quiet" textAlign="center">
+          No run on this page matches “{deferred}”.
+        </Box>
+      ) : null}
+    </Panel>
+  )
+}
+
+/** Links to newer and older pages of runs, when there is more than one. */
+function Pager({ page, pages }: { readonly page: number; readonly pages: number }) {
+  if (pages <= 1) return null
+
+  return (
+    <HStack justify="flex-end" gap="4" mt="4" fontSize="1.5" color="signal.quiet">
+      {page > 0 ? (
+        <Link to="/" search={page > 1 ? { page: page - 1 } : {}}>
+          Newer
+        </Link>
+      ) : null}
+      <span>
+        Page {page + 1} of {pages}
+      </span>
+      {page + 1 < pages ? (
+        <Link to="/" search={{ page: page + 1 }}>
+          Older
+        </Link>
+      ) : null}
+    </HStack>
+  )
 }
 
 function RunsPage() {
   const { rows, total, health } = Route.useLoaderData()
   const { page = 0 } = Route.useSearch()
-  const [query, setQuery] = useState("")
-  const deferred = useDeferredValue(query.trim())
-  const list = useRef<HTMLTableSectionElement>(null)
-  const filter = useRef<HTMLInputElement>(null)
-  const shown = deferred === "" ? rows : rows.filter((row) => matches(row, deferred))
-  const current = useListKeys(list, shown.length, filter)
-  const [now] = useState(() => Date.now())
-  const pages = Math.ceil(total / PAGE_SIZE)
+  const filter = useFilter(rows, textOf)
 
   if (total === 0)
     return (
@@ -372,64 +425,11 @@ function RunsPage() {
       <PageTitle
         title="Runs"
         detail={`${total} ${total === 1 ? "run" : "runs"} of danwo test and danwo matrix, newest first`}
-        actions={
-          <HStack gap="3">
-            <KeyHint />
-            <FilterInput
-              ref={filter}
-              type="search"
-              placeholder="Filter runs"
-              aria-label="Filter runs"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </HStack>
-        }
+        actions={<ListFilter label="Filter runs" placeholder="Filter runs" filter={filter} />}
       />
       {page === 0 ? <HealthPanel health={health} /> : null}
-      <Panel overflow="hidden">
-        <styled.table w="full" borderCollapse="collapse" fontSize="1.5">
-          <thead>
-            <tr>
-              <Th>Result</Th>
-              <Th>What ran</Th>
-              <Th display={{ base: "none", md: "table-cell" }}>Command</Th>
-              <Th textAlign="right">Time</Th>
-              <Th textAlign="right" display={{ base: "none", lg: "table-cell" }}>
-                Spend
-              </Th>
-              <Th textAlign="right">Started</Th>
-            </tr>
-          </thead>
-          <tbody ref={list}>
-            {shown.map((row, i) => (
-              <RunLine key={row.id} row={row} current={i === current} now={now} />
-            ))}
-          </tbody>
-        </styled.table>
-        {shown.length === 0 ? (
-          <Box p="6" color="signal.quiet" textAlign="center">
-            No run on this page matches “{deferred}”.
-          </Box>
-        ) : null}
-      </Panel>
-      {pages > 1 ? (
-        <HStack justify="flex-end" gap="4" mt="4" fontSize="1.5" color="signal.quiet">
-          {page > 0 ? (
-            <Link to="/" search={page > 1 ? { page: page - 1 } : {}}>
-              Newer
-            </Link>
-          ) : null}
-          <span>
-            Page {page + 1} of {pages}
-          </span>
-          {page + 1 < pages ? (
-            <Link to="/" search={{ page: page + 1 }}>
-              Older
-            </Link>
-          ) : null}
-        </HStack>
-      ) : null}
+      <RunsTable shown={filter.shown} deferred={filter.deferred} box={filter.box} />
+      <Pager page={page} pages={Math.ceil(total / PAGE_SIZE)} />
     </>
   )
 }

@@ -1,5 +1,3 @@
-import { styled } from "@danwo/ui/jsx"
-
 /** A value on a sparkline, null where the run had nothing to plot. */
 export type SparkValue = number | null
 
@@ -27,8 +25,6 @@ export function sparkPoints(
     .join(" ")
 }
 
-const Svg = styled("svg", { base: { overflow: "visible", display: "block" } })
-
 /** A small line of recent values, newest on the right, with the last value marked. */
 export function Sparkline({
   values,
@@ -52,7 +48,8 @@ export function Sparkline({
   const last = points.split(" ").at(-1)?.split(",")
 
   return (
-    <Svg
+    <svg
+      style={{ overflow: "visible", display: "block" }}
       width={fluid ? "100%" : width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
@@ -82,6 +79,6 @@ export function Sparkline({
       {!fluid && last?.length === 2 ? (
         <circle cx={last[0]} cy={last[1]} r="2.5" fill={color} />
       ) : null}
-    </Svg>
+    </svg>
   )
 }

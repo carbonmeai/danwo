@@ -1,5 +1,5 @@
 import { Box, HStack, Stack, styled } from "@danwo/ui/jsx"
-import type { ReactNode } from "react"
+import type { ReactNode, RefObject } from "react"
 
 /** The five verdict colours every status reads in. */
 export type Tone = "passed" | "failed" | "flaky" | "notJudged" | "invalid"
@@ -310,7 +310,7 @@ export const Ident = styled("span", {
 })
 
 /** The filter box a list jumps to on `/`. */
-export const FilterInput = styled("input", {
+const FilterInput = styled("input", {
   base: {
     h: "9",
     px: "3",
@@ -327,7 +327,7 @@ export const FilterInput = styled("input", {
 })
 
 /** A key, as the keyboard hints show it. */
-export const Kbd = styled("kbd", {
+const Kbd = styled("kbd", {
   base: {
     fontFamily: "mono",
     fontSize: "1",
@@ -342,14 +342,18 @@ export const Kbd = styled("kbd", {
 })
 
 /** The keys a list answers to. */
-export function KeyHint() {
+export function KeyHint({ filter = false }: { readonly filter?: boolean }) {
   return (
     <HStack gap="1.5" color="signal.quiet" fontSize="1" display={{ base: "none", lg: "flex" }}>
       <Kbd>j</Kbd>
       <Kbd>k</Kbd>
-      <span>to move,</span>
-      <Kbd>/</Kbd>
-      <span>to filter</span>
+      <span>{filter ? "to move," : "to move"}</span>
+      {filter ? (
+        <>
+          <Kbd>/</Kbd>
+          <span>to filter</span>
+        </>
+      ) : null}
     </HStack>
   )
 }
@@ -366,6 +370,35 @@ export function LintLabel({
     <HStack gap="2" minW="0">
       <Swatch tone={severity === "error" ? "failed" : "flaky"} w="2" h="2" rounded="full" />
       <Ident>{rule}</Ident>
+    </HStack>
+  )
+}
+
+/** A list's key hints and its filter box. */
+export function ListFilter({
+  label,
+  placeholder,
+  filter,
+}: {
+  readonly label: string
+  readonly placeholder: string
+  readonly filter: {
+    readonly query: string
+    readonly setQuery: (query: string) => void
+    readonly box: RefObject<HTMLInputElement | null>
+  }
+}) {
+  return (
+    <HStack gap="3">
+      <KeyHint filter />
+      <FilterInput
+        ref={filter.box}
+        type="search"
+        placeholder={placeholder}
+        aria-label={label}
+        value={filter.query}
+        onChange={(event) => filter.setQuery(event.target.value)}
+      />
     </HStack>
   )
 }

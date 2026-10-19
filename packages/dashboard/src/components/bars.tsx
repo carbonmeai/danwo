@@ -35,7 +35,7 @@ export function BarList({
           as="li"
           key={bar.key}
           data-row
-          gridTemplateColumns={{ base: "1fr 5rem", md: "minmax(0, 2fr) minmax(6rem, 3fr) 5rem" }}
+          gridTemplateColumns={{ base: "1fr 5rem", md: "minmax(0, 3fr) minmax(6rem, 2fr) 5rem" }}
           columnGap="4"
           rowGap="1"
           alignItems="center"

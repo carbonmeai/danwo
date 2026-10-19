@@ -26,7 +26,24 @@ export interface Timeline {
   readonly spanMs: number
 }
 
-type Parts = Pick<FlightRecord, "steps" | "exchanges" | "deliveries" | "startedAt">
+type Delivery = FlightRecord["deliveries"][number]
+
+/** The parts of a record the timeline reads. */
+export interface TimedRecord {
+  readonly startedAt: string
+  readonly steps: readonly Pick<
+    FlightRecord["steps"][number],
+    "index" | "label" | "status" | "startedAt" | "durationMs"
+  >[]
+  readonly exchanges: readonly Pick<
+    FlightRecord["exchanges"][number],
+    "method" | "host" | "path" | "startedAt" | "durationMs" | "status" | "aborted" | "fault"
+  >[]
+  readonly deliveries: readonly Pick<
+    Delivery,
+    "sentAt" | "at" | "service" | "topic" | "attempt" | "durationMs" | "status" | "error" | "fault"
+  >[]
+}
 
 function millis(iso: string | undefined): number | undefined {
   if (iso === undefined) return undefined
@@ -86,7 +103,7 @@ export function lanesOf(items: readonly TimelineItem[]): Lane[] {
 }
 
 /** Every step, call and webhook of a record on one clock, in the order they started. */
-export function timelineOf(record: Parts): Timeline {
+export function timelineOf(record: TimedRecord): Timeline {
   const origin = millis(record.startedAt) ?? 0
   const spans = record.steps.map((step) => {
     const start = millis(step.startedAt) ?? origin

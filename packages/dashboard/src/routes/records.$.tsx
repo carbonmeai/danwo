@@ -2,7 +2,7 @@ import type { RecordedExchange } from "@danwo/runner/runner"
 import { Box, Grid, HStack, Stack, styled } from "@danwo/ui/jsx"
 import { MarkdownDocument } from "@danwo/ui/primitives/markdown"
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { useEffect, useRef, useState } from "react"
+import { type ReactNode, useEffect, useRef, useState } from "react"
 
 import { fetchRecord, fetchScreenshot } from "../api.ts"
 import { ago, duration, when } from "../components/format.ts"
@@ -18,7 +18,7 @@ import {
 } from "../components/status.tsx"
 import type { EffectLine } from "../data/effects.ts"
 import type { RecordView, StepView } from "../data/records.ts"
-import { lanesOf, type Timeline, type TimelineItem } from "../data/timeline.ts"
+import { type Lane, lanesOf, type Timeline, type TimelineItem } from "../data/timeline.ts"
 
 export const Route = createFileRoute("/records/$")({
   loader: ({ params }) => fetchRecord({ data: params._splat ?? "" }),
@@ -64,39 +64,36 @@ function useShot(dir: string, file: string | undefined, lazy: boolean) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (file === undefined) return
-
     let live = true
-    const load = () =>
-      void screenshot(dir, file).then((url) => {
+    let observer: IntersectionObserver | undefined
+    const load = (name: string) =>
+      void screenshot(dir, name).then((url) => {
         if (live) setSrc(url)
       })
 
     setSrc(undefined)
 
-    if (!lazy || typeof IntersectionObserver === "undefined") {
-      load()
+    if (file !== undefined) {
+      if (!lazy || typeof IntersectionObserver === "undefined") load(file)
+      else {
+        const watcher = new IntersectionObserver(
+          (entries) => {
+            if (entries.some((entry) => entry.isIntersecting)) {
+              watcher.disconnect()
+              load(file)
+            }
+          },
+          { rootMargin: "200px" },
+        )
 
-      return () => {
-        live = false
+        if (ref.current) watcher.observe(ref.current)
+        observer = watcher
       }
     }
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          observer.disconnect()
-          load()
-        }
-      },
-      { rootMargin: "200px" },
-    )
-
-    if (ref.current) observer.observe(ref.current)
-
     return () => {
       live = false
-      observer.disconnect()
+      observer?.disconnect()
     }
   }, [dir, file, lazy])
 
@@ -433,6 +430,12 @@ function KindMark({ kind }: { readonly kind: TimelineItem["kind"] }) {
   )
 }
 
+const BAR_FILL = {
+  step: "signal.ruleStrong",
+  call: "signal.accent",
+  webhook: "signal.accentSoft",
+} as const
+
 /** One call, webhook or step on the waterfall's track, with a diamond where a fault landed. */
 function Bar({ item, span }: { readonly item: TimelineItem; readonly span: number }) {
   return (
@@ -442,15 +445,7 @@ function Bar({ item, span }: { readonly item: TimelineItem; readonly span: numbe
         top={item.kind === "step" ? "0" : "1"}
         bottom={item.kind === "step" ? "0" : "1"}
         rounded="sm"
-        bg={
-          item.bad
-            ? "verdict.failed.solid"
-            : item.kind === "step"
-              ? "signal.ruleStrong"
-              : item.kind === "call"
-                ? "signal.accent"
-                : "signal.accentSoft"
-        }
+        bg={item.bad ? "verdict.failed.solid" : BAR_FILL[item.kind]}
         borderWidth={item.kind === "webhook" && !item.bad ? "1.5px" : "0"}
         borderColor="signal.accent"
         style={{
@@ -479,29 +474,123 @@ function Bar({ item, span }: { readonly item: TimelineItem; readonly span: numbe
   )
 }
 
+const TICKS = [0, 0.25, 0.5, 0.75, 1]
+const TICK_SHIFT: Readonly<Record<number, string>> = { 0: "0", 1: "-100%" }
+const LANE_COLUMNS = "minmax(16rem, 2fr) minmax(0, 5fr) 5rem"
+
+/** How a lane's label is set: steps in the text face, calls and webhooks indented in mono. */
+const LABEL_STYLE = {
+  step: { fontFamily: "sans", fontSize: "1.5", fontWeight: "500" },
+  call: { fontFamily: "mono", fontSize: "1", fontWeight: "400" },
+  webhook: { fontFamily: "mono", fontSize: "1", fontWeight: "400" },
+} as const
+
+/** What a lane's right-hand column says: a step's time, or the worst status among its calls. */
+function laneEnd(lane: Lane): { readonly text: string; readonly color: string } {
+  const shown = lane.items.find((item) => item.bad) ?? lane.items[0]
+
+  if (shown === undefined) return { text: "", color: "signal.quiet" }
+
+  return {
+    text: lane.kind === "step" ? duration(shown.durationMs) : shown.outcome,
+    color: statusColor(shown),
+  }
+}
+
+function LaneLabel({ lane }: { readonly lane: Lane }) {
+  return (
+    <HStack gap="2" minW="0" pl={lane.kind === "step" ? "0" : "3"}>
+      <KindMark kind={lane.kind} />
+      <styled.span
+        {...LABEL_STYLE[lane.kind]}
+        overflow="hidden"
+        textOverflow="ellipsis"
+        whiteSpace="nowrap"
+      >
+        {lane.label}
+      </styled.span>
+      {lane.items.length > 1 ? (
+        <styled.span color="signal.quiet" fontSize="1" flexShrink="0">
+          ×{lane.items.length}
+        </styled.span>
+      ) : null}
+    </HStack>
+  )
+}
+
+/** One row of the waterfall: its label, its bars on the shared clock, and how it ended. */
+function LaneRow({
+  lane,
+  first,
+  span,
+}: {
+  readonly lane: Lane
+  readonly first: boolean
+  readonly span: number
+}) {
+  const faults = lane.items.flatMap((item) => (item.fault ? [item.fault] : []))
+  const end = laneEnd(lane)
+
+  return (
+    <Grid
+      as="li"
+      gridTemplateColumns={LANE_COLUMNS}
+      columnGap="4"
+      alignItems="center"
+      py="1"
+      borderTopWidth={lane.kind === "step" && !first ? "1px" : "0"}
+      borderColor="signal.rule"
+      data-kind={lane.kind}
+      title={faults.length > 0 ? `Fault: ${faults.join(", ")}` : lane.label}
+    >
+      <LaneLabel lane={lane} />
+      <Box position="relative" h="4" bg="signal.raised" rounded="sm">
+        {TICKS.slice(1, -1).map((tick) => (
+          <Box
+            key={tick}
+            position="absolute"
+            top="0"
+            bottom="0"
+            w="1px"
+            bg="signal.rule"
+            style={{ left: `${tick * 100}%` }}
+          />
+        ))}
+        {lane.items.map((item, j) => (
+          <Bar key={j} item={item} span={span} />
+        ))}
+      </Box>
+      <styled.span
+        fontSize="1"
+        fontWeight="500"
+        textAlign="right"
+        color={end.color}
+        whiteSpace="nowrap"
+      >
+        {end.text}
+      </styled.span>
+    </Grid>
+  )
+}
+
 /** Steps, provider calls and webhooks on one clock, with faults marked where they landed. */
 function Waterfall({ timeline }: { readonly timeline: Timeline }) {
   const span = Math.max(timeline.spanMs, 1)
-  const ticks = [0, 0.25, 0.5, 0.75, 1]
 
   return (
     <Panel p="4" overflowX="auto">
       <Box minW="44rem">
-        <Grid
-          gridTemplateColumns="minmax(16rem, 2fr) minmax(0, 5fr) 5rem"
-          columnGap="4"
-          alignItems="center"
-        >
+        <Grid gridTemplateColumns={LANE_COLUMNS} columnGap="4" alignItems="center">
           <Box />
           <Box position="relative" h="5" color="signal.faint" fontSize="1">
-            {ticks.map((tick) => (
+            {TICKS.map((tick) => (
               <styled.span
                 key={tick}
                 position="absolute"
                 whiteSpace="nowrap"
                 style={{
                   left: `${tick * 100}%`,
-                  transform: `translateX(${tick === 1 ? "-100%" : tick === 0 ? "0" : "-50%"})`,
+                  transform: `translateX(${TICK_SHIFT[tick] ?? "-50%"})`,
                 }}
               >
                 {duration(tick * span)}
@@ -511,74 +600,9 @@ function Waterfall({ timeline }: { readonly timeline: Timeline }) {
           <Box />
         </Grid>
         <styled.ol aria-label="Timeline">
-          {lanesOf(timeline.items).map((lane, i) => {
-            const bad = lane.items.find((item) => item.bad)
-            const shown = bad ?? lane.items[0]
-            const faults = lane.items.flatMap((item) => (item.fault ? [item.fault] : []))
-
-            return (
-              <Grid
-                as="li"
-                key={`${lane.kind}-${i}`}
-                gridTemplateColumns="minmax(16rem, 2fr) minmax(0, 5fr) 5rem"
-                columnGap="4"
-                alignItems="center"
-                py="1"
-                borderTopWidth={lane.kind === "step" && i > 0 ? "1px" : "0"}
-                borderColor="signal.rule"
-                data-kind={lane.kind}
-                title={faults.length > 0 ? `Fault: ${faults.join(", ")}` : lane.label}
-              >
-                <HStack gap="2" minW="0" pl={lane.kind === "step" ? "0" : "3"}>
-                  <KindMark kind={lane.kind} />
-                  <styled.span
-                    fontFamily={lane.kind === "step" ? "sans" : "mono"}
-                    fontSize={lane.kind === "step" ? "1.5" : "1"}
-                    fontWeight={lane.kind === "step" ? "500" : "400"}
-                    overflow="hidden"
-                    textOverflow="ellipsis"
-                    whiteSpace="nowrap"
-                  >
-                    {lane.label}
-                  </styled.span>
-                  {lane.items.length > 1 ? (
-                    <styled.span color="signal.quiet" fontSize="1" flexShrink="0">
-                      ×{lane.items.length}
-                    </styled.span>
-                  ) : null}
-                </HStack>
-                <Box position="relative" h="4" bg="signal.raised" rounded="sm">
-                  {ticks.slice(1, -1).map((tick) => (
-                    <Box
-                      key={tick}
-                      position="absolute"
-                      top="0"
-                      bottom="0"
-                      w="1px"
-                      bg="signal.rule"
-                      style={{ left: `${tick * 100}%` }}
-                    />
-                  ))}
-                  {lane.items.map((item, j) => (
-                    <Bar key={j} item={item} span={span} />
-                  ))}
-                </Box>
-                <styled.span
-                  fontSize="1"
-                  fontWeight="500"
-                  textAlign="right"
-                  color={shown ? statusColor(shown) : "signal.quiet"}
-                  whiteSpace="nowrap"
-                >
-                  {lane.kind === "step"
-                    ? duration(shown?.durationMs ?? 0)
-                    : bad
-                      ? bad.outcome
-                      : (shown?.outcome ?? "")}
-                </styled.span>
-              </Grid>
-            )
-          })}
+          {lanesOf(timeline.items).map((lane, i) => (
+            <LaneRow key={`${lane.kind}-${i}`} lane={lane} first={i === 0} span={span} />
+          ))}
         </styled.ol>
       </Box>
     </Panel>
@@ -722,6 +746,150 @@ const LEVEL_COLOR: Readonly<Record<string, string>> = {
   warn: "verdict.flaky.fg",
 }
 
+/** What went wrong in the run: the error, where the body stopped, a diverged replay, notes. */
+function Problem({ record }: { readonly record: RecordView["record"] }) {
+  if (!record.error && !record.stopped && !record.divergence) return null
+
+  const stopped =
+    record.stopped && !record.notes.some((note) => note.includes(record.stopped ?? ""))
+      ? record.stopped
+      : undefined
+
+  return (
+    <Panel
+      p="5"
+      borderLeftWidth="4px"
+      borderLeftColor="verdict.failed.solid"
+      aria-label="What went wrong"
+    >
+      <Stack gap="2">
+        {record.error ? (
+          <>
+            <Ident color="verdict.failed.fg" fontWeight="500">
+              {record.error.code}
+            </Ident>
+            <styled.p fontSize="3" fontWeight="500" overflowWrap="anywhere">
+              {record.error.message}
+            </styled.p>
+          </>
+        ) : null}
+        {[stopped, divergenceLine(record), ...record.notes].map((line) =>
+          line ? (
+            <Box key={line} fontSize="1.5" color="signal.quiet">
+              {line}
+            </Box>
+          ) : null,
+        )}
+      </Stack>
+    </Panel>
+  )
+}
+
+function divergenceLine(record: RecordView["record"]): string | undefined {
+  const { divergence } = record
+
+  return divergence
+    ? `The replay diverged at agent step ${divergence.step + 1} (${divergence.instruction}): ${divergence.reason}`
+    : undefined
+}
+
+function Deliveries({ deliveries }: { readonly deliveries: RecordView["record"]["deliveries"] }) {
+  return (
+    <Panel overflow="hidden">
+      {deliveries.map((d, i) => {
+        const outcome = d.status === null ? (d.error ?? "no answer") : String(d.status)
+
+        return (
+          <Grid
+            key={`${d.topic}-${i}`}
+            gridTemplateColumns="4rem minmax(0, 1fr) auto"
+            gap="3"
+            px="4"
+            py="2.5"
+            alignItems="center"
+            borderBottomWidth="1px"
+            borderColor="signal.rule"
+            _last={{ borderBottomWidth: "0" }}
+          >
+            <styled.span
+              fontWeight="600"
+              fontSize="1"
+              fontFamily="mono"
+              color={statusColor({ outcome, bad: d.status === null || d.status >= 400 })}
+            >
+              {outcome}
+            </styled.span>
+            <Ident fontSize="1">
+              {d.service ? `${d.service} ` : ""}
+              {d.topic}
+              {d.attempt > 1 ? `, attempt ${d.attempt}` : ""}
+            </Ident>
+            {d.fault ? (
+              <styled.span fontSize="1" color="verdict.failed.fg" fontWeight="500">
+                fault: {d.fault}
+              </styled.span>
+            ) : (
+              <span />
+            )}
+          </Grid>
+        )
+      })}
+    </Panel>
+  )
+}
+
+/** The app's console errors and warnings, by the step they came in. */
+function ConsoleLog({ logs }: { readonly logs: RecordView["record"]["appLog"] }) {
+  return (
+    <Pre>
+      {logs.map((log, i) => (
+        <styled.span key={i} display="block" color={LEVEL_COLOR[log.level]}>
+          {`step ${log.step}  ${log.level.padEnd(5)}  ${log.text}`}
+        </styled.span>
+      ))}
+    </Pre>
+  )
+}
+
+/** A section's content, or a line saying there is none. */
+function OrNone({
+  none,
+  children,
+}: {
+  readonly none: string | false
+  readonly children: ReactNode
+}) {
+  return none === false ? children : <Box color="signal.quiet">{none}</Box>
+}
+
+function RecordHeader({ view }: { readonly view: RecordView }) {
+  const { record } = view
+
+  return (
+    <PageTitle
+      title={record.test}
+      detail={
+        <HStack gap="2" flexWrap="wrap">
+          <StatusBadge status={record.status} />
+          <Ident>{runName(view)}</Ident>
+          <span>
+            started{" "}
+            <time
+              dateTime={record.startedAt}
+              title={when(record.startedAt)}
+              suppressHydrationWarning
+            >
+              {ago(record.startedAt)}
+            </time>
+            , took {duration(record.durationMs)}
+          </span>
+        </HStack>
+      }
+      actions={view.page ? <CopyPage text={view.page} /> : <KeyHint />}
+    />
+  )
+}
+
 function RecordPage() {
   const view = Route.useLoaderData()
 
@@ -743,139 +911,30 @@ function RecordPage() {
 
   return (
     <>
-      <PageTitle
-        title={record.test}
-        detail={
-          <HStack gap="2" flexWrap="wrap">
-            <StatusBadge status={record.status} />
-            <Ident>{runName(view)}</Ident>
-            <span>
-              started{" "}
-              <time
-                dateTime={record.startedAt}
-                title={when(record.startedAt)}
-                suppressHydrationWarning
-              >
-                {ago(record.startedAt)}
-              </time>
-              , took {duration(record.durationMs)}
-            </span>
-          </HStack>
-        }
-        actions={view.page ? <CopyPage text={view.page} /> : <KeyHint />}
-      />
-      {record.error || record.stopped || record.divergence ? (
-        <Panel
-          p="5"
-          borderLeftWidth="4px"
-          borderLeftColor="verdict.failed.solid"
-          aria-label="What went wrong"
-        >
-          <Stack gap="2">
-            {record.error ? (
-              <>
-                <Ident color="verdict.failed.fg" fontWeight="500">
-                  {record.error.code}
-                </Ident>
-                <styled.p fontSize="3" fontWeight="500" overflowWrap="anywhere">
-                  {record.error.message}
-                </styled.p>
-              </>
-            ) : null}
-            {record.stopped && !record.notes.some((note) => note.includes(record.stopped ?? "")) ? (
-              <Box fontSize="1.5" color="signal.quiet">
-                {record.stopped}
-              </Box>
-            ) : null}
-            {record.divergence ? (
-              <Box fontSize="1.5" color="signal.quiet">
-                The replay diverged at agent step {record.divergence.step + 1} (
-                {record.divergence.instruction}): {record.divergence.reason}
-              </Box>
-            ) : null}
-            {record.notes.map((note) => (
-              <Box key={note} fontSize="1.5" color="signal.quiet">
-                {note}
-              </Box>
-            ))}
-          </Stack>
-        </Panel>
-      ) : null}
+      <RecordHeader view={view} />
+      <Problem record={record} />
       <Section title="Steps" count={view.steps.length}>
         <Steps view={view} />
       </Section>
       <Section title="Timeline" aside={<TimelineLegend />}>
-        {view.timeline.items.length === 0 ? (
-          <Box color="signal.quiet">Nothing was timed in this run.</Box>
-        ) : (
+        <OrNone none={view.timeline.items.length === 0 && "Nothing was timed in this run."}>
           <Waterfall timeline={view.timeline} />
-        )}
+        </OrNone>
       </Section>
       <Section title="Provider calls" count={record.exchanges.length}>
-        {record.exchanges.length === 0 ? (
-          <Box color="signal.quiet">No calls went through the proxy.</Box>
-        ) : (
+        <OrNone none={record.exchanges.length === 0 && "No calls went through the proxy."}>
           <Calls exchanges={record.exchanges} />
-        )}
+        </OrNone>
       </Section>
       <Section title="Webhooks" count={record.deliveries.length}>
-        {record.deliveries.length === 0 ? (
-          <Box color="signal.quiet">No webhook deliveries.</Box>
-        ) : (
-          <Panel overflow="hidden">
-            {record.deliveries.map((d, i) => {
-              const outcome = d.status === null ? (d.error ?? "no answer") : String(d.status)
-
-              return (
-                <Grid
-                  key={`${d.topic}-${i}`}
-                  gridTemplateColumns="4rem minmax(0, 1fr) auto"
-                  gap="3"
-                  px="4"
-                  py="2.5"
-                  alignItems="center"
-                  borderBottomWidth="1px"
-                  borderColor="signal.rule"
-                  _last={{ borderBottomWidth: "0" }}
-                >
-                  <styled.span
-                    fontWeight="600"
-                    fontSize="1"
-                    fontFamily="mono"
-                    color={statusColor({ outcome, bad: d.status === null || d.status >= 400 })}
-                  >
-                    {outcome}
-                  </styled.span>
-                  <Ident fontSize="1">
-                    {d.service ? `${d.service} ` : ""}
-                    {d.topic}
-                    {d.attempt > 1 ? `, attempt ${d.attempt}` : ""}
-                  </Ident>
-                  {d.fault ? (
-                    <styled.span fontSize="1" color="verdict.failed.fg" fontWeight="500">
-                      fault: {d.fault}
-                    </styled.span>
-                  ) : (
-                    <span />
-                  )}
-                </Grid>
-              )
-            })}
-          </Panel>
-        )}
+        <OrNone none={record.deliveries.length === 0 && "No webhook deliveries."}>
+          <Deliveries deliveries={record.deliveries} />
+        </OrNone>
       </Section>
       <Section title="Console" count={logs.length}>
-        {logs.length === 0 ? (
-          <Box color="signal.quiet">No errors or warnings.</Box>
-        ) : (
-          <Pre>
-            {logs.map((log, i) => (
-              <styled.span key={i} display="block" color={LEVEL_COLOR[log.level]}>
-                {`step ${log.step}  ${log.level.padEnd(5)}  ${log.text}`}
-              </styled.span>
-            ))}
-          </Pre>
-        )}
+        <OrNone none={logs.length === 0 && "No errors or warnings."}>
+          <ConsoleLog logs={logs} />
+        </OrNone>
       </Section>
       {view.screen ? (
         <Section title="Screen at failure">

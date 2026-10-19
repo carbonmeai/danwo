@@ -100,6 +100,12 @@ describe("danwo serve", () => {
 
     await app.open("/")
     await screen.getByRole("link", { name: /buys 500 credits/ }).click()
+    await expect(
+      screen.getByRole("button", {
+        name: "duplicate on webhook checkout.session.completed: failed",
+      }),
+    ).toBeVisible()
+    await screen.getByRole("link", { name: "List" }).click()
     await expect(screen.getByRole("list", { name: "Faults" })).toBeVisible()
 
     const duplicate = screen

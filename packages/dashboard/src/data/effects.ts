@@ -27,11 +27,14 @@ function linesOf(effects: Effects | undefined): { area: EffectLine["area"]; text
   ]
 }
 
+function key(line: { readonly area: string; readonly text: string }): string {
+  return `${line.area}\n${line.text}`
+}
+
 /** The diff of what a step's recording expected against what its replay did, page first. */
 export function effectDiff(event: EffectsEvent): EffectLine[] {
   const expected = linesOf(event.expected)
   const observed = linesOf(event.observed)
-  const key = (line: { area: string; text: string }) => `${line.area}\n${line.text}`
   const seenNow = new Set(observed.map(key))
   const seenBefore = new Set(expected.map(key))
 

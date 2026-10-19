@@ -4,7 +4,7 @@ import { HStack, styled } from "@danwo/ui/jsx"
  * danwo's mark: the app in front, and the layer behind it that danwo watches, offset so both
  * show. Drawn in the current text colour with the accent behind.
  */
-export function Mark({ size = 20 }: { readonly size?: number }) {
+function Mark({ size = 20 }: { readonly size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <rect x="8" y="8" width="13" height="13" rx="3" fill="var(--danwo-colors-signal-accent)" />
