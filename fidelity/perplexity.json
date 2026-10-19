@@ -1,0 +1,52 @@
+{
+  "provider": "perplexity",
+  "source": "openapi",
+  "recorded": "2026-10-19",
+  "scenarios": {
+    "agent: text, a function call, structured output, a stream": {
+      "steps": [
+        {
+          "step": "answer",
+          "status": 200,
+          "shape": "dcafcfa75ff4"
+        },
+        {
+          "step": "call a function",
+          "status": 200,
+          "shape": "dcafcfa75ff4"
+        },
+        {
+          "step": "answer json",
+          "status": 200,
+          "shape": "dcafcfa75ff4"
+        }
+      ],
+      "facts": []
+    },
+    "sonar: a chat completion with citations": {
+      "steps": [
+        {
+          "step": "complete a chat",
+          "status": 200,
+          "shape": "a57ffa0c107c"
+        }
+      ],
+      "facts": []
+    },
+    "errors: no key": {
+      "steps": [
+        {
+          "step": "no key",
+          "status": 401,
+          "shape": "2bf229398362"
+        }
+      ],
+      "facts": []
+    }
+  },
+  "shapes": {
+    "2bf229398362": {"t":"object","keys":{"error":{"t":"object","keys":{"message":{"t":"string"},"type":{"t":"string"},"code":{"t":"union","of":[{"t":"string"},{"t":"number"},{"t":"null"}]}},"optional":["code"]}}},
+    "a57ffa0c107c": {"t":"object","keys":{"id":{"t":"string"},"model":{"t":"string"},"created":{"t":"number"},"usage":{"t":"union","of":[{"t":"object","keys":{"prompt_tokens":{"t":"number"},"completion_tokens":{"t":"number"},"total_tokens":{"t":"number"},"search_context_size":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"citation_tokens":{"t":"union","of":[{"t":"number"},{"t":"null"}]},"num_search_queries":{"t":"union","of":[{"t":"number"},{"t":"null"}]},"reasoning_tokens":{"t":"union","of":[{"t":"number"},{"t":"null"}]},"cost":{"t":"any"}},"optional":["search_context_size","citation_tokens","num_search_queries","reasoning_tokens"]},{"t":"null"}]},"object":{"t":"string"},"choices":{"t":"array","of":{"t":"object","keys":{"index":{"t":"number"},"finish_reason":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"message":{"t":"any"},"delta":{"t":"any"}},"optional":["finish_reason"]}},"citations":{"t":"union","of":[{"t":"array","of":{"t":"string"}},{"t":"null"}]},"search_results":{"t":"union","of":[{"t":"array","of":{"t":"object","keys":{"title":{"t":"string"},"url":{"t":"string"},"date":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"last_updated":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"snippet":{"t":"string"},"source":{"t":"string"}},"optional":["date","last_updated","snippet","source"]}},{"t":"null"}]},"images":{"t":"union","of":[{"t":"array","of":{"t":"object","keys":{"image_url":{"t":"string"},"origin_url":{"t":"string"},"height":{"t":"number"},"width":{"t":"number"},"title":{"t":"string"}},"optional":["title"]}},{"t":"null"}]},"related_questions":{"t":"union","of":[{"t":"array","of":{"t":"string"}},{"t":"null"}]}},"optional":["usage","object","citations","search_results","images","related_questions"]},
+    "dcafcfa75ff4": {"t":"object","keys":{"created_at":{"t":"number"},"error":{"t":"object","keys":{"code":{"t":"string"},"message":{"t":"string"},"type":{"t":"string"}},"optional":["code","type"]},"id":{"t":"string"},"model":{"t":"string"},"object":{"t":"literal","v":"response"},"output":{"t":"array","of":{"t":"any"}},"status":{"t":"string"},"usage":{"t":"object","keys":{"cost":{"t":"any"},"input_tokens":{"t":"number"},"input_tokens_details":{"t":"object","keys":{"cache_creation_input_tokens":{"t":"number"},"cache_read_input_tokens":{"t":"number"}},"optional":["cache_creation_input_tokens","cache_read_input_tokens"]},"output_tokens":{"t":"number"},"tool_calls_details":{"t":"object","keys":{},"open":true},"total_tokens":{"t":"number"}},"optional":["cost","input_tokens_details","tool_calls_details"]}},"optional":["error","usage"]}
+  }
+}

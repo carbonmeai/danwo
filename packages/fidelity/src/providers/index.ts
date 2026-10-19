@@ -1,14 +1,17 @@
 /** Every provider with a fidelity suite, in the order they are checked. */
 import type { FidelityProvider } from "../provider.ts"
 import { bachsFidelity } from "./bachs.ts"
+import { bedrockFidelity } from "./bedrock.ts"
 import { composioFidelity } from "./composio.ts"
 import { nangoFidelity, nylasFidelity, unipileFidelity } from "./connectors.ts"
 import { flutterwaveFidelity } from "./flutterwave.ts"
 import { gatewayFidelity } from "./gateway.ts"
+import { geminiFidelity } from "./gemini.ts"
 import { githubFidelity } from "./github.ts"
 import { googleFidelity } from "./google.ts"
 import { microsoftFidelity } from "./microsoft.ts"
 import { paystackFidelity } from "./paystack.ts"
+import { perplexityFidelity } from "./perplexity.ts"
 import { resendFidelity } from "./resend.ts"
 import { slackFidelity } from "./slack.ts"
 import { stripeFidelity } from "./stripe.ts"
@@ -26,6 +29,9 @@ export const FIDELITY_PROVIDERS: readonly FidelityProvider[] = [
   googleFidelity,
   microsoftFidelity,
   gatewayFidelity,
+  geminiFidelity,
+  perplexityFidelity,
+  bedrockFidelity,
   composioFidelity,
   nylasFidelity,
   nangoFidelity,

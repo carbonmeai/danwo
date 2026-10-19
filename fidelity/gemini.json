@@ -1,0 +1,68 @@
+{
+  "provider": "gemini",
+  "source": "openapi",
+  "recorded": "2026-10-19",
+  "scenarios": {
+    "generate: text, a function call, structured output": {
+      "steps": [
+        {
+          "step": "generate text",
+          "status": 200,
+          "shape": "b641276e9770"
+        },
+        {
+          "step": "call a function",
+          "status": 200,
+          "shape": "b641276e9770"
+        },
+        {
+          "step": "generate json",
+          "status": 200,
+          "shape": "b641276e9770"
+        }
+      ],
+      "facts": []
+    },
+    "stream text": {
+      "steps": [],
+      "facts": []
+    },
+    "count tokens and embed": {
+      "steps": [
+        {
+          "step": "count tokens",
+          "status": 200,
+          "shape": "3dea3138ade5"
+        },
+        {
+          "step": "embed",
+          "status": 200,
+          "shape": "b64eea47db70"
+        },
+        {
+          "step": "embed a batch",
+          "status": 200,
+          "shape": "70d513b1117c"
+        }
+      ],
+      "facts": []
+    },
+    "errors: no key": {
+      "steps": [
+        {
+          "step": "no key",
+          "status": 403,
+          "shape": "dbf15bac674b"
+        }
+      ],
+      "facts": []
+    }
+  },
+  "shapes": {
+    "3dea3138ade5": {"t":"object","keys":{"promptTokensDetails":{"t":"array","of":{"t":"object","keys":{"tokenCount":{"t":"number"},"modality":{"t":"any"}},"optional":["tokenCount","modality"]}},"cacheTokensDetails":{"t":"array","of":{"t":"object","keys":{"tokenCount":{"t":"number"},"modality":{"t":"any"}},"optional":["tokenCount","modality"]}},"totalTokens":{"t":"number"},"cachedContentTokenCount":{"t":"number"}},"optional":["promptTokensDetails","cacheTokensDetails","totalTokens","cachedContentTokenCount"]},
+    "70d513b1117c": {"t":"object","keys":{"usageMetadata":{"t":"any"},"embeddings":{"t":"array","of":{"t":"object","keys":{"shape":{"t":"array","of":{"t":"number"}},"values":{"t":"array","of":{"t":"number"}}},"optional":["shape","values"]}}},"optional":["usageMetadata","embeddings"]},
+    "b641276e9770": {"t":"object","keys":{"candidates":{"t":"array","of":{"t":"object","keys":{"groundingMetadata":{"t":"any"},"finishReason":{"t":"string"},"continuationToken":{"t":"string"},"citationMetadata":{"t":"any"},"groundingAttributions":{"t":"array","of":{"t":"any"}},"index":{"t":"number"},"safetyRatings":{"t":"array","of":{"t":"any"}},"urlContextMetadata":{"t":"any"},"tokenCount":{"t":"number"},"content":{"t":"any"},"finishMessage":{"t":"string"},"avgLogprobs":{"t":"number"},"logprobsResult":{"t":"any"}},"optional":["groundingMetadata","finishReason","continuationToken","citationMetadata","groundingAttributions","index","safetyRatings","urlContextMetadata","tokenCount","content","finishMessage","avgLogprobs","logprobsResult"]}},"promptFeedback":{"t":"any"},"responseId":{"t":"string"},"modelStatus":{"t":"any"},"usageMetadata":{"t":"any"},"modelVersion":{"t":"string"}},"optional":["candidates","promptFeedback","responseId","modelStatus","usageMetadata","modelVersion"]},
+    "b64eea47db70": {"t":"object","keys":{"embedding":{"t":"any"},"usageMetadata":{"t":"any"}},"optional":["embedding","usageMetadata"]},
+    "dbf15bac674b": {"t":"object","keys":{"error":{"t":"object","keys":{"code":{"t":"number"},"message":{"t":"string"},"status":{"t":"literal","v":"PERMISSION_DENIED"},"details":{"t":"array","of":null}},"optional":["details"]}}}
+  }
+}
