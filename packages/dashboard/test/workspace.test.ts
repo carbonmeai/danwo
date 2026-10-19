@@ -12,7 +12,7 @@ import type {
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { launchOf, requestOf } from "../src/modules/live/launch-args.ts"
-import { keepFeedback } from "../src/modules/overlay/feedback-data.ts"
+import { feedbackOf, keepFeedback } from "../src/modules/overlay/feedback-data.ts"
 import {
   consoleLines,
   fixPrompt,
@@ -334,6 +334,9 @@ describe("the run overlay", () => {
     await keepFeedback(root, { record: ".danwo/runs/r1/pays/attempt-1", vote: "up" }, new Date(NOW))
 
     expect(await readFile(join(root, ".danwo/feedback.jsonl"), "utf8")).toContain('"vote":"up"')
+    expect(feedbackOf({ record: "r", vote: "down" })).toEqual({ record: "r", vote: "down" })
+    expect(() => feedbackOf({ record: "r", vote: "maybe" })).toThrow("an up or down vote")
+    expect(() => feedbackOf(null)).toThrow("an up or down vote")
     await expect(keepFeedback(root, { record: "../etc", vote: "down" })).rejects.toThrow(
       "is not inside .danwo/runs",
     )
