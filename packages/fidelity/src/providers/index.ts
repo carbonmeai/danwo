@@ -2,6 +2,7 @@
 import type { FidelityProvider } from "../provider.ts"
 import { bachsFidelity } from "./bachs.ts"
 import { bedrockFidelity } from "./bedrock.ts"
+import { clerkFidelity } from "./clerk.ts"
 import { composioFidelity } from "./composio.ts"
 import { nangoFidelity, nylasFidelity, unipileFidelity } from "./connectors.ts"
 import { flutterwaveFidelity } from "./flutterwave.ts"
@@ -36,6 +37,7 @@ export const FIDELITY_PROVIDERS: readonly FidelityProvider[] = [
   nylasFidelity,
   nangoFidelity,
   unipileFidelity,
+  clerkFidelity,
 ]
 
 /** The providers named in `names`, or all of them; an unknown name is an error. */

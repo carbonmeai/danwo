@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@ai-sdk/gateway": "4.0.116",
+    "@clerk/backend": "3.25.0",
     "@danwo/emulators": "workspace:*",
     "@danwo/runner": "workspace:*",
     "ai": "7.0.143"
