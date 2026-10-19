@@ -249,6 +249,8 @@ interface RecordOptions {
    * `<artifactsDir>/video` when `video` is set.
    */
   readonly record?: { readonly stepScreenshots: boolean; readonly video?: boolean }
+  /** Hears every step as it starts (status `running`) and again as it ends, redacted. */
+  readonly onStep?: (step: StepRecord) => void
   /**
    * Baselines of `toHaveScreenshot`: the folder they live in (default `__screenshots__` in the
    * project root) and when to write them: `missing` (default) writes the ones not there yet,
@@ -536,7 +538,11 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
   const steps = new StepRecorder({
     projectRoot,
     redact: vault.redact,
-    onEnd: (step) => ended.onStep?.(step),
+    onStart: (step) => options.onStep?.(step),
+    onEnd: (step) => {
+      ended.onStep?.(step)
+      options.onStep?.(step)
+    },
   })
   const flight = createSessionFlight({
     page: () => tabs.page,

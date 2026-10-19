@@ -15,7 +15,7 @@ import type { SessionFlight } from "../flight.ts"
 import { LocatorError } from "../locate/failure.ts"
 import { MailDesk } from "../mail/desk.ts"
 import type { MailSource } from "../mail/index.ts"
-import type { FailureEvidence } from "../record/index.ts"
+import type { FailureEvidence, StepRecord } from "../record/index.ts"
 import { StepRecorder } from "../record/index.ts"
 import { ReplayStore } from "../replay/index.ts"
 import { relocationOf } from "../replay/policy.ts"
@@ -70,6 +70,8 @@ export interface DeviceSessionOptions extends AgentSettings {
   readonly stepScreenshots?: boolean
   /** Film the screen into `<artifactsDir>/video`, when the device can. */
   readonly video?: boolean
+  /** Hears every step as it starts (status `running`) and again as it ends, redacted. */
+  readonly onStep?: (step: StepRecord) => void
   readonly actionTimeout?: number
   readonly assertionTimeout?: number
   /** Check timeouts from this check's earlier passing runs, as on the web. */
@@ -300,7 +302,11 @@ export async function openDeviceSession(
   const steps = new StepRecorder({
     projectRoot: options.projectRoot,
     redact: vault.redact,
-    onEnd: (step) => onStep?.(step.index),
+    onStart: (step) => options.onStep?.(step),
+    onEnd: (step) => {
+      onStep?.(step.index)
+      options.onStep?.(step)
+    },
   })
   const ready = readiness(target, options.backend)
   const context: DeviceContext = {

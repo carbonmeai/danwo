@@ -7,6 +7,7 @@
 import { fork } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
+import type { WorkerLiveEvent } from "./live.ts"
 import type { TestFileTask, TestReport, TrialReport, TrialTask, WorkerStart } from "./tasks.ts"
 import { linkWorker, type WorkerLink } from "./wire.ts"
 
@@ -24,6 +25,8 @@ export interface CrewOptions {
   readonly start: Omit<WorkerStart, "workerIndex">
   /** A test finished somewhere in the crew. */
   readonly onTested?: (report: TestReport) => void
+  /** Something happened inside an attempt, for the run's live feed. */
+  readonly onLive?: (event: WorkerLiveEvent) => void
 }
 
 interface Member {
@@ -130,6 +133,7 @@ export class Crew {
 
     return linkWorker(child, (note) => {
       if (note.topic === "tested") this.options.onTested?.(note.data)
+      else this.options.onLive?.(note.data)
     })
   }
 }

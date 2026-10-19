@@ -191,7 +191,7 @@ function testHistory(run: TestRunReport): TestHistory {
   return {
     version: 1,
     kind: "test",
-    ...identity(run.durationMs, run.run),
+    ...identity(run.durationMs, run.id ?? run.run),
     durationMs: run.durationMs,
     ...(run.run !== undefined && { run: run.run }),
     usage: usageOfTests(run.reports),
@@ -215,7 +215,7 @@ function matrixHistory(run: MatrixRunReport): MatrixHistory {
   return {
     version: 1,
     kind: "matrix",
-    ...identity(run.durationMs, folder),
+    ...identity(run.durationMs, run.id ?? folder),
     durationMs: run.durationMs,
     ...(folder !== undefined && { run: folder }),
     usage: run.usage ?? addUsage([]),

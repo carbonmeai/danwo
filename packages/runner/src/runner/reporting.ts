@@ -21,6 +21,8 @@ export interface RunContext {
   readonly root: string
   /** The folder the command ran in; record folders are relative to it. */
   readonly cwd: string
+  /** The run's id, shared by its history summary, its record folder and its live feed. */
+  readonly id?: string
 }
 
 /** `danwo test` once every test reported. */

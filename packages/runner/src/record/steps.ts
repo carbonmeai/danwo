@@ -152,6 +152,8 @@ interface Running {
 export interface StepRecorderOptions {
   readonly projectRoot: string
   readonly redact: (text: string) => string
+  /** Called when a step starts, with its status `running`. */
+  readonly onStart?: (step: StepRecord) => void
   /** Called when a step ends, passed or failed. */
   readonly onEnd?: (step: StepRecord) => void
 }
@@ -195,6 +197,7 @@ export class StepRecorder implements StepLog {
     const started = Date.now()
 
     this.steps.push(running)
+    this.options.onStart?.(running.record)
 
     try {
       const result = await body()

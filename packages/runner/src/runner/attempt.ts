@@ -10,7 +10,7 @@ import type { CheckPace } from "../assert/pace.ts"
 import { openDeviceSession } from "../device/session.ts"
 import type { DeviceTarget } from "../device/types.ts"
 import type { SessionFlight } from "../flight.ts"
-import type { FailureEvidence } from "../record/index.ts"
+import type { FailureEvidence, StepRecord } from "../record/index.ts"
 import {
   type BrowserState,
   openWebSession,
@@ -78,6 +78,8 @@ export interface AttemptSetup {
   readonly beforeInvariant?: () => Promise<void>
   /** Runs the body alone: another attempt of the same trial judges the invariant. */
   readonly skipInvariant?: boolean
+  /** Hears every step as it starts and as it ends, for the run's live feed. */
+  readonly onStep?: (step: StepRecord) => void
 }
 
 /** What the session saw, for the flight recorder; it stays in the worker. */
@@ -420,6 +422,7 @@ async function attemptOptions(
     ...(setup.checkPace && { checkPace: setup.checkPace }),
     ...(setup.browser && { browser: await setup.browser() }),
     ...(setup.onContext && { onContext: setup.onContext }),
+    ...(setup.onStep && { onStep: setup.onStep }),
   }
 }
 
@@ -453,6 +456,7 @@ function deviceAttemptOptions(setup: AttemptSetup) {
     }),
     ...(setup.checkPace && { checkPace: setup.checkPace }),
     ...(setup.screenshots && { screenshots: setup.screenshots }),
+    ...(setup.onStep && { onStep: setup.onStep }),
   }
 }
 

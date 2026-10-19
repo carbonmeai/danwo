@@ -10,6 +10,7 @@ import { changedFiles } from "./git-changes.ts"
 import { historyReporter } from "./history.ts"
 import { chooseByChanges } from "./impact-command.ts"
 import { updateImpactIndex } from "./impact.ts"
+import { type LiveFeed, newRunId, openLiveFeed } from "./live.ts"
 import { closeRecording, openRecording } from "./recording.ts"
 import { closingLines, fileErrorLine, openingLine, runExitCode, testLine } from "./reporter.ts"
 import { type RunCommandOptions, tellReporters, type TestRunReport } from "./reporting.ts"
@@ -210,6 +211,7 @@ function testCrew(
   input: RunInput,
   size: number,
   recording: ReturnType<typeof openRecording>,
+  feed: LiveFeed,
   onTested: (report: TestReport) => void,
 ): Crew {
   const { loaded, options, cwd } = input
@@ -224,7 +226,19 @@ function testCrew(
       ...(options.lint !== undefined && { lint: options.lint }),
     },
     onTested,
+    onLive: (event) => feed.write(event),
   })
+}
+
+/** A finished test as the live feed shows it. */
+function testEvent(report: TestReport) {
+  return {
+    type: "test",
+    at: new Date().toISOString(),
+    test: report.id,
+    status: report.status,
+    durationMs: report.attempts.reduce((total, attempt) => total + attempt.durationMs, 0),
+  } as const
 }
 
 /** Every attempt's integration lint findings. */
@@ -232,22 +246,53 @@ function findingsOf(reports: readonly TestReport[]): LintFinding[] {
   return reports.flatMap((report) => report.attempts.flatMap((attempt) => attempt.lint ?? []))
 }
 
-/** Runs the picked tests on a crew and reports them; resolves to the exit code. */
+/** Runs the picked tests with a live feed of them; resolves to the exit code. */
 async function executeRun(input: RunInput): Promise<number> {
+  const recording = openRecording(input.loaded, input.options.record, input.options.video)
+  const id = recording === undefined ? newRunId() : basename(recording.runDir)
+  const count = input.entries.length
+  const feed = await openLiveFeed(input.loaded.root, {
+    id,
+    kind: "test",
+    title: `${count} ${count === 1 ? "test" : "tests"}`,
+    planned: count,
+  })
+  const began = Date.now()
+  let code = 1
+
+  try {
+    code = await runAndReport(input, { id, recording, feed, began })
+
+    return code
+  } finally {
+    await feed.finish(code, Date.now() - began)
+  }
+}
+
+/** What one run of the picked tests is: its id, recording and live feed. */
+interface RunFrame {
+  readonly id: string
+  readonly recording: ReturnType<typeof openRecording>
+  readonly feed: LiveFeed
+  readonly began: number
+}
+
+/** Runs the picked tests on a crew and reports them; resolves to the exit code. */
+async function runAndReport(input: RunInput, frame: RunFrame): Promise<number> {
   const { loaded, options, cwd, write } = input
+  const { recording, feed, began } = frame
   const { tasks, size } = planRun(loaded, options, input.ci, input.entries)
-  const recording = openRecording(loaded, options.record, options.video)
   const reporters = [
     historyReporter(),
     ...(loaded.config.reporters ?? []),
     ...(options.reporters ?? []),
   ]
-  const context = { kind: "test", root: loaded.root, cwd } as const
-  const began = Date.now()
+  const context = { kind: "test", root: loaded.root, cwd, id: frame.id } as const
   const reports: TestReport[] = []
-  const crew = testCrew(input, size, recording, (report) => {
+  const crew = testCrew(input, size, recording, feed, (report) => {
     reports.push(report)
     write(testLine(report))
+    feed.write(testEvent(report))
   })
 
   write(openingLine(input.entries.length, size))

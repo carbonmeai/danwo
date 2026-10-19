@@ -6,7 +6,7 @@
  */
 import { mkdtemp, rm } from "node:fs/promises"
 import { availableParallelism, tmpdir } from "node:os"
-import { join, relative, resolve } from "node:path"
+import { basename, join, relative, resolve } from "node:path"
 
 import {
   checkFaultFired,
@@ -28,6 +28,7 @@ import { type DanwoConfig, type LoadedConfig, loadConfig } from "./config.ts"
 import { Crew } from "./crew.ts"
 import { DEFAULT_WEBHOOK_FAULTS, defaultDataFaults, defaultOutboundFaults } from "./faults.ts"
 import { historyReporter } from "./history.ts"
+import { type LiveFeed, newRunId, openLiveFeed } from "./live.ts"
 import { racePlan } from "./races.ts"
 import { closeRecording, openRecording } from "./recording.ts"
 import {
@@ -130,20 +131,32 @@ function trialRunner(crew: Crew, run: MatrixRun) {
 
       keepTrialFacts(run, fault, report)
 
-      return outcomeOf(report, fault)
+      return told(run, outcomeOf(report, fault))
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
 
-      return {
+      return told(run, {
         fault,
         status: "environment-error",
         error: message,
         exchanges: [],
         deliveries: [],
         notes: [],
-      }
+      })
     }
   }
+}
+
+/** Puts a finished trial on the live feed. */
+function told(run: MatrixRun, outcome: RunOutcome): RunOutcome {
+  run.feed.write({
+    type: "trial",
+    at: new Date().toISOString(),
+    fault: outcome.fault?.label ?? null,
+    status: outcome.status,
+  })
+
+  return outcome
 }
 
 /**
@@ -263,6 +276,8 @@ interface TrialsSetup {
   readonly dispatch: Dispatch
   /** What the clean trial showed from the browser's side, once it ran. */
   readonly races: () => RaceEvidence | undefined
+  /** Hears how many faulted trials will run, once they are planned. */
+  readonly planned?: (count: number) => void
 }
 
 /** Every fault the clean run allows: one per call and webhook, then the races. */
@@ -300,6 +315,7 @@ async function runTrials(
   const planned = planAll(clean, setup)
   const plan = selectFaults(planned, setup.filter)
 
+  setup.planned?.(plan.length)
   write(planLine(planned.length, plan.length, setup.filter))
   write(judgingLine(setup.test))
 
@@ -371,6 +387,8 @@ interface MatrixRun {
   readonly lint: TrialFindings[]
   /** The clean trial's browser-side evidence, once it ran: what races are planned from. */
   readonly races: { current: RaceEvidence | undefined }
+  /** Where the run says what it is doing as it does it. */
+  readonly feed: LiveFeed
 }
 
 /** Runs the trials; tells the reporters when the run stopped without a result. */
@@ -383,6 +401,8 @@ async function trialsOrAbort(run: MatrixRun): Promise<{ result: FaultMatrixResul
       filter: run.faults,
       dispatch: run.dispatch,
       races: () => run.races.current,
+      planned: (count) =>
+        run.feed.write({ type: "plan", at: new Date().toISOString(), planned: count + 1 }),
     })
 
     for (const line of usageLines(run.usages)) run.write(line)
@@ -429,6 +449,30 @@ function reportMatrix(
   return tellReporters(run.reporters, (r) => r.matrixFinished?.(report), run.write)
 }
 
+/** The crew a matrix's trials go to, each worker started for this project and its recording. */
+function matrixCrew(setup: {
+  readonly loaded: LoadedConfig
+  readonly options: RunMatrixOptions
+  readonly cwd: string
+  readonly recording: ReturnType<typeof openRecording>
+  readonly workers: number
+  readonly feed: LiveFeed
+}): Crew {
+  const { options } = setup
+
+  return new Crew({
+    size: setup.workers,
+    start: {
+      cwd: setup.cwd,
+      configPath: setup.loaded.path,
+      record: setup.recording,
+      updateScreenshots: options.updateScreenshots ?? false,
+      ...(options.lint !== undefined && { lint: options.lint }),
+    },
+    onLive: (event) => setup.feed.write(event),
+  })
+}
+
 /** Runs the matrix; resolves to its result and the process exit code. */
 export async function runMatrix(
   options: RunMatrixOptions,
@@ -441,16 +485,9 @@ export async function runMatrix(
   const cache = await trialCache(loaded)
   const recording = openRecording(loaded, options.record, options.video)
   const workers = matrixWorkers(options, loaded.config)
-  const crew = new Crew({
-    size: workers,
-    start: {
-      cwd,
-      configPath: loaded.path,
-      record: recording,
-      updateScreenshots: options.updateScreenshots ?? false,
-      ...(options.lint !== undefined && { lint: options.lint }),
-    },
-  })
+  const id = recording === undefined ? newRunId() : basename(recording.runDir)
+  const feed = await openLiveFeed(loaded.root, { id, kind: "matrix", title: test.id, planned: 1 })
+  const crew = matrixCrew({ loaded, options, cwd, recording, workers, feed })
   const run: MatrixRun = {
     loaded,
     file,
@@ -462,7 +499,7 @@ export async function runMatrix(
       ...(loaded.config.reporters ?? []),
       ...(options.reporters ?? []),
     ],
-    context: { kind: "matrix", root: loaded.root, cwd },
+    context: { kind: "matrix", root: loaded.root, cwd, id },
     began: Date.now(),
     write,
     faults: options.faults,
@@ -472,6 +509,7 @@ export async function runMatrix(
     pace: { current: undefined },
     lint: [],
     races: { current: undefined },
+    feed,
   }
 
   await tellReporters(run.reporters, (r) => r.started?.(run.context), write)
@@ -489,5 +527,6 @@ export async function runMatrix(
 
     await cache.done()
     if (outcome !== undefined) await reportMatrix(run, outcome.result, reportPath)
+    await feed.finish(outcome?.code ?? 1, Date.now() - run.began)
   }
 }

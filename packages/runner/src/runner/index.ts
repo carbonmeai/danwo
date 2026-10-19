@@ -108,6 +108,14 @@ export {
   type RunHistory,
   type TestHistory,
 } from "./history.ts"
+export {
+  type LiveCall,
+  type LiveDelivery,
+  liveDir,
+  type LiveEvent,
+  type LiveRunStarted,
+  type LiveStep,
+} from "./live.ts"
 export type { Usage } from "../record/usage.ts"
 export { effectNotes, effectsOf } from "../record/effect-notes.ts"
 export { junit, type JunitOptions } from "./junit.ts"

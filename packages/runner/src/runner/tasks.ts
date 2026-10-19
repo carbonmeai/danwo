@@ -14,6 +14,7 @@ import type { ReplayDivergence } from "../session.ts"
 import type { ErrorClass } from "../support/codes.ts"
 import type { SourceLine, TestError } from "../support/errors.ts"
 import type { AttemptStatus, ResultStatus } from "../tests/retry.ts"
+import type { WorkerLiveEvent } from "./live.ts"
 import type { RecordSettings } from "./record.ts"
 import type { TrialTimings } from "./timings.ts"
 
@@ -128,6 +129,9 @@ export interface WorkerCalls {
 
 /**
  * Progress a worker reports while a task runs. `tested`: a test finished (all its attempts), so it
- * is printed as it happens rather than when its whole file ends.
+ * is printed as it happens rather than when its whole file ends. `live`: an attempt started, a step
+ * or call happened in it, or it ended, for the run's live feed.
  */
-export type WorkerNote = { readonly topic: "tested"; readonly data: TestReport }
+export type WorkerNote =
+  | { readonly topic: "tested"; readonly data: TestReport }
+  | { readonly topic: "live"; readonly data: WorkerLiveEvent }

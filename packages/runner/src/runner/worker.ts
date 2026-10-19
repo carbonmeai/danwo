@@ -20,6 +20,7 @@ import type { Browser } from "playwright-core"
 import { type CheckPace, paceOf } from "../assert/pace.ts"
 import { launchBrowser } from "../browser/index.ts"
 import { type LintConfig, type LintFinding, lint } from "../lint/index.ts"
+import type { StepRecord } from "../record/index.ts"
 import { usageOf } from "../record/usage.ts"
 import { keepsVideo } from "../record/video.ts"
 import { type DeclaredTest, type FileDeclarations, suiteHooks } from "../tests/registry.ts"
@@ -29,6 +30,7 @@ import { loadTestFile, testIdOf } from "./catalog.ts"
 import { type LoadedConfig, loadConfig } from "./config.ts"
 import type { WorkerEnvironment } from "./environment.ts"
 import { impactOf } from "./impact.ts"
+import { LiveTap } from "./live.ts"
 import { trialRace } from "./races.ts"
 import {
   attemptDir,
@@ -129,6 +131,13 @@ async function attemptOnce(
     unrecorded === true ? undefined : recording && attemptDir(recording, id, recordAs)
   const mark = markEvidence(env)
   const test = findDeclared(declarations, file, id)
+  // Another user's attempt in a race trial runs alongside the one the feed follows.
+  const tap =
+    unrecorded === true
+      ? undefined
+      : new LiveTap({ test: id, attempt: recordAs }, env, mark, (data) =>
+          sendNote({ topic: "live", data }),
+        )
   const result = await runAttempt(declarations, test, {
     id,
     config: loaded.config,
@@ -144,8 +153,11 @@ async function attemptOnce(
     sessions,
     browser: workerBrowser,
     ...(checkPace && { checkPace }),
+    ...(tap && { onStep: (step: StepRecord) => tap.step(step) }),
     ...race,
-  })
+  }).finally(() => tap?.stop())
+
+  tap?.end(result.status, result.durationMs)
 
   return { result, recordDir, mark }
 }
