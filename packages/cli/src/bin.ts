@@ -20,6 +20,7 @@ import {
   runMatrix,
   runTests,
   showRun,
+  type VideoMode,
 } from "@danwo/runner/runner"
 import { Argument, Command, InvalidArgumentError, Option } from "commander"
 
@@ -73,6 +74,12 @@ const recordOption = () =>
     "flight recorder: keep what runs did (default: config, else on-failure)",
   ).choices(["on-failure", "always", "off"])
 
+const videoOption = () =>
+  new Option(
+    "--video <mode>",
+    "video in kept records: retain-on-failure keeps failed runs' (default: config, else retain-on-failure)",
+  ).choices(["retain-on-failure", "on", "off"])
+
 const updateOption = () =>
   new Option("-u, --update-snapshots", "rewrite every toHaveScreenshot baseline")
 
@@ -118,6 +125,7 @@ withReporterOptions(withLintOptions(program.command("test")))
   .option("--ci", "CI defaults even without the CI variable: 1 retry, read-only cache, no .only")
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .addOption(recordOption())
+  .addOption(videoOption())
   .addOption(updateOption())
   .action(
     async (
@@ -139,6 +147,7 @@ withReporterOptions(withLintOptions(program.command("test")))
         ci?: boolean
         config?: string
         record?: RecordMode
+        video?: VideoMode
         updateSnapshots?: boolean
         reporter?: string[]
         prComment?: boolean
@@ -168,6 +177,7 @@ withReporterOptions(withLintOptions(program.command("matrix")))
   .option("--shuffle <seed>", "run the faulted runs in a shuffled order", integerAtLeast(0))
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .addOption(recordOption())
+  .addOption(videoOption())
   .addOption(updateOption())
   .action(
     async (
@@ -185,6 +195,7 @@ withReporterOptions(withLintOptions(program.command("matrix")))
         shuffle?: number
         config?: string
         record?: RecordMode
+        video?: VideoMode
         updateSnapshots?: boolean
         reporter?: string[]
         prComment?: boolean

@@ -14,6 +14,7 @@ import { type AppErrorOptions, AppErrors } from "./browser/app-errors.ts"
 import { type App, type BrowserFlags, launchBrowser } from "./browser/index.ts"
 import { type Backend, Readiness, type ReadinessMode } from "./browser/readiness.ts"
 import { Tabs } from "./browser/tabs.ts"
+import { hideSecretText, TabFilm, videoContextOptions } from "./browser/video.ts"
 import { createSessionFlight, type SessionFlight } from "./flight.ts"
 import { createScreen, registerValueEngine, type Screen } from "./locate/index.ts"
 import { MailDesk } from "./mail/desk.ts"
@@ -243,8 +244,11 @@ interface RecordOptions {
    * after `close()`; otherwise a temporary directory is used and removed.
    */
   readonly artifactsDir?: string
-  /** Take a screenshot after every step (see `flight`). */
-  readonly record?: { readonly stepScreenshots: boolean }
+  /**
+   * Take a screenshot after every step (see `flight`), and film every tab into
+   * `<artifactsDir>/video` when `video` is set.
+   */
+  readonly record?: { readonly stepScreenshots: boolean; readonly video?: boolean }
   /**
    * Baselines of `toHaveScreenshot`: the folder they live in (default `__screenshots__` in the
    * project root) and when to write them: `missing` (default) writes the ones not there yet,
@@ -290,32 +294,58 @@ interface Opened {
   readonly browser: Browser
   readonly context: BrowserContext
   readonly page: Page
+  /** Films the tabs, when the attempt records video. */
+  readonly film: TabFilm | undefined
+}
+
+/** A new context for the attempt: its saved state, and video when it records it. */
+async function newContext(
+  browser: Browser,
+  options: WebSessionOptions,
+  film: string | undefined,
+): Promise<BrowserContext> {
+  const context = await browser.newContext({
+    ...(options.browserState !== undefined && { storageState: options.browserState }),
+    ...(film !== undefined && videoContextOptions(film)),
+  })
+
+  if (film !== undefined) await hideSecretText(context)
+
+  return context
+}
+
+/** The browser the attempt opens in: the one given, else one launched for it alone. */
+function browserOf(options: WebSessionOptions): Promise<Browser> {
+  if (options.browser !== undefined) return Promise.resolve(options.browser)
+
+  return launchBrowser({
+    ...(options.proxy && { proxy: options.proxy }),
+    ...(options.launch && { flags: options.launch }),
+    headless: !(options.headed ?? false),
+  })
 }
 
 async function openBrowser(
   options: WebSessionOptions,
+  artifactsDir: string,
 ): Promise<Opened & { readonly own: boolean }> {
   await registerValueEngine()
 
   const own = options.browser === undefined
-  const browser =
-    options.browser ??
-    (await launchBrowser({
-      ...(options.proxy && { proxy: options.proxy }),
-      ...(options.launch && { flags: options.launch }),
-      headless: !(options.headed ?? false),
-    }))
+  const browser = await browserOf(options)
+  const filming = options.record?.video === true ? artifactsDir : undefined
 
   try {
-    const context = await browser.newContext(
-      options.browserState === undefined ? {} : { storageState: options.browserState },
-    )
+    const context = await newContext(browser, options, filming)
 
     await options.onContext?.(context)
 
     const page = await context.newPage()
+    const film = filming === undefined ? undefined : new TabFilm(filming)
 
-    return { browser, context, page, own }
+    film?.watch(page)
+
+    return { browser, context, page, own, film }
   } catch (error) {
     if (own) await browser.close()
     throw error
@@ -495,7 +525,7 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
   const store = replayStore(options)
   const ownsArtifacts = options.artifactsDir === undefined
   const artifactsDir = options.artifactsDir ?? (await mkdtemp(join(tmpdir(), "danwo-attempt-")))
-  const { browser, context, page, own } = await openBrowser(options)
+  const { browser, context, page, own, film } = await openBrowser(options, artifactsDir)
   const tabs = new Tabs(context, page)
   const settings = settingsOf(options)
   const { projectRoot, files, actionTimeout } = settings
@@ -514,6 +544,7 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
     steps,
     artifactsDir,
     stepScreenshots: settings.stepScreenshots,
+    videos: () => film?.videos() ?? [],
   })
 
   const { backend } = options
@@ -524,6 +555,7 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
   tabs.onEveryPage((opened) => {
     recordAppLog(opened, steps)
     appErrors.watch(opened)
+    film?.watch(opened)
   })
 
   const ready = readyStep(readinessOf(options), tabs, steps)
@@ -600,8 +632,11 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
       await flight.settle()
       stopped.abort()
 
+      const closedAt = Date.now()
+
       try {
         await context.close()
+        await film?.save(closedAt)
       } finally {
         if (own) await browser.close()
         if (ownsArtifacts) await rm(artifactsDir, { recursive: true, force: true })

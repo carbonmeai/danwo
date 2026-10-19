@@ -4,18 +4,29 @@
  */
 import { relative } from "node:path"
 
+import type { VideoMode } from "../record/video.ts"
 import type { LoadedConfig } from "./config.ts"
 import { newRunDir, type RecordMode, type RecordSettings } from "./record.ts"
 import { finishRun } from "./report.ts"
 
-/** The run's recording settings: the option, else the config, else `on-failure`; none when off. */
+/**
+ * The run's recording settings: the option, else the config, else `on-failure`; none when off.
+ * Video follows the same order and defaults to `retain-on-failure`.
+ */
 export function openRecording(
   loaded: LoadedConfig,
   mode: RecordMode | undefined,
+  video?: VideoMode,
 ): RecordSettings | undefined {
   const chosen = mode ?? loaded.config.record ?? "on-failure"
 
-  return chosen === "off" ? undefined : { runDir: newRunDir(loaded.root), mode: chosen }
+  return chosen === "off"
+    ? undefined
+    : {
+        runDir: newRunDir(loaded.root),
+        mode: chosen,
+        video: video ?? loaded.config.video ?? "retain-on-failure",
+      }
 }
 
 /**

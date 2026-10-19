@@ -28,8 +28,10 @@ export type {
   DeviceScreenReading,
   DeviceStart,
   DeviceTarget,
+  ScreenFilm,
   ScrollDirection,
 } from "../device/types.ts"
+export type { CapturedVideo, RecordedVideo, VideoMark, VideoMode } from "../record/video.ts"
 export {
   gmailMail,
   latestMail,

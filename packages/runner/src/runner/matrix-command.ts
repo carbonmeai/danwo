@@ -439,7 +439,7 @@ export async function runMatrix(
   const file = resolve(cwd, options.file)
   const test = await theTest(loaded, file, options)
   const cache = await trialCache(loaded)
-  const recording = openRecording(loaded, options.record)
+  const recording = openRecording(loaded, options.record, options.video)
   const workers = matrixWorkers(options, loaded.config)
   const crew = new Crew({
     size: workers,

@@ -10,7 +10,7 @@ import type { MailDesk, MailOrigin } from "../mail/desk.ts"
 import { embedsValue, paramSecret, type Params, paramTyped } from "../replay/params.ts"
 import { describeTarget, locatorFor, type Target } from "../replay/target.ts"
 import type { FromMail, RecordedAction, RecordedAddress, RecordedInput } from "../replay/trace.ts"
-import { checkSecretField } from "../secrets/fields.ts"
+import { checkSecretField, markSecretField } from "../secrets/fields.ts"
 import type { SecretVault } from "../secrets/index.ts"
 import { describeSpan, spanMs } from "../time/index.ts"
 import type { VisionDesk } from "../vision/desk.ts"
@@ -168,7 +168,10 @@ async function fillSecret(
 ): Promise<Performed> {
   const secret = paramSecret(context.params, input.secret) ?? context.vault.handle(input.secret)
 
-  await checkSecretField(context.tabs.page.getByRef(input.ref), secret, context.timeout)
+  const field = context.tabs.page.getByRef(input.ref)
+
+  await checkSecretField(field, secret, context.timeout)
+  await markSecretField(field, context.timeout)
 
   const value = await context.vault.reveal(secret)
   const performed = await onElement(

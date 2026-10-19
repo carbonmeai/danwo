@@ -106,4 +106,17 @@ export interface DeviceTarget {
   screenshot(path: string): Promise<boolean>
   /** The app's log lines since the last call, oldest first. */
   logs?(): Promise<readonly DeviceLogLine[]>
+  /**
+   * Starts filming the screen into `path` (an MP4); undefined when this device cannot film. The
+   * film is written once it is stopped.
+   */
+  recordScreen?(path: string): Promise<ScreenFilm | undefined>
+}
+
+/** The screen being filmed. */
+export interface ScreenFilm {
+  /** When filming began, by the wall clock in milliseconds. */
+  readonly startedAt: number
+  /** Stops filming and writes the file; false when no file could be written. */
+  stop(): Promise<boolean>
 }

@@ -62,6 +62,8 @@ export interface AttemptSetup {
   readonly replay: ReplayUse
   /** The flight recorder's directory for this attempt; undefined records nothing. */
   readonly recordDir: string | undefined
+  /** Film the attempt into its record directory (the browser's tabs, or the device's screen). */
+  readonly recordVideo?: boolean
   /** Where the test's `toHaveScreenshot` baselines live, and whether to rewrite them. */
   readonly screenshots?: { readonly dir: string; readonly update: "missing" | "all" }
   /** The worker's saved sessions; without it, a test's session is set up afresh every attempt. */
@@ -395,11 +397,16 @@ function replayOptions(setup: AttemptSetup): Partial<WebSessionOptions> {
   return replay.kind === "replay-only" ? { cache, replay: { mode: "strict-stop" } } : { cache }
 }
 
-/** Where the flight recorder keeps the attempt's screenshots, one after every step. */
-function recordOptions(recordDir: string | undefined): Partial<WebSessionOptions> {
+/** Where the flight recorder keeps the attempt's screenshots, one after every step, and its video. */
+function recordOptions(setup: AttemptSetup): Partial<WebSessionOptions> {
+  const { recordDir } = setup
+
   return recordDir === undefined
     ? {}
-    : { artifactsDir: recordDir, record: { stepScreenshots: true } }
+    : {
+        artifactsDir: recordDir,
+        record: { stepScreenshots: true, video: setup.recordVideo === true },
+      }
 }
 
 /** What this attempt alone brings: its baselines, starting state, check pace and browser. */
@@ -439,7 +446,11 @@ function openOnDevice(setup: AttemptSetup, device: DeviceTarget, timeout: number
 /** What this device attempt alone brings: its record folder, check pace and baselines. */
 function deviceAttemptOptions(setup: AttemptSetup) {
   return {
-    ...(setup.recordDir !== undefined && { artifactsDir: setup.recordDir, stepScreenshots: true }),
+    ...(setup.recordDir !== undefined && {
+      artifactsDir: setup.recordDir,
+      stepScreenshots: true,
+      video: setup.recordVideo === true,
+    }),
     ...(setup.checkPace && { checkPace: setup.checkPace }),
     ...(setup.screenshots && { screenshots: setup.screenshots }),
   }
@@ -479,7 +490,7 @@ async function openSession(
     ...pageOptions(config),
     ...readinessOptions(config, env),
     ...replayOptions(setup),
-    ...recordOptions(setup.recordDir),
+    ...recordOptions(setup),
     ...(await attemptOptions(setup, state)),
     projectRoot: setup.root,
     timeout,

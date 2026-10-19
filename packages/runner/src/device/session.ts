@@ -32,6 +32,7 @@ import { sessionTime, type TimeMachine, timeMachineOf } from "../time/index.ts"
 import { visionModelOf, visionModeOf } from "../vision/desk.ts"
 import { createDeviceAgent } from "./agent/agent.ts"
 import { deviceExpect } from "./expect.ts"
+import { type DeviceFilm, startDeviceFilm } from "./film.ts"
 import { type DeviceContext, DeviceReader, deviceScreen } from "./locator.ts"
 import type { DeviceForeground, DeviceNode, DeviceScreenReading, DeviceTarget } from "./types.ts"
 
@@ -67,6 +68,8 @@ export interface DeviceSessionOptions extends AgentSettings {
   readonly artifactsDir?: string
   /** A screenshot after every step (otherwise only at failure). */
   readonly stepScreenshots?: boolean
+  /** Film the screen into `<artifactsDir>/video`, when the device can. */
+  readonly video?: boolean
   readonly actionTimeout?: number
   readonly assertionTimeout?: number
   /** Check timeouts from this check's earlier passing runs, as on the web. */
@@ -192,6 +195,7 @@ function deviceFlight(
   steps: StepRecorder,
   vault: SecretVault,
   options: DeviceSessionOptions,
+  film: DeviceFilm | undefined,
 ): SessionFlight & { onStep(index: number): void } {
   const shots = new Map<number, string>()
   const dir = options.artifactsDir
@@ -226,6 +230,7 @@ function deviceFlight(
       return failureEvidence(target, reader, dir, error, vault).catch(() => undefined)
     },
     settle: () => queue,
+    videos: () => film?.videos() ?? [],
   }
 }
 
@@ -308,7 +313,11 @@ export async function openDeviceSession(
     ...(options.checkPace && { checkTimeout: pacer(options.checkPace, steps, vault.redact) }),
     shots: shotsOf(options, steps),
   }
-  const flight = deviceFlight(target, reader, steps, vault, options)
+  const film =
+    options.video === true && options.artifactsDir !== undefined
+      ? await startDeviceFilm(target, options.artifactsDir)
+      : undefined
+  const flight = deviceFlight(target, reader, steps, vault, options, film)
   const store = deviceStore(target, options)
   const desk = new MailDesk(options.mail ?? [])
   const stopped = new AbortController()
@@ -341,10 +350,16 @@ export async function openDeviceSession(
     }
   }
 
-  await steps.run("app", "app.start", target.app, async () => {
-    await start()
-    await ready()
-  })
+  await steps
+    .run("app", "app.start", target.app, async () => {
+      await start()
+      await ready()
+    })
+    .catch(async (error: unknown) => {
+      /* No session comes back to close, so the film stops here. */
+      await film?.stop()
+      throw error
+    })
 
   return {
     platform: "android",
@@ -384,6 +399,7 @@ export async function openDeviceSession(
       await flight.settle()
       stopped.abort()
       await agent.eyes.close()
+      await film?.stop()
     },
   }
 }

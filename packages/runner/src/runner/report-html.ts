@@ -257,11 +257,26 @@ function stateBlock(record: FlightRecord): string {
   return `<h4>State at the end</h4>${services.map(([name, state]) => `<details><summary>${escape(name)}</summary><pre>${escape(JSON.stringify(state, null, 2))}</pre></details>`).join("")}`
 }
 
+/** The run's video, one player per tab, when the record kept it. */
+function videoBlock(loaded: Loaded): string {
+  const videos = loaded.record.videos ?? []
+
+  if (videos.length === 0) return ""
+
+  const players = videos.map((video) => {
+    const src = escape(`${loaded.dir}/${video.file}`)
+
+    return `<figure><video class="film" controls preload="metadata" src="${src}"></video><figcaption>${videos.length > 1 ? `Tab ${video.tab}` : "The run"}, <a href="${src}">download</a></figcaption></figure>`
+  })
+
+  return `<h4>Video</h4>${players.join("")}`
+}
+
 function section(loaded: Loaded): string {
   const { record } = loaded
   const failed = record.status !== "passed"
 
-  return `<section id="${escape(loaded.dir)}" class="${failed ? "failed" : "passed"}"><h3><span class="badge">${escape(record.status)}</span> ${escape(record.test)} <span class="dim">— ${escape(runTitle(record))}</span></h3><p class="dim">${escape(record.startedAt)} · ${record.durationMs} ms · <code>${escape(loaded.dir)}</code></p>${errorBlock(record)}${lintBlock(record)}${failureBlock(loaded)}${stepsBlock(loaded)}${appLogBlock(loaded)}${exchangesBlock(loaded)}${deliveriesBlock(loaded)}${dataCallsBlock(loaded)}${stateBlock(record)}</section>`
+  return `<section id="${escape(loaded.dir)}" class="${failed ? "failed" : "passed"}"><h3><span class="badge">${escape(record.status)}</span> ${escape(record.test)} <span class="dim">— ${escape(runTitle(record))}</span></h3><p class="dim">${escape(record.startedAt)} · ${record.durationMs} ms · <code>${escape(loaded.dir)}</code></p>${errorBlock(record)}${lintBlock(record)}${failureBlock(loaded)}${videoBlock(loaded)}${stepsBlock(loaded)}${appLogBlock(loaded)}${exchangesBlock(loaded)}${deliveriesBlock(loaded)}${dataCallsBlock(loaded)}${stateBlock(record)}</section>`
 }
 
 const STYLE = `
@@ -278,7 +293,7 @@ table{border-collapse:collapse;width:100%}td{border-top:1px solid var(--line);pa
 tr.failed td,tr.error td{color:var(--bad)}tr.blocked td,tr.inconclusive td{color:var(--warn)}
 pre{background:var(--code);padding:8px;border-radius:4px;overflow-x:auto;white-space:pre-wrap;word-break:break-word;margin:4px 0}
 code{background:var(--code);padding:0 3px;border-radius:3px}
-img.thumb{max-width:160px;max-height:100px;border:1px solid var(--line)}img.failure{max-width:100%;max-height:420px;border:1px solid var(--line)}.compare{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.compare figure{margin:0}img.compare{max-width:240px;max-height:180px;border:1px solid var(--line)}
+img.thumb{max-width:160px;max-height:100px;border:1px solid var(--line)}video.film{max-width:100%;max-height:420px;border:1px solid var(--line)}img.failure{max-width:100%;max-height:420px;border:1px solid var(--line)}.compare{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.compare figure{margin:0}img.compare{max-width:240px;max-height:180px;border:1px solid var(--line)}
 summary{cursor:pointer;padding:2px 0}
 `
 

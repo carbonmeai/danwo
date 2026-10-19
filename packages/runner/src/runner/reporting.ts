@@ -7,6 +7,7 @@ import type { FaultMatrixResult } from "@danwo/matrix"
 
 import type { LintFinding } from "../lint/index.ts"
 import type { Usage } from "../record/usage.ts"
+import type { VideoMode } from "../record/video.ts"
 import type { RecordMode } from "./record.ts"
 import type { TestReport } from "./tasks.ts"
 
@@ -79,6 +80,8 @@ export interface RunCommandOptions {
   readonly config?: string
   /** Flight recorder mode; overrides the config's `record`. */
   readonly record?: RecordMode
+  /** When a kept record keeps video; overrides the config's `video`. */
+  readonly video?: VideoMode
   /** Rewrite every `toHaveScreenshot` baseline (`--update-snapshots`). */
   readonly updateScreenshots?: boolean
   /** Reporters besides the config's, e.g. from `--reporter`. */

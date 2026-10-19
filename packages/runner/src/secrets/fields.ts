@@ -40,6 +40,16 @@ function fieldKindOf(locator: Locator, timeout: number): Promise<FieldKind> {
   )
 }
 
+/** Marks a field that holds a secret: screenshots paint it over, and video hides its characters. */
+export const SECRET_FIELD = "data-danwo-secret"
+
+/** Marks the field `locator` points at as holding a secret, before the value goes in. Best effort. */
+export async function markSecretField(locator: Locator, timeout: number): Promise<void> {
+  await locator
+    .evaluate((element, name) => element.setAttribute(name, ""), SECRET_FIELD, { timeout })
+    .catch(() => undefined)
+}
+
 /** The kinds `secret` may be typed into. */
 function allowedKinds(secret: Secret): readonly FieldKind[] | "any" {
   return secret.fields ?? ALLOWED[secret.purpose]

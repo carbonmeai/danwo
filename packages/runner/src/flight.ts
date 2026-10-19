@@ -13,6 +13,7 @@ import {
   type StepRecorder,
   takeScreenshot,
 } from "./record/index.ts"
+import type { CapturedVideo } from "./record/video.ts"
 import { redactCredentials, type SecretVault } from "./secrets/index.ts"
 
 /** One screenshot is given this long; a page that will not paint is not worth holding a step for. */
@@ -35,6 +36,8 @@ export interface SessionFlight {
   captureFailure(error: unknown): Promise<FailureEvidence | undefined>
   /** Waits for screenshots still being taken. */
   settle(): Promise<void>
+  /** Video the session recorded, complete once it has closed; none when it recorded no video. */
+  videos?(): readonly CapturedVideo[]
 }
 
 export interface SessionFlightOptions {
@@ -45,6 +48,8 @@ export interface SessionFlightOptions {
   readonly artifactsDir: string
   /** Take a screenshot after every step (otherwise only at failure). */
   readonly stepScreenshots: boolean
+  /** The session's videos, once it has closed. */
+  readonly videos?: () => readonly CapturedVideo[]
 }
 
 /** The session side of the flight recorder; feed `onStep` every step that ends. */
@@ -96,6 +101,7 @@ export function createSessionFlight(
       return withCandidates(evidence, error, redact)
     },
     settle: () => queue,
+    videos: () => options.videos?.() ?? [],
   }
 }
 

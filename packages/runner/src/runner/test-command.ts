@@ -236,7 +236,7 @@ function findingsOf(reports: readonly TestReport[]): LintFinding[] {
 async function executeRun(input: RunInput): Promise<number> {
   const { loaded, options, cwd, write } = input
   const { tasks, size } = planRun(loaded, options, input.ci, input.entries)
-  const recording = openRecording(loaded, options.record)
+  const recording = openRecording(loaded, options.record, options.video)
   const reporters = [
     historyReporter(),
     ...(loaded.config.reporters ?? []),

@@ -21,6 +21,7 @@ import { type CheckPace, paceOf } from "../assert/pace.ts"
 import { launchBrowser } from "../browser/index.ts"
 import { type LintConfig, type LintFinding, lint } from "../lint/index.ts"
 import { usageOf } from "../record/usage.ts"
+import { keepsVideo } from "../record/video.ts"
 import { type DeclaredTest, type FileDeclarations, suiteHooks } from "../tests/registry.ts"
 import { resultOf, worthRetrying } from "../tests/retry.ts"
 import { type AttemptResult, type AttemptSetup, runAttempt, type ReplayUse } from "./attempt.ts"
@@ -135,6 +136,7 @@ async function attemptOnce(
     env,
     replay,
     recordDir,
+    recordVideo: recording?.video !== undefined && recording.video !== "off",
     screenshots: {
       dir: baselineDir(file, test.titlePath),
       update: updateScreenshots ? "all" : "missing",
@@ -177,6 +179,13 @@ function inspect(input: RecordInput): RecordExtras {
 /** A report's `lint` field: the findings, when there are any. */
 function lintOf(extras: RecordExtras): { lint?: readonly LintFinding[] } {
   return extras.lint !== undefined && extras.lint.length > 0 ? { lint: extras.lint } : {}
+}
+
+/** Whether a run's record keeps its video, by the recording's video mode and whether it passed. */
+function videoKept(passed: boolean): boolean {
+  const mode = benchOrFail().recording?.video
+
+  return mode !== undefined && keepsVideo(mode, passed)
 }
 
 /** Keeps or drops a run's flight record; the directory relative to the cwd when kept. */
@@ -228,6 +237,7 @@ async function runTest(
       flight: result.flight,
       env,
       mark,
+      video: videoKept(result.status === "passed"),
     }
     const inspected = inspect(input)
     const record = await keepRecord(recordDir, result.status !== "passed", () =>
@@ -498,6 +508,8 @@ async function runTrial(
     flight: result.flight,
     env,
     mark,
+    /* A trial that passed keeps no video, even when its record is kept to show a fault never fired. */
+    video: videoKept(verdict.status === "passed"),
   }
   const inspected = inspect(input)
   const report = { ...verdict, ...lintOf(inspected) }

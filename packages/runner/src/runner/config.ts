@@ -10,6 +10,7 @@ import type { LanguageModel } from "ai"
 import type { Budgets } from "../agent/budget.ts"
 import type { ReadinessMode } from "../browser/readiness.ts"
 import type { LintConfig } from "../lint/index.ts"
+import type { VideoMode } from "../record/video.ts"
 import type { RelocationPolicy } from "../replay/policy.ts"
 import type { EffectsSetting, SessionSecret } from "../session.ts"
 import { DanwoError } from "../support/codes.ts"
@@ -105,6 +106,14 @@ export interface DanwoConfig {
    * `.danwo/runs/<run>/` with an HTML report; `always` keeps every run; `off` records nothing.
    */
   readonly record?: RecordMode
+  /**
+   * Video in the flight record, one per tab or the device's screen, with every step, call and
+   * webhook on its clock: `retain-on-failure` (default) films every run and keeps the video of
+   * runs that did not pass (a matrix keeps failing and invalid trials'); `on` keeps it with every
+   * record kept; `off` films nothing. Secret fields show as dots, but a secret the app prints as
+   * text is on screen: turn video off for suites that show one.
+   */
+  readonly video?: VideoMode
   /** Reporters told about every run besides the console, e.g. `github()` from `@danwo/github`. */
   readonly reporters?: readonly Reporter[]
   /**

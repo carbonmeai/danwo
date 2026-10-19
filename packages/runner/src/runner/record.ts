@@ -13,6 +13,7 @@ import type { CapturedMessage, Exchange } from "@danwo/proxy"
 
 import type { LintFinding } from "../lint/index.ts"
 import type { AppLogRecord, FailureEvidence, StepRecord } from "../record/index.ts"
+import { type RecordedVideo, VIDEO_DIR, type VideoMode, videoMarks } from "../record/video.ts"
 import { type CredentialKind, credentialKind, sentByBrowser } from "../secrets/index.ts"
 import type { ReplayDivergence } from "../session.ts"
 import type { TestError } from "../support/errors.ts"
@@ -27,6 +28,8 @@ export type RecordMode = "on-failure" | "always" | "off"
 export interface RecordSettings {
   readonly runDir: string
   readonly mode: RecordMode
+  /** When a kept record keeps its video too; absent records none. */
+  readonly video?: VideoMode
 }
 
 export type RecordedStep = StepRecord & {
@@ -73,6 +76,8 @@ export interface FlightRecord {
   readonly state: Readonly<Record<string, unknown>>
   /** What the integration lint found in the run. */
   readonly lint?: readonly LintFinding[]
+  /** Video of the run, one per tab (or the device's screen), each with the run on its clock. */
+  readonly videos?: readonly RecordedVideo[]
 }
 
 /** The parts of a record the integration lint reads, redacted as the record keeps them. */
@@ -141,6 +146,8 @@ export interface RecordInput {
   readonly flight: AttemptFlight
   readonly env: WorkerEnvironment | undefined
   readonly mark: EvidenceMark
+  /** Keep the run's video in its record; without it the record has none. */
+  readonly video?: boolean
 }
 
 function redactorOf(input: Pick<RecordInput, "flight">): Redactor {
@@ -183,6 +190,7 @@ export interface RecordExtras {
 /** Builds the redacted record of one run from the session's flight and the environment's evidence. */
 export function buildRecord(input: RecordInput, extras: RecordExtras = {}): FlightRecord {
   const redactor = redactorOf(input)
+  const evidence = extras.evidence ?? recordEvidence(input)
 
   return {
     version: 1,
@@ -196,12 +204,22 @@ export function buildRecord(input: RecordInput, extras: RecordExtras = {}): Flig
     notes: input.notes.map((note) => redactor.text(note)),
     startedAt: input.flight.startedAt,
     durationMs: input.durationMs,
-    ...(extras.evidence ?? recordEvidence(input)),
+    ...evidence,
     appLog: redactor.deep(input.flight.session.appLog()),
     failure: redactor.deep(input.flight.failure),
     state: environmentState(input.env, redactor),
     ...(extras.lint !== undefined && extras.lint.length > 0 && { lint: extras.lint }),
+    ...videosOf(input, evidence),
   }
+}
+
+/** The run's videos with its steps, calls and webhooks on their clocks, when the record keeps them. */
+function videosOf(input: RecordInput, evidence: RecordEvidence): Pick<FlightRecord, "videos"> {
+  const videos = input.video === true ? (input.flight.session.videos?.() ?? []) : []
+
+  if (videos.length === 0) return {}
+
+  return { videos: videos.map((video) => ({ ...video, marks: videoMarks(video, evidence) })) }
 }
 
 function redactMessage(message: CapturedMessage, redactor: Redactor): CapturedMessage {
@@ -348,7 +366,12 @@ export async function finishRecord(
       return undefined
     }
 
-    await writeRecord(dir, build())
+    const record = build()
+
+    /* A record that keeps no video drops what the session captured. */
+    if (record.videos === undefined)
+      await rm(join(dir, VIDEO_DIR), { recursive: true, force: true })
+    await writeRecord(dir, record)
 
     return relative(process.cwd(), dir)
   } catch {
