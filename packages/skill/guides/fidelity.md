@@ -33,6 +33,9 @@ mismatch, a status mismatch, an error-code mismatch, an ordering difference or a
 | Slack, GitHub, Google, Microsoft | public calls: `api.test` and token errors, a public repository and a 404, sign-in discovery and signing keys                  | `DANWO_FIDELITY_PUBLIC=1`, plus an optional `DANWO_FIDELITY_GITHUB_TOKEN`                      |
 | Composio                         | key errors live; with a key, a toolkit, a tool, a trigger type, auth configs and connected accounts (reads only)              | `DANWO_FIDELITY_PUBLIC=1`; optional `DANWO_FIDELITY_COMPOSIO_KEY` (a test project's `ak_` key) |
 | AI Gateway (`gateway`)           | language model text, tool call, structured output, stream events, embedding, errors (unknown model, no key, malformed prompt) | `DANWO_FIDELITY_AI_GATEWAY_KEY`, else `AI_GATEWAY_API_KEY`                                     |
+| Gemini (`gemini`)                | text, function call, structured output, stream events, token counting, embeddings, no key                                     | `DANWO_FIDELITY_GEMINI_KEY` (a Google AI Studio key)                                           |
+| Perplexity (`perplexity`)        | Agent API text, function call, structured output, stream events; Sonar with citations; no key                                 | `DANWO_FIDELITY_PERPLEXITY_KEY`                                                                |
+| Bedrock (`bedrock`)              | Converse text and tool call, InvokeModel with Nova's body, unsigned call                                                      | `DANWO_FIDELITY_BEDROCK_API_KEY` (a Bedrock API key), optional `DANWO_FIDELITY_BEDROCK_REGION` |
 
 Keys come from the environment, or from `.env.fidelity` and then `.env` at the repository root,
 which git ignores; neither file has to exist. The gateway suite drives the AI SDK's own gateway provider, so each request is
@@ -43,8 +46,11 @@ fraction of a cent, which the gateway reports in each answer's cost metadata.
 
 - Only test and sandbox credentials. A key that looks live (`sk_live_`, `rk_live_`, a Flutterwave
   key without `_TEST`, anything but `sk_sandbox_` for Bachs) stops the run with `CONFIG_INVALID`.
-  The AI Gateway has no sandbox, so its key is a real one; with a gateway key in the environment,
-  `.env.fidelity` or `.env`, a plain `danwo fidelity` runs that suite live too (use `--offline` to stay off the network).
+  The AI Gateway, Gemini, Perplexity and Bedrock have no sandbox, so their keys are real ones; with
+  such a key in the environment, `.env.fidelity` or `.env`, a plain `danwo fidelity` runs that suite
+  live too (use `--offline` to stay off the network). Each live run uses the cheapest model and 20
+  output tokens. Bedrock's streaming calls answer in AWS's binary event stream, which the suites do
+  not read; their framing is covered by tests that drive the AWS SDK.
 - Keys are never printed or written. Every answer goes through the recorder's redaction before it
   is shaped, and goldens hold structure only.
 - Scenarios clean up what they create, and each makes a handful of requests.
