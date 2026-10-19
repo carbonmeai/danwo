@@ -456,6 +456,7 @@ function trialReport(
       .map(({ request: _q, response: _r, ...call }) => call),
     deliveries: deliveriesOf(env.webhooks).slice(mark.deliveries),
     ...(env.data !== undefined && { dataCalls: dataCallsOf(env.data, mark.data) }),
+    sockets: env.proxy.sockets().slice(mark.sockets ?? 0),
     divergence: result.divergence,
     notes: [...(stop === undefined ? [] : [stop]), ...(env.notes?.() ?? [])],
   }

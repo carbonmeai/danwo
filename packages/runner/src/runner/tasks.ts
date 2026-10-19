@@ -5,7 +5,7 @@
  */
 import type { DataCall } from "@danwo/infra"
 import type { PlannedFault, RaceEvidence, ServiceDelivery } from "@danwo/matrix"
-import type { Exchange } from "@danwo/proxy"
+import type { Exchange, SocketExchange } from "@danwo/proxy"
 
 import type { CheckPace } from "../assert/pace.ts"
 import type { LintFinding } from "../lint/index.ts"
@@ -97,6 +97,8 @@ export interface TrialReport {
   readonly deliveries: readonly ServiceDelivery[]
   /** Calls to the app's own database and cache, when the environment has data proxies. */
   readonly dataCalls?: readonly DataCall[]
+  /** WebSocket connections through the proxy, with their frame counts. */
+  readonly sockets?: readonly SocketExchange[]
   readonly divergence: ReplayDivergence | undefined
   readonly notes: readonly string[]
   /** The trial's flight record directory, relative to the cwd, when it was kept. */

@@ -29,6 +29,12 @@ export {
   planDataFaults,
 } from "./data-faults.ts"
 export {
+  applySocketFault,
+  planSocketFaults,
+  socketRoute,
+  type SocketPlannedFault,
+} from "./socket-faults.ts"
+export {
   appRoute,
   planRaceFaults,
   type RaceCall,

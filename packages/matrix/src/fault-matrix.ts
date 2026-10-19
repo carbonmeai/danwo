@@ -11,6 +11,7 @@ import {
   type OutboundCall,
   type OutboundFault,
   type Proxy,
+  type SocketExchange,
 } from "@danwo/proxy"
 import { Data, Effect, Result } from "effect"
 
@@ -21,6 +22,7 @@ import {
   type DataPlannedFault,
   planDataFaults,
 } from "./data-faults.ts"
+import { applySocketFault, planSocketFaults, type SocketPlannedFault } from "./socket-faults.ts"
 
 /**
  * Webhook delivery a run's faults can land on: one dispatcher, or several keyed by service name
@@ -67,6 +69,7 @@ export type PlannedFault =
       readonly label: string
     }
   | DataPlannedFault
+  | SocketPlannedFault
   | RaceFault
 
 /**
@@ -114,6 +117,8 @@ export interface RunOutcome {
   readonly deliveries: readonly ServiceDelivery[]
   /** The statements and commands the app sent its own database and cache, through data proxies. */
   readonly dataCalls?: readonly DataCall[] | undefined
+  /** WebSocket connections through the proxy during the run. */
+  readonly sockets?: readonly SocketExchange[] | undefined
   /** The environment's `notes()` after the journey. */
   readonly notes: readonly string[]
   /** Where the run's flight record was kept, when one was. */
@@ -240,6 +245,8 @@ export function applyFault(
     applyWebhookFault(env.webhooks, planned)
   } else if (planned?.target === "data") {
     applyDataFault(env.data, planned)
+  } else if (planned?.target === "socket") {
+    applySocketFault(env.proxy, planned)
   }
 }
 
@@ -271,6 +278,7 @@ export function faultFired(outcome: RunOutcome): boolean {
   if (fault.target === "outbound") return outcome.exchanges.some((item) => item.fault !== null)
   if (fault.target === "webhook") return outcome.deliveries.some((item) => item.fault !== null)
   if (fault.target === "data") return (outcome.dataCalls ?? []).some((item) => item.fault !== null)
+  if (fault.target === "socket") return (outcome.sockets ?? []).some((item) => item.fault !== null)
 
   return outcome.fired === true
 }
@@ -280,6 +288,7 @@ const MISSED: Readonly<Record<PlannedFault["target"], string>> = {
   outbound: "no call",
   webhook: "no delivery",
   data: "no database or cache call",
+  socket: "no WebSocket",
   page: "no request",
   users: "no second user",
   redirect: "no redirect with a webhook pending",
@@ -335,6 +344,7 @@ function runOnce<E extends RunEnvironment>(
           exchanges: env.proxy.exchanges(),
           deliveries: deliveriesOf(env.webhooks),
           dataCalls: dataCallsOf(env.data),
+          sockets: env.proxy.sockets(),
           notes: env.notes?.() ?? [],
         }
 
@@ -496,6 +506,7 @@ export function planFaults(
 
   plan.push(...planWebhookFaults(clean.deliveries, webhookFaults))
   if (dataFaults !== undefined) plan.push(...planDataFaults(clean.dataCalls ?? [], dataFaults))
+  plan.push(...planSocketFaults(clean.sockets ?? []))
 
   return plan
 }
