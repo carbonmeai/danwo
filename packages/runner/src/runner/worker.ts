@@ -30,7 +30,7 @@ import {
   suiteHooks,
 } from "../tests/registry.ts"
 import { resultOf, worthRetrying } from "../tests/retry.ts"
-import { appsDownNotes, appsDownNow, appsDownSince, withAppsDown } from "./apps-down.ts"
+import { appsDownNotes, appsDownNow, withAppsDown } from "./apps-down.ts"
 import { type AttemptResult, type AttemptSetup, runAttempt, type ReplayUse } from "./attempt.ts"
 import { loadTestFile, testIdOf } from "./catalog.ts"
 import { type LoadedConfig, loadConfig } from "./config.ts"
@@ -273,7 +273,6 @@ async function runTest(
 
     await beginAttempt(isolated)
 
-    const upBefore = appsDownNow(env)
     const { result, recordDir, mark } = await attemptOnce(
       declarations,
       task.file,
@@ -284,9 +283,7 @@ async function runTest(
       keepSignIns = false
     })
 
-    attempts.push(
-      await reportAttempt({ id, n, result, recordDir, mark, down: appsDownSince(env, upBefore) }),
-    )
+    attempts.push(await reportAttempt({ id, n, result, recordDir, mark, down: appsDownNow(env) }))
 
     if (result.status === "passed") impact = attemptImpact(result, mark)
     if (!worthRetrying(result.status)) break
@@ -295,7 +292,7 @@ async function runTest(
   return { id, status: resultOf(attempts), attempts, workerIndex, ...(impact && { impact }) }
 }
 
-/** One finished attempt of a test, with the apps that went down during it. */
+/** One finished attempt of a test, with the apps of its environment that are down. */
 interface FinishedAttempt {
   readonly id: string
   readonly n: number
@@ -306,8 +303,8 @@ interface FinishedAttempt {
 }
 
 /**
- * An attempt's report, its flight record kept when the run keeps it. Apps that went down during
- * it are named in its error and its record's notes.
+ * An attempt's report, its flight record kept when the run keeps it. Apps of the environment that
+ * are down are named in its error and its record's notes.
  */
 async function reportAttempt(attempt: FinishedAttempt): Promise<AttemptReport> {
   const { env } = benchOrFail()
@@ -712,6 +709,9 @@ let stopping: Promise<void> | undefined
 /** Closes the browser and the environment, then ends the worker. */
 async function closeAndExit(): Promise<void> {
   await (await browser?.catch(() => undefined))?.close()
+  /* Again at the end: an app's output between tests (a crash during a reset) is only kept here. */
+  if (bench?.env && bench.recording)
+    await writeEnvironmentRecord(bench.recording.runDir, bench.env, bench.workerIndex)
   await bench?.env?.close()
   if (process.connected) process.disconnect()
   process.exit(0)

@@ -3,7 +3,7 @@ import { createServer } from "node:net"
 import { describe, expect, it, vi } from "vitest"
 
 import { startApp } from "../src/runner/app-environment.ts"
-import { appsDownNotes, appsDownSince, withAppsDown } from "../src/runner/apps-down.ts"
+import { appsDownNotes, appsDownNow, withAppsDown } from "../src/runner/apps-down.ts"
 import type { WorkerEnvironment } from "../src/runner/environment.ts"
 import type { TestError } from "../src/support/errors.ts"
 
@@ -50,24 +50,24 @@ describe("apps that go down during a test", () => {
     expect(steady.exited()).toBeUndefined()
   }, 20_000)
 
-  it("names only the apps that went down since the test began", () => {
+  it("names the apps that are down", () => {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- only stopped() is read
     const env = {
       stopped: () => ["worker exited with code 2", "api exited with code 1"],
     } as unknown as WorkerEnvironment
 
-    expect(appsDownSince(env, ["worker exited with code 2"])).toEqual(["api exited with code 1"])
-    expect(appsDownSince(undefined, [])).toEqual([])
+    expect(appsDownNow(env)).toEqual(["worker exited with code 2", "api exited with code 1"])
+    expect(appsDownNow(undefined)).toEqual([])
   })
 
   it("adds them to the test's error and to the record's notes", () => {
     expect(withAppsDown(failure, ["api exited with code 1"])?.message).toBe(
-      "expected the dashboard to load\n(api exited with code 1 during this test)",
+      "expected the dashboard to load\n(api exited with code 1)",
     )
     expect(withAppsDown(failure, [])).toBe(failure)
     expect(withAppsDown(undefined, ["api exited with code 1"])).toBeUndefined()
     expect(appsDownNotes(["api exited with code 1"])).toEqual([
-      "api exited with code 1 during this test; its last output is in this record",
+      "api exited with code 1: its last output is in this record or in the run's environment-*.json",
     ])
   })
 })

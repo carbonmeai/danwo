@@ -3,6 +3,8 @@
  * output, the calls they made through the proxy, their sockets and danwo's notes about them. A
  * test's flight record only holds what happened during that test, so a stack that fails or warns
  * while booting (a provider it calls at start, a key it is missing) would otherwise leave nothing.
+ * It is written once the environment started and again when the worker ends, so it also has what
+ * an app wrote between tests (a crash during a reset) and which apps went down.
  */
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -10,7 +12,7 @@ import { join } from "node:path"
 import type { WorkerEnvironment } from "./environment.ts"
 import { createRedactor } from "./redact.ts"
 
-/** Lines of each app's startup output kept. */
+/** Lines of each app's output kept. */
 const KEPT_LINES = 400
 
 /** One call made while the environment started: no headers or bodies, and no query string. */
@@ -28,6 +30,8 @@ export interface EnvironmentRecord {
   readonly worker: number
   readonly writtenAt: string
   readonly notes: readonly string[]
+  /** Apps that stopped on their own, e.g. `api exited with code 1`. */
+  readonly stopped: readonly string[]
   readonly calls: readonly StartupCall[]
   readonly sockets: readonly Omit<StartupCall, "method" | "status">[]
   /** Each app's output so far, redacted, the last lines only. */
@@ -49,6 +53,7 @@ export function environmentRecord(env: WorkerEnvironment, worker: number): Envir
     worker,
     writtenAt: new Date().toISOString(),
     notes: env.notes?.() ?? [],
+    stopped: env.stopped?.() ?? [],
     calls: exchanges
       .filter((exchange) => exchange.asset !== true)
       .map((exchange) => ({
