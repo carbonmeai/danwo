@@ -39,6 +39,27 @@
     "reason": "The pinned stripe SDK's Charge type still declares source, so the emulator returns it as null; the API dropped it."
   },
   {
+    "provider": "stripe",
+    "scenario": "checkout session: create, retrieve, expire",
+    "path": "automatic_tax.liability",
+    "kind": "type-mismatch",
+    "reason": "Account setting: the test account has Stripe Tax turned on, so its sessions name a tax liability; the emulator models an account without Stripe Tax, where it is null."
+  },
+  {
+    "provider": "stripe",
+    "scenario": "checkout session: create, retrieve, expire",
+    "path": "automatic_tax.provider",
+    "kind": "type-mismatch",
+    "reason": "Account setting: the test account has Stripe Tax turned on, so its sessions name a tax provider; the emulator models an account without Stripe Tax, where it is null."
+  },
+  {
+    "provider": "stripe",
+    "scenario": "checkout session: create, retrieve, expire",
+    "path": "automatic_tax.status",
+    "kind": "type-mismatch",
+    "reason": "Account setting: the test account has Stripe Tax turned on, so its sessions report a tax status; the emulator models an account without Stripe Tax, where it is null."
+  },
+  {
     "provider": "resend",
     "step": "retrieve email",
     "path": "tags",
