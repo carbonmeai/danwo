@@ -5,6 +5,7 @@
  * with nothing to say are left out and their children move up; refs are the latest reading's.
  */
 import { routeOf } from "../../replay/route.ts"
+import { collapse, nameIn } from "../match.ts"
 import type { DeviceForeground, DeviceNode, DeviceScreenReading } from "../types.ts"
 
 /** What the agent sees of the device now. */
@@ -46,9 +47,9 @@ function valuePart(node: DeviceNode): string {
   return `${placeholder}${node.value ? `: ${node.value}` : ""}`
 }
 
-/** One node's line, without its indentation. */
-function nodeLine(node: DeviceNode): string {
-  const name = node.name === "" ? "" : ` ${JSON.stringify(node.name)}`
+/** One node's line, without its indentation, named `label`. */
+function nodeLine(node: DeviceNode, label: string): string {
+  const name = label === "" ? "" : ` ${JSON.stringify(label)}`
 
   return `- ${node.role}${name}${states(node)} [ref=${node.ref}]${valuePart(node)}`
 }
@@ -69,7 +70,10 @@ export function treeText(nodes: readonly DeviceNode[]): string {
     const level = above + 1
 
     depth.set(node.ref, level)
-    lines.push(`${"  ".repeat(level)}${nodeLine(node)}`)
+    /* A field is named by its label, as a person reads the form: the text beside it on a web page. */
+    lines.push(
+      `${"  ".repeat(level)}${nodeLine(node, node.editable ? collapse(nameIn(nodes, node)) : node.name)}`,
+    )
   }
 
   return lines.join("\n")

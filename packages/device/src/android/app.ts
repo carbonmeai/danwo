@@ -151,6 +151,8 @@ export class AndroidApp {
         (permission) => `pm grant ${this.package} ${permission} 2>/dev/null`,
       ),
       "logcat -c",
+      /* A crash dialog an earlier attempt left ("Chrome keeps stopping") would cover the app. */
+      "am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1",
     ]
 
     this.logsAfter = Date.now() / 1000

@@ -188,6 +188,7 @@ describe("the app", () => {
       "am force-stop com.chrome.beta 2>/dev/null",
       "pm grant com.danwo.shopmobile android.permission.POST_NOTIFICATIONS 2>/dev/null",
       "logcat -c",
+      "am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1",
       "am start -n com.danwo.shopmobile/.MainActivity",
     ].join("; ")
 

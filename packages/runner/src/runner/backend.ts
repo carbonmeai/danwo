@@ -43,10 +43,15 @@ async function round(env: WorkerEnvironment, timeoutMs: number, settle: boolean)
 /** Files a browser fetches for a page (styles, scripts, images, fonts), not calls the app makes. */
 const ASSET = /(?:\.(?:css|js|mjs|map|png|jpe?g|gif|svg|webp|ico|woff2?|ttf)|\/favicon[^/]*)$/i
 
+/**
+ * The calls the app made through the proxy. A call the proxy blocked never reached anyone: it is
+ * the device's or browser's own background traffic (update checks, sync), not something the app
+ * caused, and when it fires differs from run to run.
+ */
 function providerCalls(proxy: Proxy): BackendEvent[] {
   return proxy
     .exchanges()
-    .filter((call) => !ASSET.test(call.path.split("?")[0] ?? ""))
+    .filter((call) => call.disposition !== "blocked" && !ASSET.test(call.path.split("?")[0] ?? ""))
     .map((call) => ({ signature: routeOf(call), fault: call.fault }))
 }
 
