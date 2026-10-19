@@ -57,11 +57,9 @@ function customerChanges(body: Record<string, unknown>): Changes<Customer> {
   const email = text(body, "email")
   const phone = text(body, "phone_number")
 
+  if (email !== undefined) checkEmail(email)
   if (name !== undefined) changes.name = name
-  if (email !== undefined) {
-    checkEmail(email)
-    changes.email = email
-  }
+  if (email !== undefined) changes.email = email
   if (phone !== undefined) changes.phoneNumber = phone
   if ("metadata" in body) changes.metadata = metadataOf(body["metadata"]) ?? {}
   if ("billing_address" in body) changes.billingAddress = addressOf(body["billing_address"])

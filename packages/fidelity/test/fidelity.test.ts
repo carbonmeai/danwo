@@ -102,12 +102,16 @@ describe("comparing", () => {
   })
 })
 
+/** A target that answers every request with `status`. */
+function answering(status: number) {
+  return {
+    credentials: {},
+    send: () => Promise.resolve(Response.json({ name: "restricted" }, { status })),
+  }
+}
+
 describe("skipping", () => {
   it("reports a scenario the sandbox cannot run as skipped, not as a mismatch", async () => {
-    const answering = (status: number) => ({
-      credentials: {},
-      send: () => Promise.resolve(Response.json({ name: "restricted" }, { status })),
-    })
     const provider: FidelityProvider = {
       name: "skipping",
       credentials: [],
