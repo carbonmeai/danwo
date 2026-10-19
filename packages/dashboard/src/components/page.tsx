@@ -2,9 +2,11 @@ import { Icons } from "@danwo/ui/icons/base"
 import { Box, HStack, Stack, styled } from "@danwo/ui/jsx"
 import { Fragment, type ReactNode } from "react"
 
+import { CopyLink } from "./copy-link.tsx"
+
 /**
  * The top bar over every page: where the page sits, as a breadcrumb trail ending in the page
- * itself, under a single hairline.
+ * itself, with a link to copy on the right, under a single hairline.
  */
 function TopBar({ crumbs }: { readonly crumbs: readonly ReactNode[] }) {
   return (
@@ -42,6 +44,8 @@ function TopBar({ crumbs }: { readonly crumbs: readonly ReactNode[] }) {
           )}
         </Fragment>
       ))}
+      <Box flex="1" />
+      <CopyLink />
     </HStack>
   )
 }
