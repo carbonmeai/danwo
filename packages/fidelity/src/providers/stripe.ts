@@ -1,6 +1,7 @@
 /**
  * Stripe's fidelity suite: customers, lists and paging, errors, idempotency, products and prices,
- * a payment intent from creation to refund, a Checkout Session and the events API. Live runs use a
+ * a payment intent from creation to refund, a Checkout Session, the events API, and billing
+ * (setup intents, subscriptions and their invoices). Live runs use a
  * test-mode key only.
  */
 import { stripe } from "@danwo/emulators"
@@ -9,6 +10,7 @@ import { type FidelityProvider, refuseLive, requiredCredentials } from "../provi
 import type { Answer, Scenario, ScenarioContext } from "../scenario.ts"
 import { asJsonObject, isJsonArray } from "../shape.ts"
 import { credential, emulatorTarget, formBody, liveTarget } from "../target.ts"
+import { stripeBillingScenarios } from "./stripe-billing.ts"
 
 const API = "https://api.stripe.com"
 const KEY = "DANWO_FIDELITY_STRIPE_KEY"
@@ -481,7 +483,17 @@ export const stripeFidelity: FidelityProvider = {
       description: "a Stripe test-mode secret or restricted key (sk_test_… or rk_test_…)",
     },
   ],
-  scenarios: [customers, paging, errors, idempotency, prices, payments, checkout, events],
+  scenarios: [
+    customers,
+    paging,
+    errors,
+    idempotency,
+    prices,
+    payments,
+    checkout,
+    events,
+    ...stripeBillingScenarios({ call, field }),
+  ],
   emulator: () => emulatorTarget(stripe, { key: "sk_test_danwo_fidelity" }),
   live(env) {
     const found = requiredCredentials(this, env)
