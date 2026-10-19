@@ -85,12 +85,12 @@ const PackageSchema = z.object({
   scripts: z.record(z.string(), z.string()).default({}),
 })
 
-/** The `examples/*` folders of the repository. */
+/** The `examples/*` folders of the repository, leaving out hidden ones such as tests' `.work-*` copies. */
 export function exampleFolders(): string[] {
   const root = join(REPO_ROOT, "examples")
 
   return readdirSync(root)
-    .filter((name) => statSync(join(root, name)).isDirectory())
+    .filter((name) => !name.startsWith(".") && statSync(join(root, name)).isDirectory())
     .toSorted()
 }
 
