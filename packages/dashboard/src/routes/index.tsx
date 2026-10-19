@@ -1,41 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router"
 
-import { type TestFilter, isTestFilter } from "../modules/tests/test-values.ts"
-import { fetchTests } from "../modules/tests/tests-api.ts"
-import { TestsPage } from "../modules/tests/tests-page.tsx"
+import { fetchOverview } from "../modules/overview/overview-api.ts"
+import { type Range, rangeOf } from "../modules/overview/overview-data.ts"
+import { OverviewPage } from "../modules/overview/overview-page.tsx"
 
-/** The tests list's address: which tab, and what the filter holds. */
-interface TestsSearch {
-  readonly filter?: TestFilter
-  readonly q?: string
+/** The overview's address: how many days it covers. */
+interface OverviewSearch {
+  readonly range?: Range
 }
 
-function testsSearch(search: Record<string, unknown>): TestsSearch {
-  return {
-    ...(isTestFilter(search.filter) && search.filter !== "all" && { filter: search.filter }),
-    ...(typeof search.q === "string" && search.q !== "" && { q: search.q }),
-  }
-}
+function overviewSearch(search: Record<string, unknown>): OverviewSearch {
+  const range = rangeOf(search.range)
 
-const TestsRoute = () => {
-  const search = Route.useSearch()
-  const navigate = Route.useNavigate()
-
-  return (
-    <TestsPage
-      rows={Route.useLoaderData()}
-      filter={search.filter ?? "all"}
-      query={{
-        query: search.q ?? "",
-        onChange: (q) =>
-          void navigate({ search: (prev) => ({ ...prev, q: q || undefined }), replace: true }),
-      }}
-    />
-  )
+  return range === undefined || range === 30 ? {} : { range }
 }
 
 export const Route = createFileRoute("/")({
-  validateSearch: testsSearch,
-  loader: () => fetchTests(),
-  component: TestsRoute,
+  validateSearch: overviewSearch,
+  loaderDeps: ({ search }) => ({ range: search.range ?? 30 }),
+  loader: ({ deps }) => fetchOverview({ data: deps.range }),
+  component: () => <OverviewPage overview={Route.useLoaderData()} />,
 })

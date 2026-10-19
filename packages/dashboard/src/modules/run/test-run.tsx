@@ -29,9 +29,9 @@ function RecordingLinks({ test }: { readonly test: HistoryTest }) {
       {kept.map(({ i, dir }) => (
         <Link
           key={dir}
-          to="/tests/$testId"
-          params={{ testId: test.id }}
-          search={{ record: dir }}
+          to="."
+          search={(prev) => ({ ...prev, open: dir })}
+          resetScroll={false}
           data-link
         >
           {kept.length === 1 && test.attempts.length === 1 ? "Watch" : `Watch try ${i + 1}`}
@@ -94,10 +94,10 @@ function TestLine({
       <Td>
         <Stack gap="1">
           <Link
-            to="/tests/$testId"
-            params={{ testId: test.id }}
-            search={kept === undefined ? {} : { record: kept }}
-            title="Open this test's page, on this run's recording"
+            to={kept === undefined ? "/tests" : "."}
+            search={(prev) => (kept === undefined ? { q: test.id } : { ...prev, open: kept })}
+            resetScroll={kept === undefined}
+            title={kept === undefined ? "Find this test" : "Watch this run of the test"}
           >
             <styled.span fontWeight="500" overflowWrap="anywhere">
               {test.id}

@@ -5,11 +5,11 @@
 import { createServerFn } from "@tanstack/react-start"
 
 import { projectRoot } from "../../lib/project-files.ts"
-import { getRun, listRuns, type RunKind } from "./runs-data.ts"
+import { getRun, listRuns, type RunFilter } from "./runs-data.ts"
 
 export const fetchRuns = createServerFn({ method: "GET" })
-  .validator((input: { readonly page: number; readonly kind?: RunKind | undefined }) => input)
-  .handler(({ data }) => listRuns(projectRoot(), data.page, undefined, data.kind))
+  .validator((input: { readonly page: number; readonly filter: RunFilter }) => input)
+  .handler(({ data }) => listRuns(projectRoot(), data.page, undefined, data.filter))
 
 export const fetchRun = createServerFn({ method: "GET" })
   .validator((id: string) => id)

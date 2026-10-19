@@ -12,7 +12,6 @@ import type {
 } from "@danwo/runner/runner"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
-import { recordAnchor } from "../src/lib/record-anchors.ts"
 import { eventStream } from "../src/lib/sse.ts"
 import { sortBreakdown, testBreakdown } from "../src/modules/insights/test-breakdown.ts"
 import { launchOf, literal, requestOf } from "../src/modules/live/launch-args.ts"
@@ -276,17 +275,6 @@ describe("server-sent events", () => {
     expect(response.headers.get("content-type")).toBe("text/event-stream")
     expect(await response.text()).toBe('event: live\ndata: {"n":1}\n\n')
     expect(cleaned).toBe(1)
-  })
-})
-
-describe("addresses inside a record", () => {
-  it("reads a step number and a section, and nothing else", () => {
-    expect(recordAnchor({ step: "3", section: "Timeline" })).toEqual({
-      step: 3,
-      section: "Timeline",
-    })
-    expect(recordAnchor({ step: -1, section: "" })).toEqual({})
-    expect(recordAnchor({ step: "two" })).toEqual({})
   })
 })
 

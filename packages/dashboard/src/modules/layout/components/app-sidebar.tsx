@@ -28,7 +28,7 @@ function Section({
   active,
   badge,
 }: {
-  readonly to: "/" | "/runs" | "/insights" | "/impact"
+  readonly to: "/" | "/tests" | "/runs" | "/matrix" | "/insights" | "/impact" | "/settings"
   readonly label: string
   readonly icon: ReactNode
   readonly active: boolean
@@ -91,8 +91,7 @@ function ProjectName({ name }: { readonly name: string }) {
  */
 export function AppSidebar({ project }: { readonly project: string }) {
   const pathname = useRouterState({ select: (state) => state.location.pathname })
-  const onTests =
-    pathname === "/" || pathname.startsWith("/tests") || pathname.startsWith("/records")
+  const on = (prefix: string) => pathname.startsWith(prefix)
 
   return (
     <Sidebar collapsible="icon">
@@ -115,25 +114,37 @@ export function AppSidebar({ project }: { readonly project: string }) {
       <SidebarContent>
         <SidebarGroup>
           <SidebarMenu aria-label="Sections">
-            <Section to="/" label="Tests" icon={<Icons.checklist />} active={onTests} />
+            <Section to="/" label="Overview" icon={<Icons.home />} active={pathname === "/"} />
+            <Section to="/tests" label="Tests" icon={<Icons.checklist />} active={on("/tests")} />
             <Section
               to="/runs"
               label="Runs"
               icon={<Icons.queueList />}
-              active={pathname.startsWith("/runs")}
+              active={on("/runs") || on("/records")}
               badge={<LiveBadge />}
             />
+            <Section to="/matrix" label="Matrix" icon={<Icons.grid />} active={on("/matrix")} />
             <Section
               to="/insights"
               label="Insights"
               icon={<Icons.chartBars />}
-              active={pathname.startsWith("/insights")}
+              active={on("/insights")}
             />
             <Section
               to="/impact"
               label="Impact"
               icon={<Icons.hierarchy />}
-              active={pathname.startsWith("/impact")}
+              active={on("/impact")}
+            />
+          </SidebarMenu>
+        </SidebarGroup>
+        <SidebarGroup mt="auto">
+          <SidebarMenu>
+            <Section
+              to="/settings"
+              label="Settings"
+              icon={<Icons.setting />}
+              active={on("/settings")}
             />
           </SidebarMenu>
         </SidebarGroup>

@@ -12,12 +12,14 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ImpactRouteImport } from './routes/impact'
 import { Route as InsightsRouteImport } from './routes/insights'
+import { Route as MatrixRouteImport } from './routes/matrix'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as TestsRouteImport } from './routes/tests'
 import { Route as ApiActiveRouteImport } from './routes/api.active'
 import { Route as MediaSplatRouteImport } from './routes/media.$'
 import { Route as RecordsSplatRouteImport } from './routes/records.$'
 import { Route as RunsIndexRouteImport } from './routes/runs.index'
 import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
-import { Route as TestsTestIdRouteImport } from './routes/tests.$testId'
 import { Route as ApiLiveRunIdRouteImport } from './routes/api.live.$runId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -33,6 +35,21 @@ const ImpactRoute = ImpactRouteImport.update({
 const InsightsRoute = InsightsRouteImport.update({
   id: '/insights',
   path: '/insights',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MatrixRoute = MatrixRouteImport.update({
+  id: '/matrix',
+  path: '/matrix',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestsRoute = TestsRouteImport.update({
+  id: '/tests',
+  path: '/tests',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiActiveRoute = ApiActiveRouteImport.update({
@@ -60,11 +77,6 @@ const RunsRunIdRoute = RunsRunIdRouteImport.update({
   path: '/runs/$runId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TestsTestIdRoute = TestsTestIdRouteImport.update({
-  id: '/tests/$testId',
-  path: '/tests/$testId',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiLiveRunIdRoute = ApiLiveRunIdRouteImport.update({
   id: '/api/live/$runId',
   path: '/api/live/$runId',
@@ -75,11 +87,13 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/impact': typeof ImpactRoute
   '/insights': typeof InsightsRoute
+  '/matrix': typeof MatrixRoute
+  '/settings': typeof SettingsRoute
+  '/tests': typeof TestsRoute
   '/api/active': typeof ApiActiveRoute
   '/media/$': typeof MediaSplatRoute
   '/records/$': typeof RecordsSplatRoute
   '/runs/$runId': typeof RunsRunIdRoute
-  '/tests/$testId': typeof TestsTestIdRoute
   '/runs/': typeof RunsIndexRoute
   '/api/live/$runId': typeof ApiLiveRunIdRoute
 }
@@ -87,11 +101,13 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/impact': typeof ImpactRoute
   '/insights': typeof InsightsRoute
+  '/matrix': typeof MatrixRoute
+  '/settings': typeof SettingsRoute
+  '/tests': typeof TestsRoute
   '/api/active': typeof ApiActiveRoute
   '/media/$': typeof MediaSplatRoute
   '/records/$': typeof RecordsSplatRoute
   '/runs/$runId': typeof RunsRunIdRoute
-  '/tests/$testId': typeof TestsTestIdRoute
   '/runs': typeof RunsIndexRoute
   '/api/live/$runId': typeof ApiLiveRunIdRoute
 }
@@ -100,11 +116,13 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/impact': typeof ImpactRoute
   '/insights': typeof InsightsRoute
+  '/matrix': typeof MatrixRoute
+  '/settings': typeof SettingsRoute
+  '/tests': typeof TestsRoute
   '/api/active': typeof ApiActiveRoute
   '/media/$': typeof MediaSplatRoute
   '/records/$': typeof RecordsSplatRoute
   '/runs/$runId': typeof RunsRunIdRoute
-  '/tests/$testId': typeof TestsTestIdRoute
   '/runs/': typeof RunsIndexRoute
   '/api/live/$runId': typeof ApiLiveRunIdRoute
 }
@@ -114,11 +132,13 @@ export interface FileRouteTypes {
     | '/'
     | '/impact'
     | '/insights'
+    | '/matrix'
+    | '/settings'
+    | '/tests'
     | '/api/active'
     | '/media/$'
     | '/records/$'
     | '/runs/$runId'
-    | '/tests/$testId'
     | '/runs/'
     | '/api/live/$runId'
   fileRoutesByTo: FileRoutesByTo
@@ -126,11 +146,13 @@ export interface FileRouteTypes {
     | '/'
     | '/impact'
     | '/insights'
+    | '/matrix'
+    | '/settings'
+    | '/tests'
     | '/api/active'
     | '/media/$'
     | '/records/$'
     | '/runs/$runId'
-    | '/tests/$testId'
     | '/runs'
     | '/api/live/$runId'
   id:
@@ -138,11 +160,13 @@ export interface FileRouteTypes {
     | '/'
     | '/impact'
     | '/insights'
+    | '/matrix'
+    | '/settings'
+    | '/tests'
     | '/api/active'
     | '/media/$'
     | '/records/$'
     | '/runs/$runId'
-    | '/tests/$testId'
     | '/runs/'
     | '/api/live/$runId'
   fileRoutesById: FileRoutesById
@@ -151,11 +175,13 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ImpactRoute: typeof ImpactRoute
   InsightsRoute: typeof InsightsRoute
+  MatrixRoute: typeof MatrixRoute
+  SettingsRoute: typeof SettingsRoute
+  TestsRoute: typeof TestsRoute
   ApiActiveRoute: typeof ApiActiveRoute
   MediaSplatRoute: typeof MediaSplatRoute
   RecordsSplatRoute: typeof RecordsSplatRoute
   RunsRunIdRoute: typeof RunsRunIdRoute
-  TestsTestIdRoute: typeof TestsTestIdRoute
   RunsIndexRoute: typeof RunsIndexRoute
   ApiLiveRunIdRoute: typeof ApiLiveRunIdRoute
 }
@@ -181,6 +207,27 @@ declare module '@tanstack/react-router' {
       path: '/insights'
       fullPath: '/insights'
       preLoaderRoute: typeof InsightsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/matrix': {
+      id: '/matrix'
+      path: '/matrix'
+      fullPath: '/matrix'
+      preLoaderRoute: typeof MatrixRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tests': {
+      id: '/tests'
+      path: '/tests'
+      fullPath: '/tests'
+      preLoaderRoute: typeof TestsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/active': {
@@ -218,13 +265,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RunsRunIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/tests/$testId': {
-      id: '/tests/$testId'
-      path: '/tests/$testId'
-      fullPath: '/tests/$testId'
-      preLoaderRoute: typeof TestsTestIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/live/$runId': {
       id: '/api/live/$runId'
       path: '/api/live/$runId'
@@ -239,11 +279,13 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ImpactRoute: ImpactRoute,
   InsightsRoute: InsightsRoute,
+  MatrixRoute: MatrixRoute,
+  SettingsRoute: SettingsRoute,
+  TestsRoute: TestsRoute,
   ApiActiveRoute: ApiActiveRoute,
   MediaSplatRoute: MediaSplatRoute,
   RecordsSplatRoute: RecordsSplatRoute,
   RunsRunIdRoute: RunsRunIdRoute,
-  TestsTestIdRoute: TestsTestIdRoute,
   RunsIndexRoute: RunsIndexRoute,
   ApiLiveRunIdRoute: ApiLiveRunIdRoute,
 }

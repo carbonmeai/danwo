@@ -6,13 +6,7 @@ import { Ident } from "../../components/code.tsx"
 import { StatusBadge } from "../../components/status-badge.tsx"
 
 /** One trial in full: the fault, its verdict, what went wrong and where its record is. */
-export function TrialDetail({
-  testId,
-  trial,
-}: {
-  readonly testId: string
-  readonly trial: HistoryTrial | undefined
-}) {
+export function TrialDetail({ trial }: { readonly trial: HistoryTrial | undefined }) {
   if (trial === undefined) return <Box color="ink.muted">Point at a cell to see its trial.</Box>
 
   return (
@@ -51,9 +45,9 @@ export function TrialDetail({
       ) : null}
       {trial.record ? (
         <Link
-          to="/tests/$testId"
-          params={{ testId }}
-          search={{ record: trial.record, tab: "steps" }}
+          to="."
+          search={(prev) => ({ ...prev, open: trial.record })}
+          resetScroll={false}
           data-link
         >
           Watch this trial's recording

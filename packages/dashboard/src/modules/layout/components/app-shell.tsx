@@ -3,6 +3,7 @@ import { Box, styled } from "@danwo/ui/jsx"
 import { SidebarInset, SidebarProvider } from "@danwo/ui/primitives/sidebar"
 import { type ReactNode, useEffect, useState } from "react"
 
+import { RecordOverlay } from "../../overlay/record-overlay.tsx"
 import { AppSidebar } from "./app-sidebar.tsx"
 import { MobileSidebarTrigger } from "./mobile-sidebar-trigger.tsx"
 
@@ -82,6 +83,7 @@ export function AppShell({
         <AppSidebar project={project} />
         <MobileSidebarTrigger />
         <SidebarInset id="main">{children}</SidebarInset>
+        <RecordOverlay />
       </Box>
     </SidebarProvider>
   )

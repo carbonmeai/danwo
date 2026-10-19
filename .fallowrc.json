@@ -49,6 +49,7 @@
     "ignore": [
       "packages/*/test/fixtures/**/app.ts",
       "packages/*/test/fixtures/*-app.ts",
+      "packages/dashboard/src/routeTree.gen.ts",
       "packages/ui/src/icons/**",
       "packages/ui/src/illustrations/**",
       "packages/ui/src/primitives/dropdown-menu/**"

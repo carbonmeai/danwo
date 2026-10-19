@@ -8,7 +8,7 @@ import { join } from "node:path"
 import type { FlightRecord, MatrixHistory, RunHistory } from "@danwo/runner/runner"
 
 import { insideArea, isVersioned, readJson } from "../../lib/project-files.ts"
-import { testBreakdown } from "../insights/test-breakdown.ts"
+import { type TestBreakdown, testBreakdown } from "../insights/test-breakdown.ts"
 import type { KnownTest } from "../live/launch-args.ts"
 import { mediaUrl } from "../record/record-replay.ts"
 
@@ -65,7 +65,7 @@ export function matrixVerdict(runs: readonly MatrixHistory[]): MatrixVerdict {
 }
 
 /** The record folders a run kept for the test, newest attempt or failing trial first. */
-export function recordsOf(run: RunHistory, testId: string): string[] {
+function recordsOf(run: RunHistory, testId: string): string[] {
   if (run.kind === "matrix") {
     if (run.testId !== testId) return []
 
@@ -86,7 +86,7 @@ function isRecord(value: unknown): value is FlightRecord {
 }
 
 /** The kept record in `dir`, or undefined once its run was pruned. */
-export async function readRecord(root: string, dir: string): Promise<FlightRecord | undefined> {
+async function readRecord(root: string, dir: string): Promise<FlightRecord | undefined> {
   try {
     const record = await readJson(join(insideArea(root, "runs", dir), "record.json"))
 
@@ -136,6 +136,35 @@ function lastOf(runs: readonly RunHistory[], testId: string): TestRow["last"] {
   return undefined
 }
 
+/** What is known of one test, gathered from the history and the project's list. */
+interface Known {
+  readonly seen: TestBreakdown | undefined
+  readonly file: string | undefined
+  readonly last: TestRow["last"]
+  readonly matrix: MatrixVerdict
+  readonly thumb: Thumb | undefined
+}
+
+/** How often the test ran, and how often it passed and flaked, from its breakdown. */
+function ratesOf(
+  seen: TestBreakdown | undefined,
+): Pick<TestRow, "runs" | "passRate" | "flakeRate"> {
+  if (seen === undefined) return { runs: 0, passRate: null, flakeRate: null }
+
+  return { runs: seen.runs + seen.matrixRuns, passRate: seen.passRate, flakeRate: seen.flakeRate }
+}
+
+function rowOf(id: string, { seen, file, last, matrix, thumb }: Known): TestRow {
+  return {
+    id,
+    ...(file !== undefined && { file }),
+    ...(last !== undefined && { last }),
+    ...ratesOf(seen),
+    matrix,
+    ...(thumb !== undefined && { thumb }),
+  }
+}
+
 /** Every test, from the history (`runs`, newest first) and the project's own list, by id. */
 export async function listTests(
   root: string,
@@ -146,25 +175,18 @@ export async function listTests(
   const files = new Map(known.map((test) => [test.id, test.file]))
   const ids = [...new Set([...known.map((test) => test.id), ...breakdown.keys()])]
   const matrices = runs.filter((run): run is MatrixHistory => run.kind === "matrix")
+  const ofTest = (id: string) => matrices.filter((run) => run.testId === id)
 
   const rows = await Promise.all(
-    ids.map(async (id): Promise<TestRow> => {
-      const seen = breakdown.get(id)
-      const file = files.get(id) ?? matrices.find((run) => run.testId === id)?.file
-      const last = lastOf(runs, id)
-      const thumb = await latestThumb(root, runs, id)
-
-      return {
-        id,
-        ...(file !== undefined && { file }),
-        ...(last !== undefined && { last }),
-        runs: (seen?.runs ?? 0) + (seen?.matrixRuns ?? 0),
-        passRate: seen?.passRate ?? null,
-        flakeRate: seen?.flakeRate ?? null,
-        matrix: matrixVerdict(matrices.filter((run) => run.testId === id)),
-        ...(thumb !== undefined && { thumb }),
-      }
-    }),
+    ids.map(async (id) =>
+      rowOf(id, {
+        seen: breakdown.get(id),
+        file: files.get(id) ?? ofTest(id)[0]?.file,
+        last: lastOf(runs, id),
+        matrix: matrixVerdict(ofTest(id)),
+        thumb: await latestThumb(root, runs, id),
+      }),
+    ),
   )
 
   return rows.toSorted((a, b) => a.id.localeCompare(b.id))

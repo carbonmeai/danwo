@@ -127,15 +127,37 @@ export interface RunPage {
 /** The two kinds of run: `danwo test` runs many tests once, `danwo matrix` one test per fault. */
 export type RunKind = RunHistory["kind"]
 
-/** A page of the runs (of one kind, when given), newest first, with how many of each kind there are. */
+/** Which runs the list shows: of one kind, passing or failing, since a time or on one day. */
+export interface RunFilter {
+  readonly kind?: RunKind | undefined
+  readonly status?: "passed" | "failed" | undefined
+  /** Only runs started within this many days. */
+  readonly days?: number | undefined
+  /** Only runs started on this `YYYY-MM-DD` (UTC). */
+  readonly day?: string | undefined
+}
+
+function matches(run: RunHistory, filter: RunFilter, now: number): boolean {
+  const failed = rowOf(run).counts.failed > 0
+
+  return (
+    (filter.kind === undefined || run.kind === filter.kind) &&
+    (filter.status === undefined || (filter.status === "failed") === failed) &&
+    (filter.days === undefined || Date.parse(run.startedAt) >= now - filter.days * 86_400_000) &&
+    (filter.day === undefined || run.startedAt.startsWith(filter.day))
+  )
+}
+
+/** A page of the runs the filter keeps, newest first, with how many of each kind there are. */
 export async function listRuns(
   root: string,
   page = 0,
   size = 50,
-  kind?: RunKind,
+  filter: RunFilter = {},
+  now = Date.now(),
 ): Promise<RunPage & { readonly counts: Readonly<Record<RunKind, number>> }> {
   const all = await loadHistory(root)
-  const runs = kind === undefined ? all : all.filter((run) => run.kind === kind)
+  const runs = all.filter((run) => matches(run, filter, now))
   const matrix = all.filter((run) => run.kind === "matrix").length
 
   return {

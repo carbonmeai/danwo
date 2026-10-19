@@ -1,4 +1,4 @@
-import { Box, HStack, styled } from "@danwo/ui/jsx"
+import { Box } from "@danwo/ui/jsx"
 
 /**
  * danwo's mark on its solid tile: the app in front, and the layer behind it that danwo watches,
@@ -35,18 +35,6 @@ export function Mark({ size = 20 }: { readonly size?: number }) {
         />
       </svg>
     </Box>
-  )
-}
-
-/** The mark with the name beside it, as the sidebar shows it. */
-export function Wordmark() {
-  return (
-    <HStack gap="1.5" color="ink.strong">
-      <Mark />
-      <styled.span fontWeight="600" fontSize="2">
-        danwo
-      </styled.span>
-    </HStack>
   )
 }
 

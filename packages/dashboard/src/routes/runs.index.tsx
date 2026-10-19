@@ -1,45 +1,55 @@
 import { createFileRoute } from "@tanstack/react-router"
 
+import { useKeptQuery } from "../lib/kept-query.ts"
 import { fetchRuns } from "../modules/runs/runs-api.ts"
-import type { RunKind } from "../modules/runs/runs-data.ts"
+import type { RunFilter } from "../modules/runs/runs-data.ts"
 import { RunsPage } from "../modules/runs/runs-page.tsx"
 
-/** The runs list's address: which kind of run, which page, and what the filter holds. */
-interface RunsSearch {
-  readonly kind?: RunKind
+/** The runs list's address: its filters, which page, and what the filter box holds. */
+interface RunsSearch extends RunFilter {
   readonly page?: number
   readonly q?: string
 }
 
-function runsSearch(search: Record<string, unknown>): RunsSearch {
+const DAYS = new Set([1, 7, 30])
+
+/** Which runs the address asks for: their kind, status and date. */
+function filterOf(search: Record<string, unknown>): RunFilter {
+  const days = Number(search.days)
+
   return {
-    ...(search.kind === "matrix" && { kind: "matrix" }),
-    ...(typeof search.page === "number" && search.page > 0 && { page: search.page }),
-    ...(typeof search.q === "string" && search.q !== "" && { q: search.q }),
+    ...((search.kind === "test" || search.kind === "matrix") && { kind: search.kind }),
+    ...((search.status === "passed" || search.status === "failed") && { status: search.status }),
+    ...(DAYS.has(days) && { days }),
+  }
+}
+
+function runsSearch(search: Record<string, unknown>): RunsSearch {
+  const { day, page, q } = search
+
+  return {
+    ...filterOf(search),
+    ...(typeof day === "string" && /^\d{4}-\d{2}-\d{2}$/.test(day) && { day }),
+    ...(typeof page === "number" && page > 0 && { page }),
+    ...(typeof q === "string" && q !== "" && { q }),
   }
 }
 
 const RunsRoute = () => {
   const search = Route.useSearch()
-  const navigate = Route.useNavigate()
+  const query = useKeptQuery(search.q)
 
   return (
-    <RunsPage
-      runs={Route.useLoaderData()}
-      kind={search.kind ?? "test"}
-      page={search.page ?? 0}
-      query={{
-        query: search.q ?? "",
-        onChange: (q) =>
-          void navigate({ search: (prev) => ({ ...prev, q: q || undefined }), replace: true }),
-      }}
-    />
+    <RunsPage runs={Route.useLoaderData()} filter={search} page={search.page ?? 0} query={query} />
   )
 }
 
 export const Route = createFileRoute("/runs/")({
   validateSearch: runsSearch,
-  loaderDeps: ({ search }) => ({ page: search.page ?? 0, kind: search.kind ?? "test" }),
+  loaderDeps: ({ search }) => ({
+    page: search.page ?? 0,
+    filter: { kind: search.kind, status: search.status, days: search.days, day: search.day },
+  }),
   loader: ({ deps }) => fetchRuns({ data: deps }),
   component: RunsRoute,
 })

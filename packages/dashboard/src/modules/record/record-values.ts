@@ -46,15 +46,6 @@ export const LEVEL_COLOR: Readonly<Record<string, string>> = {
   warn: "verdict.flaky.fg",
 }
 
-/** How the run is named in the title: its attempt, or the fault it ran under. */
-export function runName(view: RecordView): string {
-  const { run } = view.record
-
-  if (run.kind === "test") return `attempt ${run.attempt}`
-
-  return run.fault ? run.fault.label : "clean run"
-}
-
 export function divergenceLine(record: RecordView["record"]): string | undefined {
   const { divergence } = record
 

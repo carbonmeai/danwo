@@ -6,6 +6,7 @@ import { type FormEvent, type ReactNode, useState } from "react"
 import { Button } from "../../components/controls.tsx"
 import type { RunRequest } from "./launch-args.ts"
 import { cancelRunFn, startRunFn } from "./live-api.ts"
+import { useActiveRuns } from "./use-live.ts"
 
 /** What the last start came to, for the line beside the buttons. */
 type Outcome =
@@ -133,6 +134,26 @@ export function RerunTest({
   )
 }
 
+/** Runs the picked tests, or every test when none is picked. */
+export function RunTests({ testIds }: { readonly testIds: readonly string[] }) {
+  const { start, pending, outcome } = useStartRun()
+  const label = testIds.length === 0 ? "Run all" : `Run ${testIds.length} selected`
+
+  return (
+    <ActionRow outcome={outcome}>
+      <Button
+        type="button"
+        look="primary"
+        disabled={pending}
+        onClick={() => void start({ action: "tests", testIds })}
+      >
+        <Icons.play size={13} />
+        {label}
+      </Button>
+    </ActionRow>
+  )
+}
+
 const FilterBox = styled("input", {
   base: {
     h: "8",
@@ -196,6 +217,30 @@ export function RunMatrix({
         </Button>
       )}
     </ActionRow>
+  )
+}
+
+/** Stops every run still going in the project, shown only while one is. */
+export function StopAll() {
+  const active = useActiveRuns()?.active ?? []
+  const [stopping, setStopping] = useState(false)
+
+  if (active.length === 0) return null
+
+  return (
+    <Button
+      type="button"
+      disabled={stopping}
+      onClick={() => {
+        setStopping(true)
+        void Promise.all(active.map((run) => cancelRunFn({ data: run.id }))).finally(() =>
+          setStopping(false),
+        )
+      }}
+    >
+      <Icons.stop size={13} />
+      {stopping ? "Stopping…" : active.length === 1 ? "Stop the run" : `Stop all ${active.length}`}
+    </Button>
   )
 }
 

@@ -6,7 +6,7 @@ import { Ident, Pre } from "../../components/code.tsx"
 import { Row, RowList } from "../../components/table.tsx"
 import { duration } from "../../lib/format.ts"
 import type { RecordView } from "./record-data.ts"
-import { LEVEL_COLOR, statusColor } from "./record-values.ts"
+import { statusColor } from "./record-values.ts"
 
 /** An HTTP status or outcome in its colour, in the mono face. */
 function Outcome({ outcome, bad }: { readonly outcome: string; readonly bad: boolean }) {
@@ -142,18 +142,5 @@ export function Deliveries({
         </Row>
       ))}
     </RowList>
-  )
-}
-
-/** The app's console errors and warnings, by the step they came in. */
-export function ConsoleLog({ logs }: { readonly logs: RecordView["record"]["appLog"] }) {
-  return (
-    <Pre bg="surface.item">
-      {logs.map((log, i) => (
-        <styled.span key={i} display="block" color={LEVEL_COLOR[log.level]}>
-          {`step ${log.step}  ${log.level.padEnd(5)}  ${log.text}`}
-        </styled.span>
-      ))}
-    </Pre>
   )
 }

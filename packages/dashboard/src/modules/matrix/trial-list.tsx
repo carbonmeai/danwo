@@ -71,9 +71,9 @@ export function TrialList({
               </span>
               {trial.record ? (
                 <Link
-                  to="/tests/$testId"
-                  params={{ testId: run.testId }}
-                  search={{ record: trial.record }}
+                  to="."
+                  search={(prev) => ({ ...prev, open: trial.record })}
+                  resetScroll={false}
                   data-link
                 >
                   Watch

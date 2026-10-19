@@ -1,24 +1,16 @@
 import { createFileRoute, redirect } from "@tanstack/react-router"
 
-import { recordAnchor } from "../lib/record-anchors.ts"
-import { fetchRecordTest } from "../modules/tests/tests-api.ts"
-
 /**
- * A flight record's old address. A record now plays on its test's page, so this sends the browser
- * there with the record picked, keeping the step, section and moment it pointed at.
+ * A flight record's old address. A recording now opens over the runs list, so this sends the
+ * browser there with it open, keeping the moment (`t`) it pointed at; `#step-N` rides along.
  */
 export const Route = createFileRoute("/records/$")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    ...recordAnchor(search),
-    ...(search.t !== undefined && { t: Number(search.t) }),
-  }),
-  loaderDeps: ({ search }) => search,
-  loader: async ({ params, deps }) => {
-    const dir = params._splat ?? ""
-    const testId = await fetchRecordTest({ data: dir })
+  loader: ({ params, location }) => {
+    const t = Number((location.search as Record<string, unknown>).t)
 
-    if (testId === null) throw redirect({ to: "/" })
-
-    throw redirect({ to: "/tests/$testId", params: { testId }, search: { ...deps, record: dir } })
+    throw redirect({
+      to: "/runs",
+      search: { open: params._splat ?? "", ...(Number.isFinite(t) && t >= 0 && { t }) },
+    })
   },
 })

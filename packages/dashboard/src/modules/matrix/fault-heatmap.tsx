@@ -193,7 +193,7 @@ export function FaultHeatmap({
       </Panel>
       <Panel position={{ xl: "sticky" }} top="16" aria-live="polite" aria-label="Trial">
         <Item p="4">
-          <TrialDetail testId={run.testId} trial={picked} />
+          <TrialDetail trial={picked} />
           {picked?.fault ? (
             <Box mt="3" fontSize="1">
               <Link

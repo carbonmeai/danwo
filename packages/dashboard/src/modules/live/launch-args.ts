@@ -8,6 +8,8 @@
 export type RunRequest =
   | { readonly action: "rerun-failed"; readonly runId: string }
   | { readonly action: "test"; readonly testId: string }
+  /** Several of the project's tests by id, or every test when none is named. */
+  | { readonly action: "tests"; readonly testIds: readonly string[] }
   | { readonly action: "matrix"; readonly testId: string; readonly faults?: string }
 
 /** One of the project's tests, as `danwo test --list` prints it. */
@@ -40,13 +42,13 @@ function findTest(known: readonly KnownTest[], id: string): KnownTest | undefine
   return known.find((test) => test.id === id)
 }
 
-/** The tests to run again, each one the project still has. */
 /**
- * A run started from the dashboard keeps its recording whatever happens, so the test it reran
- * always has one to watch on its page.
+ * A run started from the dashboard keeps its recording whatever happens, so the tests it ran
+ * always have one to watch.
  */
 const RECORD = ["--record", "always"] as const
 
+/** The tests to run again, each one the project still has. */
 function rerunFailed(known: readonly KnownTest[], failed: readonly string[]): Launch {
   const tests = failed.flatMap((id) => findTest(known, id) ?? [])
 
@@ -58,6 +60,23 @@ function rerunFailed(known: readonly KnownTest[], failed: readonly string[]): La
   return {
     args: ["test", ...files, "--grep", exactly(tests.map((test) => test.id)), ...RECORD],
     label: `rerun ${count} failed ${count === 1 ? "test" : "tests"}`,
+  }
+}
+
+/** The picked tests, or the whole suite when none is picked. */
+function someTests(known: readonly KnownTest[], ids: readonly string[]): Launch {
+  if (ids.length === 0) return { args: ["test", ...RECORD], label: "run every test" }
+
+  const tests = ids.flatMap((id) => findTest(known, id) ?? [])
+
+  if (tests.length === 0) return { error: "none of the picked tests is in the project now" }
+
+  const files = [...new Set(tests.map((test) => test.file))]
+  const count = tests.length
+
+  return {
+    args: ["test", ...files, "--grep", exactly(tests.map((test) => test.id)), ...RECORD],
+    label: `run ${count} ${count === 1 ? "test" : "tests"}`,
   }
 }
 
@@ -98,6 +117,7 @@ export function launchOf(
 ): Launch {
   if (request.action === "rerun-failed") return rerunFailed(known, failed)
   if (request.action === "test") return oneTest(known, request.testId)
+  if (request.action === "tests") return someTests(known, request.testIds)
 
   return matrix(known, request.testId, request.faults)
 }
@@ -106,26 +126,35 @@ export function launchOf(
 type Field = (key: string) => string | undefined
 
 /** How each action's request is read from what the browser sent. */
-const READERS: Readonly<Record<string, (field: Field) => RunRequest | undefined>> = {
-  "rerun-failed": (field) => {
-    const runId = field("runId")
+const READERS: Readonly<Record<string, (field: Field, value: unknown) => RunRequest | undefined>> =
+  {
+    "rerun-failed": (field) => {
+      const runId = field("runId")
 
-    return runId === undefined ? undefined : { action: "rerun-failed", runId }
-  },
-  test: (field) => {
-    const testId = field("testId")
+      return runId === undefined ? undefined : { action: "rerun-failed", runId }
+    },
+    test: (field) => {
+      const testId = field("testId")
 
-    return testId === undefined ? undefined : { action: "test", testId }
-  },
-  matrix: (field) => {
-    const testId = field("testId")
-    const faults = field("faults")
+      return testId === undefined ? undefined : { action: "test", testId }
+    },
+    tests: (_field, value) => {
+      const ids: unknown =
+        typeof value === "object" && value !== null ? Reflect.get(value, "testIds") : undefined
 
-    return testId === undefined
-      ? undefined
-      : { action: "matrix", testId, ...(faults !== undefined && { faults }) }
-  },
-}
+      return Array.isArray(ids) && ids.every((id) => typeof id === "string")
+        ? { action: "tests", testIds: ids }
+        : undefined
+    },
+    matrix: (field) => {
+      const testId = field("testId")
+      const faults = field("faults")
+
+      return testId === undefined
+        ? undefined
+        : { action: "matrix", testId, ...(faults !== undefined && { faults }) }
+    },
+  }
 
 /** A request as it arrives from the browser, checked field by field. */
 export function requestOf(value: unknown): RunRequest {
@@ -136,7 +165,7 @@ export function requestOf(value: unknown): RunRequest {
     return typeof got === "string" ? got : undefined
   }
 
-  const request = READERS[field("action") ?? ""]?.(field)
+  const request = READERS[field("action") ?? ""]?.(field, value)
 
   if (request === undefined) throw new Error("expected a run request")
 
