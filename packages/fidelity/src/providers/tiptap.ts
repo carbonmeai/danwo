@@ -7,8 +7,10 @@
 import { seedTiptap, tiptap } from "@danwo/emulators"
 
 import { type FidelityProvider, requiredCredentials } from "../provider.ts"
-import type { Scenario, ScenarioContext } from "../scenario.ts"
+import type { Scenario, ScenarioContext, Target } from "../scenario.ts"
 import { anything, arrayOf, object, str } from "../schema.ts"
+import { asJsonObject, isJsonArray, readJson } from "../shape.ts"
+import { isTagged, type Leftover } from "../sweep.ts"
 import { credential, emulatorTarget, liveTarget } from "../target.ts"
 
 const APP = "DANWO_FIDELITY_TIPTAP_APP_ID"
@@ -17,7 +19,12 @@ const EMULATED = { app: "danwo-fidelity", secret: "danwo-fidelity-secret" }
 
 const DOC = object({ type: str, content: arrayOf(anything) })
 
-function call(context: ScenarioContext, method: string, path: string, body?: unknown): Request {
+function call(
+  context: Pick<ScenarioContext, "target">,
+  method: string,
+  path: string,
+  body?: unknown,
+): Request {
   return new Request(
     `https://${credential(context.target, "app")}.collab.tiptap.cloud/api${path}`,
     {
@@ -34,12 +41,17 @@ function call(context: ScenarioContext, method: string, path: string, body?: unk
 const documents: Scenario = {
   name: "documents: create, read as JSON, delete",
   async run(context) {
-    const name = `danwo-fidelity-${context.unique}`
+    const name = context.tag
     const doc = {
       type: "doc",
       content: [{ type: "paragraph", content: [{ type: "text", text: "checked" }] }],
     }
 
+    context.created({
+      kind: "document",
+      id: name,
+      undo: () => context.target.send(call(context, "DELETE", `/documents/${name}`)),
+    })
     await context.step(
       "create a document from JSON",
       call(context, "POST", `/documents/${name}?format=json`, doc),
@@ -64,6 +76,29 @@ const documents: Scenario = {
   },
 }
 
+/** Documents earlier runs left: their names carry the fidelity tag. Each is deleted. */
+async function sweepDocuments(target: Target): Promise<Leftover[]> {
+  const context = { target }
+  const answer = await target.send(call(context, "GET", "/documents"))
+  const list = await readJson(answer)
+
+  return (isJsonArray(list) ? list : []).flatMap((item) => {
+    const name = asJsonObject(item)?.["name"]
+
+    if (typeof name !== "string" || !isTagged(name)) return []
+
+    return [
+      {
+        kind: "document",
+        id: name,
+        label: name,
+        tagged: true,
+        remove: () => target.send(call(context, "DELETE", `/documents/${name}`)),
+      },
+    ]
+  })
+}
+
 export const tiptapFidelity: FidelityProvider = {
   name: "tiptap",
   credentials: [
@@ -77,6 +112,7 @@ export const tiptapFidelity: FidelityProvider = {
     },
   ],
   scenarios: [documents],
+  sweep: sweepDocuments,
   emulator: () =>
     emulatorTarget(tiptap, EMULATED, (emulator) =>
       seedTiptap(emulator, { apps: [{ id: EMULATED.app, apiKey: EMULATED.secret }] }),

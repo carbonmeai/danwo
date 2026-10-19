@@ -75,6 +75,7 @@ const refusals: Scenario = {
 
 export const twilioFidelity: FidelityProvider = {
   name: "twilio",
+  leaves: "nothing: test credentials never send or store a message",
   openapi:
     "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/json/twilio_api_v2010.json",
   credentials: [

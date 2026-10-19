@@ -10,6 +10,7 @@ import { type FidelityProvider, refuseLive, requiredCredentials } from "../provi
 import { liveTarget } from "../target.ts"
 import { CLERK_BACKEND_SCENARIOS } from "./clerk-backend.ts"
 import { CLERK_FRONTEND_SCENARIOS } from "./clerk-frontend.ts"
+import { clerkSweep } from "./clerk-sweep.ts"
 
 const SECRET = "DANWO_FIDELITY_CLERK_SECRET_KEY"
 const PUBLISHABLE = "DANWO_FIDELITY_CLERK_PUBLISHABLE_KEY"
@@ -21,6 +22,7 @@ export const clerkFidelity: FidelityProvider = {
     { name: PUBLISHABLE, description: "the same instance's publishable key (pk_test_…)" },
   ],
   scenarios: [...CLERK_BACKEND_SCENARIOS, ...CLERK_FRONTEND_SCENARIOS],
+  sweep: clerkSweep,
   emulator() {
     const emulator = createEmulator(clerk)
 

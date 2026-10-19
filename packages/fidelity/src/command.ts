@@ -7,6 +7,7 @@ import { type ApiDescription, readDescription } from "./openapi.ts"
 import { type FidelityProvider, fidelityEnvironment } from "./provider.ts"
 import { providersNamed } from "./providers/index.ts"
 import { fidelityPassed, formatFidelity, runFidelity } from "./run.ts"
+import { formatSweep, sweepFidelity, sweepPassed } from "./sweep.ts"
 
 export interface FidelityCommandOptions {
   /** Provider names; all of them when empty. */
@@ -17,7 +18,33 @@ export interface FidelityCommandOptions {
   /** Goldens from API descriptions: a file for one provider, or each provider's published one. */
   readonly fromOpenapi?: string | true
   readonly offline?: boolean
+  /** Leave what live runs make in the sandboxes, reported as kept. */
+  readonly keep?: boolean
   readonly write?: (line: string) => void
+}
+
+export interface SweepCommandOptions {
+  /** Provider names; all of them when empty. */
+  readonly providers: readonly string[]
+  /** The repository root, where `.env.fidelity` is read from. */
+  readonly root: string
+  /** Remove the tagged leftovers; without it they are only listed. */
+  readonly yes?: boolean
+  readonly write?: (line: string) => void
+}
+
+/** Lists, and with `yes` removes, tagged leftovers; the exit code is 1 when a removal failed. */
+export async function sweepCommand(options: SweepCommandOptions): Promise<number> {
+  const write = options.write ?? ((line: string) => process.stdout.write(`${line}\n`))
+  const reports = await sweepFidelity({
+    providers: providersNamed(options.providers),
+    env: fidelityEnvironment(options.root),
+    yes: options.yes === true,
+  })
+
+  for (const line of formatSweep(reports, options.yes === true)) write(line)
+
+  return sweepPassed(reports) ? 0 : 1
 }
 
 /**
@@ -80,6 +107,8 @@ export async function fidelityCommand(options: FidelityCommandOptions): Promise<
     env: fidelityEnvironment(options.root),
     ...(options.updateGolden !== undefined && { updateGolden: options.updateGolden }),
     ...(options.offline !== undefined && { offline: options.offline }),
+    ...(options.keep !== undefined && { keep: options.keep }),
+    write,
     ...(descriptions !== undefined && { descriptions }),
   })
 

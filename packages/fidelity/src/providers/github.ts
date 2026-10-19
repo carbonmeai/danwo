@@ -48,6 +48,7 @@ const missing: Scenario = {
 
 export const githubFidelity: FidelityProvider = {
   name: "github",
+  leaves: "nothing: the suite only reads public data",
   credentials: [
     PUBLIC_ENDPOINTS,
     {

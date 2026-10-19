@@ -113,6 +113,7 @@ const project: Scenario = {
 
 export const composioFidelity: FidelityProvider = {
   name: "composio",
+  leaves: "nothing: the suite only reads",
   openapi: "https://backend.composio.dev/api/v3.1/openapi.json",
   credentials: [
     PUBLIC_ENDPOINTS,

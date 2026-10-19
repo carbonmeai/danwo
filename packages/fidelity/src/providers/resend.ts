@@ -64,7 +64,7 @@ function email(context: ScenarioContext, subject: string): Record<string, unknow
   return {
     from: SENDER,
     to: [INBOX],
-    subject: `${subject} ${context.unique}`,
+    subject: `${subject} ${context.tag}`,
     html: "<p>Sent by a danwo fidelity check.</p>",
   }
 }
@@ -167,6 +167,8 @@ const domains: Scenario = {
 
 export const resendFidelity: FidelityProvider = {
   name: "resend",
+  leaves:
+    "sent emails cannot be deleted; runs send only to Resend's test inbox, delivered@resend.dev",
   openapi: "https://raw.githubusercontent.com/resend/resend-openapi/main/resend.yaml",
   openapiLooseNulls: true,
   credentials: [

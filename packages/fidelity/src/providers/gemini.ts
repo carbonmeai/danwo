@@ -181,6 +181,7 @@ const errors: Scenario = {
 
 export const geminiFidelity: FidelityProvider = {
   name: "gemini",
+  leaves: "nothing: model calls store nothing",
   credentials: [
     {
       name: KEY,

@@ -213,6 +213,7 @@ const errors: Scenario = {
 
 export const gatewayFidelity: FidelityProvider = {
   name: "gateway",
+  leaves: "nothing: model calls store nothing",
   credentials: [
     {
       name: KEY,

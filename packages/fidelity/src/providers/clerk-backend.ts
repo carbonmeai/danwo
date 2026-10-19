@@ -3,6 +3,7 @@
  * and invitations, sessions and their tokens, the signing keys, and the error envelope. Every user
  * and organization a scenario makes is deleted afterwards.
  */
+import { FIDELITY_TAG } from "../ledger.ts"
 import type { Answer, Scenario, ScenarioContext } from "../scenario.ts"
 import { asJsonObject } from "../shape.ts"
 import { credential } from "../target.ts"
@@ -24,7 +25,7 @@ const MAPS = ["**.public_metadata", "**.private_metadata", "**.unsafe_metadata"]
 
 /** A request to the Backend API with the target's secret key, JSON encoded as Clerk's SDKs send. */
 export function backend(
-  context: ScenarioContext,
+  context: Pick<ScenarioContext, "target">,
   method: string,
   path: string,
   body?: unknown,
@@ -51,7 +52,32 @@ function idOf(answer: Answer, name = "id"): string {
 
 /** A test address Clerk's development instances accept without sending mail. */
 export function testEmail(context: ScenarioContext, who: string): string {
-  return `${who}${context.unique}+clerk_test@example.com`
+  return `${FIDELITY_TAG}-${who}${context.unique}+clerk_test@example.com`
+}
+
+/**
+ * Clerk's answer to undoing something already over (a revoked invitation, an ended session): a
+ * 4xx that leaves nothing to do.
+ */
+function settled(status: number, body: string): boolean {
+  return status >= 400 && status < 500 && /revoked|ended|not.?active|already|expired/i.test(body)
+}
+
+/** Writes down an object this run made, undone by sending `method path` with `body`. */
+function madeInClerk(
+  context: ScenarioContext,
+  kind: string,
+  id: string,
+  method: string,
+  path: string,
+  body?: unknown,
+): void {
+  context.created({
+    kind,
+    id,
+    undo: () => context.target.send(backend(context, method, path, body)),
+    settled,
+  })
 }
 
 /** Creates a user, deleted when the scenario ends. */
@@ -63,7 +89,7 @@ async function createUser(context: ScenarioContext, who: string): Promise<string
       password: `Fidelity-${context.unique}-Pw!9`,
       first_name: "Fidelity",
       last_name: "Check",
-      external_id: `fidelity_${who}_${context.unique}`,
+      external_id: `${FIDELITY_TAG}_${who}_${context.unique}`,
       public_metadata: { plan: "pro" },
       private_metadata: { tier: 1 },
       unsafe_metadata: { theme: "dark" },
@@ -72,7 +98,7 @@ async function createUser(context: ScenarioContext, who: string): Promise<string
   )
   const id = idOf(created)
 
-  context.cleanup(() => context.target.send(backend(context, "DELETE", `/users/${id}`)))
+  madeInClerk(context, "user", id, "DELETE", `/users/${id}`)
 
   return id
 }
@@ -125,14 +151,14 @@ const organizations: Scenario = {
     const created = await context.step(
       "create organization",
       backend(context, "POST", "/organizations", {
-        name: `Fidelity ${context.unique}`,
+        name: context.tag,
         created_by: owner,
       }),
       options,
     )
     const org = idOf(created)
 
-    context.cleanup(() => context.target.send(backend(context, "DELETE", `/organizations/${org}`)))
+    madeInClerk(context, "organization", org, "DELETE", `/organizations/${org}`)
     await context.step(
       "get organization",
       backend(context, "GET", `/organizations/${org}`),
@@ -140,7 +166,7 @@ const organizations: Scenario = {
     )
     await context.step(
       "update organization",
-      backend(context, "PATCH", `/organizations/${org}`, { name: `Fidelity ${context.unique} b` }),
+      backend(context, "PATCH", `/organizations/${org}`, { name: `${context.tag} b` }),
       options,
     )
     await context.step(
@@ -178,7 +204,16 @@ const organizations: Scenario = {
       }),
       options,
     )
+    const invitation = idOf(invited)
 
+    madeInClerk(
+      context,
+      "invitation",
+      invitation,
+      "POST",
+      `/organizations/${org}/invitations/${invitation}/revoke`,
+      { requesting_user_id: owner },
+    )
     await context.step(
       "list invitations",
       backend(context, "GET", `/organizations/${org}/invitations`),
@@ -186,7 +221,7 @@ const organizations: Scenario = {
     )
     await context.step(
       "revoke invitation",
-      backend(context, "POST", `/organizations/${org}/invitations/${idOf(invited)}/revoke`, {
+      backend(context, "POST", `/organizations/${org}/invitations/${invitation}/revoke`, {
         requesting_user_id: owner,
       }),
       options,
@@ -212,6 +247,7 @@ const sessions: Scenario = {
       ),
     )
 
+    madeInClerk(context, "session", session, "POST", `/sessions/${session}/revoke`)
     await context.step("get session", backend(context, "GET", `/sessions/${session}`), options)
     await context.step(
       "list the user's sessions",

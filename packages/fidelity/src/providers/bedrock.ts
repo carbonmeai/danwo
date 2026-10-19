@@ -170,6 +170,7 @@ const errors: Scenario = {
 
 export const bedrockFidelity: FidelityProvider = {
   name: "bedrock",
+  leaves: "nothing: model calls store nothing",
   credentials: [
     {
       name: KEY,

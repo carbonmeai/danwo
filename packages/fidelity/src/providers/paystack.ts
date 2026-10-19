@@ -5,6 +5,7 @@
  */
 import { paystack, seedPaystack } from "@danwo/emulators"
 
+import { FIDELITY_TAG } from "../ledger.ts"
 import { type FidelityProvider, refuseLive, requiredCredentials } from "../provider.ts"
 import type { Scenario, ScenarioContext } from "../scenario.ts"
 import { arrayOf, bool, map, nullable, num, object, partialObject, str } from "../schema.ts"
@@ -74,16 +75,21 @@ function dataField(body: Json, field: string): string {
   return value
 }
 
-function email(context: ScenarioContext): string {
-  return `fidelity-${context.unique}@example.com`
-}
+/**
+ * Paystack keeps every customer and transaction for good, with no API to delete either, and
+ * answers a create for a known email with that same customer. So every run reuses two stable,
+ * tagged addresses instead of making new ones: one for the customer scenario, and one for
+ * payments, whose history would otherwise change the customer's shape.
+ */
+const CUSTOMER_EMAIL = `${FIDELITY_TAG}@example.com`
+const PAYMENTS_EMAIL = `${FIDELITY_TAG}-payments@example.com`
 
 const transactions: Scenario = {
   name: "transactions: initialize and verify",
   async run(context) {
     const started = await context.step(
       "initialize a transaction",
-      call(context, "POST", "/transaction/initialize", { email: email(context), amount: 50000 }),
+      call(context, "POST", "/transaction/initialize", { email: PAYMENTS_EMAIL, amount: 50000 }),
       {
         literals: ["status"],
         doc: {
@@ -107,7 +113,7 @@ const customers: Scenario = {
   async run(context) {
     const created = await context.step(
       "create a customer",
-      call(context, "POST", "/customer", { email: email(context), first_name: "Fidelity" }),
+      call(context, "POST", "/customer", { email: CUSTOMER_EMAIL, first_name: "Fidelity" }),
       { literals: ["status"], doc: { status: 200, schema: envelope(CUSTOMER), ...OK } },
     )
 
@@ -158,6 +164,8 @@ const errors: Scenario = {
 
 export const paystackFidelity: FidelityProvider = {
   name: "paystack",
+  leaves:
+    "every run reuses two tagged customers (danwo-fidelity@ and danwo-fidelity-payments@example.com), since Paystack cannot delete customers; each run still adds one abandoned test transaction, which Paystack keeps for good",
   credentials: [{ name: KEY, description: "a Paystack test secret key (sk_test_…)" }],
   scenarios: [transactions, customers, banks, errors],
   emulator: () =>

@@ -55,6 +55,17 @@ function matchesAny(path: string, patterns: readonly string[]): boolean {
 }
 
 /** Whether a JSON value is an array. */
+/** An answer's body as JSON, or `null` when it is empty or not JSON. */
+export async function readJson(response: Response): Promise<Json> {
+  try {
+    const parsed: Json = JSON.parse(await response.text())
+
+    return parsed
+  } catch {
+    return null
+  }
+}
+
 export function isJsonArray(value: Json): value is readonly Json[] {
   return Array.isArray(value)
 }

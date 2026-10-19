@@ -10,7 +10,7 @@ import { createPublicKey } from "node:crypto"
 import { verifyToken } from "@clerk/backend"
 
 import type { Answer, Scenario, ScenarioContext } from "../scenario.ts"
-import { asJsonObject, isJsonArray, type Json } from "../shape.ts"
+import { asJsonObject, isJsonArray, type Json, readJson } from "../shape.ts"
 import { credential } from "../target.ts"
 import { backend, CLERK_LITERALS, testEmail } from "./clerk-backend.ts"
 
@@ -201,8 +201,41 @@ async function checkToken(context: ScenarioContext, jwt: string): Promise<void> 
   context.fact("the session token verifies with @clerk/backend", verified)
 }
 
+/** The ids of a Backend API user list. */
+function userIds(list: Json): string[] {
+  return isJsonArray(list)
+    ? list.flatMap((user) => {
+        const id = asJsonObject(user)?.["id"]
+
+        return typeof id === "string" ? [id] : []
+      })
+    : []
+}
+
+/**
+ * Deletes whichever user signs up with `email`, found by address when the scenario ends: a sign-up
+ * can stop after Clerk made the user and before the scenario learned its id.
+ */
+function deleteSignedUp(context: ScenarioContext, email: string): void {
+  context.created({
+    kind: "user (signed up)",
+    id: email,
+    async undo() {
+      const found = await context.target.send(
+        backend(context, "GET", `/users?email_address=${encodeURIComponent(email)}`),
+      )
+      let last = new Response(null, { status: 204 })
+
+      for (const id of userIds(await readJson(found)))
+        last = await context.target.send(backend(context, "DELETE", `/users/${id}`))
+
+      return last
+    },
+  })
+}
+
 /** Signs up a new test address by emailed code; resolves to the new session's id. */
-async function signUp(browser: Browser, email: string): Promise<{ session: string; user: string }> {
+async function signUp(browser: Browser, email: string): Promise<string> {
   const started = await browser.post("sign up with an email", "/v1/client/sign_ups", {
     email_address: email,
   })
@@ -221,10 +254,7 @@ async function signUp(browser: Browser, email: string): Promise<{ session: strin
     },
   )
 
-  return {
-    session: responseField(done, "created_session_id"),
-    user: responseField(done, "created_user_id"),
-  }
+  return responseField(done, "created_session_id")
 }
 
 /** Signs the address in by emailed code. */
@@ -254,10 +284,9 @@ const browserFlow: Scenario = {
     await browser.get("read the environment", "/v1/environment")
     await browser.get("read the client", "/v1/client")
 
-    const { session, user } = await signUp(browser, email)
+    deleteSignedUp(context, email)
 
-    context.cleanup(() => context.target.send(backend(context, "DELETE", `/users/${user}`)))
-
+    const session = await signUp(browser, email)
     const tokens = `/v1/client/sessions/${session}/tokens`
     const minted = await browser.raw(tokens)
     const jwt =

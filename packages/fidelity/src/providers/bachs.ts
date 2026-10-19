@@ -20,7 +20,7 @@ const KEY = "DANWO_FIDELITY_BACHS_KEY"
  * mail and keeps none.
  */
 function inbox(context: ScenarioContext): string {
-  return `delivered+danwo-fidelity-${context.unique}@resend.dev`
+  return `delivered+${context.tag}@resend.dev`
 }
 
 const ADDRESS = object({
@@ -119,6 +119,8 @@ const errors: Scenario = {
 
 export const bachsFidelity: FidelityProvider = {
   name: "bachs",
+  leaves:
+    "each run makes one sandbox customer (delivered+danwo-fidelity-…@resend.dev); the Bachs sandbox has no API to delete or list them",
   credentials: [{ name: KEY, description: "a Bachs sandbox secret key (sk_sandbox_…)" }],
   scenarios: [customers, errors],
   emulator: () => emulatorTarget(bachs, { key: "sk_sandbox_danwo_fidelity" }),

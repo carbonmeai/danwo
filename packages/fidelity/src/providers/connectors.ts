@@ -96,6 +96,7 @@ const nylasGrants: Scenario = {
 
 export const nylasFidelity: FidelityProvider = {
   name: "nylas",
+  leaves: "nothing: the suite only reads",
   credentials: [
     PUBLIC_ENDPOINTS,
     {
@@ -208,6 +209,7 @@ const nangoProject: Scenario = {
 
 export const nangoFidelity: FidelityProvider = {
   name: "nango",
+  leaves: "nothing: the suite only reads",
   credentials: [
     PUBLIC_ENDPOINTS,
     {
@@ -307,6 +309,7 @@ const unipileAccounts: Scenario = {
 
 export const unipileFidelity: FidelityProvider = {
   name: "unipile",
+  leaves: "nothing: the suite only reads",
   credentials: [
     { name: UNIPILE_DSN, description: "an account's DSN (api8.unipile.com:13851)", optional: true },
     { name: UNIPILE_KEY, description: "a Unipile access token; runs only read", optional: true },

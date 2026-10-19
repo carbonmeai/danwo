@@ -424,6 +424,15 @@ program
     "make goldens from API descriptions: a file for one provider, or each provider's published one",
   )
   .option("--offline", "compare against the goldens even when credentials are set")
+  .option(
+    "--keep",
+    "leave what live runs make in the sandboxes, listed as kept, instead of undoing it",
+  )
+  .option(
+    "--sweep",
+    "list leftovers tagged danwo-fidelity from earlier live runs instead of checking; --yes removes them",
+  )
+  .option("--yes", "with --sweep, remove the tagged leftovers it lists")
   .option("--root <dir>", "the danwo repository holding fidelity/ (default: the current folder)")
   .action(
     async (
@@ -432,18 +441,26 @@ program
         updateGolden?: boolean
         fromOpenapi?: string | true
         offline?: boolean
+        keep?: boolean
+        sweep?: boolean
+        yes?: boolean
         root?: string
       },
     ) => {
-      const { fidelityCommand } = await import("@danwo/fidelity")
+      const { fidelityCommand, sweepCommand } = await import("@danwo/fidelity")
+      const root = options.root ?? process.cwd()
 
-      process.exitCode = await fidelityCommand({
-        providers,
-        root: options.root ?? process.cwd(),
-        ...(options.updateGolden !== undefined && { updateGolden: options.updateGolden }),
-        ...(options.fromOpenapi !== undefined && { fromOpenapi: options.fromOpenapi }),
-        ...(options.offline !== undefined && { offline: options.offline }),
-      })
+      process.exitCode =
+        options.sweep === true
+          ? await sweepCommand({ providers, root, yes: options.yes === true })
+          : await fidelityCommand({
+              providers,
+              root,
+              ...(options.updateGolden !== undefined && { updateGolden: options.updateGolden }),
+              ...(options.fromOpenapi !== undefined && { fromOpenapi: options.fromOpenapi }),
+              ...(options.offline !== undefined && { offline: options.offline }),
+              ...(options.keep !== undefined && { keep: options.keep }),
+            })
     },
   )
 

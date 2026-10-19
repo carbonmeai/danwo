@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import type { OpenTarget, Scenario, Target } from "./scenario.ts"
+import type { Leftover } from "./sweep.ts"
 
 /** An environment variable a provider's live run reads. */
 export interface CredentialVariable {
@@ -37,6 +38,13 @@ export interface FidelityProvider {
   readonly openapi?: string
   /** The description does not mark nullable fields, so any property may be null. */
   readonly openapiLooseNulls?: boolean
+  /**
+   * What a live run leaves in the sandbox that no API can remove, or that nothing is ever left;
+   * printed by `--sweep` for a provider with nothing to sweep.
+   */
+  readonly leaves?: string
+  /** Finds what earlier live runs left in the sandbox, for `danwo fidelity --sweep`. */
+  sweep?(target: Target): Promise<readonly Leftover[]>
   /** A fresh emulator to run the scenarios against. */
   emulator(): Promise<OpenTarget>
   /**

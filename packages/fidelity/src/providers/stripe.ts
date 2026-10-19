@@ -8,16 +8,17 @@ import { stripe } from "@danwo/emulators"
 
 import { type FidelityProvider, refuseLive, requiredCredentials } from "../provider.ts"
 import type { Answer, Scenario, ScenarioContext } from "../scenario.ts"
-import { asJsonObject, isJsonArray } from "../shape.ts"
+import { asJsonObject, isJsonArray, readJson } from "../shape.ts"
 import { credential, emulatorTarget, formBody, liveTarget } from "../target.ts"
 import { stripeBillingScenarios } from "./stripe-billing.ts"
+import { stripeSweep } from "./stripe-sweep.ts"
 
 const API = "https://api.stripe.com"
 const KEY = "DANWO_FIDELITY_STRIPE_KEY"
 
 /** A request to Stripe's API with the target's key, form encoded as Stripe expects. */
 function call(
-  context: ScenarioContext,
+  context: Pick<ScenarioContext, "target">,
   method: string,
   path: string,
   values?: Readonly<Record<string, unknown>>,
@@ -63,7 +64,79 @@ function listIds(answer: Answer): string[] {
 }
 
 function email(context: ScenarioContext): string {
-  return `fidelity+${context.unique}@example.com`
+  return `${context.tag}@example.com`
+}
+
+/**
+ * Stripe's answer to undoing something already gone or already final (a canceled subscription, a
+ * setup intent that succeeded, an expired session): a 400 that leaves nothing to do.
+ */
+function settled(status: number, body: string): boolean {
+  return (
+    status === 400 &&
+    /resource_missing|already|has been canceled|status of (succeeded|canceled|expired)|unexpected_state/i.test(
+      body,
+    )
+  )
+}
+
+/** Writes down an object this run made, undone by sending `method path` with `values`. */
+function made(
+  context: ScenarioContext,
+  kind: string,
+  id: string,
+  method: string,
+  path: string,
+  values?: Readonly<Record<string, unknown>>,
+): void {
+  context.created({
+    kind,
+    id,
+    undo: () => context.target.send(call(context, method, path, values)),
+    settled,
+  })
+}
+
+/** Archives a price this run made: prices cannot be deleted, only set inactive. */
+function archivePrice(context: ScenarioContext, created: Answer): void {
+  const id = field(created, "id")
+
+  made(context, "price", id, "POST", `/v1/prices/${id}`, { active: false })
+}
+
+/** The product ids of a Checkout Session's line items, from its line items list. */
+async function lineItemProducts(context: ScenarioContext, session: string): Promise<string[]> {
+  const answer = await context.target.send(
+    call(context, "GET", `/v1/checkout/sessions/${session}/line_items`, { limit: 10 }),
+  )
+  const data = asJsonObject(await readJson(answer))?.["data"]
+
+  if (data === undefined || !isJsonArray(data)) return []
+
+  return data.flatMap((item) => {
+    const product = asJsonObject(asJsonObject(item)?.["price"])?.["product"]
+
+    return typeof product === "string" ? [product] : []
+  })
+}
+
+/** Archives the products a Checkout Session's inline `product_data` made. */
+function archiveInlineProducts(context: ScenarioContext, session: string): void {
+  context.created({
+    kind: "product (inline)",
+    id: session,
+    async undo() {
+      let last = new Response(null, { status: 204 })
+
+      for (const product of await lineItemProducts(context, session))
+        last = await context.target.send(
+          call(context, "POST", `/v1/products/${product}`, { active: false }),
+        )
+
+      return last
+    },
+    settled,
+  })
 }
 
 async function createCustomer(context: ScenarioContext, step = "create customer"): Promise<string> {
@@ -76,7 +149,7 @@ async function createCustomer(context: ScenarioContext, step = "create customer"
   )
   const id = field(created, "id")
 
-  context.cleanup(() => context.target.send(call(context, "DELETE", `/v1/customers/${id}`)))
+  made(context, "customer", id, "DELETE", `/v1/customers/${id}`)
 
   return id
 }
@@ -236,7 +309,7 @@ const idempotency: Scenario = {
     )
     const id = field(first, "id")
 
-    context.cleanup(() => context.target.send(call(context, "DELETE", `/v1/customers/${id}`)))
+    made(context, "customer", id, "DELETE", `/v1/customers/${id}`)
 
     const replay = await context.step(
       "replay the same request",
@@ -253,7 +326,7 @@ const idempotency: Scenario = {
     )
     await context.step(
       "reuse the key with other parameters",
-      call(context, "POST", "/v1/customers", { email: `other+${context.unique}@example.com` }, key),
+      call(context, "POST", "/v1/customers", { email: `${context.tag}-other@example.com` }, key),
       {
         literals: ["error.type"],
         doc: {
@@ -272,12 +345,15 @@ const prices: Scenario = {
   async run(context) {
     const product = await context.step(
       "create product",
-      call(context, "POST", "/v1/products", { name: `Fidelity ${context.unique}` }),
+      call(context, "POST", "/v1/products", { name: context.tag }),
       {
         doc: { operation: "post /v1/products", status: 200 },
       },
     )
     const productId = field(product, "id")
+
+    made(context, "product", productId, "POST", `/v1/products/${productId}`, { active: false })
+
     const oneOff = await context.step(
       "create one-off price",
       call(context, "POST", "/v1/prices", {
@@ -290,6 +366,9 @@ const prices: Scenario = {
         doc: { operation: "post /v1/prices", status: 200, literals: { type: "one_time" } },
       },
     )
+
+    archivePrice(context, oneOff)
+
     const monthly = await context.step(
       "create monthly price",
       call(context, "POST", "/v1/prices", {
@@ -307,6 +386,9 @@ const prices: Scenario = {
         },
       },
     )
+
+    archivePrice(context, monthly)
+
     const listed = await context.step(
       "list the product's prices",
       call(context, "GET", "/v1/prices", { product: productId, limit: 10 }),
@@ -316,14 +398,6 @@ const prices: Scenario = {
     )
 
     context.fact("prices listed for the product", listIds(listed).length)
-
-    for (const price of [field(oneOff, "id"), field(monthly, "id")])
-      context.cleanup(() =>
-        context.target.send(call(context, "POST", `/v1/prices/${price}`, { active: false })),
-      )
-    context.cleanup(() =>
-      context.target.send(call(context, "POST", `/v1/products/${productId}`, { active: false })),
-    )
   },
 }
 
@@ -399,7 +473,7 @@ const checkout: Scenario = {
             price_data: {
               currency: "usd",
               unit_amount: 500,
-              product_data: { name: "Credits", tax_code: "txcd_10000000" },
+              product_data: { name: `${context.tag} credits`, tax_code: "txcd_10000000" },
             },
           },
         ],
@@ -415,6 +489,8 @@ const checkout: Scenario = {
     )
     const id = field(created, "id")
 
+    archiveInlineProducts(context, id)
+    made(context, "checkout session", id, "POST", `/v1/checkout/sessions/${id}/expire`)
     await context.step(
       "retrieve checkout session",
       call(context, "GET", `/v1/checkout/sessions/${id}`),
@@ -492,8 +568,11 @@ export const stripeFidelity: FidelityProvider = {
     payments,
     checkout,
     events,
-    ...stripeBillingScenarios({ call, field }),
+    ...stripeBillingScenarios({ call, field, made }),
   ],
+  leaves:
+    "payment intents, refunds and expired Checkout Sessions stay in the test-mode history; Stripe has no API to delete them",
+  sweep: stripeSweep(call),
   emulator: () => emulatorTarget(stripe, { key: "sk_test_danwo_fidelity" }),
   live(env) {
     const found = requiredCredentials(this, env)

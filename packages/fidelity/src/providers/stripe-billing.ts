@@ -15,6 +15,15 @@ export interface StripeCaller {
     values?: Readonly<Record<string, unknown>>,
   ): Request
   field(answer: Answer, name: string): string
+  /** Writes down an object the run made, undone by sending `method path` with `values`. */
+  made(
+    context: ScenarioContext,
+    kind: string,
+    id: string,
+    method: string,
+    path: string,
+    values?: Readonly<Record<string, unknown>>,
+  ): void
 }
 
 /** A nested string field of an answer, such as `latest_invoice.id`. */
@@ -32,11 +41,11 @@ function nested(answer: Answer, path: string): string {
 async function customerWithCard(context: ScenarioContext, api: StripeCaller): Promise<string> {
   const customer = await context.step(
     "create customer",
-    api.call(context, "POST", "/v1/customers", { email: `fidelity+${context.unique}@example.com` }),
+    api.call(context, "POST", "/v1/customers", { email: `${context.tag}@example.com` }),
   )
   const id = api.field(customer, "id")
 
-  context.cleanup(() => context.target.send(api.call(context, "DELETE", `/v1/customers/${id}`)))
+  api.made(context, "customer", id, "DELETE", `/v1/customers/${id}`)
 
   const setup = await context.step(
     "create setup intent",
@@ -46,9 +55,13 @@ async function customerWithCard(context: ScenarioContext, api: StripeCaller): Pr
     }),
     { literals: ["status"], doc: { operation: "post /v1/setup_intents", status: 200 } },
   )
+  const setupId = api.field(setup, "id")
+
+  api.made(context, "setup intent", setupId, "POST", `/v1/setup_intents/${setupId}/cancel`)
+
   const confirmed = await context.step(
     "confirm setup intent with a test card",
-    api.call(context, "POST", `/v1/setup_intents/${api.field(setup, "id")}/confirm`, {
+    api.call(context, "POST", `/v1/setup_intents/${setupId}/confirm`, {
       payment_method: "pm_card_visa",
     }),
     {
@@ -76,11 +89,14 @@ async function monthlyPrice(context: ScenarioContext, api: StripeCaller): Promis
   const product = await context.step(
     "create product",
     api.call(context, "POST", "/v1/products", {
-      name: `Fidelity plan ${context.unique}`,
+      name: `${context.tag} plan`,
       tax_code: "txcd_10103001",
     }),
   )
   const productId = api.field(product, "id")
+
+  api.made(context, "product", productId, "POST", `/v1/products/${productId}`, { active: false })
+
   const price = await context.step(
     "create monthly price",
     api.call(context, "POST", "/v1/prices", {
@@ -92,19 +108,14 @@ async function monthlyPrice(context: ScenarioContext, api: StripeCaller): Promis
   )
   const id = api.field(price, "id")
 
-  context.cleanup(() =>
-    context.target.send(api.call(context, "POST", `/v1/products/${productId}`, { active: false })),
-  )
-  context.cleanup(() =>
-    context.target.send(api.call(context, "POST", `/v1/prices/${id}`, { active: false })),
-  )
+  api.made(context, "price", id, "POST", `/v1/prices/${id}`, { active: false })
 
   return id
 }
 
 /** Cancels a subscription when the scenario ends. */
 function cancelLater(context: ScenarioContext, api: StripeCaller, id: string): void {
-  context.cleanup(() => context.target.send(api.call(context, "DELETE", `/v1/subscriptions/${id}`)))
+  api.made(context, "subscription", id, "DELETE", `/v1/subscriptions/${id}`)
 }
 
 /** The billing scenarios, calling the API the way the rest of the Stripe suite does. */

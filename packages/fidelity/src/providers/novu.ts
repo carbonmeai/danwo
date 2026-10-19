@@ -7,8 +7,10 @@
 import { novu, seedNovu } from "@danwo/emulators"
 
 import { type FidelityProvider, PUBLIC_ENDPOINTS } from "../provider.ts"
-import type { Scenario, ScenarioContext } from "../scenario.ts"
+import type { Scenario, ScenarioContext, Target } from "../scenario.ts"
 import { anything, bool, map, nullable, num, object, str } from "../schema.ts"
+import { asJsonObject, isJsonArray, readJson } from "../shape.ts"
+import { isTagged, type Leftover, SweepUnavailable } from "../sweep.ts"
 import { emulatorTarget, keyOrPublicTarget } from "../target.ts"
 
 const API = "https://api.novu.co"
@@ -81,17 +83,20 @@ const errors: Scenario = {
 const subscribers: Scenario = {
   name: "subscribers: create, read, patch, delete",
   async run(context) {
-    const id = `danwo-fidelity-${context.unique}`
+    const id = context.tag
+    /* Built first: without a key it skips the scenario before anything is written down. */
+    const create = call(context, "POST", "/v2/subscribers", { subscriberId: id, firstName: "Ada" })
 
-    await context.step(
-      "create a subscriber",
-      call(context, "POST", "/v2/subscribers", { subscriberId: id, firstName: "Ada" }),
-      {
-        literals: ["subscriberId", "firstName"],
-        maps: ["data"],
-        doc: { schema: SUBSCRIBER, status: 201 },
-      },
-    )
+    context.created({
+      kind: "subscriber",
+      id,
+      undo: () => context.target.send(call(context, "DELETE", `/v2/subscribers/${id}`)),
+    })
+    await context.step("create a subscriber", create, {
+      literals: ["subscriberId", "firstName"],
+      maps: ["data"],
+      doc: { schema: SUBSCRIBER, status: 201 },
+    })
     await context.step("read it", call(context, "GET", `/v2/subscribers/${id}`), {
       maps: ["data"],
       doc: { schema: SUBSCRIBER, status: 200 },
@@ -112,6 +117,58 @@ const subscribers: Scenario = {
   },
 }
 
+/** A request to Novu's API with an explicit key, for the sweep, which runs outside a scenario. */
+function keyed(key: string, method: string, path: string): Request {
+  return new Request(`${API}${path}`, { method, headers: { authorization: `ApiKey ${key}` } })
+}
+
+/** One page of subscribers: their ids, and the cursor of the next page when there is one. */
+async function subscriberPage(
+  target: Target,
+  key: string,
+  after: string | undefined,
+): Promise<{ ids: string[]; next: string | undefined }> {
+  const cursor = after === undefined ? "" : `&after=${after}`
+  const body = asJsonObject(
+    await readJson(await target.send(keyed(key, "GET", `/v2/subscribers?limit=100${cursor}`))),
+  )
+  const data = body?.["data"]
+  const ids = (data !== undefined && isJsonArray(data) ? data : []).flatMap((item) => {
+    const id = asJsonObject(item)?.["subscriberId"]
+
+    return typeof id === "string" ? [id] : []
+  })
+  const next = body?.["next"]
+
+  return { ids, next: typeof next === "string" && next !== "" ? next : undefined }
+}
+
+/** Subscribers earlier runs left: their ids carry the fidelity tag. Each is deleted. */
+async function sweepSubscribers(target: Target): Promise<Leftover[]> {
+  const key = target.credentials["key"]
+
+  if (key === undefined) throw new SweepUnavailable(`set ${KEY} to list subscribers`)
+
+  const ids: string[] = []
+  let after: string | undefined
+
+  for (let page = 0; page < 20; page++) {
+    const found = await subscriberPage(target, key, after)
+
+    ids.push(...found.ids)
+    after = found.next
+    if (after === undefined) break
+  }
+
+  return ids.filter(isTagged).map((id) => ({
+    kind: "subscriber",
+    id,
+    label: id,
+    tagged: true,
+    remove: () => target.send(keyed(key, "DELETE", `/v2/subscribers/${id}`)),
+  }))
+}
+
 export const novuFidelity: FidelityProvider = {
   name: "novu",
   credentials: [
@@ -124,6 +181,7 @@ export const novuFidelity: FidelityProvider = {
     },
   ],
   scenarios: [errors, subscribers],
+  sweep: sweepSubscribers,
   emulator: () =>
     emulatorTarget(novu, { key: EMULATED_KEY }, (emulator) =>
       seedNovu(emulator.store, { apiKey: EMULATED_KEY }),

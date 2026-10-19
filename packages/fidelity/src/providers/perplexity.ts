@@ -148,6 +148,7 @@ const errors: Scenario = {
 
 export const perplexityFidelity: FidelityProvider = {
   name: "perplexity",
+  leaves: "nothing: model calls store nothing",
   credentials: [
     { name: KEY, description: "a Perplexity API key; a live run costs a fraction of a cent" },
   ],

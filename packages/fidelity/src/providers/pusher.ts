@@ -44,7 +44,7 @@ function signed(
 const triggering: Scenario = {
   name: "events: trigger, with info, and a batch",
   async run(context) {
-    const channel = `danwo-fidelity-${context.unique}`
+    const channel = context.tag
 
     await context.step(
       "trigger an event",
@@ -88,7 +88,7 @@ const channels: Scenario = {
   async run(context) {
     await context.step(
       "read an empty channel",
-      signed(context, "GET", `/channels/danwo-fidelity-${context.unique}`, {
+      signed(context, "GET", `/channels/${context.tag}`, {
         info: "subscription_count",
       }),
       {
@@ -113,6 +113,8 @@ const channels: Scenario = {
 
 export const pusherFidelity: FidelityProvider = {
   name: "pusher",
+  leaves:
+    "nothing persists: events are not stored, and a channel exists only while something is subscribed",
   credentials: [
     { name: APP_ID, description: "a Channels app's id (App Keys page)" },
     { name: KEY, description: "the app's key" },

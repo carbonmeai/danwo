@@ -45,6 +45,7 @@ const errors: Scenario = {
 
 export const slackFidelity: FidelityProvider = {
   name: "slack",
+  leaves: "nothing: the suite only calls public endpoints",
   credentials: [PUBLIC_ENDPOINTS],
   scenarios: [apiTest, errors],
   emulator: () => emulatorTarget(slack, {}),

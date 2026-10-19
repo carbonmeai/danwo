@@ -7,6 +7,7 @@
 import { redactCredentials } from "@danwo/runner"
 
 import type { DifferenceKind } from "./compare.ts"
+import { CleanupLedger, type Created, FIDELITY_TAG, type LeftBehind } from "./ledger.ts"
 import { asJsonObject, type Json, type Shape, type ShapeOptions, shapeOf } from "./shape.ts"
 
 /** Where a scenario's requests go: the emulator, or the provider's sandbox. */
@@ -72,6 +73,10 @@ export interface ScenarioRun {
   readonly error?: string
   /** Set when the scenario stopped because the target cannot run it, with why. */
   readonly skipped?: string
+  /** What the run made and could not undo, or kept on request. */
+  readonly leftBehind?: readonly LeftBehind[]
+  /** How many objects the run made and undid afterwards. */
+  readonly undone?: number
 }
 
 /** An answer as a scenario sees it. */
@@ -85,12 +90,20 @@ export interface ScenarioContext {
   readonly target: Target
   /** A short suffix unique to this run, for names and emails. */
   readonly unique: string
+  /**
+   * `danwo-fidelity-<unique>`: the marker for anything this run makes, in a name, an email tag or
+   * an external id, so `danwo fidelity --sweep` can find leftovers from runs that never finished.
+   */
+  readonly tag: string
   /** Sends one request and records its answer as a step. */
   step(name: string, request: Request, options?: StepOptions): Promise<Answer>
   /** Records a fact derived from answers. */
   fact(name: string, value: Fact["value"], kind?: DifferenceKind): void
-  /** Registers sandbox cleanup to run after the scenario, finished or not. */
-  cleanup(undo: () => Promise<unknown>): void
+  /**
+   * Writes down something the scenario made, to be undone newest first when it ends: finished,
+   * failed or thrown, and when the run is interrupted.
+   */
+  created(entry: Created): void
   /**
    * Stops the scenario because the target cannot run it (a key without the access it needs, say).
    * A skipped scenario is reported with `reason` and neither compared nor kept in a golden.
@@ -162,14 +175,34 @@ function errorText(error: unknown): string {
   return redactCredentials(error instanceof Error ? error.message : String(error))
 }
 
-/** Runs one scenario against one target, always running its cleanup. */
-export async function runScenario(scenario: Scenario, target: Target): Promise<ScenarioRun> {
+export interface RunOptions {
+  /** Leave everything the scenario made in place, reporting it as kept, for debugging. */
+  readonly keep?: boolean
+}
+
+/** What one run produced, with what it undid and what it could not, when there is any. */
+function withLeftovers(run: ScenarioRun, left: readonly LeftBehind[], undone: number): ScenarioRun {
+  return {
+    ...run,
+    ...(left.length > 0 && { leftBehind: left }),
+    ...(undone > 0 && { undone }),
+  }
+}
+
+/** Runs one scenario against one target, always undoing what it made unless asked to keep it. */
+export async function runScenario(
+  scenario: Scenario,
+  target: Target,
+  runOptions: RunOptions = {},
+): Promise<ScenarioRun> {
   const steps: Observation[] = []
   const facts: Fact[] = []
-  const undo: Array<() => Promise<unknown>> = []
+  const ledger = new CleanupLedger()
+  const unique = Date.now().toString(36)
   const context: ScenarioContext = {
     target,
-    unique: Date.now().toString(36),
+    unique,
+    tag: `${FIDELITY_TAG}-${unique}`,
     async step(name, request, options = {}) {
       const response = await target.send(request)
       const { doc, events = false, ...shapeOptions } = options
@@ -188,14 +221,27 @@ export async function runScenario(scenario: Scenario, target: Target): Promise<S
     fact(name, value, kind) {
       facts.push({ name, value, ...(kind && { kind }) })
     },
-    cleanup(step) {
-      undo.push(step)
+    created(entry) {
+      ledger.add(entry)
     },
     skip(reason) {
       throw new ScenarioSkipped(reason)
     },
   }
 
+  const run = await settle(scenario, context, steps, facts)
+  const left = runOptions.keep === true ? ledger.keep() : await ledger.drain()
+
+  return withLeftovers(run, left, ledger.undone)
+}
+
+/** The scenario's outcome: finished, skipped, or the error it threw. */
+async function settle(
+  scenario: Scenario,
+  context: ScenarioContext,
+  steps: Observation[],
+  facts: Fact[],
+): Promise<ScenarioRun> {
   try {
     await scenario.run(context)
 
@@ -205,7 +251,5 @@ export async function runScenario(scenario: Scenario, target: Target): Promise<S
       return { scenario: scenario.name, steps, facts, skipped: error.reason }
 
     return { scenario: scenario.name, steps, facts, error: errorText(error) }
-  } finally {
-    for (const step of undo.toReversed()) await step().catch(() => undefined)
   }
 }

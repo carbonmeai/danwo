@@ -14,6 +14,7 @@ import {
   readKnownDifferences,
   writeGolden,
 } from "./golden.ts"
+import { cleanUpOnInterrupt, type LeftBehind, leftBehindLines } from "./ledger.ts"
 import { type ApiDescription, documentedShape } from "./openapi.ts"
 import type { FidelityProvider } from "./provider.ts"
 import { runScenario, type Scenario, type ScenarioRun, type Target } from "./scenario.ts"
@@ -31,6 +32,10 @@ export interface ScenarioReport {
   readonly unchecked?: boolean
   /** The sandbox could not run this scenario, and why; nothing was compared. */
   readonly skipped?: string
+  /** What the live run made and could not undo, or kept on request. */
+  readonly leftBehind?: readonly LeftBehind[]
+  /** How many objects the live run made and undid. */
+  readonly undone?: number
 }
 
 export interface ProviderReport {
@@ -52,6 +57,10 @@ export interface FidelityOptions {
   readonly descriptions?: ReadonlyMap<string, ApiDescription>
   /** Never call a sandbox, even with credentials set. */
   readonly offline?: boolean
+  /** Leave what live runs make in the sandboxes, reported as kept, for debugging. */
+  readonly keep?: boolean
+  /** Where an interrupted run says what it undid; standard error by default. */
+  readonly write?: (line: string) => void
 }
 
 /** Runs one scenario on a fresh emulator, so scenarios never see each other's data. */
@@ -95,6 +104,16 @@ interface Checked {
   readonly golden: Record<string, GoldenScenario>
 }
 
+/** What a live run undid and left behind, as report fields. */
+function cleanupOf(run: ScenarioRun | undefined): Pick<ScenarioReport, "leftBehind" | "undone"> {
+  if (run === undefined) return {}
+
+  return {
+    ...(run.leftBehind !== undefined && { leftBehind: run.leftBehind }),
+    ...(run.undone !== undefined && { undone: run.undone }),
+  }
+}
+
 async function checkAgainst(
   provider: FidelityProvider,
   expectedOf: (
@@ -111,9 +130,10 @@ async function checkAgainst(
     const expected = await expectedOf(scenario, emulated)
     const error = expected.run?.error ?? emulated.error
     const skipped = expected.run?.skipped
+    const cleanup = cleanupOf(expected.run)
 
     if (skipped !== undefined) {
-      reports.push({ scenario: scenario.name, counted: [], accepted: [], skipped })
+      reports.push({ scenario: scenario.name, counted: [], accepted: [], skipped, ...cleanup })
       continue
     }
 
@@ -124,6 +144,7 @@ async function checkAgainst(
         accepted: [],
         unchecked: true,
         ...(error !== undefined && { error }),
+        ...cleanup,
       })
       continue
     }
@@ -138,6 +159,7 @@ async function checkAgainst(
       counted,
       accepted,
       ...(error !== undefined && { error }),
+      ...cleanup,
     })
   }
 
@@ -162,7 +184,7 @@ function expectations(
     return {
       mode: "live",
       of: async (scenario) => {
-        const run = await runScenario(scenario, live)
+        const run = await runScenario(scenario, live, { keep: options.keep === true })
 
         return {
           run,
@@ -226,11 +248,20 @@ async function checkProvider(
   }
 }
 
-/** Checks every provider in `options.providers`, one after the other. */
+/**
+ * Checks every provider in `options.providers`, one after the other. While it runs, an interrupt
+ * undoes what live scenarios made before the process exits.
+ */
 export async function runFidelity(options: FidelityOptions): Promise<ProviderReport[]> {
   const reports: ProviderReport[] = []
+  const write = options.write ?? ((line: string) => process.stderr.write(`${line}\n`))
+  const release = cleanUpOnInterrupt(write)
 
-  for (const provider of options.providers) reports.push(await checkProvider(provider, options))
+  try {
+    for (const provider of options.providers) reports.push(await checkProvider(provider, options))
+  } finally {
+    release()
+  }
 
   return reports
 }
@@ -276,25 +307,69 @@ function scenarioLines(report: ScenarioReport): string[] {
   return lines
 }
 
-/** A report as lines for a terminal. */
-export function formatFidelity(reports: readonly ProviderReport[]): string[] {
-  return reports.flatMap((report) => {
-    const failing = report.scenarios.filter((s) => s.counted.length > 0).length
-    const skipped = report.scenarios.filter((s) => s.skipped !== undefined).length
-    const header = `${report.provider} (${report.mode}): ${report.scenarios.length - failing - skipped} of ${report.scenarios.length} scenarios match${skipped > 0 ? `, ${skipped} skipped` : ""}`
+/** Everything a provider's live scenarios left in its sandbox, split into kept and stuck. */
+function leftovers(report: ProviderReport): { kept: LeftBehind[]; stuck: LeftBehind[] } {
+  const all = report.scenarios.flatMap((scenario) => scenario.leftBehind ?? [])
 
-    return [
-      header,
-      ...report.scenarios.flatMap(scenarioLines),
-      ...(report.wrote === undefined ? [] : [`  wrote ${report.wrote}`]),
-      "",
-    ]
-  })
+  return {
+    kept: all.filter((item) => item.reason === "kept"),
+    stuck: all.filter((item) => item.reason !== "kept"),
+  }
 }
 
-/** Whether every checked scenario matched. */
+function providerLines(report: ProviderReport): string[] {
+  const failing = report.scenarios.filter((s) => s.counted.length > 0).length
+  const skipped = report.scenarios.filter((s) => s.skipped !== undefined).length
+  const header = `${report.provider} (${report.mode}): ${report.scenarios.length - failing - skipped} of ${report.scenarios.length} scenarios match${skipped > 0 ? `, ${skipped} skipped` : ""}`
+  const { kept, stuck } = leftovers(report)
+
+  return [
+    header,
+    ...report.scenarios.flatMap(scenarioLines),
+    ...leftBehindLines("could not be undone", stuck),
+    ...leftBehindLines("kept, as --keep asked", kept),
+    ...(report.wrote === undefined ? [] : [`  wrote ${report.wrote}`]),
+    "",
+  ]
+}
+
+/** The closing line for live runs: whether the sandboxes were left as they were found. */
+function cleanupSummary(reports: readonly ProviderReport[]): string[] {
+  const live = reports.filter((report) => report.mode === "live")
+
+  if (live.length === 0) return []
+
+  const stuck = live.flatMap((report) => leftovers(report).stuck)
+  const kept = live.flatMap((report) => leftovers(report).kept)
+  const undone = live
+    .flatMap((report) => report.scenarios)
+    .reduce((sum, scenario) => sum + (scenario.undone ?? 0), 0)
+
+  if (stuck.length > 0)
+    return [
+      `left behind: ${stuck.length} object(s) in the sandboxes could not be undone; \`danwo fidelity --sweep\` removes tagged leftovers`,
+    ]
+  if (kept.length > 0)
+    return [
+      `kept: ${kept.length} object(s) in the sandboxes; \`danwo fidelity --sweep\` removes them`,
+    ]
+
+  return undone === 0 ? [] : [`cleaned up: ${undone} object(s) undone, nothing left behind`]
+}
+
+/** A report as lines for a terminal. */
+export function formatFidelity(reports: readonly ProviderReport[]): string[] {
+  return [...reports.flatMap(providerLines), ...cleanupSummary(reports)]
+}
+
+/**
+ * Whether every checked scenario matched and the live runs left nothing behind they were meant
+ * to undo (what `--keep` kept on purpose does not count).
+ */
 export function fidelityPassed(reports: readonly ProviderReport[]): boolean {
-  return reports.every((report) =>
-    report.scenarios.every((scenario) => scenario.counted.length === 0),
+  return reports.every(
+    (report) =>
+      report.scenarios.every((scenario) => scenario.counted.length === 0) &&
+      leftovers(report).stuck.length === 0,
   )
 }

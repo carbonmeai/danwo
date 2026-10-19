@@ -33,6 +33,7 @@ const keys: Scenario = {
 
 export const googleFidelity: FidelityProvider = {
   name: "google",
+  leaves: "nothing: the suite only reads public discovery documents",
   credentials: [PUBLIC_ENDPOINTS],
   scenarios: [discovery, keys],
   emulator: () => emulatorTarget(google, {}),

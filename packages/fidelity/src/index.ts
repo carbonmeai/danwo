@@ -1,5 +1,10 @@
 /** Fidelity: checks that danwo's emulators answer like the providers they stand in for. */
-export { fidelityCommand, type FidelityCommandOptions } from "./command.ts"
+export {
+  fidelityCommand,
+  type FidelityCommandOptions,
+  sweepCommand,
+  type SweepCommandOptions,
+} from "./command.ts"
 export { compareShapes, type Difference, type DifferenceKind } from "./compare.ts"
 export {
   type Golden,
@@ -35,3 +40,11 @@ export type {
   Target,
 } from "./scenario.ts"
 export { type Shape, shapeOf } from "./shape.ts"
+export { CleanupLedger, type Created, FIDELITY_TAG, type LeftBehind } from "./ledger.ts"
+export {
+  formatSweep,
+  type Leftover,
+  sweepFidelity,
+  type SweepOptions,
+  type SweepReport,
+} from "./sweep.ts"

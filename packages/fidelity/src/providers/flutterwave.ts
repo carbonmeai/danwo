@@ -32,11 +32,11 @@ const paymentLink: Scenario = {
     await context.step(
       "create a payment link",
       call(context, "POST", "/v3/payments", {
-        tx_ref: `danwo-fidelity-${context.unique}`,
+        tx_ref: context.tag,
         amount: 100,
         currency: "NGN",
         redirect_url: "https://example.com/fidelity",
-        customer: { email: `fidelity-${context.unique}@example.com` },
+        customer: { email: `${context.tag}@example.com` },
       }),
       {
         literals: ["status"],
@@ -81,6 +81,8 @@ const errors: Scenario = {
 
 export const flutterwaveFidelity: FidelityProvider = {
   name: "flutterwave",
+  leaves:
+    "each run makes one hosted payment link (tx_ref danwo-fidelity-…); Flutterwave has no API to delete them",
   credentials: [{ name: KEY, description: "a Flutterwave test secret key (FLWSECK_TEST-…)" }],
   scenarios: [paymentLink, banks, errors],
   emulator: () => emulatorTarget(flutterwave, { key: "REDACTED-TEST-VALUE" }),
