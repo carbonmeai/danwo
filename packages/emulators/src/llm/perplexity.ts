@@ -49,10 +49,9 @@ function sources(reply: LlmReply): readonly LlmSource[] {
   return reply.sources ?? []
 }
 
-/** A source as a search result: its numbered id, title, address and what Perplexity read of it. */
-function searchResult(source: LlmSource, index: number) {
+/** A source as Sonar's search result: its title, address and what Perplexity read of it. */
+function searchResult(source: LlmSource) {
   return {
-    id: index + 1,
     title: source.title ?? source.url,
     url: source.url,
     snippet: source.snippet ?? "",
@@ -60,6 +59,11 @@ function searchResult(source: LlmSource, index: number) {
     last_updated: source.date ?? null,
     source: "web",
   }
+}
+
+/** A source as the Agent API's search result, which numbers its results. */
+function agentResult(source: LlmSource, index: number) {
+  return { id: index + 1, ...searchResult(source) }
 }
 
 function messageItem(reply: LlmReply) {
@@ -101,7 +105,7 @@ function outputOf(reply: LlmReply) {
 
   return [
     ...(cited.length > 0
-      ? [{ type: "search_results" as const, results: cited.map(searchResult) }]
+      ? [{ type: "search_results" as const, results: cited.map(agentResult) }]
       : []),
     ...(hasMessage ? [messageItem(reply)] : []),
     ...calls,
@@ -148,7 +152,6 @@ export function agentResponse(
     model,
     status: reason === null ? "completed" : "incomplete",
     ...(reason !== null && { incomplete_details: reason }),
-    error: null,
     output: outputOf(reply),
     usage: agentUsage(counts, costOf(counts, price), sources(reply).length > 0),
   }
@@ -216,7 +219,16 @@ export function sonarCompletion(
   head: { id: string; model: string; created: number },
   price?: LlmPrice,
 ) {
-  return { ...chatCompletion(reply, counts, head), ...sonarExtras(reply, counts, price) }
+  const completion = chatCompletion(reply, counts, head)
+
+  return {
+    ...completion,
+    choices: completion.choices.map(({ logprobs: _logprobs, ...choice }) => ({
+      ...choice,
+      delta: { role: "assistant", content: "" },
+    })),
+    ...sonarExtras(reply, counts, price),
+  }
 }
 
 /** A Sonar answer streamed: each chunk carries the citations, and the last one the usage. */

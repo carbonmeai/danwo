@@ -60,11 +60,30 @@ function contents(list: unknown): unknown[] {
   })
 }
 
+/**
+ * Gemini's `responseSchema` as JSON Schema: its own subset names types in capitals (`OBJECT`,
+ * `STRING`), which JSON Schema writes in lower case.
+ */
+function jsonSchemaOf(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(jsonSchemaOf)
+
+  const record = asRecord(schema)
+
+  if (record === undefined) return schema
+
+  return Object.fromEntries(
+    Object.entries(record).map(([key, value]) => [
+      key,
+      key === "type" && typeof value === "string" ? value.toLowerCase() : jsonSchemaOf(value),
+    ]),
+  )
+}
+
 /** The schema a structured answer must follow, when the call asks for JSON. */
 function schemaOf(config: Record<string, unknown> | undefined): unknown {
   if (config?.responseMimeType !== "application/json") return undefined
 
-  return config.responseJsonSchema ?? config.responseSchema ?? {}
+  return config.responseJsonSchema ?? jsonSchemaOf(config.responseSchema ?? {})
 }
 
 /** A `generateContent` or `streamGenerateContent` body; the model comes from the path. */
