@@ -2,6 +2,7 @@
  * Builders for complete Stripe objects. Each is typed against the `stripe` SDK, so a field the
  * API returns cannot be forgotten; fields the emulator does not model take Stripe's empty values.
  */
+import { createHash } from "node:crypto"
 import type {
   CardDetails,
   Charge,
@@ -21,6 +22,35 @@ import type {
 type Metadata = Record<string, string>
 
 const noAddress = null
+
+/** A 15-digit network transaction id, the same for the same charge. */
+function networkTransactionId(chargeId: string): string {
+  const digest = createHash("sha256").update(chargeId).digest()
+
+  return BigInt(`0x${digest.subarray(0, 8).toString("hex")}`)
+    .toString()
+    .padStart(15, "0")
+    .slice(0, 15)
+}
+
+/** A card number's fingerprint: the same card always gets the same one. */
+function fingerprintOf(brand: string, last4: string): string {
+  return createHash("sha256")
+    .update(`${brand}:${last4}`)
+    .digest("base64url")
+    .replaceAll(/[-_]/g, "")
+    .slice(0, 16)
+}
+
+/** A billing address nobody filled in: every part present, all of them null. */
+const blankAddress = {
+  city: null,
+  country: null,
+  line1: null,
+  line2: null,
+  postal_code: null,
+  state: null,
+}
 
 export function customerObject(fields: {
   id: string
@@ -222,7 +252,7 @@ export function chargeObject(fields: {
   paymentMethod: string
   card: CardDetails | null
   receiptUrl: string
-}): Charge {
+}): Charge & { destination: null; dispute: null; order: null } {
   const { intent } = fields
 
   return {
@@ -235,13 +265,15 @@ export function chargeObject(fields: {
     application_fee: null,
     application_fee_amount: null,
     balance_transaction: null,
-    billing_details: { address: noAddress, email: null, name: null, phone: null, tax_id: null },
+    billing_details: { address: blankAddress, email: null, name: null, phone: null, tax_id: null },
     calculated_statement_descriptor: "DANWO",
     captured: true,
     created: fields.created,
     currency: intent.currency,
     customer: typeof intent.customer === "string" ? intent.customer : null,
     description: intent.description,
+    destination: null,
+    dispute: null,
     disputed: false,
     failure_balance_transaction: null,
     failure_code: null,
@@ -250,6 +282,7 @@ export function chargeObject(fields: {
     livemode: false,
     metadata: intent.metadata,
     on_behalf_of: null,
+    order: null,
     outcome: {
       advice_code: null,
       network_advice_code: null,
@@ -257,6 +290,7 @@ export function chargeObject(fields: {
       network_status: "approved_by_network",
       reason: null,
       risk_level: "normal",
+      risk_score: 32,
       seller_message: "Payment complete.",
       type: "authorized",
     },
@@ -271,21 +305,28 @@ export function chargeObject(fields: {
         brand: fields.card.brand,
         checks: { address_line1_check: null, address_postal_code_check: null, cvc_check: "pass" },
         country: fields.card.country,
-        electronic_commerce_indicator: null,
+        electronic_commerce_indicator: "07",
         exp_month: fields.card.exp_month,
         exp_year: fields.card.exp_year,
+        extended_authorization: { status: "disabled" },
+        fingerprint: fields.card.fingerprint ?? null,
         funding: fields.card.funding,
+        incremental_authorization: { status: "unavailable" },
         installments: null,
         last4: fields.card.last4,
         mandate: null,
+        multicapture: { status: "unavailable" },
         network: fields.card.brand,
-        network_transaction_id: null,
+        network_token: { used: false },
+        network_transaction_id: networkTransactionId(fields.id),
+        overcapture: { maximum_amount_capturable: intent.amount, status: "unavailable" },
         regulated_status: "unregulated",
         three_d_secure: null,
         transaction_link_id: null,
         wallet: null,
       },
     },
+    radar_options: {},
     receipt_email: intent.receipt_email,
     receipt_number: null,
     receipt_url: fields.receiptUrl,
@@ -313,7 +354,7 @@ export function paymentMethodObject(fields: {
     id: fields.id,
     object: "payment_method",
     allow_redisplay: "unspecified",
-    billing_details: { address: noAddress, email: null, name: null, phone: null, tax_id: null },
+    billing_details: { address: blankAddress, email: null, name: null, phone: null, tax_id: null },
     card: fields.card,
     created: fields.created,
     customer: fields.customer,
@@ -340,6 +381,7 @@ export function cardDetails(card: {
     display_brand: card.brand,
     exp_month: card.expMonth,
     exp_year: card.expYear,
+    fingerprint: fingerprintOf(card.brand, card.last4),
     funding: card.funding,
     generated_from: null,
     last4: card.last4,
