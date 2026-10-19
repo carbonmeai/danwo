@@ -7,7 +7,7 @@ import type { WebhookDispatcher } from "@danwo/emulators"
  * clock, retries) runs as part of it.
  */
 import { type RunWebhooks, routeOf, webhookSources } from "@danwo/matrix"
-import type { Proxy } from "@danwo/proxy"
+import { isPageAsset, type Proxy } from "@danwo/proxy"
 
 import type { Backend, BackendActivity, BackendEvent } from "../browser/readiness.ts"
 import type { WorkerEnvironment } from "./environment.ts"
@@ -40,18 +40,16 @@ async function round(env: WorkerEnvironment, timeoutMs: number, settle: boolean)
   if (settle) await env.settle?.()
 }
 
-/** Files a browser fetches for a page (styles, scripts, images, fonts), not calls the app makes. */
-const ASSET = /(?:\.(?:css|js|mjs|map|png|jpe?g|gif|svg|webp|ico|woff2?|ttf)|\/favicon[^/]*)$/i
-
 /**
  * The calls the app made through the proxy. A call the proxy blocked never reached anyone: it is
  * the device's or browser's own background traffic (update checks, sync), not something the app
- * caused, and when it fires differs from run to run.
+ * caused, and when it fires differs from run to run. The page loading itself (static files, a dev
+ * server's modules and hot reload) is left out the same way: it is not a call the app makes.
  */
 function providerCalls(proxy: Proxy): BackendEvent[] {
   return proxy
     .exchanges()
-    .filter((call) => call.disposition !== "blocked" && !ASSET.test(call.path.split("?")[0] ?? ""))
+    .filter((call) => call.disposition !== "blocked" && !(call.asset ?? isPageAsset(call.path)))
     .map((call) => ({ signature: routeOf(call), fault: call.fault }))
 }
 

@@ -9,11 +9,21 @@ import {
   generateSPKIFingerprint,
   getLocal,
   type Headers as MockttpHeaders,
+  type Mockttp,
 } from "mockttp"
 
 import { APP_CLOCK_VARIABLE, type AppClock, createAppClock } from "./app-clock.ts"
 import { type CapturedMessage, captureMessage } from "./capture.ts"
+import { hostMatches, isLoopback, isPageAsset, isStreaming, TELEMETRY_HOSTS } from "./hosts.ts"
 import { forwardTo } from "./upstream.ts"
+import {
+  handleSockets,
+  type SocketExchange,
+  type SocketFaultRule,
+  type SocketUpstream,
+} from "./websocket.ts"
+
+export { hostMatches } from "./hosts.ts"
 
 /** Answers a request the way a server would; `emulator.fetch` is one. */
 export type Handler = (request: Request) => Promise<Response>
@@ -23,7 +33,12 @@ export type Handler = (request: Request) => Promise<Response>
  * (`*.amazonaws.com`, any subdomain at any depth, not the bare domain).
  */
 export type Route =
-  | { readonly hosts: readonly string[]; readonly handler: Handler }
+  | {
+      readonly hosts: readonly string[]
+      readonly handler: Handler
+      /** Where this route's WebSockets go (`ws://…`); without one, upgrades are refused with 501. */
+      readonly webSocket?: string
+    }
   /** Forwarded to an outside endpoint (e.g. a MiniStack container) with the original `Host` kept. */
   | { readonly hosts: readonly string[]; readonly upstream: string }
 
@@ -39,6 +54,17 @@ export interface ProxyOptions {
    * through: background traffic of no interest to a run, such as a device browser's own sync.
    */
   readonly blocked?: readonly string[]
+  /**
+   * Hosts that always pass through, even when `unmatched` is `block` or a `blocked` pattern
+   * covers them. This machine (`localhost`, `127.0.0.1`, `::1`) always does: it is where the
+   * apps a run starts, and services such as Inngest dev, answer.
+   */
+  readonly allow?: readonly string[]
+  /**
+   * Analytics, error reporting and telemetry hosts (`TELEMETRY_HOSTS`): blocked by default, so
+   * a run neither sends real data out nor fills its record with noise; `passthrough` lets them go.
+   */
+  readonly telemetry?: "block" | "passthrough"
 }
 
 /** A request to a routed host, as a fault rule sees it. */
@@ -139,6 +165,16 @@ export interface Exchange {
   request?: CapturedMessage
   /** The response the client got; absent until it was sent, and for aborted requests. Unredacted. */
   response?: CapturedMessage
+  /**
+   * True for a response that streams for as long as the client listens (server-sent events,
+   * NDJSON feeds): readiness does not wait for it to finish.
+   */
+  stream?: boolean
+  /**
+   * True for the page loading itself (a static file, a dev server's module or hot reload), not a
+   * call the app makes: readiness, effects and the matrix leave these out.
+   */
+  asset?: boolean
 }
 
 export interface Proxy {
@@ -162,9 +198,13 @@ export interface Proxy {
   /** The clock of every app started with `env()`: an offset ahead of real time the runner moves. */
   readonly clock: AppClock
   exchanges(): readonly Exchange[]
+  /** Every WebSocket connection through the proxy, with its frame counts and sizes. */
+  sockets(): readonly SocketExchange[]
   /** Sets the rule that picks a fault for each routed call; `undefined` removes it. */
   setFault(rule: OutboundFaultRule | undefined): void
-  /** Forgets recorded exchanges and restarts call numbering, for reuse across runs. */
+  /** Sets the rule that refuses or drops WebSockets; `undefined` removes it. */
+  setSocketFault(rule: SocketFaultRule | undefined): void
+  /** Forgets recorded exchanges and sockets and restarts call numbering, for reuse across runs. */
   clear(): void
   /**
    * Resolves once every exchange seen so far has finished (responded or aborted). The proxy
@@ -172,11 +212,6 @@ export interface Proxy {
    */
   settled(timeoutMs?: number): Promise<void>
   stop(): Promise<void>
-}
-
-/** True when `host` matches an exact hostname or a `*.domain` wildcard. */
-export function hostMatches(pattern: string, host: string): boolean {
-  return pattern.startsWith("*.") ? host.endsWith(pattern.slice(1)) : host === pattern
 }
 
 function routeHandler(route: Route): Handler {
@@ -315,6 +350,89 @@ async function answerLate(
   return callHandler(handler, req)
 }
 
+/** How the proxy treats a host no route answers: let it through, or refuse it. */
+interface HostPolicy {
+  readonly isRouted: (host: string) => boolean
+  readonly isBlocked: (host: string) => boolean
+  readonly isAllowed: (host: string) => boolean
+  readonly unmatched: "passthrough" | "block"
+  readonly upstreamOf: (host: string) => string | undefined
+  dispositionOf(host: string): Exchange["disposition"]
+}
+
+function matchesAny(patterns: readonly string[], host: string): boolean {
+  return patterns.some((pattern) => hostMatches(pattern, host))
+}
+
+function hostPolicy(options: ProxyOptions, isRouted: (host: string) => boolean): HostPolicy {
+  const listed = options.blocked ?? []
+  const telemetry = options.telemetry === "passthrough" ? [] : TELEMETRY_HOSTS
+  const allow = options.allow ?? []
+  /* An explicit `blocked` entry wins over this machine; `allow` wins over everything. */
+  const isAllowed = (host: string) =>
+    matchesAny(allow, host) || (isLoopback(host) && !matchesAny(listed, host))
+  const isBlocked = (host: string) =>
+    !isAllowed(host) && (matchesAny(listed, host) || matchesAny(telemetry, host))
+  const unmatched = options.unmatched ?? "passthrough"
+  const upstreams = socketUpstreams(options.routes)
+
+  return {
+    isRouted,
+    isBlocked,
+    isAllowed,
+    unmatched,
+    upstreamOf: (host) => upstreams.find((route) => route.matches(host))?.upstream,
+    dispositionOf(host) {
+      if (isRouted(host)) return "routed"
+      if (isAllowed(host)) return "passthrough"
+
+      return unmatched === "block" || isBlocked(host) ? "blocked" : "passthrough"
+    },
+  }
+}
+
+/**
+ * The rules for hosts no route answers: blocked ones get 502, this machine and allowed hosts pass
+ * through, and the rest pass through or get 502 as `unmatched` says.
+ */
+async function placeUnrouted(server: Mockttp, options: ProxyOptions, hosts: HostPolicy) {
+  const unrouted = (req: CompletedRequest) => !hosts.isRouted(req.destination.hostname)
+
+  await server
+    .forAnyRequest()
+    .matching((req) => unrouted(req) && hosts.isBlocked(req.destination.hostname))
+    .always()
+    .thenReply(502, "danwo proxy: host is blocked for this run")
+
+  if (options.unmatched !== "block") {
+    await server.forUnmatchedRequest().thenPassThrough()
+
+    return
+  }
+
+  await server
+    .forAnyRequest()
+    .matching((req) => unrouted(req) && hosts.isAllowed(req.destination.hostname))
+    .always()
+    .thenPassThrough()
+  await server
+    .forUnmatchedRequest()
+    .thenReply(502, "danwo proxy: host is not routed and passthrough is blocked")
+}
+
+/** Each route's WebSocket destination: its own `webSocket`, or its upstream's, as `ws(s)://`. */
+function socketUpstreams(routes: readonly Route[]): SocketUpstream[] {
+  return routes.flatMap((route) => {
+    const target = "upstream" in route ? route.upstream.replace(/^http/, "ws") : route.webSocket
+
+    if (target === undefined) return []
+
+    const matches = (host: string) => route.hosts.some((pattern) => hostMatches(pattern, host))
+
+    return [{ matches, upstream: target }]
+  })
+}
+
 /** Whether a request's user agent is a browser's rather than a server-side HTTP client's. */
 function clientOf(userAgent: string | string[] | undefined): "browser" | "server" {
   const agent = Array.isArray(userAgent) ? userAgent.join(" ") : (userAgent ?? "")
@@ -411,30 +529,18 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
       .thenCallback((req) => handle(handler, req))
   }
 
-  const blocked = options.blocked ?? []
-  const isBlocked = (host: string) => blocked.some((pattern) => hostMatches(pattern, host))
+  const hosts = hostPolicy(options, isRouted)
 
-  if (blocked.length > 0) {
-    await server
-      .forAnyRequest()
-      .matching((req) => !isRouted(req.destination.hostname) && isBlocked(req.destination.hostname))
-      .always()
-      .thenReply(502, "danwo proxy: host is blocked for this run")
-  }
+  await placeUnrouted(server, options, hosts)
 
-  if (options.unmatched === "block") {
-    await server
-      .forUnmatchedRequest()
-      .thenReply(502, "danwo proxy: host is not routed and passthrough is blocked")
-  } else {
-    await server.forUnmatchedRequest().thenPassThrough()
-  }
+  const sockets = await handleSockets(server, hosts, socketUpstreams(options.routes))
 
   const waiters = new Set<() => void>()
   // Bodies are read off the event loop; an exchange counts as finished once its captures land.
   const capturing = new Set<Promise<void>>()
   const finished = () =>
-    capturing.size === 0 && [...log.values()].every((e) => e.status !== null || e.aborted)
+    capturing.size === 0 &&
+    [...log.values()].every((e) => e.stream === true || e.status !== null || e.aborted)
 
   const capture = (work: Promise<void>) => {
     const tracked = work.finally(() => {
@@ -458,11 +564,8 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
       host,
       method: req.method,
       path: req.path,
-      disposition: isRouted(host)
-        ? "routed"
-        : options.unmatched === "block" || isBlocked(host)
-          ? "blocked"
-          : "passthrough",
+      disposition: hosts.dispositionOf(host),
+      ...(isPageAsset(req.path) && { asset: true }),
       startedAt: new Date(req.timingEvents.startTime).toISOString(),
       client: clientOf(req.headers["user-agent"]),
       status: null,
@@ -480,6 +583,16 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
         if (exchange) exchange.request = message
       }),
     )
+  })
+  /* A stream's headers arrive long before it ends, if it ever does: readiness stops waiting then. */
+  await server.on("response-initiated", (res) => {
+    const exchange = log.get(res.id)
+
+    if (exchange && isStreaming(res.headers["content-type"])) {
+      exchange.stream = true
+      exchange.status = res.statusCode
+      notify()
+    }
   })
   await server.on("response", (res) => {
     const exchange = log.get(res.id)
@@ -532,11 +645,16 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
       }
     },
     exchanges: () => [...log.values()],
+    sockets: () => sockets.sockets(),
     setFault(rule) {
       faultRule = rule
     },
+    setSocketFault(rule) {
+      sockets.setFault(rule)
+    },
     clear() {
       log.clear()
+      sockets.clear()
       faultLabels.clear()
       callIndex = 0
     },

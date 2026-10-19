@@ -22,14 +22,17 @@
     "@bachs/sdk": "1.0.0",
     "@danwo/emulators": "workspace:*",
     "@types/express": "5.0.6",
+    "@types/ws": "8.18.2",
     "ai": "7.0.143",
     "express": "5.3.0",
     "express-openid-connect": "3.4.0",
     "google-auth-library": "11.3.1",
+    "https-proxy-agent": "7.0.6",
     "openai": "7.38.0",
     "resend": "6.34.1",
     "stripe": "23.0.0",
     "twilio": "6.2.0",
+    "ws": "8.22.0",
     "zod": "4.6.1"
   }
 }

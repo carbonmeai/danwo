@@ -149,7 +149,7 @@ describe("routing an unmodified app", () => {
     }
   })
 
-  it("blocks unrouted hosts when asked", async () => {
+  it("blocks unrouted hosts when asked, but still lets calls to this machine through", async () => {
     const emulator = createEmulator(stripe)
     const proxy = await startProxy({
       routes: [{ hosts: ["api.stripe.com", "checkout.stripe.com"], handler: emulator.fetch }],
@@ -160,11 +160,11 @@ describe("routing an unmodified app", () => {
       const out = await runApp(proxy.env())
 
       expect(out.customer).toMatch(/^cus_/)
-      expect(out.other).toBe(502)
+      expect(out.other).toBe(204)
       await proxy.settled()
       expect(proxy.exchanges().find((e) => e.path === "/ping")).toMatchObject({
-        disposition: "blocked",
-        status: 502,
+        disposition: "passthrough",
+        status: 204,
       })
     } finally {
       await proxy.stop()
