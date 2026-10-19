@@ -11,7 +11,7 @@ import {
   runFidelity,
   shapeOf,
 } from "../src/index.ts"
-import { LiveCredentialRefused } from "../src/provider.ts"
+import { type FidelityProvider, LiveCredentialRefused } from "../src/provider.ts"
 import { formBody } from "../src/target.ts"
 
 const root = fileURLToPath(new URL("../../..", import.meta.url))
@@ -99,6 +99,40 @@ describe("comparing", () => {
 
     expect(accepted).toHaveLength(1)
     expect(counted).toHaveLength(2)
+  })
+})
+
+describe("skipping", () => {
+  it("reports a scenario the sandbox cannot run as skipped, not as a mismatch", async () => {
+    const answering = (status: number) => ({
+      credentials: {},
+      send: () => Promise.resolve(Response.json({ name: "restricted" }, { status })),
+    })
+    const provider: FidelityProvider = {
+      name: "skipping",
+      credentials: [],
+      scenarios: [
+        {
+          name: "read something",
+          async run(context) {
+            const answer = await context.step("read", new Request("https://api.test/read"))
+
+            if (answer.status === 401) context.skip("the key cannot read")
+          },
+        },
+      ],
+      emulator: () => Promise.resolve({ kind: "emulator", ...answering(200), close: async () => {} }),
+      live: () => ({ kind: "live", ...answering(401) }),
+    }
+    const reports = await runFidelity({ root, providers: [provider], env: {} })
+
+    expect(reports[0]?.scenarios[0]?.skipped).toBe("the key cannot read")
+    expect(fidelityPassed(reports)).toBe(true)
+    expect(formatFidelity(reports)).toEqual([
+      "skipping (live): 0 of 1 scenarios match, 1 skipped",
+      "  - read something (skipped: the key cannot read)",
+      "",
+    ])
   })
 })
 

@@ -29,6 +29,8 @@ export interface ScenarioReport {
   readonly error?: string
   /** No golden covers this scenario yet. */
   readonly unchecked?: boolean
+  /** The sandbox could not run this scenario, and why; nothing was compared. */
+  readonly skipped?: string
 }
 
 export interface ProviderReport {
@@ -108,6 +110,12 @@ async function checkAgainst(
     const emulated = await onEmulator(provider, scenario)
     const expected = await expectedOf(scenario, emulated)
     const error = expected.run?.error ?? emulated.error
+    const skipped = expected.run?.skipped
+
+    if (skipped !== undefined) {
+      reports.push({ scenario: scenario.name, counted: [], accepted: [], skipped })
+      continue
+    }
 
     if (expected.golden === undefined) {
       reports.push({
@@ -156,7 +164,10 @@ function expectations(
       of: async (scenario) => {
         const run = await runScenario(scenario, live)
 
-        return { run, ...(run.error === undefined && { golden: goldenOf(run) }) }
+        return {
+          run,
+          ...(run.error === undefined && run.skipped === undefined && { golden: goldenOf(run) }),
+        }
       },
     }
   if (description !== undefined)
@@ -240,15 +251,22 @@ function differenceLine(difference: StepDifference): string {
   return `      ${KIND_LABELS[difference.kind]}${where}: real ${difference.expected}, emulator ${difference.actual}`
 }
 
+function scenarioHead(report: ScenarioReport): string {
+  if (report.skipped !== undefined) return "  -"
+  if (report.unchecked === true) return "  ·"
+
+  return report.counted.length === 0 ? "  ✓" : "  ✗"
+}
+
+function scenarioNote(report: ScenarioReport): string {
+  if (report.skipped !== undefined) return ` (skipped: ${report.skipped})`
+  if (report.unchecked === true) return " (no golden yet)"
+
+  return report.accepted.length > 0 ? ` (${report.accepted.length} known)` : ""
+}
+
 function scenarioLines(report: ScenarioReport): string[] {
-  const head = report.unchecked === true ? "  ·" : report.counted.length === 0 ? "  ✓" : "  ✗"
-  const note =
-    report.unchecked === true
-      ? " (no golden yet)"
-      : report.accepted.length > 0
-        ? ` (${report.accepted.length} known)`
-        : ""
-  const lines = [`${head} ${report.scenario}${note}`]
+  const lines = [`${scenarioHead(report)} ${report.scenario}${scenarioNote(report)}`]
   const byStep = Map.groupBy(report.counted, (difference) => difference.step)
 
   for (const [step, differences] of byStep)
@@ -262,7 +280,8 @@ function scenarioLines(report: ScenarioReport): string[] {
 export function formatFidelity(reports: readonly ProviderReport[]): string[] {
   return reports.flatMap((report) => {
     const failing = report.scenarios.filter((s) => s.counted.length > 0).length
-    const header = `${report.provider} (${report.mode}): ${report.scenarios.length - failing} of ${report.scenarios.length} scenarios match`
+    const skipped = report.scenarios.filter((s) => s.skipped !== undefined).length
+    const header = `${report.provider} (${report.mode}): ${report.scenarios.length - failing - skipped} of ${report.scenarios.length} scenarios match${skipped > 0 ? `, ${skipped} skipped` : ""}`
 
     return [
       header,

@@ -70,6 +70,8 @@ export interface ScenarioRun {
   readonly facts: readonly Fact[]
   /** Set when the scenario threw instead of finishing. */
   readonly error?: string
+  /** Set when the scenario stopped because the target cannot run it, with why. */
+  readonly skipped?: string
 }
 
 /** An answer as a scenario sees it. */
@@ -89,6 +91,11 @@ export interface ScenarioContext {
   fact(name: string, value: Fact["value"], kind?: DifferenceKind): void
   /** Registers sandbox cleanup to run after the scenario, finished or not. */
   cleanup(undo: () => Promise<unknown>): void
+  /**
+   * Stops the scenario because the target cannot run it (a key without the access it needs, say).
+   * A skipped scenario is reported with `reason` and neither compared nor kept in a golden.
+   */
+  skip(reason: string): never
 }
 
 export interface Scenario {
@@ -141,6 +148,16 @@ async function readBody(response: Response, events: boolean): Promise<Json> {
   return events ? eventsByType(text) : parseJson(text)
 }
 
+/** Thrown by `skip` to end a scenario early. */
+class ScenarioSkipped extends Error {
+  readonly reason: string
+
+  constructor(reason: string) {
+    super(reason)
+    this.reason = reason
+  }
+}
+
 function errorText(error: unknown): string {
   return redactCredentials(error instanceof Error ? error.message : String(error))
 }
@@ -174,6 +191,9 @@ export async function runScenario(scenario: Scenario, target: Target): Promise<S
     cleanup(step) {
       undo.push(step)
     },
+    skip(reason) {
+      throw new ScenarioSkipped(reason)
+    },
   }
 
   try {
@@ -181,6 +201,9 @@ export async function runScenario(scenario: Scenario, target: Target): Promise<S
 
     return { scenario: scenario.name, steps, facts }
   } catch (error) {
+    if (error instanceof ScenarioSkipped)
+      return { scenario: scenario.name, steps, facts, skipped: error.reason }
+
     return { scenario: scenario.name, steps, facts, error: errorText(error) }
   } finally {
     for (const step of undo.toReversed()) await step().catch(() => undefined)
