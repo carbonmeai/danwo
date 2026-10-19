@@ -174,6 +174,33 @@ describe("novu server API", () => {
   })
 })
 
+describe("novu idempotency", () => {
+  it("answers a retried trigger with the first answer, and runs the workflow once", async () => {
+    seedNovu(emulator.store, {
+      workflows: [{ workflowId: "once", steps: [{ stepId: "bell", type: "in_app", body: "hi" }] }],
+    })
+
+    const send = (body: unknown) =>
+      fetch(`${origin()}/v1/events/trigger`, {
+        method: "POST",
+        headers: {
+          authorization: `ApiKey ${KEY}`,
+          "content-type": "application/json",
+          "idempotency-key": "k-1",
+        },
+        body: JSON.stringify(body),
+      })
+    const first = await send({ name: "once", to: "u9", payload: {} })
+    const again = await send({ name: "once", to: "u9", payload: {} })
+
+    expect(again.headers.get("idempotency-replayed")).toBe("true")
+    expect(await again.json()).toEqual(await first.json())
+    expect((await send({ name: "once", to: "u10", payload: {} })).status).toBe(422)
+    await novuProject(emulator).idle()
+    expect(novuProject(emulator).inbox("u9")).toHaveLength(1)
+  })
+})
+
 describe("novu framework bridge", () => {
   it("executes each step through the app's bridge, skipping what it skips, and emails through Resend", async () => {
     const mail = createEmulator(resend)

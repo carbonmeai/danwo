@@ -4,9 +4,9 @@
  * topics and their subscriptions, and a subscriber's notifications.
  */
 import { HttpError } from "../errors.ts"
-import type { App, Context } from "../http.ts"
+import type { App, Context, Middleware } from "../http.ts"
 import { asRecord } from "../json.ts"
-import type { Clock } from "../store.ts"
+import type { Clock, DataKey, Store } from "../store.ts"
 import type { NovuEngine } from "./engine.ts"
 import type { NovuEnvironment, NovuSubscriber } from "./entities.ts"
 import {
@@ -436,7 +436,61 @@ function topicRoutes(ctx: NovuRouteContext): void {
   })
 }
 
-export function apiRoutes(ctx: NovuRouteContext): void {
+/** What one idempotency key remembers: the request it came with and the answer it got. */
+interface Remembered {
+  readonly request: string
+  readonly status: number
+  readonly body: string
+  readonly at: number
+}
+
+const IDEMPOTENCY: DataKey<Map<string, Remembered>> = { name: "novu.idempotency" }
+const KEY_LIFETIME_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Novu answers a write it has seen under the same `idempotency-key` (which `@novu/api` sends on
+ * every request, and keeps across its retries) with the first answer, marked
+ * `idempotency-replayed`, so a retry after a lost answer triggers a workflow once. The same key
+ * with a different request is refused.
+ */
+function idempotency(ctx: NovuRouteContext, store: Store): Middleware {
+  return async (c, next) => {
+    const key = c.req.header("idempotency-key")
+
+    if (key === undefined || c.req.method === "GET" || c.req.path.startsWith("/v1/inbox/"))
+      return next()
+
+    const memory = store.getData(IDEMPOTENCY) ?? new Map<string, Remembered>()
+    const request = `${c.req.method} ${c.req.path} ${await c.req.text()}`
+    const now = ctx.clock().getTime()
+    const earlier = memory.get(key)
+
+    if (earlier && now - earlier.at < KEY_LIFETIME_MS) {
+      if (earlier.request !== request)
+        throw new HttpError(422, `Request with key "${key}" is being reused for a different body`)
+
+      return c.body(earlier.body, earlier.status, {
+        "content-type": "application/json",
+        "idempotency-key": key,
+        "idempotency-replayed": "true",
+      })
+    }
+
+    const response = await next()
+    const body = await response.clone().text()
+
+    if (response.status < 500)
+      store.setData(
+        IDEMPOTENCY,
+        new Map(memory).set(key, { request, status: response.status, body, at: now }),
+      )
+
+    return response
+  }
+}
+
+export function apiRoutes(ctx: NovuRouteContext, store: Store): void {
+  ctx.app.use(idempotency(ctx, store))
   eventRoutes(ctx)
   subscriberRoutes(ctx)
   topicRoutes(ctx)

@@ -78,7 +78,7 @@ export const novu = defineEmulator({
       return novuError(c, status, error instanceof Error ? error.message : "Internal server error")
     })
     inboxRoutes({ app, objects, clock, engine, realtime })
-    apiRoutes({ app, objects, clock, engine, realtime })
+    apiRoutes({ app, objects, clock, engine, realtime }, store)
   },
   seed({ store }) {
     seedNovu(store, {
