@@ -5,7 +5,7 @@
 import type { LiveEvent } from "@danwo/runner/runner"
 import { useEffect, useMemo, useState } from "react"
 
-import { faviconWith } from "../layout/components/brand.tsx"
+import { faviconWith } from "../layout/brand.ts"
 import type { LauncherState } from "./launcher.ts"
 import type { ActiveRun } from "./live-data.ts"
 import { foldLive, type LiveView } from "./live-values.ts"
@@ -93,7 +93,7 @@ export function useRunInTab(state: string | undefined, title: string): void {
 
 /** Points the tab's icon at `href`; gives back what points it back. */
 function swapIcon(href: string): () => void {
-  const icon = document.querySelector<HTMLLinkElement>("link[rel=icon]")
+  const icon = document.querySelector<HTMLLinkElement>('link[rel=icon][type="image/svg+xml"]')
   const before = icon?.getAttribute("href") ?? ""
 
   icon?.setAttribute("href", href)

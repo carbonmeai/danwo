@@ -1,54 +1,48 @@
-import { Box } from "@danwo/ui/jsx"
+import { styled } from "@danwo/ui/jsx"
+
+import { BRAND, BRAND_NAME } from "../brand.ts"
+
+/** Which brand image: the horizontal lockup, the mark on its tile, or the bare glyph. */
+type Kind = keyof typeof BRAND
 
 /**
- * danwo's mark on its solid tile: the app in front, and the layer behind it that danwo watches,
- * offset so both show.
+ * A brand image in the theme's version: the light-page file, swapped for the dark-page one under
+ * the dark theme. `label` names it; without one it is decoration next to words that already say
+ * the name.
  */
-export function Mark({ size = 20 }: { readonly size?: number }) {
+export function BrandImage({
+  kind,
+  height,
+  label = BRAND_NAME,
+  decorative = false,
+}: {
+  readonly kind: Kind
+  readonly height: number
+  readonly label?: string
+  readonly decorative?: boolean
+}) {
+  const alt = decorative ? "" : label
+
   return (
-    <Box
-      display="inline-grid"
-      placeItems="center"
-      flexShrink="0"
-      rounded="6px"
-      bg="ink.solid"
-      color="ink.onSolid"
-      style={{ width: size, height: size }}
-    >
-      <svg
-        width={size * 0.7}
-        height={size * 0.7}
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-        focusable="false"
-      >
-        <rect x="9" y="9" width="12" height="12" rx="2.5" fill="currentColor" opacity="0.45" />
-        <rect
-          x="3"
-          y="3"
-          width="12"
-          height="12"
-          rx="2.5"
-          fill="var(--danwo-colors-ink-solid)"
-          stroke="currentColor"
-          strokeWidth="2.2"
-        />
-      </svg>
-    </Box>
+    <>
+      <styled.img
+        src={BRAND[kind].onLight}
+        alt={alt}
+        height={height}
+        flexShrink="0"
+        display="block"
+        _dark={{ display: "none" }}
+        style={{ height }}
+      />
+      <styled.img
+        src={BRAND[kind].onDark}
+        alt={alt}
+        height={height}
+        flexShrink="0"
+        display="none"
+        _dark={{ display: "block" }}
+        style={{ height }}
+      />
+    </>
   )
 }
-
-/** The mark as an SVG data URL for the favicon, with a dot of colour `dot` in its corner if given. */
-export function faviconWith(dot?: string): string {
-  const badge =
-    dot === undefined
-      ? ""
-      : `<circle cx="19" cy="5" r="5" fill="${dot}" stroke="#fff" stroke-width="1.5"/>`
-
-  return `data:image/svg+xml,${encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#0a1217"/><g transform="translate(3.6 3.6) scale(.7)"><rect x="9" y="9" width="12" height="12" rx="2.5" fill="#fff" opacity=".45"/><rect x="3" y="3" width="12" height="12" rx="2.5" fill="#0a1217" stroke="#fff" stroke-width="2.2"/></g>${badge}</svg>`,
-  )}`
-}
-
-/** The mark as an SVG data URL, for the favicon. */
-export const FAVICON = faviconWith()

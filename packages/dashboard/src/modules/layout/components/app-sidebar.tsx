@@ -1,5 +1,5 @@
 import { Icons } from "@danwo/ui/icons/base"
-import { Box, HStack } from "@danwo/ui/jsx"
+import { Box, HStack, Stack } from "@danwo/ui/jsx"
 import {
   Sidebar,
   SidebarContent,
@@ -18,7 +18,7 @@ import { Link, useRouterState } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 
 import { useActiveRuns } from "../../live/use-live.ts"
-import { Mark } from "./brand.tsx"
+import { BrandImage } from "./brand.tsx"
 import { ThemeSwitch } from "./theme-switch.tsx"
 
 /** One section of the dashboard in the sidebar: its icon, its name, and a count when it has one. */
@@ -62,16 +62,23 @@ function LiveBadge() {
   )
 }
 
-/** The project the dashboard reads, as the sidebar's heading: danwo's mark and the folder's name. */
+/**
+ * The sidebar's heading: the brand's horizontal lockup and the project's folder beneath it; only
+ * the mark when the sidebar is the icon rail.
+ */
 function ProjectName({ name }: { readonly name: string }) {
   return (
-    <Link to="/" aria-label={`danwo, the tests of ${name}`}>
-      <HStack gap="2" minW="0" h="8" px="1">
-        <Box flexShrink="0" display="inline-flex">
-          <Mark />
+    <Link to="/" aria-label={`dánwò, the tests of ${name}`}>
+      <Stack gap="1" minW="0" px="1" py="0.5">
+        <Box display="flex" css={{ "[data-collapsible=icon] &": { display: "none" } }}>
+          <BrandImage kind="lockup" height={22} />
+        </Box>
+        <Box display="none" css={{ "[data-collapsible=icon] &": { display: "flex" } }}>
+          <BrandImage kind="mark" height={24} />
         </Box>
         <Span
-          fontWeight="600"
+          fontSize="1"
+          color="ink.muted"
           overflow="hidden"
           textOverflow="ellipsis"
           whiteSpace="nowrap"
@@ -80,7 +87,7 @@ function ProjectName({ name }: { readonly name: string }) {
         >
           {name}
         </Span>
-      </HStack>
+      </Stack>
     </Link>
   )
 }

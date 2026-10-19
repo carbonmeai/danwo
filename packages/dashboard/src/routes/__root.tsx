@@ -4,8 +4,8 @@ import { createRootRoute, HeadContent, Link, Outlet, Scripts } from "@tanstack/r
 
 import { Empty } from "../components/empty-state.tsx"
 import { Page } from "../components/page.tsx"
+import { ICON_LINKS } from "../modules/layout/brand.ts"
 import { AppShell } from "../modules/layout/components/app-shell.tsx"
-import { FAVICON } from "../modules/layout/components/brand.tsx"
 import { fetchProject } from "../modules/layout/project-api.ts"
 import type { Pane } from "../modules/overlay/overlay-panes.tsx"
 import { isPane } from "../modules/overlay/record-overlay.tsx"
@@ -41,10 +41,7 @@ export const Route = createRootRoute({
       { name: "color-scheme", content: "light dark" },
       { title: "danwo" },
     ],
-    links: [
-      { rel: "stylesheet", href: appCss },
-      { rel: "icon", type: "image/svg+xml", href: FAVICON },
-    ],
+    links: [{ rel: "stylesheet", href: appCss }, ...ICON_LINKS],
   }),
   loader: () => fetchProject(),
   staleTime: Infinity,

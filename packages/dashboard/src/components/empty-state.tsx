@@ -1,9 +1,9 @@
-import { Icons } from "@danwo/ui/icons/base"
 import { Box } from "@danwo/ui/jsx"
 import { Card } from "@danwo/ui/primitives/card"
 import { Text } from "@danwo/ui/primitives/typography"
 import type { ReactNode } from "react"
 
+import { BrandImage } from "../modules/layout/components/brand.tsx"
 import { Command } from "./code.tsx"
 
 /** What a page shows when there is nothing to show yet, and the command that fills it. */
@@ -39,7 +39,7 @@ export function Empty({
         color="ink.muted"
         mb="1"
       >
-        <Icons.folderOpen size={18} />
+        <BrandImage kind="glyph" height={18} decorative />
       </Box>
       <Text fontWeight="600" fontSize="15px">
         {title}
