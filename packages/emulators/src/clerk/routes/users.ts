@@ -177,7 +177,7 @@ function writeRoutes(app: App, context: ClerkContext): void {
     context.clerk.users.remove(user.id)
     context.events.userDeleted(user)
 
-    return c.json({ object: "user", id: user.id, slug: null, deleted: true })
+    return c.json({ object: "user", id: user.id, deleted: true, external_id: user.external_id })
   })
 }
 
@@ -213,7 +213,7 @@ function accountRoutes(app: App, context: ClerkContext): void {
 
     if (address === undefined) throw invalidParameter("email_address")
 
-    const email = verifiedEmail(address)
+    const email = verifiedEmail(address, context.clock().getTime())
 
     changeUser(context, user.id, { email_addresses: [...user.email_addresses, email] })
 

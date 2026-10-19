@@ -88,7 +88,7 @@ function browserUser(context: ClerkContext, user: ClerkUser) {
     unsafe_metadata: user.unsafe_metadata,
     last_sign_in_at: user.last_sign_in_at,
     create_organization_enabled: user.create_organization_enabled,
-    create_organizations_limit: user.create_organizations_limit,
+    create_organizations_limit: null,
     delete_self_enabled: user.delete_self_enabled,
     legal_accepted_at: user.legal_accepted_at,
     timezone: user.timezone,
