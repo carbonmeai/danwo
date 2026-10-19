@@ -212,6 +212,21 @@ export {
 } from "./s3.ts"
 export { type Service, type Services, startServices } from "./services.ts"
 export {
+  type AppCommand,
+  appEnvironment,
+  type AppEnvironmentOptions,
+  type StartedApp,
+  startApp,
+} from "./app-environment.ts"
+export {
+  RESEND_HOSTS,
+  type ResendEnvironment,
+  resendEnvironment,
+  type ResendOptions,
+  resendService,
+} from "./resend.ts"
+export { type ModelPrice, priced } from "../model/priced.ts"
+export {
   type StripeEnvironment,
   stripeEnvironment,
   type StripeOptions,

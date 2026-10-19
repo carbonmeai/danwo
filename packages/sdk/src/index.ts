@@ -39,6 +39,14 @@ export interface S3Fixtures {
   readonly settle: () => Promise<void>
 }
 
+/** Fixtures a `resendEnvironment()` or `resendService()` contributes. */
+export interface ResendFixtures {
+  /** The Resend emulator; read the mail the app sent with `resendInbox(resend)`. */
+  readonly resend: Emulator
+  readonly proxy: Proxy
+  readonly settle: () => Promise<void>
+}
+
 /** Fixtures an `awsEnvironment()` or `awsService()` (MiniStack) contributes. */
 export interface AwsFixtures {
   readonly aws: AwsFixture
@@ -186,6 +194,17 @@ export const test: TestAPI<DanwoFixtures> =
 export const { describe, beforeEach, afterEach, beforeAll, afterAll } = test
 
 export {
+  type AppCommand,
+  appEnvironment,
+  type AppEnvironmentOptions,
+  type ModelPrice,
+  priced,
+  type ResendEnvironment,
+  resendEnvironment,
+  type ResendOptions,
+  resendService,
+  type StartedApp,
+  startApp,
   type Auth0Environment,
   auth0Environment,
   type Auth0Options,
