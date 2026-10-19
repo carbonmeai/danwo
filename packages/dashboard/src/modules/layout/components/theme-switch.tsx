@@ -1,11 +1,20 @@
 import { Icons } from "@danwo/ui/icons/base"
 import { Button } from "@danwo/ui/primitives/button"
 import { useTheme } from "@danwo/ui/primitives/theme"
+import { useEffect, useState } from "react"
 
-/** Switches between the light and dark themes, as the library's icon button. */
+/**
+ * Switches between the light and dark themes, as the library's icon button. The theme is only
+ * known in the browser, so the button names the light theme until the page has hydrated, and the
+ * server and the first browser render agree.
+ */
 export function ThemeSwitch() {
   const { resolvedTheme, setTheme } = useTheme()
-  const next = resolvedTheme === "dark" ? "light" : "dark"
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => setMounted(true), [])
+
+  const next = mounted && resolvedTheme === "dark" ? "light" : "dark"
 
   return (
     <Button

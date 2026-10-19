@@ -86,7 +86,12 @@ function Feedback({ dir }: { readonly dir: string }) {
           tooltipChildren={each === "up" ? "This helped" : "This did not help"}
           onClick={() => send(each)}
         >
-          <Icons.thumbsUp size={14} transform={each === "down" ? "rotate(180deg)" : undefined} />
+          <Box
+            display="inline-flex"
+            style={{ transform: each === "down" ? "rotate(180deg)" : undefined }}
+          >
+            <Icons.thumbsUp size={14} />
+          </Box>
         </Button>
       ))}
     </HStack>
@@ -180,7 +185,14 @@ export function Transcript({
 
   return (
     <Stack gap="0" h="full" minH="0">
-      <Stack gap="2" px="5" pt="5" pb="4" boxShadow="inset 0 -1px 0 {colors.hairline}">
+      <Stack
+        gap="2"
+        pl="5"
+        pr={{ base: "12", md: "5" }}
+        pt="5"
+        pb="4"
+        boxShadow="inset 0 -1px 0 {colors.hairline}"
+      >
         <HStack justify="space-between" gap="3" alignItems="flex-start">
           <DialogTitle fontSize="2" fontWeight="600" overflowWrap="anywhere">
             {record.test}

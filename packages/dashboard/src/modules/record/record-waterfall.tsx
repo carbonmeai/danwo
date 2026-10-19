@@ -1,3 +1,4 @@
+import { cva } from "@danwo/ui/css"
 import { Box, Grid, HStack } from "@danwo/ui/jsx"
 import { Button } from "@danwo/ui/primitives/button"
 import { Span } from "@danwo/ui/primitives/typography"
@@ -23,11 +24,16 @@ function KindMark({ kind }: { readonly kind: TimelineItem["kind"] }) {
 }
 
 /** Each kind's bar colour: steps grey, calls blue, webhooks aqua. */
-const BAR_FILL = {
-  step: "series.other",
-  call: "series.1",
-  webhook: "series.3",
-} as const
+const fill = cva({
+  variants: {
+    kind: {
+      step: { bg: "series.other" },
+      call: { bg: "series.1" },
+      webhook: { bg: "series.3" },
+      failed: { bg: "verdict.failed.solid" },
+    },
+  },
+})
 
 /** What the waterfall does with the replay player: where it is, and seeking it to a bar. */
 export interface WaterfallPlayer {
@@ -54,12 +60,12 @@ function Bar({
     left: `${(item.startMs / span) * 100}%`,
     width: `max(3px, ${(item.durationMs / span) * 100}%)`,
   }
-  const fill = (
+  const bar = (
     <Box
       position="absolute"
       inset="0"
       rounded="2px"
-      bg={item.bad ? "verdict.failed.solid" : BAR_FILL[item.kind]}
+      className={fill({ kind: item.bad ? "failed" : item.kind })}
     />
   )
 
@@ -81,7 +87,7 @@ function Bar({
           style={place}
           onClick={() => onSeek(item.startMs)}
         >
-          {fill}
+          {bar}
         </Button>
       ) : (
         <Box
@@ -90,7 +96,7 @@ function Bar({
           bottom={item.kind === "step" ? "0" : "1"}
           style={place}
         >
-          {fill}
+          {bar}
         </Box>
       )}
       {item.fault ? (
@@ -278,11 +284,11 @@ export function Waterfall({
 
 /** What the waterfall's colours and marks mean. */
 export function TimelineLegend() {
-  const entries: readonly (readonly [string, string])[] = [
-    ["Step", "series.other"],
-    ["Provider call", "series.1"],
-    ["Webhook", "series.3"],
-    ["Failed", "verdict.failed.solid"],
+  const entries: readonly (readonly [string, "step" | "call" | "webhook" | "failed"])[] = [
+    ["Step", "step"],
+    ["Provider call", "call"],
+    ["Webhook", "webhook"],
+    ["Failed", "failed"],
   ]
 
   return (
@@ -294,9 +300,9 @@ export function TimelineLegend() {
       color="ink.soft"
       flexWrap="wrap"
     >
-      {entries.map(([label, color]) => (
+      {entries.map(([label, kind]) => (
         <HStack role="listitem" key={label} gap="1.5">
-          <Box w="2" h="2" rounded="2px" bg={color} />
+          <Box w="2" h="2" rounded="2px" className={fill({ kind })} />
           {label}
         </HStack>
       ))}

@@ -42,6 +42,7 @@ function Cell({
           <Button
             key={trial.fault}
             variant="transparent"
+            position="relative"
             size="icon"
             flex="1"
             minW="0"
@@ -68,7 +69,7 @@ function Cell({
               else onPick(trial)
             }}
           >
-            <Swatch tone={toneOf(trial.status)} w="full" h="full" rounded="6px" />
+            <Swatch tone={toneOf(trial.status)} position="absolute" inset="0" rounded="6px" />
           </Button>
         )
       })}
