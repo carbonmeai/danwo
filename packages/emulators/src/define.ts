@@ -1,5 +1,6 @@
 import { App } from "./http.ts"
 import { Outbox } from "./outbox.ts"
+import type { SocketHandler } from "./sockets.ts"
 import { type Clock, Store, type StoreSnapshot, systemClock } from "./store.ts"
 import { systemTimer, type Timer } from "./time.ts"
 import {
@@ -45,6 +46,8 @@ export interface EmulatorDefinition {
   /** Default data, applied when the emulator starts and after every reset. */
   readonly seed?: (context: EmulatorContext) => void
   readonly webhooks?: (context: EmulatorContext) => WebhookSetup
+  /** Answers the provider's WebSockets (realtime channels, collaboration) for clients that keep one open. */
+  readonly sockets?: (context: EmulatorContext) => SocketHandler
 }
 
 /** Checks a definition's name and returns it, typed. */
@@ -77,6 +80,8 @@ export interface Emulator {
   readonly outbox: Outbox
   readonly webhooks: WebhookDispatcher | undefined
   readonly fetch: (request: Request) => Promise<Response>
+  /** Answers one WebSocket connection; undefined for an emulator that serves none. */
+  readonly connect: SocketHandler | undefined
   snapshot(): StoreSnapshot
   /** Puts the store back as `snapshot` kept it and drops the webhooks emitted since. */
   restore(snapshot: StoreSnapshot): void
@@ -110,6 +115,8 @@ export function createEmulator(
 
   webhooks?.start()
 
+  const connect = definition.sockets?.(context)
+
   return {
     name: definition.name,
     baseUrl,
@@ -117,6 +124,7 @@ export function createEmulator(
     outbox: context.outbox,
     webhooks,
     fetch: (request) => context.app.fetch(request),
+    connect,
     snapshot: () => context.store.snapshot(),
     restore(snapshot) {
       context.store.restore(snapshot)

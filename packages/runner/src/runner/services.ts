@@ -13,6 +13,8 @@ export interface Service {
   /** Names the service in fixtures' evidence and in `danwo matrix` labels (`stripe`, `s3`). */
   readonly name: string
   readonly routes: readonly Route[]
+  /** Starts what the routes need before the proxy reads them, such as a local WebSocket server. */
+  start?(): Promise<void>
   readonly fixtures?: Readonly<Record<string, unknown>>
   /** Webhook delivery `danwo matrix` can fault. */
   readonly webhooks?: WebhookDispatcher | undefined
@@ -93,6 +95,8 @@ export async function startServices(
   services: readonly Service[],
   options: UnroutedHosts = {},
 ): Promise<Services> {
+  for (const service of services) await service.start?.()
+
   const proxy = await startProxy({ routes: services.flatMap((s) => s.routes), ...options })
 
   for (const service of services) service.attach?.(proxy)

@@ -309,6 +309,33 @@ export {
   seedLlm,
 } from "./llm/index.ts"
 export { seedStripe, stripe, stripeOutboundFaults, type StripeSeedConfig } from "./stripe/index.ts"
+export {
+  type BeamsDevice,
+  type BeamsPublish,
+  PUSHER_DEFAULTS,
+  PUSHER_HOSTS,
+  type PusherBeams,
+  type PusherChannels,
+  type PusherEvent,
+  type PusherSeedApp,
+  type PusherSeedBeams,
+  type PusherSeedConfig,
+  type PusherWebhookKind,
+  pusher,
+  pusherBeams,
+  pusherChannels,
+  pusherOutboundFaults,
+  pusherSignedQuery,
+  seedPusher,
+} from "./pusher/index.ts"
+export {
+  type EmulatorSocket,
+  type SocketHandler,
+  type SocketServer,
+  type SocketSession,
+  type SocketUpgrade,
+  serveSockets,
+} from "./sockets.ts"
 export { ManualClock, systemTimer, type Timer } from "./time.ts"
 export {
   type PhoneMessage,

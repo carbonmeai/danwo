@@ -34,7 +34,9 @@ import {
   seedPaystack,
   seedSlack,
   seedTwilio,
+  serveSockets,
   SLACK_HOSTS,
+  type SocketServer,
   slack,
   type SlackSeedConfig,
   twilio,
@@ -216,14 +218,36 @@ export function oauthService<Config>(
 
   apply()
 
+  const lifecycle = emulatorLifecycle(emulator, clock, apply)
+  const { connect } = emulator
+  let sockets: SocketServer | undefined
+
   return {
     name: provider.name,
     emulator,
     clock,
-    routes: [{ hosts: provider.hosts, handler: emulator.fetch }],
+    /* An emulator that answers WebSockets gets them on a local port the proxy sends upgrades to. */
+    get routes() {
+      return [
+        {
+          hosts: provider.hosts,
+          handler: emulator.fetch,
+          ...(sockets && { webSocket: sockets.url }),
+        },
+      ]
+    },
+    ...(connect && {
+      async start() {
+        sockets ??= await serveSockets(connect)
+      },
+    }),
     fixtures: { [provider.name]: emulator },
     webhooks: emulator.webhooks,
-    ...emulatorLifecycle(emulator, clock, apply),
+    ...lifecycle,
+    async close() {
+      await sockets?.close()
+      await lifecycle.close()
+    },
   }
 }
 
