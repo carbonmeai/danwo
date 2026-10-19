@@ -1,6 +1,6 @@
 import { createRouter } from "@tanstack/react-router"
 
-import { PageSkeleton } from "./components/skeleton.tsx"
+import { PageSkeleton } from "./modules/layout/components/page-skeleton.tsx"
 import { routeTree } from "./routeTree.gen"
 
 /** TanStack Start looks for `getRouter` on the router entry. */

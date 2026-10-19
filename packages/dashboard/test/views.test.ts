@@ -1,12 +1,12 @@
 import type { HistoryTest, HistoryTrial, TestHistory, Usage } from "@danwo/runner/runner"
 import { describe, expect, it } from "vitest"
 
-import { type KeyPress, listAction } from "../src/components/keys.ts"
 import { sparkPoints } from "../src/components/sparkline.tsx"
-import { effectDiff } from "../src/data/effects.ts"
-import { faultGrid, gridGroups, placeOf } from "../src/data/grid.ts"
-import { lanesOf, type TimedRecord, timelineOf } from "../src/data/timeline.ts"
-import { cacheHitRate, healthOf } from "../src/data/trend.ts"
+import { type KeyPress, listAction } from "../src/lib/list-keys.ts"
+import { faultGrid, gridGroups, placeOf } from "../src/modules/matrix/fault-grid.ts"
+import { effectDiff } from "../src/modules/record/record-effects.ts"
+import { lanesOf, type TimedRecord, timelineOf } from "../src/modules/record/record-timeline.ts"
+import { cacheHitRate, healthOf } from "../src/modules/runs/run-trend.ts"
 
 const USAGE: Usage = {
   cache: {},

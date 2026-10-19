@@ -4,8 +4,8 @@
  */
 import type { HistoryLint, HistoryTest, RunHistory, TestHistory } from "@danwo/runner/runner"
 
-import { loadHistory } from "./runs.ts"
-import { cacheHitRate } from "./trend.ts"
+import { cacheHitRate } from "../runs/run-trend.ts"
+import { loadHistory } from "../runs/runs-data.ts"
 
 /** One test's record over the runs that ran it. */
 export interface TestInsight {

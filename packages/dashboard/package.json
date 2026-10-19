@@ -5,6 +5,7 @@
   "description": "The danwo dashboard: runs, flight records, matrix grids and flaky tests, read from a project's .danwo folder.",
   "files": [
     "src",
+    "public",
     "panda.config.ts",
     "postcss.config.ts",
     "vite.config.ts",
@@ -20,8 +21,6 @@
   "dependencies": {
     "@danwo/runner": "workspace:*",
     "@danwo/ui": "workspace:*",
-    "@fontsource/ibm-plex-mono": "5.3.0",
-    "@fontsource/ibm-plex-sans": "5.3.0",
     "@pandacss/dev": "2.2.0",
     "@pandacss/preset-base": "2.2.0",
     "@tanstack/react-router": "1.170.44",

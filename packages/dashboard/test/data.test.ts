@@ -4,11 +4,11 @@ import { join } from "node:path"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
-import { insideArea } from "../src/data/files.ts"
-import { getImpact } from "../src/data/impact.ts"
-import { getInsights } from "../src/data/insights.ts"
-import { getRecord, getScreenshot } from "../src/data/records.ts"
-import { getRun, listRuns } from "../src/data/runs.ts"
+import { insideArea } from "../src/lib/project-files.ts"
+import { getImpact } from "../src/modules/impact/impact-data.ts"
+import { getInsights } from "../src/modules/insights/insights-data.ts"
+import { getRecord, getScreenshot } from "../src/modules/record/record-data.ts"
+import { getRun, listRuns } from "../src/modules/runs/runs-data.ts"
 
 const NO_USAGE = { cache: {}, spent: { calls: 0, retries: 0, tokens: [0, 0], usd: 0 }, steps: [] }
 const SPENT = {

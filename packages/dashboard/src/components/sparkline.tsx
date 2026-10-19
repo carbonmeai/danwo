@@ -29,7 +29,7 @@ export function sparkPoints(
 export function Sparkline({
   values,
   label,
-  color = "var(--danwo-colors-signal-accent)",
+  color = "var(--danwo-colors-series-1)",
   range,
   width = 112,
   height = 28,
@@ -62,7 +62,7 @@ export function Sparkline({
         x2={width}
         y1={height}
         y2={height}
-        stroke="var(--danwo-colors-signal-rule)"
+        stroke="var(--danwo-colors-hairline)"
         strokeWidth="1"
       />
       {points === "" ? null : (

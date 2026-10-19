@@ -15,9 +15,9 @@ import {
   redactCredentials,
 } from "@danwo/runner/runner"
 
-import { type EffectLine, effectDiff } from "./effects.ts"
-import { insideArea, isVersioned, readJson } from "./files.ts"
-import { type Timeline, timelineOf } from "./timeline.ts"
+import { insideArea, isVersioned, readJson } from "../../lib/project-files.ts"
+import { type EffectLine, effectDiff } from "./record-effects.ts"
+import { type Timeline, timelineOf } from "./record-timeline.ts"
 
 /** A step with what the page needs beside the record's own fields. */
 export interface StepView {

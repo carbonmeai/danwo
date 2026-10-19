@@ -7,8 +7,8 @@ import { join } from "node:path"
 
 import type { MatrixHistory, RunHistory, TestHistory, Usage } from "@danwo/runner/runner"
 
-import { danwoDir, entries, isVersioned, readJson } from "./files.ts"
-import { type Health, healthOf } from "./trend.ts"
+import { danwoDir, entries, isVersioned, readJson } from "../../lib/project-files.ts"
+import { type Health, healthOf } from "./run-trend.ts"
 
 /** The statuses a row counts; tests and matrix trials share the words. */
 export interface RunCounts {

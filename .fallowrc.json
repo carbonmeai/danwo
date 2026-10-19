@@ -21,9 +21,9 @@
         "reason": "Design-system components carried over whole: many small prop branches, exercised through the dashboard's browser tests rather than unit coverage."
       },
       {
-        "files": ["packages/dashboard/src/routes/**"],
+        "files": ["packages/dashboard/src/{routes,modules,components}/**/*.tsx"],
         "maxCrap": 120,
-        "reason": "Page components: their branches are conditional rendering, exercised by the dashboard's browser test rather than unit coverage; the data they render is unit tested in packages/dashboard/src/data."
+        "reason": "Page components: their branches are conditional rendering, exercised by the dashboard's browser test rather than unit coverage; the data and values they render are unit tested in packages/dashboard/test."
       },
       {
         "files": ["examples/shop-mobile/src/scripted-model.ts"],
@@ -67,11 +67,6 @@
     "benchmarks/app/server.ts",
     "benchmarks/bench/run.ts"
   ],
-  "ignoreDependencies": [
-    "@danwo/example-shop",
-    "@fontsource/ibm-plex-sans",
-    "@fontsource/ibm-plex-mono"
-  ],
-  "publicPackages": ["@danwo/ui"],
-  "ignoreUnresolvedImports": ["@fontsource/ibm-plex-sans/*", "@fontsource/ibm-plex-mono/*"]
+  "ignoreDependencies": ["@danwo/example-shop"],
+  "publicPackages": ["@danwo/ui"]
 }
