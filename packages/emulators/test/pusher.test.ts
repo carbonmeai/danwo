@@ -1,8 +1,14 @@
 import { createHmac } from "node:crypto"
 import { once } from "node:events"
+import { createRequire } from "node:module"
 
 import PusherServer from "pusher"
-import PusherClient from "pusher-js"
+import type {
+  Channel,
+  ChannelAuthorizationHandler,
+  ConnectionManager,
+  Options as PusherClientOptions,
+} from "pusher-js"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { serve } from "../src/http.ts"
@@ -16,6 +22,22 @@ import {
   type SocketServer,
 } from "../src/index.ts"
 import { listeningPort } from "../src/net.ts"
+
+/*
+ * pusher-js's CommonJS build exports its class itself, which its type declarations call the
+ * module's default export; loading it with require gives the class at runtime and in the types.
+ */
+interface PusherClient {
+  readonly connection: ConnectionManager
+  subscribe(channel: string): Channel
+  disconnect(): void
+}
+
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- see above: the declared and the real shape of the module differ
+const PusherClient = createRequire(import.meta.url)("pusher-js") as new (
+  key: string,
+  options: PusherClientOptions,
+) => PusherClient
 
 const APP = { id: "4242", key: "app-key", secret: "app-secret", cluster: "eu" }
 
@@ -38,6 +60,24 @@ function server(): PusherServer {
   })
 }
 
+/** Hands the client an authorisation the emulator must refuse. */
+const refuse: ChannelAuthorizationHandler = (_request, callback) =>
+  callback(null, { auth: `${APP.key}:bad` })
+
+/** Authorises channels for `user` the way the app's auth endpoint would, with the server SDK. */
+function authorise(signer: PusherServer, user: string): ChannelAuthorizationHandler {
+  return ({ socketId, channelName }, callback) =>
+    callback(
+      null,
+      channelName.startsWith("presence-")
+        ? signer.authorizeChannel(socketId, channelName, {
+            user_id: user,
+            user_info: { name: user },
+          })
+        : signer.authorizeChannel(socketId, channelName),
+    )
+}
+
 /** `pusher-js` connected to the emulator's sockets, authorising channels as the app's server would. */
 function client(user = "u1"): PusherClient {
   const port = Number(new URL(sockets.url).port)
@@ -51,16 +91,7 @@ function client(user = "u1"): PusherClient {
     channelAuthorization: {
       endpoint: "",
       transport: "ajax",
-      customHandler: ({ socketId, channelName }, callback) =>
-        callback(
-          null,
-          channelName.startsWith("presence-")
-            ? signer.authorizeChannel(socketId, channelName, {
-                user_id: user,
-                user_info: { name: user },
-              })
-            : signer.authorizeChannel(socketId, channelName),
-        ),
+      customHandler: authorise(signer, user),
     },
   })
 
@@ -171,7 +202,7 @@ describe("pusher channels", () => {
       channelAuthorization: {
         endpoint: "",
         transport: "ajax",
-        customHandler: (_request, callback) => callback(null, { auth: `${APP.key}:bad` }),
+        customHandler: refuse,
       },
     })
 

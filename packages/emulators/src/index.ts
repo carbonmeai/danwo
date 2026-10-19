@@ -336,6 +336,18 @@ export {
   type SocketUpgrade,
   serveSockets,
 } from "./sockets.ts"
+export {
+  seedTiptap,
+  TIPTAP_HOSTS,
+  type TiptapCollabView,
+  type TiptapNode,
+  type TiptapSeedApp,
+  type TiptapSeedConfig,
+  type TiptapTrouble,
+  tiptap,
+  tiptapCollab,
+  tiptapOutboundFaults,
+} from "./tiptap/index.ts"
 export { ManualClock, systemTimer, type Timer } from "./time.ts"
 export {
   type PhoneMessage,
