@@ -77,6 +77,19 @@ export {
   stableClerkId,
 } from "./clerk/index.ts"
 export {
+  seedUnipile,
+  unipile,
+  UNIPILE_HOSTS,
+  type UnipileAccountRecord,
+  type UnipileAccountType,
+  type UnipileEmailRecord,
+  type UnipileMessageRecord,
+  unipileOutboundFaults,
+  type UnipileSeedConfig,
+  type UnipileWorkspace,
+  unipileWorkspace,
+} from "./unipile/index.ts"
+export {
   connectNangoBackends,
   NANGO_HOSTS,
   nango,
