@@ -6,12 +6,15 @@ import { forwardTo } from "@danwo/proxy"
 import { defineConfig, type Service, startServices, stripeService } from "@danwo/sdk"
 
 import { launchShop, type Shop } from "./src/launch.ts"
+import { scriptedModel } from "./src/scripted-model.ts"
 
 const WEBHOOK_SECRET = "whsec_danwo_example"
 /** The host the app calls; the proxy routes it to the shop's server on this machine. */
 const SHOP_HOST = "shop.danwo.test"
 const APP = fileURLToPath(new URL("./app", import.meta.url))
 const AVD = process.env.DANWO_AVD ?? "danwo_spike"
+/** A model id to record agent steps with, or `scripted` for the shop's own scripted model. */
+const MODEL = process.env.DANWO_MODEL
 
 export default defineConfig({
   testDir: "tests",
@@ -19,6 +22,9 @@ export default defineConfig({
   workers: androidWorkers({ avd: AVD }),
   timeout: 120_000,
   readiness: { mode: "page+backend", settle: true },
+  /* Agent steps record here and replay with no model; a model is needed only to record them. */
+  cache: { dir: process.env.DANWO_CACHE_DIR ?? "tests/__recordings__" },
+  ...(MODEL !== undefined && { model: MODEL === "scripted" ? scriptedModel : MODEL }),
   /*
    * The Stripe emulator and the shop's server behind one proxy, and an Android emulator bound to
    * it: the app's calls and the Checkout page in its Custom Tab all go through the proxy. Every

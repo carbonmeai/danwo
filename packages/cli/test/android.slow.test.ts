@@ -1,12 +1,15 @@
 /**
- * The mobile shop on a real Android emulator: build (or reuse) its APK, run its test, then the
- * fault matrix for a careful app and for one that grants a duplicated webhook twice. Runs only when
- * asked (`DANWO_ANDROID=1`) on a machine with the Android SDK and the AVD (`DANWO_AVD`, default
- * `danwo_spike`); otherwise it skips at once.
+ * The mobile shop on a real Android emulator: build (or reuse) its APK, run its tests, record its
+ * agent steps with a scripted model and replay them with none, then the fault matrix for a careful
+ * app (on two emulators for the agent's test) and for one that grants a duplicated webhook twice.
+ * Runs only when asked (`DANWO_ANDROID=1`) on a machine with the Android SDK and the AVD
+ * (`DANWO_AVD`, default `danwo_spike`; `DANWO_AVD_SNAPSHOT` boots from a saved snapshot);
+ * otherwise it skips at once.
  */
 import { execFile } from "node:child_process"
 import { existsSync } from "node:fs"
-import { homedir } from "node:os"
+import { mkdtemp, rm } from "node:fs/promises"
+import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -16,6 +19,7 @@ import { describe, expect, it } from "vitest"
 const BIN = fileURLToPath(new URL("../src/bin.ts", import.meta.url))
 const SHOP = fileURLToPath(new URL("../../../examples/shop-mobile", import.meta.url))
 const TEST = "tests/buy-credits.danwo.ts"
+const AGENT_TEST = "tests/agent-buy.danwo.ts"
 const AVD = process.env.DANWO_AVD ?? "danwo_spike"
 /** A build, a boot and a matrix of about thirty trials on one emulator take minutes. */
 const LONG = 1_800_000
@@ -28,9 +32,12 @@ const ready =
   androidSdkRoot() !== undefined &&
   existsSync(join(homedir(), ".android", "avd", `${AVD}.avd`))
 
-/** Runs `danwo <args>` in the mobile shop, with `bug` set; resolves to exit code and output. */
-function danwo(args: readonly string[], bug?: string): Promise<{ code: number; out: string }> {
-  const env = { ...process.env, NO_COLOR: "1", ...(bug !== undefined && { SHOP_BUG: bug }) }
+/** Runs `danwo <args>` in the mobile shop with `extra` in its environment; exit code and output. */
+function danwo(
+  args: readonly string[],
+  extra: Readonly<Record<string, string>> = {},
+): Promise<{ code: number; out: string }> {
+  const env = { ...process.env, NO_COLOR: "1", ...extra }
 
   return new Promise((resolve) => {
     execFile(
@@ -61,9 +68,53 @@ describe.skipIf(!ready)("an Expo app on an Android emulator", () => {
   it("buys credits through Stripe Checkout in a Custom Tab", { timeout: LONG }, async () => {
     const { code, out } = await danwo(["test"])
 
-    expect(out).toContain("1 passed")
+    /* The agent's test replays its committed recordings: no model is asked. */
+    expect(out).toContain("2 passed")
+    expect(out).toContain("cache: 3 replayed")
+    expect(out).not.toMatch(/^model: /m)
     expect(code).toBe(0)
   })
+
+  it(
+    "records agent steps with a model, then replays them with none",
+    { timeout: LONG },
+    async () => {
+      const dir = await mkdtemp(join(tmpdir(), "danwo-android-cache-"))
+
+      try {
+        const recorded = await danwo(["test", AGENT_TEST], {
+          DANWO_MODEL: "scripted",
+          DANWO_CACHE_DIR: dir,
+        })
+
+        expect(recorded.out).toContain("0 replayed · 0 relocated · 0 handed off · 3 missed")
+        expect(recorded.out).toMatch(/^model: 6 calls/m)
+        expect(recorded.code).toBe(0)
+
+        const replayed = await danwo(["test", AGENT_TEST, "--ci"], { DANWO_CACHE_DIR: dir })
+
+        expect(replayed.out).toContain("cache: 3 replayed")
+        expect(replayed.out).not.toMatch(/^model: /m)
+        expect(replayed.code).toBe(0)
+      } finally {
+        await rm(dir, { recursive: true, force: true })
+      }
+    },
+  )
+
+  it(
+    "runs the agent's test's matrix on two emulators with no model call",
+    { timeout: LONG },
+    async () => {
+      const { code, out } = await danwo(["matrix", AGENT_TEST, "--workers", "2"])
+
+      expect(out).toContain("PASS  clean run")
+      expect(out).not.toMatch(/^FAIL /m)
+      expect(out).toContain("0 handed off · 0 missed")
+      expect(out).not.toMatch(/^model: /m)
+      expect([0, 3]).toContain(code)
+    },
+  )
 
   it("passes every judged fault for a careful app", { timeout: LONG }, async () => {
     const { code, out } = await danwo(["matrix", TEST])
@@ -78,7 +129,7 @@ describe.skipIf(!ready)("an Expo app on an Android emulator", () => {
     "fails only the duplicated checkout.session.completed when the app does not dedupe",
     { timeout: LONG },
     async () => {
-      const { code, out } = await danwo(["matrix", TEST], "no-dedupe")
+      const { code, out } = await danwo(["matrix", TEST], { SHOP_BUG: "no-dedupe" })
       const failed = out.split("\n").filter((line) => line.startsWith("FAIL "))
 
       expect(failed).toEqual(["FAIL  duplicate on stripe webhook checkout.session.completed"])

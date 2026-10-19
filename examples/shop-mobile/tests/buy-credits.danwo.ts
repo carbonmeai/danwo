@@ -11,7 +11,10 @@ test("buys 500 credits through Stripe Checkout in a Custom Tab", async ({
   device,
 }) => {
   await expect(screen.getByRole("heading", { name: "Danwo Shop" })).toBeVisible()
-  await expect(screen.getByTestId("credits")).toHaveText("Credits: 0")
+  await expect(screen.getByTestId("credits")).toHaveText(/^Credits: \d+$/)
+
+  /* The worker's shop keeps its credits from test to test; this purchase adds 500. */
+  const before = Number((await screen.getByTestId("credits").innerText()).replace(/\D/g, ""))
 
   await screen.getByTestId("buy").tap()
 
@@ -24,7 +27,7 @@ test("buys 500 credits through Stripe Checkout in a Custom Tab", async ({
 
   /* Checkout returns to the app through `danwoshop://done`. */
   await expect(screen.getByTestId("status")).toHaveText("Thanks for your order")
-  await expect(screen.getByTestId("credits")).toHaveText("Credits: 500")
+  await expect(screen.getByTestId("credits")).toHaveText(`Credits: ${before + 500}`)
 }).invariant(async ({ app, stripe, expect }) => {
   /* However the purchase went on the device, credits match the paid Checkout Sessions. */
   const paid = await paidCredits(stripe, "u1")

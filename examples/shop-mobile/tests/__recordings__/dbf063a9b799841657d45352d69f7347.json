@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "instruction": "Pay for the credits with the email {email}",
+  "recordedAt": "2026-10-19T02:09:52.209Z",
+  "actions": [
+    {
+      "kind": "fill",
+      "target": {
+        "role": "textbox",
+        "name": "Email"
+      },
+      "input": {
+        "param": "email"
+      }
+    },
+    {
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Pay $5.00"
+      }
+    }
+  ],
+  "endRoute": "app",
+  "effects": {
+    "page": {
+      "appeared": [
+        "heading \"Danwo Shop\"",
+        "button \"Buy 500 credits\"",
+        "text \"Credits: 500\"",
+        "text \"Buy 500 credits\"",
+        "text \"Thanks for your order\""
+      ],
+      "vanished": [
+        "button \"Pay $5.00\"",
+        "button \"Back\"",
+        "button \"Close tab\"",
+        "button \"Connection is secure\"",
+        "button \"Share\"",
+        "button \"More options\"",
+        "document \"Checkout\"",
+        "text \"Pay danwo\"",
+        "text \"Test mode: no real card is charged.\"",
+        "generic \"Order\""
+      ]
+    },
+    "backend": [
+      "GET shop.danwo.test/credits",
+      "POST checkout.stripe.com/checkout/:id/complete",
+      "webhook checkout.session.completed"
+    ]
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent-buy.danwo.ts › buys 500 credits when asked in plain words",
+    "appIdentity": "android:com.danwo.shopmobile",
+    "kind": "act",
+    "step": 2,
+    "instruction": "Pay for the credits with the email {email}",
+    "params": {
+      "email": "text:buyer@example.com"
+    },
+    "policy": "similar-v1"
+  }
+}

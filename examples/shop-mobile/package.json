@@ -10,7 +10,8 @@
     "matrix": "danwo matrix tests/buy-credits.danwo.ts"
   },
   "dependencies": {
-    "stripe": "23.0.0"
+    "stripe": "23.0.0",
+    "zod": "4.6.1"
   },
   "devDependencies": {
     "@danwo/cli": "workspace:*",

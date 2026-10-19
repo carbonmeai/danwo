@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "instruction": "Start buying 500 credits",
+  "recordedAt": "2026-10-19T02:09:43.785Z",
+  "actions": [
+    {
+      "kind": "click",
+      "target": {
+        "testId": "buy",
+        "role": "button"
+      }
+    }
+  ],
+  "endRoute": "checkout.stripe.com/checkout/:id",
+  "effects": {
+    "page": {
+      "appeared": [
+        "button \"Pay $5.00\"",
+        "button \"Back\"",
+        "button \"Close tab\"",
+        "button \"Connection is secure\"",
+        "button \"Share\"",
+        "button \"More options\"",
+        "document \"Checkout\"",
+        "text \"Pay danwo\"",
+        "text \"Test mode: no real card is charged.\"",
+        "generic \"Order\""
+      ],
+      "vanished": [
+        "heading \"Danwo Shop\"",
+        "button \"Buy 500 credits\"",
+        "text \"Credits: 0\"",
+        "text \"Buy 500 credits\"",
+        "text \"Ready\""
+      ]
+    },
+    "backend": [
+      "GET checkout.stripe.com/checkout/:id",
+      "POST api.stripe.com/v1/checkout/sessions",
+      "POST shop.danwo.test/checkout"
+    ]
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent-buy.danwo.ts › buys 500 credits when asked in plain words",
+    "appIdentity": "android:com.danwo.shopmobile",
+    "kind": "act",
+    "step": 1,
+    "instruction": "Start buying 500 credits",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}
