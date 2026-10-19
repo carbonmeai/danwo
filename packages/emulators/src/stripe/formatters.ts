@@ -3,6 +3,7 @@
  * API returns cannot be forgotten; fields the emulator does not model take Stripe's empty values.
  */
 import { createHash } from "node:crypto"
+
 import type {
   CardDetails,
   Charge,

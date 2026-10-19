@@ -121,7 +121,8 @@ describe("skipping", () => {
           },
         },
       ],
-      emulator: () => Promise.resolve({ kind: "emulator", ...answering(200), close: async () => {} }),
+      emulator: () =>
+        Promise.resolve({ kind: "emulator", ...answering(200), close: async () => {} }),
       live: () => ({ kind: "live", ...answering(401) }),
     }
     const reports = await runFidelity({ root, providers: [provider], env: {} })
