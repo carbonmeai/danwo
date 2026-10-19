@@ -11,8 +11,21 @@ export const MAX_CODE_TRIES = 3
 /** How long an emailed code stays good: ten minutes. */
 export const CODE_LIFETIME_MS = 10 * 60 * 1000
 
-/** Sends a six-digit code to `to` and returns it. */
+/**
+ * The code development instances accept for Clerk's test addresses (`…+clerk_test@…`): no mail is
+ * sent for them, as Clerk sends none.
+ */
+export const TEST_CODE = "424242"
+
+/** Whether `address` is one of Clerk's test addresses. */
+export function isTestAddress(address: string): boolean {
+  return /\+clerk_test@/i.test(address)
+}
+
+/** Sends a six-digit code to `to` and returns it; a test address gets the fixed test code, unsent. */
 function emailCode(context: ClerkContext, to: string): string {
+  if (isTestAddress(to)) return TEST_CODE
+
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0")
 
   context.clerk.messages.add(

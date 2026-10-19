@@ -7,7 +7,7 @@ import { type ClerkContext, instanceOf, now, signingKeyOf } from "../context.ts"
 import { environmentJson } from "../environment.ts"
 import { browserClient, browserSession } from "../frontend-json.ts"
 import { devBrowserFor } from "../handshake.ts"
-import { ClerkFailure, str } from "../helpers.ts"
+import { ClerkFailure, stableClerkId, str } from "../helpers.ts"
 import { endSession, isLive, sessionClaims } from "../sessions.ts"
 import { templateClaims } from "../templates.ts"
 
@@ -103,9 +103,20 @@ function sessionRoutes(app: App, context: ClerkContext): void {
  * instance's settings, and the browser's client with its sessions and tokens.
  */
 export function clientApiRoutes(app: App, context: ClerkContext): void {
-  app.post("/v1/dev_browser", (c) =>
-    c.json({ object: "dev_browser", id: devBrowserFor(context, undefined).id }),
-  )
+  app.post("/v1/dev_browser", (c) => {
+    const devBrowser = devBrowserFor(context, undefined)
+    const at = new Date(now(context)).toISOString()
+
+    return c.json({
+      id: devBrowser.id,
+      instance_id: stableClerkId("ins", instanceOf(context).slug),
+      client_id: null,
+      created_at: at,
+      updated_at: at,
+      home_origin: null,
+      token: devBrowser.id,
+    })
+  })
   app.get("/v1/environment", (c) => c.json(environmentJson(instanceOf(context))))
   app.patch("/v1/environment", (c) => c.json(environmentJson(instanceOf(context))))
   clientRoutes(app, context)
