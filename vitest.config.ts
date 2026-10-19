@@ -9,8 +9,8 @@ import { uiSourceAlias } from "./packages/ui/source-alias.ts"
  */
 export default defineConfig({
   test: {
-    // Fails a run that leaves anything behind in the examples or fixtures.
-    globalSetup: ["./scripts/untouched-examples.ts"],
+    // Fails a run that leaves anything behind in the examples or fixtures, or any process running.
+    globalSetup: ["./scripts/untouched-examples.ts", "./scripts/no-leftover-processes.ts"],
     projects: [
       {
         test: {
