@@ -1,6 +1,6 @@
 # Emulating a provider
 
-danwo runs fake Stripe, Resend, S3 and Tigris, Auth0, Google, Microsoft, Slack, GitHub and Twilio behind
+danwo runs fake Stripe, Resend, S3 and Tigris, Auth0, Google, Microsoft, Slack, GitHub, Twilio and Composio behind
 an egress proxy, so the app talks to the real hostnames, unchanged, and tests can read and fault
 what it did.
 
@@ -66,14 +66,14 @@ once it runs, and they are applied again after every reset.
 composes services behind one proxy; its result has `fixtures`, `webhooks` (keyed by service),
 `settle`, `reset` and `close` merged. Single-provider shortcuts: `stripeEnvironment`,
 `s3Environment`, `auth0Environment`, `googleEnvironment`, `microsoftEnvironment`, `slackEnvironment`,
-`githubEnvironment`, `awsEnvironment` (MiniStack for other AWS services).
+`githubEnvironment`, `composioEnvironment`, `awsEnvironment` (MiniStack for other AWS services).
 
 ## Reading what happened
 
 Type the fixtures with `test.extend<StripeFixtures>()` and read the emulators in tests and
 invariants: `resendInbox`, `s3Objects`, `auth0Tenant`, `gmailMailbox`, `googleCalendar`, `googleDrive`,
 `outlookMailbox`, `outlookCalendar`, `oneDrive`, `graphSubscriptions`, `slackWorkspace`,
-`githubRepo`, `twilioInbox` (and `twilioPhone` to text the app), and the `*SignIns` helpers. `danwo spec --topic emulators` lists them with their
+`githubRepo`, `twilioInbox` (and `twilioPhone` to text the app), `composioProject`, and the `*SignIns` helpers. `danwo spec --topic emulators` lists them with their
 signatures, and `--topic environments` the seed shapes.
 
 ## Auth0
@@ -181,3 +181,48 @@ tokens, Clerk cookies, dev browser tokens and handshake nonces.
 
 Not emulated: social and enterprise sign-in, phone codes, passkeys, MFA, waitlists, billing and
 Clerk's webhooks.
+
+## Composio
+
+`composioEnvironment({ seed, backends })` emulates Composio (`backend.composio.dev`, both
+`/api/v3` and `/api/v3.1`) for apps that give agents tools through `@composio/core`: toolkits and
+tools, `tools.execute`, auth configs, connected accounts (`link`, `initiate`, `waitForConnection`,
+refresh, enable and disable), trigger types and instances, and the project's webhook
+subscription. Seed API keys (only those are accepted when given), auth configs, connected
+accounts with their credentials, triggers, the webhook URL and secret, custom toolkits and tools,
+and canned `results` per tool.
+
+```ts
+const composio = await composioEnvironment({
+  seed: {
+    authConfigs: [{ id: "ac_gmail", toolkit: "gmail" }],
+    webhook: { url: `http://127.0.0.1:${port}/webhooks/composio`, secret: "whsec_inbox" },
+  },
+  backends: [googleService({ seed: { users: [{ email: "ada@inbox.test", name: "Ada" }] } })],
+})
+```
+
+With `backends`, the toolkits act on those emulators: a link sends the browser to that
+emulator's own account chooser (Composio's managed app is registered there on first use, with
+PKCE), the code is exchanged on its token endpoint, and tools call its real API with the
+account's token, so `GMAIL_SEND_EMAIL` lands in `gmailMailbox(google, email).sent()`,
+`SLACK_SEND_MESSAGE` in `slackWorkspace(slack).messages(channel)`, `GITHUB_CREATE_AN_ISSUE` in
+`githubRepo(github, repo).issues()` and `OUTLOOK_SEND_EMAIL` in Outlook's sent items. A 401 from
+the backend refreshes the token once; when that fails the account turns `EXPIRED` and the
+`composio.connected_account.expired` webhook goes out (revoke a Google grant to see it). Without
+a backend, the hosted link shows Composio's own page (Connect or Cancel) and tools answer from
+seeded results or sample data. Either way the link ends on the app's callback URL with
+`status` and `connected_account_id`.
+
+In tests, `composioProject(composio)` reads accounts and every tool run (with whether a seed, the
+backend or a sample answered), `fire(trigger, data)` sends a signed `composio.trigger.message`
+webhook for each enabled instance, and `expire(accountId)` expires an account;
+`composioTools(composio).handle(slug, fn)` answers a tool from the test. `danwo matrix` faults
+tool execution (429 with `retry-after`, 503, 408, 422 for an expired account, a 200 with
+`successful: false`, a slow answer, resets before and after Composio acted), starting a
+connection (429, 500, reset) and other API calls (500, reset); the hosted link and the OAuth
+callback are pages and are left alone. Recordings redact `ak_` and `uak_` keys.
+
+Not emulated: Tool Router sessions and MCP servers, files, custom tools defined in code, poll
+triggers watching the backend on their own (fire them with `fire`), V1 and V2 webhook payloads,
+and the exact error codes beyond the two key errors, which are approximations.

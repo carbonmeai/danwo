@@ -90,7 +90,7 @@ verified at all.
 ### webhooks-accepts-stale
 
 The app accepted a delivery whose signature was made long ago, from a provider that signs a
-timestamp (Stripe, Slack, Resend, Bachs, Google). Check the timestamp against a tolerance. Seen in
+timestamp (Stripe, Slack, Resend, Bachs, Google, Composio). Check the timestamp against a tolerance. Seen in
 matrix trials with a `stale` fault; providers that sign no timestamp (GitHub, Twilio, Paystack,
 Flutterwave) are not judged.
 
