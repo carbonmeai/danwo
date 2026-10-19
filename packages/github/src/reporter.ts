@@ -1,8 +1,9 @@
 /**
  * The GitHub reporter: inside a GitHub Actions job it opens a check run when the run starts, adds
  * an annotation for every failure, completes the check with a conclusion and summary, and appends
- * the same summary to the job summary. Outside Actions, without a token, or without permission it
- * says why and leaves the run alone: reporting never fails a run.
+ * the same summary to the job summary. On a pull request it also keeps one comment up to date with
+ * every run's results. Outside Actions, without a token, or without permission it says why and
+ * leaves the run alone: reporting never fails a run.
  */
 import { appendFile } from "node:fs/promises"
 
@@ -22,8 +23,9 @@ import {
   type ChecksClient,
   checksClient,
   type Conclusion,
-  GitHubError,
 } from "./checks.ts"
+import { PullRequestComment } from "./comment-poster.ts"
+import { explainRefusal } from "./request.ts"
 import { matrixSummary, matrixTitle, testSummary, testTitle } from "./summary.ts"
 
 export interface GitHubReporterOptions {
@@ -36,7 +38,20 @@ export interface GitHubReporterOptions {
   readonly fetch?: typeof fetch
   /** Where warnings go; default stderr. */
   readonly log?: (line: string) => void
+  /**
+   * Keep one comment on the pull request up to date with the run's results; default on, off with
+   * `false`, `--no-pr-comment` or `DANWO_PR_COMMENT=off`. Needs `pull-requests: write`.
+   */
+  readonly prComment?: boolean
+  /**
+   * Where the run's report or the dashboard is published, which test names in the comment link
+   * to; default `DANWO_REPORT_URL`.
+   */
+  readonly reportUrl?: string
 }
+
+/** `DANWO_PR_COMMENT` values that turn the comment off. */
+const OFF = new Set(["0", "false", "off", "no"])
 
 /** A finished run, ready to post: its conclusion, title, summary and annotations. */
 interface Verdict {
@@ -48,13 +63,8 @@ interface Verdict {
 
 const NAMES: Readonly<Record<RunKind, string>> = { test: "danwo", matrix: "danwo matrix" }
 
-/** Why a request failed, worded as what to do about it. */
-function explain(error: unknown): string {
-  if (error instanceof GitHubError && (error.status === 403 || error.status === 404))
-    return `GitHub refused the check run (${error.status}: ${error.message}); give the workflow "permissions: checks: write"`
-
-  return error instanceof Error ? error.message : String(error)
-}
+/** Why a check run request failed, worded as what to do about it. */
+const explain = (error: unknown) => explainRefusal(error, "check run", "checks: write")
 
 /** `annotations` in request-sized batches; the last one goes with the completing request. */
 function batches(annotations: readonly Annotation[]): Annotation[][] {
@@ -154,8 +164,16 @@ export function github(options: GitHubReporterOptions = {}): Reporter {
   const artifact = options.artifact ?? "danwo-runs"
   let job: Promise<ActionsJob | string> | undefined
   const checks = new Map<RunKind, CheckRun>()
+  const env = options.env ?? process.env
+  const comment = new PullRequestComment({
+    enabled: options.prComment ?? !OFF.has((env["DANWO_PR_COMMENT"] ?? "").toLowerCase()),
+    artifact,
+    reportUrl: options.reportUrl ?? (env["DANWO_REPORT_URL"] || undefined),
+    fetch: options.fetch ?? fetch,
+    log,
+  })
 
-  const jobOnce = () => (job ??= actionsJob(options.env ?? process.env))
+  const jobOnce = () => (job ??= actionsJob(env))
 
   /** The run's check, or none outside Actions or without a token (said once, on first use). */
   async function checkFor(kind: RunKind): Promise<CheckRun | undefined> {
@@ -190,7 +208,11 @@ export function github(options: GitHubReporterOptions = {}): Reporter {
     await (await checkFor(run.kind))?.open()
   }
 
-  async function finished(kind: RunKind, verdict: (job: ActionsJob) => Verdict): Promise<void> {
+  async function finished(
+    kind: RunKind,
+    verdict: (job: ActionsJob) => Verdict,
+    commented?: (job: ActionsJob) => Promise<void>,
+  ): Promise<void> {
     const found = await jobOnce()
 
     if (typeof found === "string") return
@@ -199,13 +221,24 @@ export function github(options: GitHubReporterOptions = {}): Reporter {
 
     await writeStepSummary(found, result.summary, log)
     await (await checkFor(kind))?.finish(result)
+    await commented?.(found)
   }
 
   return {
     name: "github",
     started,
-    testsFinished: (run) => finished("test", (found) => testVerdict(run, found, artifact)),
-    matrixFinished: (run) => finished("matrix", (found) => matrixVerdict(run, found, artifact)),
+    testsFinished: (run) =>
+      finished(
+        "test",
+        (found) => testVerdict(run, found, artifact),
+        (found) => comment.tests(found, run),
+      ),
+    matrixFinished: (run) =>
+      finished(
+        "matrix",
+        (found) => matrixVerdict(run, found, artifact),
+        (found) => comment.matrix(found, run),
+      ),
     async aborted(run) {
       const reason = `the run stopped before it had a result: ${shown(run.error)}`
 

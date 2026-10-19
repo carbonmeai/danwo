@@ -10,6 +10,8 @@ export interface ActionsJob {
   readonly repository: string
   /** The commit checks attach to: a pull request's head, else the pushed commit. */
   readonly headSha: string
+  /** The pull request the run is for; absent on a push or a schedule. */
+  readonly pullRequest: number | undefined
   /** The run's page; artifacts are listed at its foot. */
   readonly runUrl: string
   /** Where the repository is checked out; annotation paths are relative to it. */
@@ -22,19 +24,24 @@ export interface ActionsJob {
 
 type Env = Readonly<Record<string, string | undefined>>
 
-/** The pull request's head commit from the event payload, when the event is a pull request. */
-async function pullRequestHead(eventPath: string | undefined): Promise<string | undefined> {
-  if (eventPath === undefined) return undefined
+/** The pull request in the event payload: its number and head commit, when the event has one. */
+async function pullRequestOf(
+  eventPath: string | undefined,
+): Promise<{ readonly number?: number; readonly headSha?: string }> {
+  if (eventPath === undefined) return {}
 
   try {
-    const event: { pull_request?: { head?: { sha?: unknown } } } = JSON.parse(
+    const event: { pull_request?: { number?: unknown; head?: { sha?: unknown } } } = JSON.parse(
       await readFile(eventPath, "utf8"),
     )
-    const sha = event.pull_request?.head?.sha
+    const { number, head } = event.pull_request ?? {}
 
-    return typeof sha === "string" ? sha : undefined
+    return {
+      ...(typeof number === "number" && { number }),
+      ...(typeof head?.sha === "string" && { headSha: head.sha }),
+    }
   } catch {
-    return undefined
+    return {}
   }
 }
 
@@ -53,7 +60,8 @@ export async function actionsJob(env: Env): Promise<ActionsJob | string> {
   if (env["GITHUB_ACTIONS"] !== "true") return "not running in GitHub Actions"
 
   const repository = env["GITHUB_REPOSITORY"]
-  const headSha = (await pullRequestHead(env["GITHUB_EVENT_PATH"])) ?? env["GITHUB_SHA"]
+  const pull = await pullRequestOf(env["GITHUB_EVENT_PATH"])
+  const headSha = pull.headSha ?? env["GITHUB_SHA"]
 
   if (repository === undefined || headSha === undefined)
     return "GITHUB_REPOSITORY or GITHUB_SHA is not set"
@@ -62,6 +70,7 @@ export async function actionsJob(env: Env): Promise<ActionsJob | string> {
     apiUrl: env["GITHUB_API_URL"] ?? "https://api.github.com",
     repository,
     headSha,
+    pullRequest: pull.number,
     runUrl: runUrlOf(env, repository),
     workspace: env["GITHUB_WORKSPACE"],
     token: env["GITHUB_TOKEN"] || undefined,

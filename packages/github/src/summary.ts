@@ -24,7 +24,7 @@ export interface RecordsLink {
   readonly artifact: string
 }
 
-const STATUS_MARK: Readonly<Record<string, string>> = {
+export const STATUS_MARK: Readonly<Record<string, string>> = {
   passed: "✅",
   flaky: "⚠️",
   failed: "❌",
@@ -36,19 +36,19 @@ const STATUS_MARK: Readonly<Record<string, string>> = {
   "environment-error": "💥",
 }
 
-const FAILED = new Set(["failed", "timed-out", "interrupted"])
+export const FAILED = new Set(["failed", "timed-out", "interrupted"])
 
 /** A table cell: one line, pipes escaped, short. */
-function cell(text: string): string {
+export function cell(text: string): string {
   return shown(text, 300)
     .replaceAll("|", "\\|")
     .replaceAll(/\s*\n\s*/g, " ")
 }
 
-const seconds = (ms: number) => `${(ms / 1000).toFixed(1)} s`
+export const seconds = (ms: number) => `${(ms / 1000).toFixed(1)} s`
 
 /** A flight record folder as it appears inside the uploaded artifact. */
-function recordInArtifact(record: string): string {
+export function recordInArtifact(record: string): string {
   const at = record.indexOf(".danwo/runs/")
 
   return at === -1 ? record : record.slice(at + ".danwo/runs/".length)

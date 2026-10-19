@@ -2,7 +2,7 @@
   "name": "@danwo/github",
   "version": "0.0.0",
   "private": true,
-  "description": "Reports danwo runs to GitHub from Actions: a Check Run with annotations and a job summary.",
+  "description": "Reports danwo runs to GitHub from Actions: a Check Run with annotations, a pull request comment and a job summary.",
   "files": [
     "src"
   ],

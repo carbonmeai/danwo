@@ -33,6 +33,8 @@ export interface TestRunReport extends RunContext {
   readonly reportPath: string | undefined
   /** The run's flight-record folder name under `.danwo/runs`, when it recorded. */
   readonly run?: string
+  /** Which shard of a split run this was, as `i/n`; `danwo merge-reports` reports the whole. */
+  readonly shard?: string
 }
 
 /** `danwo matrix` once every trial finished. */
