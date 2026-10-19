@@ -2,6 +2,8 @@
  * The browser's side of connecting: the hosted link page, the hand-off to a backend emulator's
  * consent page, and the OAuth callback that brings the user back and on to the app.
  */
+import { createHash, randomBytes } from "node:crypto"
+
 import { escapeHtml, htmlPage } from "../../html.ts"
 import type { Context } from "../../http.ts"
 import { liveLink } from "../accounts.ts"
@@ -88,18 +90,37 @@ function clientOf(config: AuthConfigRecord, connected: ConnectedBackend): OAuthC
   return connected.backend.managedClient
 }
 
+/**
+ * Sends the browser to the backend's consent page, binding the code it will send back to a PKCE
+ * verifier kept on the link when the provider takes one.
+ */
+function toBackend(
+  context: ComposioRouteContext,
+  c: Context,
+  parts: Parts,
+  connected: ConnectedBackend,
+): Response {
+  const verifier = connected.backend.pkce ? randomBytes(32).toString("base64url") : null
+  const challenge =
+    verifier === null ? null : createHash("sha256").update(verifier).digest("base64url")
+
+  context.objects.links.change(parts.link.id, { verifier })
+
+  return c.redirect(
+    connected.backend.authorizeUrl(
+      clientOf(parts.config, connected),
+      parts.config.scopes,
+      parts.link.id,
+      challenge,
+    ),
+  )
+}
+
 function connectPage(context: ComposioRouteContext, c: Context, parts: Parts): Response {
   const connected =
     connectsOnBackend(context, parts.config) && backendFor(context.store, parts.config.toolkit)
 
-  if (connected)
-    return c.redirect(
-      connected.backend.authorizeUrl(
-        clientOf(parts.config, connected),
-        parts.config.scopes,
-        parts.link.id,
-      ),
-    )
+  if (connected) return toBackend(context, c, parts, connected)
 
   const name = escapeHtml(toolkitName(context.objects, parts.config.toolkit))
   const field =
@@ -160,7 +181,12 @@ async function callback(context: ComposioRouteContext, c: Context): Promise<Resp
   const send = (request: Request) => connected.emulator.fetch(request)
 
   try {
-    const tokens = await connected.backend.exchange(send, clientOf(parts.config, connected), code)
+    const tokens = await connected.backend.exchange(
+      send,
+      clientOf(parts.config, connected),
+      code,
+      parts.link.verifier,
+    )
 
     completeConnection(
       context,

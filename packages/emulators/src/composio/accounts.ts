@@ -99,6 +99,7 @@ export function newLink(
       id: composioId("lk", 16),
       accountId: account.id,
       callbackUrl,
+      verifier: null,
       expiresAt: iso(new Date(context.clock().getTime() + LINK_LIFETIME_MS)),
     },
     null,

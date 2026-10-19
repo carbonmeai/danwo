@@ -8,6 +8,7 @@ import {
   arg,
   argList,
   type Backend,
+  challengeParams,
   type Executor,
   tokenEndpoint,
   withQuery,
@@ -38,12 +39,14 @@ export const githubBackend: Backend = {
     client_id: "Iv1.c0mp0s10managed",
     client_secret: "composio-managed-github-secret",
   },
-  authorizeUrl: (client, scopes, state) =>
+  pkce: true,
+  authorizeUrl: (client, scopes, state, challenge) =>
     withQuery("https://github.com/login/oauth/authorize", {
       client_id: client.client_id,
       redirect_uri: OAUTH_CALLBACK,
       scope: scopes.join(" "),
       state,
+      ...challengeParams(challenge),
     }),
   ...tokenEndpoint(TOKEN),
   async whoami(send, token) {

@@ -46,10 +46,25 @@ export interface Backend {
   readonly toolkits: readonly string[]
   /** Composio's own app at the provider, for auth configs that are Composio-managed. */
   readonly managedClient: OAuthClient
-  /** Where the browser goes to consent to `scopes` for `client`, coming back with `state`. */
-  authorizeUrl(client: OAuthClient, scopes: readonly string[], state: string): string
-  /** Exchanges the code the provider sent back for tokens. */
-  exchange(send: Send, client: OAuthClient, code: string): Promise<TokenSet>
+  /** Whether the provider takes PKCE, so the code is bound to a verifier only Composio holds. */
+  readonly pkce: boolean
+  /**
+   * Where the browser goes to consent to `scopes` for `client`, coming back with `state`; with the
+   * S256 `challenge` when the provider takes PKCE.
+   */
+  authorizeUrl(
+    client: OAuthClient,
+    scopes: readonly string[],
+    state: string,
+    challenge: string | null,
+  ): string
+  /** Exchanges the code the provider sent back for tokens, with the PKCE verifier when there is one. */
+  exchange(
+    send: Send,
+    client: OAuthClient,
+    code: string,
+    verifier: string | null,
+  ): Promise<TokenSet>
   /** New tokens from a refresh token; undefined when the provider refuses it. */
   refresh(send: Send, client: OAuthClient, refreshToken: string): Promise<TokenSet | undefined>
   /** Who the token acts as (an email, a login), for the account's label. */
@@ -158,13 +173,14 @@ export function tokensOf(answer: {
 /** Code exchange and refresh at a provider's token endpoint, the standard way. */
 export function tokenEndpoint(url: string): Pick<Backend, "exchange" | "refresh"> {
   return {
-    exchange: async (send, client, code) =>
+    exchange: async (send, client, code, verifier) =>
       tokensOf(
         await tokenCall(send, url, {
           grant_type: "authorization_code",
           code,
           redirect_uri: OAUTH_CALLBACK,
           ...client,
+          ...(verifier !== null && { code_verifier: verifier }),
         }),
       ),
     async refresh(send, client, refreshToken) {
@@ -177,6 +193,11 @@ export function tokenEndpoint(url: string): Pick<Backend, "exchange" | "refresh"
       return answer.ok ? tokensOf(answer) : undefined
     },
   }
+}
+
+/** The query parameters that send an S256 PKCE challenge, when there is one. */
+export function challengeParams(challenge: string | null): Record<string, string> {
+  return challenge === null ? {} : { code_challenge: challenge, code_challenge_method: "S256" }
 }
 
 /** A string argument, or undefined. */

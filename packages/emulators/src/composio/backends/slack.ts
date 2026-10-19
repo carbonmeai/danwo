@@ -73,6 +73,7 @@ export const slackBackend: Backend = {
   name: "slack",
   toolkits: ["slack"],
   managedClient: { client_id: "1000000001.1000000001", client_secret: "composio-managed-slack" },
+  pkce: false,
   authorizeUrl: (client, scopes, state) =>
     withQuery("https://slack.com/oauth/v2/authorize", {
       client_id: client.client_id,

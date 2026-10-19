@@ -121,6 +121,8 @@ export interface LinkRecord {
   readonly accountId: string
   readonly callbackUrl: string | null
   readonly expiresAt: string
+  /** The PKCE verifier for the provider's code, once the link hands the user to a backend. */
+  readonly verifier: string | null
 }
 
 /** A trigger set up on a connected account. */

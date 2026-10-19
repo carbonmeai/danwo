@@ -9,6 +9,7 @@ import {
   argList,
   argNumber,
   type Backend,
+  challengeParams,
   type BackendAnswer,
   type Executor,
   type Send,
@@ -196,7 +197,8 @@ export const googleBackend: Backend = {
     client_id: "composio-managed.apps.googleusercontent.com",
     client_secret: "GOCSPX-composio-managed",
   },
-  authorizeUrl: (client, scopes, state) =>
+  pkce: true,
+  authorizeUrl: (client, scopes, state, challenge) =>
     withQuery("https://accounts.google.com/o/oauth2/v2/auth", {
       client_id: client.client_id,
       redirect_uri: OAUTH_CALLBACK,
@@ -205,6 +207,7 @@ export const googleBackend: Backend = {
       access_type: "offline",
       prompt: "consent",
       state,
+      ...challengeParams(challenge),
     }),
   ...tokenEndpoint(TOKEN),
   whoami,

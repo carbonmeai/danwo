@@ -9,6 +9,7 @@ import {
   argList,
   argNumber,
   type Backend,
+  challengeParams,
   type Executor,
   tokenEndpoint,
   withQuery,
@@ -59,7 +60,8 @@ export const microsoftBackend: Backend = {
     client_id: "5c0e2c6b-7a4d-4f4e-9b61-c0a1b2c3d4e5",
     client_secret: "Composio~managed~secret",
   },
-  authorizeUrl: (client, scopes, state) =>
+  pkce: true,
+  authorizeUrl: (client, scopes, state, challenge) =>
     withQuery(`${LOGIN}/authorize`, {
       client_id: client.client_id,
       redirect_uri: OAUTH_CALLBACK,
@@ -67,6 +69,7 @@ export const microsoftBackend: Backend = {
       response_mode: "query",
       scope: scopes.join(" "),
       state,
+      ...challengeParams(challenge),
     }),
   ...tokenEndpoint(`${LOGIN}/token`),
   async whoami(send, token) {
