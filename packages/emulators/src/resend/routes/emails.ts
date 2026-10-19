@@ -8,6 +8,7 @@ import type { Email } from "../entities.ts"
 import { listedEmail } from "../formatters.ts"
 import {
   addresses,
+  addressesOrNull,
   jsonBody,
   listOf,
   newUuid,
@@ -15,6 +16,7 @@ import {
   resendError,
   tagsOf,
   textOf,
+  visibleText,
 } from "../helpers.ts"
 
 const KEY_LIMIT = 256
@@ -43,18 +45,26 @@ function draftOf(body: Record<string, unknown>): Draft | { readonly problem: str
   if (to.length === 0) return { problem: "Missing `to` field." }
   if (subject === undefined) return { problem: "Missing `subject` field." }
 
+  const html = textOf(body.html) ?? null
+
   return {
     from,
     to,
     subject,
-    html: textOf(body.html) ?? null,
-    text: textOf(body.text) ?? null,
-    cc: addresses(body.cc),
-    bcc: addresses(body.bcc),
-    reply_to: addresses(body.reply_to),
+    html,
+    // Resend writes a plain-text part from the HTML when the send leaves it out.
+    text: textOf(body.text) ?? (html === null ? null : plainText(html)),
+    cc: addressesOrNull(body.cc),
+    bcc: addressesOrNull(body.bcc),
+    reply_to: addressesOrNull(body.reply_to),
     tags: tagsOf(body.tags),
     scheduled_at: textOf(body.scheduled_at) ?? textOf(body.scheduledAt) ?? null,
   }
+}
+
+/** `html` as plain text, with whitespace runs collapsed. */
+function plainText(html: string): string {
+  return visibleText(html).replace(/\s+/g, " ").trim()
 }
 
 /** Every recipient is on the allowlist, when one is set (as on a sandboxed Resend account). */

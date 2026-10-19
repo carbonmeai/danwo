@@ -37,6 +37,20 @@ export function textOf(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined
 }
 
+/** A field that takes one address or a list, as a list; `null` when none were given. */
+export function addressesOrNull(value: unknown): string[] | null {
+  const list = addresses(value)
+
+  return list.length > 0 ? list : null
+}
+
+const TAGS = /<(script|style)\b[\s\S]*?<\/\1>|<[^>]*>/gi
+
+/** The words a reader sees in `html`, with tags dropped and common entities decoded. */
+export function visibleText(html: string): string {
+  return html.replace(TAGS, " ").replaceAll("&nbsp;", " ").replaceAll("&amp;", "&")
+}
+
 /** A field that takes one address or a list, as a list. */
 export function addresses(value: unknown): string[] {
   const list = Array.isArray(value) ? value : [value]

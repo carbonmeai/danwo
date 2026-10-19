@@ -1,6 +1,7 @@
 import type { Emulator } from "../define.ts"
 import { waitUntil } from "../poll.ts"
 import type { Email } from "./entities.ts"
+import { visibleText } from "./helpers.ts"
 import { resendStore } from "./store.ts"
 
 /** One email the emulator accepted, as a test reads it. */
@@ -26,13 +27,6 @@ export interface ResendInbox {
   latest(to: string): InboxEmail | undefined
   /** Waits up to `timeoutMs` (10 s by default) for an email to `to` accepted after `since`. */
   waitFor(to: string, options?: { since?: string; timeoutMs?: number }): Promise<InboxEmail>
-}
-
-const TAGS = /<(script|style)\b[\s\S]*?<\/\1>|<[^>]*>/gi
-
-/** The readable text of an HTML body. */
-function visibleText(html: string): string {
-  return html.replace(TAGS, " ").replaceAll("&nbsp;", " ").replaceAll("&amp;", "&")
 }
 
 function linksIn(email: Email): string[] {
