@@ -152,6 +152,15 @@ async function preloadCheck(
   return warnings
 }
 
+/** The started apps that have stopped on their own, e.g. `api exited with code 1`. */
+function stoppedApps(started: ReadonlyMap<string, StartedApp>): string[] {
+  return [...started].flatMap(([name, app]) => {
+    const exit = app.exited()
+
+    return exit === undefined ? [] : [`${name} ${exit}`]
+  })
+}
+
 /**
  * A worker environment for a stack of apps: the services behind one proxy, every app started
  * through it in `dependsOn` order, and the lifecycle `danwo matrix` needs. Apps keep running
@@ -198,6 +207,7 @@ export async function stackEnvironment(
     /* `apps`: every app's URL by name, for a test that reads a worker's state directly. */
     fixtures: { ...services.fixtures, apps: urls },
     logs: () => Object.fromEntries([...started].map(([name, app]) => [name, app.logs()])),
+    stopped: () => stoppedApps(started),
     notes: () => warnings,
     state: () => services.state(),
     ...servicesLifecycle(services),

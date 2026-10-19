@@ -72,6 +72,12 @@ export interface WorkerEnvironment {
   /** Facts to print next to a matrix run's verdict. */
   notes?(): readonly string[]
   /**
+   * Apps the environment started that have since stopped on their own, e.g. `api exited with code
+   * 1`: a test that fails after one went down says so, rather than leaving only its symptoms (a
+   * refused connection, a page that never loads).
+   */
+  stopped?(): readonly string[]
+  /**
    * What each app the environment started has written, by app: the flight record keeps the lines
    * written during each run.
    */

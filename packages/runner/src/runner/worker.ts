@@ -30,6 +30,7 @@ import {
   suiteHooks,
 } from "../tests/registry.ts"
 import { resultOf, worthRetrying } from "../tests/retry.ts"
+import { appsDownNotes, appsDownNow, appsDownSince, withAppsDown } from "./apps-down.ts"
 import { type AttemptResult, type AttemptSetup, runAttempt, type ReplayUse } from "./attempt.ts"
 import { loadTestFile, testIdOf } from "./catalog.ts"
 import { type LoadedConfig, loadConfig } from "./config.ts"
@@ -272,6 +273,7 @@ async function runTest(
 
     await beginAttempt(isolated)
 
+    const upBefore = appsDownNow(env)
     const { result, recordDir, mark } = await attemptOnce(
       declarations,
       task.file,
@@ -281,39 +283,63 @@ async function runTest(
     ).finally(() => {
       keepSignIns = false
     })
-    const input: RecordInput = {
-      test: id,
-      run: { kind: "test", attempt: n },
-      status: result.status,
-      error: result.error,
-      stopped: result.stopped,
-      divergence: result.divergence,
-      notes: result.notes,
-      durationMs: result.durationMs,
-      flight: result.flight,
-      env,
-      mark,
-      video: videoKept(result.status === "passed"),
-    }
-    const inspected = inspect(input)
-    const record = await keepRecord(recordDir, result.status !== "passed", () =>
-      buildRecord(input, inspected),
-    )
 
-    attempts.push({
-      status: result.status,
-      error: result.error,
-      durationMs: result.durationMs,
-      record,
-      usage: usageOf(result.flight.session.steps()),
-      ...lintOf(inspected),
-    })
+    attempts.push(
+      await reportAttempt({ id, n, result, recordDir, mark, down: appsDownSince(env, upBefore) }),
+    )
 
     if (result.status === "passed") impact = attemptImpact(result, mark)
     if (!worthRetrying(result.status)) break
   }
 
   return { id, status: resultOf(attempts), attempts, workerIndex, ...(impact && { impact }) }
+}
+
+/** One finished attempt of a test, with the apps that went down during it. */
+interface FinishedAttempt {
+  readonly id: string
+  readonly n: number
+  readonly result: AttemptResult
+  readonly recordDir: string | undefined
+  readonly mark: EvidenceMark
+  readonly down: readonly string[]
+}
+
+/**
+ * An attempt's report, its flight record kept when the run keeps it. Apps that went down during
+ * it are named in its error and its record's notes.
+ */
+async function reportAttempt(attempt: FinishedAttempt): Promise<AttemptReport> {
+  const { env } = benchOrFail()
+  const { result, down } = attempt
+  const error = withAppsDown(result.error, down)
+  const input: RecordInput = {
+    test: attempt.id,
+    run: { kind: "test", attempt: attempt.n },
+    status: result.status,
+    error,
+    stopped: result.stopped,
+    divergence: result.divergence,
+    notes: [...result.notes, ...appsDownNotes(down)],
+    durationMs: result.durationMs,
+    flight: result.flight,
+    env,
+    mark: attempt.mark,
+    video: videoKept(result.status === "passed"),
+  }
+  const inspected = inspect(input)
+  const record = await keepRecord(attempt.recordDir, result.status !== "passed", () =>
+    buildRecord(input, inspected),
+  )
+
+  return {
+    status: result.status,
+    error,
+    durationMs: result.durationMs,
+    record,
+    usage: usageOf(result.flight.session.steps()),
+    ...lintOf(inspected),
+  }
 }
 
 /** What a passing attempt touched: the app's pages, and the calls and webhooks behind them. */
