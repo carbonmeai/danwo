@@ -62,6 +62,16 @@ function referenceProblem(
     : undefined
 }
 
+/** The metadata a call attaches; Paystack keeps an empty string when it attaches none. */
+function attachedMetadata(fields: Record<string, unknown>): Transaction["metadata"] {
+  return fields["metadata"] === undefined ? "" : metadataOf(fields["metadata"])
+}
+
+/** The address a call came from: the first hop a proxy names, or the loopback address. */
+function callerAddress(c: Context): string {
+  return c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "127.0.0.1"
+}
+
 function channelsOf(fields: Record<string, unknown>): readonly string[] {
   const given = fields["channels"]
 
@@ -92,7 +102,8 @@ async function initialize(
     amount: amountOf(fields) ?? 0,
     currency,
     reference: text(fields, "reference"),
-    metadata: metadataOf(fields["metadata"]),
+    metadata: attachedMetadata(fields),
+    ipAddress: callerAddress(c),
     callbackUrl: text(fields, "callback_url") ?? null,
     channels: channelsOf(fields),
     plan: planCode === undefined ? null : (context.paystack.plans.get(planCode) ?? null),
@@ -181,7 +192,8 @@ async function chargeAuthorization(
       amount: amountOf(fields) ?? 0,
       currency: currencyOf(fields, "NGN") ?? "NGN",
       reference: text(fields, "reference"),
-      metadata: metadataOf(fields["metadata"]),
+      metadata: attachedMetadata(fields),
+      ipAddress: callerAddress(c),
       callbackUrl: null,
       channels: ["card"],
       plan: null,

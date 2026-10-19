@@ -44,7 +44,9 @@ export interface NewTransaction {
   readonly amount: number
   readonly currency: string
   readonly reference?: string | undefined
-  readonly metadata: Record<string, unknown>
+  readonly metadata: Transaction["metadata"]
+  /** The caller's address, for a payment started by an API call; none for one Paystack starts. */
+  readonly ipAddress?: string | undefined
   readonly callbackUrl: string | null
   readonly channels: readonly string[]
   readonly plan: Plan | null
@@ -98,7 +100,8 @@ export class PaystackPayments {
         currency: input.currency,
         customer: this.customerFor(input.integration, input.email),
         metadata: input.metadata,
-        plan: input.plan?.plan_code ?? null,
+        plan: input.plan,
+        ipAddress: input.ipAddress ?? null,
         now: clock(),
       }),
       extra,

@@ -70,10 +70,13 @@ export interface Transaction {
   readonly domain: string
   readonly status: TransactionStatus
   readonly reference: string
+  readonly receipt_number: string | null
   readonly amount: number
   readonly requested_amount: number
   readonly message: string | null
   readonly gateway_response: string
+  readonly gateway_response_code: string | null
+  readonly response_code: string | null
   readonly paid_at: string | null
   readonly paidAt: string | null
   readonly created_at: string
@@ -82,11 +85,22 @@ export interface Transaction {
   readonly channel: string
   readonly currency: string
   readonly ip_address: string | null
-  readonly metadata: Record<string, unknown> | string
+  /** What the caller attached; an empty string when it attached nothing. */
+  readonly metadata: Record<string, unknown> | ""
   readonly fees: number | null
+  readonly fees_split: null
+  readonly fees_breakdown: null
   readonly authorization: Authorization | Record<string, never>
   readonly customer: CustomerSummary
   readonly plan: string | null
+  /** The plan the transaction pays for, or an empty object. */
+  readonly plan_object: Plan | Record<string, never>
+  readonly split: Record<string, never>
+  readonly subaccount: Record<string, never>
+  readonly order_id: null
+  readonly pos_transaction_data: null
+  readonly source: null
+  readonly connect: null
   readonly log: null
 }
 

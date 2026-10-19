@@ -76,8 +76,10 @@ export interface TransactionInput {
   readonly amount: number
   readonly currency: string
   readonly customer: Customer
-  readonly metadata: Record<string, unknown>
-  readonly plan: string | null
+  readonly metadata: Transaction["metadata"]
+  readonly plan: Plan | null
+  /** The address the payment was started from, when a caller started it. */
+  readonly ipAddress: string | null
   readonly now: Date
 }
 
@@ -90,10 +92,13 @@ export function transactionObject(input: TransactionInput): Transaction {
     domain: DOMAIN,
     status: "abandoned",
     reference: input.reference,
+    receipt_number: null,
     amount: input.amount,
     requested_amount: input.amount,
     message: null,
     gateway_response: "The transaction was not completed",
+    gateway_response_code: null,
+    response_code: null,
     paid_at: null,
     paidAt: null,
     created_at: at,
@@ -101,12 +106,21 @@ export function transactionObject(input: TransactionInput): Transaction {
     transaction_date: at,
     channel: "card",
     currency: input.currency,
-    ip_address: null,
+    ip_address: input.ipAddress,
     metadata: input.metadata,
     fees: null,
+    fees_split: null,
+    fees_breakdown: null,
     authorization: {},
     customer: summaryOf(input.customer),
-    plan: input.plan,
+    plan: input.plan?.plan_code ?? null,
+    plan_object: input.plan ?? {},
+    split: {},
+    subaccount: {},
+    order_id: null,
+    pos_transaction_data: null,
+    source: null,
+    connect: null,
     log: null,
   }
 }
