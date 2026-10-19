@@ -1,4 +1,9 @@
-# danwo
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/svg/danwo-lockup-horizontal-on-dark.svg">
+    <img src="brand/svg/danwo-lockup-horizontal-on-light.svg" alt="dánwò" height="64">
+  </picture>
+</h1>
 
 An open-source QA platform for the agentic era, with a cloud offering and a self-hosted version.
 
