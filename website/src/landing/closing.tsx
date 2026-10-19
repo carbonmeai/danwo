@@ -76,18 +76,18 @@ export function Footer() {
             title="Product"
             links={[
               ["Emulators", "/docs/providers"],
-              ["Fault matrix", "/docs/concepts/invariants-and-matrix"],
-              ["Flight recorder", "/docs/concepts/flight-records"],
-              ["Mobile", "/docs/tools/mobile"],
+              ["Fault matrix", "/docs/fault-matrix"],
+              ["Flight recorder", "/docs/flight-records"],
+              ["Mobile", "/docs/mobile"],
             ]}
           />
           <Column
             title="Developers"
             links={[
               ["Docs", "/docs"],
-              ["Quickstart", "/docs/quickstart"],
-              ["MCP", "/docs/tools/mcp"],
-              ["Playwright", "/docs/tools/playwright"],
+              ["Quickstart", "/docs/first-test"],
+              ["MCP", "/docs/coding-agents"],
+              ["Playwright", "/docs/playwright"],
             ]}
           />
           <Column
@@ -95,7 +95,7 @@ export function Footer() {
             links={[
               ...(github ? [["GitHub", github] as const] : []),
               ["Changelog", "/changelog"],
-              ["Fidelity", "/docs/tools/fidelity"],
+              ["Fidelity", "/docs/fidelity"],
               ["llms.txt", "/llms.txt"],
             ]}
           />

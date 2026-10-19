@@ -124,7 +124,7 @@ export const Hero = forwardRef<HTMLElement>(function Hero(_props, ref) {
   return (
     <section className="hero" id="hero" ref={ref}>
       <div className="wrap">
-        <Link className="pill" to="/docs/$" params={{ _splat: "tools/mobile" }}>
+        <Link className="pill" to="/docs/$" params={{ _splat: "mobile" }}>
           <b>New</b>Android apps: same tests, same matrix
           <span className="more">
             <ChevronIcon size={12} />
@@ -155,7 +155,7 @@ export const Hero = forwardRef<HTMLElement>(function Hero(_props, ref) {
               GitHub
             </a>
           ) : (
-            <Link className="btn btn-solid" to="/docs/$" params={{ _splat: "quickstart" }}>
+            <Link className="btn btn-solid" to="/docs/$" params={{ _splat: "first-test" }}>
               Quickstart
             </Link>
           )}

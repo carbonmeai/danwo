@@ -137,3 +137,76 @@ body {
   font-size: 12px;
   color: var(--color-fd-muted-foreground);
 }
+
+/* A docs page's head: the section it sits in, then its title with its actions beside it. */
+.danwo-eyebrow {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-fd-muted-foreground);
+  margin-bottom: -4px;
+}
+
+.danwo-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.danwo-page-actions {
+  display: inline-flex;
+  flex: none;
+  margin-top: 4px;
+}
+
+.danwo-page-actions > :first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.danwo-page-actions > :last-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  margin-left: -1px;
+}
+
+@media (max-width: 640px) {
+  .danwo-title-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+/* The card under the table of contents. */
+.danwo-cta {
+  margin-top: 20px;
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--color-fd-card);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-fd-muted-foreground);
+}
+
+.danwo-cta-title {
+  font-weight: 600;
+  color: var(--color-fd-foreground);
+  margin-bottom: 4px;
+}
+
+.danwo-cta-button {
+  display: inline-flex;
+  margin-top: 10px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  font-weight: 500;
+  font-size: 12.5px;
+  background: var(--color-fd-primary);
+  color: var(--color-fd-primary-foreground);
+}
+
+/* Reference tables: signatures in code wrap rather than widen the page. */
+.prose td code {
+  white-space: pre-wrap;
+  word-break: break-word;
+}

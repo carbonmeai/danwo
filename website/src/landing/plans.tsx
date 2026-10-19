@@ -65,7 +65,7 @@ export function Plans() {
                   Install danwo
                 </Link>
               )}
-              <Link className="btn btn-soft" to="/docs/$" params={{ _splat: "quickstart" }}>
+              <Link className="btn btn-soft" to="/docs/$" params={{ _splat: "first-test" }}>
                 Quickstart
               </Link>
             </div>

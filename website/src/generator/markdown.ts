@@ -140,7 +140,67 @@ export function entryMarkdown(entry: SpecEntry, level = 3): string {
   return parts.join("\n\n")
 }
 
-/** A whole spec section: what it covers, then each entry. */
-export function sectionMarkdown(spec: SpecSection, level = 3): string {
-  return [spec.about, ...spec.entries.map((entry) => entryMarkdown(entry, level))].join("\n\n")
+/** Text for one table cell: on one line, with the table's own bars escaped. */
+function cell(text: string): string {
+  return oneLine(text).replaceAll("|", "\\|")
+}
+
+/** `text` as inline code, fenced with enough backticks for any it holds. */
+function code(text: string): string {
+  return text.includes("`") ? `\`\` ${cell(text)} \`\`` : `\`${cell(text)}\``
+}
+
+/** An entry's members as a table: each member's signature, which names it, and what it does. */
+function membersTable(members: readonly SpecMember[]): string {
+  const rows = members.map(
+    (member) => `| ${code(member.signature || member.name)} | ${cell(member.doc) || " "} |`,
+  )
+
+  return ["| Member | Description |", "| --- | --- |", ...rows].join("\n")
+}
+
+/**
+ * One spec entry as a reference section: a `##` heading so the page's table of contents lists
+ * it, its kind, its signature, its doc and its members in a table.
+ */
+export function referenceEntry(entry: SpecEntry): string {
+  const parts = [`## \`${entry.name}\``, `_${entry.kind}_`]
+
+  if (entry.signature) parts.push(`\`\`\`${fence(entry)}\n${entry.signature}\n\`\`\``)
+  if (entry.doc) parts.push(entry.doc)
+  if (entry.members.length > 0) parts.push(membersTable(entry.members))
+
+  return parts.join("\n\n")
+}
+
+/** Entries short enough to read as one table: none has members or a long signature. */
+function tabular(entries: readonly SpecEntry[]): boolean {
+  return entries.every((entry) => entry.members.length === 0 && entry.signature.length <= 60)
+}
+
+/** Entries as one table: name, kind, and what each is (with its signature when it has one). */
+function entriesTable(entries: readonly SpecEntry[]): string {
+  const rows = entries.map((entry) => {
+    const about = [entry.signature && code(entry.signature), cell(entry.doc)].filter(Boolean)
+
+    return `| ${code(entry.name)} | ${entry.kind} | ${about.join(" — ") || " "} |`
+  })
+
+  return ["| Name | Kind | Description |", "| --- | --- | --- |", ...rows].join("\n")
+}
+
+/**
+ * A reference page's body from spec sections: what each covers, then its entries, as sections
+ * of their own or, when every entry is a one-liner, as a single table.
+ */
+export function referenceBody(sections: readonly SpecSection[]): string {
+  return sections
+    .map((spec) => {
+      const entries = tabular(spec.entries)
+        ? [entriesTable(spec.entries)]
+        : spec.entries.map(referenceEntry)
+
+      return [spec.about, ...entries].join("\n\n")
+    })
+    .join("\n\n")
 }

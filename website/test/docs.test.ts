@@ -11,7 +11,13 @@ import {
   readInputs,
   WEBSITE,
 } from "../src/generator/generate.ts"
-import { PLAN, PROVIDER_GUIDE_SECTIONS } from "../src/generator/plan.ts"
+import { EXAMPLES, exampleFolders } from "../src/generator/examples.ts"
+import {
+  type PageSource,
+  PLAN,
+  plannedPages,
+  PROVIDER_GUIDE_SECTIONS,
+} from "../src/generator/plan.ts"
 import { docsSlugs, postSlugs, prerenderedPaths } from "../src/generator/routes.ts"
 import { markdownPath, slugsOfMarkdown } from "../src/lib/paths.ts"
 import { PROVIDERS } from "../src/lib/providers.ts"
@@ -30,17 +36,45 @@ function field(text: string, name: string): string | undefined {
   return new RegExp(`^${name}: (.+)$`, "m").exec(text)?.[1]
 }
 
+/** The planned pages' sources. */
+function sources(): PageSource[] {
+  return plannedPages().map(({ page }) => page.source)
+}
+
 describe("the docs plan", () => {
-  it("gives every guide a page", () => {
-    const planned = PLAN.flatMap((folder) =>
-      folder.pages.flatMap((page) => (page.source.kind === "guide" ? [page.source.topic] : [])),
-    )
+  it("gives every guide exactly one page", () => {
+    const planned = sources().flatMap((source) => (source.kind === "guide" ? [source.topic] : []))
+    const homes = [...planned, ...PROVIDERS.flatMap((provider) => provider.guide ?? [])]
     const guides = readdirSync(GUIDES_DIR)
       .filter((file) => file.endsWith(".md"))
       .map((file) => file.slice(0, -".md".length))
-    const covered = new Set([...planned, ...PROVIDERS.flatMap((provider) => provider.guide ?? [])])
 
-    expect(guides.filter((topic) => !covered.has(topic))).toEqual([])
+    expect(guides.filter((topic) => !homes.includes(topic))).toEqual([])
+    expect(homes.filter((topic, i) => homes.indexOf(topic) !== i)).toEqual([])
+  })
+
+  it("puts every provider in exactly one section of the Providers tab", () => {
+    const listed = sources().flatMap((source) =>
+      source.kind === "provider" ? [source.provider] : [],
+    )
+
+    expect(listed.toSorted()).toEqual(PROVIDERS.map((provider) => provider.slug).toSorted())
+  })
+
+  it("gives every example folder a page", () => {
+    expect(EXAMPLES.map((example) => example.folder).toSorted()).toEqual(exampleFolders())
+  })
+
+  it("gives every page a short title and an icon, and slugs unique in their tab", () => {
+    for (const { tab, page } of plannedPages()) {
+      if (page.source.kind === "provider") continue
+
+      expect(page.title.length, page.slug).toBeLessThanOrEqual(24)
+      expect(page.icon, page.slug).toBeTruthy()
+      expect(
+        tab.sections.flatMap((group) => group.pages).filter((other) => other.slug === page.slug),
+      ).toHaveLength(1)
+    }
   })
 
   it("names only sections the providers guide has", () => {
@@ -50,9 +84,7 @@ describe("the docs plan", () => {
   })
 
   it("names only pages written for the website that exist", () => {
-    const written = PLAN.flatMap((folder) =>
-      folder.pages.flatMap((page) => (page.source.kind === "file" ? [page.source.file] : [])),
-    )
+    const written = sources().flatMap((source) => (source.kind === "file" ? [source.file] : []))
 
     expect(written.filter((file) => !existsSync(join(CONTENT, file)))).toEqual([])
   })
@@ -80,12 +112,37 @@ describe("the docs tree", () => {
     }
   })
 
-  it("lists every page in its folder's sidebar order", () => {
-    const concepts: unknown = JSON.parse(files.get(join("concepts", "meta.json")) ?? "{}")
-    const providers: unknown = JSON.parse(files.get(join("providers", "meta.json")) ?? "{}")
+  it("makes each tab a root folder with its sections as separators", () => {
+    const root: unknown = JSON.parse(files.get("meta.json") ?? "{}")
 
-    expect(concepts).toMatchObject({ pages: expect.arrayContaining(["invariants-and-matrix"]) })
-    expect(providers).toMatchObject({ pages: PROVIDERS.map((provider) => provider.slug) })
+    expect(root).toEqual({ pages: PLAN.map((tab) => tab.dir) })
+
+    for (const tab of PLAN) {
+      const meta: unknown = JSON.parse(files.get(join(tab.dir, "meta.json")) ?? "{}")
+      const pages = tab.sections.flatMap((group) => [
+        `---${group.title}---`,
+        ...group.pages.map((page) => page.slug),
+      ])
+
+      expect(meta).toMatchObject({ title: tab.title, root: true, pages })
+    }
+  })
+
+  it("puts each page's section over its title", () => {
+    for (const { tab, section: group, page } of plannedPages()) {
+      const ext = files.has(join(tab.dir, `${page.slug}.md`)) ? "md" : "mdx"
+      const text = files.get(join(tab.dir, `${page.slug}.${ext}`)) ?? ""
+
+      expect(field(text, "section"), page.slug).toBe(JSON.stringify(group.title))
+    }
+  })
+
+  it("opens a reference page with its example and lists its entries as sections", () => {
+    const page = files.get(join("reference", "screen.md")) ?? ""
+
+    expect(page).toContain('```ts title="tests/storefront.danwo.ts"')
+    expect(page).toMatch(/^## `Locator`$/m)
+    expect(page).toContain("| Member | Description |")
   })
 
   it("reads the spec topics the reference pages show", () => {

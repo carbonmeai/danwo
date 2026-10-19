@@ -6,8 +6,9 @@ import {
   guidePage,
   oneLine,
   plainText,
+  referenceBody,
+  referenceEntry,
   section,
-  sectionMarkdown,
   withoutSections,
 } from "../src/generator/markdown.ts"
 
@@ -140,17 +141,81 @@ describe("entryMarkdown", () => {
   })
 })
 
-describe("sectionMarkdown", () => {
-  it("puts what the section covers before its entries", () => {
-    const text = sectionMarkdown({
-      topic: "cache",
-      title: "Cache outcomes",
-      about: "What each step's replay came to.",
-      entries: [
-        { name: "replayed", kind: "outcome", signature: "", doc: "as recorded", members: [] },
+describe("referenceEntry", () => {
+  it("gives an entry a section of its own, its members in a table with their bars escaped", () => {
+    const text = referenceEntry({
+      name: "Locator",
+      kind: "interface",
+      signature: "Locator extends Screen",
+      doc: "An element on the screen.",
+      members: [
+        { name: "click", signature: "click: Action", doc: "Clicks it.\nOnce it is ready." },
+        { name: "state", signature: "state: 'on' | 'off'", doc: "" },
       ],
     })
 
-    expect(text.startsWith("What each step's replay came to.\n\n### `replayed`")).toBe(true)
+    expect(text).toBe(
+      [
+        "## `Locator`",
+        "_interface_",
+        "```ts\nLocator extends Screen\n```",
+        "An element on the screen.",
+        [
+          "| Member | Description |",
+          "| --- | --- |",
+          "| `click: Action` | Clicks it. Once it is ready. |",
+          "| `state: 'on' \\| 'off'` |   |",
+        ].join("\n"),
+      ].join("\n\n"),
+    )
+  })
+})
+
+describe("referenceBody", () => {
+  it("puts what a section covers before its entries, as sections of their own", () => {
+    const text = referenceBody([
+      {
+        topic: "agent",
+        title: "Agent",
+        about: "Plain-English steps.",
+        entries: [
+          {
+            name: "Agent",
+            kind: "interface",
+            signature: "",
+            doc: "",
+            members: [{ name: "act", signature: "act(goal: string)", doc: "Does it." }],
+          },
+        ],
+      },
+    ])
+
+    expect(text.startsWith("Plain-English steps.\n\n## `Agent`")).toBe(true)
+  })
+
+  it("lists one-line entries as a single table", () => {
+    const text = referenceBody([
+      {
+        topic: "cache",
+        title: "Cache outcomes",
+        about: "What each step's replay came to.",
+        entries: [
+          { name: "replayed", kind: "outcome", signature: "", doc: "as recorded", members: [] },
+          { name: "missed", kind: "outcome", signature: "exit 1", doc: "no recording", members: [] },
+        ],
+      },
+    ])
+
+    expect(text).toBe(
+      [
+        "What each step's replay came to.",
+        [
+          "| Name | Kind | Description |",
+          "| --- | --- | --- |",
+          "| `replayed` | outcome | as recorded |",
+          "| `missed` | outcome | `exit 1` — no recording |",
+        ].join("\n"),
+      ].join("\n\n"),
+    )
   })
 })

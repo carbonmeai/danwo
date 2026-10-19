@@ -40,12 +40,16 @@ function fidelityBlock(provider: Provider): string[] {
 
   return [
     "## Checked against the real API",
-    `\`danwo fidelity ${provider.fidelity}\` compares this emulator's answers with the provider's own by structure; see [Fidelity](/docs/tools/fidelity).`,
+    `\`danwo fidelity ${provider.fidelity}\` compares this emulator's answers with the provider's own by structure; see [Fidelity](/docs/fidelity).`,
   ]
 }
 
-/** One provider's page. */
-export function providerPage(provider: Provider, spec: ReadonlyMap<string, SpecSection>): string {
+/** One provider's page, under the sidebar section named `group`. */
+export function providerPage(
+  provider: Provider,
+  spec: ReadonlyMap<string, SpecSection>,
+  group: string,
+): string {
   const guide = guideText(provider)
   const parts = [
     frontmatter({
@@ -55,6 +59,7 @@ export function providerPage(provider: Provider, spec: ReadonlyMap<string, SpecS
         .filter((file) => file !== undefined)
         .map((file) => `/icons/${file}`)
         .join("|"),
+      section: group,
       source:
         provider.guideSection || provider.guide
           ? "packages/skill/guides"
@@ -81,8 +86,8 @@ function cardIcon(provider: Provider): string {
     : img(provider.icon)
 }
 
-/** The Providers index: a card per provider, linking to its page. */
-export function providerIndex(): string {
+/** The Providers overview, under the sidebar section named `group`: a card per provider. */
+export function providerIndex(group: string): string {
   const cards = PROVIDERS.map(
     (provider) =>
       `  <Card title=${JSON.stringify(provider.name)} href="/docs/providers/${provider.slug}" icon={${cardIcon(provider)}}>\n    ${provider.summary}\n  </Card>`,
@@ -93,9 +98,11 @@ export function providerIndex(): string {
       title: "Providers",
       description:
         "The third-party APIs danwo emulates behind its egress proxy: the app keeps calling the real hostnames, unchanged.",
+      icon: "Plug",
+      section: group,
       source: "website/src/lib/providers.ts",
     }),
-    "Each emulator answers the provider's real hostnames, keeps state across calls, signs its webhooks and returns the error shapes the provider's SDK parses. [Emulating a provider](/docs/concepts/emulators) covers how an environment starts them.",
+    "Each emulator answers the provider's real hostnames, keeps state across calls, signs its webhooks and returns the error shapes the provider's SDK parses. [Emulators](/docs/emulators) covers how an environment starts them.",
     `<Cards>\n${cards.join("\n")}\n</Cards>`,
     "",
   ].join("\n\n")

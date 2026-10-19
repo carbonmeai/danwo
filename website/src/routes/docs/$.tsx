@@ -1,5 +1,5 @@
 import { createFileRoute, notFound } from "@tanstack/react-router"
-import { DocsLayout } from "fumadocs-ui/layouts/docs"
+import { DocsLayout } from "fumadocs-ui/layouts/notebook"
 import {
   DocsBody,
   DocsDescription,
@@ -7,11 +7,12 @@ import {
   DocsTitle,
   MarkdownCopyButton,
   ViewOptionsPopover,
-} from "fumadocs-ui/layouts/docs/page"
+} from "fumadocs-ui/layouts/notebook/page"
 import { Suspense, use } from "react"
 
+import { DocsCta } from "../../components/docs-cta.tsx"
 import { useMdxComponents } from "../../components/mdx.tsx"
-import { baseOptions } from "../../lib/layout.tsx"
+import { docsOptions } from "../../lib/layout.tsx"
 import { pageHead } from "../../lib/meta.ts"
 import { markdownPath } from "../../lib/paths.ts"
 import { SITE } from "../../lib/site.ts"
@@ -35,6 +36,7 @@ export const Route = createFileRoute("/docs/$")({
       url: page.url,
       title: page.data.title,
       description: page.data.description ?? "",
+      section: page.data.section,
       markdownUrl: markdownPath(slugs.join("/")),
       origin: page.data.source,
     }
@@ -58,12 +60,32 @@ function editUrl(origin: string | undefined): string | undefined {
   return `https://github.com/${SITE.repo}/blob/${SITE.branch}/${origin}`
 }
 
+/** The page's actions beside its title: copy it as markdown, or open it elsewhere. */
+function PageActions({
+  markdownUrl,
+  origin,
+}: {
+  readonly markdownUrl: string
+  readonly origin: string | undefined
+}) {
+  const github = editUrl(origin)
+
+  return (
+    <div className="danwo-page-actions">
+      <MarkdownCopyButton markdownUrl={markdownUrl} />
+      <ViewOptionsPopover markdownUrl={markdownUrl} {...(github && { githubUrl: github })} />
+    </div>
+  )
+}
+
 function Content({
   path,
+  section,
   markdownUrl,
   origin,
 }: {
   readonly path: string
+  readonly section: string | undefined
   readonly markdownUrl: string
   readonly origin: string | undefined
 }) {
@@ -73,16 +95,19 @@ function Content({
 
   const { toc } = use(page.load())
   const Mdx = page.body
-  const github = editUrl(origin)
 
   return (
-    <DocsPage toc={toc}>
-      <DocsTitle>{page.title}</DocsTitle>
-      <DocsDescription>{page.description}</DocsDescription>
-      <div className="-mt-4 flex flex-row items-center gap-2 border-b pb-6">
-        <MarkdownCopyButton markdownUrl={markdownUrl} />
-        <ViewOptionsPopover markdownUrl={markdownUrl} {...(github && { githubUrl: github })} />
+    <DocsPage
+      toc={toc}
+      breadcrumb={{ enabled: false }}
+      tableOfContent={{ style: "clerk", footer: <DocsCta /> }}
+    >
+      {section && <p className="danwo-eyebrow">{section}</p>}
+      <div className="danwo-title-row">
+        <DocsTitle>{page.title}</DocsTitle>
+        <PageActions markdownUrl={markdownUrl} origin={origin} />
       </div>
+      <DocsDescription>{page.description}</DocsDescription>
       <DocsBody>
         <Mdx components={useMdxComponents()} />
       </DocsBody>
@@ -91,12 +116,12 @@ function Content({
 }
 
 function Page() {
-  const { path, markdownUrl, origin } = Route.useLoaderData()
+  const { path, section, markdownUrl, origin } = Route.useLoaderData()
 
   return (
-    <DocsLayout {...baseOptions()} tree={source.getPageTree()}>
+    <DocsLayout {...docsOptions()} tree={source.getPageTree()}>
       <Suspense>
-        <Content path={path} markdownUrl={markdownUrl} origin={origin} />
+        <Content path={path} section={section} markdownUrl={markdownUrl} origin={origin} />
       </Suspense>
     </DocsLayout>
   )

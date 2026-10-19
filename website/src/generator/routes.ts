@@ -7,21 +7,12 @@ import { readdirSync } from "node:fs"
 import { join } from "node:path"
 
 import { markdownPath } from "../lib/paths.ts"
-import { PROVIDERS } from "../lib/providers.ts"
-import { WEBSITE } from "./generate.ts"
-import { PLAN } from "./plan.ts"
+import { pageSlug, WEBSITE } from "./generate.ts"
+import { plannedPages } from "./plan.ts"
 
 /** Each docs page's path under `/docs`, `""` for the docs' home. */
 export function docsSlugs(): string[] {
-  return PLAN.flatMap((folder) =>
-    folder.pages.flatMap((page) => {
-      const own = [folder.dir, page.slug === "index" ? "" : page.slug].filter(Boolean).join("/")
-
-      return page.source.kind === "providers"
-        ? [own, ...PROVIDERS.map((provider) => `${folder.dir}/${provider.slug}`)]
-        : [own]
-    }),
-  )
+  return plannedPages().map(({ tab, page }) => pageSlug(tab, page))
 }
 
 /** The slugs of the posts in a content collection, by their file names. */

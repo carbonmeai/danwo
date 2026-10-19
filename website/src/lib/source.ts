@@ -9,8 +9,14 @@ import { z } from "zod"
 
 import { iconsPlugin } from "./icons.tsx"
 
-/** A docs page's frontmatter: the standard fields and the file its text came from. */
-const docsPageSchema = pageSchema.extend({ source: z.string().optional() })
+/**
+ * A docs page's frontmatter: the standard fields, the sidebar section it sits in (shown over its
+ * title) and the file its text came from.
+ */
+const docsPageSchema = pageSchema.extend({
+  section: z.string().optional(),
+  source: z.string().optional(),
+})
 
 export const docs = defineDocs({
   dir: "generated/docs",
