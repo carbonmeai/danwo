@@ -22,6 +22,7 @@ import {
   type DataPlannedFault,
   planDataFaults,
 } from "./data-faults.ts"
+import { occurrenceOf } from "./occurrence.ts"
 import { applySocketFault, planSocketFaults, type SocketPlannedFault } from "./socket-faults.ts"
 
 /**
@@ -229,18 +230,9 @@ export function applyFault(
   planned: PlannedFault | null,
 ): void {
   if (planned?.target === "outbound") {
-    const seen = new Map<string, number>()
+    const hits = occurrenceOf(routeOf, planned)
 
-    env.proxy.setFault((call) => {
-      const route = routeOf(call)
-      const occurrence = seen.get(route) ?? 0
-
-      seen.set(route, occurrence + 1)
-
-      return route === planned.route && occurrence === planned.occurrence
-        ? planned.fault
-        : undefined
-    })
+    env.proxy.setFault((call) => (hits(call) ? planned.fault : undefined))
   } else if (planned?.target === "webhook") {
     applyWebhookFault(env.webhooks, planned)
   } else if (planned?.target === "data") {

@@ -1,6 +1,6 @@
 import { once } from "node:events"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
-import { createServer, request, type Server } from "node:http"
+import { createServer, request, type Server, type ServerResponse } from "node:http"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -87,6 +87,23 @@ describe("live provider keys", () => {
   })
 })
 
+/** The run an event accepted at `at` triggered, finished once `runMs` has passed. */
+function runOf(id: string, at: number, runMs: number) {
+  const done = Date.now() - at >= runMs
+
+  return {
+    run_id: `run_${id}`,
+    function_id: "provision-workspace",
+    status: done ? "Completed" : "Running",
+    run_started_at: new Date(at).toISOString(),
+    ...(done && { ended_at: new Date(at + runMs).toISOString() }),
+  }
+}
+
+function json(res: ServerResponse, value: unknown): void {
+  res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(value))
+}
+
 /**
  * A stand-in for the Inngest dev server's event and runs API: an event it accepts triggers one
  * run, which finishes `runMs` later.
@@ -98,28 +115,15 @@ async function devServer(runMs: number): Promise<{ server: Server; url: string }
       const id = `evt_${accepted.size + 1}`
 
       accepted.set(id, Date.now())
-      res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ ids: [id] }))
+      json(res, { ids: [id] })
 
       return
     }
 
     const id = /^\/v1\/events\/([^/]+)\/runs$/.exec(req.url ?? "")?.[1] ?? ""
     const at = accepted.get(id)
-    const done = at !== undefined && Date.now() - at >= runMs
-    const runs =
-      at === undefined
-        ? []
-        : [
-            {
-              run_id: `run_${id}`,
-              function_id: "provision-workspace",
-              status: done ? "Completed" : "Running",
-              run_started_at: new Date(at).toISOString(),
-              ...(done && { ended_at: new Date(at + runMs).toISOString() }),
-            },
-          ]
 
-    res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ data: runs }))
+    json(res, { data: at === undefined ? [] : [runOf(id, at, runMs)] })
   })
 
   server.listen(0, "127.0.0.1")

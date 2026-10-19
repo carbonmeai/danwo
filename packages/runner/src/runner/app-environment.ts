@@ -211,7 +211,8 @@ export async function appEnvironment(
     proxy: services.proxy,
     webhooks: services.webhooks,
     fixtures: services.fixtures,
-    logs: () => (started === undefined ? {} : { app: started.logs() }),
+    logs: (): Readonly<Record<string, ProcessLog>> =>
+      started === undefined ? {} : { app: started.logs() },
     state: () => services.state(),
     settle: () => services.settle(),
     travel: (ms) => services.travel(ms),

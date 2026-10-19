@@ -3,7 +3,7 @@
  * function each triggers by calling the worker's endpoint (`WORKER_URL`), and reports runs at
  * `GET /v1/events/<id>/runs` in the shape the dev server's REST API answers with.
  */
-import { createServer } from "node:http"
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
 
 const port = Number(process.env.PORT)
 const worker = process.env.WORKER_URL ?? ""
@@ -16,55 +16,60 @@ interface Run {
 }
 
 const runs = new Map<string, Run>()
-let events = 0
 
-async function run(event: string, body: string): Promise<void> {
-  const entry = runs.get(event)
+async function run(entry: Run, body: string): Promise<void> {
+  const response = await fetch(`${worker}/api/inngest`, { method: "POST", body }).catch(
+    () => undefined,
+  )
 
-  if (entry === undefined) return
+  entry.status = response?.ok === true ? "Completed" : "Failed"
+  entry.endedAt = new Date().toISOString()
+}
 
-  try {
-    const response = await fetch(`${worker}/api/inngest`, { method: "POST", body })
+function json(res: ServerResponse, value: unknown): void {
+  res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(value))
+}
 
-    entry.status = response.ok ? "Completed" : "Failed"
-  } catch {
-    entry.status = "Failed"
+/** An event: queued, and its function run a little later, as a queued step would be. */
+function accept(res: ServerResponse, body: string): void {
+  const id = `evt_${runs.size + 1}`
+  const entry: Run = {
+    id: `run_${runs.size + 1}`,
+    status: "Running",
+    startedAt: new Date().toISOString(),
   }
 
-  entry.endedAt = new Date().toISOString()
+  runs.set(id, entry)
+  setTimeout(() => void run(entry, body), 300)
+  json(res, { ids: [id] })
+}
+
+function runOf(entry: Run) {
+  return {
+    run_id: entry.id,
+    function_id: "provision-task",
+    status: entry.status,
+    run_started_at: entry.startedAt,
+    ...(entry.endedAt !== undefined && { ended_at: entry.endedAt }),
+  }
+}
+
+/** The runs an event triggered. */
+function report(res: ServerResponse, url: string): void {
+  const event = /^\/v1\/events\/([^/]+)\/runs$/.exec(url)?.[1] ?? ""
+  const entry = runs.get(event)
+
+  json(res, { data: entry === undefined ? [] : [runOf(entry)] })
+}
+
+function handle(req: IncomingMessage, res: ServerResponse, body: string): void {
+  if (req.method === "POST" && req.url?.startsWith("/e/")) accept(res, body)
+  else report(res, req.url ?? "")
 }
 
 createServer((req, res) => {
   let body = ""
 
   req.on("data", (chunk: Buffer) => (body += chunk.toString()))
-  req.on("end", () => {
-    if (req.method === "POST" && req.url?.startsWith("/e/")) {
-      const id = `evt_${++events}`
-
-      runs.set(id, { id: `run_${events}`, status: "Running", startedAt: new Date().toISOString() })
-      /* The function runs a little later, as a queued step would. */
-      setTimeout(() => void run(id, body), 300)
-      res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ ids: [id] }))
-
-      return
-    }
-
-    const event = /^\/v1\/events\/([^/]+)\/runs$/.exec(req.url ?? "")?.[1]
-    const entry = event === undefined ? undefined : runs.get(event)
-    const data =
-      entry === undefined
-        ? []
-        : [
-            {
-              run_id: entry.id,
-              function_id: "provision-task",
-              status: entry.status,
-              run_started_at: entry.startedAt,
-              ...(entry.endedAt !== undefined && { ended_at: entry.endedAt }),
-            },
-          ]
-
-    res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ data }))
-  })
+  req.on("end", () => handle(req, res, body))
 }).listen(port, "127.0.0.1", () => console.log("inngest dev listening"))

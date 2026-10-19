@@ -8,7 +8,14 @@
 import { liveKeyWarnings, preloadWarnings } from "./app-checks.ts"
 import { type AppCommand, type StartedApp, startApp } from "./app-environment.ts"
 import type { WorkerEnvironment } from "./environment.ts"
-import { type Service, startServices, type UnroutedHosts, unroutedOf } from "./services.ts"
+import {
+  type Service,
+  type Services,
+  servicesLifecycle,
+  startServices,
+  type UnroutedHosts,
+  unroutedOf,
+} from "./services.ts"
 
 /** The other apps' URLs, by name, for wiring one app's environment to another's. */
 export type StackUrls = Readonly<Record<string, string>>
@@ -93,6 +100,51 @@ function report(warnings: readonly string[], mode: StackEnvironmentOptions["secr
   for (const warning of warnings) process.stderr.write(`danwo: ${warning}\n`)
 }
 
+/** What starting one app of the stack needs to know about the rest. */
+interface StackContext {
+  readonly options: StackEnvironmentOptions
+  readonly services: Services
+  readonly serviceList: readonly Service[]
+  readonly urls: StackUrls
+}
+
+/** Starts one app through the proxy, after checking its environment for live keys. */
+async function startOne(app: StackApp, context: StackContext): Promise<StartedApp> {
+  const { options, services } = context
+  const env = ownEnv(app, context.urls)
+  const proxyEnv = services.proxy.env(process.env, { nodeShim: options.nodeShim ?? true })
+
+  report(
+    await liveKeyWarnings({
+      app: app.name,
+      cwd: app.cwd,
+      env: { ...proxyEnv, ...env },
+      overridden: new Set(Object.keys(env)),
+      services: new Set(context.serviceList.map((service) => service.name)),
+      passthrough: (options.unmatched ?? "passthrough") === "passthrough",
+    }),
+    options.secrets,
+  )
+
+  return startApp({ ...app, env }, proxyEnv)
+}
+
+/** Warns about every started app's Node processes that run without the preload. */
+async function preloadCheck(
+  started: ReadonlyMap<string, StartedApp>,
+  services: Services,
+): Promise<string[]> {
+  const warnings: string[] = []
+
+  for (const [name, app] of started)
+    if (app.pid !== undefined)
+      warnings.push(...(await preloadWarnings(name, app.pid, services.proxy)))
+
+  for (const warning of warnings) process.stderr.write(`danwo: ${warning}\n`)
+
+  return warnings
+}
+
 /**
  * A worker environment for a stack of apps: the services behind one proxy, every app started
  * through it in `dependsOn` order, and the lifecycle `danwo matrix` needs. Apps keep running
@@ -116,32 +168,14 @@ export async function stackEnvironment(
   }
 
   try {
-    for (const batch of order) {
+    for (const batch of order)
       await Promise.all(
-        batch.map(async (app) => {
-          const env = ownEnv(app, urls)
-          const proxyEnv = services.proxy.env(process.env, { nodeShim: options.nodeShim ?? true })
-
-          report(
-            await liveKeyWarnings({
-              app: app.name,
-              cwd: app.cwd,
-              env: { ...proxyEnv, ...env },
-              overridden: new Set(Object.keys(env)),
-              services: new Set(serviceList.map((s) => s.name)),
-              passthrough: (options.unmatched ?? "passthrough") === "passthrough",
-            }),
-            options.secrets,
-          )
-          started.set(app.name, await startApp({ ...app, env }, proxyEnv))
-        }),
+        batch.map(async (app) =>
+          started.set(app.name, await startOne(app, { options, services, serviceList, urls })),
+        ),
       )
-    }
 
-    for (const [name, app] of started)
-      if (app.pid !== undefined)
-        warnings.push(...(await preloadWarnings(name, app.pid, services.proxy)))
-    for (const warning of warnings) process.stderr.write(`danwo: ${warning}\n`)
+    warnings.push(...(await preloadCheck(started, services)))
   } catch (error) {
     await stopAll()
     await services.close()
@@ -159,11 +193,7 @@ export async function stackEnvironment(
     logs: () => Object.fromEntries([...started].map(([name, app]) => [name, app.logs()])),
     notes: () => warnings,
     state: () => services.state(),
-    settle: () => services.settle(),
-    travel: (ms) => services.travel(ms),
-    reset: () => services.reset(),
-    snapshot: () => services.snapshot(),
-    restore: () => services.restore(),
+    ...servicesLifecycle(services),
     async close() {
       await stopAll()
       await services.close()

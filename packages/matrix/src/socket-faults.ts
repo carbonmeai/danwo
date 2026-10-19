@@ -5,6 +5,8 @@
  */
 import type { Proxy, SocketExchange, SocketFault } from "@danwo/proxy"
 
+import { occurrenceOf } from "./occurrence.ts"
+
 /** One socket fault, placed on one WebSocket the clean run opened. */
 export interface SocketPlannedFault {
   readonly target: "socket"
@@ -56,14 +58,7 @@ export function planSocketFaults(sockets: readonly SocketExchange[]): SocketPlan
 
 /** Sets the proxy's socket fault rule so `planned` fires on its socket. */
 export function applySocketFault(proxy: Proxy, planned: SocketPlannedFault): void {
-  const seen = new Map<string, number>()
+  const hits = occurrenceOf(socketRoute, planned)
 
-  proxy.setSocketFault((call) => {
-    const route = socketRoute(call)
-    const occurrence = seen.get(route) ?? 0
-
-    seen.set(route, occurrence + 1)
-
-    return route === planned.route && occurrence === planned.occurrence ? planned.fault : undefined
-  })
+  proxy.setSocketFault((call) => (hits(call) ? planned.fault : undefined))
 }

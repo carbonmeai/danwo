@@ -9,6 +9,7 @@ import https from "node:https"
 
 import { Stripe } from "stripe"
 import { type RawData, WebSocketServer } from "ws"
+import { z } from "zod"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "", {
   httpAgent: new https.Agent({ keepAlive: true }),
@@ -22,14 +23,25 @@ function cors(res: ServerResponse): ServerResponse {
     .setHeader("access-control-allow-headers", "content-type")
 }
 
-async function createTask(req: IncomingMessage, res: ServerResponse): Promise<void> {
+const NewTask = z.object({ title: z.string() })
+
+/** The `title` of a JSON body, or an empty string. */
+async function titleOf(req: IncomingMessage): Promise<string> {
+  const parsed = NewTask.safeParse(JSON.parse(await bodyOf(req)))
+
+  return parsed.success ? parsed.data.title : ""
+}
+
+async function bodyOf(req: IncomingMessage): Promise<string> {
   let body = ""
 
   for await (const chunk of req) body += String(chunk)
 
-  const parsed: unknown = JSON.parse(body || "{}")
-  const title =
-    typeof parsed === "object" && parsed !== null ? String(Reflect.get(parsed, "title")) : ""
+  return body || "{}"
+}
+
+async function createTask(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const title = await titleOf(req)
   const customer = await stripe.customers.create({ description: title })
 
   await fetch(inngest, {
@@ -47,16 +59,28 @@ function streamEvents(res: ServerResponse): void {
   res.write("data: hello\n\n")
 }
 
-const server = createServer((req, res) => {
-  if (req.method === "OPTIONS") return void cors(res).writeHead(204).end()
-  if (req.method === "POST" && req.url === "/tasks")
-    return void createTask(req, res).catch((error: unknown) => {
-      console.log(`task failed: ${error instanceof Error ? error.message : "unknown"}`)
-      cors(res).writeHead(502).end("could not save the task")
-    })
-  if (req.url === "/events") return streamEvents(res)
+function saveTask(req: IncomingMessage, res: ServerResponse): void {
+  createTask(req, res).catch((error: unknown) => {
+    console.log(`task failed: ${error instanceof Error ? error.message : "unknown"}`)
+    cors(res).writeHead(502).end("could not save the task")
+  })
+}
 
+type Route = (req: IncomingMessage, res: ServerResponse) => void
+
+/** What answers each `METHOD /path`; anything else gets a plain answer. */
+const ROUTES: ReadonlyMap<string, Route> = new Map<string, Route>([
+  ["POST /tasks", saveTask],
+  ["GET /events", (_req, res) => streamEvents(res)],
+  ["OPTIONS /tasks", (_req, res) => void cors(res).writeHead(204).end()],
+])
+
+const plain: Route = (_req, res) => {
   cors(res).writeHead(200, { "content-type": "text/plain" }).end("api")
+}
+
+const server = createServer((req, res) => {
+  ;(ROUTES.get(`${String(req.method)} ${String(req.url)}`) ?? plain)(req, res)
 })
 
 function text(data: RawData): string {
