@@ -102,15 +102,15 @@ export interface DanwoConfig {
   /** Starts what a worker's tests run against (app, emulators, proxy); called once per worker. */
   readonly environment?: (context: EnvironmentContext) => Promise<WorkerEnvironment>
   /**
-   * The flight recorder: `on-failure` (default) keeps what failed runs did under
-   * `.danwo/runs/<run>/` with an HTML report; `always` keeps every run; `off` records nothing.
+   * The flight recorder: `always` (default) keeps what every run did under `.danwo/runs/<run>/`
+   * with an HTML report; `on-failure` keeps failed runs only; `off` records nothing.
    */
   readonly record?: RecordMode
   /**
    * Video in the flight record, one per tab or the device's screen, with every step, call and
-   * webhook on its clock: `retain-on-failure` (default) films every run and keeps the video of
-   * runs that did not pass (a matrix keeps failing and invalid trials'); `on` keeps it with every
-   * record kept; `off` films nothing. Secret fields show as dots, but a secret the app prints as
+   * webhook on its clock: `on` (default) keeps it with every record kept; `retain-on-failure` films
+   * every run and keeps the video of runs that did not pass (a matrix keeps failing and invalid
+   * trials'); `off` films nothing. Secret fields show as dots, but a secret the app prints as
    * text is on screen: turn video off for suites that show one.
    */
   readonly video?: VideoMode

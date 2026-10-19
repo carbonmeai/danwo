@@ -21,7 +21,7 @@ import type { AttemptFlight } from "./attempt.ts"
 import type { WorkerEnvironment } from "./environment.ts"
 import { createRedactor, type Redactor } from "./redact.ts"
 
-/** `on-failure` keeps failed runs only (the default); `always` keeps every run; `off` records nothing. */
+/** `always` keeps every run (the default); `on-failure` keeps failed runs only; `off` records nothing. */
 export type RecordMode = "on-failure" | "always" | "off"
 
 /** Where one `danwo test` or `danwo matrix` invocation records, and what it keeps. */

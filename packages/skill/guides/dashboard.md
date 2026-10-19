@@ -50,8 +50,8 @@ and fault as an offset into it. Which videos are kept:
 
 | `video` (config) or `--video` | Kept                                                                                   |
 | ----------------------------- | -------------------------------------------------------------------------------------- |
-| `retain-on-failure` (default) | with the records of runs that did not pass; a matrix keeps failing and invalid trials' |
-| `on`                          | with every record kept (`--record always` keeps every run)                             |
+| `retain-on-failure`           | with the records of runs that did not pass; a matrix keeps failing and invalid trials' |
+| `on` (default)                | with every record kept; every run is kept by default (`record: "always"`)              |
 | `off`                         | none; nothing is filmed                                                                |
 
 A short test's video is tens of kilobytes. Video shows the screen as it was: fields holding a

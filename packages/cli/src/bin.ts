@@ -73,13 +73,13 @@ function integerAtLeast(min: number): (value: string) => number {
 const recordOption = () =>
   new Option(
     "--record <mode>",
-    "flight recorder: keep what runs did (default: config, else on-failure)",
+    "flight recorder: keep what runs did (default: config, else always)",
   ).choices(["on-failure", "always", "off"])
 
 const videoOption = () =>
   new Option(
     "--video <mode>",
-    "video in kept records: retain-on-failure keeps failed runs' (default: config, else retain-on-failure)",
+    "video in kept records: retain-on-failure keeps failed runs' (default: config, else on)",
   ).choices(["retain-on-failure", "on", "off"])
 
 const updateOption = () =>

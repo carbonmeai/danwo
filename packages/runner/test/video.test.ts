@@ -115,10 +115,13 @@ describe("video marks", () => {
     expect(keepsVideo("off", false)).toBe(false)
   })
 
-  it("takes the video mode from the option, else the config, else retain-on-failure", () => {
-    expect(openRecording(loaded(), undefined)?.video).toBe("retain-on-failure")
+  it("takes the video mode from the option, else the config, else on, and keeps every run", () => {
+    expect(openRecording(loaded(), undefined)?.video).toBe("on")
+    expect(openRecording(loaded(), undefined)?.mode).toBe("always")
     expect(openRecording(loaded("off"), undefined)?.video).toBe("off")
-    expect(openRecording(loaded("off"), undefined, "on")?.video).toBe("on")
+    expect(openRecording(loaded("off"), undefined, "retain-on-failure")?.video).toBe(
+      "retain-on-failure",
+    )
     expect(openRecording(loaded(), "off", "on")).toBeUndefined()
   })
 })

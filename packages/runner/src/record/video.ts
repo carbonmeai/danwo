@@ -5,9 +5,9 @@
  */
 
 /**
- * When the flight recorder keeps video: `retain-on-failure` (the default) records every run and
- * keeps the video of runs that did not pass; `on` keeps it with every record kept; `off` records
- * none. Video shows the screen as it was: fields holding a secret are masked, but a secret the app
+ * When the flight recorder keeps video: `on` (the default) keeps it with every record kept;
+ * `retain-on-failure` records every run and keeps the video of runs that did not pass; `off`
+ * records none. Video shows the screen as it was: fields holding a secret are masked, but a secret the app
  * prints as plain text is visible, so suites that show secrets should turn video off.
  */
 export type VideoMode = "retain-on-failure" | "on" | "off"
