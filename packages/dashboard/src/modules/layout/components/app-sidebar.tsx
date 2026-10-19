@@ -69,7 +69,7 @@ function LiveBadge() {
 function ProjectName({ name }: { readonly name: string }) {
   return (
     <Link to="/" aria-label={`dánwò, the tests of ${name}`}>
-      <Stack gap="1" minW="0" px="1" py="0.5">
+      <Stack gap="1" minW="0" px="1" pt="1.5" pb="1">
         <Box display="flex" css={{ "[data-collapsible=icon] &": { display: "none" } }}>
           <BrandImage kind="lockup" height={22} />
         </Box>

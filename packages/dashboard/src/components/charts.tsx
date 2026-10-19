@@ -109,7 +109,7 @@ export function TrendLine({
           />
           <Line
             dataKey="value"
-            type="monotone"
+            type="linear"
             stroke="var(--color-value)"
             strokeWidth={1.75}
             dot={false}
