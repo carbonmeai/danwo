@@ -1,4 +1,4 @@
-import { composioTools, type Emulator } from "@danwo/emulators"
+import { clerkInstance, composioTools, type Emulator } from "@danwo/emulators"
 import { describe, expect, it } from "vitest"
 import { z } from "zod"
 
@@ -406,6 +406,50 @@ const CASES: readonly Case[] = [
       ),
   },
   {
+    name: "clerk with webhooks and seeded ids",
+    make: () =>
+      clerkService({
+        seed: {
+          users: [{ email: "ada@shop.test" }],
+          organizations: [{ name: "Acme", members: [{ email: "ada@shop.test" }] }],
+          webhooks: [{ endpoint: "http://127.0.0.1:9/webhooks/clerk" }],
+        },
+      }),
+    change: (e) =>
+      post(
+        e,
+        "https://api.clerk.com/v1/users",
+        { email_address: ["grace@shop.test"] },
+        { authorization: "Bearer REDACTED-TEST-VALUE" },
+      ),
+  },
+  {
+    name: "stripe subscriptions",
+    make: () =>
+      stripeService({
+        seed: () => ({
+          customers: [{ id: "cus_ada", email: "ada@shop.test" }],
+          products: [{ name: "Pro" }],
+          prices: [
+            {
+              id: "price_pro",
+              product_name: "Pro",
+              currency: "usd",
+              unit_amount: 2000,
+              recurring: { interval: "month" },
+            },
+          ],
+        }),
+      }),
+    change: (e) =>
+      postForm(
+        e,
+        "https://api.stripe.com/v1/subscriptions",
+        { customer: "cus_ada", "items[0][price]": "price_pro", trial_period_days: "7" },
+        { authorization: "Bearer sk_test_emulated" },
+      ),
+  },
+  {
     name: "composio",
     make: () => composioService(),
     change: (e) =>
@@ -457,6 +501,72 @@ describe("every emulator's reset and restore", () => {
       }
     },
   )
+
+  it("drops Clerk's queued webhooks on restore and keeps its seeded ids across resets", async () => {
+    const service = clerkService({
+      seed: {
+        users: [{ email: "ada@shop.test" }],
+        webhooks: [{ endpoint: "http://127.0.0.1:9/webhooks/clerk" }],
+      },
+    })
+    const ada = () => clerkInstance(service.emulator).user("ada@shop.test")?.id
+
+    try {
+      const seededId = ada()
+
+      await service.snapshot?.()
+      await post(
+        service.emulator,
+        "https://api.clerk.com/v1/users",
+        { email_address: ["grace@shop.test"] },
+        { authorization: "Bearer REDACTED-TEST-VALUE" },
+      )
+      expect(service.emulator.outbox.all().map((m) => m.topic)).toEqual(["user.created"])
+
+      await service.restore?.()
+      expect(service.emulator.outbox.all()).toEqual([])
+
+      await service.reset?.()
+      expect(ada()).toBe(seededId)
+      expect(clerkInstance(service.emulator).webhookSecret()).toMatch(/^whsec_/)
+    } finally {
+      await service.close()
+    }
+  })
+
+  it("renews nothing after a restore drops a Stripe subscription", async () => {
+    const service = stripeService({
+      seed: () => ({
+        customers: [{ id: "cus_ada", email: "ada@shop.test" }],
+        products: [{ name: "Pro" }],
+        prices: [
+          {
+            id: "price_pro",
+            product_name: "Pro",
+            currency: "usd",
+            unit_amount: 2000,
+            recurring: { interval: "month" },
+          },
+        ],
+      }),
+    })
+
+    try {
+      await service.snapshot?.()
+      await postForm(
+        service.emulator,
+        "https://api.stripe.com/v1/subscriptions",
+        { customer: "cus_ada", "items[0][price]": "price_pro", trial_period_days: "1" },
+        { authorization: "Bearer sk_test_emulated" },
+      )
+      await service.restore?.()
+      // The subscription's renewal timer still fires, but finds nothing due in the restored store.
+      await service.travel?.(40 * 86_400_000)
+      expect(service.emulator.outbox.all()).toEqual([])
+    } finally {
+      await service.close()
+    }
+  })
 
   it("drops tool handlers test code set when Composio is restored", async () => {
     const service = composioService({
