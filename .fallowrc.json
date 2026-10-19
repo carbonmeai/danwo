@@ -46,7 +46,12 @@
     "unused-dependencies": "warn"
   },
   "ignorePatterns": ["examples/shop-mobile/app/**"],
-  "usedClassMembers": [{ "implements": "Locator", "members": ["getBy*"] }],
+  "usedClassMembers": [
+    {
+      "implements": "Locator",
+      "members": ["getBy*"]
+    }
+  ],
   "dynamicallyLoaded": [
     "**/danwo.config.ts",
     "**/*.danwo.ts",
@@ -57,6 +62,11 @@
     "benchmarks/app/server.ts",
     "benchmarks/bench/run.ts"
   ],
-  "ignoreDependencies": ["@danwo/example-shop"],
-  "publicPackages": ["@danwo/ui"]
+  "ignoreDependencies": [
+    "@danwo/example-shop",
+    "@fontsource/ibm-plex-sans",
+    "@fontsource/ibm-plex-mono"
+  ],
+  "publicPackages": ["@danwo/ui"],
+  "ignoreUnresolvedImports": ["@fontsource/ibm-plex-sans/*", "@fontsource/ibm-plex-mono/*"]
 }
