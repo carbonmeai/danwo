@@ -1,12 +1,12 @@
 import type { App } from "../../http.ts"
 import { bodyOf } from "../backend-auth.ts"
 import { clientJson } from "../client-json.ts"
-import { type ClerkContext, instanceOf, now } from "../context.ts"
+import { type ClerkContext, instanceOf, now, signingKeyOf } from "../context.ts"
 import { clerkId, invalidParameter, notFound, num, record, secretToken, str } from "../helpers.ts"
 import { userOf } from "./users.ts"
 
 function keyRoutes(app: App, context: ClerkContext): void {
-  app.get("/v1/jwks", (c) => c.json({ keys: [context.key.jwk] }))
+  app.get("/v1/jwks", (c) => c.json({ keys: [signingKeyOf(context).jwk] }))
 }
 
 function templateRoutes(app: App, context: ClerkContext): void {

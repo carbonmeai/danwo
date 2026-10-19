@@ -1,6 +1,6 @@
 import type { SessionJSON } from "@clerk/backend"
 
-import { type ClerkContext, instanceOf, now } from "./context.ts"
+import { type ClerkContext, instanceOf, now, signingKeyOf } from "./context.ts"
 import { clerkId, notFound } from "./helpers.ts"
 import type { ClientRecord } from "./store.ts"
 
@@ -60,6 +60,7 @@ export function startSession(
     updated_at: at,
   })
   context.clerk.users.change(userId, { last_sign_in_at: at, last_active_at: at })
+  context.events.session("session.created", session)
 
   return session
 }
@@ -96,6 +97,8 @@ export function endSession(
     })
   }
 
+  context.events.session(`session.${status}`, ended)
+
   return ended
 }
 
@@ -122,9 +125,10 @@ export function sessionClaims(
   azp: string | undefined,
 ): Record<string, unknown> {
   const iat = Math.floor(context.wallClock().getTime() / 1000)
+  const party = azp ?? instanceOf(context).origin
 
   return {
-    ...(azp !== undefined && { azp }),
+    ...(party !== undefined && { azp: party }),
     exp: iat + TOKEN_LIFETIME_S,
     fva: [0, -1],
     iat,
@@ -140,7 +144,7 @@ export function sessionClaims(
 
 /** A signed session token for a live session. */
 export function sessionToken(context: ClerkContext, session: SessionJSON, azp?: string): string {
-  return context.key.sign(sessionClaims(context, session, azp))
+  return signingKeyOf(context).sign(sessionClaims(context, session, azp))
 }
 
 /** The client's active session, if it still has a live one. */

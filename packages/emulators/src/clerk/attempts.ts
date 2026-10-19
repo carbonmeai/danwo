@@ -110,5 +110,9 @@ export function createSignedUpUser(context: ClerkContext, attempt: AttemptRecord
     now(context),
   )
 
-  return context.clerk.users.add(user, { password: attempt.password }).id
+  const created = context.clerk.users.add(user, { password: attempt.password })
+
+  context.events.user("user.created", created)
+
+  return created.id
 }

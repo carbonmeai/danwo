@@ -1,8 +1,8 @@
-import type { SessionJSON } from "@clerk/backend"
+import type { OrganizationJSON, SessionJSON } from "@clerk/backend"
 
 import type { Emulator } from "../define.ts"
 import { waitUntil } from "../poll.ts"
-import { contextOf, instanceOf } from "./context.ts"
+import { type ClerkContext, contextOf, instanceOf, signingKeyOf } from "./context.ts"
 import type { ClerkUser } from "./entities.ts"
 import { userByEmail } from "./routes/users.ts"
 import { endSession } from "./sessions.ts"
@@ -21,6 +21,21 @@ export interface ClerkInstanceView {
   messages(to: string): ClerkMessage[]
   /** The newest code emailed to `to`, waiting up to `timeoutMs` for one to arrive. */
   code(to: string, timeoutMs?: number): Promise<string>
+  /** The organizations, oldest first. */
+  organizations(): OrganizationJSON[]
+  /**
+   * The public key session tokens are signed with, as a PEM: what an app that verifies tokens
+   * offline is configured with (`CLERK_PEM_PUBLIC_KEY`, `CLERK_JWT_KEY`, `jwtKey`).
+   */
+  publicKeyPem(): string
+  /** The `whsec_` secret webhooks to `endpoint` (or the only endpoint) are signed with. */
+  webhookSecret(endpoint?: string): string
+  /**
+   * The environment an app's Clerk SDKs read: the publishable and secret keys (also with the
+   * `VITE_` and `NEXT_PUBLIC_` prefixes), the public key PEM for offline verification and the
+   * webhook signing secret when one endpoint is seeded.
+   */
+  env(): Record<string, string>
 }
 
 /** The Clerk emulator's instance, users, sessions and sent codes, for tests. */
@@ -58,5 +73,40 @@ export function clerkInstance(emulator: Pick<Emulator, "store">): ClerkInstanceV
         timeoutMs,
         `no Clerk code was emailed to ${to}`,
       ),
+    organizations: () => context.clerk.organizations.all(),
+    publicKeyPem: () => signingKeyOf(context).pem,
+    webhookSecret: (endpoint) => webhookSecretOf(context, endpoint),
+    env: () => clerkEnv(context),
+  }
+}
+
+/** The signing secret of `endpoint`, or of the only seeded endpoint. */
+function webhookSecretOf(context: ClerkContext, endpoint: string | undefined): string {
+  const hooks = context.clerk.webhooks.where((h) => endpoint === undefined || h.url === endpoint)
+
+  if (hooks.length !== 1)
+    throw new Error(
+      endpoint === undefined
+        ? `the Clerk emulator has ${hooks.length} webhook endpoints; name one`
+        : `the Clerk emulator has no webhook endpoint ${endpoint}`,
+    )
+
+  return hooks[0]?.secret ?? ""
+}
+
+/** The variables an app's Clerk SDKs read, for this emulator. */
+function clerkEnv(context: ClerkContext): Record<string, string> {
+  const instance = instanceOf(context)
+  const publishable = instance.publishableKey
+  const hooks = context.clerk.webhooks.all()
+
+  return {
+    CLERK_PUBLISHABLE_KEY: publishable,
+    VITE_CLERK_PUBLISHABLE_KEY: publishable,
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: publishable,
+    CLERK_SECRET_KEY: instance.secretKeys[0] ?? "",
+    CLERK_PEM_PUBLIC_KEY: signingKeyOf(context).pem,
+    CLERK_JWT_KEY: signingKeyOf(context).pem,
+    ...(hooks.length === 1 && { CLERK_WEBHOOK_SIGNING_SECRET: hooks[0]?.secret ?? "" }),
   }
 }

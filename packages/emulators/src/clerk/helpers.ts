@@ -26,6 +26,17 @@ export function clerkId(prefix: string): string {
   return `${prefix}_${[...bytes].map((byte) => ALPHABET[byte % ALPHABET.length]).join("")}`
 }
 
+/**
+ * A Clerk-style id derived from `name`, the same on every run and after every reset, e.g.
+ * `stableClerkId("user", "ada@example.com")`: seeded records keep the ids an app's own database
+ * was seeded with.
+ */
+export function stableClerkId(prefix: string, name: string): string {
+  const bytes = createHash("sha256").update(`${prefix}:${name}`).digest()
+
+  return `${prefix}_${[...bytes.subarray(0, 27)].map((byte) => ALPHABET[byte % ALPHABET.length]).join("")}`
+}
+
 /** A random opaque secret, base64url. */
 export function secretToken(bytes = 24): string {
   return randomBytes(bytes).toString("base64url")

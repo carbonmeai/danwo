@@ -2,6 +2,7 @@ import { defineEmulator, type EmulatorContext } from "../define.ts"
 import { HttpError } from "../errors.ts"
 import { App, type ErrorHandler, type Middleware } from "../http.ts"
 import { createSigningKey } from "../oauth/jwt.ts"
+import { SVIX_DELIVERY } from "../svix.ts"
 import { backendAuth } from "./backend-auth.ts"
 import { type ClerkContext, instanceOf, registerContext } from "./context.ts"
 import { BAPI_HOST, ClerkFailure, clerkErrorBody } from "./helpers.ts"
@@ -16,6 +17,7 @@ import { userRoutes } from "./routes/users.ts"
 import { clerkScripts } from "./scripts.ts"
 import { instanceFrom } from "./seed.ts"
 import { clerkStore, INSTANCE } from "./store.ts"
+import { clerkEndpoints, ClerkEvents, clerkWebhookHeaders } from "./webhooks.ts"
 
 export { clerkOutboundFaults } from "./faults.ts"
 export { CLERK_HOSTS, isClerkHost } from "./helpers.ts"
@@ -25,8 +27,11 @@ export {
   type ClerkSeedOrganization,
   type ClerkSeedTemplate,
   type ClerkSeedUser,
+  type ClerkSeedWebhook,
   seedClerk,
 } from "./seed.ts"
+export { stableClerkId } from "./helpers.ts"
+export type { ClerkEventType } from "./webhooks.ts"
 export type { ClerkInstance, ClerkMessage } from "./store.ts"
 export type { ClerkUser } from "./entities.ts"
 
@@ -83,6 +88,7 @@ function contextFor(emulator: EmulatorContext): ClerkContext {
     clock: emulator.clock,
     wallClock: emulator.wallClock,
     key: createSigningKey(),
+    events: new ClerkEvents(emulator.store, emulator.outbox, emulator.clock),
   })
 }
 
@@ -117,4 +123,9 @@ export const clerk = defineEmulator({
   seed: ({ store }) => {
     store.setData(INSTANCE, instanceFrom())
   },
+  webhooks: ({ store }) => ({
+    endpoints: () => clerkEndpoints(store),
+    sign: ({ endpoint, body, timestamp }) => clerkWebhookHeaders(endpoint.secret, body, timestamp),
+    policy: SVIX_DELIVERY,
+  }),
 })

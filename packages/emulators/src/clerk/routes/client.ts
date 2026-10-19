@@ -3,7 +3,7 @@ import type { SessionJSON } from "@clerk/backend"
 import type { App, Context } from "../../http.ts"
 import { bodyOf } from "../backend-auth.ts"
 import { type BrowserRequest, browserRequest, currentClient, reply } from "../browser-request.ts"
-import { type ClerkContext, instanceOf, now } from "../context.ts"
+import { type ClerkContext, instanceOf, now, signingKeyOf } from "../context.ts"
 import { environmentJson } from "../environment.ts"
 import { browserClient, browserSession } from "../frontend-json.ts"
 import { devBrowserFor } from "../handshake.ts"
@@ -31,7 +31,7 @@ function token(c: Context, context: ClerkContext, template: string | undefined):
   const base = sessionClaims(context, session, request.azp)
   const claims = template === undefined ? base : templateClaims(context, template, session, base)
 
-  return c.json({ object: "token", jwt: context.key.sign(claims) })
+  return c.json({ object: "token", jwt: signingKeyOf(context).sign(claims) })
 }
 
 /** Ends every session on the client, as signing out of all of them does. */

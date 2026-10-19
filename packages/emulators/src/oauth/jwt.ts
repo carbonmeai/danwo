@@ -1,4 +1,11 @@
-import { createHash, createSign, generateKeyPairSync, type KeyObject } from "node:crypto"
+import {
+  createHash,
+  createPrivateKey,
+  createPublicKey,
+  createSign,
+  generateKeyPairSync,
+  type KeyObject,
+} from "node:crypto"
 
 /** The public half of a signing key, as a JWKS lists it. */
 export interface PublicJwk {
@@ -21,15 +28,28 @@ export interface SigningKey {
 
 const base64url = (value: string | Buffer) => Buffer.from(value).toString("base64url")
 
+/** The key pair of a private key PEM. */
+function keyPairOf(privatePem: string): { privateKey: KeyObject; publicKey: KeyObject } {
+  const privateKey = createPrivateKey(privatePem)
+
+  return { privateKey, publicKey: createPublicKey(privateKey) }
+}
+
 function publicJwk(key: KeyObject, kid: string): PublicJwk {
   const { n = "", e = "", kty = "RSA" } = key.export({ format: "jwk" })
 
   return { kty, n, e, kid, use: "sig", alg: "RS256" }
 }
 
-/** A fresh 2048-bit RSA key; its id is derived from the public key, so it is stable per key. */
-export function createSigningKey(): SigningKey {
-  const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 })
+/**
+ * A fresh 2048-bit RSA key, or the one in `privatePem` (PKCS#8 or PKCS#1 PEM), so tokens verify
+ * across runs. Its id is derived from the public key, so it is stable per key.
+ */
+export function createSigningKey(privatePem?: string): SigningKey {
+  const { privateKey, publicKey } =
+    privatePem === undefined
+      ? generateKeyPairSync("rsa", { modulusLength: 2048 })
+      : keyPairOf(privatePem)
   const pem = publicKey.export({ format: "pem", type: "spki" }).toString()
   const kid = createHash("sha256").update(pem).digest("hex").slice(0, 40)
 

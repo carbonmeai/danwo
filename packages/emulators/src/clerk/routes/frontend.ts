@@ -1,5 +1,5 @@
 import type { App, Context, Middleware } from "../../http.ts"
-import type { ClerkContext } from "../context.ts"
+import { type ClerkContext, signingKeyOf } from "../context.ts"
 import { devBrowserFor, handshakeDirectives, storeNonce } from "../handshake.ts"
 import { invalidParameter } from "../helpers.ts"
 
@@ -88,5 +88,5 @@ export function methodOverride(app: App): Middleware {
 /** The Frontend API's handshake and public keys. */
 export function frontendRoutes(app: App, context: ClerkContext): void {
   app.get("/v1/client/handshake", (c) => handshake(c, context))
-  app.get("/.well-known/jwks.json", (c) => c.json({ keys: [context.key.jwk] }))
+  app.get("/.well-known/jwks.json", (c) => c.json({ keys: [signingKeyOf(context).jwk] }))
 }

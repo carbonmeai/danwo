@@ -69,9 +69,12 @@ export {
   type ClerkSeedOrganization,
   type ClerkSeedTemplate,
   type ClerkSeedUser,
+  type ClerkSeedWebhook,
+  type ClerkEventType,
   type ClerkUser,
   isClerkHost,
   seedClerk,
+  stableClerkId,
 } from "./clerk/index.ts"
 export {
   COMPOSIO_HOSTS,

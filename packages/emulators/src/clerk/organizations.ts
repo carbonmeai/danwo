@@ -43,6 +43,8 @@ function slugify(name: string): string {
 
 /** The fields an organization is created with. */
 export interface NewOrganization {
+  /** A fixed id, for seeded organizations; otherwise a random one. */
+  readonly id?: string
   readonly name: string
   readonly slug?: string
   readonly createdBy?: string
@@ -65,7 +67,7 @@ export function createOrganization(
   const org = context.clerk.organizations.add(
     {
       object: "organization",
-      id: clerkId("org"),
+      id: fields.id ?? clerkId("org"),
       name: fields.name,
       slug,
       image_url: "https://img.clerk.com/eyJ0eXBlIjoiZGVmYXVsdCJ9",
@@ -81,6 +83,7 @@ export function createOrganization(
     null,
   )
 
+  context.events.organization("organization.created", organizationJson(context, org))
   if (fields.createdBy !== undefined) addMembership(context, org.id, fields.createdBy, "org:admin")
 
   return org
@@ -92,6 +95,7 @@ export function addMembership(
   orgId: string,
   userId: string,
   role: string,
+  id = clerkId("orgmem"),
 ): MembershipRecord {
   if (membershipOf(context, orgId, userId))
     throw new ClerkFailure(
@@ -103,9 +107,9 @@ export function addMembership(
 
   const at = now(context)
 
-  return context.clerk.memberships.add(
+  const membership = context.clerk.memberships.add(
     {
-      id: clerkId("orgmem"),
+      id,
       organization_id: orgId,
       user_id: userId,
       role,
@@ -116,6 +120,10 @@ export function addMembership(
     },
     null,
   )
+
+  context.events.membership("organizationMembership.created", membershipJson(context, membership))
+
+  return membership
 }
 
 /** A user's membership in an organization, if any. */

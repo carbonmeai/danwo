@@ -62,8 +62,11 @@ function organizationCrud(app: App, context: ClerkContext): void {
       ...(slug !== undefined && { slug }),
       updated_at: now(context),
     })
+    const json = organizationJson(context, changed ?? org)
 
-    return c.json(organizationJson(context, changed ?? org))
+    context.events.organization("organization.updated", json)
+
+    return c.json(json)
   })
   app.delete("/v1/organizations/:id", (c) => {
     const org = organizationOf(context, c.req.param("id"))
@@ -71,6 +74,7 @@ function organizationCrud(app: App, context: ClerkContext): void {
     for (const m of context.clerk.memberships.where((x) => x.organization_id === org.id))
       context.clerk.memberships.remove(m.id)
     context.clerk.organizations.remove(org.id)
+    context.events.organizationDeleted(org.id)
 
     return c.json({ object: "organization", id: org.id, slug: org.slug, deleted: true })
   })
@@ -105,8 +109,11 @@ function membershipRoutes(app: App, context: ClerkContext): void {
       role,
       updated_at: now(context),
     })
+    const json = membershipJson(context, changed ?? membership)
 
-    return c.json(membershipJson(context, changed ?? membership))
+    context.events.membership("organizationMembership.updated", json)
+
+    return c.json(json)
   })
   app.delete("/v1/organizations/:id/memberships/:user", (c) => {
     const org = organizationOf(context, c.req.param("id"))
@@ -117,6 +124,7 @@ function membershipRoutes(app: App, context: ClerkContext): void {
     const json = membershipJson(context, membership)
 
     context.clerk.memberships.remove(membership.id)
+    context.events.membership("organizationMembership.deleted", json)
 
     return c.json(json)
   })

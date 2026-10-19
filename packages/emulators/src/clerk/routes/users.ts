@@ -78,7 +78,22 @@ function createUser(context: ClerkContext, body: Record<string, unknown>): Clerk
     now(context),
   )
 
-  return context.clerk.users.add(user, { password })
+  const created = context.clerk.users.add(user, { password })
+
+  context.events.user("user.created", created)
+
+  return created
+}
+
+/** Applies `changes` to a user and sends `user.updated`. */
+function changeUser(context: ClerkContext, id: string, changes: Partial<ClerkUser>): ClerkUser {
+  const changed = context.clerk.users.change(id, changes)
+
+  if (!changed) throw notFound("user")
+
+  context.events.user("user.updated", changed)
+
+  return changed
 }
 
 /** The name and metadata fields an update call may change. */
@@ -143,13 +158,13 @@ function writeRoutes(app: App, context: ClerkContext): void {
     const user = userOf(context, c.req.param("id"))
     const changed = { ...updates(await bodyOf(c)), updated_at: now(context) }
 
-    return c.json(context.clerk.users.change(user.id, changed))
+    return c.json(changeUser(context, user.id, changed))
   })
   app.patch("/v1/users/:id/metadata", async (c) => {
     const user = userOf(context, c.req.param("id"))
 
     return c.json(
-      context.clerk.users.change(user.id, {
+      changeUser(context, user.id, {
         ...mergeMetadata(user, await bodyOf(c)),
         updated_at: now(context),
       }),
@@ -160,6 +175,7 @@ function writeRoutes(app: App, context: ClerkContext): void {
 
     endSessionsOf(context, user.id)
     context.clerk.users.remove(user.id)
+    context.events.userDeleted(user)
 
     return c.json({ object: "user", id: user.id, slug: null, deleted: true })
   })
@@ -175,7 +191,7 @@ function accountRoutes(app: App, context: ClerkContext): void {
 
       if (banned) endSessionsOf(context, user.id)
 
-      return c.json(context.clerk.users.change(user.id, { banned, updated_at: now(context) }))
+      return c.json(changeUser(context, user.id, { banned, updated_at: now(context) }))
     })
   app.post("/v1/users/:id/verify_password", async (c) => {
     const user = userOf(context, c.req.param("id"))
@@ -199,7 +215,7 @@ function accountRoutes(app: App, context: ClerkContext): void {
 
     const email = verifiedEmail(address)
 
-    context.clerk.users.change(user.id, { email_addresses: [...user.email_addresses, email] })
+    changeUser(context, user.id, { email_addresses: [...user.email_addresses, email] })
 
     return c.json(email)
   })

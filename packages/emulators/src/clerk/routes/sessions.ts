@@ -2,7 +2,7 @@ import type { SessionJSON } from "@clerk/backend"
 
 import type { App } from "../../http.ts"
 import { bodyOf, pageOf } from "../backend-auth.ts"
-import { type ClerkContext, now } from "../context.ts"
+import { type ClerkContext, now, signingKeyOf } from "../context.ts"
 import { ClerkFailure, invalidParameter, notFound, str } from "../helpers.ts"
 import { endSession, isLive, newClient, sessionClaims, startSession } from "../sessions.ts"
 import { templateClaims } from "../templates.ts"
@@ -51,7 +51,7 @@ function tokenFor(context: ClerkContext, session: SessionJSON, template: string 
   const base = sessionClaims(context, session, undefined)
   const claims = template === undefined ? base : templateClaims(context, template, session, base)
 
-  return { object: "token", jwt: context.key.sign(claims) }
+  return { object: "token", jwt: signingKeyOf(context).sign(claims) }
 }
 
 function readRoutes(app: App, context: ClerkContext): void {

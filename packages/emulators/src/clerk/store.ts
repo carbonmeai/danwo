@@ -8,6 +8,7 @@ import type {
 import { objectTable } from "../objects.ts"
 import type { DataKey, Store } from "../store.ts"
 import type { ClerkUser } from "./entities.ts"
+import type { ClerkWebhookRecord } from "./webhooks.ts"
 
 /** The instance an emulator plays: its slug, keys and the hosts derived from them. */
 export interface ClerkInstance {
@@ -20,6 +21,11 @@ export interface ClerkInstance {
   readonly secretKeys: readonly string[]
   /** Whether sign-in asks for a password; otherwise an emailed code. */
   readonly password: boolean
+  /**
+   * The app's origin: the `azp` of tokens minted without a browser `Origin` (the Backend API's
+   * session tokens), so an app's `authorizedParties` check passes for them too.
+   */
+  readonly origin?: string
 }
 
 /** What the emulator keeps about a user beyond what the API shows. */
@@ -110,6 +116,9 @@ export interface ClerkMessage {
   readonly sent_at: number
 }
 
+/** A seeded signing key (PKCS#8 PEM) that replaces the emulator's own, so tokens verify across runs. */
+export const SIGNING_KEY: DataKey<string> = { name: "clerk.signing_key" }
+
 /** The instance, read with `instanceOf`. */
 export const INSTANCE: DataKey<ClerkInstance> = { name: "clerk.instance" }
 
@@ -128,6 +137,7 @@ export function clerkStore(store: Store) {
     jwtTemplates: objectTable<JwtTemplateRecord>(store, "clerk.jwt_templates"),
     attempts: objectTable<AttemptRecord>(store, "clerk.attempts"),
     messages: objectTable<ClerkMessage>(store, "clerk.messages"),
+    webhooks: objectTable<ClerkWebhookRecord>(store, "clerk.webhooks"),
   }
 }
 
