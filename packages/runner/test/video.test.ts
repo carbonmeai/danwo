@@ -160,7 +160,7 @@ function filmedSession(): SessionFlight {
 function input(video: boolean): RecordInput {
   const exchanges: Exchange[] = RUN.exchanges.map((call) => ({ ...call, disposition: "routed" }))
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a test double: the recorder reads only the exchange log
-  const proxy = { exchanges: () => exchanges } as unknown as Proxy
+  const proxy = { exchanges: () => exchanges, sockets: () => [] } as unknown as Proxy
   const env: WorkerEnvironment = { proxy, close: () => Promise.resolve() }
 
   return {

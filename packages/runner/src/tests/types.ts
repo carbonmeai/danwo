@@ -8,6 +8,7 @@ import type { App } from "../browser/index.ts"
 import type { Screen } from "../locate/index.ts"
 import type { Isolation } from "../runner/isolation.ts"
 import type { Secret } from "../secrets/index.ts"
+import type { SessionMail } from "../session.ts"
 import type { SessionTime } from "../time/index.ts"
 
 /** What every test body, hook and invariant receives before environment and extended fixtures. */
@@ -80,6 +81,11 @@ export interface SessionExtras {
   readonly expect: Expect
   /** A handle for a configured secret, to fill by name without its value reaching the model. */
   readonly secret: (name: string) => Secret
+  /**
+   * Mail the app sent, from the environment's `mail` sources, as in a test: a setup that signs in
+   * with an emailed code reads it here (`await mail.code({ to })`).
+   */
+  readonly mail: SessionMail
 }
 
 /** What a session's setup and check receive: a fresh browser session's handles. */

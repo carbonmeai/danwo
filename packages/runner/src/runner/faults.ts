@@ -31,6 +31,8 @@ import {
 } from "@danwo/emulators"
 import type { OutboundCall, OutboundFault } from "@danwo/proxy"
 
+import { INNGEST_HOST, inngestOutboundFaults } from "./inngest.ts"
+
 type Catalogue = (call: OutboundCall) => readonly OutboundFault[]
 
 /** Each provider's own fault catalogue, by the hosts it answers. */
@@ -47,6 +49,7 @@ const BY_HOST = new Map<string, Catalogue>([
   ...hostsOf(BACHS_HOSTS, bachsOutboundFaults),
   ...hostsOf(LLM_HOSTS, llmOutboundFaults),
   ...hostsOf(COMPOSIO_HOSTS, composioOutboundFaults),
+  ...hostsOf([INNGEST_HOST], inngestOutboundFaults),
 ])
 
 /** Pairs every host with the catalogue that serves it. */

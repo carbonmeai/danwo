@@ -9,7 +9,7 @@ import { join, relative } from "node:path"
 
 import type { DataCall } from "@danwo/infra"
 import { dataCallsOf, deliveriesOf, type PlannedFault, type ServiceDelivery } from "@danwo/matrix"
-import type { CapturedMessage, Exchange } from "@danwo/proxy"
+import type { CapturedMessage, Exchange, SocketExchange } from "@danwo/proxy"
 
 import type { LintFinding } from "../lint/index.ts"
 import type { AppLogRecord, FailureEvidence, StepRecord } from "../record/index.ts"
@@ -69,6 +69,10 @@ export interface FlightRecord {
   readonly failure: FailureEvidence | undefined
   /** Calls through the proxy during the run, bodies capped and redacted. */
   readonly exchanges: readonly RecordedExchange[]
+  /** WebSocket connections through the proxy during the run: frame counts and sizes, no frames. */
+  readonly sockets?: readonly SocketExchange[]
+  /** What each app the environment started wrote during the run, by app, redacted. */
+  readonly processLogs?: Readonly<Record<string, readonly string[]>>
   readonly deliveries: readonly ServiceDelivery[]
   /** Statements and commands the app sent its own database and cache, through data proxies. */
   readonly dataCalls?: readonly DataCall[]
@@ -81,7 +85,10 @@ export interface FlightRecord {
 }
 
 /** The parts of a record the integration lint reads, redacted as the record keeps them. */
-export type RecordEvidence = Pick<FlightRecord, "steps" | "exchanges" | "deliveries" | "dataCalls">
+export type RecordEvidence = Pick<
+  FlightRecord,
+  "steps" | "exchanges" | "sockets" | "deliveries" | "dataCalls"
+>
 
 const RUNS_DIR = join(".danwo", "runs")
 
@@ -123,6 +130,10 @@ export interface EvidenceMark {
   readonly deliveries: number
   /** Each data proxy's calls so far, in the environment's order. */
   readonly data?: readonly number[]
+  /** WebSocket connections so far. */
+  readonly sockets?: number
+  /** Lines each app has written so far, by app. */
+  readonly logs?: Readonly<Record<string, number>>
 }
 
 export function markEvidence(env: WorkerEnvironment | undefined): EvidenceMark {
@@ -130,6 +141,28 @@ export function markEvidence(env: WorkerEnvironment | undefined): EvidenceMark {
     exchanges: env?.proxy?.exchanges().length ?? 0,
     deliveries: deliveriesOf(env?.webhooks).length,
     data: (env?.data ?? []).map((proxy) => proxy.calls().length),
+    sockets: env?.proxy?.sockets().length ?? 0,
+    logs: Object.fromEntries(
+      Object.entries(env?.logs?.() ?? {}).map(([name, log]) => [name, log.written]),
+    ),
+  }
+}
+
+/** The lines each app wrote since `mark`, redacted; none when the environment started no app. */
+function processLogsOf(input: RecordInput, redactor: Redactor): Pick<FlightRecord, "processLogs"> {
+  const logs = Object.entries(input.env?.logs?.() ?? {})
+
+  if (logs.length === 0) return {}
+
+  return {
+    processLogs: Object.fromEntries(
+      logs.map(([name, log]) => {
+        const dropped = log.written - log.lines.length
+        const from = Math.max(0, (input.mark.logs?.[name] ?? 0) - dropped)
+
+        return [name, log.lines.slice(from).map((line) => redactor.text(line))]
+      }),
+    ),
   }
 }
 
@@ -168,8 +201,23 @@ export function recordEvidence(input: RecordInput): RecordEvidence {
     exchanges: (input.env?.proxy?.exchanges() ?? [])
       .slice(input.mark.exchanges)
       .map((exchange) => redactExchange(exchange, redactor)),
+    ...socketsOf(input, redactor),
     deliveries: deliveriesOf(input.env?.webhooks).slice(input.mark.deliveries),
     ...dataEvidence(input, redactor),
+  }
+}
+
+/** The run's WebSocket connections, paths redacted; none when it opened none. */
+function socketsOf(input: RecordInput, redactor: Redactor): Pick<RecordEvidence, "sockets"> {
+  const sockets = (input.env?.proxy?.sockets() ?? []).slice(input.mark.sockets ?? 0)
+
+  if (sockets.length === 0) return {}
+
+  return {
+    sockets: sockets.map((socket) => ({
+      ...socket,
+      path: redactedPath(socket.host, socket.path, redactor),
+    })),
   }
 }
 
@@ -206,6 +254,7 @@ export function buildRecord(input: RecordInput, extras: RecordExtras = {}): Flig
     durationMs: input.durationMs,
     ...evidence,
     appLog: redactor.deep(input.flight.session.appLog()),
+    ...processLogsOf(input, redactor),
     failure: redactor.deep(input.flight.failure),
     state: environmentState(input.env, redactor),
     ...(extras.lint !== undefined && extras.lint.length > 0 && { lint: extras.lint }),

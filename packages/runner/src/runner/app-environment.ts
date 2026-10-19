@@ -7,8 +7,8 @@
 import type { ChildProcess } from "node:child_process"
 
 import { spawnOwned } from "../support/children.ts"
-import type { WorkerEnvironment } from "./environment.ts"
-import { type Service, startServices } from "./services.ts"
+import type { ProcessLog, WorkerEnvironment } from "./environment.ts"
+import { type Service, startServices, type UnroutedHosts, unroutedOf } from "./services.ts"
 
 /** How danwo starts the app. */
 export interface AppCommand {
@@ -18,15 +18,27 @@ export interface AppCommand {
   readonly url: string
   /** The folder to run the command in; default the current one. */
   readonly cwd?: string
-  /** More environment for the app, over the proxy's. */
+  /**
+   * More environment for the app, over the proxy's. A `NODE_OPTIONS` (or `BUN_OPTIONS`) here is
+   * joined with the proxy's rather than replacing it, so the app keeps danwo's preload.
+   */
   readonly env?: Readonly<Record<string, string>>
   /** How long to wait for it to answer; default two minutes, for a dev server's first build. */
   readonly timeoutMs?: number
+  /**
+   * When it counts as started: `url` answering (the default), a `path` under it answering (a
+   * health check), or a `log` line in its output, for a worker that serves nothing.
+   */
+  readonly ready?: { readonly path?: string; readonly log?: string | RegExp }
 }
 
 /** An app `startApp` started. */
 export interface StartedApp {
   readonly url: string
+  /** The process group's leader: the shell that runs the command. */
+  readonly pid: number | undefined
+  /** What it has written to stdout and stderr so far, line by line (the last lines only). */
+  logs(): ProcessLog
   /** Stops the command and every process it started. */
   stop(): Promise<void>
 }
@@ -35,6 +47,8 @@ const DEFAULT_TIMEOUT_MS = 120_000
 const POLL_MS = 250
 /** Lines of the app's output kept for the error when it fails to start. */
 const KEPT_LINES = 30
+/** Lines of the app's output kept for the flight record. */
+const LOGGED_LINES = 2_000
 
 /** Whether anything answers HTTP at `url` right now, whatever the status. */
 async function answers(url: string): Promise<boolean> {
@@ -47,42 +61,74 @@ async function answers(url: string): Promise<boolean> {
   }
 }
 
-/** The last lines a child wrote, for an error message. */
-function tail(child: ChildProcess): () => string {
-  const lines: string[] = []
+/** Every line a child writes, the last `LOGGED_LINES` of them kept, and how many in all. */
+function captureOutput(child: ChildProcess): { readonly lines: string[]; written: number } {
+  const output = { lines: [] as string[], written: 0 }
 
   const keep = (chunk: Buffer) => {
-    lines.push(...chunk.toString().split("\n").filter(Boolean))
-    lines.splice(0, Math.max(0, lines.length - KEPT_LINES))
+    const lines = chunk.toString().split("\n").filter(Boolean)
+
+    output.written += lines.length
+    output.lines.push(...lines)
+    output.lines.splice(0, Math.max(0, output.lines.length - LOGGED_LINES))
   }
 
   child.stdout?.on("data", keep)
   child.stderr?.on("data", keep)
 
-  return () => lines.join("\n")
+  return output
+}
+
+/** The app's environment: the proxy's, its port, then its own, with NODE_OPTIONS joined. */
+function appEnv(app: AppCommand, env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const port = new URL(app.url).port
+  const own = app.env ?? {}
+  const joined = (name: "NODE_OPTIONS" | "BUN_OPTIONS") =>
+    own[name] === undefined ? {} : { [name]: [own[name], env[name]].filter(Boolean).join(" ") }
+
+  return {
+    ...env,
+    ...(port !== "" && { PORT: port }),
+    ...own,
+    ...joined("NODE_OPTIONS"),
+    ...joined("BUN_OPTIONS"),
+  }
+}
+
+/** Whether the app has started, by its `ready` rule. */
+async function isReady(app: AppCommand, lines: readonly string[]): Promise<boolean> {
+  const log = app.ready?.log
+
+  if (log !== undefined)
+    return lines.some((line) => (typeof log === "string" ? line.includes(log) : log.test(line)))
+
+  return answers(new URL(app.ready?.path ?? "", app.url).href)
 }
 
 /** How long the app and what it started get to exit on SIGTERM before they are killed. */
 const STOP_GRACE_MS = 5_000
 
-/** Resolves once `url` answers; rejects when the child exits first or `timeoutMs` passes. */
-async function untilAnswering(
+/** Resolves once the app is ready; rejects when the child exits first or `timeoutMs` passes. */
+async function untilReady(
   child: ChildProcess,
-  url: string,
-  timeoutMs: number,
-  output: () => string,
+  app: AppCommand,
+  output: { readonly lines: readonly string[] },
 ): Promise<void> {
+  const timeoutMs = app.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const deadline = Date.now() + timeoutMs
+  const recent = () => output.lines.slice(-KEPT_LINES).join("\n")
+  const what =
+    app.ready?.log === undefined ? `${app.url} answered` : `it logged ${String(app.ready.log)}`
   let exit: string | undefined
 
   child.once("exit", (code, signal) => {
     exit = signal === null ? `exited with code ${code}` : `was stopped by ${signal}`
   })
 
-  while (!(await answers(url))) {
-    if (exit !== undefined) throw new Error(`the app ${exit} before ${url} answered\n${output()}`)
+  while (!(await isReady(app, output.lines))) {
+    if (exit !== undefined) throw new Error(`the app ${exit} before ${what}\n${recent()}`)
     if (Date.now() > deadline)
-      throw new Error(`the app did not answer at ${url} within ${timeoutMs / 1000} s\n${output()}`)
+      throw new Error(`the app was not ready (${what}) within ${timeoutMs / 1000} s\n${recent()}`)
     await new Promise((resolve) => setTimeout(resolve, POLL_MS))
   }
 }
@@ -101,28 +147,32 @@ export async function startApp(
       `something already answers at ${app.url}: stop it so danwo can start the app through its proxy, or set APP_URL to test the app that runs there (its calls to providers then reach the real ones)`,
     )
 
-  const port = new URL(app.url).port
   /* Its own process group: a dev command often runs the server as its own child, and both go. */
   const owned = spawnOwned(app.command, [], {
     shell: true,
     cwd: app.cwd,
-    env: { ...env, ...(port !== "" && { PORT: port }), ...app.env },
+    env: appEnv(app, env),
     stdio: ["ignore", "pipe", "pipe"],
   })
-  const output = tail(owned.child)
+  const output = captureOutput(owned.child)
 
   try {
-    await untilAnswering(owned.child, app.url, app.timeoutMs ?? DEFAULT_TIMEOUT_MS, output)
+    await untilReady(owned.child, app, output)
   } catch (error) {
     await owned.stop(STOP_GRACE_MS)
     throw error
   }
 
-  return { url: app.url, stop: () => owned.stop(STOP_GRACE_MS) }
+  return {
+    url: app.url,
+    pid: owned.child.pid,
+    logs: () => ({ lines: [...output.lines], written: output.written }),
+    stop: () => owned.stop(STOP_GRACE_MS),
+  }
 }
 
 /** Options of `appEnvironment()`. */
-export interface AppEnvironmentOptions {
+export interface AppEnvironmentOptions extends UnroutedHosts {
   /**
    * The app: how danwo starts it, or the URL of one that already runs (whose own calls to
    * providers then reach the real ones). Leave it out when there is no server to start, as for a
@@ -131,10 +181,6 @@ export interface AppEnvironmentOptions {
   readonly app?: AppCommand | string
   /** Emulated providers, e.g. `[stripeService(), resendService()]`, behind one proxy. */
   readonly services?: readonly (Service | Promise<Service>)[]
-  /** What happens to calls for hosts no service answers; default they pass through. */
-  readonly unmatched?: "passthrough" | "block"
-  /** Hosts answered as blocked even when others pass through. */
-  readonly blocked?: readonly string[]
 }
 
 /**
@@ -147,10 +193,7 @@ export async function appEnvironment(
   options: AppEnvironmentOptions = {},
 ): Promise<WorkerEnvironment> {
   const pending = (options.services ?? []).map((service) => Promise.resolve(service))
-  const services = await startServices(await Promise.all(pending), {
-    ...(options.unmatched && { unmatched: options.unmatched }),
-    ...(options.blocked && { blocked: options.blocked }),
-  })
+  const services = await startServices(await Promise.all(pending), unroutedOf(options))
   const { app } = options
   let started: StartedApp | undefined
 
@@ -168,6 +211,7 @@ export async function appEnvironment(
     proxy: services.proxy,
     webhooks: services.webhooks,
     fixtures: services.fixtures,
+    logs: () => (started === undefined ? {} : { app: started.logs() }),
     state: () => services.state(),
     settle: () => services.settle(),
     travel: (ms) => services.travel(ms),

@@ -72,11 +72,24 @@ export interface WorkerEnvironment {
   /** Facts to print next to a matrix run's verdict. */
   notes?(): readonly string[]
   /**
+   * What each app the environment started has written, by app: the flight record keeps the lines
+   * written during each run.
+   */
+  logs?(): Readonly<Record<string, ProcessLog>>
+  /**
    * State the flight recorder keeps when a run ends, by service (what an invariant reads from).
    * Default: a snapshot of every emulator among `fixtures`.
    */
   state?(): Readonly<Record<string, unknown>>
   close(): Promise<void>
+}
+
+/** One process's output: its latest lines, and how many it has written in all. */
+export interface ProcessLog {
+  /** The latest lines, oldest first; earlier ones are dropped past a cap. */
+  readonly lines: readonly string[]
+  /** Lines written since the process started, kept or not: a run marks where it began by this. */
+  readonly written: number
 }
 
 /** What a config's `environment()` is called with, once per worker. */

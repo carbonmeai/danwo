@@ -210,7 +210,7 @@ export {
   s3Service,
   type S3Service,
 } from "./s3.ts"
-export { type Service, type Services, startServices } from "./services.ts"
+export { type Service, type Services, startServices, type UnroutedHosts } from "./services.ts"
 export {
   type AppCommand,
   appEnvironment,
@@ -218,6 +218,19 @@ export {
   type StartedApp,
   startApp,
 } from "./app-environment.ts"
+export {
+  INNGEST_HOST,
+  type InngestOptions,
+  type InngestRun,
+  type InngestService,
+  inngestService,
+} from "./inngest.ts"
+export {
+  type StackApp,
+  stackEnvironment,
+  type StackEnvironmentOptions,
+  type StackUrls,
+} from "./stack-environment.ts"
 export {
   RESEND_HOSTS,
   type ResendEnvironment,

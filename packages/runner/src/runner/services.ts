@@ -14,6 +14,8 @@ export interface Service {
   readonly fixtures?: Readonly<Record<string, unknown>>
   /** Webhook delivery `danwo matrix` can fault. */
   readonly webhooks?: WebhookDispatcher | undefined
+  /** Hears of the proxy once it runs, for a service that reads the calls made through it. */
+  attach?(proxy: Proxy): void
   /** What the flight recorder keeps of this service when a run ends (an emulator's snapshot). */
   state?(): unknown
   settle?(): Promise<void>
@@ -28,6 +30,31 @@ export interface Service {
   /** Back to the kept state, faster than a reset; services without one are reset instead. */
   restore?(): Promise<void>
   close(): Promise<void>
+}
+
+/** What happens to calls for hosts no service answers. */
+export interface UnroutedHosts {
+  /**
+   * `passthrough` (default) sends them to the real host; `block` answers 502. This machine
+   * (`localhost`, `127.0.0.1`), where the apps run, always passes, and so does the `allow` list.
+   */
+  readonly unmatched?: "passthrough" | "block"
+  /** Hosts answered as blocked even when others pass through, e.g. `ANDROID_BACKGROUND_HOSTS`. */
+  readonly blocked?: readonly string[]
+  /** Hosts that always pass through, even under `unmatched: "block"`. */
+  readonly allow?: readonly string[]
+  /** Analytics and telemetry hosts: blocked by default; `passthrough` lets them go. */
+  readonly telemetry?: "block" | "passthrough"
+}
+
+/** Just the `UnroutedHosts` options from a larger options object. */
+export function unroutedOf(options: UnroutedHosts): UnroutedHosts {
+  return {
+    ...(options.unmatched && { unmatched: options.unmatched }),
+    ...(options.blocked && { blocked: options.blocked }),
+    ...(options.allow && { allow: options.allow }),
+    ...(options.telemetry && { telemetry: options.telemetry }),
+  }
 }
 
 /** Services started together; its fields slot straight into a `WorkerEnvironment`. */
@@ -58,17 +85,11 @@ export interface Services {
  */
 export async function startServices(
   services: readonly Service[],
-  options: {
-    readonly unmatched?: "passthrough" | "block"
-    /** Hosts answered as blocked even when others pass through, e.g. `ANDROID_BACKGROUND_HOSTS`. */
-    readonly blocked?: readonly string[]
-  } = {},
+  options: UnroutedHosts = {},
 ): Promise<Services> {
-  const proxy = await startProxy({
-    routes: services.flatMap((s) => s.routes),
-    ...(options.unmatched && { unmatched: options.unmatched }),
-    ...(options.blocked && { blocked: options.blocked }),
-  })
+  const proxy = await startProxy({ routes: services.flatMap((s) => s.routes), ...options })
+
+  for (const service of services) service.attach?.(proxy)
   const webhooks = webhooksByService(services)
 
   const settle = async () => {
