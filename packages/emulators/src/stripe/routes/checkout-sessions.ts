@@ -346,7 +346,10 @@ function successRedirect(c: Context, session: CheckoutSession): Response {
 function settleExpiry(context: StripeRouteContext, session: CheckoutSession): CheckoutSession {
   if (session.status !== "open" || unix(context.clock()) < session.expires_at) return session
 
-  const expired = context.objects.checkoutSessions.change(session.id, { status: "expired" })
+  const expired = context.objects.checkoutSessions.change(session.id, {
+    status: "expired",
+    url: null,
+  })
 
   if (expired) context.events.emit("checkout.session.expired", expired)
 
@@ -399,7 +402,7 @@ export function checkoutSessionRoutes(context: StripeRouteContext): void {
         `Only Checkout Sessions with a status of open can be expired. This Checkout Session has a status of ${session.status}.`,
       )
 
-    const expired = sessions.change(id, { status: "expired" })
+    const expired = sessions.change(id, { status: "expired", url: null })
 
     if (expired) events.emit("checkout.session.expired", expired)
 

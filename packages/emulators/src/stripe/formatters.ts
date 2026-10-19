@@ -438,9 +438,9 @@ function sessionPricing(
         custom_fields: null,
         description: fields.invoiceCreation?.description ?? null,
         footer: null,
-        issuer: null,
+        issuer: { type: "self" },
         metadata: fields.invoiceCreation?.metadata ?? {},
-        rendering_options: null,
+        rendering_options: { amount_tax_display: null, template: null },
       },
     },
     payment_status: "unpaid",
@@ -448,7 +448,9 @@ function sessionPricing(
   }
 }
 
-export function checkoutSessionObject(fields: SessionFields): CheckoutSession {
+export function checkoutSessionObject(
+  fields: SessionFields,
+): CheckoutSession & { marketing_attributions: null } {
   return {
     id: fields.id,
     object: "checkout.session",
@@ -459,6 +461,15 @@ export function checkoutSessionObject(fields: SessionFields): CheckoutSession {
     ...sessionPricing(fields),
     automatic_tax: { enabled: false, liability: null, provider: null, status: null },
     billing_address_collection: null,
+    branding_settings: {
+      background_color: "#ffffff",
+      border_style: "rounded",
+      button_color: "#0074d4",
+      display_name: "Danwo",
+      font_family: "default",
+      icon: null,
+      logo: null,
+    },
     cancel_url: fields.cancelUrl,
     client_reference_id: fields.clientReferenceId,
     client_secret: null,
@@ -486,7 +497,8 @@ export function checkoutSessionObject(fields: SessionFields): CheckoutSession {
     invoice: null,
     livemode: false,
     locale: null,
-    managed_payments: null,
+    managed_payments: { enabled: false },
+    marketing_attributions: null,
     metadata: fields.metadata,
     mode: fields.mode,
     origin_context: null,
@@ -496,11 +508,16 @@ export function checkoutSessionObject(fields: SessionFields): CheckoutSession {
     payment_method_configuration_details: fields.configuration
       ? { id: fields.configuration, parent: null }
       : null,
-    payment_method_options: {},
+    payment_method_options: { card: { request_three_d_secure: "automatic" } },
     payment_method_types: ["card"],
     permissions: null,
+    phone_number_collection: { enabled: false },
     recovered_from: null,
-    saved_payment_method_options: null,
+    saved_payment_method_options: {
+      allow_redisplay_filters: [],
+      payment_method_remove: "disabled",
+      payment_method_save: null,
+    },
     setup_intent: null,
     shipping_address_collection: null,
     shipping_cost: null,
@@ -509,6 +526,7 @@ export function checkoutSessionObject(fields: SessionFields): CheckoutSession {
     submit_type: null,
     subscription: null,
     success_url: fields.successUrl,
+    tax_id_collection: { enabled: false, required: "never" },
     ui_mode: "hosted",
     url: fields.url,
     wallet_options: null,
