@@ -478,3 +478,62 @@ Not emulated: Nylas's notetakers, smart compose and ICS, and Nylas grants backed
 Microsoft emulators; Nango's syncs running on their own and its MCP endpoints; Unipile's posts
 beyond empty lists, invitations, attachments and calendar. Error codes beyond the key errors are
 approximations.
+
+## Pusher, Novu and Tiptap
+
+Three providers apps use for realtime features, each with a socket the browser keeps open. The
+proxy sends a WebSocket upgrade to one of their hosts to a local port the emulator serves, so
+`pusher-js`, Novu's Inbox and Tiptap's collaboration provider connect with no change to the app.
+
+```ts
+import { novuService, pusherService, stackEnvironment, tiptapService } from "@danwo/sdk"
+
+const services = [
+  pusherService({
+    seed: { apps: [{ id: "4242", key: "app-key", secret: "app-secret", cluster: "eu" }] },
+  }),
+  novuService({
+    seed: { apiKey: "novu-secret", bridgeUrl: "http://127.0.0.1:4400/api/novu-bridge" },
+  }),
+  tiptapService({ seed: { apps: [{ id: "notes", secret: process.env.TIPTAP_COLLAB_SECRET }] } }),
+]
+```
+
+**Pusher** (`*.pusher.com`) answers the Channels API the server SDKs sign (triggers, batches,
+channel info, presence users, ending a user's connections) and checks each signature, body hash
+and timestamp. On the socket it speaks the protocol `pusher-js` does: public, private and
+presence channels (authorised as the app's auth endpoint would), user sign-in, client events and
+pings. Seeded apps' webhooks (`channel_occupied`, `member_added`, `client_event`, …) are signed
+with the app's secret. Beams publishes and the device API are kept for tests. Without a seed it
+answers for `PUSHER_DEFAULTS`. In tests, `pusherChannels(pusher)` lists what was published, on
+which channel and which connections it reached, lists open connections, and publishes from the
+test; `pusherBeams(pusher)` reads push publishes and registered devices.
+
+**Novu** (`api.novu.co`, `socket.novu.co`, and the EU hosts) answers `@novu/api`: triggers
+(one, bulk, broadcast, cancel), v2 subscribers, credentials, topics and a subscriber's
+notifications, with each write replayed under its `idempotency-key` as Novu does. A workflow
+seeded as templates runs at once; a code-first workflow runs step by step through the app's
+`@novu/framework` bridge, with requests signed with the secret key, as Novu Cloud runs it.
+In-app messages reach the Inbox the browser opened (`@novu/react`, `@novu/js`) and its socket;
+email steps go through a Resend service given as `email`. `settle` waits for the workflow runs.
+`novuProject(novu)` reads runs (with each step's status and outputs), messages and Inboxes.
+
+**Tiptap Cloud** (`<appId>.collab.tiptap.cloud`) is the collaboration server: editors connected
+with `@hocuspocus/provider` or `TiptapCollabProvider` sync a document over the Yjs protocol,
+see each other's cursors, and get Tiptap's stateless messages. Tokens are checked against the
+app's secret, with `allowedDocumentNames` and `readonlyDocumentNames`. The REST API reads a
+document as JSON or a Yjs update, creates, replaces (editors receive the change) and deletes it.
+`tiptapCollab(tiptap)` reads a document's JSON or text, waits for text, writes one, counts its
+editors, and makes trouble: `trouble({ permissionDenied: true })` refuses tokens and
+`trouble({ syncDelayMs })` slows syncs.
+
+`danwo matrix` faults their API calls (Pusher: 429, 500 and lost answers on triggers; Novu: 429,
+500, reset and a lost answer on triggers, a failed Inbox session; Tiptap: 429, 500 and resets on
+the REST API) and every socket the clean run opened (upgrade refused, connection dropped). A
+reset closes the open sockets; clients reconnect to the seeded state. Recordings redact Novu's
+`ApiKey` header and Inbox tokens and Pusher's signatures.
+
+Not emulated: Pusher's encrypted channels, watchlist events and the SockJS fallback; Novu's
+digests and delays (run straight through), preferences beyond the defaults, SMS, chat and push
+delivery (kept, not sent); Tiptap's document versions, AI and conversion APIs. Pusher's and
+Tiptap's answers are checked against their API references, not live yet.
