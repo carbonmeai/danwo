@@ -1,0 +1,313 @@
+{
+  "provider": "clerk",
+  "source": "live",
+  "recorded": "2026-10-19",
+  "scenarios": {
+    "users: create, read, list, update, ban, delete": {
+      "steps": [
+        {
+          "step": "create user (user)",
+          "status": 200,
+          "shape": "dc98d38a3693"
+        },
+        {
+          "step": "get user",
+          "status": 200,
+          "shape": "dc98d38a3693"
+        },
+        {
+          "step": "list users by email",
+          "status": 200,
+          "shape": "3a874c6d04f8"
+        },
+        {
+          "step": "update user",
+          "status": 200,
+          "shape": "dc98d38a3693"
+        },
+        {
+          "step": "update metadata",
+          "status": 200,
+          "shape": "dc98d38a3693"
+        },
+        {
+          "step": "ban user",
+          "status": 200,
+          "shape": "dc98d38a3693"
+        },
+        {
+          "step": "unban user",
+          "status": 200,
+          "shape": "dc98d38a3693"
+        },
+        {
+          "step": "delete user",
+          "status": 200,
+          "shape": "99e79841e78e"
+        }
+      ],
+      "facts": [
+        {
+          "name": "a banned user reads banned",
+          "value": true
+        }
+      ]
+    },
+    "organizations: create, members, invitations, delete": {
+      "steps": [
+        {
+          "step": "create user (owner)",
+          "status": 200,
+          "shape": "dc98d38a3693"
+        },
+        {
+          "step": "create user (member)",
+          "status": 200,
+          "shape": "dc98d38a3693"
+        },
+        {
+          "step": "create organization",
+          "status": 200,
+          "shape": "b8a5e411f9e3"
+        },
+        {
+          "step": "get organization",
+          "status": 200,
+          "shape": "94d9eecd79bd"
+        },
+        {
+          "step": "update organization",
+          "status": 200,
+          "shape": "b8a5e411f9e3"
+        },
+        {
+          "step": "add member",
+          "status": 200,
+          "shape": "4b5542c06e1b"
+        },
+        {
+          "step": "list memberships",
+          "status": 200,
+          "shape": "b8fe42c567f4"
+        },
+        {
+          "step": "change member role",
+          "status": 200,
+          "shape": "064e6485d5e9"
+        },
+        {
+          "step": "remove member",
+          "status": 200,
+          "shape": "064e6485d5e9"
+        },
+        {
+          "step": "invite by email",
+          "status": 200,
+          "shape": "74c3d888f83d"
+        },
+        {
+          "step": "list invitations",
+          "status": 200,
+          "shape": "62901515baf7"
+        },
+        {
+          "step": "revoke invitation",
+          "status": 200,
+          "shape": "2012d9131eab"
+        },
+        {
+          "step": "delete organization",
+          "status": 200,
+          "shape": "2b8e3f051a8e"
+        }
+      ],
+      "facts": []
+    },
+    "sessions: create, list, token, revoke, and the signing keys": {
+      "steps": [
+        {
+          "step": "create user (session)",
+          "status": 200,
+          "shape": "dc98d38a3693"
+        },
+        {
+          "step": "create session",
+          "status": 200,
+          "shape": "e3966c155e69"
+        },
+        {
+          "step": "get session",
+          "status": 200,
+          "shape": "e3966c155e69"
+        },
+        {
+          "step": "list the user's sessions",
+          "status": 200,
+          "shape": "5266ff797de3"
+        },
+        {
+          "step": "mint a session token",
+          "status": 200,
+          "shape": "07c302a693f8"
+        },
+        {
+          "step": "revoke session",
+          "status": 200,
+          "shape": "e6a30cf1c30f"
+        },
+        {
+          "step": "read the signing keys",
+          "status": 200,
+          "shape": "8123752ec20d"
+        }
+      ],
+      "facts": []
+    },
+    "errors: bad key, missing field, duplicate email, not found": {
+      "steps": [
+        {
+          "step": "call with a key Clerk never issued",
+          "status": 401,
+          "shape": "575e77b24687"
+        },
+        {
+          "step": "create organization without a name",
+          "status": 422,
+          "shape": "f8bd6cb6edbf"
+        },
+        {
+          "step": "create user (taken)",
+          "status": 200,
+          "shape": "dc98d38a3693"
+        },
+        {
+          "step": "create user with a taken email",
+          "status": 422,
+          "shape": "76f50c2dbe22"
+        },
+        {
+          "step": "get a user that does not exist",
+          "status": 404,
+          "shape": "16141324e200"
+        }
+      ],
+      "facts": []
+    },
+    "frontend: dev browser, sign-up and sign-in by email code, session token": {
+      "steps": [
+        {
+          "step": "start the dev browser",
+          "status": 200,
+          "shape": "dc1c5802814f"
+        },
+        {
+          "step": "read the environment",
+          "status": 200,
+          "shape": "5f93eaae5d1c"
+        },
+        {
+          "step": "read the client",
+          "status": 200,
+          "shape": "fa942fe092e3"
+        },
+        {
+          "step": "sign up with an email",
+          "status": 200,
+          "shape": "6ccda8e3be5d"
+        },
+        {
+          "step": "send the sign-up code",
+          "status": 200,
+          "shape": "6d0f7bdcef73"
+        },
+        {
+          "step": "enter the sign-up code",
+          "status": 200,
+          "shape": "e8ef7aff4c91"
+        },
+        {
+          "step": "mint the session token",
+          "status": 200,
+          "shape": "07c302a693f8"
+        },
+        {
+          "step": "sign out",
+          "status": 200,
+          "shape": "66a1a4c77cd6"
+        },
+        {
+          "step": "sign in with the email",
+          "status": 200,
+          "shape": "931b280a4c8c"
+        },
+        {
+          "step": "send the sign-in code",
+          "status": 200,
+          "shape": "8de30c14878a"
+        },
+        {
+          "step": "enter the sign-in code",
+          "status": 200,
+          "shape": "9c46a583f975"
+        },
+        {
+          "step": "sign in with an unknown email",
+          "status": 422,
+          "shape": "d4c05eb0c42d"
+        }
+      ],
+      "facts": [
+        {
+          "name": "session token claims",
+          "value": "azp exp fva iat iss nbf sid sts sub"
+        },
+        {
+          "name": "session token header",
+          "value": "alg cat kid oiat typ"
+        },
+        {
+          "name": "the session token's azp is the calling origin",
+          "value": true
+        },
+        {
+          "name": "the session token verifies with @clerk/backend",
+          "value": true
+        }
+      ]
+    }
+  },
+  "shapes": {
+    "064e6485d5e9": {"t":"object","keys":{"object":{"t":"literal","v":"organization_membership"},"id":{"t":"string"},"public_metadata":{"t":"object","keys":{},"open":true},"private_metadata":{"t":"object","keys":{},"open":true},"role":{"t":"literal","v":"org:admin"},"role_name":{"t":"string"},"permissions":{"t":"array","of":{"t":"string"}},"created_at":{"t":"number"},"updated_at":{"t":"number"},"organization":{"t":"object","keys":{"object":{"t":"literal","v":"organization"},"id":{"t":"string"},"name":{"t":"string"},"slug":{"t":"string"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"members_count":{"t":"number"},"pending_invitations_count":{"t":"number"},"max_allowed_memberships":{"t":"number"},"admin_delete_enabled":{"t":"boolean"},"self_serve_sso_enabled":{"t":"boolean"},"self_serve_directory_sync_enabled":{"t":"boolean"},"public_metadata":{"t":"object","keys":{},"open":true},"private_metadata":{"t":"object","keys":{},"open":true},"created_by":{"t":"string"},"created_at":{"t":"number"},"updated_at":{"t":"number"},"logo_url":{"t":"null"}}},"public_user_data":{"t":"object","keys":{"first_name":{"t":"string"},"last_name":{"t":"string"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"identifier":{"t":"string"},"username":{"t":"null"},"profile_image_url":{"t":"string"},"user_id":{"t":"string"},"banned":{"t":"boolean"},"deprovisioned":{"t":"boolean"}}}}},
+    "07c302a693f8": {"t":"object","keys":{"object":{"t":"literal","v":"token"},"jwt":{"t":"string"}}},
+    "16141324e200": {"t":"object","keys":{"errors":{"t":"array","of":{"t":"object","keys":{"message":{"t":"string"},"long_message":{"t":"string"},"code":{"t":"literal","v":"resource_not_found"}}}},"clerk_trace_id":{"t":"string"}}},
+    "2012d9131eab": {"t":"object","keys":{"object":{"t":"literal","v":"organization_invitation"},"id":{"t":"string"},"email_address":{"t":"string"},"role":{"t":"literal","v":"org:member"},"role_name":{"t":"string"},"organization_id":{"t":"string"},"status":{"t":"literal","v":"revoked"},"public_metadata":{"t":"object","keys":{},"open":true},"private_metadata":{"t":"object","keys":{},"open":true},"url":{"t":"string"},"expires_at":{"t":"number"},"created_at":{"t":"number"},"updated_at":{"t":"number"},"inviter_id":{"t":"string"},"public_inviter_data":{"t":"object","keys":{"user_id":{"t":"string"},"first_name":{"t":"string"},"last_name":{"t":"string"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"identifier":{"t":"string"}}}}},
+    "2b8e3f051a8e": {"t":"object","keys":{"id":{"t":"string"},"object":{"t":"literal","v":"organization"},"deleted":{"t":"literal","v":true}}},
+    "3a874c6d04f8": {"t":"array","of":{"t":"object","keys":{"id":{"t":"string"},"object":{"t":"literal","v":"user"},"username":{"t":"null"},"first_name":{"t":"string"},"last_name":{"t":"string"},"locale":{"t":"null"},"timezone":{"t":"null"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"primary_email_address_id":{"t":"string"},"primary_phone_number_id":{"t":"null"},"primary_web3_wallet_id":{"t":"null"},"password_enabled":{"t":"boolean"},"two_factor_enabled":{"t":"boolean"},"totp_enabled":{"t":"boolean"},"backup_code_enabled":{"t":"boolean"},"email_addresses":{"t":"array","of":{"t":"object","keys":{"id":{"t":"string"},"object":{"t":"literal","v":"email_address"},"email_address":{"t":"string"},"reserved":{"t":"boolean"},"verification":{"t":"object","keys":{"object":{"t":"literal","v":"verification_admin"},"status":{"t":"literal","v":"verified"},"strategy":{"t":"literal","v":"admin"},"attempts":{"t":"null"},"expire_at":{"t":"null"}}},"linked_to":{"t":"array","of":null},"matches_sso_connection":{"t":"boolean"},"created_at":{"t":"number"},"updated_at":{"t":"number"}}}},"phone_numbers":{"t":"array","of":null},"web3_wallets":{"t":"array","of":null},"passkeys":{"t":"array","of":null},"external_accounts":{"t":"array","of":null},"saml_accounts":{"t":"array","of":null},"enterprise_accounts":{"t":"array","of":null},"password_last_updated_at":{"t":"number"},"public_metadata":{"t":"object","keys":{},"open":true},"private_metadata":{"t":"object","keys":{},"open":true},"unsafe_metadata":{"t":"object","keys":{},"open":true},"external_id":{"t":"string"},"last_sign_in_at":{"t":"null"},"banned":{"t":"boolean"},"locked":{"t":"boolean"},"lockout_expires_in_seconds":{"t":"null"},"verification_attempts_remaining":{"t":"number"},"created_at":{"t":"number"},"updated_at":{"t":"number"},"delete_self_enabled":{"t":"boolean"},"bypass_client_trust":{"t":"boolean"},"create_organization_enabled":{"t":"boolean"},"last_active_at":{"t":"null"},"mfa_enabled_at":{"t":"null"},"mfa_disabled_at":{"t":"null"},"legal_accepted_at":{"t":"null"},"requires_password_reset":{"t":"boolean"},"deprovisioned":{"t":"boolean"},"profile_image_url":{"t":"string"}}}},
+    "4b5542c06e1b": {"t":"object","keys":{"object":{"t":"literal","v":"organization_membership"},"id":{"t":"string"},"public_metadata":{"t":"object","keys":{},"open":true},"private_metadata":{"t":"object","keys":{},"open":true},"role":{"t":"literal","v":"org:member"},"role_name":{"t":"string"},"permissions":{"t":"array","of":{"t":"string"}},"created_at":{"t":"number"},"updated_at":{"t":"number"},"organization":{"t":"object","keys":{"object":{"t":"literal","v":"organization"},"id":{"t":"string"},"name":{"t":"string"},"slug":{"t":"string"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"members_count":{"t":"number"},"pending_invitations_count":{"t":"number"},"max_allowed_memberships":{"t":"number"},"admin_delete_enabled":{"t":"boolean"},"self_serve_sso_enabled":{"t":"boolean"},"self_serve_directory_sync_enabled":{"t":"boolean"},"public_metadata":{"t":"object","keys":{},"open":true},"private_metadata":{"t":"object","keys":{},"open":true},"created_by":{"t":"string"},"created_at":{"t":"number"},"updated_at":{"t":"number"},"logo_url":{"t":"null"}}},"public_user_data":{"t":"object","keys":{"first_name":{"t":"string"},"last_name":{"t":"string"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"identifier":{"t":"string"},"username":{"t":"null"},"profile_image_url":{"t":"string"},"user_id":{"t":"string"},"banned":{"t":"boolean"},"deprovisioned":{"t":"boolean"}}}}},
+    "5266ff797de3": {"t":"array","of":{"t":"object","keys":{"object":{"t":"literal","v":"session"},"id":{"t":"string"},"client_id":{"t":"string"},"user_id":{"t":"string"},"status":{"t":"string"},"actor":{"t":"null"},"last_active_at":{"t":"number"},"expire_at":{"t":"number"},"abandon_at":{"t":"number"},"created_at":{"t":"number"},"updated_at":{"t":"number"}}}},
+    "575e77b24687": {"t":"object","keys":{"errors":{"t":"array","of":{"t":"object","keys":{"message":{"t":"string"},"long_message":{"t":"string"},"code":{"t":"literal","v":"clerk_key_invalid"}}}},"clerk_trace_id":{"t":"string"}}},
+    "5f93eaae5d1c": {"t":"object","keys":{"auth_config":{"t":"object","keys":{"object":{"t":"literal","v":"auth_config"},"id":{"t":"string"},"first_name":{"t":"string"},"last_name":{"t":"string"},"email_address":{"t":"string"},"phone_number":{"t":"string"},"username":{"t":"string"},"password":{"t":"string"},"identification_requirements":{"t":"array","of":{"t":"array","of":{"t":"string"}}},"identification_strategies":{"t":"array","of":{"t":"string"}},"first_factors":{"t":"array","of":{"t":"string"}},"second_factors":{"t":"array","of":null},"email_address_verification_strategies":{"t":"array","of":{"t":"string"}},"single_session_mode":{"t":"boolean"},"enhanced_email_deliverability":{"t":"boolean"},"test_mode":{"t":"boolean"},"cookieless_dev":{"t":"boolean"},"url_based_session_syncing":{"t":"boolean"},"claimed_at":{"t":"null"},"reverification":{"t":"boolean"},"native_settings":{"t":"object","keys":{"object":{"t":"literal","v":"native_settings"},"api_enabled":{"t":"boolean"},"trusted_device_sign_in_enabled":{"t":"boolean"},"trusted_device_enrollment_prompt_after_sign_in_enabled":{"t":"boolean"},"trusted_device_enrollment_prompt_after_sign_up_enabled":{"t":"boolean"}}}}},"display_config":{"t":"object","keys":{"object":{"t":"literal","v":"display_config"},"id":{"t":"string"},"instance_environment_type":{"t":"string"},"application_name":{"t":"string"},"theme":{"t":"object","keys":{"buttons":{"t":"object","keys":{"font_color":{"t":"string"},"font_family":{"t":"string"},"font_weight":{"t":"string"}}},"general":{"t":"object","keys":{"color":{"t":"string"},"padding":{"t":"string"},"box_shadow":{"t":"string"},"font_color":{"t":"string"},"font_family":{"t":"string"},"border_radius":{"t":"string"},"background_color":{"t":"string"},"label_font_weight":{"t":"string"}}},"accounts":{"t":"object","keys":{"background_color":{"t":"string"}}}}},"preferred_sign_in_strategy":{"t":"string"},"logo_image_url":{"t":"string"},"favicon_image_url":{"t":"string"},"home_url":{"t":"string"},"sign_in_url":{"t":"string"},"sign_up_url":{"t":"string"},"user_profile_url":{"t":"string"},"waitlist_url":{"t":"string"},"oauth_consent_url":{"t":"string"},"oauth_device_verification_url":{"t":"string"},"after_sign_in_url":{"t":"string"},"after_sign_up_url":{"t":"string"},"after_sign_out_one_url":{"t":"string"},"after_sign_out_all_url":{"t":"string"},"after_switch_session_url":{"t":"string"},"after_join_waitlist_url":{"t":"string"},"organization_profile_url":{"t":"string"},"create_organization_url":{"t":"string"},"after_leave_organization_url":{"t":"string"},"after_create_organization_url":{"t":"string"},"logo_link_url":{"t":"string"},"support_email":{"t":"null"},"branded":{"t":"boolean"},"experimental_force_oauth_first":{"t":"boolean"},"clerk_js_version":{"t":"string"},"show_devmode_warning":{"t":"boolean"},"google_one_tap_client_id":{"t":"string"},"help_url":{"t":"null"},"privacy_policy_url":{"t":"null"},"terms_url":{"t":"null"},"logo_url":{"t":"null"},"favicon_url":{"t":"null"},"logo_image":{"t":"null"},"favicon_image":{"t":"null"},"captcha_public_key":{"t":"null"},"captcha_widget_type":{"t":"null"},"captcha_public_key_invisible":{"t":"null"},"captcha_provider":{"t":"null"},"captcha_oauth_bypass":{"t":"array","of":null}}},"user_settings":{"t":"object","keys":{"attributes":{"t":"object","keys":{"email_address":{"t":"object","keys":{"enabled":{"t":"boolean"},"required":{"t":"boolean"},"used_for_first_factor":{"t":"boolean"},"first_factors":{"t":"array","of":{"t":"string"}},"used_for_second_factor":{"t":"boolean"},"second_factors":{"t":"array","of":null},"verifications":{"t":"array","of":{"t":"string"}},"verify_at_sign_up":{"t":"boolean"},"immutable":{"t":"boolean"}}},"phone_number":{"t":"object","keys":{"enabled":{"t":"boolean"},"required":{"t":"boolean"},"used_for_first_factor":{"t":"boolean"},"first_factors":{"t":"array","of":null},"used_for_second_factor":{"t":"boolean"},"second_factors":{"t":"array","of":null},"verifications":{"t":"array","of":null},"verify_at_sign_up":{"t":"boolean"},"immutable":{"t":"boolean"}}},"username":{"t":"object","keys":{"enabled":{"t":"boolean"},"required":{"t":"boolean"},"used_for_first_factor":{"t":"boolean"},"first_factors":{"t":"array","of":null},"used_for_second_factor":{"t":"boolean"},"second_factors":{"t":"array","of":null},"verifications":{"t":"array","of":null},"verify_at_sign_up":{"t":"boolean"},"immutable":{"t":"boolean"}}},"web3_wallet":{"t":"object","keys":{"enabled":{"t":"boolean"},"required":{"t":"boolean"},"used_for_first_factor":{"t":"boolean"},"first_factors":{"t":"array","of":null},"used_for_second_factor":{"t":"boolean"},"second_factors":{"t":"array","of":null},"verifications":{"t":"array","of":null},"verify_at_sign_up":{"t":"boolean"},"immutable":{"t":"boolean"}}},"first_name":{"t":"object","keys":{"enabled":{"t":"boolean"},"required":{"t":"boolean"},"used_for_first_factor":{"t":"boolean"},"first_factors":{"t":"array","of":null},"used_for_second_factor":{"t":"boolean"},"second_factors":{"t":"array","of":null},"verifications":{"t":"array","of":null},"verify_at_sign_up":{"t":"boolean"},"immutable":{"t":"boolean"}}},"last_name":{"t":"object","keys":{"enabled":{"t":"boolean"},"required":{"t":"boolean"},"used_for_first_factor":{"t":"boolean"},"first_factors":{"t":"array","of":null},"used_for_second_factor":{"t":"boolean"},"second_factors":{"t":"array","of":null},"verifications":{"t":"array","of":null},"verify_at_sign_up":{"t":"boolean"},"immutable":{"t":"boolean"}}},"password":{"t":"object","keys":{"enabled":{"t":"boolean"},"required":{"t":"boolean"},"used_for_first_factor":{"t":"boolean"},"first_factors":{"t":"array","of":null},"used_for_second_factor":{"t":"boolean"},"second_factors":{"t":"array","of":null},"verifications":{"t":"array","of":null},"verify_at_sign_up":{"t":"boolean"},"immutable":{"t":"boolean"}}},"authenticator_app":{"t":"object","keys":{"enabled":{"t":"boolean"},"required":{"t":"boolean"},"used_for_first_factor":{"t":"boolean"},"first_factors":{"t":"array","of":null},"used_for_second_factor":{"t":"boolean"},"second_factors":{"t":"array","of":null},"verifications":{"t":"array","of":null},"verify_at_sign_up":{"t":"boolean"},"immutable":{"t":"boolean"}}},"ticket":{"t":"object","keys":{"enabled":{"t":"boolean"},"required":{"t":"boolean"},"used_for_first_factor":{"t":"boolean"},"first_factors":{"t":"array","of":null},"used_for_second_factor":{"t":"boolean"},"second_factors":{"t":"array","of":null},"verifications":{"t":"array","of":null},"verify_at_sign_up":{"t":"boolean"},"immutable":{"t":"boolean"}}},"backup_code":{"t":"object","keys":{"enabled":{"t":"boolean"},"required":{"t":"boolean"},"used_for_first_factor":{"t":"boolean"},"first_factors":{"t":"array","of":null},"used_for_second_factor":{"t":"boolean"},"second_factors":{"t":"array","of":null},"verifications":{"t":"array","of":null},"verify_at_sign_up":{"t":"boolean"},"immutable":{"t":"boolean"}}},"passkey":{"t":"object","keys":{"enabled":{"t":"boolean"},"required":{"t":"boolean"},"used_for_first_factor":{"t":"boolean"},"first_factors":{"t":"array","of":null},"used_for_second_factor":{"t":"boolean"},"second_factors":{"t":"array","of":null},"verifications":{"t":"array","of":null},"verify_at_sign_up":{"t":"boolean"},"immutable":{"t":"boolean"}}}}},"sign_in":{"t":"object","keys":{"second_factor":{"t":"object","keys":{"required":{"t":"boolean"}}}}},"sign_up":{"t":"object","keys":{"captcha_enabled":{"t":"boolean"},"captcha_widget_type":{"t":"string"},"custom_action_required":{"t":"boolean"},"progressive":{"t":"boolean"},"mode":{"t":"string"},"legal_consent_enabled":{"t":"boolean"},"mfa":{"t":"object","keys":{"required":{"t":"boolean"}}}}},"restrictions":{"t":"object","keys":{"allowlist":{"t":"object","keys":{"enabled":{"t":"boolean"}}},"blocklist":{"t":"object","keys":{"enabled":{"t":"boolean"}}},"allowlist_blocklist_disabled_on_sign_in":{"t":"object","keys":{"enabled":{"t":"boolean"}}},"block_email_subaddresses":{"t":"object","keys":{"enabled":{"t":"boolean"}}},"block_disposable_email_domains":{"t":"object","keys":{"enabled":{"t":"boolean"}}}}},"username_settings":{"t":"object","keys":{"min_length":{"t":"number"},"max_length":{"t":"number"},"allow_extended_special_characters":{"t":"boolean"},"allow_numeric_usernames":{"t":"boolean"}}},"actions":{"t":"object","keys":{"delete_self":{"t":"boolean"},"create_organization":{"t":"boolean"},"create_organizations_limit":{"t":"null"}}},"attack_protection":{"t":"object","keys":{"user_lockout":{"t":"object","keys":{"enabled":{"t":"boolean"},"max_attempts":{"t":"number"},"duration_in_minutes":{"t":"number"}}},"pii":{"t":"object","keys":{"enabled":{"t":"boolean"}}},"email_link":{"t":"object","keys":{"require_same_client":{"t":"boolean"}}},"enumeration_protection":{"t":"object","keys":{"enabled":{"t":"boolean"}}}}},"passkey_settings":{"t":"object","keys":{"allow_autofill":{"t":"boolean"},"show_sign_in_button":{"t":"boolean"},"satisfies_second_factor":{"t":"boolean"}}},"social":{"t":"object","keys":{},"open":true},"password_settings":{"t":"object","keys":{"disable_hibp":{"t":"boolean"},"disable_password_reverification":{"t":"boolean"},"min_length":{"t":"number"},"max_length":{"t":"number"},"require_special_char":{"t":"boolean"},"require_numbers":{"t":"boolean"},"require_uppercase":{"t":"boolean"},"require_lowercase":{"t":"boolean"},"show_zxcvbn":{"t":"boolean"},"min_zxcvbn_strength":{"t":"number"},"enforce_hibp_on_sign_in":{"t":"boolean"},"allowed_special_characters":{"t":"string"}}},"saml":{"t":"object","keys":{"enabled":{"t":"boolean"}}},"enterprise_sso":{"t":"object","keys":{"enabled":{"t":"boolean"},"self_serve_sso":{"t":"boolean"},"self_serve_directory_sync":{"t":"boolean"}}}}},"organization_settings":{"t":"object","keys":{"enabled":{"t":"boolean"},"max_allowed_memberships":{"t":"number"},"actions":{"t":"object","keys":{"admin_delete":{"t":"boolean"}}},"domains":{"t":"object","keys":{"enabled":{"t":"boolean"},"enrollment_modes":{"t":"array","of":{"t":"string"}},"default_role":{"t":"string"}}},"slug":{"t":"object","keys":{"disabled":{"t":"boolean"}}},"creator_role":{"t":"string"},"organization_creation_defaults":{"t":"object","keys":{"enabled":{"t":"boolean"},"automatic_organization_creation":{"t":"object","keys":{"enabled":{"t":"boolean"}}},"detect_from_email_domain":{"t":"object","keys":{"enabled":{"t":"boolean"}}},"organization_name_template":{"t":"object","keys":{"enabled":{"t":"boolean"},"template":{"t":"string"}}},"fallback":{"t":"object","keys":{"name":{"t":"string"}}}}}}},"fraud_settings":{"t":"object","keys":{"object":{"t":"literal","v":"fraud_settings"},"native":{"t":"object","keys":{"device_attestation_mode":{"t":"string"}}}}},"commerce_settings":{"t":"object","keys":{"billing":{"t":"object","keys":{"enabled":{"t":"boolean"},"has_paid_user_plans":{"t":"boolean"},"has_paid_org_plans":{"t":"boolean"},"free_trial_requires_payment_method":{"t":"boolean"},"user":{"t":"object","keys":{"enabled":{"t":"boolean"},"has_paid_plans":{"t":"boolean"}}},"organization":{"t":"object","keys":{"enabled":{"t":"boolean"},"has_paid_plans":{"t":"boolean"}}}}}}},"api_keys_settings":{"t":"object","keys":{"enabled":{"t":"boolean"},"user_api_keys_enabled":{"t":"boolean"},"orgs_api_keys_enabled":{"t":"boolean"}}},"maintenance_mode":{"t":"boolean"},"client_debug_mode":{"t":"boolean"},"partitioned_cookies":{"t":"boolean"}}},
+    "62901515baf7": {"t":"object","keys":{"data":{"t":"array","of":{"t":"object","keys":{"object":{"t":"literal","v":"organization_invitation"},"id":{"t":"string"},"email_address":{"t":"string"},"role":{"t":"string"},"role_name":{"t":"string"},"organization_id":{"t":"string"},"status":{"t":"string"},"public_metadata":{"t":"object","keys":{},"open":true},"private_metadata":{"t":"object","keys":{},"open":true},"url":{"t":"string"},"expires_at":{"t":"number"},"created_at":{"t":"number"},"updated_at":{"t":"number"},"inviter_id":{"t":"string"},"public_inviter_data":{"t":"object","keys":{"user_id":{"t":"string"},"first_name":{"t":"string"},"last_name":{"t":"string"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"identifier":{"t":"string"}}}}}},"total_count":{"t":"number"}}},
+    "66a1a4c77cd6": {"t":"object","keys":{"response":{"t":"object","keys":{"object":{"t":"literal","v":"client"},"id":{"t":"string"},"sessions":{"t":"array","of":null},"sign_in":{"t":"null"},"sign_up":{"t":"null"},"last_active_session_id":{"t":"null"},"last_authentication_strategy":{"t":"string"},"cookie_expires_at":{"t":"null"},"captcha_bypass":{"t":"boolean"},"created_at":{"t":"number"},"updated_at":{"t":"number"}}},"client":{"t":"object","keys":{"object":{"t":"literal","v":"client"},"id":{"t":"string"},"sessions":{"t":"array","of":null},"sign_in":{"t":"null"},"sign_up":{"t":"null"},"last_active_session_id":{"t":"null"},"last_authentication_strategy":{"t":"string"},"cookie_expires_at":{"t":"null"},"captcha_bypass":{"t":"boolean"},"created_at":{"t":"number"},"updated_at":{"t":"number"}}}}},
+    "6ccda8e3be5d": {"t":"object","keys":{"response":{"t":"object","keys":{"object":{"t":"literal","v":"sign_up_attempt"},"id":{"t":"string"},"status":{"t":"literal","v":"missing_requirements"},"required_fields":{"t":"array","of":{"t":"string"}},"optional_fields":{"t":"array","of":{"t":"string"}},"missing_fields":{"t":"array","of":null},"unverified_fields":{"t":"array","of":{"t":"string"}},"verifications":{"t":"object","keys":{"email_address":{"t":"null"},"phone_number":{"t":"null"},"web3_wallet":{"t":"null"},"external_account":{"t":"null"}}},"username":{"t":"null"},"email_address":{"t":"string"},"phone_number":{"t":"null"},"web3_wallet":{"t":"null"},"password_enabled":{"t":"boolean"},"first_name":{"t":"null"},"last_name":{"t":"null"},"unsafe_metadata":{"t":"object","keys":{},"open":true},"public_metadata":{"t":"object","keys":{},"open":true},"custom_action":{"t":"boolean"},"external_id":{"t":"null"},"created_session_id":{"t":"null"},"created_user_id":{"t":"null"},"abandon_at":{"t":"number"},"legal_accepted_at":{"t":"null"},"locale":{"t":"null"},"timezone":{"t":"string"}}},"client":{"t":"object","keys":{"object":{"t":"literal","v":"client"},"id":{"t":"string"},"sessions":{"t":"array","of":null},"sign_in":{"t":"null"},"sign_up":{"t":"object","keys":{"object":{"t":"literal","v":"sign_up_attempt"},"id":{"t":"string"},"status":{"t":"literal","v":"missing_requirements"},"required_fields":{"t":"array","of":{"t":"string"}},"optional_fields":{"t":"array","of":{"t":"string"}},"missing_fields":{"t":"array","of":null},"unverified_fields":{"t":"array","of":{"t":"string"}},"verifications":{"t":"object","keys":{"email_address":{"t":"null"},"phone_number":{"t":"null"},"web3_wallet":{"t":"null"},"external_account":{"t":"null"}}},"username":{"t":"null"},"email_address":{"t":"string"},"phone_number":{"t":"null"},"web3_wallet":{"t":"null"},"password_enabled":{"t":"boolean"},"first_name":{"t":"null"},"last_name":{"t":"null"},"unsafe_metadata":{"t":"object","keys":{},"open":true},"public_metadata":{"t":"object","keys":{},"open":true},"custom_action":{"t":"boolean"},"external_id":{"t":"null"},"created_session_id":{"t":"null"},"created_user_id":{"t":"null"},"abandon_at":{"t":"number"},"legal_accepted_at":{"t":"null"},"locale":{"t":"null"},"timezone":{"t":"string"}}},"last_active_session_id":{"t":"null"},"last_authentication_strategy":{"t":"null"},"cookie_expires_at":{"t":"null"},"captcha_bypass":{"t":"boolean"},"created_at":{"t":"number"},"updated_at":{"t":"number"}}}}},
+    "6d0f7bdcef73": {"t":"object","keys":{"response":{"t":"object","keys":{"object":{"t":"literal","v":"sign_up_attempt"},"id":{"t":"string"},"status":{"t":"literal","v":"missing_requirements"},"required_fields":{"t":"array","of":{"t":"string"}},"optional_fields":{"t":"array","of":{"t":"string"}},"missing_fields":{"t":"array","of":null},"unverified_fields":{"t":"array","of":{"t":"string"}},"verifications":{"t":"object","keys":{"email_address":{"t":"object","keys":{"object":{"t":"literal","v":"verification_otp"},"status":{"t":"string"},"strategy":{"t":"string"},"attempts":{"t":"number"},"expire_at":{"t":"number"},"next_action":{"t":"string"},"supported_strategies":{"t":"array","of":{"t":"string"}}}},"phone_number":{"t":"null"},"web3_wallet":{"t":"null"},"external_account":{"t":"null"}}},"username":{"t":"null"},"email_address":{"t":"string"},"phone_number":{"t":"null"},"web3_wallet":{"t":"null"},"password_enabled":{"t":"boolean"},"first_name":{"t":"null"},"last_name":{"t":"null"},"unsafe_metadata":{"t":"object","keys":{},"open":true},"public_metadata":{"t":"object","keys":{},"open":true},"custom_action":{"t":"boolean"},"external_id":{"t":"null"},"created_session_id":{"t":"null"},"created_user_id":{"t":"null"},"abandon_at":{"t":"number"},"legal_accepted_at":{"t":"null"},"locale":{"t":"null"},"timezone":{"t":"string"}}},"client":{"t":"object","keys":{"object":{"t":"literal","v":"client"},"id":{"t":"string"},"sessions":{"t":"array","of":null},"sign_in":{"t":"null"},"sign_up":{"t":"object","keys":{"object":{"t":"literal","v":"sign_up_attempt"},"id":{"t":"string"},"status":{"t":"literal","v":"missing_requirements"},"required_fields":{"t":"array","of":{"t":"string"}},"optional_fields":{"t":"array","of":{"t":"string"}},"missing_fields":{"t":"array","of":null},"unverified_fields":{"t":"array","of":{"t":"string"}},"verifications":{"t":"object","keys":{"email_address":{"t":"object","keys":{"object":{"t":"literal","v":"verification_otp"},"status":{"t":"string"},"strategy":{"t":"string"},"attempts":{"t":"number"},"expire_at":{"t":"number"},"next_action":{"t":"string"},"supported_strategies":{"t":"array","of":{"t":"string"}}}},"phone_number":{"t":"null"},"web3_wallet":{"t":"null"},"external_account":{"t":"null"}}},"username":{"t":"null"},"email_address":{"t":"string"},"phone_number":{"t":"null"},"web3_wallet":{"t":"null"},"password_enabled":{"t":"boolean"},"first_name":{"t":"null"},"last_name":{"t":"null"},"unsafe_metadata":{"t":"object","keys":{},"open":true},"public_metadata":{"t":"object","keys":{},"open":true},"custom_action":{"t":"boolean"},"external_id":{"t":"null"},"created_session_id":{"t":"null"},"created_user_id":{"t":"null"},"abandon_at":{"t":"number"},"legal_accepted_at":{"t":"null"},"locale":{"t":"null"},"timezone":{"t":"string"}}},"last_active_session_id":{"t":"null"},"last_authentication_strategy":{"t":"null"},"cookie_expires_at":{"t":"null"},"captcha_bypass":{"t":"boolean"},"created_at":{"t":"number"},"updated_at":{"t":"number"}}}}},
+    "74c3d888f83d": {"t":"object","keys":{"object":{"t":"literal","v":"organization_invitation"},"id":{"t":"string"},"email_address":{"t":"string"},"role":{"t":"literal","v":"org:member"},"role_name":{"t":"string"},"organization_id":{"t":"string"},"status":{"t":"literal","v":"pending"},"public_metadata":{"t":"object","keys":{},"open":true},"private_metadata":{"t":"object","keys":{},"open":true},"url":{"t":"string"},"expires_at":{"t":"number"},"created_at":{"t":"number"},"updated_at":{"t":"number"},"inviter_id":{"t":"string"},"public_inviter_data":{"t":"object","keys":{"user_id":{"t":"string"},"first_name":{"t":"string"},"last_name":{"t":"string"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"identifier":{"t":"string"}}}}},
+    "76f50c2dbe22": {"t":"object","keys":{"errors":{"t":"array","of":{"t":"object","keys":{"message":{"t":"string"},"long_message":{"t":"string"},"code":{"t":"literal","v":"form_identifier_exists"},"meta":{"t":"object","keys":{"param_name":{"t":"string"}}}}}},"clerk_trace_id":{"t":"string"}}},
+    "8123752ec20d": {"t":"object","keys":{"keys":{"t":"array","of":{"t":"object","keys":{"use":{"t":"literal","v":"sig"},"kty":{"t":"literal","v":"RSA"},"kid":{"t":"string"},"alg":{"t":"literal","v":"RS256"},"n":{"t":"string"},"e":{"t":"string"}}}}}},
+    "8de30c14878a": {"t":"object","keys":{"response":{"t":"object","keys":{"object":{"t":"literal","v":"sign_in_attempt"},"id":{"t":"string"},"status":{"t":"literal","v":"needs_first_factor"},"supported_identifiers":{"t":"array","of":{"t":"string"}},"supported_first_factors":{"t":"array","of":{"t":"object","keys":{"strategy":{"t":"string"},"safe_identifier":{"t":"string"},"email_address_id":{"t":"string"},"primary":{"t":"boolean"}}}},"supported_second_factors":{"t":"null"},"first_factor_verification":{"t":"object","keys":{"object":{"t":"literal","v":"verification_otp"},"status":{"t":"string"},"strategy":{"t":"string"},"attempts":{"t":"number"},"expire_at":{"t":"number"}}},"second_factor_verification":{"t":"null"},"identifier":{"t":"string"},"user_data":{"t":"object","keys":{"first_name":{"t":"null"},"last_name":{"t":"null"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"profile_image_url":{"t":"string"}}},"created_session_id":{"t":"null"},"abandon_at":{"t":"number"},"locale":{"t":"null"},"timezone":{"t":"string"},"client_trust_state":{"t":"string"}}},"client":{"t":"object","keys":{"object":{"t":"literal","v":"client"},"id":{"t":"string"},"sessions":{"t":"array","of":null},"sign_in":{"t":"object","keys":{"object":{"t":"literal","v":"sign_in_attempt"},"id":{"t":"string"},"status":{"t":"literal","v":"needs_first_factor"},"supported_identifiers":{"t":"array","of":{"t":"string"}},"supported_first_factors":{"t":"array","of":{"t":"object","keys":{"strategy":{"t":"string"},"safe_identifier":{"t":"string"},"email_address_id":{"t":"string"},"primary":{"t":"boolean"}}}},"supported_second_factors":{"t":"null"},"first_factor_verification":{"t":"object","keys":{"object":{"t":"literal","v":"verification_otp"},"status":{"t":"string"},"strategy":{"t":"string"},"attempts":{"t":"number"},"expire_at":{"t":"number"}}},"second_factor_verification":{"t":"null"},"identifier":{"t":"string"},"user_data":{"t":"object","keys":{"first_name":{"t":"null"},"last_name":{"t":"null"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"profile_image_url":{"t":"string"}}},"created_session_id":{"t":"null"},"abandon_at":{"t":"number"},"locale":{"t":"null"},"timezone":{"t":"string"},"client_trust_state":{"t":"string"}}},"sign_up":{"t":"null"},"last_active_session_id":{"t":"null"},"last_authentication_strategy":{"t":"string"},"cookie_expires_at":{"t":"null"},"captcha_bypass":{"t":"boolean"},"created_at":{"t":"number"},"updated_at":{"t":"number"}}}}},
+    "931b280a4c8c": {"t":"object","keys":{"response":{"t":"object","keys":{"object":{"t":"literal","v":"sign_in_attempt"},"id":{"t":"string"},"status":{"t":"literal","v":"needs_first_factor"},"supported_identifiers":{"t":"array","of":{"t":"string"}},"supported_first_factors":{"t":"array","of":{"t":"object","keys":{"strategy":{"t":"string"},"safe_identifier":{"t":"string"},"email_address_id":{"t":"string"},"primary":{"t":"boolean"}}}},"supported_second_factors":{"t":"null"},"first_factor_verification":{"t":"null"},"second_factor_verification":{"t":"null"},"identifier":{"t":"string"},"user_data":{"t":"object","keys":{"first_name":{"t":"null"},"last_name":{"t":"null"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"profile_image_url":{"t":"string"}}},"created_session_id":{"t":"null"},"abandon_at":{"t":"number"},"locale":{"t":"null"},"timezone":{"t":"string"},"client_trust_state":{"t":"string"}}},"client":{"t":"object","keys":{"object":{"t":"literal","v":"client"},"id":{"t":"string"},"sessions":{"t":"array","of":null},"sign_in":{"t":"object","keys":{"object":{"t":"literal","v":"sign_in_attempt"},"id":{"t":"string"},"status":{"t":"literal","v":"needs_first_factor"},"supported_identifiers":{"t":"array","of":{"t":"string"}},"supported_first_factors":{"t":"array","of":{"t":"object","keys":{"strategy":{"t":"string"},"safe_identifier":{"t":"string"},"email_address_id":{"t":"string"},"primary":{"t":"boolean"}}}},"supported_second_factors":{"t":"null"},"first_factor_verification":{"t":"null"},"second_factor_verification":{"t":"null"},"identifier":{"t":"string"},"user_data":{"t":"object","keys":{"first_name":{"t":"null"},"last_name":{"t":"null"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"profile_image_url":{"t":"string"}}},"created_session_id":{"t":"null"},"abandon_at":{"t":"number"},"locale":{"t":"null"},"timezone":{"t":"string"},"client_trust_state":{"t":"string"}}},"sign_up":{"t":"null"},"last_active_session_id":{"t":"null"},"last_authentication_strategy":{"t":"string"},"cookie_expires_at":{"t":"null"},"captcha_bypass":{"t":"boolean"},"created_at":{"t":"number"},"updated_at":{"t":"number"}}}}},
+    "94d9eecd79bd": {"t":"object","keys":{"object":{"t":"literal","v":"organization"},"id":{"t":"string"},"name":{"t":"string"},"slug":{"t":"string"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"max_allowed_memberships":{"t":"number"},"admin_delete_enabled":{"t":"boolean"},"self_serve_sso_enabled":{"t":"boolean"},"self_serve_directory_sync_enabled":{"t":"boolean"},"role_set_key":{"t":"string"},"public_metadata":{"t":"object","keys":{},"open":true},"private_metadata":{"t":"object","keys":{},"open":true},"created_by":{"t":"string"},"created_at":{"t":"number"},"updated_at":{"t":"number"},"logo_url":{"t":"null"}}},
+    "99e79841e78e": {"t":"object","keys":{"id":{"t":"string"},"object":{"t":"literal","v":"user"},"deleted":{"t":"literal","v":true},"external_id":{"t":"string"}}},
+    "9c46a583f975": {"t":"object","keys":{"response":{"t":"object","keys":{"object":{"t":"literal","v":"sign_in_attempt"},"id":{"t":"string"},"status":{"t":"literal","v":"complete"},"supported_identifiers":{"t":"array","of":{"t":"string"}},"supported_first_factors":{"t":"null"},"supported_second_factors":{"t":"null"},"first_factor_verification":{"t":"object","keys":{"object":{"t":"literal","v":"verification_otp"},"status":{"t":"string"},"strategy":{"t":"string"},"attempts":{"t":"number"},"expire_at":{"t":"number"}}},"second_factor_verification":{"t":"null"},"identifier":{"t":"string"},"user_data":{"t":"object","keys":{"first_name":{"t":"null"},"last_name":{"t":"null"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"profile_image_url":{"t":"string"}}},"created_session_id":{"t":"string"},"abandon_at":{"t":"number"},"locale":{"t":"null"},"timezone":{"t":"string"},"client_trust_state":{"t":"string"}}},"client":{"t":"object","keys":{"object":{"t":"literal","v":"client"},"id":{"t":"string"},"sessions":{"t":"array","of":{"t":"object","keys":{"object":{"t":"literal","v":"session"},"id":{"t":"string"},"status":{"t":"string"},"expire_at":{"t":"number"},"abandon_at":{"t":"number"},"last_active_at":{"t":"number"},"last_active_organization_id":{"t":"null"},"actor":{"t":"null"},"user":{"t":"object","keys":{"id":{"t":"string"},"object":{"t":"literal","v":"user"},"username":{"t":"null"},"first_name":{"t":"null"},"last_name":{"t":"null"},"locale":{"t":"null"},"timezone":{"t":"string"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"primary_email_address_id":{"t":"string"},"primary_phone_number_id":{"t":"null"},"primary_web3_wallet_id":{"t":"null"},"password_enabled":{"t":"boolean"},"two_factor_enabled":{"t":"boolean"},"totp_enabled":{"t":"boolean"},"backup_code_enabled":{"t":"boolean"},"email_addresses":{"t":"array","of":{"t":"object","keys":{"id":{"t":"string"},"object":{"t":"literal","v":"email_address"},"email_address":{"t":"string"},"reserved":{"t":"boolean"},"verification":{"t":"object","keys":{"object":{"t":"literal","v":"verification_otp"},"status":{"t":"literal","v":"verified"},"strategy":{"t":"literal","v":"email_code"},"attempts":{"t":"number"},"expire_at":{"t":"number"}}},"linked_to":{"t":"array","of":null},"matches_sso_connection":{"t":"boolean"},"created_at":{"t":"number"},"updated_at":{"t":"number"}}}},"phone_numbers":{"t":"array","of":null},"web3_wallets":{"t":"array","of":null},"passkeys":{"t":"array","of":null},"external_accounts":{"t":"array","of":null},"saml_accounts":{"t":"array","of":null},"enterprise_accounts":{"t":"array","of":null},"password_last_updated_at":{"t":"null"},"public_metadata":{"t":"object","keys":{},"open":true},"unsafe_metadata":{"t":"object","keys":{},"open":true},"external_id":{"t":"null"},"last_sign_in_at":{"t":"number"},"banned":{"t":"boolean"},"locked":{"t":"boolean"},"lockout_expires_in_seconds":{"t":"null"},"verification_attempts_remaining":{"t":"number"},"created_at":{"t":"number"},"updated_at":{"t":"number"},"delete_self_enabled":{"t":"boolean"},"bypass_client_trust":{"t":"boolean"},"create_organization_enabled":{"t":"boolean"},"last_active_at":{"t":"number"},"mfa_enabled_at":{"t":"null"},"mfa_disabled_at":{"t":"null"},"legal_accepted_at":{"t":"null"},"deprovisioned":{"t":"boolean"},"profile_image_url":{"t":"string"},"organization_memberships":{"t":"array","of":null}}},"public_user_data":{"t":"object","keys":{"first_name":{"t":"null"},"last_name":{"t":"null"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"identifier":{"t":"string"},"username":{"t":"null"},"profile_image_url":{"t":"string"}}},"factor_verification_age":{"t":"array","of":{"t":"number"}},"created_at":{"t":"number"},"updated_at":{"t":"number"},"last_active_token":{"t":"object","keys":{"object":{"t":"literal","v":"token"},"jwt":{"t":"string"}}}}}},"sign_in":{"t":"null"},"sign_up":{"t":"null"},"last_active_session_id":{"t":"string"},"last_authentication_strategy":{"t":"string"},"cookie_expires_at":{"t":"null"},"captcha_bypass":{"t":"boolean"},"created_at":{"t":"number"},"updated_at":{"t":"number"}}}}},
+    "b8a5e411f9e3": {"t":"object","keys":{"object":{"t":"literal","v":"organization"},"id":{"t":"string"},"name":{"t":"string"},"slug":{"t":"string"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"max_allowed_memberships":{"t":"number"},"admin_delete_enabled":{"t":"boolean"},"self_serve_sso_enabled":{"t":"boolean"},"self_serve_directory_sync_enabled":{"t":"boolean"},"public_metadata":{"t":"object","keys":{},"open":true},"private_metadata":{"t":"object","keys":{},"open":true},"created_by":{"t":"string"},"created_at":{"t":"number"},"updated_at":{"t":"number"},"logo_url":{"t":"null"}}},
+    "b8fe42c567f4": {"t":"object","keys":{"data":{"t":"array","of":{"t":"object","keys":{"object":{"t":"literal","v":"organization_membership"},"id":{"t":"string"},"public_metadata":{"t":"object","keys":{},"open":true},"private_metadata":{"t":"object","keys":{},"open":true},"role":{"t":"string"},"role_name":{"t":"string"},"permissions":{"t":"array","of":{"t":"string"}},"created_at":{"t":"number"},"updated_at":{"t":"number"},"organization":{"t":"object","keys":{"object":{"t":"literal","v":"organization"},"id":{"t":"string"},"name":{"t":"string"},"slug":{"t":"string"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"members_count":{"t":"number"},"pending_invitations_count":{"t":"number"},"max_allowed_memberships":{"t":"number"},"admin_delete_enabled":{"t":"boolean"},"self_serve_sso_enabled":{"t":"boolean"},"self_serve_directory_sync_enabled":{"t":"boolean"},"public_metadata":{"t":"object","keys":{},"open":true},"private_metadata":{"t":"object","keys":{},"open":true},"created_by":{"t":"string"},"created_at":{"t":"number"},"updated_at":{"t":"number"},"logo_url":{"t":"null"}}},"public_user_data":{"t":"object","keys":{"first_name":{"t":"string"},"last_name":{"t":"string"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"identifier":{"t":"string"},"username":{"t":"null"},"profile_image_url":{"t":"string"},"user_id":{"t":"string"},"banned":{"t":"boolean"},"deprovisioned":{"t":"boolean"}}}}}},"total_count":{"t":"number"}}},
+    "d4c05eb0c42d": {"t":"object","keys":{"errors":{"t":"array","of":{"t":"object","keys":{"message":{"t":"string"},"long_message":{"t":"string"},"code":{"t":"literal","v":"form_identifier_not_found"},"meta":{"t":"object","keys":{"param_name":{"t":"string"}}}}}},"meta":{"t":"object","keys":{"client":{"t":"object","keys":{"object":{"t":"literal","v":"client"},"id":{"t":"string"},"sessions":{"t":"array","of":{"t":"object","keys":{"object":{"t":"literal","v":"session"},"id":{"t":"string"},"status":{"t":"string"},"expire_at":{"t":"number"},"abandon_at":{"t":"number"},"last_active_at":{"t":"number"},"last_active_organization_id":{"t":"null"},"actor":{"t":"null"},"user":{"t":"object","keys":{"id":{"t":"string"},"object":{"t":"literal","v":"user"},"username":{"t":"null"},"first_name":{"t":"null"},"last_name":{"t":"null"},"locale":{"t":"null"},"timezone":{"t":"string"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"primary_email_address_id":{"t":"string"},"primary_phone_number_id":{"t":"null"},"primary_web3_wallet_id":{"t":"null"},"password_enabled":{"t":"boolean"},"two_factor_enabled":{"t":"boolean"},"totp_enabled":{"t":"boolean"},"backup_code_enabled":{"t":"boolean"},"email_addresses":{"t":"array","of":{"t":"object","keys":{"id":{"t":"string"},"object":{"t":"literal","v":"email_address"},"email_address":{"t":"string"},"reserved":{"t":"boolean"},"verification":{"t":"object","keys":{"object":{"t":"literal","v":"verification_otp"},"status":{"t":"literal","v":"verified"},"strategy":{"t":"literal","v":"email_code"},"attempts":{"t":"number"},"expire_at":{"t":"number"}}},"linked_to":{"t":"array","of":null},"matches_sso_connection":{"t":"boolean"},"created_at":{"t":"number"},"updated_at":{"t":"number"}}}},"phone_numbers":{"t":"array","of":null},"web3_wallets":{"t":"array","of":null},"passkeys":{"t":"array","of":null},"external_accounts":{"t":"array","of":null},"saml_accounts":{"t":"array","of":null},"enterprise_accounts":{"t":"array","of":null},"password_last_updated_at":{"t":"null"},"public_metadata":{"t":"object","keys":{},"open":true},"unsafe_metadata":{"t":"object","keys":{},"open":true},"external_id":{"t":"null"},"last_sign_in_at":{"t":"number"},"banned":{"t":"boolean"},"locked":{"t":"boolean"},"lockout_expires_in_seconds":{"t":"null"},"verification_attempts_remaining":{"t":"number"},"created_at":{"t":"number"},"updated_at":{"t":"number"},"delete_self_enabled":{"t":"boolean"},"bypass_client_trust":{"t":"boolean"},"create_organization_enabled":{"t":"boolean"},"last_active_at":{"t":"number"},"mfa_enabled_at":{"t":"null"},"mfa_disabled_at":{"t":"null"},"legal_accepted_at":{"t":"null"},"deprovisioned":{"t":"boolean"},"profile_image_url":{"t":"string"},"organization_memberships":{"t":"array","of":null}}},"public_user_data":{"t":"object","keys":{"first_name":{"t":"null"},"last_name":{"t":"null"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"identifier":{"t":"string"},"username":{"t":"null"},"profile_image_url":{"t":"string"}}},"factor_verification_age":{"t":"array","of":{"t":"number"}},"created_at":{"t":"number"},"updated_at":{"t":"number"},"last_active_token":{"t":"object","keys":{"object":{"t":"literal","v":"token"},"jwt":{"t":"string"}}}}}},"sign_in":{"t":"object","keys":{"object":{"t":"literal","v":"sign_in_attempt"},"id":{"t":"string"},"status":{"t":"literal","v":"needs_identifier"},"supported_identifiers":{"t":"array","of":{"t":"string"}},"supported_first_factors":{"t":"array","of":{"t":"object","keys":{"strategy":{"t":"string"}}}},"supported_second_factors":{"t":"null"},"first_factor_verification":{"t":"null"},"second_factor_verification":{"t":"null"},"identifier":{"t":"null"},"user_data":{"t":"null"},"created_session_id":{"t":"null"},"abandon_at":{"t":"number"},"locale":{"t":"null"},"timezone":{"t":"string"},"client_trust_state":{"t":"string"}}},"sign_up":{"t":"null"},"last_active_session_id":{"t":"string"},"last_authentication_strategy":{"t":"string"},"cookie_expires_at":{"t":"null"},"captcha_bypass":{"t":"boolean"},"created_at":{"t":"number"},"updated_at":{"t":"number"}}}}},"clerk_trace_id":{"t":"string"}}},
+    "dc1c5802814f": {"t":"object","keys":{"id":{"t":"string"},"instance_id":{"t":"string"},"client_id":{"t":"null"},"created_at":{"t":"string"},"updated_at":{"t":"string"},"home_origin":{"t":"null"},"token":{"t":"string"}}},
+    "dc98d38a3693": {"t":"object","keys":{"id":{"t":"string"},"object":{"t":"literal","v":"user"},"username":{"t":"null"},"first_name":{"t":"string"},"last_name":{"t":"string"},"locale":{"t":"null"},"timezone":{"t":"null"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"primary_email_address_id":{"t":"string"},"primary_phone_number_id":{"t":"null"},"primary_web3_wallet_id":{"t":"null"},"password_enabled":{"t":"boolean"},"two_factor_enabled":{"t":"boolean"},"totp_enabled":{"t":"boolean"},"backup_code_enabled":{"t":"boolean"},"email_addresses":{"t":"array","of":{"t":"object","keys":{"id":{"t":"string"},"object":{"t":"literal","v":"email_address"},"email_address":{"t":"string"},"reserved":{"t":"boolean"},"verification":{"t":"object","keys":{"object":{"t":"literal","v":"verification_admin"},"status":{"t":"literal","v":"verified"},"strategy":{"t":"literal","v":"admin"},"attempts":{"t":"null"},"expire_at":{"t":"null"}}},"linked_to":{"t":"array","of":null},"matches_sso_connection":{"t":"boolean"},"created_at":{"t":"number"},"updated_at":{"t":"number"}}}},"phone_numbers":{"t":"array","of":null},"web3_wallets":{"t":"array","of":null},"passkeys":{"t":"array","of":null},"external_accounts":{"t":"array","of":null},"saml_accounts":{"t":"array","of":null},"enterprise_accounts":{"t":"array","of":null},"password_last_updated_at":{"t":"number"},"public_metadata":{"t":"object","keys":{},"open":true},"private_metadata":{"t":"object","keys":{},"open":true},"unsafe_metadata":{"t":"object","keys":{},"open":true},"external_id":{"t":"string"},"last_sign_in_at":{"t":"null"},"banned":{"t":"boolean"},"locked":{"t":"boolean"},"lockout_expires_in_seconds":{"t":"null"},"verification_attempts_remaining":{"t":"number"},"created_at":{"t":"number"},"updated_at":{"t":"number"},"delete_self_enabled":{"t":"boolean"},"bypass_client_trust":{"t":"boolean"},"create_organization_enabled":{"t":"boolean"},"last_active_at":{"t":"null"},"mfa_enabled_at":{"t":"null"},"mfa_disabled_at":{"t":"null"},"legal_accepted_at":{"t":"null"},"requires_password_reset":{"t":"boolean"},"deprovisioned":{"t":"boolean"},"profile_image_url":{"t":"string"}}},
+    "e3966c155e69": {"t":"object","keys":{"object":{"t":"literal","v":"session"},"id":{"t":"string"},"client_id":{"t":"string"},"user_id":{"t":"string"},"status":{"t":"literal","v":"active"},"actor":{"t":"null"},"last_active_at":{"t":"number"},"expire_at":{"t":"number"},"abandon_at":{"t":"number"},"created_at":{"t":"number"},"updated_at":{"t":"number"}}},
+    "e6a30cf1c30f": {"t":"object","keys":{"object":{"t":"literal","v":"session"},"id":{"t":"string"},"client_id":{"t":"string"},"user_id":{"t":"string"},"status":{"t":"literal","v":"revoked"},"actor":{"t":"null"},"last_active_at":{"t":"number"},"expire_at":{"t":"number"},"abandon_at":{"t":"number"},"created_at":{"t":"number"},"updated_at":{"t":"number"}}},
+    "e8ef7aff4c91": {"t":"object","keys":{"response":{"t":"object","keys":{"object":{"t":"literal","v":"sign_up_attempt"},"id":{"t":"string"},"status":{"t":"literal","v":"complete"},"required_fields":{"t":"array","of":{"t":"string"}},"optional_fields":{"t":"array","of":{"t":"string"}},"missing_fields":{"t":"array","of":null},"unverified_fields":{"t":"array","of":null},"verifications":{"t":"object","keys":{"email_address":{"t":"object","keys":{"object":{"t":"literal","v":"verification_otp"},"status":{"t":"string"},"strategy":{"t":"string"},"attempts":{"t":"number"},"expire_at":{"t":"number"},"next_action":{"t":"string"},"supported_strategies":{"t":"array","of":{"t":"string"}}}},"phone_number":{"t":"null"},"web3_wallet":{"t":"null"},"external_account":{"t":"null"}}},"username":{"t":"null"},"email_address":{"t":"string"},"phone_number":{"t":"null"},"web3_wallet":{"t":"null"},"password_enabled":{"t":"boolean"},"first_name":{"t":"null"},"last_name":{"t":"null"},"unsafe_metadata":{"t":"object","keys":{},"open":true},"public_metadata":{"t":"object","keys":{},"open":true},"custom_action":{"t":"boolean"},"external_id":{"t":"null"},"created_session_id":{"t":"string"},"created_user_id":{"t":"string"},"abandon_at":{"t":"number"},"legal_accepted_at":{"t":"null"},"locale":{"t":"null"},"timezone":{"t":"string"}}},"client":{"t":"object","keys":{"object":{"t":"literal","v":"client"},"id":{"t":"string"},"sessions":{"t":"array","of":{"t":"object","keys":{"object":{"t":"literal","v":"session"},"id":{"t":"string"},"status":{"t":"string"},"expire_at":{"t":"number"},"abandon_at":{"t":"number"},"last_active_at":{"t":"number"},"last_active_organization_id":{"t":"null"},"actor":{"t":"null"},"user":{"t":"object","keys":{"id":{"t":"string"},"object":{"t":"literal","v":"user"},"username":{"t":"null"},"first_name":{"t":"null"},"last_name":{"t":"null"},"locale":{"t":"null"},"timezone":{"t":"string"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"primary_email_address_id":{"t":"string"},"primary_phone_number_id":{"t":"null"},"primary_web3_wallet_id":{"t":"null"},"password_enabled":{"t":"boolean"},"two_factor_enabled":{"t":"boolean"},"totp_enabled":{"t":"boolean"},"backup_code_enabled":{"t":"boolean"},"email_addresses":{"t":"array","of":{"t":"object","keys":{"id":{"t":"string"},"object":{"t":"literal","v":"email_address"},"email_address":{"t":"string"},"reserved":{"t":"boolean"},"verification":{"t":"object","keys":{"object":{"t":"literal","v":"verification_otp"},"status":{"t":"literal","v":"verified"},"strategy":{"t":"literal","v":"email_code"},"attempts":{"t":"number"},"expire_at":{"t":"number"}}},"linked_to":{"t":"array","of":null},"matches_sso_connection":{"t":"boolean"},"created_at":{"t":"number"},"updated_at":{"t":"number"}}}},"phone_numbers":{"t":"array","of":null},"web3_wallets":{"t":"array","of":null},"passkeys":{"t":"array","of":null},"external_accounts":{"t":"array","of":null},"saml_accounts":{"t":"array","of":null},"enterprise_accounts":{"t":"array","of":null},"password_last_updated_at":{"t":"null"},"public_metadata":{"t":"object","keys":{},"open":true},"unsafe_metadata":{"t":"object","keys":{},"open":true},"external_id":{"t":"null"},"last_sign_in_at":{"t":"number"},"banned":{"t":"boolean"},"locked":{"t":"boolean"},"lockout_expires_in_seconds":{"t":"null"},"verification_attempts_remaining":{"t":"number"},"created_at":{"t":"number"},"updated_at":{"t":"number"},"delete_self_enabled":{"t":"boolean"},"bypass_client_trust":{"t":"boolean"},"create_organization_enabled":{"t":"boolean"},"last_active_at":{"t":"number"},"mfa_enabled_at":{"t":"null"},"mfa_disabled_at":{"t":"null"},"legal_accepted_at":{"t":"null"},"deprovisioned":{"t":"boolean"},"profile_image_url":{"t":"string"},"organization_memberships":{"t":"array","of":null}}},"public_user_data":{"t":"object","keys":{"first_name":{"t":"null"},"last_name":{"t":"null"},"image_url":{"t":"string"},"has_image":{"t":"boolean"},"identifier":{"t":"string"},"username":{"t":"null"},"profile_image_url":{"t":"string"}}},"factor_verification_age":{"t":"array","of":{"t":"number"}},"created_at":{"t":"number"},"updated_at":{"t":"number"},"last_active_token":{"t":"object","keys":{"object":{"t":"literal","v":"token"},"jwt":{"t":"string"}}}}}},"sign_in":{"t":"null"},"sign_up":{"t":"null"},"last_active_session_id":{"t":"string"},"last_authentication_strategy":{"t":"string"},"cookie_expires_at":{"t":"null"},"captcha_bypass":{"t":"boolean"},"created_at":{"t":"number"},"updated_at":{"t":"number"}}}}},
+    "f8bd6cb6edbf": {"t":"object","keys":{"errors":{"t":"array","of":{"t":"object","keys":{"message":{"t":"string"},"long_message":{"t":"string"},"code":{"t":"literal","v":"form_param_missing"},"meta":{"t":"object","keys":{"param_name":{"t":"string"}}}}}},"clerk_trace_id":{"t":"string"}}},
+    "fa942fe092e3": {"t":"object","keys":{"response":{"t":"object","keys":{"object":{"t":"literal","v":"client"},"id":{"t":"string"},"sessions":{"t":"array","of":null},"sign_in":{"t":"null"},"sign_up":{"t":"null"},"last_active_session_id":{"t":"null"},"last_authentication_strategy":{"t":"null"},"cookie_expires_at":{"t":"null"},"captcha_bypass":{"t":"boolean"},"created_at":{"t":"number"},"updated_at":{"t":"number"}}},"client":{"t":"null"}}}
+  }
+}
