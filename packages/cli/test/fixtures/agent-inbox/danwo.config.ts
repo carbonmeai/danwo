@@ -19,7 +19,9 @@ export default defineConfig({
         authConfigs: [{ id: "ac_inboxGmail", toolkit: "gmail" }],
         webhook: { url: `http://127.0.0.1:${port}/webhooks/composio`, secret: WEBHOOK_SECRET },
       },
-      backends: [googleService({ seed: { users: [{ email: "ada@inbox.test", name: "Ada Lovelace" }] } })],
+      backends: [
+        googleService({ seed: { users: [{ email: "ada@inbox.test", name: "Ada Lovelace" }] } }),
+      ],
     })
     const env = () => ({
       ...composio.proxy.env(),

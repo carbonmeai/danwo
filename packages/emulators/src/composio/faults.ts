@@ -91,9 +91,12 @@ const EXECUTE_FAULTS = [
 
 /**
  * `danwo matrix`'s Composio faults: the full set on tool execution, rate limiting and a server
- * error on starting a connection, and plain server failures elsewhere.
+ * error on starting a connection, and plain server failures on other API calls; the hosted link
+ * and the OAuth callback the browser visits are left alone.
  */
 export function composioOutboundFaults(call: { method: string; path: string }) {
+  /* The browser's hosted link and OAuth callback are pages, not API calls an app makes. */
+  if (call.path.startsWith("/link/") || call.path.endsWith("/toolkits/auth/callback")) return []
   if (call.method === "POST" && EXECUTE.test(call.path) && !call.path.endsWith("/proxy"))
     return EXECUTE_FAULTS
   if (call.method === "POST" && CONNECT.test(call.path))

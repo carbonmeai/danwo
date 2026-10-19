@@ -56,7 +56,10 @@ test("counts a new-mail trigger only when Composio signed it", async ({
   )
 
   expect(upserted.status).toBe(200)
-  composioProject(composio).fire("GMAIL_NEW_GMAIL_MESSAGE", { subject: "Hello", sender: "bob@inbox.test" })
+  composioProject(composio).fire("GMAIL_NEW_GMAIL_MESSAGE", {
+    subject: "Hello",
+    sender: "bob@inbox.test",
+  })
   await settle()
 
   await app.open("/")

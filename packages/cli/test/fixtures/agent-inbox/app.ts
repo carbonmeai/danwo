@@ -4,7 +4,8 @@
  * counts new-mail triggers from Composio's signed webhooks. It knows nothing about danwo.
  *
  * Env: PORT, COMPOSIO_API_KEY, COMPOSIO_AUTH_CONFIG (the Gmail auth config), COMPOSIO_WEBHOOK_SECRET.
- * INBOX_BUG=no-verify counts webhooks without checking their signature: a bug to catch.
+ * INBOX_BUG=resend sends the summary again on every click, so a double-submitted form mails the
+ * team twice: a bug to catch.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
 
@@ -13,17 +14,23 @@ import { Composio } from "@composio/core"
 const port = Number(process.env["PORT"])
 const authConfig = process.env["COMPOSIO_AUTH_CONFIG"] ?? ""
 const webhookSecret = process.env["COMPOSIO_WEBHOOK_SECRET"] ?? ""
-const verify = process.env["INBOX_BUG"] !== "no-verify"
-const composio = new Composio({ apiKey: process.env["COMPOSIO_API_KEY"] ?? "", allowTracking: false })
+const once = process.env["INBOX_BUG"] !== "resend"
+const composio = new Composio({
+  apiKey: process.env["COMPOSIO_API_KEY"] ?? "",
+  allowTracking: false,
+})
 const USER = "ada"
 
 let notice = ""
 let triggers = 0
+/** The summary's send, started once; a second click waits on the first instead of sending again. */
+let sending: Promise<string> | undefined
 
 async function bodyOf(req: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = []
 
-  for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)))
+  for await (const chunk of req)
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)))
 
   return Buffer.concat(chunks).toString()
 }
@@ -58,39 +65,50 @@ async function connect(res: ServerResponse): Promise<void> {
   res.writeHead(302, { location: request.redirectUrl ?? "/" }).end()
 }
 
-async function send(res: ServerResponse): Promise<void> {
+async function sendSummary(): Promise<string> {
   try {
     const result = await composio.tools.execute("GMAIL_SEND_EMAIL", {
       userId: USER,
-      arguments: { recipient_email: "team@inbox.test", subject: "Weekly summary", body: "All good." },
+      arguments: {
+        recipient_email: "team@inbox.test",
+        subject: "Weekly summary",
+        body: "All good.",
+      },
       dangerouslySkipVersionCheck: true,
     })
 
-    notice = result.successful ? "Sent" : "Could not send, try again"
-  } catch {
-    notice = "Could not send, try again"
-  }
+    if (!result.successful) sending = undefined
 
+    return result.successful ? "Sent" : "Could not send, try again"
+  } catch {
+    sending = undefined
+
+    return "Could not send, try again"
+  }
+}
+
+async function send(res: ServerResponse): Promise<void> {
+  if (!once) sending = undefined
+  sending ??= sendSummary()
+  notice = await sending
   res.writeHead(303, { location: "/" }).end()
 }
 
 async function webhook(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const payload = await bodyOf(req)
 
-  if (verify) {
-    try {
-      await composio.triggers.verifyWebhook({
-        payload,
-        id: String(req.headers["webhook-id"] ?? ""),
-        timestamp: String(req.headers["webhook-timestamp"] ?? ""),
-        signature: String(req.headers["webhook-signature"] ?? ""),
-        secret: webhookSecret,
-      })
-    } catch {
-      res.writeHead(401).end()
+  try {
+    await composio.triggers.verifyWebhook({
+      payload,
+      id: String(req.headers["webhook-id"] ?? ""),
+      timestamp: String(req.headers["webhook-timestamp"] ?? ""),
+      signature: String(req.headers["webhook-signature"] ?? ""),
+      secret: webhookSecret,
+    })
+  } catch {
+    res.writeHead(401).end()
 
-      return
-    }
+    return
   }
 
   triggers++
