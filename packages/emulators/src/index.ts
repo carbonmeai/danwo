@@ -77,6 +77,25 @@ export {
   stableClerkId,
 } from "./clerk/index.ts"
 export {
+  connectNangoBackends,
+  NANGO_HOSTS,
+  nango,
+  type NangoActionOutput,
+  type NangoBackendName,
+  type NangoBackends,
+  type NangoCall,
+  type NangoConnection,
+  type NangoEnvironment,
+  nangoEnvironment,
+  nangoOutboundFaults,
+  type NangoProxyAnswer,
+  type NangoSeedConfig,
+  type NangoSeedConnection,
+  type NangoSeedIntegration,
+  nangoSignature,
+  seedNango,
+} from "./nango/index.ts"
+export {
   NYLAS_HOSTS,
   NYLAS_TRIGGERS,
   type NylasApplication,
