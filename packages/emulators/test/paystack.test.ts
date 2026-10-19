@@ -315,6 +315,28 @@ describe("Paystack customers, plans and subscriptions", () => {
     expect(await byEmail.json()).toMatchObject({ data: { email: "grace@shop.test" } })
   })
 
+  it("answers a create for a known email with that customer, unset details as null", async () => {
+    const first = await dataOf(
+      await call("POST", "https://api.paystack.co/customer", { email: "lin@shop.test" }),
+    )
+    const again = await dataOf(
+      await call("POST", "https://api.paystack.co/customer", {
+        email: "lin@shop.test",
+        first_name: "Lin",
+      }),
+    )
+
+    expect(first).not.toHaveProperty("last_name")
+    expect(again).toMatchObject({
+      customer_code: field(first, "customer_code"),
+      first_name: "Lin",
+      last_name: null,
+      phone: null,
+      metadata: null,
+    })
+    expect(again).not.toHaveProperty("international_format_phone")
+  })
+
   it("subscribes on paying for a plan, renews on the clock and can be disabled", async () => {
     const { authorization_url } = await initialize({ plan: "PLN_monthly" })
 

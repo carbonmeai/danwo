@@ -49,13 +49,17 @@ async function create(
   if (email === undefined || !email.includes("@"))
     return fail(c, 400, '"email" must be a valid email')
 
+  const existing =
+    context.paystack.customers.where(
+      (known) => known.email === email.toLowerCase() && known.integration === integration.number,
+    ).length > 0
   const customer = payments.customerFor(integration, email)
   const updated = context.paystack.customers.change(customer.customer_code, {
     ...detailsOf(fields),
     updatedAt: context.clock().toISOString(),
   })
 
-  return ok(c, "Customer created", updated && createdCustomerObject(updated))
+  return ok(c, "Customer created", updated && createdCustomerObject(updated, existing))
 }
 
 /** Everything the integration holds for a customer: its payments, plans, cards and accounts. */

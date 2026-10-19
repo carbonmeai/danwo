@@ -72,9 +72,10 @@ export function customerObject(input: CustomerInput): Customer {
 
 /**
  * A customer as creating one answers: no history yet, and only the details the call set, since
- * Paystack leaves out a name, phone or metadata nobody gave.
+ * Paystack leaves out a name, phone or metadata nobody gave. A create for an email the integration
+ * already has answers with that customer, unset details as `null`.
  */
-export function createdCustomerObject(customer: Customer) {
+export function createdCustomerObject(customer: Customer, existing = false) {
   const {
     first_name: first,
     last_name: last,
@@ -88,10 +89,10 @@ export function createdCustomerObject(customer: Customer) {
     transactions: [],
     subscriptions: [],
     authorizations: [],
-    ...(first !== null && { first_name: first }),
-    ...(last !== null && { last_name: last }),
-    ...(phone !== null && { phone }),
-    ...(metadata !== null && { metadata }),
+    ...((existing || first !== null) && { first_name: first }),
+    ...((existing || last !== null) && { last_name: last }),
+    ...((existing || phone !== null) && { phone }),
+    ...((existing || metadata !== null) && { metadata }),
     ...always,
     identifications: null,
   }
