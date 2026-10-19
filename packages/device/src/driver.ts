@@ -14,6 +14,8 @@ export interface DeviceDriver {
   tap(ref: string): Promise<void>
   /** Types `text` into the field with `ref`, replacing what it holds. */
   fill(ref: string, text: string): Promise<void>
+  /** Types `text` into whatever has focus, any characters; without it adb types ASCII only. */
+  type?(text: string): Promise<void>
   /** Saves a PNG of the screen; false when none could be taken. */
   screenshot(path: string): Promise<boolean>
   /** Ends the session; the device keeps running. */

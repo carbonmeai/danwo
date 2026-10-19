@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest"
 
 import { AndroidApp, parseLogcat, topActivity } from "../src/android/app.ts"
 import { androidCaFileName, subjectDer } from "../src/android/ca.ts"
+import { inputText, keyCode, swipeFor } from "../src/android/device.ts"
 import { bootArgs, useEmulator } from "../src/android/emulator.ts"
 import {
   Adb,
@@ -273,6 +274,29 @@ describe("the app", () => {
       { at: "2025-10-09T08:53:21.250Z", level: "error", text: "ReactNativeJS: checkout failed" },
       { at: "2025-10-09T08:53:22.000Z", level: "warn", text: "OkHttp: slow" },
     ])
+  })
+})
+
+describe("gestures and keys", () => {
+  it("names keys as web tests do, and takes Android's own codes", () => {
+    expect(keyCode("Enter")).toBe(66)
+    expect(keyCode("arrow-down")).toBe(20)
+    expect(keyCode("Backspace")).toBe(67)
+    expect(keyCode("187")).toBe(187)
+    expect(keyCode("Hyper")).toBeUndefined()
+  })
+
+  it("swipes across the middle half of a box, against the way the content moves", () => {
+    const box = { x: 0, y: 400, width: 800, height: 400 }
+
+    expect(swipeFor(box, "down")).toEqual([400, 700, 400, 500])
+    expect(swipeFor(box, "up")).toEqual([400, 500, 400, 700])
+    expect(swipeFor(box, "right")).toEqual([600, 600, 200, 600])
+  })
+
+  it("types text through adb with spaces and shell characters kept", () => {
+    expect(inputText("buyer@example.com")).toBe("buyer@example.com")
+    expect(inputText("a b&c's")).toBe("a%sb\\&c\\'s")
   })
 })
 

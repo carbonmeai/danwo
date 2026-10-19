@@ -15,10 +15,10 @@ import type { AppErrors, FailureMark } from "../browser/app-errors.ts"
 import type { BackendActivity } from "../browser/readiness.ts"
 import type { Tabs } from "../browser/tabs.ts"
 import type { MailDesk } from "../mail/desk.ts"
-import { type CallCost, resolveModel } from "../model/resolve.ts"
+import type { CallCost } from "../model/resolve.ts"
 import type { StepRecorder } from "../record/index.ts"
 import type { CacheNote } from "../record/steps.ts"
-import { type Params, paramText } from "../replay/params.ts"
+import type { Params } from "../replay/params.ts"
 import { type RelocationPolicy, relocates } from "../replay/policy.ts"
 import { findOrRelocate } from "../replay/relocate.ts"
 import {
@@ -32,12 +32,10 @@ import type { ReplayStore, StepKey } from "../replay/store.ts"
 import { describe } from "../replay/target.ts"
 import type { Trace } from "../replay/trace.ts"
 import type { SecretVault } from "../secrets/index.ts"
-import { DanwoError } from "../support/codes.ts"
 import { type VisionChoice, VisionDesk, visionFor, type VisionMode } from "../vision/desk.ts"
 import { SecretSpots } from "../vision/screen.ts"
-import { type Budget, type Budgets, DEFAULT_STEP_BUDGET, Spend, Spends } from "./budget.ts"
+import { type Budget, type Budgets, Spend } from "./budget.ts"
 import { type BackendMark, EffectWatch, markOf } from "./effect-watch.ts"
-import { AgentStepFailed } from "./errors.ts"
 import { extractStep } from "./extract-step.ts"
 import { ExtractFailed } from "./extract.ts"
 import type { Files } from "./files.ts"
@@ -45,13 +43,21 @@ import { judge, type JudgeContext, type Poll } from "./judge.ts"
 import { type LiveResult, runLive } from "./live.ts"
 import { missError, missOf } from "./miss.ts"
 import { JUDGE_PROMPT, WAIT_PROMPT } from "./prompts.ts"
+import {
+  compareEffects,
+  keepRecording,
+  pollOf,
+  requireModel,
+  passed,
+  stepEvents,
+  stepSpends,
+} from "./recording.ts"
 import type {
   ActOptions,
   ActResult,
   Agent,
   AssertOptions,
   ExtractOptions,
-  PollOption,
   WaitForOptions,
 } from "./types.ts"
 import { waitStep } from "./wait.ts"
@@ -64,17 +70,6 @@ function now(): string {
 /** How long `agent.waitFor` waits by default, and how often the judge looks meanwhile. */
 const DEFAULT_WAIT_MS = 30_000
 const DEFAULT_INTERVAL_MS = 1_000
-
-/** The polling an assert asked for: none, the session's defaults, or its own numbers. */
-function pollOf(option: PollOption | undefined, defaults: Poll): Poll | undefined {
-  if (option === undefined || option === false) return undefined
-  if (option === true) return defaults
-
-  return {
-    timeout: option.timeout ?? defaults.timeout,
-    interval: option.interval ?? defaults.interval,
-  }
-}
 
 /** Where a strict replay stopped following its recording. */
 export interface ReplayDivergence {
@@ -477,18 +472,8 @@ class SessionAgent implements Agent {
     }
   }
 
-  /** Compares the replay's effects with the recording's and notes how; why they differ, if they do. */
-  private async checkEffects(
-    trace: Trace,
-    watch: EffectWatch | undefined,
-  ): Promise<string | undefined> {
-    if (watch === undefined || trace.effects === undefined) return undefined
-
-    const check = await watch.compare(trace.effects)
-
-    this.options.steps.event({ kind: "effects", at: now(), ...check })
-
-    return check.result === "diverged" ? check.reason : undefined
+  private checkEffects(trace: Trace, watch: EffectWatch | undefined): Promise<string | undefined> {
+    return compareEffects(this.options.steps, trace, watch)
   }
 
   /** Records where moved elements were found, and keeps the recording pointing at them. */
@@ -566,10 +551,6 @@ class SessionAgent implements Agent {
   private async runModel(call: ActCall, mark: FailureMark | undefined): Promise<LiveResult> {
     const { steps, vault, budgets, appErrors } = this.options
     const { instruction } = call
-    const own = new Spend(
-      { ...DEFAULT_STEP_BUDGET, ...budgets?.step, ...call.budget },
-      `step "${vault.redact(instruction)}"`,
-    )
     const result = await runLive(instruction, {
       model: this.requireModel(this.options.model),
       tabs: this.options.tabs,
@@ -580,7 +561,7 @@ class SessionAgent implements Agent {
       timeout: this.options.actionTimeout,
       context: this.options.context,
       signal: this.options.signal,
-      spends: new Spends(own, this.spent),
+      spends: stepSpends(budgets, call.budget, `step "${vault.redact(instruction)}"`, this.spent),
       transcriptBudget: this.options.transcriptBudget,
       ready: this.options.ready,
       mail: this.options.mail,
@@ -588,65 +569,36 @@ class SessionAgent implements Agent {
       travel: call.time ? this.options.travel : undefined,
       ...(appErrors !== undefined &&
         mark !== undefined && { appFailure: () => appErrors.since(mark) }),
-      onModelCall: (cost) => steps.event({ kind: "model", at: now(), ...cost }),
-      onAction: (label) => steps.event({ kind: "action", at: now(), label }),
+      ...stepEvents(steps),
     })
 
-    if (result.status === "failed")
-      throw new AgentStepFailed(
-        `agent.act(${JSON.stringify(instruction)}) failed: ${this.options.vault.redact(result.summary)}`,
-      )
-
-    return result
+    return passed(result, instruction, this.options.vault.redact)
   }
 
-  /**
-   * Stages the step's actions as its recording, written once a later check confirms them, with the
-   * effects the step had when it was watched.
-   */
-  private async keep(
+  /** Stages the step's actions as its recording, written once a later check confirms them. */
+  private keep(
     key: StepKey | undefined,
     call: ActCall,
     result: LiveResult,
     seen: { readonly miss: CacheNote; readonly watch: EffectWatch | undefined },
   ): Promise<void> {
-    const { store, steps } = this.options
-    const { miss, watch } = seen
+    const { store, steps, mail, tabs, appUrl } = this.options
 
-    if (store === undefined || key === undefined || result.recorded === null || !store.writes) {
-      steps.cache(miss.mode, { ...miss, saved: false })
-
-      return
-    }
-
-    const effects = await watch?.effects(this.runValues(call.params))
-
-    store.stage(key, steps.next - 1, {
-      version: 1,
+    return keepRecording({
+      store,
+      steps,
+      key,
       instruction: call.instruction,
-      recordedAt: new Date().toISOString(),
-      actions: [...result.recorded],
-      endRoute: routeOf(this.options.tabs.page.url(), new URL(this.options.appUrl).origin),
-      ...(effects !== undefined && { effects }),
+      params: call.params,
+      mail,
+      recorded: result.recorded,
+      ...seen,
+      endRoute: () => routeOf(tabs.page.url(), new URL(appUrl).origin),
     })
-    steps.cache(miss.mode, { ...miss, saved: true })
-  }
-
-  /** Values that differ from run to run, which an effect may not hold: params and mail values. */
-  private runValues(params: Params): string[] {
-    const named = Object.keys(params).flatMap((name) => paramText(params, name) ?? [])
-
-    return [...named, ...this.options.mail.values()]
   }
 
   private requireModel(model: LanguageModel | undefined) {
-    if (model === undefined)
-      throw new DanwoError(
-        "CONFIG_INVALID",
-        "this session has no model: pass `model` to use agent.act and agent.assert",
-      )
-
-    return resolveModel(model)
+    return requireModel(model)
   }
 }
 

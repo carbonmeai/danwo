@@ -196,6 +196,11 @@ export function resolveChain(nodes: readonly DeviceNode[], chain: Chain): Device
   return run(new Tree(nodes), chain, undefined)
 }
 
+/** The name a role query compares on `node` in this reading: a field's label, else its name. */
+export function nameIn(nodes: readonly DeviceNode[], node: DeviceNode): string {
+  return nameOf(new Tree(nodes), node)
+}
+
 /** The text of `node` and everything inside it, from one reading. */
 export function textOf(nodes: readonly DeviceNode[], node: DeviceNode): string {
   return collapse(new Tree(nodes).textWithin(node))

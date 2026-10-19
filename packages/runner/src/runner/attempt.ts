@@ -425,14 +425,24 @@ function openOnDevice(setup: AttemptSetup, device: DeviceTarget, timeout: number
   return openDeviceSession(device, {
     baseUrl: env?.baseUrl ?? config.baseUrl,
     projectRoot: setup.root,
-    ...(config.secrets !== undefined && { secrets: config.secrets }),
     ...(env?.mail && { mail: env.mail }),
     ...(backend && { backend }),
     time: timeMachineOf(env),
-    ...(setup.recordDir !== undefined && { artifactsDir: setup.recordDir, stepScreenshots: true }),
     actionTimeout: Math.min(timeout, DEVICE_ACTION_MS),
-    ...(setup.checkPace && { checkPace: setup.checkPace }),
+    ...agentOptions(config),
+    ...pageOptions(config),
+    ...replayOptions(setup),
+    ...deviceAttemptOptions(setup),
   })
+}
+
+/** What this device attempt alone brings: its record folder, check pace and baselines. */
+function deviceAttemptOptions(setup: AttemptSetup) {
+  return {
+    ...(setup.recordDir !== undefined && { artifactsDir: setup.recordDir, stepScreenshots: true }),
+    ...(setup.checkPace && { checkPace: setup.checkPace }),
+    ...(setup.screenshots && { screenshots: setup.screenshots }),
+  }
 }
 
 /** How long one action on a device may wait for its element. */

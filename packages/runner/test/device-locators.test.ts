@@ -109,6 +109,10 @@ class FakeDevice implements DeviceTarget {
     this.acts.push("back")
   }
 
+  async pressKey(key: string) {
+    this.acts.push(`key ${key}`)
+  }
+
   async screenshot() {
     return false
   }
@@ -303,18 +307,33 @@ describe("acting on a device", () => {
     })
   })
 
+  it("presses keys in a field and picks an option from a picker", async () => {
+    const device = new FakeDevice()
+    const { screen } = await open(device)
+    const picker = [
+      node("p1", { role: "text", name: "Large" }),
+      node("p2", { role: "text", name: "Small" }),
+    ]
+
+    device.onTap.set("e4", () => {
+      device.screen = [...HOME, ...picker]
+    })
+    await screen.getByTestId("buy").press("Enter")
+    await screen.getByTestId("buy").selectOption("Small")
+    expect(device.acts.slice(-4)).toEqual(["tap e4", "key Enter", "tap e4", "tap p2"])
+    await expect(screen.getByTestId("buy").selectOption("Huge", { timeout: 50 })).rejects.toThrow(
+      'shows no option "Huge"',
+    )
+  })
+
   it("says plainly what Android does not support yet", async () => {
     const session = await open(new FakeDevice())
     const buy = session.screen.getByTestId("buy")
 
     for (const call of [
       () => buy.hover(),
-      () => buy.press("Enter"),
       () => buy.setInputFiles("a.png"),
       () => buy.dragTo(buy),
-      () => buy.selectOption("a"),
-      () => buy.getAttribute("href"),
-      () => session.agent.act("buy credits"),
       () => session.mail.open("a@b.c"),
       () => session.browserState(),
     ]) {
@@ -359,9 +378,12 @@ describe("expect on a device", () => {
     await expect(check(screen.getByTestId("credits")).toHaveText("Credits: 1000")).rejects.toThrow(
       'expect(getByTestId("credits")).toHaveText("Credits: 1000") failed after 300 ms\n  received: "Credits: 500"',
     )
-    await expect(check(screen.getByTestId("buy")).toHaveAttribute("href", "x")).rejects.toThrow(
-      "Android yet",
-    )
+    await check(screen.getByTestId("buy")).toHaveAttribute("data-testid", "buy")
+    await check(screen.getByTestId("buy")).toHaveAttribute("aria-label", /buy 500/i)
+    await check(screen.getByRole("switch")).toHaveAttribute("aria-checked", "false")
+    await check(screen.getByTestId("buy")).not.toHaveAttribute("href")
+    expect(await screen.getByTestId("credits").getAttribute("aria-label")).toBe("Credits: 500")
+    expect(await screen.getByTestId("credits").getAttribute("href")).toBeNull()
     check(1 + 1).toBe(2)
   })
 

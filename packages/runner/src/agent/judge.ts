@@ -197,26 +197,73 @@ function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
  * Asks the judge about `claim` until it holds or `poll` runs out; the last verdict, and the page
  * it was given on. Without `poll` it asks once.
  */
-export async function judgeUntil(
+export function judgeUntil(
   claim: string,
   context: JudgeContext,
   poll: Poll | undefined,
 ): Promise<{ readonly verdict: Verdict; readonly page: string }> {
+  return untilHolds(() => judgeNow(claim, context), poll, context.signal)
+}
+
+/** Asks `judged` again until its verdict holds or `poll` runs out; once without `poll`. */
+async function untilHolds(
+  judged: () => Promise<{ readonly verdict: Verdict; readonly page: string }>,
+  poll: Poll | undefined,
+  signal: AbortSignal | undefined,
+): Promise<{ readonly verdict: Verdict; readonly page: string }> {
   const deadline = performance.now() + (poll?.timeout ?? 0)
 
   for (;;) {
-    const judged = await judgeNow(claim, context)
+    const answer = await judged()
     const left = deadline - performance.now()
 
-    if (judged.verdict.verdict === "holds" || poll === undefined || left <= 0) return judged
+    if (answer.verdict.verdict === "holds" || poll === undefined || left <= 0) return answer
 
-    await sleep(Math.min(poll.interval, left), context.signal)
+    await sleep(Math.min(poll.interval, left), signal)
   }
 }
 
 /** Asks the judge about `claim`; resolves when it holds, throws ClaimFailed otherwise. */
 export async function judge(claim: string, context: JudgeContext, poll?: Poll): Promise<void> {
   const { verdict } = await judgeUntil(claim, context, poll)
+
+  if (verdict.verdict !== "holds")
+    throw new ClaimFailed(claim, verdict.verdict, context.redact(verdict.reason))
+}
+
+/** A judge of a screen that is not a page, such as a device's: it is shown what `see` gives. */
+export interface ScreenJudge extends JudgeCall {
+  readonly redact: (text: string) => string
+  readonly vocabulary?: string | undefined
+  /** The screen now, as the judge reads it. */
+  readonly see: () => Promise<JudgeInput["screen"]>
+}
+
+/** The verdict on `claim` for the screen `context` sees, asked until it holds or `poll` ends. */
+export function judgeScreenUntil(
+  claim: string,
+  context: ScreenJudge,
+  poll: Poll | undefined,
+): Promise<{ readonly verdict: Verdict; readonly page: string }> {
+  return untilHolds(
+    async () => {
+      const screen = await context.see()
+      const input = {
+        claim,
+        screen,
+        ...(context.vocabulary !== undefined && { vocabulary: context.vocabulary }),
+      }
+
+      return { verdict: await askJudge(input, context), page: screen.text }
+    },
+    poll,
+    context.signal,
+  )
+}
+
+/** Asks the judge about `claim` on the screen; resolves when it holds, throws otherwise. */
+export async function judgeScreen(claim: string, context: ScreenJudge, poll?: Poll): Promise<void> {
+  const { verdict } = await judgeScreenUntil(claim, context, poll)
 
   if (verdict.verdict !== "holds")
     throw new ClaimFailed(claim, verdict.verdict, context.redact(verdict.reason))

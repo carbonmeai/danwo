@@ -26,6 +26,12 @@ export interface DriverNode {
   readonly visibleToUser?: boolean
   readonly parentIndex?: number
   readonly systemBar?: string
+  readonly rect?: {
+    readonly x: number
+    readonly y: number
+    readonly width: number
+    readonly height: number
+  }
 }
 
 /** Android widget classes by the role they play, checked in order. */
@@ -88,6 +94,9 @@ function optionalFields(node: DriverNode, value: string | undefined, parent: str
     ...(node.placeholder !== undefined && { placeholder: node.placeholder }),
     ...(node.checked !== undefined && { checked: node.checked }),
     ...(parent !== undefined && { parent }),
+    ...(node.rect !== undefined && {
+      box: { x: node.rect.x, y: node.rect.y, width: node.rect.width, height: node.rect.height },
+    }),
   }
 }
 

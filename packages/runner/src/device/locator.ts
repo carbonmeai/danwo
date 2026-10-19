@@ -3,6 +3,7 @@
  * `getByText`…), resolved on the device's accessibility tree instead of a page. Each action waits
  * for exactly one match, acts on it through the device driver by ref, and records a step.
  */
+import type { ScreenshotEvent, ScreenshotSettings } from "../assert/screenshot.ts"
 import { filterCall, roleCall, shown, textCall } from "../locate/describe.ts"
 import { LocatorError } from "../locate/failure.ts"
 import type {
@@ -19,7 +20,15 @@ import type {
 import type { StepRecorder } from "../record/index.ts"
 import { isSecret, type Secret } from "../secrets/index.ts"
 import { DanwoError } from "../support/codes.ts"
-import { type Chain, type ChainLink, type DeviceQuery, resolveChain, textOf } from "./match.ts"
+import { attributeOf } from "./attributes.ts"
+import {
+  type Chain,
+  type ChainLink,
+  collapse,
+  type DeviceQuery,
+  resolveChain,
+  textOf,
+} from "./match.ts"
 import type { DeviceNode, DeviceScreenReading, DeviceTarget } from "./types.ts"
 
 /** What a device's locators work with. */
@@ -31,6 +40,12 @@ export interface DeviceContext {
   readonly assertionTimeout: number
   /** Waits for the app and the services behind it to settle after an action. */
   readonly ready: () => Promise<void>
+  /** Baselines of `toHaveScreenshot`, and where a difference's images go. */
+  readonly shots?: {
+    readonly settings: ScreenshotSettings
+    next(): number
+    note(event: ScreenshotEvent): void
+  }
   /** A check's timeout from its earlier passing runs; the given one without a pace. */
   readonly checkTimeout?: (api: string, label: string, fallback: number) => number
 }
@@ -269,8 +284,20 @@ export class DeviceLocator implements Locator {
     return unsupported("hover")
   }
 
-  press(): Promise<void> {
-    return unsupported("press")
+  /** Taps the element so it has focus, then presses `key` (`Enter`, `Tab`, `Backspace`…). */
+  press(key: string, options?: ActionOptions): Promise<void> {
+    return this.act("press", JSON.stringify(key), options, async (node) => {
+      const { target } = this.context
+
+      if (target.pressKey === undefined) {
+        await unsupported("press")
+
+        return
+      }
+
+      await target.tap(node.ref)
+      await target.pressKey(key)
+    })
   }
 
   setInputFiles(): Promise<void> {
@@ -281,8 +308,37 @@ export class DeviceLocator implements Locator {
     return unsupported("dragTo")
   }
 
-  selectOption(): Promise<void> {
-    return unsupported("selectOption")
+  /** Opens the picker and taps the option with this text; one option, as a spinner holds one. */
+  selectOption(option: string | readonly string[], options?: ActionOptions): Promise<void> {
+    const [wanted, ...more] = typeof option === "string" ? [option] : option
+
+    if (wanted === undefined || more.length > 0)
+      return Promise.reject(
+        new LocatorError("LOCATOR_FAILED", "locator.selectOption takes one option on a device"),
+      )
+
+    return this.act("selectOption", JSON.stringify(wanted), options, async (node) => {
+      const { target } = this.context
+
+      await target.tap(node.ref)
+
+      const deadline = Date.now() + this.timeout(options)
+
+      for (;;) {
+        const choice = (await target.read()).nodes.find(
+          (each) => each.ref !== node.ref && collapse(each.text || each.name) === collapse(wanted),
+        )
+
+        if (choice !== undefined) return target.tap(choice.ref)
+        if (Date.now() >= deadline)
+          throw new LocatorError(
+            "LOCATOR_NOT_FOUND",
+            `locator.selectOption: the picker of ${this.text} shows no option ${JSON.stringify(wanted)}`,
+          )
+
+        await sleep(POLL_MS)
+      }
+    })
   }
 
   async waitFor(options: WaitOptions = {}): Promise<void> {
@@ -336,8 +392,9 @@ export class DeviceLocator implements Locator {
     return node.value ?? ""
   }
 
-  getAttribute(): Promise<string | null> {
-    return unsupported("getAttribute")
+  /** An attribute by its web name (`aria-label`, `data-testid`, `aria-checked`…); see attributes.ts. */
+  async getAttribute(name: string, options?: ActionOptions): Promise<string | null> {
+    return attributeOf(await this.one("locator.getAttribute", this.timeout(options)), name)
   }
 
   async isVisible(): Promise<boolean> {

@@ -116,6 +116,10 @@ export class AgentDeviceDriver implements DeviceDriver {
     )
   }
 
+  async type(text: string): Promise<void> {
+    await this.recovering((signal) => this.session.interactions.type({ text, signal }))
+  }
+
   async screenshot(path: string): Promise<boolean> {
     try {
       await this.session.capture.screenshot({ path })

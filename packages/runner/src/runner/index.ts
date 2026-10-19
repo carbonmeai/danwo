@@ -21,12 +21,14 @@ export type {
 } from "../agent/index.ts"
 export type { ReadinessMode } from "../browser/readiness.ts"
 export type {
+  DeviceBox,
   DeviceForeground,
   DeviceLogLine,
   DeviceNode,
   DeviceScreenReading,
   DeviceStart,
   DeviceTarget,
+  ScrollDirection,
 } from "../device/types.ts"
 export {
   gmailMail,

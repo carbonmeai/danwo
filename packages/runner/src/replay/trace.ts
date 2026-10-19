@@ -74,7 +74,8 @@ const action = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("dialog"), accept: z.boolean(), input: input.optional() }),
   z.object({
     kind: z.literal("scroll"),
-    direction: z.enum(["up", "down"]).optional(),
+    /** Left and right come from devices, where lists also scroll sideways. */
+    direction: z.enum(["up", "down", "left", "right"]).optional(),
     target: target.optional(),
   }),
   /** A navigation; `mail` when the URL was a link from an email, read again on replay. */

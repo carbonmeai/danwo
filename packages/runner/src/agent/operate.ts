@@ -113,8 +113,14 @@ export async function watched(
 
 const SCROLL_PX = 600
 
-export async function scroll(page: Page, direction: "up" | "down"): Promise<void> {
-  await page.mouse.wheel(0, direction === "down" ? SCROLL_PX : -SCROLL_PX)
+export async function scroll(
+  page: Page,
+  direction: "up" | "down" | "left" | "right",
+): Promise<void> {
+  const across = { left: -SCROLL_PX, right: SCROLL_PX, up: 0, down: 0 }[direction]
+  const along = { up: -SCROLL_PX, down: SCROLL_PX, left: 0, right: 0 }[direction]
+
+  await page.mouse.wheel(across, along)
 }
 
 /** How long an action's page load is waited for before the next look at the page. */

@@ -39,7 +39,8 @@ export interface FieldSource {
   readonly as: ReadAs
 }
 
-const readInput = z.object({
+/** What a `read` call takes: each field, the element that shows it, and how to read it. */
+export const readInput = z.object({
   fields: z
     .array(
       z.object({
@@ -102,7 +103,7 @@ const NUMBER = /-?\d[\d,]*(?:\.\d+)?|-?\.\d+/
 const TRUE_WORDS = /^(?:yes|true|on|enabled|active|checked)$/i
 
 /** The number in `text`, e.g. 1234.5 from "$1,234.50"; undefined when there is none. */
-function numberIn(text: string): number | undefined {
+export function numberIn(text: string): number | undefined {
   const found = NUMBER.exec(text)?.[0]
 
   return found === undefined ? undefined : Number(found.replaceAll(",", ""))
@@ -186,10 +187,22 @@ export async function readFields<T>(
   fields: readonly { readonly path: string; readonly as: ReadAs; readonly element: Locator }[],
   schema: z.ZodType<T>,
 ): Promise<T> {
-  let root: unknown = {}
+  const values: { readonly path: string; readonly value: unknown }[] = []
 
   for (const field of fields)
-    root = withPath(root, pathKeys(field.path), await readElement(field.element, field.as))
+    values.push({ path: field.path, value: await readElement(field.element, field.as) })
+
+  return assembleFields(values, schema)
+}
+
+/** The result `values` make, each put at its path, checked against `schema`. */
+export function assembleFields<T>(
+  values: readonly { readonly path: string; readonly value: unknown }[],
+  schema: z.ZodType<T>,
+): T {
+  let root: unknown = {}
+
+  for (const field of values) root = withPath(root, pathKeys(field.path), field.value)
 
   const parsed = schema.safeParse(root)
 

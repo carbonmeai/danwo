@@ -7,10 +7,12 @@ import { join } from "node:path"
 
 import type { Proxy } from "@danwo/proxy"
 import type {
+  DeviceBox,
   DeviceForeground,
   DeviceScreenReading,
   DeviceStart,
   DeviceTarget,
+  ScrollDirection,
 } from "@danwo/runner/runner"
 
 import type { Exec } from "../adb.ts"
@@ -46,6 +48,60 @@ const READ_RETRY_MS = 5_000
 const READ_PAUSE_MS = 250
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/** Android key codes by the names tests and the agent use (web key names, mostly). */
+const KEY_CODES: Readonly<Record<string, number>> = {
+  enter: 66,
+  tab: 61,
+  backspace: 67,
+  delete: 112,
+  escape: 111,
+  back: 4,
+  home: 3,
+  space: 62,
+  arrowup: 19,
+  arrowdown: 20,
+  arrowleft: 21,
+  arrowright: 22,
+  pageup: 92,
+  pagedown: 93,
+  search: 84,
+  menu: 82,
+}
+
+/** The key code of `key`, by name (any case) or as a number; undefined for an unknown name. */
+export function keyCode(key: string): number | undefined {
+  if (/^\d+$/.test(key)) return Number(key)
+
+  return KEY_CODES[key.toLowerCase().replaceAll(/[\s_-]/g, "")]
+}
+
+/** How long a scroll's swipe takes: slow enough not to fling the list past what it shows. */
+const SWIPE_MS = 350
+
+/**
+ * The swipe that scrolls `box` to show more `direction`: the finger runs across the middle half of
+ * the box, the other way.
+ */
+export function swipeFor(box: DeviceBox, direction: ScrollDirection): readonly number[] {
+  const x = Math.round(box.x + box.width / 2)
+  const y = Math.round(box.y + box.height / 2)
+  const dx = Math.round(box.width / 4)
+  const dy = Math.round(box.height / 4)
+  const moves: Record<ScrollDirection, readonly number[]> = {
+    down: [x, y + dy, x, y - dy],
+    up: [x, y - dy, x, y + dy],
+    right: [x + dx, y, x - dx, y],
+    left: [x - dx, y, x + dx, y],
+  }
+
+  return moves[direction]
+}
+
+/** `text` as `adb shell input text` takes it: spaces as %s, the shell's own characters escaped. */
+export function inputText(text: string): string {
+  return text.replaceAll(/[\\'"`$&|;<>()*?#~!{}[\]]/g, (char) => `\\${char}`).replaceAll(" ", "%s")
+}
 
 /** The page a browser in front shows: the newest document the browser fetched through the proxy. */
 function browserPage(proxy: AndroidDeviceOptions["proxy"]): string | undefined {
@@ -145,6 +201,38 @@ export class AndroidDevice implements DeviceTarget {
 
   back(): Promise<void> {
     return this.application.back()
+  }
+
+  async scroll(direction: ScrollDirection, within?: DeviceBox): Promise<void> {
+    const box = within ?? (await this.screenBox())
+
+    await this.emulator.adb.shell(`input swipe ${swipeFor(box, direction).join(" ")} ${SWIPE_MS}`)
+  }
+
+  async pressKey(key: string): Promise<void> {
+    const code = keyCode(key)
+
+    if (code === undefined) throw new Error(`no Android key is called ${JSON.stringify(key)}`)
+
+    await this.emulator.adb.shell(`input keyevent ${code}`)
+  }
+
+  async tapAt(x: number, y: number): Promise<void> {
+    await this.emulator.adb.shell(`input tap ${Math.round(x)} ${Math.round(y)}`)
+  }
+
+  async typeText(text: string): Promise<void> {
+    if (this.driver.type !== undefined) return this.driver.type(text)
+
+    await this.emulator.adb.shell(`input text ${inputText(text)}`)
+  }
+
+  /** The whole screen, from `wm size` (the override when one is set). */
+  private async screenBox(): Promise<DeviceBox> {
+    const size = await this.emulator.adb.shell("wm size")
+    const [width, height] = (/(\d+)x(\d+)\s*$/.exec(size) ?? []).slice(1).map(Number)
+
+    return { x: 0, y: 0, width: width ?? 1080, height: height ?? 2220 }
   }
 
   /**

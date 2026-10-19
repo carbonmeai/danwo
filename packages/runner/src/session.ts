@@ -222,7 +222,7 @@ function effectsOf(setting: EffectsSetting | undefined) {
 }
 
 /** The agent's effect settings and where it reads the backend's history from. */
-function effectsOptions(options: {
+export function effectsOptions(options: {
   readonly effects?: EffectsSetting
   readonly backend?: Backend
 }) {

@@ -114,6 +114,40 @@ const descriptions: Record<ToolName, string> = {
   done: "End the step: `passed` once the instruction is carried out, `failed` when it cannot be. Say why in `summary`.",
 }
 
+/** A call of one of the tools `Schemas` describes (every tool but `done`), with its input. */
+export type CallOf<Schemas extends Readonly<Record<string, z.ZodType>>> = {
+  [Name in Exclude<keyof Schemas & string, "done">]: {
+    readonly name: Name
+    readonly input: z.infer<Schemas[Name]>
+  }
+}[Exclude<keyof Schemas & string, "done">]
+
+/**
+ * A raw tool call parsed against `schemas` (one per tool), or what was wrong with it in words the
+ * model can act on; `done` and unknown tools are problems too.
+ */
+export function parseToolCall<Schemas extends Readonly<Record<string, z.ZodType>>>(
+  schemas: Schemas,
+  name: string,
+  input: unknown,
+): { readonly call: CallOf<Schemas> } | { readonly problem: string } {
+  const schema = name === "done" || !Object.hasOwn(schemas, name) ? undefined : schemas[name]
+
+  if (schema === undefined) return { problem: `there is no tool "${name}"` }
+
+  const parsed = schema.safeParse(input)
+
+  if (!parsed.success)
+    return {
+      problem: parsed.error.issues
+        .map((issue) => `${issue.path.join(".") || "input"}: ${issue.message}`)
+        .join("; "),
+    }
+
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- schemas[name] parses that tool's input; TypeScript can't correlate a key with its schema's output
+  return { call: { name, input: parsed.data } as CallOf<Schemas> }
+}
+
 /** One tool as the model is offered it. */
 function offer<Input>(name: ToolName, inputSchema: z.ZodType<Input>) {
   return tool({ description: descriptions[name], inputSchema, outputSchema: outcome })

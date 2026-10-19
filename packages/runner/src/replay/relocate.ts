@@ -101,14 +101,22 @@ async function bestCandidate(
     scored.push({ ref: candidate.ref, score: score(target, candidate, testId) })
   }
 
-  scored.sort((a, b) => b.score - a.score)
+  return clearWinner(scored)?.ref
+}
 
-  const [best, next] = scored
+/**
+ * The best-scoring candidate when it scores well and clearly beats the next; undefined when none
+ * does, so a move is taken only when it is plain.
+ */
+export function clearWinner<Candidate extends { readonly score: number }>(
+  scored: readonly Candidate[],
+): Candidate | undefined {
+  const [best, next] = scored.toSorted((a, b) => b.score - a.score)
 
   if (best === undefined || best.score < ACCEPT) return undefined
   if (next !== undefined && best.score - next.score < MARGIN) return undefined
 
-  return best.ref
+  return best
 }
 
 /** The element `target` moved to, with a description of it where it is now; undefined if unclear. */

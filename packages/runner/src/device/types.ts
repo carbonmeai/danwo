@@ -26,7 +26,20 @@ export interface DeviceNode {
   readonly checked?: boolean
   /** The ref of the element that contains this one. */
   readonly parent?: string
+  /** Where it is on the screen, in screenshot pixels. */
+  readonly box?: DeviceBox
 }
+
+/** A rectangle on the screen, in screenshot pixels. */
+export interface DeviceBox {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+}
+
+/** A way to swipe: the direction the finger moves is the opposite of where the content goes. */
+export type ScrollDirection = "up" | "down" | "left" | "right"
 
 /** What is in front on the device. */
 export interface DeviceForeground {
@@ -78,6 +91,17 @@ export interface DeviceTarget {
   fill(ref: string, text: string): Promise<void>
   /** Presses the device's Back button. */
   back(): Promise<void>
+  /**
+   * Scrolls the screen (or the part of it in `within`, a list's box) to show what is further
+   * `direction`: `down` swipes the finger up, as a person scrolls a list down.
+   */
+  scroll?(direction: ScrollDirection, within?: DeviceBox): Promise<void>
+  /** Presses a key by its name: `Enter`, `Tab`, `Backspace`, `Escape`, `Home`, `ArrowDown`… */
+  pressKey?(key: string): Promise<void>
+  /** Taps a point of the screen, in screenshot pixels. */
+  tapAt?(x: number, y: number): Promise<void>
+  /** Types `text` into whatever has focus. */
+  typeText?(text: string): Promise<void>
   /** Saves a PNG of the screen to `path`; false when none could be taken. */
   screenshot(path: string): Promise<boolean>
   /** The app's log lines since the last call, oldest first. */

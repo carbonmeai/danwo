@@ -7,9 +7,10 @@ import { type Expect, expect as valueExpect } from "../assert/expect.ts"
 import type { AssertOptions, LocatorAssertions } from "../assert/matchers.ts"
 import { shown } from "../locate/describe.ts"
 import type { TextMatch } from "../locate/types.ts"
-import { DanwoError } from "../support/codes.ts"
+import { attributeOf } from "./attributes.ts"
 import { DeviceLocator } from "./locator.ts"
 import { collapse, textOf } from "./match.ts"
+import { deviceScreenshot } from "./screenshot.ts"
 import type { DeviceNode } from "./types.ts"
 
 /** What one reading says about a check. */
@@ -92,6 +93,15 @@ const judges = {
       pass: whole(collapse(node.value ?? ""), expected),
       received: JSON.stringify(node.value ?? ""),
     })),
+  attribute: (name: string, expected: TextMatch | undefined) =>
+    onSingle(({ node }) => {
+      const value = attributeOf(node, name)
+
+      return {
+        pass: value !== null && (expected === undefined || whole(collapse(value), expected)),
+        received: value === null ? "no such attribute" : JSON.stringify(value),
+      }
+    }),
   count:
     (expected: number): Judge =>
     (_, matched) => ({
@@ -122,12 +132,6 @@ async function hold(
   }
 
   throw new CheckFailed(`${call} failed after ${timeout} ms\n  received: ${last.received}`)
-}
-
-function unsupported(name: string): Promise<never> {
-  return Promise.reject(
-    new DanwoError("CONFIG_INVALID", `expect(...).${name} is not supported on Android yet`),
-  )
 }
 
 /** The checks on a device locator; `negate` flips each one. */
@@ -172,8 +176,20 @@ function deviceAssertions(locator: DeviceLocator, negate = false): LocatorAssert
       check("toHaveValue", shown(expected), judges.value(expected), options),
     toHaveCount: (expected, options) =>
       check("toHaveCount", String(expected), judges.count(expected), options),
-    toHaveAttribute: () => unsupported("toHaveAttribute"),
-    toHaveScreenshot: () => unsupported("toHaveScreenshot"),
+    toHaveAttribute: (name, expected, options) =>
+      check(
+        "toHaveAttribute",
+        expected === undefined
+          ? JSON.stringify(name)
+          : `${JSON.stringify(name)}, ${shown(expected)}`,
+        judges.attribute(name, expected),
+        options,
+      ),
+    toHaveScreenshot: (name, options) => {
+      if (negate) throw new TypeError("expect(...).not.toHaveScreenshot is not supported")
+
+      return deviceScreenshot(locator, name, options)
+    },
   }
 }
 

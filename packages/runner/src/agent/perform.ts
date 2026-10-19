@@ -24,7 +24,7 @@ import {
   typeAt,
   type VisionPerformContext,
 } from "./perform-vision.ts"
-import { type ToolInput, toolInputs, type ToolName } from "./tools.ts"
+import { parseToolCall, type ToolInput, toolInputs, type ToolName } from "./tools.ts"
 
 export interface PerformContext {
   readonly tabs: Tabs
@@ -68,31 +68,12 @@ type CallOf<Names extends ActionName> = {
 /** A tool call the agent made, parsed. */
 export type Call = CallOf<ActionName>
 
-function isActionName(name: string): name is ActionName {
-  return name !== "done" && Object.hasOwn(toolInputs, name)
-}
-
 /** A parsed tool call, or what was wrong with it in words the model can act on. */
 export type ParsedCall = { readonly call: Call } | { readonly problem: string }
 
-/** Parses `input` against the named tool's schema. */
-function parseAs(name: ActionName, input: unknown): ParsedCall {
-  const parsed = toolInputs[name].safeParse(input)
-
-  if (!parsed.success)
-    return {
-      problem: parsed.error.issues
-        .map((issue) => `${issue.path.join(".") || "input"}: ${issue.message}`)
-        .join("; "),
-    }
-
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- toolInputs[name] parses ToolInput<Name>; TypeScript can't correlate a generic key with its schema's output
-  return { call: { name, input: parsed.data } as Call }
-}
-
 /** Parses a raw tool call; `done` and unknown tools are problems too. */
 export function parseCall(name: string, input: unknown): ParsedCall {
-  return isActionName(name) ? parseAs(name, input) : { problem: `there is no tool "${name}"` }
+  return parseToolCall(toolInputs, name, input)
 }
 
 /** What the model is told happened besides the action itself. */

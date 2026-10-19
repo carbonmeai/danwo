@@ -29,8 +29,14 @@ const SETTLE_MS = 3_000
 const POLL_MS = 150
 
 /** Where a step's effects are read from, for the whole session. */
-export interface EffectSources {
-  readonly tabs: Tabs
+export type EffectSources = EffectCommon &
+  (
+    | { readonly tabs: Tabs }
+    /** A screen that is not a page (a device's), as a view's lines. */
+    | { readonly tree: () => Promise<string> }
+  )
+
+interface EffectCommon {
   readonly redact: (text: string) => string
   /** The backend's history so far; without it only page effects are compared. */
   readonly activity?: () => BackendActivity
@@ -103,7 +109,12 @@ export class EffectWatch {
   }
 
   private static async page(sources: EffectSources): Promise<string[]> {
-    return pageDescriptions((await viewPage(sources.tabs.page, sources.redact)).tree)
+    const tree =
+      "tree" in sources
+        ? await sources.tree()
+        : (await viewPage(sources.tabs.page, sources.redact)).tree
+
+    return pageDescriptions(tree)
   }
 
   private now(): BackendActivity {

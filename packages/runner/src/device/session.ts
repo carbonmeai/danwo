@@ -6,9 +6,9 @@
  * screen at failure.
  */
 import { mkdir, writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import { tmpdir } from "node:os"
+import { join, resolve as resolvePath } from "node:path"
 
-import type { Agent } from "../agent/index.ts"
 import type { CheckPace } from "../assert/pace.ts"
 import type { Backend } from "../browser/readiness.ts"
 import type { SessionFlight } from "../flight.ts"
@@ -17,16 +17,44 @@ import { MailDesk } from "../mail/desk.ts"
 import type { MailSource } from "../mail/index.ts"
 import type { FailureEvidence } from "../record/index.ts"
 import { StepRecorder } from "../record/index.ts"
+import { ReplayStore } from "../replay/index.ts"
+import { relocationOf } from "../replay/policy.ts"
 import { redactCredentials, SecretVault, type SessionSecret } from "../secrets/index.ts"
-import { pacer, type SessionMail, type WebSession } from "../session.ts"
+import {
+  effectsOptions,
+  pacer,
+  type SessionMail,
+  type WebSession,
+  type WebSessionOptions,
+} from "../session.ts"
 import { DanwoError } from "../support/codes.ts"
 import { sessionTime, type TimeMachine, timeMachineOf } from "../time/index.ts"
+import { visionModelOf, visionModeOf } from "../vision/desk.ts"
+import { createDeviceAgent } from "./agent/agent.ts"
 import { deviceExpect } from "./expect.ts"
 import { type DeviceContext, DeviceReader, deviceScreen } from "./locator.ts"
 import type { DeviceForeground, DeviceNode, DeviceScreenReading, DeviceTarget } from "./types.ts"
 
+/** The agent's settings, as a web session takes them. */
+type AgentSettings = Pick<
+  WebSessionOptions,
+  | "model"
+  | "judge"
+  | "judgeScreenshot"
+  | "vision"
+  | "budget"
+  | "transcriptBudget"
+  | "agentContext"
+  | "cache"
+  | "replay"
+  | "relocate"
+  | "relocation"
+  | "effects"
+  | "screenshots"
+>
+
 /** Options of `openDeviceSession`. */
-export interface DeviceSessionOptions {
+export interface DeviceSessionOptions extends AgentSettings {
   /** The app's backend, for invariants that read the app's own state (`app.baseUrl`). */
   readonly baseUrl?: string | undefined
   readonly projectRoot: string
@@ -102,18 +130,59 @@ function screenText(reading: DeviceScreenReading, front: DeviceForeground): stri
   return [header.trim(), ...lines].join("\n")
 }
 
-function refuseAgent(): Promise<never> {
-  return Promise.reject(
-    new DanwoError(
-      "CONFIG_INVALID",
-      "the agent is not available on Android yet; use screen locators",
-    ),
-  )
+/** The session's `toHaveScreenshot` baselines, and where a difference's images are kept. */
+function shotsOf(
+  options: DeviceSessionOptions,
+  steps: StepRecorder,
+): NonNullable<DeviceContext["shots"]> {
+  let count = 0
+
+  return {
+    settings: {
+      dir: resolvePath(options.projectRoot, options.screenshots?.dir ?? "__screenshots__"),
+      update: options.screenshots?.update ?? "missing",
+      artifactsDir: options.artifactsDir ?? join(tmpdir(), "danwo-device-shots"),
+    },
+    next: () => ++count,
+    note: (event) => steps.event(event),
+  }
 }
 
-/** The agent is web-only for now: every call says so. */
-function webOnlyAgent(): Agent {
-  return { act: refuseAgent, extract: refuseAgent, assert: refuseAgent, waitFor: refuseAgent }
+/** The agent's settings as the session's options give them. */
+function agentSettings(options: DeviceSessionOptions) {
+  return {
+    strict: options.replay?.mode === "strict-stop",
+    relocation: relocationOf(options),
+    model: options.model,
+    judge: options.judge,
+    context: options.agentContext,
+    ...(options.judgeScreenshot !== undefined && { judgeScreenshot: options.judgeScreenshot }),
+    ...(options.budget !== undefined && { budgets: options.budget }),
+    ...(options.transcriptBudget !== undefined && { transcriptBudget: options.transcriptBudget }),
+    ...effectsOptions(options),
+    vision: {
+      mode: visionModeOf(options.vision, options.model),
+      model: visionModelOf(options.vision),
+    },
+  }
+}
+
+/** Where the session's recordings live, keyed by the app's package unless told otherwise. */
+function deviceStore(target: DeviceTarget, options: DeviceSessionOptions): ReplayStore | undefined {
+  const { cache } = options
+
+  if (options.replay && !cache)
+    throw new Error("openDeviceSession: `replay` needs `cache`, the recordings to replay")
+  if (cache === undefined) return undefined
+
+  return new ReplayStore({
+    dir: cache.dir,
+    mode: options.replay ? "read-only" : cache.mode,
+    projectId: cache.projectId ?? "danwo",
+    journey: cache.journey ?? "journey",
+    appIdentity: cache.appIdentity ?? `android:${target.app}`,
+    policy: relocationOf(options),
+  })
 }
 
 /** The flight recorder's side of a device session. */
@@ -237,8 +306,24 @@ export async function openDeviceSession(
     assertionTimeout: options.assertionTimeout ?? DEFAULT_ASSERTION_MS,
     ready,
     ...(options.checkPace && { checkTimeout: pacer(options.checkPace, steps, vault.redact) }),
+    shots: shotsOf(options, steps),
   }
   const flight = deviceFlight(target, reader, steps, vault, options)
+  const store = deviceStore(target, options)
+  const desk = new MailDesk(options.mail ?? [])
+  const stopped = new AbortController()
+  const agent = createDeviceAgent({
+    target,
+    steps,
+    vault,
+    store,
+    actionTimeout: context.actionTimeout,
+    assertionTimeout: context.assertionTimeout,
+    signal: stopped.signal,
+    ready,
+    mail: desk,
+    ...agentSettings(options),
+  })
 
   onStep = (index) => flight.onStep(index)
 
@@ -265,7 +350,7 @@ export async function openDeviceSession(
     platform: "android",
     screen: deviceScreen(context, reader),
     expect: deviceExpect,
-    agent: webOnlyAgent(),
+    agent,
     app: {
       baseUrl: options.baseUrl ?? "",
       open: (path) =>
@@ -278,9 +363,9 @@ export async function openDeviceSession(
           await ready()
         }),
     },
-    divergence: () => undefined,
+    divergence: () => agent.diverged(),
     secret: (name) => vault.handle(name),
-    mail: deviceMail(new MailDesk(options.mail ?? []), context.actionTimeout),
+    mail: deviceMail(desk, context.actionTimeout),
     flight,
     browserState: () =>
       Promise.reject(
@@ -294,7 +379,11 @@ export async function openDeviceSession(
       ready,
     ),
     async close() {
+      /* A recording is written only once a later check confirmed what its step did. */
+      await store?.settle((step) => steps.verifiedAfter(step))
       await flight.settle()
+      stopped.abort()
+      await agent.eyes.close()
     },
   }
 }
