@@ -77,6 +77,24 @@ export {
   stableClerkId,
 } from "./clerk/index.ts"
 export {
+  NYLAS_HOSTS,
+  NYLAS_TRIGGERS,
+  type NylasApplication,
+  nylas,
+  nylasApplication,
+  type NylasEvent,
+  type NylasGrant,
+  type NylasMessage,
+  nylasOutboundFaults,
+  type NylasSeedConfig,
+  type NylasSeedEvent,
+  type NylasSeedGrant,
+  type NylasSeedMessage,
+  nylasSignature,
+  type NylasTrigger,
+  seedNylas,
+} from "./nylas/index.ts"
+export {
   COMPOSIO_HOSTS,
   COMPOSIO_OAUTH_CALLBACK,
   type ComposioAccountView,
