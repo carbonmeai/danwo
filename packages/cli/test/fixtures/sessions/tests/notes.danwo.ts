@@ -8,7 +8,12 @@ async function statsOf(baseUrl: string) {
   return Stats.parse(await (await fetch(`${baseUrl}/stats`)).json())
 }
 
-test.use({ session: "ada" })
+/*
+ * These tests are about what carries from one test to the next (a kept sign-in, the app ending
+ * every session), and the environment can only reset by restarting the app, so they share the
+ * file's state rather than starting each from a fresh app.
+ */
+test.use({ session: "ada", isolation: "file" })
 
 test("saves a note", async ({ app, screen, expect }) => {
   await app.open("/notes")
