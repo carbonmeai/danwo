@@ -5,6 +5,9 @@ import { newUser } from "./entities.ts"
 import { clerkId } from "./helpers.ts"
 import type { AttemptRecord } from "./store.ts"
 
+/** The timezone a browser sign-up and its attempts record when the browser names none. */
+export const BROWSER_TIMEZONE = "UTC"
+
 /** How many wrong codes an attempt takes before it must start over. */
 export const MAX_CODE_TRIES = 3
 
@@ -119,6 +122,8 @@ export function createSignedUpUser(context: ClerkContext, attempt: AttemptRecord
       firstName: attempt.first_name,
       lastName: attempt.last_name,
       hasPassword: attempt.password !== null,
+      emailStrategy: "email_code",
+      timezone: BROWSER_TIMEZONE,
     },
     now(context),
   )

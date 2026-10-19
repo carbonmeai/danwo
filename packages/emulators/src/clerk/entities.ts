@@ -43,17 +43,19 @@ export type ClerkUser = Omit<
  * (`admin`) or verified by a code.
  */
 export function verifiedEmail(address: string, at: number, strategy = "admin"): ClerkEmail {
+  const byCode = strategy === "email_code"
+
   return {
     object: "email_address",
     id: clerkId("idn"),
     email_address: address,
     reserved: false,
     verification: {
-      object: `verification_${strategy}`,
+      object: byCode ? "verification_otp" : `verification_${strategy}`,
       status: "verified",
       strategy,
-      attempts: null,
-      expire_at: null,
+      attempts: byCode ? 1 : null,
+      expire_at: byCode ? at + EMAIL_CODE_LIFETIME_MS : null,
     },
     linked_to: [],
     matches_sso_connection: false,
@@ -72,6 +74,9 @@ export type ClerkOrganization = OrganizationJSON & {
   logo_url: string | null
 }
 
+/** How long an emailed code stays good: ten minutes, the expiry a code verification records. */
+const EMAIL_CODE_LIFETIME_MS = 10 * 60 * 1000
+
 /** The fields a user is created with; the rest start empty. */
 export interface NewUser {
   readonly emails: readonly string[]
@@ -83,6 +88,10 @@ export interface NewUser {
   readonly publicMetadata?: Record<string, unknown> | undefined
   readonly privateMetadata?: Record<string, unknown> | undefined
   readonly unsafeMetadata?: Record<string, unknown> | undefined
+  /** How the email addresses were verified: `admin` (the Backend API) unless a code did it. */
+  readonly emailStrategy?: string | undefined
+  /** The user's timezone; a browser sign-up records one. */
+  readonly timezone?: string | undefined
 }
 
 /** A user's name parts, null when not given. */
@@ -143,7 +152,7 @@ const FRESH = {
 
 /** A new user record at `at` (milliseconds). */
 export function newUser(fields: NewUser, at: number): ClerkUser {
-  const emails = fields.emails.map((address) => verifiedEmail(address, at))
+  const emails = fields.emails.map((address) => verifiedEmail(address, at, fields.emailStrategy))
 
   return {
     object: "user",
@@ -152,6 +161,7 @@ export function newUser(fields: NewUser, at: number): ClerkUser {
     ...names(fields),
     ...metadata(fields),
     primary_email_address_id: emails[0]?.id ?? null,
+    timezone: fields.timezone ?? null,
     password_enabled: fields.hasPassword,
     password_last_updated_at: fields.hasPassword ? at : null,
     email_addresses: emails,

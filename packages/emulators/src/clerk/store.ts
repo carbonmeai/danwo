@@ -38,6 +38,8 @@ export interface ClientRecord {
   last_active_session_id: string | null
   sign_in_id: string | null
   sign_up_id: string | null
+  /** The strategy the client last signed in or up with, such as `email_code`. */
+  last_authentication_strategy: string | null
   created_at: number
   updated_at: number
 }

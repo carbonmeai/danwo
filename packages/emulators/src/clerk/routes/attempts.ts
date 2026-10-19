@@ -60,6 +60,10 @@ function complete(
 ): AttemptRecord {
   const session = startSession(context, currentClient(context, request), userId)
 
+  context.clerk.clients.change(request.client.id, {
+    last_authentication_strategy: attempt.strategy,
+  })
+
   return (
     context.clerk.attempts.change(attempt.id, {
       status: "complete",
@@ -126,8 +130,20 @@ async function createSignIn(c: Context, context: ClerkContext): Promise<Response
   const identifier = str(body.identifier) ?? ""
   const user = userByEmail(context, identifier)
 
-  if (!user)
+  if (!user) {
+    /* Clerk keeps the failed sign-in on the client, waiting for an identifier it knows. */
+    const unknown = newAttempt(context, "sign_in", {
+      clientId: request.client.id,
+      identifier: "",
+      userId: null,
+      password: null,
+    })
+
+    context.clerk.attempts.change(unknown.id, { status: "needs_identifier" })
+    track(context, request, unknown)
+
     throw formError("form_identifier_not_found", "identifier", "Couldn't find your account.")
+  }
   if (user.banned)
     throw new ClerkFailure(
       403,

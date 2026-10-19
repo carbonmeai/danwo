@@ -1,10 +1,15 @@
-import { CODE_LIFETIME_MS, MAX_CODE_TRIES } from "./attempts.ts"
+import { BROWSER_TIMEZONE, CODE_LIFETIME_MS, MAX_CODE_TRIES } from "./attempts.ts"
 import { type ClerkContext, instanceOf } from "./context.ts"
 import type { ClerkUser } from "./entities.ts"
 import type { AttemptRecord } from "./store.ts"
 
 /** How long an unfinished attempt is kept: a day. */
 const ABANDON_AFTER_MS = 24 * 60 * 60 * 1000
+
+/** A verification's `object`: `verification_otp` for an emailed code, else named for its strategy. */
+export function verificationObject(strategy: string): string {
+  return strategy === "email_code" ? "verification_otp" : `verification_${strategy}`
+}
 
 /** The verification of the factor an attempt is working on, or null before one is chosen. */
 function verificationOf(attempt: AttemptRecord) {
@@ -13,14 +18,11 @@ function verificationOf(attempt: AttemptRecord) {
   const done = attempt.status === "complete"
 
   return {
-    object: "verification" as const,
-    id: "",
+    object: verificationObject(attempt.strategy),
     status: done ? "verified" : attempt.attempts >= MAX_CODE_TRIES ? "failed" : "unverified",
     strategy: attempt.strategy,
     attempts: attempt.attempts,
     expire_at: attempt.code_sent_at === null ? null : attempt.code_sent_at + CODE_LIFETIME_MS,
-    verified_at_client: null,
-    error: null,
   }
 }
 
@@ -51,27 +53,32 @@ function firstFactors(context: ClerkContext, user: ClerkUser | undefined) {
 export function signInJson(context: ClerkContext, attempt: AttemptRecord) {
   const user = attempt.user_id === null ? undefined : context.clerk.users.get(attempt.user_id)
 
+  const done = attempt.status === "complete"
+
   return {
-    object: "sign_in",
+    object: "sign_in_attempt",
     id: attempt.id,
     status: attempt.status,
     supported_identifiers: ["email_address"],
-    identifier: attempt.identifier,
+    identifier: attempt.identifier === "" ? null : attempt.identifier,
     user_data: user
       ? {
-          ...(user.first_name !== null && { first_name: user.first_name }),
-          ...(user.last_name !== null && { last_name: user.last_name }),
+          first_name: user.first_name,
+          last_name: user.last_name,
           image_url: user.image_url,
           has_image: user.has_image,
+          profile_image_url: user.profile_image_url,
         }
       : null,
-    supported_first_factors: firstFactors(context, user),
-    supported_second_factors: [],
+    supported_first_factors: done ? null : firstFactors(context, user),
+    supported_second_factors: null,
     first_factor_verification: verificationOf(attempt),
     second_factor_verification: null,
     created_session_id: attempt.created_session_id,
     abandon_at: attempt.created_at + ABANDON_AFTER_MS,
-    timezone: null,
+    client_trust_state: "new",
+    locale: null,
+    timezone: BROWSER_TIMEZONE,
   }
 }
 
@@ -89,7 +96,7 @@ export function signUpJson(context: ClerkContext, attempt: AttemptRecord) {
   const verification = verificationOf(attempt)
 
   return {
-    object: "sign_up",
+    object: "sign_up_attempt",
     id: attempt.id,
     status: attempt.status,
     required_fields: ["email_address", ...(instanceOf(context).password ? ["password"] : [])],
@@ -114,15 +121,16 @@ export function signUpJson(context: ClerkContext, attempt: AttemptRecord) {
     email_address: attempt.identifier === "" ? null : attempt.identifier,
     phone_number: null,
     web3_wallet: null,
-    external_account_strategy: null,
-    external_account: null,
-    has_password: attempt.password !== null,
+    password_enabled: attempt.password !== null,
     unsafe_metadata: {},
+    public_metadata: {},
+    custom_action: false,
+    external_id: null,
     created_session_id: attempt.created_session_id,
     created_user_id: done ? attempt.user_id : null,
     abandon_at: attempt.created_at + ABANDON_AFTER_MS,
     legal_accepted_at: null,
     locale: null,
-    timezone: null,
+    timezone: BROWSER_TIMEZONE,
   }
 }
