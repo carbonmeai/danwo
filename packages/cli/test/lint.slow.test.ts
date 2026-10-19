@@ -1,13 +1,15 @@
 import { execFile } from "node:child_process"
-import { readFile, rm } from "node:fs/promises"
+import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { afterAll, describe, expect, it } from "vitest"
 
+import { removeWorkCopies, workCopy } from "./work-copy.ts"
+
 const BIN = fileURLToPath(new URL("../src/bin.ts", import.meta.url))
-const SLOPPY = fileURLToPath(new URL("./fixtures/sloppy-shop", import.meta.url))
-const SHOP = fileURLToPath(new URL("../../../examples/shop", import.meta.url))
+const SLOPPY = workCopy(fileURLToPath(new URL("./fixtures/sloppy-shop", import.meta.url)))
+const SHOP = workCopy(fileURLToPath(new URL("../../../examples/shop", import.meta.url)))
 
 /** Runs `danwo <args>` under Node in `cwd`; resolves to its exit code and output. */
 function danwo(cwd: string, args: readonly string[]): Promise<{ code: number; out: string }> {
@@ -25,9 +27,7 @@ function danwo(cwd: string, args: readonly string[]): Promise<{ code: number; ou
   })
 }
 
-afterAll(async () => {
-  for (const dir of [SLOPPY, SHOP]) await rm(join(dir, ".danwo"), { recursive: true, force: true })
-})
+afterAll(removeWorkCopies)
 
 describe("integration lint", () => {
   it("finds a sloppy shop's risky Stripe usage while its test passes", async () => {

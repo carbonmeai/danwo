@@ -14,10 +14,12 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { androidSdkRoot } from "@danwo/device/toolchain"
-import { describe, expect, it } from "vitest"
+import { afterAll, describe, expect, it } from "vitest"
+
+import { removeWorkCopies, workCopy } from "./work-copy.ts"
 
 const BIN = fileURLToPath(new URL("../src/bin.ts", import.meta.url))
-const SHOP = fileURLToPath(new URL("../../../examples/shop-mobile", import.meta.url))
+const SOURCE = fileURLToPath(new URL("../../../examples/shop-mobile", import.meta.url))
 const TEST = "tests/buy-credits.danwo.ts"
 const AGENT_TEST = "tests/agent-buy.danwo.ts"
 const AVD = process.env.DANWO_AVD ?? "danwo_spike"
@@ -43,7 +45,7 @@ function danwo(
     execFile(
       process.execPath,
       [BIN, ...args],
-      { cwd: SHOP, env, maxBuffer: 64 * 1024 * 1024 },
+      { cwd: workCopy(SOURCE), env, maxBuffer: 64 * 1024 * 1024 },
       (error, stdout, stderr) => {
         const code = error === null ? 0 : typeof error.code === "number" ? error.code : 1
 
@@ -52,6 +54,9 @@ function danwo(
     )
   })
 }
+
+// Every run writes into the fixture's copy; the copies go when the file is done.
+afterAll(removeWorkCopies)
 
 describe.skipIf(!ready)("an Expo app on an Android emulator", () => {
   it(

@@ -1,12 +1,12 @@
 import { execFile } from "node:child_process"
-import { rm } from "node:fs/promises"
-import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { afterAll, describe, expect, it } from "vitest"
 
+import { removeWorkCopies, workCopy } from "./work-copy.ts"
+
 const BIN = fileURLToPath(new URL("../src/bin.ts", import.meta.url))
-const TRIAL = fileURLToPath(new URL("./fixtures/trial-app", import.meta.url))
+const TRIAL = workCopy(fileURLToPath(new URL("./fixtures/trial-app", import.meta.url)))
 const TEST = "tests/trial.danwo.ts"
 
 /** Runs `danwo <args>` under Node in the trial app, with `bug` set; resolves to exit code and output. */
@@ -22,9 +22,7 @@ function danwo(args: readonly string[], bug?: string): Promise<{ code: number; o
   })
 }
 
-afterAll(async () => {
-  await rm(join(TRIAL, ".danwo"), { recursive: true, force: true })
-})
+afterAll(removeWorkCopies)
 
 describe("time travel on a subscription app", () => {
   it("runs 55 days of trial, renewal and a failing card in seconds, with no lint findings", async () => {

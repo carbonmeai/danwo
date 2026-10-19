@@ -1,16 +1,18 @@
 import { execFile } from "node:child_process"
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { basename, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { type FakeGitHub, startFakeGitHub } from "../../github/test/fake-github.ts"
+import { removeWorkCopies, workCopy } from "./work-copy.ts"
 
 const BIN = fileURLToPath(new URL("../src/bin.ts", import.meta.url))
-const fixture = (name: string) => fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url))
-const SHOP = fileURLToPath(new URL("../../../examples/shop", import.meta.url))
+const fixture = (name: string) =>
+  workCopy(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)))
+const SHOP = workCopy(fileURLToPath(new URL("../../../examples/shop", import.meta.url)))
 
 let state: string
 
@@ -22,29 +24,8 @@ afterEach(async () => {
   await rm(state, { recursive: true, force: true })
 })
 
-// Failing runs leave flight records beside each fixture's config; they are the tests' own.
-afterAll(async () => {
-  for (const dir of [
-    fixture("basic"),
-    fixture("invariant"),
-    fixture("uploads"),
-    fixture("signin"),
-    fixture("auth0-orders"),
-    fixture("integration"),
-    fixture("slack-bot"),
-    fixture("github-bot"),
-    fixture("sms-app"),
-    fixture("clerk-app"),
-    fixture("flutterwave-shop"),
-    fixture("naira-shop"),
-    fixture("bachs-store"),
-    fixture("sessions"),
-    fixture("visual"),
-    SHOP,
-  ])
-    await rm(join(dir, ".danwo"), { recursive: true, force: true })
-  await rm(join(fixture("visual"), "tests", "__screenshots__"), { recursive: true, force: true })
-})
+// Every run writes into its fixture's copy; the copies go when the file is done.
+afterAll(removeWorkCopies)
 
 /** Runs `danwo <args>` under Node in `cwd`; resolves to its exit code and output. */
 function danwo(
@@ -358,7 +339,7 @@ describe("danwo matrix", () => {
     expect(bodyOf(fake, -1)?.output?.title).toBe("faults: 17 passed · 1 failed")
     expect(bodyOf(fake, -1)?.output?.annotations).toEqual([
       expect.objectContaining({
-        path: "examples/shop/tests/buy-credits.danwo.ts",
+        path: `examples/${basename(SHOP)}/tests/buy-credits.danwo.ts`,
         title: "failed: duplicate on webhook checkout.session.completed",
       }),
     ])

@@ -11,9 +11,11 @@ import { promisify } from "node:util"
 
 import { afterAll, describe, expect, it } from "vitest"
 
+import { removeWorkCopies, workCopy } from "./work-copy.ts"
+
 const BIN = fileURLToPath(new URL("../src/bin.ts", import.meta.url))
 const FIXTURES = fileURLToPath(new URL("./fixtures", import.meta.url))
-const SHOP = fileURLToPath(new URL("../../../examples/shop", import.meta.url))
+const SHOP = workCopy(fileURLToPath(new URL("../../../examples/shop", import.meta.url)))
 const exec = promisify(execFile)
 
 interface Ran {
@@ -44,12 +46,9 @@ async function cli(
   }
 }
 
-const ci = join(FIXTURES, "ci")
+const ci = workCopy(join(FIXTURES, "ci"))
 
-afterAll(async () => {
-  for (const dir of [ci, join(FIXTURES, "ci-only"), join(FIXTURES, "basic"), SHOP])
-    await rm(join(dir, ".danwo"), { recursive: true, force: true })
-})
+afterAll(removeWorkCopies)
 
 describe("danwo test in CI", () => {
   it("reruns only what failed, and reports a test that then passed as flaky", async () => {
@@ -73,14 +72,14 @@ describe("danwo test in CI", () => {
   }, 120_000)
 
   it("refuses .only in CI, naming the file and line", async () => {
-    const { code, out } = await cli(join(FIXTURES, "ci-only"), ["test"], { CI: "true" })
+    const { code, out } = await cli(workCopy(join(FIXTURES, "ci-only")), ["test"], { CI: "true" })
 
     expect(code).toBe(2)
     expect(out).toContain("tests/focused.danwo.ts:3")
   }, 60_000)
 
   it("retries once by default in CI, so a test that passes on its retry reads as flaky", async () => {
-    const { code, out } = await cli(join(FIXTURES, "basic"), ["test", "flaky"], {
+    const { code, out } = await cli(workCopy(join(FIXTURES, "basic")), ["test", "flaky"], {
       CI: "true",
       DANWO_FIXTURE_STATE: await mkdtemp(join(tmpdir(), "danwo-ci-state-")),
     })

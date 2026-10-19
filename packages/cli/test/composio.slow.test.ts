@@ -1,12 +1,12 @@
 import { execFile } from "node:child_process"
-import { rm } from "node:fs/promises"
-import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { afterAll, describe, expect, it } from "vitest"
 
+import { removeWorkCopies, workCopy } from "./work-copy.ts"
+
 const BIN = fileURLToPath(new URL("../bin/danwo.mjs", import.meta.url))
-const INBOX = fileURLToPath(new URL("./fixtures/agent-inbox/", import.meta.url))
+const INBOX = workCopy(fileURLToPath(new URL("./fixtures/agent-inbox/", import.meta.url)))
 
 /** Runs `danwo <args>` in the inbox fixture, with `bug` switched on (or none). */
 function danwo(args: readonly string[], bug?: string) {
@@ -29,7 +29,7 @@ function danwo(args: readonly string[], bug?: string) {
 
 const SEND = ["matrix", "tests/inbox.danwo.ts", "--grep", "sends the summary", "--workers", "4"]
 
-afterAll(() => rm(join(INBOX, ".danwo"), { recursive: true, force: true }))
+afterAll(removeWorkCopies)
 
 describe("an assistant app on the Composio emulator, backed by the Google emulator", () => {
   it("connects Gmail on Google's chooser, sends mail with a tool and takes signed triggers", async () => {

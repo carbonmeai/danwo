@@ -6,9 +6,12 @@ import { fileURLToPath } from "node:url"
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest"
 
+import { removeWorkCopies, workCopy } from "./work-copy.ts"
+
 const BIN = fileURLToPath(new URL("../src/bin.ts", import.meta.url))
-const fixture = (name: string) => fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url))
-const SHOP = fileURLToPath(new URL("../../../examples/shop", import.meta.url))
+const fixture = (name: string) =>
+  workCopy(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)))
+const SHOP = workCopy(fileURLToPath(new URL("../../../examples/shop", import.meta.url)))
 
 let state: string
 
@@ -21,10 +24,7 @@ afterEach(async () => {
 })
 
 /** Failing runs leave flight records beside each fixture's config; they are the tests' own. */
-afterAll(async () => {
-  for (const dir of [fixture("last-item"), fixture("order-status")])
-    await rm(join(dir, ".danwo"), { recursive: true, force: true })
-})
+afterAll(removeWorkCopies)
 
 /** Runs `danwo <args>` under Node in `cwd`; resolves to its exit code and output. */
 function danwo(

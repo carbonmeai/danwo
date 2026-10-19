@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process"
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises"
+import { mkdtemp, readdir, readFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -7,20 +7,19 @@ import { fileURLToPath } from "node:url"
 import type { Page } from "playwright-core"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
+import { removeWorkCopies, workCopy } from "../../cli/test/work-copy.ts"
 import { type RecordedTest, startRecording } from "../src/index.ts"
 
 /* The shop example's config, from a folder of its own so recorded tests stay out of the example. */
-const SHOP = fileURLToPath(new URL("./fixtures/shop", import.meta.url))
-const SESSIONS = fileURLToPath(new URL("../../cli/test/fixtures/sessions", import.meta.url))
-const SIGNUP = fileURLToPath(new URL("./fixtures/signup", import.meta.url))
+const SHOP = workCopy(fileURLToPath(new URL("./fixtures/shop", import.meta.url)))
+const SESSIONS = workCopy(
+  fileURLToPath(new URL("../../cli/test/fixtures/sessions", import.meta.url)),
+)
+const SIGNUP = workCopy(fileURLToPath(new URL("./fixtures/signup", import.meta.url)))
 const BIN = fileURLToPath(new URL("../../cli/src/bin.ts", import.meta.url))
-const written: string[] = []
 
-afterAll(async () => {
-  for (const path of written) await rm(path, { force: true })
-  for (const dir of [SHOP, SESSIONS, SIGNUP])
-    await rm(join(dir, ".danwo"), { recursive: true, force: true })
-})
+/* Recorded tests and every run land in the fixtures' copies, which go when the file is done. */
+afterAll(removeWorkCopies)
 
 /** Runs `danwo <args>` under Node in `cwd`. */
 function danwo(cwd: string, args: readonly string[], env: NodeJS.ProcessEnv = {}) {
@@ -52,11 +51,7 @@ async function stopAndWrite(
   await toolbar(recording.page, "stop")
   await recording.stopped
 
-  const recorded = await recording.finish({ out, name })
-
-  written.push(recorded.path)
-
-  return recorded
+  return recording.finish({ out, name })
 }
 
 describe("danwo record on the shop", () => {

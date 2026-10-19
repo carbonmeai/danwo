@@ -12,8 +12,10 @@ import { fileURLToPath } from "node:url"
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest"
 
+import { removeWorkCopies, workCopy } from "./work-copy.ts"
+
 const BIN = fileURLToPath(new URL("../src/bin.ts", import.meta.url))
-const FIXTURE = fileURLToPath(new URL("./fixtures/contract", import.meta.url))
+const FIXTURE = workCopy(fileURLToPath(new URL("./fixtures/contract", import.meta.url)))
 
 let state: string
 
@@ -25,9 +27,7 @@ afterEach(async () => {
   await rm(state, { recursive: true, force: true })
 })
 
-afterAll(async () => {
-  await rm(join(FIXTURE, ".danwo"), { recursive: true, force: true })
-})
+afterAll(removeWorkCopies)
 
 /** Runs `danwo test <file>` in the fixture; resolves to its exit code, output and the run log. */
 function danwoTest(file: string): Promise<{ code: number; out: string; log: string[] }> {

@@ -4,11 +4,12 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import type { FaultMatrixResult } from "@danwo/matrix"
-import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest"
 
+import { removeWorkCopies, workCopy } from "../../cli/test/work-copy.ts"
 import { runMatrix } from "../src/runner/matrix-command.ts"
 
-const FIXTURE = fileURLToPath(new URL("./fixtures/counted-shop/", import.meta.url))
+const FIXTURE = workCopy(fileURLToPath(new URL("./fixtures/counted-shop/", import.meta.url)))
 const CONFIG = join(FIXTURE, "danwo.config.ts")
 const TEST = fileURLToPath(
   new URL("../../../examples/shop/tests/buy-credits.danwo.ts", import.meta.url),
@@ -69,6 +70,9 @@ async function calls(): Promise<Record<string, number>> {
 
   return counts
 }
+
+// Every run writes into the fixture's copy; the copies go when the file is done.
+afterAll(removeWorkCopies)
 
 describe("danwo matrix speed", () => {
   it("gives the same verdicts whatever order its trials run in", async () => {

@@ -6,10 +6,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { container, dockerAvailable, startPostgres, waitFor } from "../../data/test/containers.ts"
 import { rebuild, withDatabase } from "./fixtures/orders-postgres/schema.ts"
+import { removeWorkCopies, workCopy } from "./work-copy.ts"
 
 const BIN = fileURLToPath(new URL("../bin/danwo.mjs", import.meta.url))
-const CHECKOUT = fileURLToPath(new URL("./fixtures/checkout-postgres/", import.meta.url))
-const RATE_LIMIT = fileURLToPath(new URL("./fixtures/rate-limit-redis/", import.meta.url))
+const CHECKOUT = workCopy(fileURLToPath(new URL("./fixtures/checkout-postgres/", import.meta.url)))
+const RATE_LIMIT = workCopy(fileURLToPath(new URL("./fixtures/rate-limit-redis/", import.meta.url)))
 
 const CHECKOUT_SCHEMA = `
   CREATE TABLE orders (id serial PRIMARY KEY, checkout_key text UNIQUE, payment_intent text NOT NULL);
@@ -48,6 +49,9 @@ function labelled(out: string, status: string): string[] {
     .filter((line) => line.startsWith(`${status} `))
     .map((line) => line.slice(status.length + 1))
 }
+
+// Every run writes into the fixture's copy; the copies go when the file is done.
+afterAll(removeWorkCopies)
 
 describe.skipIf(!dockerAvailable())("danwo matrix faults the app's own Postgres", () => {
   let server: Awaited<ReturnType<typeof startPostgres>>

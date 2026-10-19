@@ -5,9 +5,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { dockerAvailable, startPostgres } from "../../data/test/containers.ts"
 import { rebuild, withDatabase } from "./fixtures/orders-postgres/schema.ts"
+import { removeWorkCopies, workCopy } from "./work-copy.ts"
 
 const BIN = fileURLToPath(new URL("../bin/danwo.mjs", import.meta.url))
-const ORDERS = fileURLToPath(new URL("./fixtures/orders-postgres/", import.meta.url))
+const ORDERS = workCopy(fileURLToPath(new URL("./fixtures/orders-postgres/", import.meta.url)))
 
 /** Runs the orders fixture's matrix; its exit code and output. */
 function matrix(env: NodeJS.ProcessEnv, args: readonly string[] = []) {
@@ -37,6 +38,9 @@ function verdicts(out: string): string[] {
 function preparedIn(out: string): number {
   return Number(/prepare (\d+) ms/.exec(out)?.[1] ?? Number.NaN)
 }
+
+// Every run writes into the fixture's copy; the copies go when the file is done.
+afterAll(removeWorkCopies)
 
 describe.skipIf(!dockerAvailable())("danwo matrix on an app backed by Postgres", () => {
   let server: Awaited<ReturnType<typeof startPostgres>>

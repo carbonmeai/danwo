@@ -5,9 +5,10 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js"
 import { type CallToolResult, CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js"
 
+import { workCopy } from "../../cli/test/work-copy.ts"
 import { createDanwoServer, type DanwoServerOptions } from "../src/index.ts"
 
-export const PANTRY = fileURLToPath(new URL("./fixtures/pantry", import.meta.url))
+export const PANTRY = workCopy(fileURLToPath(new URL("./fixtures/pantry", import.meta.url)))
 
 export async function connect(
   cwd: string,

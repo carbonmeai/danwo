@@ -7,10 +7,11 @@ import type { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
+import { removeWorkCopies, workCopy } from "../../cli/test/work-copy.ts"
 import { connect, PANTRY, resultOf, textOf } from "./client.ts"
 import { PANTRY_SECRET } from "./fixtures/pantry/site.ts"
 
-const SHOP = fileURLToPath(new URL("../../../examples/shop", import.meta.url))
+const SHOP = workCopy(fileURLToPath(new URL("../../../examples/shop", import.meta.url)))
 const LONG = { timeout: 120_000 }
 
 /** Calls a tool and answers with its text; fails the test when the tool reports an error. */
@@ -39,6 +40,9 @@ async function refused(client: Client, name: string, args: Record<string, unknow
 function sessionOf(opened: string): string {
   return /session (s\d+) is open/.exec(opened)?.[1] ?? ""
 }
+
+// Every run writes into the fixture's copy; the copies go when the file is done.
+afterAll(removeWorkCopies)
 
 describe("a live session on the shop", () => {
   let client: Client

@@ -5,11 +5,15 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
+import { removeWorkCopies, workCopy } from "../../cli/test/work-copy.ts"
 import { connect, PANTRY, resultOf, textOf } from "./client.ts"
 
-const SHOP = fileURLToPath(new URL("../../../examples/shop", import.meta.url))
+const SHOP = workCopy(fileURLToPath(new URL("../../../examples/shop", import.meta.url)))
 const DANWO = fileURLToPath(new URL("../../cli/bin/danwo.mjs", import.meta.url))
 const LONG = { timeout: 280_000, resetTimeoutOnProgress: true }
+
+// Every run writes into the fixture's copy; the copies go when the file is done.
+afterAll(removeWorkCopies)
 
 describe("running and explaining tests", () => {
   let client: Client

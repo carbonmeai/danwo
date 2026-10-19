@@ -1,12 +1,12 @@
 import { execFile } from "node:child_process"
-import { rm } from "node:fs/promises"
-import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { afterAll, describe, expect, it } from "vitest"
 
+import { removeWorkCopies, workCopy } from "./work-copy.ts"
+
 const BIN = fileURLToPath(new URL("../bin/danwo.mjs", import.meta.url))
-const BOT = fileURLToPath(new URL("./fixtures/support-bot/", import.meta.url))
+const BOT = workCopy(fileURLToPath(new URL("./fixtures/support-bot/", import.meta.url)))
 
 /** Runs the support bot's matrix with `bug` switched on (or none); its exit code and output. */
 function matrix(bug?: string) {
@@ -36,7 +36,7 @@ function failed(out: string): string[] {
   return [...new Set(labels)].toSorted()
 }
 
-afterAll(() => rm(join(BOT, ".danwo"), { recursive: true, force: true }))
+afterAll(removeWorkCopies)
 
 describe("danwo matrix on an assistant that calls a model", () => {
   it("passes every model fault when the app retries once, refunds once and hides raw errors", async () => {

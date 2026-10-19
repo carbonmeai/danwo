@@ -4,11 +4,15 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { locatorCode } from "@danwo/recorder"
-import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest"
 
+import { removeWorkCopies } from "../../cli/test/work-copy.ts"
 import { Project } from "../src/project.ts"
 import { testSource } from "../src/tools/scaffold.ts"
 import { connect, PANTRY, resultOf, textOf } from "./client.ts"
+
+// Every run writes into the fixture's copy; the copies go when the file is done.
+afterAll(removeWorkCopies)
 
 describe("the server", () => {
   it("offers its tools, resources and prompt", async () => {

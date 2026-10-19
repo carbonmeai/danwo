@@ -1,15 +1,20 @@
 import { execFile } from "node:child_process"
 import { createRequire } from "node:module"
+import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
 import { z } from "@danwo/runner/runner"
-import { describe, expect, it } from "vitest"
+import { afterAll, describe, expect, it } from "vitest"
+
+import { removeWorkCopies, workCopy } from "../../cli/test/work-copy.ts"
 
 const run = promisify(execFile)
-const EXAMPLE = fileURLToPath(new URL("../../../examples/shop-playwright/", import.meta.url))
+const EXAMPLE = workCopy(
+  fileURLToPath(new URL("../../../examples/shop-playwright/", import.meta.url)),
+)
 const BIN = fileURLToPath(new URL("../bin/danwo-playwright.mjs", import.meta.url))
-const PLAYWRIGHT = createRequire(`${EXAMPLE}package.json`).resolve("@playwright/test/cli")
+const PLAYWRIGHT = createRequire(join(EXAMPLE, "package.json")).resolve("@playwright/test/cli")
 
 interface Exit {
   readonly code: number
@@ -55,6 +60,9 @@ const JsonReport = z.object({
     }),
   ),
 })
+
+// Every run writes into the fixture's copy; the copies go when the file is done.
+afterAll(removeWorkCopies)
 
 describe("@danwo/playwright on the shop", () => {
   it("runs Playwright tests against the shop's emulated Stripe, live faults included", async () => {
