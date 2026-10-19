@@ -163,6 +163,19 @@ describe("credentials", () => {
     expect(provider?.live({ [variable]: test })?.kind).toBe("live")
   })
 
+  it("refuses a live Clerk key and needs both of a development instance's keys", () => {
+    const clerk = FIDELITY_PROVIDERS.find((provider) => provider.name === "clerk")
+    const keys = (secret: string, publishable: string) => ({
+      DANWO_FIDELITY_CLERK_SECRET_KEY: secret,
+      DANWO_FIDELITY_CLERK_PUBLISHABLE_KEY: publishable,
+    })
+
+    expect(() => clerk?.live(keys("sk_live_abc", "pk_test_abc"))).toThrow(LiveCredentialRefused)
+    expect(() => clerk?.live(keys("sk_test_abc", "pk_live_abc"))).toThrow(LiveCredentialRefused)
+    expect(clerk?.live({ DANWO_FIDELITY_CLERK_SECRET_KEY: "sk_test_abc" })).toBeUndefined()
+    expect(clerk?.live(keys("sk_test_abc", "pk_test_abc"))?.kind).toBe("live")
+  })
+
   it("calls public endpoints only when opted in", () => {
     const google = FIDELITY_PROVIDERS.find((provider) => provider.name === "google")
 
