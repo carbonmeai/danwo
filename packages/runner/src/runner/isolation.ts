@@ -14,8 +14,6 @@ import type { WorkerEnvironment } from "./environment.ts"
  */
 export type Isolation = "test" | "file" | "none"
 
-export const ISOLATION_MODES: readonly Isolation[] = ["test", "file", "none"]
-
 /** What the starting point needs from the environment: its reset and, optionally, a snapshot. */
 type Resettable = Pick<WorkerEnvironment, "reset" | "snapshot" | "restore">
 

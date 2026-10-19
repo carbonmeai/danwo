@@ -240,6 +240,16 @@ async function fromStart(): Promise<void> {
   untouched = true
 }
 
+/**
+ * Readies the environment for an attempt: restored first when the test is isolated. A sign-in
+ * the attempt makes is kept in the starting point only when the attempt began from it.
+ */
+async function beginAttempt(isolated: boolean): Promise<void> {
+  if (isolated) await fromStart()
+  keepSignIns = untouched
+  untouched = false
+}
+
 /** A test with its retries; every retry loads the file afresh. `isolated` restores before each. */
 async function runTest(
   task: TestFileTask,
@@ -259,10 +269,7 @@ async function runTest(
   for (let n = 1; n <= tries; n++) {
     const declarations = n === 1 ? first : await loadTestFile(task.file)
 
-    if (isolated) await fromStart()
-    // A sign-in is kept as part of the starting point only when this attempt began from it.
-    keepSignIns = untouched
-    untouched = false
+    await beginAttempt(isolated)
 
     const { result, recordDir, mark } = await attemptOnce(
       declarations,

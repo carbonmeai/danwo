@@ -247,6 +247,7 @@ export class Store {
   }
 
   /** Runs `clear` on every reset and restore, for state that lives beside the store. */
+  // fallow-ignore-next-line unused-class-member -- called on an emulator's store by helpers that keep state beside it
   whenReset(clear: () => void): void {
     this.onReset.add(clear)
   }

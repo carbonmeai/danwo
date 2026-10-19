@@ -270,7 +270,13 @@ const CASES: readonly Case[] = [
         seed: {
           users: [{ name: "ada" }],
           apps: [
-            { name: "Echo", client_id: "1.2", client_secret: "s", bot_scopes: ["chat:write"] },
+            {
+              name: "Echo",
+              client_id: "1.2",
+              client_secret: "s",
+              signing_secret: "echo-signing",
+              bot_scopes: ["chat:write"],
+            },
           ],
           installations: [{ app: "Echo", bot_token: "xoxb-echo", channels: ["general"] }],
         },
