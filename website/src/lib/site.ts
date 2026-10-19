@@ -30,6 +30,11 @@ export const SITE = {
   waitlistUrl: undefined as string | undefined,
   /** Where "Talk to us" goes. */
   contactUrl: undefined as string | undefined,
+  /** danwo's accounts elsewhere; an unset one is left out of the footer. */
+  social: {
+    x: undefined as string | undefined,
+    discord: undefined as string | undefined,
+  },
 } as const
 
 /** The repository's web address, when it is public. */

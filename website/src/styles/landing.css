@@ -2374,25 +2374,67 @@
 .landing footer {
   background: var(--h-bg);
   color: var(--h-muted);
-  padding: 40px 0 44px;
+  padding: 72px 0 44px;
   font-size: 13.5px;
+  overflow: hidden;
+}
+
+/*
+ * The wordmark band: dim letters a few shades above the page, a spotlight that reveals the lit
+ * layers where the pointer is, and a horizon line that cuts the letters and glows beneath.
+ */
+.landing .wm {
+  position: relative;
+}
+
+.landing .wm-clip {
+  position: relative;
+  overflow: hidden;
+}
+
+.landing .wm-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.landing .wm-dim {
+  fill: #151517;
+}
+
+.landing .wm-under {
+  position: relative;
+  height: 170px;
+  box-shadow: inset 0 1px 0 #ffffff1c;
+  background: radial-gradient(ellipse 52% 100% at 50% 0%, #ffffff0b, transparent 72%);
+  pointer-events: none;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: var(--gi, 0);
+    background: radial-gradient(ellipse 26% 90% at var(--gx, 60%) 0%, #ffffff12, transparent 70%);
+  }
 }
 
 .landing .foot {
   display: grid;
   grid-template-columns: 1.6fr repeat(4, 1fr);
   gap: 32px;
+  margin-top: 8px;
 
   & h4 {
-    margin: 0 0 12px;
+    margin: 0 0 14px;
     color: var(--h-text);
     font-weight: 500;
-    font-size: 13px;
+    font-size: 13.5px;
   }
 
   & a {
     display: block;
-    padding: 4px 0;
+    padding: 5px 0;
     transition: color 0.15s;
   }
 
@@ -2407,6 +2449,54 @@
   }
 }
 
+.landing .foot-brand {
+  & p {
+    margin: 14px 0 0;
+    max-width: 260px;
+  }
+}
+
+.landing .socials {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+
+  &:empty {
+    display: none;
+  }
+
+  & .social {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border-radius: 50%;
+    background: #ffffff0d;
+    color: var(--h-text-2);
+    transition:
+      background 0.15s,
+      color 0.15s;
+  }
+
+  & .social:hover {
+    background: #ffffff1a;
+    color: var(--h-text);
+  }
+}
+
+.landing .foot-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #ffffff0b;
+  color: var(--h-text-2);
+  font-size: 12.5px;
+}
+
 .landing .foot-b {
   margin-top: 56px;
   padding-top: 22px;
@@ -2417,16 +2507,6 @@
   flex-wrap: wrap;
   font: 12px var(--mono);
   color: var(--h-faint);
-}
-
-.landing .status-dot::before {
-  content: "";
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #00c950;
-  margin-right: 7px;
 }
 
 /* ---------- reveal on scroll ---------- */
@@ -2640,6 +2720,14 @@
 
   .landing .foot {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .landing footer {
+    padding-top: 48px;
+  }
+
+  .landing .wm-under {
+    height: 96px;
   }
 
   .landing .plan {
