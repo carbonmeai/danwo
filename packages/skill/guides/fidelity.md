@@ -22,20 +22,21 @@ mismatch, a status mismatch, an error-code mismatch, an ordering difference or a
 
 ## Suites
 
-| Provider                         | Scenarios                                                                                                                     | Live run reads                                                                                 |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Stripe                           | customers, paging, errors, idempotency, products and prices, payment intent and refund, checkout session, events              | `DANWO_FIDELITY_STRIPE_KEY` (`sk_test_` or `rk_test_`)                                         |
-| Resend                           | send and read back, batch, idempotent send, errors, domains                                                                   | `DANWO_FIDELITY_RESEND_KEY`; sends only to `delivered@resend.dev`                              |
-| Twilio                           | send from the magic test number, invalid recipient and unowned sender                                                         | `DANWO_FIDELITY_TWILIO_ACCOUNT_SID`, `DANWO_FIDELITY_TWILIO_AUTH_TOKEN` (test credentials)     |
-| Paystack                         | initialize and verify, customers, banks, errors                                                                               | `DANWO_FIDELITY_PAYSTACK_KEY` (`sk_test_`)                                                     |
-| Flutterwave                      | hosted payment link, banks, key errors                                                                                        | `DANWO_FIDELITY_FLUTTERWAVE_KEY` (`FLWSECK_TEST-`)                                             |
-| Bachs                            | customers, errors                                                                                                             | `DANWO_FIDELITY_BACHS_KEY` (`sk_sandbox_`)                                                     |
-| Slack, GitHub, Google, Microsoft | public calls: `api.test` and token errors, a public repository and a 404, sign-in discovery and signing keys                  | `DANWO_FIDELITY_PUBLIC=1`, plus an optional `DANWO_FIDELITY_GITHUB_TOKEN`                      |
-| Composio                         | key errors live; with a key, a toolkit, a tool, a trigger type, auth configs and connected accounts (reads only)              | `DANWO_FIDELITY_PUBLIC=1`; optional `DANWO_FIDELITY_COMPOSIO_KEY` (a test project's `ak_` key) |
-| AI Gateway (`gateway`)           | language model text, tool call, structured output, stream events, embedding, errors (unknown model, no key, malformed prompt) | `DANWO_FIDELITY_AI_GATEWAY_KEY`, else `AI_GATEWAY_API_KEY`                                     |
-| Gemini (`gemini`)                | text, function call, structured output, stream events, token counting, embeddings, no key                                     | `DANWO_FIDELITY_GEMINI_KEY` (a Google AI Studio key)                                           |
-| Perplexity (`perplexity`)        | Agent API text, function call, structured output, stream events; Sonar with citations; no key                                 | `DANWO_FIDELITY_PERPLEXITY_KEY`                                                                |
-| Bedrock (`bedrock`)              | Converse text and tool call, InvokeModel with Nova's body, unsigned call                                                      | `DANWO_FIDELITY_BEDROCK_API_KEY` (a Bedrock API key), optional `DANWO_FIDELITY_BEDROCK_REGION` |
+| Provider                         | Scenarios                                                                                                                                                                         | Live run reads                                                                                                                   |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Stripe                           | customers, paging, errors, idempotency, products and prices, payment intent and refund, checkout session, events                                                                  | `DANWO_FIDELITY_STRIPE_KEY` (`sk_test_` or `rk_test_`)                                                                           |
+| Resend                           | send and read back, batch, idempotent send, errors, domains                                                                                                                       | `DANWO_FIDELITY_RESEND_KEY`; sends only to `delivered@resend.dev`                                                                |
+| Twilio                           | send from the magic test number, invalid recipient and unowned sender                                                                                                             | `DANWO_FIDELITY_TWILIO_ACCOUNT_SID`, `DANWO_FIDELITY_TWILIO_AUTH_TOKEN` (test credentials)                                       |
+| Paystack                         | initialize and verify, customers, banks, errors                                                                                                                                   | `DANWO_FIDELITY_PAYSTACK_KEY` (`sk_test_`)                                                                                       |
+| Flutterwave                      | hosted payment link, banks, key errors                                                                                                                                            | `DANWO_FIDELITY_FLUTTERWAVE_KEY` (`FLWSECK_TEST-`)                                                                               |
+| Bachs                            | customers, errors                                                                                                                                                                 | `DANWO_FIDELITY_BACHS_KEY` (`sk_sandbox_`)                                                                                       |
+| Slack, GitHub, Google, Microsoft | public calls: `api.test` and token errors, a public repository and a 404, sign-in discovery and signing keys                                                                      | `DANWO_FIDELITY_PUBLIC=1`, plus an optional `DANWO_FIDELITY_GITHUB_TOKEN`                                                        |
+| Composio                         | key errors live; with a key, a toolkit, a tool, a trigger type, auth configs and connected accounts (reads only)                                                                  | `DANWO_FIDELITY_PUBLIC=1`; optional `DANWO_FIDELITY_COMPOSIO_KEY` (a test project's `ak_` key)                                   |
+| Clerk                            | users, organizations with members and invitations, sessions and tokens, signing keys, errors; the browser's sign-up and sign-in by emailed code, and the session token it ends in | `DANWO_FIDELITY_CLERK_SECRET_KEY` (`sk_test_`) and `DANWO_FIDELITY_CLERK_PUBLISHABLE_KEY` (`pk_test_`) of a development instance |
+| AI Gateway (`gateway`)           | language model text, tool call, structured output, stream events, embedding, errors (unknown model, no key, malformed prompt)                                                     | `DANWO_FIDELITY_AI_GATEWAY_KEY`, else `AI_GATEWAY_API_KEY`                                                                       |
+| Gemini (`gemini`)                | text, function call, structured output, stream events, token counting, embeddings, no key                                                                                         | `DANWO_FIDELITY_GEMINI_KEY` (a Google AI Studio key)                                                                             |
+| Perplexity (`perplexity`)        | Agent API text, function call, structured output, stream events; Sonar with citations; no key                                                                                     | `DANWO_FIDELITY_PERPLEXITY_KEY`                                                                                                  |
+| Bedrock (`bedrock`)              | Converse text and tool call, InvokeModel with Nova's body, unsigned call                                                                                                          | `DANWO_FIDELITY_BEDROCK_API_KEY` (a Bedrock API key), optional `DANWO_FIDELITY_BEDROCK_REGION`                                   |
 
 Keys come from the environment, or from `.env.fidelity` and then `.env` at the repository root,
 which git ignores; neither file has to exist. The gateway suite drives the AI SDK's own gateway provider, so each request is
@@ -45,7 +46,7 @@ fraction of a cent, which the gateway reports in each answer's cost metadata.
 ## Safety
 
 - Only test and sandbox credentials. A key that looks live (`sk_live_`, `rk_live_`, a Flutterwave
-  key without `_TEST`, anything but `sk_sandbox_` for Bachs) stops the run with `CONFIG_INVALID`.
+  key without `_TEST`, anything but `sk_sandbox_` for Bachs, a Clerk key that is not `sk_test_` or `pk_test_`) stops the run with `CONFIG_INVALID`.
   The AI Gateway, Gemini, Perplexity and Bedrock have no sandbox, so their keys are real ones; with
   such a key in the environment, `.env.fidelity` or `.env`, a plain `danwo fidelity` runs that suite
   live too (use `--offline` to stay off the network). Each live run uses the cheapest model and 20
@@ -55,6 +56,12 @@ fraction of a cent, which the gateway reports in each answer's cost metadata.
   is shaped, and goldens hold structure only.
 - Scenarios clean up what they create, and each makes a handful of requests.
 - Twilio runs use magic numbers: with real credentials the sender is not owned, so nothing sends.
+- Clerk runs use Clerk's test addresses (`…+clerk_test@example.com`, which take the code `424242`),
+  so a development instance sends no mail, and delete every user and organization they make. The
+  token checks compare a session token's claim and header names and verify it with
+  `@clerk/backend` against the key that signed it. Clerk's webhooks are checked without keys: the
+  emulator's `user.*`, `organization.*` and `organizationMembership.*` payloads are compared with
+  the Backend API shapes in the Clerk golden, and each delivery must pass `verifyWebhook`.
 
 ## Goldens and known differences
 
