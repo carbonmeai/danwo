@@ -48,7 +48,11 @@ const handleStyles = css({
     outline: "none",
   },
 
-  "&[data-panel-group-direction=vertical]": {
+  /**
+   * The separator between stacked panels: react-resizable-panels 4 marks it with
+   * `aria-orientation="horizontal"` rather than the older group-direction attribute.
+   */
+  "&[data-panel-group-direction=vertical], &[aria-orientation=horizontal]": {
     "&:after": {
       h: "4px",
       left: 0,
