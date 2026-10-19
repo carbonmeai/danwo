@@ -477,7 +477,7 @@ function Heatmap({ run }: { readonly run: MatrixHistory }) {
           role="table"
           aria-label="Fault grid"
           style={{
-            gridTemplateColumns: `minmax(12rem, max-content) repeat(${grid.columns.length}, ${CELL})`,
+            gridTemplateColumns: `minmax(10rem, 1fr) repeat(${grid.columns.length}, ${CELL})`,
           }}
           columnGap="1.5"
           rowGap="1.5"
@@ -526,7 +526,14 @@ function Heatmap({ run }: { readonly run: MatrixHistory }) {
               {group.rows.map((row) => (
                 <Box role="row" display="contents" key={row.target}>
                   <Box role="rowheader" pr="4" minW="0">
-                    <Ident fontSize="1.5" title={row.target} whiteSpace="nowrap">
+                    <Ident
+                      fontSize="1.5"
+                      title={row.target}
+                      display="block"
+                      whiteSpace="nowrap"
+                      overflow="hidden"
+                      textOverflow="ellipsis"
+                    >
                       {row.target}
                     </Ident>
                   </Box>
