@@ -69,7 +69,13 @@ export const TOOLKITS: readonly ToolkitDefinition[] = [
     authSchemes: ["OAUTH2", "BEARER_TOKEN"],
     managed: true,
     appUrl: "https://slack.com",
-    defaultScopes: ["chat:write", "channels:read", "channels:history", "users:read"],
+    defaultScopes: [
+      "chat:write",
+      "chat:write.public",
+      "channels:read",
+      "channels:history",
+      "users:read",
+    ],
   },
   {
     slug: "github",
