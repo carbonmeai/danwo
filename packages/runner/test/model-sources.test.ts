@@ -1,11 +1,15 @@
 /**
- * The agent on every kind of model `danwo init` can configure: each provider's own AI SDK package
- * pointed at the model API emulator, so the requests, tool calls and usage go over each
- * provider's real wire format. A step acts, the judge asserts, and the step records its tokens.
+ * The agent on every kind of model `danwo init` can configure, and on Perplexity and Bedrock: each
+ * provider's own AI SDK package pointed at the model API emulator, so the requests, tool calls and
+ * usage go over each provider's real wire format. A step acts, the judge asserts, and the step
+ * records its tokens.
  */
+import { createAmazonBedrock } from "@ai-sdk/amazon-bedrock"
 import { createAnthropic } from "@ai-sdk/anthropic"
+import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { createOpenAI } from "@ai-sdk/openai"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
+import { createPerplexity } from "@ai-sdk/perplexity"
 import { createEmulator, type Emulator, llm, llmCalls, llmScripts, seedLlm } from "@danwo/emulators"
 import { createGateway, type LanguageModel } from "ai"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
@@ -114,6 +118,27 @@ const SOURCES: readonly {
     name: "the AI Gateway",
     api: "language-model",
     model: (fetch) => createGateway({ apiKey: KEY, fetch })("anthropic/claude-sonnet-5"),
+  },
+  {
+    name: "Google Gemini",
+    api: "gemini",
+    model: (fetch) => createGoogleGenerativeAI({ apiKey: KEY, fetch })("gemini-2.5-flash"),
+  },
+  {
+    name: "Perplexity",
+    api: "agent",
+    model: (fetch) => createPerplexity({ apiKey: KEY, fetch })("sonar-pro"),
+  },
+  {
+    name: "Amazon Bedrock",
+    api: "converse",
+    model: (fetch) =>
+      createAmazonBedrock({
+        region: "us-east-1",
+        accessKeyId: "REDACTED-TEST-VALUE",
+        secretAccessKey: "danwo-emulated-secret",
+        fetch,
+      })("us.anthropic.claude-sonnet-4-5-20250929-v1:0"),
   },
 ]
 

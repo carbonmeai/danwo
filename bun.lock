@@ -364,9 +364,12 @@
         "zod": "4.6.1",
       },
       "devDependencies": {
+        "@ai-sdk/amazon-bedrock": "5.0.119",
         "@ai-sdk/anthropic": "4.0.82",
+        "@ai-sdk/google": "4.0.100",
         "@ai-sdk/openai": "4.0.96",
         "@ai-sdk/openai-compatible": "3.0.71",
+        "@ai-sdk/perplexity": "5.0.15",
         "@aws-sdk/client-s3": "3.1152.0",
         "@aws-sdk/client-sqs": "3.1152.0",
         "@types/pngjs": "6.0.5",
