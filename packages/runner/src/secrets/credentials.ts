@@ -63,6 +63,11 @@ const TOKEN_PATTERNS: readonly [RegExp, string][] = [
   /* OpenAI project, service-account and legacy keys; Anthropic keys; AI Gateway keys. */
   [/\b(sk-(?:ant-[a-z]+\d*-|proj-|svcacct-|admin-)?)[A-Za-z0-9_-]{16,}/g, `$1${REDACTED}`],
   [/\b(vck_)[A-Za-z0-9_-]{8,}/g, `$1${REDACTED}`],
+  /* Google API keys (Gemini), anywhere and as a `?key=` query; Perplexity and Bedrock API keys. */
+  [/\b(AIza)[A-Za-z0-9_-]{30,}/g, `$1${REDACTED}`],
+  [/([?&]key=)[^&#\s"']+/g, `$1${REDACTED}`],
+  [/\b(pplx-)[A-Za-z0-9]{16,}/g, `$1${REDACTED}`],
+  [/\b(ABSK)[A-Za-z0-9+/=]{20,}/g, `$1${REDACTED}`],
   /* Composio project and user API keys. */
   [/\b(u?ak_)[A-Za-z0-9_-]{8,}/g, `$1${REDACTED}`],
   /* Nylas API keys and the access, refresh and id tokens its hosted auth hands out. */
