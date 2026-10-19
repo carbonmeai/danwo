@@ -100,6 +100,7 @@ export interface PusherBeams {
   devices(): BeamsDevice[]
 }
 
+/** The Beams side of a Pusher emulator: notifications published, and the devices registered. */
 export function pusherBeams(emulator: Pick<Emulator, "store">): PusherBeams {
   const objects = pusherStore(emulator.store)
 

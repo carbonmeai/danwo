@@ -46,6 +46,7 @@ export interface NovuProject {
   openInboxes(): Record<string, number>
 }
 
+/** A Novu emulator's project: subscribers, workflow runs, messages sent and open Inboxes. */
 export function novuProject(emulator: Pick<Emulator, "store">): NovuProject {
   const objects = novuStore(emulator.store)
   const messages = (filter: Parameters<NovuProject["messages"]>[0] = {}) =>

@@ -5,7 +5,7 @@
  * socket. Its keys come from the environment; nothing in it knows about danwo.
  */
 import { readFileSync } from "node:fs"
-import { createServer } from "node:http"
+import { createServer, type ServerResponse } from "node:http"
 import { createRequire } from "node:module"
 import { fileURLToPath } from "node:url"
 
@@ -67,28 +67,29 @@ async function placeOrder(): Promise<void> {
   await novu.trigger({ workflowId: "order-placed", to: "buyer-1", payload: order })
 }
 
+/** The scripts the page loads: Pusher's client, and the bundled collaboration client. */
+const SCRIPTS: Record<string, () => string | Buffer> = {
+  "/pusher.js": () => readFileSync(require.resolve("pusher-js/dist/web/pusher.min.js")),
+  "/collab.js": () => collab,
+}
+
+/** Places the order, answering 502 with the error when a provider refuses it. */
+function placeOrderFor(res: ServerResponse): void {
+  placeOrder().then(
+    () => res.writeHead(201).end(),
+    (error: unknown) => res.writeHead(502).end(String(error)),
+  )
+}
+
+/** One of the page's scripts, or the page itself. */
+function serve(res: ServerResponse, url: string | undefined): void {
+  const script = SCRIPTS[url ?? ""]
+
+  if (script) res.writeHead(200, { "content-type": "text/javascript" }).end(script())
+  else res.writeHead(200, { "content-type": "text/html" }).end(PAGE)
+}
+
 createServer((req, res) => {
-  if (req.method === "POST" && req.url === "/orders") {
-    placeOrder().then(
-      () => res.writeHead(201).end(),
-      (error: unknown) => res.writeHead(502).end(String(error)),
-    )
-
-    return
-  }
-
-  if (req.url === "/pusher.js") {
-    res.writeHead(200, { "content-type": "text/javascript" })
-    res.end(readFileSync(require.resolve("pusher-js/dist/web/pusher.min.js")))
-
-    return
-  }
-
-  if (req.url === "/collab.js") {
-    res.writeHead(200, { "content-type": "text/javascript" }).end(collab)
-
-    return
-  }
-
-  res.writeHead(200, { "content-type": "text/html" }).end(PAGE)
+  if (req.method === "POST" && req.url === "/orders") placeOrderFor(res)
+  else serve(res, req.url)
 }).listen(Number(process.env.PORT), "127.0.0.1", () => console.log("orders listening"))

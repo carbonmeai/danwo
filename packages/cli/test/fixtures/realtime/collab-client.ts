@@ -12,12 +12,14 @@ declare global {
   }
 }
 
-addEventListener("DOMContentLoaded", () => {
-  const show = (text: string) => {
-    const state = document.getElementById("note-state")
+/** Says where the note is up to. */
+function show(text: string): void {
+  const state = document.getElementById("note-state")
 
-    if (state) state.textContent = text
-  }
+  if (state) state.textContent = text
+}
+
+addEventListener("DOMContentLoaded", () => {
   const provider = new HocuspocusProvider({
     url: `wss://${window.CONFIG.collabApp}.collab.tiptap.cloud?__version=3.7.2`,
     name: "order-notes",

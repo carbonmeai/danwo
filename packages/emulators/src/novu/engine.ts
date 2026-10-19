@@ -78,6 +78,73 @@ function bridgeSubscriber(subscriber: NovuSubscriber) {
   }
 }
 
+/** The strings in `value` when it is a list, else none. */
+function strings(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : []
+}
+
+/** The workflow `workflowId` in a bridge's `discover` answer: its steps and tags. */
+function discovered(answer: unknown, workflowId: string): { steps: BridgeStep[]; tags: string[] } {
+  const workflows = asRecord(answer)?.["workflows"]
+  const workflow = (Array.isArray(workflows) ? workflows : [])
+    .map((found) => asRecord(found))
+    .find((found) => found?.["workflowId"] === workflowId)
+
+  if (workflow === undefined) throw new Error(`the bridge has no workflow ${workflowId}`)
+
+  const listed = Array.isArray(workflow["steps"]) ? workflow["steps"] : []
+  const steps = listed.flatMap((step) => {
+    const fields = asRecord(step)
+    const stepId = fields?.["stepId"]
+    const type = fields?.["type"]
+
+    return typeof stepId === "string" && typeof type === "string" ? [{ stepId, type }] : []
+  })
+
+  return { steps, tags: strings(workflow["tags"]) }
+}
+
+/** Who a step's message went to: the subscriber's email or phone, for those channels. */
+function recipientOf(channel: NovuChannel, subscriber: NovuSubscriber): string | null {
+  if (channel === "email") return subscriber.email
+  if (channel === "sms") return subscriber.phone
+
+  return null
+}
+
+/** The message a delivering step sent, from its outputs. */
+function messageOf(
+  execution: NovuExecution,
+  subscriber: NovuSubscriber,
+  step: { stepId: string; channel: NovuChannel; tags: readonly string[] },
+  outputs: Record<string, unknown>,
+  now: string,
+): NovuMessage {
+  return {
+    id: objectId(),
+    transaction_id: execution.transaction_id,
+    workflow_id: execution.workflow_id,
+    step_id: step.stepId,
+    channel: step.channel,
+    subscriber_id: subscriber.subscriber_id,
+    subject: stringOf(outputs["subject"]),
+    content: stringOf(outputs["body"]) ?? "",
+    data: asRecord(outputs["data"]) ?? null,
+    redirect_url: stringOf(asRecord(outputs["redirect"])?.["url"]),
+    to: recipientOf(step.channel, subscriber),
+    tags: [...step.tags],
+    read: false,
+    seen: false,
+    archived: false,
+    read_at: null,
+    seen_at: null,
+    archived_at: null,
+    created: now,
+  }
+}
+
 export class NovuEngine {
   private readonly objects: NovuStore
   private readonly clock: Clock
@@ -125,6 +192,7 @@ export class NovuEngine {
   }
 
   /** Resolves once every run started so far has finished. */
+  // fallow-ignore-next-line unused-class-member -- called through the novuProject helper
   async idle(): Promise<void> {
     while (this.running.size > 0) await Promise.allSettled(this.running)
   }
@@ -205,62 +273,49 @@ export class NovuEngine {
     if (env.bridge_url === null)
       throw new Error(`workflow ${execution.workflow_id} is not seeded and no bridge URL is set`)
 
-    const discovered = asRecord(await this.bridge(env, "GET", { action: "discover" }, {}))
-    const workflows = Array.isArray(discovered?.["workflows"]) ? discovered["workflows"] : []
-    const workflow = workflows
-      .map((found) => asRecord(found))
-      .find((found) => found?.["workflowId"] === execution.workflow_id)
-
-    if (workflow === undefined)
-      throw new Error(`the bridge has no workflow ${execution.workflow_id}`)
-
-    const steps: BridgeStep[] = (Array.isArray(workflow["steps"]) ? workflow["steps"] : []).flatMap(
-      (step) => {
-        const fields = asRecord(step)
-
-        return typeof fields?.["stepId"] === "string" && typeof fields["type"] === "string"
-          ? [{ stepId: fields["stepId"], type: fields["type"] }]
-          : []
-      },
-    )
-    const tags = Array.isArray(workflow["tags"])
-      ? workflow["tags"].filter((tag): tag is string => typeof tag === "string")
-      : []
+    const answer = await this.bridge(env, "GET", { action: "discover" }, {})
+    const { steps, tags } = discovered(answer, execution.workflow_id)
     const state: { stepId: string; outputs: Record<string, unknown>; state: { status: string } }[] =
       []
 
     for (const step of steps) {
       if (this.canceled(execution)) return
 
-      const result = asRecord(
-        await this.bridge(
-          env,
-          "POST",
-          { action: "execute", workflowId: execution.workflow_id, stepId: step.stepId },
-          {
-            payload: execution.payload,
-            subscriber: bridgeSubscriber(subscriber),
-            state,
-            controls: {},
-            inputs: {},
-          },
-        ),
-      )
-      const skipped = asRecord(result?.["options"])?.["skip"] === true
-      const outputs = asRecord(result?.["outputs"]) ?? {}
+      const { skipped, outputs } = await this.executeStep(env, execution, subscriber, step, state)
+      const status = skipped ? "skipped" : "completed"
 
       if (!skipped) await this.deliver(execution, subscriber, step.stepId, step.type, outputs, tags)
-      this.record(execution, {
-        stepId: step.stepId,
-        type: step.type,
-        status: skipped ? "skipped" : "completed",
-        outputs,
-      })
-      state.push({
-        stepId: step.stepId,
-        outputs,
-        state: { status: skipped ? "skipped" : "completed" },
-      })
+      this.record(execution, { stepId: step.stepId, type: step.type, status, outputs })
+      state.push({ stepId: step.stepId, outputs, state: { status } })
+    }
+  }
+
+  /** Asks the bridge to run one step, with the outputs of the ones before. */
+  private async executeStep(
+    env: NovuEnvironment,
+    execution: NovuExecution,
+    subscriber: NovuSubscriber,
+    step: BridgeStep,
+    state: readonly unknown[],
+  ): Promise<{ skipped: boolean; outputs: Record<string, unknown> }> {
+    const result = asRecord(
+      await this.bridge(
+        env,
+        "POST",
+        { action: "execute", workflowId: execution.workflow_id, stepId: step.stepId },
+        {
+          payload: execution.payload,
+          subscriber: bridgeSubscriber(subscriber),
+          state,
+          controls: {},
+          inputs: {},
+        },
+      ),
+    )
+
+    return {
+      skipped: asRecord(result?.["options"])?.["skip"] === true,
+      outputs: asRecord(result?.["outputs"]) ?? {},
     }
   }
 
@@ -309,36 +364,13 @@ export class NovuEngine {
 
     if (channel === undefined) return
 
-    const message: NovuMessage = {
-      id: objectId(),
-      transaction_id: execution.transaction_id,
-      workflow_id: execution.workflow_id,
-      step_id: stepId,
-      channel,
-      subscriber_id: subscriber.subscriber_id,
-      subject: stringOf(outputs["subject"]),
-      content: stringOf(outputs["body"]) ?? "",
-      data: asRecord(outputs["data"]) ?? null,
-      redirect_url: stringOf(asRecord(outputs["redirect"])?.["url"]),
-      to: channel === "email" ? subscriber.email : channel === "sms" ? subscriber.phone : null,
-      tags: [...tags],
-      read: false,
-      seen: false,
-      archived: false,
-      read_at: null,
-      seen_at: null,
-      archived_at: null,
-      created: this.clock().toISOString(),
-    }
+    const now = this.clock().toISOString()
+    const message = messageOf(execution, subscriber, { stepId, channel, tags }, outputs, now)
 
     this.objects.messages.add(message, null)
 
     if (channel === "in_app") this.realtime.notify(message, subscriber)
-    if (channel === "email" && subscriber.email !== null && this.email)
-      await this.email({
-        to: subscriber.email,
-        subject: message.subject ?? "",
-        html: message.content,
-      })
+    if (channel === "email" && message.to !== null && this.email)
+      await this.email({ to: message.to, subject: message.subject ?? "", html: message.content })
   }
 }

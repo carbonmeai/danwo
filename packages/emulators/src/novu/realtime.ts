@@ -64,6 +64,7 @@ export class NovuRealtime {
   }
 
   /** Inboxes open right now, by subscriber id. */
+  // fallow-ignore-next-line unused-class-member -- called through the novuProject helper
   inboxes(): Record<string, number> {
     return Object.fromEntries([...this.sockets].map(([id, set]) => [id, set.size]))
   }

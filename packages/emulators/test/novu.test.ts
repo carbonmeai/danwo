@@ -174,22 +174,25 @@ describe("novu server API", () => {
   })
 })
 
+/** A trigger under one idempotency key, as a retry would send it again. */
+function send(body: unknown): Promise<Response> {
+  return fetch(`${origin()}/v1/events/trigger`, {
+    method: "POST",
+    headers: {
+      authorization: `ApiKey ${KEY}`,
+      "content-type": "application/json",
+      "idempotency-key": "k-1",
+    },
+    body: JSON.stringify(body),
+  })
+}
+
 describe("novu idempotency", () => {
   it("answers a retried trigger with the first answer, and runs the workflow once", async () => {
     seedNovu(emulator.store, {
       workflows: [{ workflowId: "once", steps: [{ stepId: "bell", type: "in_app", body: "hi" }] }],
     })
 
-    const send = (body: unknown) =>
-      fetch(`${origin()}/v1/events/trigger`, {
-        method: "POST",
-        headers: {
-          authorization: `ApiKey ${KEY}`,
-          "content-type": "application/json",
-          "idempotency-key": "k-1",
-        },
-        body: JSON.stringify(body),
-      })
     const first = await send({ name: "once", to: "u9", payload: {} })
     const again = await send({ name: "once", to: "u9", payload: {} })
 

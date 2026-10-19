@@ -4,11 +4,11 @@
  * through (devices, their interests, the user they belong to). Notifications are not pushed to a
  * real device; each publish is kept with the devices it would reach, for tests to read.
  */
-import { createHmac } from "node:crypto"
 
 import { HttpError } from "../errors.ts"
+import { hs256Claims } from "../hs256.ts"
 import type { App, Context } from "../http.ts"
-import { asRecord } from "../json.ts"
+import { asRecord, jsonObjectOf } from "../json.ts"
 import type { Clock } from "../store.ts"
 import type { BeamsDevice, BeamsInstance } from "./entities.ts"
 import type { PusherStore } from "./store.ts"
@@ -51,14 +51,6 @@ function authorised(ctx: BeamsRouteContext, c: Context): BeamsInstance {
   return instance
 }
 
-async function bodyOf(c: Context): Promise<Record<string, unknown>> {
-  try {
-    return asRecord(JSON.parse(await c.req.text())) ?? {}
-  } catch {
-    throw new HttpError(400, "Request body is not valid JSON")
-  }
-}
-
 function strings(value: unknown, field: string): string[] {
   if (
     !Array.isArray(value) ||
@@ -84,7 +76,7 @@ function deviceOf(ctx: BeamsRouteContext, c: Context): BeamsDevice {
 function publishRoutes(ctx: BeamsRouteContext): void {
   ctx.app.post("/publish_api/v1/instances/:instanceId/publishes/interests", async (c) => {
     const instance = authorised(ctx, c)
-    const { interests, ...request } = await bodyOf(c)
+    const { interests, ...request } = await jsonObjectOf(c)
     const names = strings(interests, "interests")
 
     if (!names.every((name) => INTEREST.test(name)))
@@ -107,7 +99,7 @@ function publishRoutes(ctx: BeamsRouteContext): void {
 
   ctx.app.post("/publish_api/v1/instances/:instanceId/publishes/users", async (c) => {
     const instance = authorised(ctx, c)
-    const { users, ...request } = await bodyOf(c)
+    const { users, ...request } = await jsonObjectOf(c)
     const publish = ctx.objects.publishes.add(
       {
         id: `pub_${ctx.objects.next()}`,
@@ -140,7 +132,7 @@ function deviceRoutes(ctx: BeamsRouteContext): void {
 
   ctx.app.post(base, async (c) => {
     const instance = instanceOf(ctx, c)
-    const body = await bodyOf(c)
+    const body = await jsonObjectOf(c)
     const platform = c.req.param("platform")
 
     if (platform !== "web" && platform !== "fcm" && platform !== "apns")
@@ -168,7 +160,7 @@ function deviceRoutes(ctx: BeamsRouteContext): void {
 
   ctx.app.put(`${base}/:deviceId/interests`, async (c) => {
     const device = deviceOf(ctx, c)
-    const interests = (await bodyOf(c))["interests"]
+    const interests = (await jsonObjectOf(c))["interests"]
 
     ctx.objects.devices.change(device.id, {
       interests: Array.isArray(interests)
@@ -224,27 +216,12 @@ function deviceRoutes(ctx: BeamsRouteContext): void {
  * (the server SDK's `generateToken`), issued for this instance. Undefined when it is not one.
  */
 function subjectOf(token: string, instance: BeamsInstance): string | undefined {
-  const [header, payload, signature] = token.split(".")
+  const claims = hs256Claims(token, instance.secret_key)
+  const sub = claims?.["sub"]
 
-  if (header === undefined || payload === undefined || signature === undefined) return undefined
+  if (claims?.["iss"] !== `https://${instance.id}.pushnotifications.pusher.com`) return undefined
 
-  const expected = createHmac("sha256", instance.secret_key)
-    .update(`${header}.${payload}`)
-    .digest("base64url")
-
-  if (expected !== signature) return undefined
-
-  try {
-    const claims = asRecord(JSON.parse(Buffer.from(payload, "base64url").toString("utf8")))
-    const sub = claims?.["sub"]
-
-    return typeof sub === "string" &&
-      claims?.["iss"] === `https://${instance.id}.pushnotifications.pusher.com`
-      ? sub
-      : undefined
-  } catch {
-    return undefined
-  }
+  return typeof sub === "string" ? sub : undefined
 }
 
 export function beamsRoutes(ctx: BeamsRouteContext): void {

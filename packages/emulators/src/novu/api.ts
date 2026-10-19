@@ -5,7 +5,7 @@
  */
 import { HttpError } from "../errors.ts"
 import type { App, Context, Middleware } from "../http.ts"
-import { asRecord } from "../json.ts"
+import { asRecord, jsonObjectOf } from "../json.ts"
 import type { Clock, DataKey, Store } from "../store.ts"
 import type { NovuEngine } from "./engine.ts"
 import type { NovuEnvironment, NovuSubscriber } from "./entities.ts"
@@ -16,7 +16,7 @@ import {
   topicObject,
 } from "./formatters.ts"
 import type { NovuRealtime } from "./realtime.ts"
-import { type NovuStore, objectId } from "./store.ts"
+import { defined, newSubscriber, type NovuStore, objectId, type SubscriberFields } from "./store.ts"
 
 export interface NovuRouteContext {
   readonly app: App
@@ -27,7 +27,7 @@ export interface NovuRouteContext {
 }
 
 /** The environment a request's `Authorization: ApiKey <key>` names. */
-export function environmentOf(ctx: NovuRouteContext, c: Context): NovuEnvironment {
+function environmentOf(ctx: NovuRouteContext, c: Context): NovuEnvironment {
   const env = ctx.objects.environment()
   const key = (c.req.header("authorization") ?? "")
     .replace(/^ApiKey\s+/i, "")
@@ -38,15 +38,23 @@ export function environmentOf(ctx: NovuRouteContext, c: Context): NovuEnvironmen
   return env
 }
 
-async function bodyOf(c: Context): Promise<Record<string, unknown>> {
-  try {
-    return asRecord(JSON.parse(await c.req.text())) ?? {}
-  } catch {
-    throw new HttpError(400, "Request body is not valid JSON")
-  }
-}
-
 const text = (value: unknown): string | null => (typeof value === "string" ? value : null)
+
+/** The request fields of a subscriber that were given, by their stored names. */
+function requestFields(fields: Record<string, unknown>): SubscriberFields {
+  const given = (name: string) => (name in fields ? text(fields[name]) : undefined)
+
+  return defined({
+    first_name: given("firstName"),
+    last_name: given("lastName"),
+    email: given("email"),
+    phone: given("phone"),
+    avatar: given("avatar"),
+    locale: given("locale"),
+    timezone: given("timezone"),
+    data: "data" in fields ? (asRecord(fields["data"]) ?? null) : undefined,
+  })
+}
 
 /** Creates or updates a subscriber from the fields a request gives. */
 export function upsertSubscriber(
@@ -60,39 +68,12 @@ export function upsertSubscriber(
 
   const now = ctx.clock().toISOString()
   const existing = ctx.objects.subscribers.where((s) => s.subscriber_id === subscriberId)[0]
-  const changes = {
-    ...("firstName" in fields && { first_name: text(fields["firstName"]) }),
-    ...("lastName" in fields && { last_name: text(fields["lastName"]) }),
-    ...("email" in fields && { email: text(fields["email"]) }),
-    ...("phone" in fields && { phone: text(fields["phone"]) }),
-    ...("avatar" in fields && { avatar: text(fields["avatar"]) }),
-    ...("locale" in fields && { locale: text(fields["locale"]) }),
-    ...("timezone" in fields && { timezone: text(fields["timezone"]) }),
-    ...("data" in fields && { data: asRecord(fields["data"]) ?? null }),
-  }
+  const changes = requestFields(fields)
 
   if (existing)
     return ctx.objects.subscribers.change(existing.id, { ...changes, updated: now }) ?? existing
 
-  return ctx.objects.subscribers.add(
-    {
-      id: objectId(),
-      subscriber_id: subscriberId,
-      first_name: null,
-      last_name: null,
-      email: null,
-      phone: null,
-      avatar: null,
-      locale: null,
-      timezone: null,
-      data: null,
-      channels: [],
-      created: now,
-      updated: now,
-      ...changes,
-    },
-    null,
-  )
+  return ctx.objects.subscribers.add(newSubscriber(subscriberId, now, changes), null)
 }
 
 function subscriberById(ctx: NovuRouteContext, subscriberId: string): NovuSubscriber {
@@ -103,32 +84,26 @@ function subscriberById(ctx: NovuRouteContext, subscriberId: string): NovuSubscr
   return found
 }
 
+/** The subscribers one entry of a trigger's `to` names: an id, a subscriber object, or a topic. */
+function recipientsOfEntry(ctx: NovuRouteContext, entry: unknown): NovuSubscriber[] {
+  if (typeof entry === "string") return [upsertSubscriber(ctx, { subscriberId: entry })]
+
+  const fields = asRecord(entry) ?? {}
+
+  if (fields["type"] !== "Topic") return [upsertSubscriber(ctx, fields)]
+
+  const topic = ctx.objects.topics.where((t) => t.key === fields["topicKey"])[0]
+
+  return (topic?.subscribers ?? []).map((id) => subscriberById(ctx, id))
+}
+
 /** The subscribers a trigger's `to` names: ids, subscriber objects (upserted) and topics. */
 function recipientsOf(ctx: NovuRouteContext, to: unknown): NovuSubscriber[] {
-  const entries = Array.isArray(to) ? to : [to]
   const found = new Map<string, NovuSubscriber>()
 
-  for (const entry of entries) {
-    if (typeof entry === "string") {
-      const subscriber = upsertSubscriber(ctx, { subscriberId: entry })
-
+  for (const entry of Array.isArray(to) ? to : [to])
+    for (const subscriber of recipientsOfEntry(ctx, entry))
       found.set(subscriber.subscriber_id, subscriber)
-      continue
-    }
-
-    const fields = asRecord(entry) ?? {}
-
-    if (fields["type"] === "Topic" && typeof fields["topicKey"] === "string") {
-      const topic = ctx.objects.topics.where((t) => t.key === fields["topicKey"])[0]
-
-      for (const id of topic?.subscribers ?? []) found.set(id, subscriberById(ctx, id))
-      continue
-    }
-
-    const subscriber = upsertSubscriber(ctx, fields)
-
-    found.set(subscriber.subscriber_id, subscriber)
-  }
 
   return [...found.values()]
 }
@@ -167,12 +142,12 @@ function eventRoutes(ctx: NovuRouteContext): void {
   const { app } = ctx
 
   app.post("/v1/events/trigger", async (c) =>
-    c.json({ data: trigger(ctx, environmentOf(ctx, c), await bodyOf(c)) }, 201),
+    c.json({ data: trigger(ctx, environmentOf(ctx, c), await jsonObjectOf(c)) }, 201),
   )
 
   app.post("/v1/events/trigger/bulk", async (c) => {
     const env = environmentOf(ctx, c)
-    const events = (await bodyOf(c))["events"]
+    const events = (await jsonObjectOf(c))["events"]
 
     if (!Array.isArray(events)) throw new HttpError(400, "events must be an array")
 
@@ -181,7 +156,7 @@ function eventRoutes(ctx: NovuRouteContext): void {
 
   app.post("/v1/events/trigger/broadcast", async (c) => {
     const env = environmentOf(ctx, c)
-    const body = await bodyOf(c)
+    const body = await jsonObjectOf(c)
 
     return c.json(
       {
@@ -207,7 +182,7 @@ function subscriberRoutes(ctx: NovuRouteContext): void {
   app.post("/v2/subscribers", async (c) => {
     const env = environmentOf(ctx, c)
 
-    return c.json(subscriberObject(env, upsertSubscriber(ctx, await bodyOf(c))), 201)
+    return c.json(subscriberObject(env, upsertSubscriber(ctx, await jsonObjectOf(c))), 201)
   })
 
   app.get("/v2/subscribers", (c) => {
@@ -244,7 +219,10 @@ function subscriberRoutes(ctx: NovuRouteContext): void {
     return c.json(
       subscriberObject(
         env,
-        upsertSubscriber(ctx, { ...(await bodyOf(c)), subscriberId: c.req.param("subscriberId") }),
+        upsertSubscriber(ctx, {
+          ...(await jsonObjectOf(c)),
+          subscriberId: c.req.param("subscriberId"),
+        }),
       ),
     )
   })
@@ -259,7 +237,7 @@ function subscriberRoutes(ctx: NovuRouteContext): void {
   app.put("/v1/subscribers/:subscriberId/credentials", async (c) => {
     const env = environmentOf(ctx, c)
     const subscriber = subscriberById(ctx, c.req.param("subscriberId"))
-    const body = await bodyOf(c)
+    const body = await jsonObjectOf(c)
     const providerId = text(body["providerId"])
 
     if (providerId === null) throw new HttpError(400, "providerId must be a string")
@@ -303,6 +281,17 @@ function subscriberRoutes(ctx: NovuRouteContext): void {
   })
 }
 
+/** The subscriber ids a topic subscription request lists, as ids or `{ subscriberId }`. */
+function subscriberIdsOf(body: Record<string, unknown>): string[] {
+  const listed = [body["subscriptions"], body["subscriberIds"]].find(Array.isArray) ?? []
+
+  return listed.flatMap((entry: unknown) => {
+    const id = typeof entry === "string" ? entry : text(asRecord(entry)?.["subscriberId"])
+
+    return id === null ? [] : [id]
+  })
+}
+
 function topicRoutes(ctx: NovuRouteContext): void {
   const { app } = ctx
 
@@ -317,7 +306,7 @@ function topicRoutes(ctx: NovuRouteContext): void {
   app.post("/v2/topics", async (c) => {
     environmentOf(ctx, c)
 
-    const body = await bodyOf(c)
+    const body = await jsonObjectOf(c)
     const key = text(body["key"])
 
     if (key === null) throw new HttpError(400, "key must be a string")
@@ -359,21 +348,18 @@ function topicRoutes(ctx: NovuRouteContext): void {
     updatedAt: topic.updated,
   })
 
-  app.post("/v2/topics/:topicKey/subscriptions", async (c) => {
+  /** The topic a subscription request is for, and the subscriber ids it lists. */
+  const subscriptionRequest = async (c: Context) => {
     environmentOf(ctx, c)
 
-    const topic = topicByKey(c.req.param("topicKey"))
-    const body = await bodyOf(c)
-    const listed = Array.isArray(body["subscriptions"])
-      ? body["subscriptions"]
-      : Array.isArray(body["subscriberIds"])
-        ? body["subscriberIds"]
-        : []
-    const ids = listed.flatMap((entry) => {
-      const id = typeof entry === "string" ? entry : text(asRecord(entry)?.["subscriberId"])
+    return {
+      topic: topicByKey(c.req.param("topicKey")),
+      ids: subscriberIdsOf(await jsonObjectOf(c)),
+    }
+  }
 
-      return id === null ? [] : [id]
-    })
+  app.post("/v2/topics/:topicKey/subscriptions", async (c) => {
+    const { topic, ids } = await subscriptionRequest(c)
     const subscribers = ids.map((id) => subscriberById(ctx, id))
     const updated =
       ctx.objects.topics.change(topic.id, {
@@ -405,20 +391,7 @@ function topicRoutes(ctx: NovuRouteContext): void {
   })
 
   app.delete("/v2/topics/:topicKey/subscriptions", async (c) => {
-    environmentOf(ctx, c)
-
-    const topic = topicByKey(c.req.param("topicKey"))
-    const body = await bodyOf(c)
-    const listed = Array.isArray(body["subscriptions"])
-      ? body["subscriptions"]
-      : Array.isArray(body["subscriberIds"])
-        ? body["subscriberIds"]
-        : []
-    const ids = listed.flatMap((entry) => {
-      const id = typeof entry === "string" ? entry : text(asRecord(entry)?.["subscriberId"])
-
-      return id === null ? [] : [id]
-    })
+    const { topic, ids } = await subscriptionRequest(c)
     const removed = ids.filter((id) => topic.subscribers.includes(id))
 
     ctx.objects.topics.change(topic.id, {

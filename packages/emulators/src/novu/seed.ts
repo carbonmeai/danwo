@@ -1,6 +1,6 @@
 import type { Store } from "../store.ts"
 import type { NovuStepTemplate } from "./entities.ts"
-import { novuStore, objectId } from "./store.ts"
+import { defined, newSubscriber, novuStore, objectId, type SubscriberFields } from "./store.ts"
 
 /** A subscriber to start with. */
 export type NovuSeedSubscriber = { readonly subscriberId: string } & Partial<{
@@ -39,21 +39,41 @@ export const NOVU_DEFAULTS = {
   applicationIdentifier: "danwo-novu-app",
 } as const
 
+/** The environment's settings a seed gives, by their stored names. */
+function environmentSettings(config: NovuSeedConfig) {
+  return defined({
+    api_key: config.apiKey,
+    application_identifier: config.applicationIdentifier,
+    bridge_url: config.bridgeUrl,
+    hmac: config.hmac,
+  })
+}
+
+/** A seeded subscriber's fields, by their stored names. */
+function subscriberFields(subscriber: NovuSeedSubscriber): SubscriberFields {
+  return defined({
+    first_name: subscriber.firstName,
+    last_name: subscriber.lastName,
+    email: subscriber.email,
+    phone: subscriber.phone,
+    data: subscriber.data && { ...subscriber.data },
+  })
+}
+
 /** Loads `config` into a Novu emulator's store; the environment's settings replace the defaults. */
 export function seedNovu(store: Store, config: NovuSeedConfig): void {
   const objects = novuStore(store)
   const current = objects.environment()
   const now = store.clock().toISOString()
   const env = {
-    id: current?.id ?? objectId(),
-    organization_id: current?.organization_id ?? objectId(),
-    api_key: config.apiKey ?? current?.api_key ?? NOVU_DEFAULTS.apiKey,
-    application_identifier:
-      config.applicationIdentifier ??
-      current?.application_identifier ??
-      NOVU_DEFAULTS.applicationIdentifier,
-    bridge_url: config.bridgeUrl ?? current?.bridge_url ?? null,
-    hmac: config.hmac ?? current?.hmac ?? false,
+    id: objectId(),
+    organization_id: objectId(),
+    api_key: NOVU_DEFAULTS.apiKey,
+    application_identifier: NOVU_DEFAULTS.applicationIdentifier,
+    bridge_url: null,
+    hmac: false,
+    ...current,
+    ...environmentSettings(config),
   }
 
   if (current) objects.environments.change(current.id, env)
@@ -61,21 +81,7 @@ export function seedNovu(store: Store, config: NovuSeedConfig): void {
 
   for (const subscriber of config.subscribers ?? [])
     objects.subscribers.add(
-      {
-        id: objectId(),
-        subscriber_id: subscriber.subscriberId,
-        first_name: subscriber.firstName ?? null,
-        last_name: subscriber.lastName ?? null,
-        email: subscriber.email ?? null,
-        phone: subscriber.phone ?? null,
-        avatar: null,
-        locale: null,
-        timezone: null,
-        data: subscriber.data ? { ...subscriber.data } : null,
-        channels: [],
-        created: now,
-        updated: now,
-      },
+      newSubscriber(subscriber.subscriberId, now, subscriberFields(subscriber)),
       null,
     )
 

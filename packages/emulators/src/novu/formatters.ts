@@ -106,6 +106,24 @@ export function inboxNotification(message: NovuMessage, subscriber: NovuSubscrib
   }
 }
 
+/** Who an Inbox notification is to: only the names and details the subscriber has. */
+function recipientSummary(subscriberId: string, subscriber: NovuSubscriber | undefined) {
+  if (subscriber === undefined) return { id: subscriberId, subscriberId }
+
+  const optional = {
+    firstName: subscriber.first_name,
+    lastName: subscriber.last_name,
+    avatar: subscriber.avatar,
+    email: subscriber.email,
+  }
+
+  return {
+    id: subscriber.id,
+    subscriberId,
+    ...Object.fromEntries(Object.entries(optional).filter(([, value]) => value !== null)),
+  }
+}
+
 /** An in-app message as the v2 subscriber API and the Inbox API list it (the Inbox client's shape). */
 export function subscriberNotification(
   message: NovuMessage,
@@ -116,14 +134,7 @@ export function subscriberNotification(
     transactionId: message.transaction_id,
     ...(message.subject !== null && { subject: message.subject }),
     body: message.content,
-    to: {
-      id: subscriber?.id ?? message.subscriber_id,
-      subscriberId: message.subscriber_id,
-      ...(subscriber?.first_name && { firstName: subscriber.first_name }),
-      ...(subscriber?.last_name && { lastName: subscriber.last_name }),
-      ...(subscriber?.avatar && { avatar: subscriber.avatar }),
-      ...(subscriber?.email && { email: subscriber.email }),
-    },
+    to: recipientSummary(message.subscriber_id, subscriber),
     isRead: message.read,
     isSeen: message.seen,
     isArchived: message.archived,

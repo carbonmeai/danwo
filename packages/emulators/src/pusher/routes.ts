@@ -4,7 +4,7 @@
  */
 import { HttpError } from "../errors.ts"
 import type { App, Context } from "../http.ts"
-import { asRecord } from "../json.ts"
+import { asRecord, jsonObjectOf } from "../json.ts"
 import type { Clock } from "../store.ts"
 import type { PusherHub } from "./channels.ts"
 import type { PusherApp } from "./entities.ts"
@@ -49,6 +49,36 @@ async function signedApp(c: Context, ctx: PusherRouteContext): Promise<PusherApp
   return app
 }
 
+/** The channels a trigger body names, checked the way Pusher checks them. */
+function channelsOf(body: Record<string, unknown>): string[] {
+  const listed = Array.isArray(body["channels"]) ? body["channels"] : [body["channel"]]
+  const channels = listed.filter((channel): channel is string => typeof channel === "string")
+
+  if (channels.length === 0) throw new HttpError(400, "Missing parameter: channels")
+  if (channels.length > MAX_CHANNELS)
+    throw new HttpError(400, `Too many channels: ${channels.length} > ${MAX_CHANNELS}`)
+
+  return channels
+}
+
+/** A trigger's data as the string clients receive, within Pusher's size limit. */
+function encodedData(data: unknown): string {
+  if (data === undefined) throw new HttpError(400, "Missing parameter: data")
+
+  const encoded = typeof data === "string" ? data : JSON.stringify(data)
+  const bytes = Buffer.byteLength(encoded)
+
+  if (bytes > MAX_DATA_BYTES)
+    throw new HttpError(413, `Event data too large: ${bytes} > ${MAX_DATA_BYTES} bytes`)
+
+  return encoded
+}
+
+/** `value` when it is a string, else null. */
+function stringOrNull(value: unknown): string | null {
+  return typeof value === "string" ? value : null
+}
+
 /** The event fields of a trigger body, checked the way Pusher checks them. */
 function eventOf(body: Record<string, unknown>): {
   name: string
@@ -58,41 +88,17 @@ function eventOf(body: Record<string, unknown>): {
   info: string | null
 } {
   const name = body["name"]
-  const data = body["data"]
-  const channels = Array.isArray(body["channels"])
-    ? body["channels"]
-    : typeof body["channel"] === "string"
-      ? [body["channel"]]
-      : []
 
   if (typeof name !== "string" || name === "") throw new HttpError(400, "Missing parameter: name")
-  if (data === undefined) throw new HttpError(400, "Missing parameter: data")
-  if (channels.length === 0) throw new HttpError(400, "Missing parameter: channels")
-  if (channels.length > MAX_CHANNELS)
-    throw new HttpError(400, `Too many channels: ${channels.length} > ${MAX_CHANNELS}`)
 
-  const encoded = typeof data === "string" ? data : JSON.stringify(data)
-
-  if (Buffer.byteLength(encoded) > MAX_DATA_BYTES)
-    throw new HttpError(
-      413,
-      `Event data too large: ${Buffer.byteLength(encoded)} > ${MAX_DATA_BYTES} bytes`,
-    )
+  const data = encodedData(body["data"])
 
   return {
     name,
-    data: encoded,
-    channels: channels.filter((channel): channel is string => typeof channel === "string"),
-    socketId: typeof body["socket_id"] === "string" ? body["socket_id"] : null,
-    info: typeof body["info"] === "string" ? body["info"] : null,
-  }
-}
-
-async function bodyOf(c: Context): Promise<Record<string, unknown>> {
-  try {
-    return asRecord(JSON.parse(await c.req.text())) ?? {}
-  } catch {
-    throw new HttpError(400, "Request body is not valid JSON")
+    data,
+    channels: channelsOf(body),
+    socketId: stringOrNull(body["socket_id"]),
+    info: stringOrNull(body["info"]),
   }
 }
 
@@ -135,7 +141,7 @@ export function channelRoutes(ctx: PusherRouteContext): void {
 
   router.post("/apps/:appId/events", async (c) => {
     const app = await signedApp(c, ctx)
-    const event = eventOf(await bodyOf(c))
+    const event = eventOf(await jsonObjectOf(c))
 
     publish(ctx, app, event)
 
@@ -155,7 +161,7 @@ export function channelRoutes(ctx: PusherRouteContext): void {
 
   router.post("/apps/:appId/batch_events", async (c) => {
     const app = await signedApp(c, ctx)
-    const batch = (await bodyOf(c))["batch"]
+    const batch = (await jsonObjectOf(c))["batch"]
 
     if (!Array.isArray(batch)) throw new HttpError(400, "Missing parameter: batch")
     if (batch.length > MAX_BATCH)

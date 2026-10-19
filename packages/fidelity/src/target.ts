@@ -1,7 +1,7 @@
 /** Targets: the emulator in process, or the provider's sandbox over the network. */
 import { createEmulator, type Emulator, type EmulatorDefinition } from "@danwo/emulators"
 
-import { sendLive } from "./provider.ts"
+import { publicEndpointsAllowed, sendLive } from "./provider.ts"
 import type { OpenTarget, Target } from "./scenario.ts"
 
 /**
@@ -28,6 +28,21 @@ export function emulatorTarget(
 /** The provider's sandbox, called with `credentials`. */
 export function liveTarget(credentials: Readonly<Record<string, string>>): Target {
   return { kind: "live", credentials, send: sendLive }
+}
+
+/**
+ * The sandbox for a provider whose only credential is an optional `key` variable: with the key
+ * when it is set, keyless when public endpoints are allowed, else none.
+ */
+export function keyOrPublicTarget(
+  env: Readonly<Record<string, string | undefined>>,
+  variable: string,
+): Target | undefined {
+  const key = env[variable]?.trim()
+
+  if (key !== undefined && key !== "") return liveTarget({ key })
+
+  return publicEndpointsAllowed(env) ? liveTarget({}) : undefined
 }
 
 /** The value of `name` in a target's credentials; a scenario bug when it is missing. */

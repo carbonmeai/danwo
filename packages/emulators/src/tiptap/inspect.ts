@@ -43,6 +43,7 @@ export interface TiptapCollabView {
   trouble(trouble: Partial<TiptapTrouble>): void
 }
 
+/** A Tiptap emulator's documents as JSON or text, who is editing them, and their faults. */
 export function tiptapCollab(emulator: Pick<Emulator, "store">): TiptapCollabView {
   const server = () => tiptapServer(emulator.store)
 

@@ -49,8 +49,6 @@
     "@octokit/openapi-webhooks-types": "12.1.0",
     "@octokit/rest": "22.0.1",
     "@octokit/webhooks": "14.2.0",
-    "@pusher/push-notifications-server": "1.2.7",
-    "@pusher/push-notifications-web": "1.1.0",
     "@slack/bolt": "5.1.0",
     "@slack/web-api": "8.2.0",
     "@types/ws": "8.18.2",

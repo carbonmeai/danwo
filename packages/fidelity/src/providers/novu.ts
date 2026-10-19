@@ -6,10 +6,10 @@
  */
 import { novu, seedNovu } from "@danwo/emulators"
 
-import { type FidelityProvider, PUBLIC_ENDPOINTS, publicEndpointsAllowed } from "../provider.ts"
+import { type FidelityProvider, PUBLIC_ENDPOINTS } from "../provider.ts"
 import type { Scenario, ScenarioContext } from "../scenario.ts"
 import { anything, bool, map, nullable, num, object, str } from "../schema.ts"
-import { emulatorTarget, liveTarget } from "../target.ts"
+import { emulatorTarget, keyOrPublicTarget } from "../target.ts"
 
 const API = "https://api.novu.co"
 const KEY = "DANWO_FIDELITY_NOVU_KEY"
@@ -128,11 +128,5 @@ export const novuFidelity: FidelityProvider = {
     emulatorTarget(novu, { key: EMULATED_KEY }, (emulator) =>
       seedNovu(emulator.store, { apiKey: EMULATED_KEY }),
     ),
-  live(env) {
-    const key = env[KEY]?.trim()
-
-    if (key !== undefined && key !== "") return liveTarget({ key })
-
-    return publicEndpointsAllowed(env) ? liveTarget({}) : undefined
-  },
+  live: (env) => keyOrPublicTarget(env, KEY),
 }

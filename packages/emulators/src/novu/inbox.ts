@@ -7,24 +7,12 @@ import { createHmac, randomBytes } from "node:crypto"
 
 import { HttpError } from "../errors.ts"
 import type { Context } from "../http.ts"
-import { asRecord } from "../json.ts"
+import { asRecord, jsonObjectOf } from "../json.ts"
 import { type NovuRouteContext, upsertSubscriber } from "./api.ts"
 import type { NovuMessage, NovuSubscriber } from "./entities.ts"
 import { subscriberNotification } from "./formatters.ts"
 
 const BASE = "/v1/inbox"
-
-async function bodyOf(c: Context): Promise<Record<string, unknown>> {
-  const raw = await c.req.text()
-
-  if (raw === "") return {}
-
-  try {
-    return asRecord(JSON.parse(raw)) ?? {}
-  } catch {
-    throw new HttpError(400, "Request body is not valid JSON")
-  }
-}
 
 /** The subscriber an Inbox request's session token belongs to. */
 function sessionSubscriber(ctx: NovuRouteContext, c: Context): NovuSubscriber {
@@ -70,13 +58,20 @@ function inboxOf(
     .toReversed()
 }
 
-/** Changes one of the subscriber's notifications and tells their open Inboxes. */
-function change(ctx: NovuRouteContext, c: Context, changes: (now: string) => Partial<NovuMessage>) {
+/** The session's subscriber, and the notification of theirs the request names. */
+function ownNotification(ctx: NovuRouteContext, c: Context) {
   const subscriber = sessionSubscriber(ctx, c)
   const message = ctx.objects.messages.get(c.req.param("id"))
 
   if (message?.subscriber_id !== subscriber.subscriber_id)
     throw new HttpError(404, "Notification not found")
+
+  return { subscriber, message }
+}
+
+/** Changes one of the subscriber's notifications and tells their open Inboxes. */
+function change(ctx: NovuRouteContext, c: Context, changes: (now: string) => Partial<NovuMessage>) {
+  const { subscriber, message } = ownNotification(ctx, c)
 
   const updated =
     ctx.objects.messages.change(message.id, changes(ctx.clock().toISOString())) ?? message
@@ -108,7 +103,7 @@ function changeAll(
 function sessionRoute(ctx: NovuRouteContext): void {
   ctx.app.post(`${BASE}/session`, async (c) => {
     const env = ctx.objects.environment()
-    const body = await bodyOf(c)
+    const body = await jsonObjectOf(c)
 
     if (env === undefined || body["applicationIdentifier"] !== env.application_identifier)
       throw new HttpError(400, "Please provide a valid application identifier")
@@ -241,7 +236,7 @@ function changeRoutes(ctx: NovuRouteContext): void {
   app.post(`${BASE}/notifications/seen`, async (c) => {
     const subscriber = sessionSubscriber(ctx, c)
 
-    changeAll(ctx, subscriber, (await bodyOf(c))["notificationIds"], {
+    changeAll(ctx, subscriber, (await jsonObjectOf(c))["notificationIds"], {
       seen: true,
       seen_at: ctx.clock().toISOString(),
     })
@@ -259,11 +254,8 @@ function changeRoutes(ctx: NovuRouteContext): void {
   })
 
   app.delete(`${BASE}/notifications/:id/delete`, (c) => {
-    const subscriber = sessionSubscriber(ctx, c)
-    const message = ctx.objects.messages.get(c.req.param("id"))
+    const { subscriber, message } = ownNotification(ctx, c)
 
-    if (message?.subscriber_id !== subscriber.subscriber_id)
-      throw new HttpError(404, "Notification not found")
     ctx.objects.messages.remove(message.id)
     ctx.realtime.counts(subscriber.subscriber_id)
 

@@ -5,9 +5,9 @@
  */
 import { composio, seedComposio } from "@danwo/emulators"
 
-import { type FidelityProvider, PUBLIC_ENDPOINTS, publicEndpointsAllowed } from "../provider.ts"
+import { type FidelityProvider, PUBLIC_ENDPOINTS } from "../provider.ts"
 import type { Scenario, ScenarioContext, StepDoc } from "../scenario.ts"
-import { emulatorTarget, liveTarget } from "../target.ts"
+import { emulatorTarget, keyOrPublicTarget } from "../target.ts"
 
 const API = "https://backend.composio.dev/api/v3.1"
 const KEY = "DANWO_FIDELITY_COMPOSIO_KEY"
@@ -134,12 +134,6 @@ export const composioFidelity: FidelityProvider = {
         ],
       }),
     ),
-  live(env) {
-    const key = env[KEY]?.trim()
-
-    /* Composio has no test mode: a project key is the sandbox, so a dedicated test project's key belongs here. */
-    if (key !== undefined && key !== "") return liveTarget({ key })
-
-    return publicEndpointsAllowed(env) ? liveTarget({}) : undefined
-  },
+  /* Composio has no test mode: a project key is the sandbox, so a dedicated test project's key belongs here. */
+  live: (env) => keyOrPublicTarget(env, KEY),
 }

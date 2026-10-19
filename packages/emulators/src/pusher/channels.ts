@@ -71,6 +71,50 @@ const isPresence = (channel: string) => channel.startsWith("presence-")
 const userChannel = (userId: string) => `#server-to-user-${userId}`
 
 /** The connections, and what the realtime side tells webhooks. */
+/** Why a subscription to `channel` is refused, or undefined when it may join. */
+function subscribeRefusal(
+  connection: Connection,
+  channel: string,
+  auth: unknown,
+  channelData: string | undefined,
+): string | undefined {
+  if (channel.startsWith("private-encrypted-"))
+    return "Encrypted channels are not supported by danwo's Pusher emulator"
+  if (!isPrivate(channel) && !isPresence(channel)) return undefined
+
+  const presenceData = isPresence(channel) ? channelData : undefined
+
+  if (channelAuthValid(connection.app, connection.socketId, channel, auth, presenceData))
+    return undefined
+
+  return `Invalid signature: Expected HMAC SHA256 hex digest of ${connection.socketId}:${channel}, but got ${typeof auth === "string" ? auth : "nothing"}`
+}
+
+/** The member a presence subscription's `channel_data` names, or undefined without a user_id. */
+function presenceMember(channelData: string | undefined): Member | undefined {
+  const fields = asRecord(channelData === undefined ? undefined : safeJson(channelData))
+  const userId = fields?.["user_id"]
+
+  if (typeof userId !== "string" && typeof userId !== "number") return undefined
+
+  return { user_id: String(userId), user_info: fields?.["user_info"] ?? null }
+}
+
+/** The frame telling a new presence member who is on the channel. */
+function presenceSucceeded(channel: string, members: readonly Member[]): string {
+  return frame(
+    "pusher_internal:subscription_succeeded",
+    {
+      presence: {
+        count: members.length,
+        ids: members.map((m) => m.user_id),
+        hash: Object.fromEntries(members.map((m) => [m.user_id, m.user_info])),
+      },
+    },
+    channel,
+  )
+}
+
 export class PusherHub {
   private readonly connections = new Map<string, Connection>()
   private readonly objects: PusherStore
@@ -175,6 +219,7 @@ export class PusherHub {
   }
 
   /** The open connections, for tests: socket id, app, channels and signed-in user. */
+  // fallow-ignore-next-line unused-class-member -- called through the pusherChannels helper
   list(): { socket_id: string; app_id: string; channels: string[]; user_id: string | null }[] {
     return [...this.connections.values()].map((connection) => ({
       socket_id: connection.socketId,
@@ -198,30 +243,29 @@ export class PusherHub {
     this.connections.clear()
   }
 
+  /** What each `pusher:` control event a client sends does. */
+  private readonly controls: Record<
+    string,
+    (connection: Connection, data: Record<string, unknown>) => void
+  > = {
+    "pusher:ping": (connection) => connection.socket.send(frame("pusher:pong", {})),
+    "pusher:subscribe": (connection, data) => this.subscribe(connection, data),
+    "pusher:unsubscribe": (connection, data) => {
+      if (typeof data["channel"] === "string") this.leave(connection, data["channel"])
+    },
+    "pusher:signin": (connection, data) => this.signin(connection, data),
+  }
+
   private handle(connection: Connection, text: string): void {
     const message = parse(text)
 
     if (message === undefined) return
 
-    const data = asRecord(message.data) ?? {}
+    const control = this.controls[message.event]
 
-    switch (message.event) {
-      case "pusher:ping":
-        connection.socket.send(frame("pusher:pong", {}))
-        break
-      case "pusher:subscribe":
-        this.subscribe(connection, data)
-        break
-      case "pusher:unsubscribe":
-        if (typeof data["channel"] === "string") this.leave(connection, data["channel"])
-        break
-      case "pusher:signin":
-        this.signin(connection, data)
-        break
-      default:
-        if (message.event.startsWith("client-") && message.channel !== undefined)
-          this.clientEvent(connection, message.event, message.channel, message.data)
-    }
+    if (control) control(connection, asRecord(message.data) ?? {})
+    else if (message.event.startsWith("client-") && message.channel !== undefined)
+      this.clientEvent(connection, message.event, message.channel, message.data)
   }
 
   private error(connection: Connection, message: string, code: number | null = null): void {
@@ -238,33 +282,10 @@ export class PusherHub {
     }
 
     const channelData = typeof data["channel_data"] === "string" ? data["channel_data"] : undefined
-    const needsAuth = isPrivate(channel) || isPresence(channel)
+    const refused = subscribeRefusal(connection, channel, data["auth"], channelData)
 
-    if (channel.startsWith("private-encrypted-")) {
-      this.error(connection, "Encrypted channels are not supported by danwo's Pusher emulator")
-
-      return
-    }
-
-    if (
-      needsAuth &&
-      !channelAuthValid(
-        connection.app,
-        connection.socketId,
-        channel,
-        data["auth"],
-        isPresence(channel) ? channelData : undefined,
-      )
-    ) {
-      this.error(
-        connection,
-        `Invalid signature: Expected HMAC SHA256 hex digest of ${connection.socketId}:${channel}, but got ${typeof data["auth"] === "string" ? data["auth"] : "nothing"}`,
-      )
-
-      return
-    }
-
-    if (isPresence(channel)) this.joinPresence(connection, channel, channelData)
+    if (refused !== undefined) this.error(connection, refused)
+    else if (isPresence(channel)) this.joinPresence(connection, channel, channelData)
     else this.join(connection, channel, null)
   }
 
@@ -282,42 +303,25 @@ export class PusherHub {
     channel: string,
     channelData: string | undefined,
   ): void {
-    const fields = asRecord(channelData === undefined ? undefined : safeJson(channelData))
-    const userId = fields?.["user_id"]
+    const member = presenceMember(channelData)
 
-    if (typeof userId !== "string" && typeof userId !== "number") {
+    if (member === undefined) {
       this.error(connection, "Presence channel_data must include a user_id")
 
       return
     }
 
-    const member: Member = { user_id: String(userId), user_info: fields?.["user_info"] ?? null }
     const known = this.members(connection.app, channel).some((m) => m.user_id === member.user_id)
 
     this.join(connection, channel, member)
+    connection.socket.send(presenceSucceeded(channel, this.members(connection.app, channel)))
 
-    const members = this.members(connection.app, channel)
+    if (known) return
 
-    connection.socket.send(
-      frame(
-        "pusher_internal:subscription_succeeded",
-        {
-          presence: {
-            count: members.length,
-            ids: members.map((m) => m.user_id),
-            hash: Object.fromEntries(members.map((m) => [m.user_id, m.user_info])),
-          },
-        },
-        channel,
-      ),
-    )
-
-    if (!known) {
-      for (const other of this.on(connection.app, channel))
-        if (other !== connection)
-          other.socket.send(frame("pusher_internal:member_added", member, channel))
-      this.webhook(connection.app, { name: "member_added", channel, user_id: member.user_id })
-    }
+    for (const other of this.on(connection.app, channel))
+      if (other !== connection)
+        other.socket.send(frame("pusher_internal:member_added", member, channel))
+    this.webhook(connection.app, { name: "member_added", channel, user_id: member.user_id })
   }
 
   private leave(connection: Connection, channel: string): void {
@@ -369,39 +373,32 @@ export class PusherHub {
     connection.socket.send(frame("pusher_internal:subscription_succeeded", {}, userChannel(id)))
   }
 
+  /** Why a client event on `channel` is refused, or undefined when it may be sent. */
+  private clientRefusal(connection: Connection, channel: string): string | undefined {
+    if (!isPrivate(channel) && !isPresence(channel))
+      return "Client event rejected - only supported on private and presence channels"
+    if (!connection.channels.has(channel))
+      return `Client event rejected - not subscribed to ${channel}`
+
+    return undefined
+  }
+
   private clientEvent(connection: Connection, name: string, channel: string, data: unknown): void {
-    if (!isPrivate(channel) && !isPresence(channel)) {
-      this.error(
-        connection,
-        "Client event rejected - only supported on private and presence channels",
-      )
+    const refused = this.clientRefusal(connection, channel)
+
+    if (refused !== undefined) {
+      this.error(connection, refused)
 
       return
     }
 
-    const member = connection.channels.get(channel)
-
-    if (member === undefined) {
-      this.error(connection, `Client event rejected - not subscribed to ${channel}`)
-
-      return
-    }
-
+    const userId = connection.channels.get(channel)?.user_id ?? null
+    const sender = userId === null ? {} : { user_id: userId }
     const encoded = typeof data === "string" ? data : JSON.stringify(data)
-    const reached: string[] = []
+    const others = this.on(connection.app, channel).filter((other) => other !== connection)
+    const sent = JSON.stringify({ event: name, channel, data: encoded, ...sender })
 
-    for (const other of this.on(connection.app, channel)) {
-      if (other === connection) continue
-      other.socket.send(
-        JSON.stringify({
-          event: name,
-          channel,
-          data: encoded,
-          ...(member && { user_id: member.user_id }),
-        }),
-      )
-      reached.push(other.socketId)
-    }
+    for (const other of others) other.socket.send(sent)
 
     this.record(connection.app, {
       channel,
@@ -409,8 +406,8 @@ export class PusherHub {
       data: encoded,
       socket_id: connection.socketId,
       source: "client",
-      user_id: member?.user_id ?? null,
-      delivered_to: reached,
+      user_id: userId,
+      delivered_to: others.map((other) => other.socketId),
     })
     this.webhook(connection.app, {
       name: "client_event",
@@ -418,7 +415,7 @@ export class PusherHub {
       event: name,
       data: encoded,
       socket_id: connection.socketId,
-      ...(member && { user_id: member.user_id }),
+      ...sender,
     })
   }
 

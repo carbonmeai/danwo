@@ -5,13 +5,13 @@
  * token, the Yjs sync protocol, awareness (who is where) and stateless messages. Several
  * documents can share one socket; several sockets can edit one document.
  */
-import { createHmac } from "node:crypto"
 
 import * as decoding from "lib0/decoding"
 import * as encoding from "lib0/encoding"
 import * as awarenessProtocol from "y-protocols/awareness"
 import * as syncProtocol from "y-protocols/sync"
 
+import { hs256Claims } from "../hs256.ts"
 import { asRecord } from "../json.ts"
 import type { EmulatorSocket, SocketSession, SocketUpgrade } from "../sockets.ts"
 import type { Store } from "../store.ts"
@@ -72,28 +72,6 @@ function message(
   return encoding.toUint8Array(encoder)
 }
 
-/** The claims of an HS256 JWT signed with `secret`, or undefined when it is not one. */
-function verifiedClaims(token: string, secret: string): Record<string, unknown> | undefined {
-  const [header, payload, signature] = token.split(".")
-
-  if (header === undefined || payload === undefined || signature === undefined) return undefined
-
-  const expected = createHmac("sha256", secret).update(`${header}.${payload}`).digest("base64url")
-
-  if (expected !== signature) return undefined
-
-  try {
-    const claims = asRecord(JSON.parse(Buffer.from(payload, "base64url").toString("utf8")))
-    const exp = claims?.["exp"]
-
-    if (typeof exp === "number" && exp * 1000 < Date.now()) return undefined
-
-    return claims
-  } catch {
-    return undefined
-  }
-}
-
 /** Whether `name` matches one of a token's document name patterns (`*` matches any run). */
 function listed(patterns: unknown, name: string): boolean {
   if (!Array.isArray(patterns)) return false
@@ -120,7 +98,7 @@ function listed(patterns: unknown, name: string): boolean {
 function scopeOf(app: TiptapApp | undefined, token: string, name: string): string {
   if (app?.secret === null || app?.secret === undefined) return "read-write"
 
-  const claims = verifiedClaims(token, app.secret)
+  const claims = hs256Claims(token, app.secret)
 
   if (claims === undefined) return "invalid token"
   if (listed(claims["readonlyDocumentNames"], name)) return "readonly"
@@ -161,6 +139,7 @@ export class TiptapCollab {
   }
 
   /** The connections editing `name` right now. */
+  // fallow-ignore-next-line unused-class-member -- called through the tiptapCollab helper
   editors(name: string): number {
     return [...this.connections].filter((connection) =>
       [...connection.opened.values()].some((opened) => opened.name === name),
@@ -210,6 +189,15 @@ export class TiptapCollab {
     if (delay > 0 && type === MESSAGE.sync)
       await new Promise((resolve) => setTimeout(resolve, delay))
 
+    this.dispatch(connection, opened, type, decoder)
+  }
+
+  private dispatch(
+    connection: Connection,
+    opened: Opened,
+    type: number,
+    decoder: decoding.Decoder,
+  ): void {
     switch (type) {
       case MESSAGE.sync:
         this.sync(connection, opened, decoder)
@@ -224,7 +212,7 @@ export class TiptapCollab {
         this.stateless(connection, opened, decoding.readVarString(decoder))
         break
       case MESSAGE.close:
-        connection.opened.delete(key)
+        connection.opened.delete(opened.key)
         break
       default:
     }
@@ -305,14 +293,21 @@ export class TiptapCollab {
 
   /** Sends a document's change to every other connection editing it. */
   private broadcast(name: string, update: Uint8Array, origin: unknown): void {
+    this.sendToEditors(name, origin, MESSAGE.sync, (out) => syncProtocol.writeUpdate(out, update))
+  }
+
+  /** Sends one message to every connection but `except` that has `name` open. */
+  private sendToEditors(
+    name: string,
+    except: unknown,
+    type: number,
+    write: (encoder: encoding.Encoder) => void,
+  ): void {
     for (const connection of this.connections) {
-      if (connection === origin) continue
+      if (connection === except) continue
 
       for (const opened of connection.opened.values())
-        if (opened.name === name)
-          connection.socket.send(
-            message(opened.key, MESSAGE.sync, (out) => syncProtocol.writeUpdate(out, update)),
-          )
+        if (opened.name === name) connection.socket.send(message(opened.key, type, write))
     }
   }
 
@@ -324,16 +319,9 @@ export class TiptapCollab {
     for (const client of awareness.getStates().keys())
       if (!before.has(client)) opened.clients.add(client)
 
-    for (const other of this.connections) {
-      if (other === connection) continue
-      for (const theirs of other.opened.values())
-        if (theirs.name === opened.name)
-          other.socket.send(
-            message(theirs.key, MESSAGE.awareness, (out) =>
-              encoding.writeVarUint8Array(out, update),
-            ),
-          )
-    }
+    this.sendToEditors(opened.name, connection, MESSAGE.awareness, (out) =>
+      encoding.writeVarUint8Array(out, update),
+    )
   }
 
   private sendAwareness(connection: Connection, opened: Opened): void {
@@ -380,14 +368,9 @@ export class TiptapCollab {
 
       const update = awarenessProtocol.encodeAwarenessUpdate(awareness, gone)
 
-      for (const other of this.connections)
-        for (const theirs of other.opened.values())
-          if (theirs.name === opened.name)
-            other.socket.send(
-              message(theirs.key, MESSAGE.awareness, (out) =>
-                encoding.writeVarUint8Array(out, update),
-              ),
-            )
+      this.sendToEditors(opened.name, connection, MESSAGE.awareness, (out) =>
+        encoding.writeVarUint8Array(out, update),
+      )
     }
   }
 }

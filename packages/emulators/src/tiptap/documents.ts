@@ -101,6 +101,7 @@ export class TiptapDocuments {
   }
 
   /** A document's plain text. */
+  // fallow-ignore-next-line unused-class-member -- called through the tiptapCollab helper
   text(name: string, fragment = DEFAULT_FRAGMENT): string {
     return textOf(this.json(name, fragment))
   }
@@ -138,6 +139,7 @@ export class TiptapDocuments {
     return this.store.getData(TROUBLE) ?? { permissionDenied: false, syncDelayMs: 0 }
   }
 
+  // fallow-ignore-next-line unused-class-member -- called through the tiptapCollab helper
   setTrouble(trouble: Partial<TiptapTrouble>): void {
     this.store.setData(TROUBLE, { ...this.trouble(), ...trouble })
   }
@@ -152,7 +154,7 @@ export class TiptapDocuments {
   }
 }
 
-export function documentTable(store: Store) {
+function documentTable(store: Store) {
   return objectTable<TiptapDocumentRecord>(store, "tiptap.documents")
 }
 

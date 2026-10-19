@@ -67,6 +67,12 @@ async function isJson(c: Context): Promise<boolean> {
   }
 }
 
+/** Writes a request's body into a document: a Yjs update, or a ProseMirror JSON document. */
+async function write(documents: TiptapDocuments, c: Context, name: string, yjs: boolean) {
+  if (yjs) documents.applyUpdate(name, new Uint8Array(await c.req.arrayBuffer()), "rest")
+  else documents.replace(name, await jsonBody(c), c.req.query("fragment") ?? DEFAULT_FRAGMENT)
+}
+
 function existing(ctx: TiptapRouteContext, name: string): void {
   if (!ctx.documents.has(name)) throw new HttpError(404, `Document ${name} not found`)
 }
@@ -110,9 +116,7 @@ export function tiptapRoutes(ctx: TiptapRouteContext): void {
     if (documents.has(name)) throw new HttpError(409, `Document ${name} already exists`)
 
     /* A body that is not JSON is a Yjs update, as a duplicate posts what a `yjs` read returned. */
-    if (formatOf(c) === "yjs" || !(await isJson(c)))
-      documents.applyUpdate(name, new Uint8Array(await c.req.arrayBuffer()), "rest")
-    else documents.replace(name, await jsonBody(c), c.req.query("fragment") ?? DEFAULT_FRAGMENT)
+    await write(documents, c, name, formatOf(c) === "yjs" || !(await isJson(c)))
 
     return c.body(null, 204)
   })
@@ -124,9 +128,7 @@ export function tiptapRoutes(ctx: TiptapRouteContext): void {
 
     existing(ctx, name)
 
-    if (formatOf(c) === "yjs")
-      documents.applyUpdate(name, new Uint8Array(await c.req.arrayBuffer()), "rest")
-    else documents.replace(name, await jsonBody(c), c.req.query("fragment") ?? DEFAULT_FRAGMENT)
+    await write(documents, c, name, formatOf(c) === "yjs")
 
     return c.body(null, 204)
   })
