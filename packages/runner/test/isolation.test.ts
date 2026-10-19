@@ -1,4 +1,10 @@
-import { clerkInstance, composioTools, type Emulator } from "@danwo/emulators"
+import {
+  clerkInstance,
+  composioTools,
+  type Emulator,
+  PUSHER_DEFAULTS,
+  pusherSignedQuery,
+} from "@danwo/emulators"
 import { describe, expect, it } from "vitest"
 import { z } from "zod"
 
@@ -18,6 +24,7 @@ import {
   slackService,
   twilioService,
 } from "../src/runner/oauth.ts"
+import { novuService, pusherService, tiptapService } from "../src/runner/realtime.ts"
 import { resendService } from "../src/runner/resend.ts"
 import { s3Service } from "../src/runner/s3.ts"
 import type { Service } from "../src/runner/services.ts"
@@ -498,6 +505,46 @@ const CASES: readonly Case[] = [
         "https://api8.unipile.com/api/v1/chats",
         { account_id: "acc", attendees_ids: ["ACoAAgrace"], text: "Hi" },
         { "x-api-key": "unipile-token" },
+      ),
+  },
+  {
+    name: "pusher",
+    make: () => pusherService(),
+    change: (e) => {
+      const app = { ...PUSHER_DEFAULTS.app, webhooks: [] }
+      const path = `/apps/${app.id}/events`
+      const body = JSON.stringify({ name: "placed", channels: ["orders"], data: "{}" })
+      const query = pusherSignedQuery(app, "POST", path, body, new Date())
+
+      return e.fetch(
+        new Request(`https://api-mt1.pusher.com${path}?${query.toString()}`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body,
+        }),
+      )
+    },
+  },
+  {
+    name: "novu",
+    make: () => novuService(),
+    change: (e) =>
+      post(
+        e,
+        "https://api.novu.co/v2/subscribers",
+        { subscriberId: "ada", email: "ada@shop.test" },
+        { authorization: "ApiKey danwo-novu-secret-key" },
+      ),
+  },
+  {
+    name: "tiptap",
+    make: () => tiptapService(),
+    change: (e) =>
+      post(
+        e,
+        "https://app.collab.tiptap.cloud/api/documents/note?format=json",
+        { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "hi" }] }] },
+        {},
       ),
   },
   {

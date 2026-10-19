@@ -107,6 +107,8 @@ const LIVE_KEYS: readonly KeyShape[] = [
   { provider: "perplexity", value: /^pplx-[A-Za-z0-9]{20,}$/ },
   { provider: "bedrock", value: /^ABSK[A-Za-z0-9+/=]{20,}$/ },
   { provider: "twilio", value: /^SK[0-9a-fA-F]{32}$/, name: /TWILIO/i },
+  { provider: "novu", value: /^[0-9a-f]{32}$/, name: /NOVU/i },
+  { provider: "pusher", value: /^[0-9a-f]{20}$/, name: /PUSHER.*SECRET/i },
 ]
 
 /** Which danwo services emulate each provider's hosts. */

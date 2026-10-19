@@ -23,6 +23,10 @@ import {
   llmOutboundFaults,
   MICROSOFT_HOSTS,
   microsoftOutboundFaults,
+  NOVU_HOSTS,
+  novuOutboundFaults,
+  pusherOutboundFaults,
+  tiptapOutboundFaults,
   PAYSTACK_HOSTS,
   paystackOutboundFaults,
   resendOutboundFaults,
@@ -56,6 +60,7 @@ const BY_HOST = new Map<string, Catalogue>([
   ...hostsOf(COMPOSIO_HOSTS, composioOutboundFaults),
   ...hostsOf(NYLAS_HOSTS, nylasOutboundFaults),
   ...hostsOf(NANGO_HOSTS, nangoOutboundFaults),
+  ...hostsOf(NOVU_HOSTS, novuOutboundFaults),
   ...hostsOf([INNGEST_HOST], inngestOutboundFaults),
 ])
 
@@ -64,12 +69,18 @@ function hostsOf(hosts: readonly string[], catalogue: Catalogue): Array<[string,
   return hosts.map((host) => [host, catalogue])
 }
 
-/** The catalogue for providers known by a host pattern rather than a list: S3 buckets, Auth0 tenants, Clerk instances and Unipile DSNs. */
+/**
+ * The catalogue for providers known by a host pattern rather than a list: S3 buckets, Auth0
+ * tenants, Clerk instances, Unipile DSNs, Pusher clusters and Beams instances, and Tiptap
+ * collaboration apps.
+ */
 function catalogueByPattern(host: string): Catalogue | undefined {
   if (isS3Host(host)) return s3OutboundFaults
   if (isAuth0Host(host)) return auth0OutboundFaults
   if (isClerkHost(host)) return clerkOutboundFaults
   if (host === "unipile.com" || host.endsWith(".unipile.com")) return unipileOutboundFaults
+  if (host.endsWith(".pusher.com") || host.endsWith(".pusherapp.com")) return pusherOutboundFaults
+  if (host.endsWith(".collab.tiptap.cloud")) return tiptapOutboundFaults
 
   return undefined
 }
@@ -90,7 +101,8 @@ function genericOutboundFaults(call: OutboundCall): readonly OutboundFault[] {
 /**
  * `danwo matrix`'s default fault catalogue: each call gets its provider's faults by host (Stripe,
  * Resend, S3 and Tigris, Auth0, Google, Microsoft, Slack, GitHub, Twilio, Flutterwave, Paystack, Bachs,
- * Clerk, Composio, Nylas, Nango, Unipile and the model APIs, with error bodies their SDKs parse),
+ * Clerk, Composio, Nylas, Nango, Unipile, Pusher, Novu, Tiptap and the model APIs, with error
+ * bodies their SDKs parse),
  * and any other routed host (an outside endpoint such as MiniStack) gets plain HTTP failures.
  */
 export function defaultOutboundFaults(call: OutboundCall): readonly OutboundFault[] {

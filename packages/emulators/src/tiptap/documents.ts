@@ -55,6 +55,8 @@ export class TiptapDocuments {
     this.store = store
     this.clock = clock
     this.table = documentTable(store)
+    /* Made up front, so every snapshot holds the same collections whatever ran first. */
+    appTable(store)
   }
 
   /** Whether a document exists. */

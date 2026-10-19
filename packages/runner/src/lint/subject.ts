@@ -23,6 +23,9 @@ const PROVIDER_HOSTS: readonly (readonly [string, readonly string[]])[] = [
   ["nylas", ["nylas.com"]],
   ["nango", ["nango.dev"]],
   ["unipile", ["unipile.com"]],
+  ["pusher", ["pusher.com", "pusherapp.com"]],
+  ["novu", ["novu.co"]],
+  ["tiptap", ["collab.tiptap.cloud"]],
 ]
 
 /** The provider a host belongs to, if danwo knows it. */

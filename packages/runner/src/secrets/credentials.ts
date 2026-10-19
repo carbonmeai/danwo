@@ -76,6 +76,16 @@ const TOKEN_PATTERNS: readonly [RegExp, string][] = [
   [/\b(nyk_|ny(?:at|rt|id)_)[A-Za-z0-9_-]{8,}/g, `$1${REDACTED}`],
   /* Nango connect session tokens. */
   [/\b(nango_connect_session_)[A-Za-z0-9]{8,}/g, `$1${REDACTED}`],
+  /* Novu's secret key header, and its Inbox session tokens in the socket URL. */
+  [/\b(ApiKey)\s+[A-Za-z0-9._~+/=-]+/g, `$1 ${REDACTED}`],
+  [/\b(nvs_)[A-Za-z0-9_-]{8,}/g, `$1${REDACTED}`],
+  /*
+   * Pusher: API request signatures, channel and user authorisations (`key:signature`), webhook
+   * and Novu bridge signatures.
+   */
+  [/([?&]auth_signature=)[0-9a-f]+/g, `$1${REDACTED}`],
+  [/("auth"\s*:\s*"[^":]+:)[0-9a-f]{64}/g, `$1${REDACTED}`],
+  [/\b(v1=)[0-9a-f]{64}/g, `$1${REDACTED}`],
 ]
 
 /** `text` with every credential-shaped value replaced. */

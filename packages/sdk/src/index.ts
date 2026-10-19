@@ -162,6 +162,34 @@ export interface ComposioFixtures {
   readonly settle: () => Promise<void>
 }
 
+/** Fixtures a `pusherEnvironment()` or `pusherService()` contributes. */
+export interface PusherFixtures {
+  /**
+   * The Pusher emulator: read published events and who they reached, list open connections and
+   * publish from the test with `pusherChannels(pusher)`; read Beams publishes with `pusherBeams(pusher)`.
+   */
+  readonly pusher: Emulator
+  readonly proxy: Proxy
+  readonly settle: () => Promise<void>
+}
+
+/** Fixtures a `novuEnvironment()` or `novuService()` contributes. */
+export interface NovuFixtures {
+  /** The Novu emulator: read workflow runs, messages and Inboxes with `novuProject(novu)`. */
+  readonly novu: Emulator
+  readonly proxy: Proxy
+  /** Waits for workflow runs, then for pending deliveries. */
+  readonly settle: () => Promise<void>
+}
+
+/** Fixtures a `tiptapEnvironment()` or `tiptapService()` contributes. */
+export interface TiptapFixtures {
+  /** The Tiptap emulator: read and write documents and see who edits them with `tiptapCollab(tiptap)`. */
+  readonly tiptap: Emulator
+  readonly proxy: Proxy
+  readonly settle: () => Promise<void>
+}
+
 /** Fixtures a `clerkEnvironment()` or `clerkService()` contributes. */
 export interface ClerkFixtures {
   /**
@@ -277,6 +305,18 @@ export {
   composioEnvironment,
   type ComposioOptions,
   composioService,
+  type NovuEnvironment,
+  novuEnvironment,
+  type NovuOptions,
+  novuService,
+  type PusherEnvironment,
+  pusherEnvironment,
+  type PusherOptions,
+  pusherService,
+  type TiptapEnvironment,
+  tiptapEnvironment,
+  type TiptapOptions,
+  tiptapService,
   type GoogleEnvironment,
   googleEnvironment,
   type GoogleOptions,
@@ -486,6 +526,20 @@ export {
   type UnipileSeedConfig,
   type UnipileWorkspace,
   unipileWorkspace,
+  type NovuExecution,
+  type NovuMessage,
+  type NovuProject,
+  novuProject,
+  type NovuSeedConfig,
+  type PusherBeams,
+  type PusherChannels,
+  type PusherEvent,
+  pusherBeams,
+  pusherChannels,
+  type PusherSeedConfig,
+  type TiptapCollabView,
+  tiptapCollab,
+  type TiptapSeedConfig,
 } from "@danwo/emulators"
 export {
   type DatabaseSnapshot,
