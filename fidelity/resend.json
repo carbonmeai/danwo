@@ -8,12 +8,12 @@
         {
           "step": "send email",
           "status": 200,
-          "shape": "291b10481a0e"
+          "shape": "1613cf70d1cd"
         },
         {
           "step": "retrieve email",
           "status": 200,
-          "shape": "b5d8a34c6d36"
+          "shape": "ca8f8fb15cdb"
         }
       ],
       "facts": []
@@ -73,7 +73,7 @@
         {
           "step": "list domains",
           "status": 200,
-          "shape": "cf38585b5b32"
+          "shape": "3f6e884aa660"
         }
       ],
       "facts": []
@@ -81,11 +81,10 @@
   },
   "shapes": {
     "1613cf70d1cd": {"t":"object","keys":{"id":{"t":"string"}}},
-    "291b10481a0e": {"t":"object","keys":{"id":{"t":"union","of":[{"t":"string"},{"t":"null"}]}},"optional":["id"]},
+    "3f6e884aa660": {"t":"object","keys":{"object":{"t":"literal","v":"list"},"has_more":{"t":"boolean"},"data":{"t":"array","of":null}}},
     "718c8dd96555": {"t":"object","keys":{"data":{"t":"array","of":{"t":"object","keys":{"id":{"t":"string"}}}}}},
     "7ba28361e7a5": {"t":"object","keys":{"message":{"t":"string"},"name":{"t":"literal","v":"missing_required_field"},"statusCode":{"t":"literal","v":422}}},
-    "b5d8a34c6d36": {"t":"object","keys":{"object":{"t":"literal","v":"email"},"id":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"message_id":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"to":{"t":"union","of":[{"t":"array","of":{"t":"string"}},{"t":"null"}]},"from":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"created_at":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"subject":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"html":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"text":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"bcc":{"t":"union","of":[{"t":"array","of":{"t":"string"}},{"t":"null"}]},"cc":{"t":"union","of":[{"t":"array","of":{"t":"string"}},{"t":"null"}]},"reply_to":{"t":"union","of":[{"t":"array","of":{"t":"string"}},{"t":"null"}]},"last_event":{"t":"union","of":[{"t":"string"},{"t":"null"}]}},"optional":["object","id","message_id","to","from","created_at","subject","html","text","bcc","cc","reply_to","last_event"]},
-    "cf38585b5b32": {"t":"object","keys":{"object":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"has_more":{"t":"union","of":[{"t":"boolean"},{"t":"null"}]},"data":{"t":"union","of":[{"t":"array","of":{"t":"object","keys":{"id":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"name":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"status":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"created_at":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"region":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"open_tracking":{"t":"union","of":[{"t":"boolean"},{"t":"null"}]},"click_tracking":{"t":"union","of":[{"t":"boolean"},{"t":"null"}]},"capabilities":{"t":"union","of":[{"t":"any"},{"t":"null"}]}},"optional":["id","name","status","created_at","region","open_tracking","click_tracking","capabilities"]}},{"t":"null"}]}},"optional":["object","has_more","data"]},
+    "ca8f8fb15cdb": {"t":"object","keys":{"object":{"t":"literal","v":"email"},"id":{"t":"string"},"to":{"t":"array","of":{"t":"string"}},"from":{"t":"string"},"created_at":{"t":"string"},"subject":{"t":"string"},"bcc":{"t":"null"},"cc":{"t":"null"},"reply_to":{"t":"null"},"last_event":{"t":"string"},"scheduled_at":{"t":"null"},"message_id":{"t":"string"},"html":{"t":"string"},"text":{"t":"string"}}},
     "df2e5dac7791": {"t":"object","keys":{"statusCode":{"t":"literal","v":401},"message":{"t":"string"},"name":{"t":"literal","v":"missing_api_key"}}}
   }
 }
