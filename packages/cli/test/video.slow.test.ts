@@ -125,7 +125,15 @@ describe("video in the flight record", () => {
   })
 
   it("keeps a passing run's record without video under retain-on-failure, with it under on", async () => {
-    await danwo(["test", "--record", "always", "--grep", "buys 500 credits"])
+    await danwo([
+      "test",
+      "--record",
+      "always",
+      "--video",
+      "retain-on-failure",
+      "--grep",
+      "buys 500 credits",
+    ])
 
     const plain = await kept(CHECKOUT_ID)
 
