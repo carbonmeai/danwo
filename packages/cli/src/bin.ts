@@ -123,6 +123,7 @@ withReporterOptions(withLintOptions(program.command("test")))
     integerAtLeast(1),
   )
   .option("--ci", "CI defaults even without the CI variable: 1 retry, read-only cache, no .only")
+  .option("--list", "print the picked tests as JSON (id, file) instead of running them")
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .addOption(recordOption())
   .addOption(videoOption())
@@ -145,6 +146,7 @@ withReporterOptions(withLintOptions(program.command("test")))
         shard?: string
         maxFailures?: number
         ci?: boolean
+        list?: boolean
         config?: string
         record?: RecordMode
         video?: VideoMode

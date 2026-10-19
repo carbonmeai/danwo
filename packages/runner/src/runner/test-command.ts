@@ -40,6 +40,8 @@ interface TestSelection {
   readonly since?: string
   /** This machine's part of a split run, as `i/n` (`--shard`). */
   readonly shard?: string
+  /** Print the picked tests as JSON instead of running them (`--list`). */
+  readonly list?: boolean
 }
 
 /** How the selected tests run. */
@@ -115,6 +117,8 @@ export async function runTests(options: RunTestsOptions = {}): Promise<number> {
   const ci = options.ci ?? inCi()
   const picked = await pickTests(loaded, options, ci, write)
 
+  if (options.list) return listTests(loaded, picked.entries, write)
+
   if (picked.entries.length === 0) {
     write(picked.empty)
 
@@ -124,6 +128,25 @@ export async function runTests(options: RunTestsOptions = {}): Promise<number> {
   if (ci) write("CI: retries default to 1, the replay cache is read-only, .only is refused")
 
   return executeRun({ loaded, options, ci, cwd, write, ...picked })
+}
+
+/** `--list`: the picked tests as one JSON array of their ids and files, and nothing run. */
+function listTests(
+  loaded: LoadedConfig,
+  entries: readonly CatalogEntry[],
+  write: (line: string) => void,
+): number {
+  write(
+    JSON.stringify(
+      entries.map((entry) => ({
+        id: entry.id,
+        file: relative(loaded.root, entry.file),
+        invariant: entry.invariant,
+      })),
+    ),
+  )
+
+  return 0
 }
 
 interface Picked {
