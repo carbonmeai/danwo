@@ -29,6 +29,9 @@
     "zod": "4.6.1"
   },
   "devDependencies": {
+    "@ai-sdk/anthropic": "4.0.82",
+    "@ai-sdk/openai": "4.0.96",
+    "@ai-sdk/openai-compatible": "3.0.71",
     "@aws-sdk/client-s3": "3.1152.0",
     "@aws-sdk/client-sqs": "3.1152.0",
     "@types/pngjs": "6.0.5"
