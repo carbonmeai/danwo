@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "Snapshots of the app's own data stores (Postgres, SQLite, Redis) for danwo matrix.",
+  "license": "Apache-2.0",
   "files": [
     "src"
   ],

@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "danwo's environments, emulators, faults, invariants and fault matrix for Playwright Test suites.",
+  "license": "Apache-2.0",
   "bin": {
     "danwo-playwright": "./bin/danwo-playwright.mjs"
   },

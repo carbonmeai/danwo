@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "Writes danwo tests: records someone using the app, and finds the locators and invariant the test needs.",
+  "license": "Apache-2.0",
   "files": [
     "src"
   ],

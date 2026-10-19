@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "danwo init: detects a project, asks what to set up, and writes the config, an example test and the agent skill.",
+  "license": "Apache-2.0",
   "files": [
     "src"
   ],

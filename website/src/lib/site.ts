@@ -17,12 +17,11 @@ export const SITE = {
    */
   repo: undefined as string | undefined,
   branch: "main",
-  /**
-   * How the site describes the licence. The licence is not decided yet: set `openSource` once it
-   * is, and the pages that say "open source" start saying it.
-   */
+  /** How the site describes the licence: danwo is open source under Apache-2.0. */
   licence: {
-    openSource: false,
+    openSource: true,
+    /** The licence's SPDX identifier, shown where the site names it. */
+    name: "Apache-2.0",
     /** The words used where the site would otherwise say "open source". */
     wording: "Self-hosted",
   },

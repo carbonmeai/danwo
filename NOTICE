@@ -1,4 +1,12 @@
-danwo
+dánwò (danwo)
+Copyright 2026 Faithful Ojebiyi
 
-All code in this repository is danwo's own. Third-party packages it depends on are
-listed in each package.json and keep their own licences.
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The dánwò name, wordmark and logos in brand/ are trademarks and are not
+licensed under the Apache License; see TRADEMARKS.md. The wordmark is drawn
+from Young Serif, licensed under the SIL Open Font License 1.1
+(brand/YoungSerif-OFL.txt).
+
+All code in this repository is danwo's own. Third-party packages it depends on
+are listed in each package.json and keep their own licences.

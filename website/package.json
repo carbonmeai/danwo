@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "danwo's website: the landing page, the docs built from the skill's guides and the generated spec, the blog and the changelog.",
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "dev": "vite dev",

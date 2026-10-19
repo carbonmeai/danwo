@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "The danwo dashboard: runs, flight records, matrix grids and flaky tests, read from a project's .danwo folder.",
+  "license": "Apache-2.0",
   "files": [
     "src",
     "public",
