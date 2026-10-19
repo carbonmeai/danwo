@@ -76,5 +76,6 @@
     "benchmarks/bench/run.ts"
   ],
   "ignoreDependencies": ["@danwo/example-shop"],
-  "publicPackages": ["@danwo/ui"]
+  "publicPackages": ["@danwo/ui"],
+  "ignoreUnresolvedImports": ["fumadocs-ui/css/*"]
 }
