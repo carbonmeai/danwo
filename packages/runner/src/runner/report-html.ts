@@ -9,6 +9,7 @@ import { findingPlace } from "../lint/index.ts"
 import { effectNotes, effectsOf } from "../record/effect-notes.ts"
 import { dollars, type Spent, tokensText, usageOf } from "../record/usage.ts"
 import type { FlightRecord, RecordedExchange, RecordedStep } from "./record.ts"
+import { FAVICON, LOCKUP_ON_DARK, LOCKUP_ON_LIGHT } from "./report-brand.ts"
 
 /** One kept record, as the report reads it. */
 export interface Loaded {
@@ -295,7 +296,12 @@ pre{background:var(--code);padding:8px;border-radius:4px;overflow-x:auto;white-s
 code{background:var(--code);padding:0 3px;border-radius:3px}
 img.thumb{max-width:160px;max-height:100px;border:1px solid var(--line)}video.film{max-width:100%;max-height:420px;border:1px solid var(--line)}img.failure{max-width:100%;max-height:420px;border:1px solid var(--line)}.compare{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.compare figure{margin:0}img.compare{max-width:240px;max-height:180px;border:1px solid var(--line)}
 summary{cursor:pointer;padding:2px 0}
+.brand{display:block;margin:8px 0 4px}.brand img{height:22px;width:auto;display:block}.brand .on-dark{display:none}
+@media (prefers-color-scheme:dark){.brand .on-light{display:none}.brand .on-dark{display:block}}
 `
+
+/** The lockup at the top of the report, the on-dark one in a dark colour scheme. */
+const BRAND = `<span class="brand"><img class="on-light" src="${LOCKUP_ON_LIGHT}" alt="dánwò" height="22"><img class="on-dark" src="${LOCKUP_ON_DARK}" alt="dánwò" height="22"></span>`
 
 /** The report's HTML for `records` of the run `runId`. */
 export function renderReport(runId: string, records: readonly Loaded[]): string {
@@ -307,5 +313,5 @@ export function renderReport(runId: string, records: readonly Loaded[]): string 
     )
     .join("")
 
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>danwo run ${escape(runId)}</title><style>${STYLE}</style></head><body><h1>danwo run ${escape(runId)}</h1><p class="dim">${records.length} recorded run${records.length === 1 ? "" : "s"}, ${failed} not passing. Secrets and credentials are redacted.</p><ul>${index}</ul>${records.map(section).join("")}</body></html>\n`
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>danwo run ${escape(runId)}</title><link rel="icon" type="image/svg+xml" href="${FAVICON}"><style>${STYLE}</style></head><body>${BRAND}<h1>danwo run ${escape(runId)}</h1><p class="dim">${records.length} recorded run${records.length === 1 ? "" : "s"}, ${failed} not passing. Secrets and credentials are redacted.</p><ul>${index}</ul>${records.map(section).join("")}</body></html>\n`
 }
