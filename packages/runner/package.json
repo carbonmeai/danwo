@@ -12,6 +12,7 @@
     ".": "./src/index.ts",
     "./runner": "./src/runner/index.ts",
     "./register": "./src/runner/register.ts",
+    "./children": "./src/support/children.ts",
     "./strip-types": "./strip-types.mjs"
   },
   "dependencies": {
