@@ -1,13 +1,8 @@
-import type {
-  OrganizationInvitationJSON,
-  OrganizationJSON,
-  SessionJSON,
-  SignInTokenJSON,
-} from "@clerk/backend"
+import type { OrganizationInvitationJSON, SessionJSON, SignInTokenJSON } from "@clerk/backend"
 
 import { objectTable } from "../objects.ts"
 import type { DataKey, Store } from "../store.ts"
-import type { ClerkUser } from "./entities.ts"
+import type { ClerkOrganization, ClerkUser } from "./entities.ts"
 import type { ClerkWebhookRecord } from "./webhooks.ts"
 
 /** The instance an emulator plays: its slug, keys and the hosts derived from them. */
@@ -130,7 +125,7 @@ export function clerkStore(store: Store) {
     clients: objectTable<ClientRecord>(store, "clerk.clients"),
     devBrowsers: objectTable<DevBrowser>(store, "clerk.dev_browsers"),
     nonces: objectTable<HandshakeNonce>(store, "clerk.handshake_nonces"),
-    organizations: objectTable<OrganizationJSON>(store, "clerk.organizations"),
+    organizations: objectTable<ClerkOrganization>(store, "clerk.organizations"),
     memberships: objectTable<MembershipRecord>(store, "clerk.memberships"),
     invitations: objectTable<OrganizationInvitationJSON>(store, "clerk.organization_invitations"),
     signInTokens: objectTable<SignInTokenJSON>(store, "clerk.sign_in_tokens"),

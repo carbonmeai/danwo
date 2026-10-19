@@ -1,7 +1,7 @@
 import type { App, Context } from "../../http.ts"
 import { bodyOf, pageOf } from "../backend-auth.ts"
 import { type ClerkContext, now } from "../context.ts"
-import { invalidParameter, notFound, num, record, str } from "../helpers.ts"
+import { missingParameter, notFound, num, record, str } from "../helpers.ts"
 import {
   addMembership,
   createOrganization,
@@ -33,7 +33,7 @@ function organizationCrud(app: App, context: ClerkContext): void {
     const body = await bodyOf(c)
     const name = str(body.name)
 
-    if (name === undefined) throw invalidParameter("name", "name is required.")
+    if (name === undefined) throw missingParameter("name")
 
     const createdBy = str(body.created_by)
     const slug = str(body.slug)
@@ -50,7 +50,10 @@ function organizationCrud(app: App, context: ClerkContext): void {
     return c.json(organizationJson(context, org))
   })
   app.get("/v1/organizations/:id", (c) =>
-    c.json(organizationJson(context, organizationOf(context, c.req.param("id")))),
+    c.json({
+      ...organizationJson(context, organizationOf(context, c.req.param("id"))),
+      role_set_key: "role_set:default",
+    }),
   )
   app.patch("/v1/organizations/:id", async (c) => {
     const org = organizationOf(context, c.req.param("id"))
@@ -76,7 +79,7 @@ function organizationCrud(app: App, context: ClerkContext): void {
     context.clerk.organizations.remove(org.id)
     context.events.organizationDeleted(org.id)
 
-    return c.json({ object: "organization", id: org.id, slug: org.slug, deleted: true })
+    return c.json({ object: "organization", id: org.id, deleted: true })
   })
 }
 
@@ -103,7 +106,7 @@ function membershipRoutes(app: App, context: ClerkContext): void {
     const role = str((await bodyOf(c)).role)
 
     if (!membership) throw notFound("organization membership")
-    if (role === undefined) throw invalidParameter("role")
+    if (role === undefined) throw missingParameter("role")
 
     const changed = context.clerk.memberships.change(membership.id, {
       role,
@@ -156,10 +159,16 @@ function invitationRoutes(app: App, context: ClerkContext): void {
     const body = await bodyOf(c)
     const email = str(body.email_address)
 
-    if (email === undefined) throw invalidParameter("email_address")
+    if (email === undefined) throw missingParameter("email_address")
 
     return c.json(
-      inviteToOrganization(context, c.req.param("id"), email, str(body.role) ?? "org:member"),
+      inviteToOrganization(
+        context,
+        c.req.param("id"),
+        email,
+        str(body.role) ?? "org:member",
+        str(body.inviter_user_id),
+      ),
     )
   })
   app.post("/v1/organizations/:id/invitations/:invitation/revoke", (c) => {
