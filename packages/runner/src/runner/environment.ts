@@ -49,18 +49,24 @@ export interface WorkerEnvironment {
    * `time.travel` moves only the apps' clocks and the browser's.
    */
   travel?(ms: number): Promise<void>
-  /** Back to a clean state between `danwo matrix` runs (emulators, app state, fault rules). */
+  /**
+   * Back to a clean state (emulators to their seeds, app state, fault rules), before the tests
+   * and matrix trials that need one; see the config's `isolation`.
+   */
   reset?(): Promise<void>
   /**
-   * Keeps the state it is in now, right after a `reset()`, for `restore()` to return to: e.g.
-   * emulator stores in memory, a Postgres template database, a copy of a data folder. Optional,
-   * and only used together with `restore`.
+   * Keeps the state it is in now for `restore()` to return to: e.g. emulator stores in memory, a
+   * Postgres template database, a copy of a data folder. Called right after a `reset()`, and again
+   * after setup the next tests start from (a file's `beforeAll`, a saved session's sign-in).
+   * Optional, and only used together with `restore`.
    */
   snapshot?(): Promise<void>
   /**
-   * Back to what `snapshot()` kept, faster than `reset()`. `danwo matrix` resets each worker's
-   * environment once, snapshots it, and restores it before every later trial. Like `reset`, it
-   * also clears the proxy's log and fault rules. Without it every trial resets.
+   * Back to what `snapshot()` kept, faster than `reset()`. A worker resets its environment once,
+   * snapshots it, and restores it before every later test and trial. Like `reset`, it also clears
+   * the proxy's log, fault rules and the apps' clock offset. The app's own memory is the
+   * environment's to reset here (e.g. by calling a test-reset endpoint). Without it, each test
+   * resets.
    */
   restore?(): Promise<void>
   /** Facts to print next to a matrix run's verdict. */

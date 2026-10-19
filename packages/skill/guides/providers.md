@@ -84,6 +84,29 @@ worker owned once the worker is gone. Have the app exit on SIGTERM. An environme
 its own processes should start them with `spawnOwned()` from `@danwo/sdk`, which takes the same
 arguments as `spawn()` and returns the child with a `stop()`.
 
+## Isolation
+
+Every test starts from the environment's seeded state, and so does every retry. Before a test runs,
+its worker restores the snapshot it keeps: every emulator goes back to its seed (customers, mail,
+sign-ins and OAuth grants, connected accounts, tool handlers set from test code), webhook queues
+and the proxy's log are emptied, the clock is back to now, and data stores with a `snapshot()` and
+`restore()` (`postgresSnapshot`, `sqliteSnapshot`, `redisSnapshot`) are restored. Restoring four
+emulators takes about a tenth of a millisecond and a test-sized Postgres database tens of
+milliseconds, so this costs next to nothing. A file's `beforeAll` work and
+saved sessions' sign-ins are kept on top, so tests start signed in and set up without paying for it
+again.
+
+Change it with `isolation` in the config, or per file or describe block with `test.use({ isolation
+})`: `"test"` (default), `"file"` (reset once per file; its tests build on one another) or `"none"`
+(never reset; state carries from file to file in a worker). Each worker has its own environment, so
+parallel workers never share state.
+
+danwo cannot reach into the app's own memory. An app that keeps state in memory should offer a
+test-reset endpoint, called from the environment's `restore()` (and `reset()`), as the shop example
+does with `POST /__test/reset`. An environment with only `reset()` is reset before every test,
+which usually means restarting the app; a file with `beforeAll` hooks is then reset once per file
+instead, so its setup survives. An environment with neither keeps whatever state it has.
+
 ## Several providers
 
 `startServices([stripeService({ seed }), s3Service(), slackService({ seed }), githubService()])`

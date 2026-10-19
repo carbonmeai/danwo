@@ -30,7 +30,10 @@ one with `test.session(name, setup)`.
   localStorage and IndexedDB are kept and loaded into each test's fresh browser.
 - `check` (optional) runs when a test reuses the state; when it throws, the session is set up
   again.
-- Every environment reset drops the kept state, so each `danwo matrix` trial signs in afresh.
+- With an environment that has `snapshot()` and `restore()`, the backend side of a sign-in (the
+  user and session in the emulators and the app's database) is kept in the state every test starts
+  from, so later tests reuse it although each starts isolated. A full reset drops the kept state,
+  and each `danwo matrix` trial signs in afresh.
 - Agent steps in a setup record and replay like any others.
 - A failing setup fails the tests that use it with `SESSION_SETUP_FAILED`, once.
 - The browser state is never written to flight records.
