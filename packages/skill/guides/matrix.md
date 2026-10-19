@@ -45,6 +45,12 @@ statements and commands the test sent: `reset-after on COMMIT (postgres)`,
 `OOM on INCR rate:login:* (cache)`. `danwo guide infrastructure` covers wiring, labels and
 defaults.
 
+Every WebSocket the clean run opened (a realtime channel, a collaboration session) gets two
+trials: `upgrade refused on WS <host>/<path>` and `connection dropped on WS <host>/<path>`. With
+`inngestService()` in the environment, each event the test sent gets `status 500`, `reset-after`
+(accepted, but the answer lost, so an app that retries sends it twice) and a slow send on
+`POST inngest.danwo.test/e/<key>`.
+
 ## Races
 
 Beside the one-call faults, the matrix plans races from what the clean run did, and only where

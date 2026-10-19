@@ -84,6 +84,109 @@ worker owned once the worker is gone. Have the app exit on SIGTERM. An environme
 its own processes should start them with `spawnOwned()` from `@danwo/sdk`, which takes the same
 arguments as `spawn()` and returns the child with a `stop()`.
 
+`app.ready` changes when it counts as started: `{ path: "/health" }` waits for that path, and
+`{ log: "worker ready" }` for a line in its output, for a worker that serves nothing. Its output is
+kept in each run's flight record (`processLogs`), redacted, line by line.
+
+## Several apps
+
+`stackEnvironment({ apps, services })` starts a frontend, the API it calls, a worker and a local
+dev server together, all behind one proxy. Each app has its own `command`, `cwd`, `url`, `env` and
+`ready` rule; `dependsOn` sets the start order (apps with nothing between them start together), and
+`env` can be a function of the other apps' URLs, so the frontend points at the API it started:
+
+```ts
+environment: async () => {
+  const inngest = await inngestService({ url: "http://127.0.0.1:8288" })
+
+  return stackEnvironment({
+    unmatched: "block",
+    services: [stripeService(), clerkService(), inngest],
+    apps: [
+      {
+        name: "web",
+        command: "pnpm start",
+        url: "http://localhost:3050",
+        dependsOn: ["api"],
+        env: ({ api }) => ({ VITE_API_URL: api }),
+      },
+      {
+        name: "api",
+        command: "node dist/apps/api/main.js",
+        url: "http://localhost:4400",
+        dependsOn: ["worker"],
+        env: { ...inngest.env },
+      },
+      {
+        name: "worker",
+        command: "node dist/apps/worker/main.js",
+        url: "http://localhost:4100",
+        ready: { log: "worker ready" },
+        env: { ...inngest.env },
+      },
+    ],
+  })
+}
+```
+
+The first app (or `baseUrl: "<name>"`) is the one the browser opens; tests get every app's URL as
+the `apps` fixture. Each app's output goes into the flight record under its name.
+
+Two checks run as the apps start, and neither prints a value:
+
+- **The preload.** danwo routes a Node app through its proxy by adding its preload to
+  `NODE_OPTIONS`. A start script that sets `NODE_OPTIONS` itself (`NODE_OPTIONS=--max-old-space-size=8192
+  nest start`) replaces it, and SDKs with their own HTTP agent (the official Stripe client) then
+  call real hosts. danwo puts a `node` shim first on each app's PATH that loads the preload
+  whatever `NODE_OPTIONS` says, and warns about any Node process of an app that still runs without
+  it (`nodeShim: false` turns the shim off). A `NODE_OPTIONS` in an app's own `env` is joined with
+  danwo's rather than replacing it. Stripe's client with its own `https.Agent`, axios with a custom
+  agent and fetch with an undici `Agent` all go through the proxy.
+- **Live keys.** With unrouted hosts passing through, a live-looking key (`sk_live_…`, an OpenAI or
+  Anthropic key, an AWS access key…) for a provider the run does not emulate, in an app's
+  environment or in a `.env` file in its folder that the run does not override, would reach the real
+  provider. Each is a warning naming the variable and file; `secrets: "fail"` refuses to start,
+  `secrets: "ignore"` stays quiet.
+
+### Inngest
+
+`inngestService({ url })` uses an Inngest dev server that runs at `url` (or starts one with
+`start: true`, which runs `npx --yes inngest-cli dev`). Give each app `inngest.env`: it turns on
+dev mode and points the SDK at `inngest.danwo.test`, which the proxy routes to the dev server, so
+every event a test sends is in its flight record and `danwo matrix` can fault it (the dev server
+down, an event accepted whose answer was lost, so a retrying app sends it twice, and a slow send).
+`settle()` (and readiness with `settle: true`) waits until the function runs those events
+triggered have finished, so an invariant reads what the background jobs wrote; the record lists
+each run with its function, status and duration under `inngest`.
+
+## Hosts no service answers
+
+Calls to hosts no service emulates pass through to the real host by default
+(`unmatched: "passthrough"`), or get 502 with `unmatched: "block"`. Whichever you pick:
+
+- **This machine always passes**: `localhost`, `127.0.0.1` and `::1`, where the apps a run starts
+  and local servers such as Inngest dev answer. A `blocked` entry naming one of them still blocks it.
+- **`allow`** lists hosts that always pass, even under `block`.
+- **`blocked`** lists hosts that get 502 even when others pass through.
+- **Telemetry** (PostHog, Sentry, Segment, Amplitude, Datadog, hosted trace backends, Google
+  Analytics and the like) is blocked by default, so a run neither sends real data out nor fills its
+  record with noise; `telemetry: "passthrough"` lets it go.
+
+The page loading itself (static files, and a dev server's modules and hot reload such as
+`/@vite/client` or `/src/main.ts?v=…`) is in the flight record but left out of readiness, effects
+and the matrix. A response that streams for as long as the client listens (server-sent events,
+NDJSON) is recorded once its headers arrive and never holds readiness up.
+
+### WebSockets
+
+WebSockets go through the proxy too. Sockets to this machine and to passthrough hosts are passed
+on; a routed host's sockets go to its `webSocket` endpoint, or are refused with 501 when its
+emulator serves none; blocked hosts are refused with 403. Each socket is in the flight record
+(`sockets`) with its frame counts and sizes, never the frames. `danwo matrix` tries every socket the
+clean run opened twice more: with its upgrade refused, and with the connection dropped. A
+browser's sockets always go through the proxy; Node does not proxy WebSockets on its own, so a
+server-side WebSocket client reaches the proxy only when it is given a proxy agent.
+
 ## Isolation
 
 Every test starts from the environment's seeded state, and so does every retry. Before a test runs,
