@@ -40,8 +40,12 @@ export function workCopy(source: string): string {
   return copy
 }
 
-/** Deletes every copy {@link workCopy} made in this test file. */
+/**
+ * Deletes every copy {@link workCopy} made in this test file. A process the test just stopped
+ * may still be writing into the copy, so a busy directory is retried rather than failing.
+ */
 export function removeWorkCopies(): void {
-  for (const copy of copies.values()) rmSync(copy, { recursive: true, force: true })
+  for (const copy of copies.values())
+    rmSync(copy, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   copies.clear()
 }
