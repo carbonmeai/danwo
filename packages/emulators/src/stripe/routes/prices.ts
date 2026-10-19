@@ -44,8 +44,9 @@ function amountOf(params: Record<string, unknown>): number | undefined {
   )
 }
 
-function taxBehaviorOf(value: unknown): TaxBehavior | null {
-  return isOneOf(TAX_BEHAVIORS, value) ? value : null
+/** A price's tax behavior; Stripe reports `unspecified` when the request names none. */
+function taxBehaviorOf(value: unknown): TaxBehavior {
+  return isOneOf(TAX_BEHAVIORS, value) ? value : "unspecified"
 }
 
 /** The product a price belongs to: an existing id, or a new one from `product_data`. */

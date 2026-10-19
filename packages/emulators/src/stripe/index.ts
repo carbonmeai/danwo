@@ -119,7 +119,7 @@ function seedPrices(objects: StripeObjects, created: number, prices: readonly Se
         active: true,
         nickname: null,
         lookupKey: null,
-        taxBehavior: null,
+        taxBehavior: "unspecified",
         recurring: null,
         metadata: {},
       }),
