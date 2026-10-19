@@ -1,6 +1,7 @@
 /** Every provider with a fidelity suite, in the order they are checked. */
 import type { FidelityProvider } from "../provider.ts"
 import { bachsFidelity } from "./bachs.ts"
+import { composioFidelity } from "./composio.ts"
 import { flutterwaveFidelity } from "./flutterwave.ts"
 import { gatewayFidelity } from "./gateway.ts"
 import { githubFidelity } from "./github.ts"
@@ -24,6 +25,7 @@ export const FIDELITY_PROVIDERS: readonly FidelityProvider[] = [
   googleFidelity,
   microsoftFidelity,
   gatewayFidelity,
+  composioFidelity,
 ]
 
 /** The providers named in `names`, or all of them; an unknown name is an error. */
