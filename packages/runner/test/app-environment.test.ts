@@ -5,7 +5,9 @@ import { resendInbox } from "@danwo/emulators"
 import { describe, expect, it } from "vitest"
 
 import { appEnvironment, startApp } from "../src/runner/app-environment.ts"
+import { clerkService } from "../src/runner/clerk.ts"
 import { resendService } from "../src/runner/resend.ts"
+import { stackEnvironment } from "../src/runner/stack-environment.ts"
 
 const APP = fileURLToPath(new URL("./fixtures/mail-app.ts", import.meta.url))
 
@@ -94,6 +96,31 @@ describe("appEnvironment", () => {
       await env.close()
     }
   })
+
+  it("hands the services' mail sources on, so the mail fixture reads Clerk's codes", async () => {
+    const env = await appEnvironment({ services: [clerkService()] })
+
+    try {
+      expect(env.mail).toHaveLength(1)
+    } finally {
+      await env.close()
+    }
+  })
+
+  it("hands a stack's services' mail sources on too", async () => {
+    const command = await appCommand()
+    const env = await stackEnvironment({
+      apps: [{ name: "web", ...command }],
+      services: [clerkService()],
+    })
+
+    try {
+      expect(env.mail).toHaveLength(1)
+      expect(env.fixtures?.["apps"]).toEqual({ web: command.url })
+    } finally {
+      await env.close()
+    }
+  }, 30_000)
 
   it("closes the services when the app fails to start", async () => {
     await expect(

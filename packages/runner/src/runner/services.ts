@@ -209,6 +209,8 @@ export function emulatorLifecycle(emulator: Emulator, clock: ManualClock, reseed
 /** The lifecycle a single-service environment hands on from its started `services`. */
 export function servicesLifecycle(services: Services) {
   return {
+    /* Where the services' mail lands (Clerk's codes, Resend's emails), for the `mail` fixture. */
+    ...(services.mail && { mail: services.mail }),
     settle: () => services.settle(),
     travel: (ms: number) => services.travel(ms),
     reset: () => services.reset(),

@@ -39,6 +39,8 @@ export interface StartedApp {
   readonly pid: number | undefined
   /** What it has written to stdout and stderr so far, line by line (the last lines only). */
   logs(): ProcessLog
+  /** How it ended when it stopped on its own after starting (`exited with code 1`); else undefined. */
+  exited(): string | undefined
   /** Stops the command and every process it started. */
   stop(): Promise<void>
 }
@@ -163,11 +165,23 @@ export async function startApp(
     throw error
   }
 
+  let stopping = false
+  let exit: string | undefined
+
+  owned.child.once("exit", (code, signal) => {
+    if (!stopping) exit = signal === null ? `exited with code ${code}` : `was stopped by ${signal}`
+  })
+
   return {
     url: app.url,
     pid: owned.child.pid,
     logs: () => ({ lines: [...output.lines], written: output.written }),
-    stop: () => owned.stop(STOP_GRACE_MS),
+    exited: () => exit,
+    stop: () => {
+      stopping = true
+
+      return owned.stop(STOP_GRACE_MS)
+    },
   }
 }
 
@@ -211,8 +225,15 @@ export async function appEnvironment(
     proxy: services.proxy,
     webhooks: services.webhooks,
     fixtures: services.fixtures,
+    /* Where the services' mail lands (Clerk's codes, Resend's emails), for the `mail` fixture. */
+    ...(services.mail && { mail: services.mail }),
     logs: (): Readonly<Record<string, ProcessLog>> =>
       started === undefined ? {} : { app: started.logs() },
+    stopped: () => {
+      const exit = started?.exited()
+
+      return exit === undefined ? [] : [`the app ${exit}`]
+    },
     state: () => services.state(),
     settle: () => services.settle(),
     travel: (ms) => services.travel(ms),
