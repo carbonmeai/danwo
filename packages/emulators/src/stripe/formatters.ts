@@ -152,7 +152,9 @@ export function paymentIntentObject(fields: {
   metadata: Metadata
   receiptEmail: string | null
   automaticPaymentMethods?: { enabled: boolean; allow_redirects: "always" | "never" } | null
-}): PaymentIntent {
+  /** The payment method configuration an intent with dynamic payment methods draws from. */
+  configuration?: string | null
+}): PaymentIntent & { shared_payment_granted_token: null } {
   return {
     id: fields.id,
     object: "payment_intent",
@@ -178,19 +180,30 @@ export function paymentIntentObject(fields: {
     last_payment_error: null,
     latest_charge: null,
     livemode: false,
-    managed_payments: null,
+    managed_payments: { enabled: false },
     metadata: fields.metadata,
     next_action: null,
     on_behalf_of: null,
     payment_method: fields.paymentMethod,
-    payment_method_configuration_details: null,
-    payment_method_options: null,
+    payment_method_configuration_details: fields.configuration
+      ? { id: fields.configuration, parent: null }
+      : null,
+    payment_method_options: {
+      card: {
+        installments: null,
+        mandate_options: null,
+        network: null,
+        request_three_d_secure: "automatic",
+      },
+      link: { persistent_token: null },
+    },
     payment_method_types: ["card"],
     payment_record: null,
     processing: null,
     receipt_email: fields.receiptEmail,
     review: null,
     setup_future_usage: fields.setupFutureUsage,
+    shared_payment_granted_token: null,
     shipping: null,
     source: null,
     statement_descriptor: null,

@@ -25,10 +25,25 @@ export interface AutomaticPaymentMethods {
   readonly allow_redirects: "always" | "never"
 }
 
+/** The account's default payment method configuration, which dynamic payment methods draw from. */
+function defaultConfiguration(payments: Payments): string | null {
+  return (
+    payments.objects.paymentMethodConfigurations.where((found) => found.is_default)[0]?.id ?? null
+  )
+}
+
 /** Stores a new PaymentIntent and emits `payment_intent.created`. */
 export function createIntent(payments: Payments, fields: IntentFields): PaymentIntent {
+  const configuration = fields.automaticPaymentMethods?.enabled
+    ? defaultConfiguration(payments)
+    : null
   const intent = payments.objects.paymentIntents.add(
-    paymentIntentObject({ id: newId("pi"), created: unix(payments.clock()), ...fields }),
+    paymentIntentObject({
+      id: newId("pi"),
+      created: unix(payments.clock()),
+      ...fields,
+      configuration,
+    }),
     null,
   )
 
