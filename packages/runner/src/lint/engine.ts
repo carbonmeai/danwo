@@ -2,6 +2,7 @@
  * Runs the integration lint rules over a run, and says what came of them: findings with their
  * level, a summary line, detail lines, and whether they fail the run.
  */
+import { noRetryOnSerialization } from "./rules/data.ts"
 import { duplicateMessage } from "./rules/messages.ts"
 import { oauthPkce, oauthState } from "./rules/oauth.ts"
 import { flutterwaveVerify, unconfirmedPayment } from "./rules/payments.ts"
@@ -42,6 +43,7 @@ export const LINT_RULES: readonly LintRule[] = [
   noRetryOnRead,
   oauthPkce,
   publishableKeyOnServer,
+  noRetryOnSerialization,
 ]
 
 const LEVELS: Readonly<Record<Exclude<RuleLevel, "off">, LintSeverity>> = {

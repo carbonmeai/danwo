@@ -2,6 +2,7 @@
  * Integration lint: rules that read what a run did behind the app (its provider calls, the
  * webhooks it answered, its steps) and flag risky provider usage, with no invariant to write.
  */
+import type { DataCall } from "@danwo/infra"
 import type { ServiceDelivery } from "@danwo/matrix"
 
 import type { RecordedExchange, RecordedStep } from "../runner/record.ts"
@@ -52,6 +53,8 @@ export interface LintSubject {
   readonly steps: readonly RecordedStep[]
   readonly exchanges: readonly RecordedExchange[]
   readonly deliveries: readonly ServiceDelivery[]
+  /** Calls to the app's own database and cache, when the environment has data proxies. */
+  readonly dataCalls?: readonly DataCall[]
 }
 
 /** What a rule reports before the engine adds its id, severity, hint and docs. */

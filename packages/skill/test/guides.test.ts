@@ -14,6 +14,7 @@ describe("danwo guide", () => {
       "first-test",
       "locators-vs-agent",
       "matrix",
+      "infrastructure",
       "lint",
       "providers",
       "fidelity",

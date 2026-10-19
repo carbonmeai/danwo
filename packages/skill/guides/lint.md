@@ -134,6 +134,13 @@ which also hold a client secret.
 
 The app's server called a provider with a publishable key. Informational.
 
+### data-no-retry-on-serialization
+
+A Postgres statement through a data proxy (see `danwo guide infrastructure`) failed with
+`serialization_failure` (40001) or `deadlock_detected` (40P01), and no later BEGIN or the same
+statement followed: the transaction was given up rather than run again, which is what Postgres
+asks for with these two errors.
+
 ## What it does not check
 
 Whether an id token was checked against the provider's keys (a fetch of the keys proves little,

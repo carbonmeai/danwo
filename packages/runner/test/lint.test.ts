@@ -1,3 +1,4 @@
+import type { DataCall } from "@danwo/infra"
 import type { ServiceDelivery } from "@danwo/matrix"
 import { describe, expect, it } from "vitest"
 
@@ -535,6 +536,40 @@ describe("the engine", () => {
     expect(finding?.docs).toBe("danwo guide lint#stripe-idempotency-key")
     expect(finding?.hint).toMatch(/Idempotency-Key|key/)
     expect(finding?.evidence.source).toEqual({ file: "tests/x.danwo.ts", line: 10 })
+  })
+})
+
+/** A Postgres call through a data proxy. */
+const pg = (operation: string, verb: string, error?: string): DataCall => ({
+  service: "postgres",
+  kind: "postgres",
+  operation,
+  verb,
+  role: verb === "UPDATE" ? "write" : "boundary",
+  inTransaction: verb !== "BEGIN",
+  connection: 1,
+  startedAt: at(0),
+  durationMs: 1,
+  outcome: error === undefined ? "ok" : "error",
+  ...(error !== undefined && { error }),
+  fault: null,
+})
+
+describe("data/no-retry-on-serialization", () => {
+  it("flags a transaction given up after 40001, not one run again", () => {
+    const failed = [
+      pg("BEGIN", "BEGIN"),
+      pg("UPDATE stock", "UPDATE", "40001"),
+      pg("ROLLBACK", "ROLLBACK"),
+    ]
+    const retried = [...failed, pg("BEGIN", "BEGIN"), pg("UPDATE stock", "UPDATE")]
+
+    expect(rules(subject({ dataCalls: failed }))).toEqual(["data/no-retry-on-serialization"])
+    expect(lint(subject({ dataCalls: failed }))[0]?.message).toBe(
+      "UPDATE stock failed with serialization_failure (40001) and the transaction was not tried again",
+    )
+    expect(rules(subject({ dataCalls: retried }))).toEqual([])
+    expect(rules(subject({ dataCalls: [pg("UPDATE stock", "UPDATE", "23505")] }))).toEqual([])
   })
 })
 

@@ -1,7 +1,7 @@
 # Invariants and the fault matrix
 
-An invariant says what must be true however a run went; `danwo matrix` breaks one provider call
-or webhook at a time and checks the invariant held.
+An invariant says what must be true however a run went; `danwo matrix` breaks one provider call,
+webhook, or call to the app's own database or cache at a time and checks the invariant held.
 
 ## Writing the invariant
 
@@ -38,6 +38,12 @@ below) and replays the clean run's recorded steps without the model.
 the labels each provider gets. Without an invariant the body itself must pass under every fault.
 
 The matrix needs the environment to provide `proxy`, `reset()`, and `webhooks` for webhook faults.
+
+With `data` proxies in front of the app's Postgres and Redis, it also plans faults on the
+statements and commands the test sent: `reset-after on COMMIT (postgres)`,
+`serialization_failure on UPDATE orders (postgres)`, `down 3000ms on BEGIN (postgres)`,
+`OOM on INCR rate:login:* (cache)`. `danwo guide infrastructure` covers wiring, labels and
+defaults.
 
 ## Races
 
