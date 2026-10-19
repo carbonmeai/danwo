@@ -14,6 +14,15 @@ import { bearerRequest, emulatorTarget, liveTarget } from "../target.ts"
 const API = "https://sandbox-api.bachs.io"
 const KEY = "DANWO_FIDELITY_BACHS_KEY"
 
+/**
+ * The email a run's customer is created with. Bachs refuses an address whose domain takes no mail,
+ * which rules out every reserved name, so runs use Resend's test inbox: a real domain that accepts
+ * mail and keeps none.
+ */
+function inbox(context: ScenarioContext): string {
+  return `delivered+danwo-fidelity-${context.unique}@resend.dev`
+}
+
 const ADDRESS = object({
   line1: nullable(str),
   line2: nullable(str),
@@ -67,7 +76,7 @@ const customers: Scenario = {
     const created = await context.step(
       "create a customer",
       call(context, "POST", "/v1/customers", {
-        email: `fidelity-${context.unique}@example.com`,
+        email: inbox(context),
         name: "Danwo Fidelity",
         metadata: { suite: "fidelity" },
         billing_address: { line1: "40 Yaba Road", city: "Lagos", country: "NG" },
