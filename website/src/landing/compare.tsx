@@ -1,6 +1,6 @@
 /** The comparison with testing that stops at the screen. */
 
-import { Glyph } from "../components/brand.tsx"
+import { Mark } from "../components/brand.tsx"
 import { PROVIDERS } from "../lib/providers.ts"
 import { licenceWords } from "../lib/site.ts"
 import { CheckIcon, CrossIcon, DashIcon } from "./glyphs.tsx"
@@ -87,9 +87,7 @@ export function Compare() {
             <div className="trow thead" role="row">
               <div role="columnheader" />
               <div className="us" role="columnheader">
-                <span className="danwo-glyph" style={{ width: 18, height: 18, borderRadius: 5 }}>
-                  <Glyph size={10} />
-                </span>
+                <Mark size={18} />
                 danwo
               </div>
               <div role="columnheader">UI-only AI testing</div>

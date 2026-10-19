@@ -1,28 +1,63 @@
-/** danwo's mark: two overlapping squares, outlined and filled, on a near-black tile. */
+/**
+ * The dánwò brand on the site: the horizontal lockup and the mark, served from `/brand/`, which
+ * the build copies from the repository's `brand/` folder. Each is drawn twice, one for light
+ * surfaces and one for dark, and the theme shows the right one.
+ */
 
-/** The mark as an inline SVG data URL, for the favicon. */
-export const BRAND_ICON = `data:image/svg+xml,${encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="7" fill="#0a1217"/><g transform="translate(5.5 5.5) scale(.8125)"><rect x="2" y="2" width="8" height="8" rx="2" fill="none" stroke="#fff" stroke-width="1.6"/><rect x="7" y="7" width="7" height="7" rx="1.6" fill="#fff"/></g></svg>',
-)}`
+/** Where the copied brand files are served. */
+const BRAND = "/brand/svg"
 
-/** The mark's two squares, drawn in white. */
-export function Glyph({ size = 13 }: { readonly size?: number }) {
+/** The horizontal lockup's width over its height. */
+const LOCKUP_RATIO = 726.36 / 168
+
+/** The lockup, `height` pixels tall; `className` lets a dark surface force its on-dark version. */
+export function Lockup({
+  height = 24,
+  className = "",
+}: {
+  readonly height?: number
+  readonly className?: string
+}) {
+  const width = Math.round(height * LOCKUP_RATIO)
+
   return (
-    <svg viewBox="0 0 16 16" fill="none" width={size} height={size} aria-hidden="true">
-      <rect x="2" y="2" width="8" height="8" rx="2" stroke="#fff" strokeWidth="1.6" />
-      <rect x="7" y="7" width="7" height="7" rx="1.6" fill="#fff" />
-    </svg>
+    <span className={`danwo-lockup ${className}`.trim()}>
+      <img
+        className="only-light"
+        src={`${BRAND}/danwo-lockup-horizontal-on-light.svg`}
+        alt="dánwò"
+        width={width}
+        height={height}
+      />
+      <img
+        className="only-dark"
+        src={`${BRAND}/danwo-lockup-horizontal-on-dark.svg`}
+        alt="dánwò"
+        width={width}
+        height={height}
+      />
+    </span>
   )
 }
 
-/** The mark on its tile, followed by the name. */
-export function Brand() {
+/** The mark on its tile, `size` pixels square. */
+export function Mark({ size = 18 }: { readonly size?: number }) {
   return (
-    <span className="danwo-brand">
-      <span className="danwo-glyph">
-        <Glyph />
-      </span>
-      danwo
+    <span className="danwo-mark">
+      <img
+        className="only-light"
+        src={`${BRAND}/danwo-mark-on-light.svg`}
+        alt=""
+        width={size}
+        height={size}
+      />
+      <img
+        className="only-dark"
+        src={`${BRAND}/danwo-mark-on-dark.svg`}
+        alt=""
+        width={size}
+        height={size}
+      />
     </span>
   )
 }

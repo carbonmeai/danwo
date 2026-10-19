@@ -47,3 +47,10 @@ Files ending `-on-dark` are the variant for dark backgrounds. `wordmarks/` holds
 
 Not in theSVG: Paystack, Flutterwave, Tigris, Bachs (taken from each provider's own site, above).
 Bachs has only raster logos; ask them for an SVG before launch.
+
+## danwo's own brand
+
+The dánwò lockups, mark, favicons and app icons come from the repository's `brand/` folder; the
+build copies them to `/brand/` and `/favicon.ico` (see `src/generator/brand.ts`), so edit them only
+there. The wordmark is set in Young Serif (SIL Open Font License, `brand/YoungSerif-OFL.txt`) and is
+already converted to outlines, so the site ships no font file and needs no copy of the licence.

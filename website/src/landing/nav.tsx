@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router"
 import { useTheme } from "next-themes"
 import { type RefObject, useEffect, useState } from "react"
 
-import { Glyph } from "../components/brand.tsx"
+import { Lockup } from "../components/brand.tsx"
 import { repoUrl } from "../lib/site.ts"
 import { GithubIcon, MenuIcon, MoonIcon, SunIcon } from "./glyphs.tsx"
 
@@ -73,11 +73,8 @@ export function Nav({
   return (
     <header className={["nav", light && "light", open && "open"].filter(Boolean).join(" ")}>
       <div className="wrap">
-        <Link to="/" className="danwo-brand" aria-label="danwo home">
-          <span className="danwo-glyph">
-            <Glyph />
-          </span>
-          danwo
+        <Link to="/" className="danwo-brand" aria-label="dánwò home">
+          <Lockup height={24} />
         </Link>
         <nav className="nav-links" aria-label="Primary">
           {LINKS.map((link) => (

@@ -3,3 +3,5 @@ dist/
 .output/
 .tanstack/
 .source/
+public/brand/
+public/favicon.ico

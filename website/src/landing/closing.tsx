@@ -1,7 +1,7 @@
 /** The closing call to action and the footer. */
 import { Link } from "@tanstack/react-router"
 
-import { Glyph } from "../components/brand.tsx"
+import { Lockup } from "../components/brand.tsx"
 import { repoUrl, SITE } from "../lib/site.ts"
 import { CopyBox } from "./copy.tsx"
 
@@ -62,11 +62,8 @@ export function Footer() {
       <div className="wrap">
         <div className="foot">
           <div>
-            <Link className="danwo-brand home" to="/">
-              <span className="danwo-glyph">
-                <Glyph />
-              </span>
-              danwo
+            <Link className="danwo-brand home" to="/" aria-label="dánwò home">
+              <Lockup height={26} className="on-dark" />
             </Link>
             <p style={{ margin: "14px 0 0", maxWidth: 260 }}>
               {SITE.tagline} Testing for the agentic era.

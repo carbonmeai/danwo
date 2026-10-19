@@ -2,14 +2,14 @@
 import type { DocsLayoutProps } from "fumadocs-ui/layouts/notebook"
 import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared"
 
-import { Brand } from "../components/brand.tsx"
+import { Lockup } from "../components/brand.tsx"
 import { repoUrl } from "./site.ts"
 
 export function baseOptions(): BaseLayoutProps {
   const github = repoUrl()
 
   return {
-    nav: { title: <Brand />, url: "/" },
+    nav: { title: <Lockup height={22} />, url: "/" },
     links: [
       { text: "Docs", url: "/docs", active: "nested-url" },
       { text: "Blog", url: "/blog", active: "nested-url" },
@@ -27,7 +27,7 @@ export function docsOptions(): Omit<DocsLayoutProps, "tree"> {
   const github = repoUrl()
 
   return {
-    nav: { title: <Brand />, url: "/", mode: "top" },
+    nav: { title: <Lockup height={22} />, url: "/", mode: "top" },
     tabMode: "navbar",
     links: [
       { text: "Blog", url: "/blog", active: "nested-url" },

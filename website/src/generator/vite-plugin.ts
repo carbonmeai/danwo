@@ -1,18 +1,22 @@
 /**
  * Builds the docs tree before Vite reads it, and again whenever a guide, the README or a page
  * written for the website changes while the dev server runs. Also serves the landing page's
- * highlighted code samples as a virtual module.
+ * highlighted code samples as a virtual module, and copies the brand files into `public/`.
  */
 import { join } from "node:path"
 
 import type { Plugin } from "vite"
 
+import { BRAND_DIR, copyBrand } from "./brand.ts"
 import { codeSamples } from "./code-samples.ts"
 import { GUIDES_DIR, REPO_ROOT } from "./danwo.ts"
-import { CONTENT, generateDocs } from "./generate.ts"
+import { CONTENT, generateDocs, WEBSITE } from "./generate.ts"
 
 /** Files whose change rebuilds the docs tree. */
 const WATCHED = [GUIDES_DIR, CONTENT, join(REPO_ROOT, "README.md")]
+
+/** Where Vite serves static files from. */
+const PUBLIC = join(WEBSITE, "public")
 
 /** The module the landing page imports its code samples from. */
 const SAMPLES_ID = "virtual:danwo/code-samples"
@@ -26,6 +30,7 @@ export function danwoDocs(): Plugin {
     /* Before any other plugin reads the content folder. */
     config() {
       generateDocs()
+      copyBrand(PUBLIC)
     },
     resolveId(id) {
       return id === SAMPLES_ID ? RESOLVED_SAMPLES_ID : undefined
@@ -36,8 +41,9 @@ export function danwoDocs(): Plugin {
       return `export default ${JSON.stringify(await codeSamples())}`
     },
     configureServer(server) {
-      server.watcher.add(WATCHED)
+      server.watcher.add([...WATCHED, BRAND_DIR])
       server.watcher.on("all", (_event, path) => {
+        if (path.startsWith(BRAND_DIR)) copyBrand(PUBLIC)
         if (!WATCHED.some((watched) => path.startsWith(watched))) return
 
         const changed = generateDocs()

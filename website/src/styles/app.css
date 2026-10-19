@@ -106,27 +106,31 @@ body {
   display: none;
 }
 
-/* The brand in every layout's navigation bar. */
+/* The brand in every layout's navigation bar: the lockup, or the mark beside a name. */
 .danwo-brand {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  font-weight: 600;
-  font-size: 16px;
-  letter-spacing: -0.015em;
 }
 
-.danwo-glyph {
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
-  background: #0a1217;
-  box-shadow:
-    inset 0 0 0 1px #ffffff2e,
-    0 1px 2px rgb(0 0 0 / 0.2);
-  display: grid;
-  place-items: center;
+.danwo-lockup,
+.danwo-mark {
+  display: inline-flex;
+  align-items: center;
   flex: none;
+
+  & img {
+    display: block;
+    max-width: none;
+  }
+}
+
+/* On a surface that is always dark, the on-dark drawing whatever the theme. */
+.danwo-lockup.on-dark .only-light {
+  display: none;
+}
+
+.danwo-lockup.on-dark .only-dark {
+  display: block;
 }
 
 /* Spec pages: the kind of each entry, under its heading. */

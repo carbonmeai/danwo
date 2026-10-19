@@ -2,7 +2,6 @@ import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-r
 import { RootProvider } from "fumadocs-ui/provider/tanstack"
 import type { ReactNode } from "react"
 
-import { BRAND_ICON } from "../components/brand.tsx"
 import { SITE } from "../lib/site.ts"
 
 import appCss from "../styles/app.css?url"
@@ -13,12 +12,15 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { name: "color-scheme", content: "light dark" },
-      { name: "theme-color", content: "#0a0a0b" },
+      { name: "theme-color", content: "#0a0a0a" },
       { title: SITE.name },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", type: "image/svg+xml", href: BRAND_ICON },
+      { rel: "icon", href: "/favicon.ico", sizes: "any" },
+      { rel: "icon", type: "image/svg+xml", href: "/brand/svg/favicon.svg" },
+      { rel: "apple-touch-icon", href: "/brand/png/apple-touch-icon.png" },
+      { rel: "manifest", href: "/site.webmanifest" },
     ],
   }),
   component: RootComponent,

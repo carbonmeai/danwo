@@ -247,6 +247,15 @@
     box-shadow: 0 1px 0 var(--line);
   }
 
+  /* Over the dark hero the on-dark lockup, whatever the theme. */
+  &:not(.light) .danwo-lockup .only-light {
+    display: none;
+  }
+
+  &:not(.light) .danwo-lockup .only-dark {
+    display: block;
+  }
+
   & .wrap {
     display: flex;
     align-items: center;
