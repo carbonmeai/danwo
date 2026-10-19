@@ -33,8 +33,8 @@ async function onAdmin(url: string, sql: string): Promise<void> {
   }
 }
 
-/** Drops and creates `database` on the server of `url`, then migrates and seeds it. */
-export async function rebuild(url: string, database: string): Promise<void> {
+/** Drops and creates `database` on the server of `url`, then migrates and seeds it with `migration`. */
+export async function rebuild(url: string, database: string, migration = MIGRATION): Promise<void> {
   await onAdmin(url, `DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`)
   await onAdmin(url, `CREATE DATABASE "${database}"`)
 
@@ -43,7 +43,7 @@ export async function rebuild(url: string, database: string): Promise<void> {
   await client.connect()
 
   try {
-    await client.query(MIGRATION)
+    await client.query(migration)
   } finally {
     await client.end()
   }
