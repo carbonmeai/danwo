@@ -70,11 +70,12 @@ export function productObject(fields: {
   description: string | null
   active: boolean
   metadata: Metadata
-}): Product {
+}): Product & { attributes: string[] } {
   return {
     id: fields.id,
     object: "product",
     active: fields.active,
+    attributes: [],
     created: fields.created,
     default_price: null,
     description: fields.description,
@@ -85,6 +86,7 @@ export function productObject(fields: {
     name: fields.name,
     package_dimensions: null,
     shippable: null,
+    statement_descriptor: null,
     tax_code: null,
     tax_details: null,
     type: "service",
