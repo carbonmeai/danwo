@@ -146,12 +146,49 @@ describe("danwo serve", () => {
     await expect(seek).toHaveAttribute("aria-valuetext", "0:00.5")
   })
 
+  it("runs a matrix from the dashboard and shows it live until it becomes the run's page", async () => {
+    const { app, screen, expect } = session
+
+    await app.open("/")
+    await screen.getByRole("link", { name: /buys 500 credits/ }).click()
+    await screen.getByRole("button", { name: "Run the matrix" }).click()
+    await screen.getByRole("textbox", { name: "Only faults containing" }).fill("on POST /buy")
+    await screen.getByRole("button", { name: "Run", exact: true }).click()
+
+    await expect(screen.getByText("running", { exact: true }).first()).toBeVisible({
+      timeout: 60_000,
+    })
+    await expect(screen.getByRole("region", { name: "Running now" })).toBeVisible()
+    await expect(screen.getByRole("table", { name: "Fault grid" })).toBeVisible({
+      timeout: 120_000,
+    })
+    await expect(screen.getByRole("button", { name: /double-submit on POST \/buy/ })).toBeVisible()
+  })
+
+  it("reruns one test from its run and opens the new run", async () => {
+    const { app, screen, expect } = session
+
+    await app.open("/")
+    await screen.getByRole("link", { name: "3 tests" }).click()
+    await screen.getByRole("button", { name: /Rerun tests\/storefront\.danwo\.ts/ }).click()
+    await expect(screen.getByRole("heading", { name: "1 test" })).toBeVisible({ timeout: 60_000 })
+    await app.open("/")
+    await expect(screen.getByRole("link", { name: "1 test" })).toBeVisible()
+  })
+
   it("shows the impact index and the insights", async () => {
     const { app, screen, expect } = session
 
     await app.open("/impact")
     await expect(screen.getByText("api.stripe.com").first()).toBeVisible({ timeout: 30_000 })
-    await app.open("/insights")
+    await app.open("/insights?sort=faults")
     await expect(screen.getByRole("heading", { name: "Slowest tests" })).toBeVisible()
+
+    const matrixTest = screen
+      .getByRole("table", { name: "Tests" })
+      .getByRole("row")
+      .filter({ hasText: "buys 500 credits" })
+
+    await expect(matrixTest).toContainText("duplicate on webhook checkout.session.completed")
   })
 })
