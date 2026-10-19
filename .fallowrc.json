@@ -26,6 +26,11 @@
         "reason": "Page components: their branches are conditional rendering, exercised by the dashboard's browser test rather than unit coverage; the data they render is unit tested in packages/dashboard/src/data."
       },
       {
+        "files": ["examples/shop-mobile/src/scripted-model.ts"],
+        "maxCrap": 120,
+        "reason": "The scripted model records the mobile shop's agent steps; it runs on an emulator in the Android slow test, which unit coverage cannot see."
+      },
+      {
         "files": ["benchmarks/app/**"],
         "maxCrap": 120,
         "reason": "The benchmark app is the system under test: every branch is exercised end to end by the benchmark's own runs (each planted bug flips one), not by unit tests of its handlers."

@@ -236,7 +236,6 @@ export class DeviceEyes {
   }
 
   /** Removes the session's screenshots. */
-  // fallow-ignore-next-line unused-class-member -- the device session's, when it closes
   async close(): Promise<void> {
     if (this.dir !== undefined) await rm(this.dir, { recursive: true, force: true })
   }

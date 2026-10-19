@@ -30,11 +30,10 @@ function call(toolName: string, input: unknown) {
 /** Every string in a prompt, joined: what the model reads. */
 function textOf(value: unknown): string {
   if (typeof value === "string") return value
-  if (Array.isArray(value)) return value.map(textOf).join("\n")
-  if (typeof value === "object" && value !== null)
-    return Object.values(value).map(textOf).join("\n")
 
-  return ""
+  const parts = Array.isArray(value) ? value : Object.values(value ?? {})
+
+  return typeof value === "object" ? parts.map(textOf).join("\n") : ""
 }
 
 /** The ref of the element with this role and name in the latest view of `prompt`. */
@@ -48,10 +47,18 @@ function refOf(prompt: string, role: string, name: string): string {
   return ref
 }
 
-/** The answer to a prompt: the next action of the step it is in, or done. */
+/** The step's actions in order, each from the screen it acts on; `done` after the last. */
+const STEPS: Readonly<Record<string, readonly ((text: string) => ReturnType<typeof call>)[]>> = {
+  "Start buying": [(text) => call("tap", { ref: refOf(text, "button", "Buy 500 credits") })],
+  "Pay for the credits": [
+    (text) => call("fill", { ref: refOf(text, "textbox", "Email"), text: "buyer@example.com" }),
+    (text) => call("tap", { ref: refOf(text, "button", "Pay $5.00") }),
+  ],
+}
+
+/** The answer to a prompt: the read of an extraction, or the step's next action, or done. */
 function answer(prompt: readonly { readonly role: string; readonly content: unknown }[]) {
   const text = textOf(prompt.filter((message) => message.role !== "system"))
-  const acted = prompt.filter((message) => message.role === "tool").length
 
   if (/^Extract: /m.test(text)) {
     const credits = /- text "Credits: \d+" \[ref=(e\d+)\]/.exec(text)?.[1]
@@ -59,17 +66,10 @@ function answer(prompt: readonly { readonly role: string; readonly content: unkn
     return call("read", { fields: [{ path: "credits", ref: credits, as: "number" }] })
   }
 
-  if (text.includes("Instruction: Start buying")) {
-    return acted === 0
-      ? call("tap", { ref: refOf(text, "button", "Buy 500 credits") })
-      : call("done", { status: "passed", summary: "opened checkout" })
-  }
+  const step = Object.keys(STEPS).find((start) => text.includes(`Instruction: ${start}`)) ?? ""
+  const next = STEPS[step]?.[prompt.filter((message) => message.role === "tool").length]
 
-  if (acted === 0)
-    return call("fill", { ref: refOf(text, "textbox", "Email"), text: "buyer@example.com" })
-  if (acted === 1) return call("tap", { ref: refOf(text, "button", "Pay $5.00") })
-
-  return call("done", { status: "passed", summary: "paid" })
+  return next === undefined ? call("done", { status: "passed", summary: "done" }) : next(text)
 }
 
 /** The scripted model, as an AI SDK language model. */
