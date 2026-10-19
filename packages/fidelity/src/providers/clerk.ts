@@ -4,7 +4,7 @@
  * development instance only. Live runs use Clerk's test addresses, so no mail is sent, and delete
  * every user and organization they make.
  */
-import { clerk, clerkInstance, createEmulator } from "@danwo/emulators"
+import { clerk, clerkInstance, createEmulator, seedClerk } from "@danwo/emulators"
 
 import { type FidelityProvider, refuseLive, requiredCredentials } from "../provider.ts"
 import { liveTarget } from "../target.ts"
@@ -23,6 +23,10 @@ export const clerkFidelity: FidelityProvider = {
   scenarios: [...CLERK_BACKEND_SCENARIOS, ...CLERK_FRONTEND_SCENARIOS],
   emulator() {
     const emulator = createEmulator(clerk)
+
+    /* The check's development instance signs in by emailed code, with no password. */
+    seedClerk(emulator.store, { instance: { password: false } })
+
     const { secretKey, publishableKey } = clerkInstance(emulator).instance
 
     return Promise.resolve({

@@ -53,9 +53,9 @@ class Browser {
   }
 
   /**
-   * Starts the dev browser: development instances key the client on its token, not a cookie. The
-   * token is read from an unrecorded call (recorded answers have secrets taken out), and a second
-   * call records the answer's shape.
+   * Starts the dev browser: development instances key the client on it, not a cookie. Its id is
+   * sent as `__clerk_db_jwt`, as ClerkJS does; it is read from an unrecorded call (recorded answers
+   * have secrets taken out), and a second call records the answer's shape.
    */
   async start(): Promise<void> {
     const request = () =>
@@ -64,11 +64,11 @@ class Browser {
         headers: { origin: ORIGIN },
       })
     const raw: unknown = await (await this.context.target.send(request())).json()
-    const token = typeof raw === "object" && raw !== null && "token" in raw ? raw.token : undefined
+    const id = typeof raw === "object" && raw !== null && "id" in raw ? raw.id : undefined
 
-    if (typeof token !== "string") throw new Error("the dev browser answer has no token")
+    if (typeof id !== "string") throw new Error("the dev browser answer has no id")
 
-    this.devBrowser = token
+    this.devBrowser = id
     await this.context.step("start the dev browser", request())
   }
 
