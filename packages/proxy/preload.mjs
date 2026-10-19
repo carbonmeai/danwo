@@ -17,8 +17,9 @@
 import { mkdirSync, readFileSync, rmSync, watch, writeFileSync } from "node:fs"
 import http from "node:http"
 import https from "node:https"
-import { syncBuiltinESMExports } from "node:module"
+import Module, { syncBuiltinESMExports } from "node:module"
 import { basename, dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 function definesProtocol(target, Base) {
   let proto = target.prototype
@@ -83,5 +84,56 @@ function shiftClock(file) {
   process.once("exit", () => rmSync(ack, { force: true }))
 }
 
-if (!process.versions.bun) proxyAgents()
+/** undici's entry point, however the app's package manager lays out node_modules. */
+const UNDICI_ENTRY = /[\\/]node_modules[\\/]undici[\\/]index\.js$/
+
+/** Appended to undici's entry point: its `Agent` becomes the proxy-aware one. */
+const UNDICI_AGENT =
+  "\n;module.exports.Agent = class Agent extends module.exports.EnvHttpProxyAgent {};\n"
+
+/*
+ * undici's own `Agent`, which an app can hand to fetch as its dispatcher, ignores HTTPS_PROXY.
+ * When the app loads undici (by `require` or `import`), its `Agent` becomes `EnvHttpProxyAgent`,
+ * which takes the same options and goes through the proxy.
+ */
+function proxyUndici() {
+  if (typeof Module.registerHooks !== "function") return
+
+  Module.registerHooks({
+    load(url, context, nextLoad) {
+      const loaded = nextLoad(url, context)
+
+      if (!url.startsWith("file:") || !UNDICI_ENTRY.test(fileURLToPath(url))) return loaded
+
+      const source =
+        typeof loaded.source === "string" ? loaded.source : new TextDecoder().decode(loaded.source)
+
+      return { ...loaded, source: `${source}${UNDICI_AGENT}` }
+    },
+  })
+}
+
+/*
+ * A file named after this process in DANWO_PRELOAD_DIR, so the runner can tell which of the app's
+ * Node processes run with the proxy and which lost it (a start script that sets its own
+ * NODE_OPTIONS drops the preload).
+ */
+function heartbeat(dir) {
+  const file = join(dir, String(process.pid))
+
+  try {
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(file, process.argv.slice(1).join(" "))
+    process.once("exit", () => rmSync(file, { force: true }))
+  } catch {
+    /* The run that owned the folder has ended. */
+  }
+}
+
+if (!process.versions.bun) {
+  proxyAgents()
+  proxyUndici()
+}
+
 if (process.env.DANWO_TIME_FILE) shiftClock(process.env.DANWO_TIME_FILE)
+if (process.env.DANWO_PRELOAD_DIR) heartbeat(process.env.DANWO_PRELOAD_DIR)

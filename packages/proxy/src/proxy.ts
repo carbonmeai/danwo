@@ -1,7 +1,6 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { fileURLToPath, pathToFileURL } from "node:url"
 
 import {
   type CompletedRequest,
@@ -12,9 +11,10 @@ import {
   type Mockttp,
 } from "mockttp"
 
-import { APP_CLOCK_VARIABLE, type AppClock, createAppClock } from "./app-clock.ts"
+import { type AppClock, createAppClock } from "./app-clock.ts"
 import { type CapturedMessage, captureMessage } from "./capture.ts"
 import { hostMatches, isLoopback, isPageAsset, isStreaming, TELEMETRY_HOSTS } from "./hosts.ts"
+import { type EnvOptions, preloadedPids, proxyEnvironment, writeNodeShim } from "./node-env.ts"
 import { forwardTo } from "./upstream.ts"
 import {
   handleSockets,
@@ -192,9 +192,16 @@ export interface Proxy {
    * Environment for a Node app to route through the proxy with no code changes: proxy variables,
    * `NODE_USE_ENV_PROXY=1`, the CA in `NODE_EXTRA_CA_CERTS`, and the preload appended to
    * `NODE_OPTIONS` (and to `BUN_OPTIONS` for Bun apps). The preload also runs the app's `Date` on
-   * `clock`. Merged over `base` (default `process.env`).
+   * `clock`. Merged over `base` (default `process.env`). A `node` shim goes first on PATH, so a
+   * start script that replaces NODE_OPTIONS still loads the preload (`nodeShim: false` leaves it
+   * out).
    */
-  env(base?: NodeJS.ProcessEnv): NodeJS.ProcessEnv
+  env(base?: NodeJS.ProcessEnv, options?: EnvOptions): NodeJS.ProcessEnv
+  /**
+   * The pids of the processes started with `env()` that loaded the preload and still run: a Node
+   * process of the app's that is missing from here calls providers without the proxy.
+   */
+  preloaded(): Promise<readonly number[]>
   /** The clock of every app started with `env()`: an offset ahead of real time the runner moves. */
   readonly clock: AppClock
   exchanges(): readonly Exchange[]
@@ -217,8 +224,6 @@ export interface Proxy {
 function routeHandler(route: Route): Handler {
   return "handler" in route ? route.handler : forwardTo(route.upstream)
 }
-
-const PRELOAD = fileURLToPath(new URL("../preload.mjs", import.meta.url))
 
 function toFetchHeaders(headers: MockttpHeaders): Headers {
   const out = new Headers()
@@ -453,6 +458,8 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   await writeFile(caCertPath, ca.cert)
 
   const clock = createAppClock(dir)
+  const preloadDir = join(dir, "preloaded")
+  const shimDir = await writeNodeShim(dir)
 
   const server = getLocal({ https: ca })
 
@@ -628,22 +635,10 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
     caCertPath,
     caSpki: await generateSPKIFingerprint(ca.cert),
     clock,
-    env(base = process.env) {
-      const preload = `--import=${pathToFileURL(PRELOAD).href}`
-
-      return {
-        ...base,
-        HTTPS_PROXY: url,
-        HTTP_PROXY: url,
-        https_proxy: url,
-        http_proxy: url,
-        NODE_USE_ENV_PROXY: "1",
-        NODE_EXTRA_CA_CERTS: caCertPath,
-        NODE_OPTIONS: [base.NODE_OPTIONS, preload].filter(Boolean).join(" "),
-        BUN_OPTIONS: [base.BUN_OPTIONS, `--preload=${PRELOAD}`].filter(Boolean).join(" "),
-        [APP_CLOCK_VARIABLE]: clock.file,
-      }
+    env(base = process.env, envOptions = {}) {
+      return proxyEnvironment({ url, caCertPath, clock, preloadDir, shimDir }, base, envOptions)
     },
+    preloaded: () => preloadedPids(preloadDir),
     exchanges: () => [...log.values()],
     sockets: () => sockets.sockets(),
     setFault(rule) {

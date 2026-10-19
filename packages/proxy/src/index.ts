@@ -16,6 +16,7 @@ export {
 export { APP_CLOCK_VARIABLE, type AppClock } from "./app-clock.ts"
 export { type CapturedMessage, MAX_CAPTURED_BODY_BYTES } from "./capture.ts"
 export { isLoopback, isPageAsset, isStreaming, TELEMETRY_HOSTS } from "./hosts.ts"
+export { type EnvOptions, PRELOAD_DIR_VARIABLE } from "./node-env.ts"
 export { forwardTo } from "./upstream.ts"
 export {
   type SocketCall,
