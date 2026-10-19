@@ -537,6 +537,8 @@ export {
   pusherBeams,
   pusherChannels,
   type PusherSeedConfig,
+  PUSHER_DEFAULTS,
+  NOVU_DEFAULTS,
   type TiptapCollabView,
   tiptapCollab,
   type TiptapSeedConfig,
