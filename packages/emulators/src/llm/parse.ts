@@ -3,10 +3,19 @@
  * tool calls, a refusal, and whether the answer was cut off.
  */
 import { asRecord } from "../json.ts"
-import type { LlmReply, LlmToolCall } from "./entities.ts"
+import type { LlmReply, LlmSource, LlmToolCall } from "./entities.ts"
 
-/** Each API a recording can read, by the route the call came through. */
-export type LlmApi = "chat" | "responses" | "messages" | "language-model"
+/** Each API a call can come through, by its route; all but Bedrock's can be recorded. */
+export type LlmApi =
+  | "chat"
+  | "responses"
+  | "messages"
+  | "language-model"
+  | "gemini"
+  | "agent"
+  | "converse"
+  | "converse-stream"
+  | "invoke"
 
 function str(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined
@@ -46,11 +55,20 @@ function reply(parts: {
   }
 }
 
-function stopOf(reason: unknown): LlmReply["stop"] {
-  if (reason === "length" || reason === "max_tokens" || reason === "max_output_tokens")
-    return "length"
+/** Each provider's word for stopping at the token limit or at a content filter. */
+const STOPS: ReadonlyMap<unknown, LlmReply["stop"]> = new Map<unknown, LlmReply["stop"]>([
+  ["length", "length"],
+  ["max_tokens", "length"],
+  ["max_output_tokens", "length"],
+  ["MAX_TOKENS", "length"],
+  ["content_filter", "content_filter"],
+  ["content-filter", "content_filter"],
+  ["content_filtered", "content_filter"],
+  ["SAFETY", "content_filter"],
+])
 
-  return reason === "content_filter" || reason === "content-filter" ? "content_filter" : undefined
+function stopOf(reason: unknown): LlmReply["stop"] {
+  return STOPS.get(reason)
 }
 
 function fromChat(body: Record<string, unknown>): LlmReply {
@@ -113,11 +131,63 @@ function fromGateway(body: Record<string, unknown>): LlmReply {
   })
 }
 
+/** A Gemini answer: its first candidate's text and function calls. */
+function fromGemini(body: Record<string, unknown>): LlmReply {
+  const candidate = asRecord(list(body.candidates)[0])
+  const parts = list(asRecord(candidate?.content)?.parts).map(asRecord)
+
+  return reply({
+    text: parts.map((part) => str(part?.text) ?? ""),
+    calls: parts.flatMap((part) => {
+      const call = asRecord(part?.functionCall)
+
+      return call === undefined ? [] : [{ name: str(call.name) ?? "", arguments: call.args ?? {} }]
+    }),
+    stop: stopOf(candidate?.finishReason),
+  })
+}
+
+/** A Converse answer: its message's text and tool uses. */
+function fromConverse(body: Record<string, unknown>): LlmReply {
+  const blocks = list(asRecord(asRecord(body.output)?.message)?.content).map(asRecord)
+
+  return reply({
+    text: blocks.map((block) => str(block?.text) ?? ""),
+    calls: blocks.flatMap((block) => {
+      const use = asRecord(block?.toolUse)
+
+      return use === undefined ? [] : [{ name: str(use.name) ?? "", arguments: use.input ?? {} }]
+    }),
+    stop: stopOf(body.stopReason),
+  })
+}
+
+/** Perplexity's Agent API answers like the Responses API, with its citations as sources. */
+function fromAgent(body: Record<string, unknown>): LlmReply {
+  const found = fromResponses(body)
+  const results = list(body.output)
+    .map(asRecord)
+    .filter((item) => item?.type === "search_results")
+    .flatMap((item) => list(item?.results).map(asRecord))
+  const sources = results.map((result): LlmSource => {
+    const title = str(result?.title)
+
+    return { url: str(result?.url) ?? "", ...(title !== undefined && { title }) }
+  })
+
+  return sources.length === 0 ? found : { ...found, sources }
+}
+
 const READERS: Record<LlmApi, (body: Record<string, unknown>) => LlmReply> = {
   chat: fromChat,
   responses: fromResponses,
   messages: fromMessages,
   "language-model": fromGateway,
+  gemini: fromGemini,
+  agent: fromAgent,
+  converse: fromConverse,
+  "converse-stream": fromConverse,
+  invoke: fromMessages,
 }
 
 /** A real answer from `api` as a reply. */

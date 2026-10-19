@@ -10,7 +10,13 @@ import { HttpError } from "../errors.ts"
 import { asRecord } from "../json.ts"
 import type { Store } from "../store.ts"
 import type { LlmProvider, LlmReply, LlmRequest } from "./entities.ts"
-import { ANTHROPIC_HOST, GATEWAY_HOST, OPENAI_HOST } from "./helpers.ts"
+import {
+  ANTHROPIC_HOST,
+  GATEWAY_HOST,
+  GOOGLE_AI_HOST,
+  OPENAI_HOST,
+  PERPLEXITY_HOST,
+} from "./helpers.ts"
 import { type LlmApi, replyFromAnswer } from "./parse.ts"
 import { addScripts, fingerprintOf, type LlmScript } from "./scripts.ts"
 import { llmStore } from "./store.ts"
@@ -26,10 +32,23 @@ export interface LlmRecordOptions {
   readonly fetch?: typeof fetch
 }
 
-const REAL_ORIGINS: Record<LlmProvider, string> = {
+/**
+ * Where each recordable provider is reached. Bedrock is not recordable: its calls are signed with
+ * the user's AWS secret, which a recording would have to hold to sign again.
+ */
+const REAL_ORIGINS: Partial<Record<LlmProvider, string>> = {
   openai: `https://${OPENAI_HOST}`,
   anthropic: `https://${ANTHROPIC_HOST}`,
   gateway: `https://${GATEWAY_HOST}`,
+  google: `https://${GOOGLE_AI_HOST}`,
+  perplexity: `https://${PERPLEXITY_HOST}`,
+}
+
+/** How each provider takes the user's key on a recorded call. */
+function keyHeaders(provider: LlmProvider, key: string): Record<string, string> {
+  if (provider === "anthropic") return { "x-api-key": key }
+
+  return provider === "google" ? { "x-goog-api-key": key } : { authorization: `Bearer ${key}` }
 }
 
 /** Each store's recording settings, held outside the store so its snapshots never carry keys. */
@@ -40,6 +59,9 @@ export function scrubKeys(text: string): string {
   return text
     .replace(/\b(sk-(?:ant-[a-z0-9]+-|proj-|svcacct-)?)[A-Za-z0-9_-]{12,}/g, "$1[redacted]")
     .replace(/\b(vck_)[A-Za-z0-9_-]{8,}/g, "$1[redacted]")
+    .replace(/\b(AIza)[A-Za-z0-9_-]{30,}/g, "$1[redacted]")
+    .replace(/\b(pplx-)[A-Za-z0-9]{16,}/g, "$1[redacted]")
+    .replace(/\b(ABSK)[A-Za-z0-9+/=]{20,}/g, "$1[redacted]")
     .replace(/\b(Bearer)\s+[A-Za-z0-9._~+/=-]+/gi, "$1 [redacted]")
 }
 
@@ -78,17 +100,18 @@ function upstreamHeaders(call: RecordableCall, key: string): Record<string, stri
   const kept = Object.fromEntries(
     Object.entries(call.headers).filter(([name]) => /^(anthropic-|ai-|openai-)/.test(name)),
   )
-  const auth: Record<string, string> =
-    call.request.provider === "anthropic"
-      ? { "x-api-key": key }
-      : { authorization: `Bearer ${key}` }
 
   return {
     ...kept,
-    ...auth,
+    ...keyHeaders(call.request.provider, key),
     "content-type": "application/json",
     "ai-language-model-streaming": "false",
   }
+}
+
+/** The path that answers whole: Gemini streams from its own method, which a recording does not use. */
+function wholePath(path: string): string {
+  return path.replace(/:streamGenerateContent$/, ":generateContent")
 }
 
 /** The body asked whole: recordings always read a whole answer, and replay it streamed if asked. */
@@ -116,11 +139,11 @@ export async function recordedReply(
 ): Promise<LlmReply | undefined> {
   const options = recorders.get(store)
   const key = options?.keys?.[call.request.provider]
+  const origin = options?.upstreams?.[call.request.provider] ?? REAL_ORIGINS[call.request.provider]
 
-  if (options === undefined || key === undefined) return undefined
+  if (options === undefined || key === undefined || origin === undefined) return undefined
 
-  const origin = options.upstreams?.[call.request.provider] ?? REAL_ORIGINS[call.request.provider]
-  const response = await (options.fetch ?? fetch)(`${origin}${call.path}`, {
+  const response = await (options.fetch ?? fetch)(`${origin}${wholePath(call.path)}`, {
     method: "POST",
     headers: upstreamHeaders(call, key),
     body: JSON.stringify(wholeBody(call.body)),

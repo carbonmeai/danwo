@@ -6,11 +6,33 @@ import { asRecord, isRecord } from "../json.ts"
 import type { LlmMessage, LlmProvider, LlmRequest } from "./entities.ts"
 
 /** The text inside a message's content, whichever way a provider lays it out. */
-function textOf(content: unknown): string {
+export function textOf(content: unknown): string {
   if (typeof content === "string") return content
   if (Array.isArray(content)) return content.map(partText).filter(Boolean).join("\n")
 
   return isRecord(content) ? partText(content) : ""
+}
+
+/**
+ * The text a tool's result hands back, in Bedrock's (`toolResult`) or Gemini's
+ * (`functionResponse`) shape; undefined for any other part.
+ */
+function toolResultText(record: Record<string, unknown>): string | undefined {
+  const bedrock = asRecord(record.toolResult)
+
+  if (bedrock !== undefined) return textOf(bedrock.content)
+
+  const gemini = asRecord(record.functionResponse)
+
+  return gemini === undefined ? undefined : JSON.stringify(gemini.response ?? {})
+}
+
+/** A part's own text, as a string, a `text` field or a `json` value. */
+function ownText(record: Record<string, unknown>): string | undefined {
+  if (typeof record.text === "string") return record.text
+  if (record.json !== undefined) return JSON.stringify(record.json)
+
+  return typeof record.output === "string" ? record.output : undefined
 }
 
 /** A content part's text: its own text, its nested content, or a tool result's output. */
@@ -20,30 +42,39 @@ function partText(part: unknown): string {
   const record = asRecord(part)
 
   if (record === undefined) return ""
-  if (typeof record.text === "string") return record.text
-  if (record.content !== undefined) return textOf(record.content)
-  if (typeof record.output === "string") return record.output
+  if (record.content !== undefined && ownText(record) === undefined) return textOf(record.content)
+
+  const text = ownText(record) ?? toolResultText(record)
+
+  if (text !== undefined) return text
 
   const output = asRecord(record.output)
 
   return output === undefined ? "" : textOf(output.value)
 }
 
-function str(value: unknown): string {
+export function str(value: unknown): string {
   return typeof value === "string" ? value : ""
 }
 
-/** Whether a message only hands back tool results, as Anthropic's user turns after a tool call do. */
-function onlyToolResults(content: unknown): boolean {
+/** Whether a part hands back a tool's result, in Anthropic's, Bedrock's or Gemini's shape. */
+function isToolResult(part: unknown): boolean {
+  const record = asRecord(part)
+
   return (
-    Array.isArray(content) &&
-    content.length > 0 &&
-    content.every((part) => asRecord(part)?.type === "tool_result")
+    record?.type === "tool_result" ||
+    record?.toolResult !== undefined ||
+    record?.functionResponse !== undefined
   )
 }
 
+/** Whether a message only hands back tool results, as the user turns after a tool call do. */
+function onlyToolResults(content: unknown): boolean {
+  return Array.isArray(content) && content.length > 0 && content.every(isToolResult)
+}
+
 /** The messages of a list, with system and developer messages split out. */
-function splitMessages(list: unknown): { system: string[]; messages: LlmMessage[] } {
+export function splitMessages(list: unknown): { system: string[]; messages: LlmMessage[] } {
   const system: string[] = []
   const messages: LlmMessage[] = []
 
@@ -62,18 +93,33 @@ function splitMessages(list: unknown): { system: string[]; messages: LlmMessage[
   return { system, messages }
 }
 
-/** Tool names from a list of tool definitions, flat or wrapped in `function`. */
-function toolNames(list: unknown): string[] {
-  return (Array.isArray(list) ? list : []).flatMap((entry) => {
-    const tool = asRecord(entry)
-    const name = str(tool?.name) || str(asRecord(tool?.function)?.name)
+/** A tool definition's name: flat, or wrapped in `function` (OpenAI) or `toolSpec` (Bedrock). */
+function toolName(entry: unknown): string {
+  const tool = asRecord(entry)
+
+  return (
+    str(tool?.name) || str(asRecord(tool?.function)?.name) || str(asRecord(tool?.toolSpec)?.name)
+  )
+}
+
+/**
+ * Tool names from a list of tool definitions. Gemini groups its functions under
+ * `functionDeclarations`, each read as a tool of its own.
+ */
+export function toolNames(list: unknown): string[] {
+  return (Array.isArray(list) ? list : []).flatMap((entry): string[] => {
+    const declarations = asRecord(entry)?.functionDeclarations
+
+    if (Array.isArray(declarations)) return toolNames(declarations)
+
+    const name = toolName(entry)
 
     return name === "" ? [] : [name]
   })
 }
 
 /** A request's parts, before the provider and streaming are known. */
-interface Parsed {
+export interface Parsed {
   readonly model: string
   readonly system: readonly string[]
   readonly messages: readonly LlmMessage[]
@@ -81,7 +127,7 @@ interface Parsed {
   readonly schema?: unknown
 }
 
-function request(provider: LlmProvider, parsed: Parsed, stream: boolean): LlmRequest {
+export function request(provider: LlmProvider, parsed: Parsed, stream: boolean): LlmRequest {
   return {
     provider,
     model: parsed.model,
@@ -94,7 +140,7 @@ function request(provider: LlmProvider, parsed: Parsed, stream: boolean): LlmReq
 }
 
 /** The schema of an OpenAI `response_format` or Responses `text.format`, when it asks for JSON. */
-function openaiSchema(format: unknown): unknown {
+export function openaiSchema(format: unknown): unknown {
   const record = asRecord(format)
 
   if (record?.type === "json_object") return {}
@@ -103,12 +149,18 @@ function openaiSchema(format: unknown): unknown {
   return asRecord(record.json_schema)?.schema ?? record.schema ?? {}
 }
 
-/** A Chat Completions body. */
-export function chatRequest(body: Record<string, unknown>): LlmRequest {
+/**
+ * A Chat Completions body. Perplexity's Sonar API takes the same body, so `provider` names which
+ * API it came through.
+ */
+export function chatRequest(
+  body: Record<string, unknown>,
+  provider: LlmProvider = "openai",
+): LlmRequest {
   const { system, messages } = splitMessages(body.messages)
 
   return request(
-    "openai",
+    provider,
     {
       model: str(body.model),
       system,
@@ -139,19 +191,23 @@ export function responsesRequest(body: Record<string, unknown>): LlmRequest {
   )
 }
 
-/** An Anthropic Messages body; `system` is a string or a list of text blocks. */
-export function messagesRequest(body: Record<string, unknown>): LlmRequest {
+/**
+ * An Anthropic Messages body; `system` is a string or a list of text blocks. Bedrock carries the
+ * same body for Claude models, so `provider` names which API it came through, and Bedrock's model
+ * comes from the path.
+ */
+export function messagesRequest(
+  body: Record<string, unknown>,
+  provider: LlmProvider = "anthropic",
+  model: string = str(body.model),
+  stream: boolean = body.stream === true,
+): LlmRequest {
   const { messages } = splitMessages(body.messages)
 
   return request(
-    "anthropic",
-    {
-      model: str(body.model),
-      system: [textOf(body.system)],
-      messages,
-      tools: toolNames(body.tools),
-    },
-    body.stream === true,
+    provider,
+    { model, system: [textOf(body.system)], messages, tools: toolNames(body.tools) },
+    stream,
   )
 }
 

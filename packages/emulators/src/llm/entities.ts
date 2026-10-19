@@ -5,7 +5,7 @@
 import type { Entity } from "../store.ts"
 
 /** The APIs the emulator answers. */
-export type LlmProvider = "openai" | "anthropic" | "gateway"
+export type LlmProvider = "openai" | "anthropic" | "gateway" | "google" | "perplexity" | "bedrock"
 
 /** One tool call a scripted reply makes; `arguments` is sent as JSON, or as is when a string. */
 export interface LlmToolCall {
@@ -13,9 +13,19 @@ export interface LlmToolCall {
   readonly arguments: unknown
 }
 
+/** A web page an answer cites, as search-backed models (Perplexity) list their sources. */
+export interface LlmSource {
+  readonly url: string
+  readonly title?: string
+  readonly snippet?: string
+  /** When the page was published, as `YYYY-MM-DD`. */
+  readonly date?: string
+}
+
 /**
  * What the model answers: text, tool calls, a structured object (for a `response_format` or JSON
  * response), or a refusal; `stop` ends it early, as running out of tokens or a content filter does.
+ * `sources` are the pages a search-backed answer cites; providers without citations leave them out.
  */
 export interface LlmReply {
   readonly text?: string
@@ -23,6 +33,7 @@ export interface LlmReply {
   readonly json?: unknown
   readonly refusal?: string
   readonly stop?: "length" | "content_filter"
+  readonly sources?: readonly LlmSource[]
 }
 
 /** A pattern as stored: a regular expression's source and flags. */

@@ -286,6 +286,8 @@ export {
 } from "./slack/index.ts"
 export {
   LLM_BEHAVIOURS,
+  BEDROCK_HOSTS,
+  GOOGLE_AI_HOST,
   LLM_HOSTS,
   llm,
   type LlmBehaviour,
@@ -299,7 +301,9 @@ export {
   type LlmReply,
   type LlmScript,
   type LlmScripts,
+  type LlmSource,
   llmScripts,
+  PERPLEXITY_HOST,
   type LlmSeedConfig,
   type LlmToolCall,
   seedLlm,

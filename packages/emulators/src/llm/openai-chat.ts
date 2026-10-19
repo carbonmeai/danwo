@@ -103,6 +103,16 @@ export function chatStream(
   head: Head,
   includeUsage: boolean,
 ): string[] {
+  return [...chatChunks(reply, counts, head, includeUsage).map((item) => sse(item)), sse("[DONE]")]
+}
+
+/** The chunks a completion streams in, before they are framed as events. */
+export function chatChunks(
+  reply: LlmReply,
+  counts: LlmUsage,
+  head: Head,
+  includeUsage: boolean,
+): Chunk[] {
   const content =
     reply.refusal === undefined
       ? deltas(messageText(reply)).map((piece) => chunk(head, { content: piece }))
@@ -115,13 +125,12 @@ export function chatStream(
   const tail: Chunk[] = includeUsage
     ? [{ ...head, object: "chat.completion.chunk", choices: [], usage: usage(counts) }]
     : []
-  const chunks = [
+
+  return [
     chunk(head, { role: "assistant", content: "" }),
     ...content,
     ...toolDeltas(head, reply),
     last,
     ...tail,
   ]
-
-  return [...chunks.map((item) => sse(item)), sse("[DONE]")]
 }

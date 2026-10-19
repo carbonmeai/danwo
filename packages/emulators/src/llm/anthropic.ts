@@ -115,10 +115,16 @@ function rawInputs(reply: LlmReply, message: Message): string[] {
   )
 }
 
-/** A message as its stream of events. */
+/** A message as its stream of server-sent events. */
 export function anthropicStream(reply: LlmReply, whole: Message): string[] {
+  return anthropicEvents(reply, whole).map((event) => sse(event, event.type))
+}
+
+/** A message as the events it streams in, before they are framed. */
+export function anthropicEvents(reply: LlmReply, whole: Message): StreamEvent[] {
   const raws = rawInputs(reply, whole)
-  const events: StreamEvent[] = [
+
+  return [
     {
       type: "message_start",
       message: {
@@ -148,6 +154,4 @@ export function anthropicStream(reply: LlmReply, whole: Message): string[] {
     },
     { type: "message_stop" },
   ]
-
-  return events.map((event) => sse(event, event.type))
 }
