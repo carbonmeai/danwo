@@ -106,10 +106,13 @@ function ColumnHeads({ columns }: { readonly columns: readonly string[] }) {
 export function FaultHeatmap({
   run,
   focus,
+  onPick,
 }: {
   readonly run: MatrixHistory
   /** The trial the page's address points at, by its fault. */
   readonly focus?: string | undefined
+  /** Hears each trial picked, as well as the panel beside the grid showing it. */
+  readonly onPick?: (trial: HistoryTrial) => void
 }) {
   const grid = faultGrid(run.trials)
   const groups = gridGroups(grid)
@@ -172,7 +175,14 @@ export function FaultHeatmap({
                   </Box>
                   {grid.columns.map((column) => (
                     <Box role="cell" key={column}>
-                      <Cell cells={at(row.target, column)} picked={picked} onPick={setPicked} />
+                      <Cell
+                        cells={at(row.target, column)}
+                        picked={picked}
+                        onPick={(trial) => {
+                          setPicked(trial)
+                          onPick?.(trial)
+                        }}
+                      />
                     </Box>
                   ))}
                 </Box>
@@ -183,7 +193,7 @@ export function FaultHeatmap({
       </Panel>
       <Panel position={{ xl: "sticky" }} top="16" aria-live="polite" aria-label="Trial">
         <Item p="4">
-          <TrialDetail trial={picked} />
+          <TrialDetail testId={run.testId} trial={picked} />
           {picked?.fault ? (
             <Box mt="3" fontSize="1">
               <Link

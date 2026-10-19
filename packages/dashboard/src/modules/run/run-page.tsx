@@ -29,7 +29,11 @@ export function RunPage({
   readonly view: MatrixView
   readonly search: RunFocus
 }) {
-  const runs = <Link to="/">Runs</Link>
+  const runs = (
+    <Link to="/runs" search={run?.kind === "matrix" ? { kind: "matrix" } : {}}>
+      Runs
+    </Link>
+  )
 
   if (run === null && live !== null) return <LiveRunPage key={live.id} initial={live} />
 
@@ -41,7 +45,7 @@ export function RunPage({
           hint={
             <>
               It may have been pruned; the history keeps the latest 200 runs.{" "}
-              <Link to="/">See all runs</Link>
+              <Link to="/runs">See all runs</Link>
             </>
           }
         />

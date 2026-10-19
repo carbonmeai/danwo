@@ -51,8 +51,8 @@ function TopBar({ crumbs }: { readonly crumbs: readonly ReactNode[] }) {
 }
 
 /**
- * A page: the top bar, then a centred column with the page's title, what it is about and any
- * actions on its right, and the content beneath.
+ * A page: the top bar, then the page's title, what it is about and any actions on its right, and
+ * the content beneath, using the window's width up to a wide screen's.
  */
 export function Page({
   crumbs,
@@ -70,7 +70,7 @@ export function Page({
   return (
     <>
       <TopBar crumbs={crumbs} />
-      <Box maxW="1120px" mx="auto" px={{ base: "4", md: "6" }} pt="10" pb="24">
+      <Box maxW="1600px" mx="auto" px={{ base: "4", md: "8" }} pt="8" pb="24" w="full" minW="0">
         <HStack alignItems="flex-start" gap="4" mb="6" flexWrap="wrap">
           <Stack gap="1" minW="0" flex="1">
             <styled.h1 fontSize="17px" fontWeight="600" lineHeight="1.35" overflowWrap="anywhere">

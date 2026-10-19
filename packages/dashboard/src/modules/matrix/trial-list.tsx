@@ -70,8 +70,13 @@ export function TrialList({
                 {trial.calls} calls, {trial.deliveries} webhooks
               </span>
               {trial.record ? (
-                <Link to="/records/$" params={{ _splat: trial.record }} data-link>
-                  Record
+                <Link
+                  to="/tests/$testId"
+                  params={{ testId: run.testId }}
+                  search={{ record: trial.record }}
+                  data-link
+                >
+                  Watch
                 </Link>
               ) : null}
             </HStack>

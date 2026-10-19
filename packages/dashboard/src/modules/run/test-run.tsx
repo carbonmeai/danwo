@@ -16,19 +16,25 @@ import { useListKeys } from "../../lib/list-keys.ts"
 import { RerunFailed, RerunTest } from "../live/run-actions.tsx"
 import { cacheLine, sortedTests, testFigures } from "./run-values.ts"
 
-/** Links to a test's kept flight records, one per attempt that kept one. */
-function AttemptLinks({ test }: { readonly test: HistoryTest }) {
+/** Links to watch a test's kept recordings, one per try that kept one, on the test's page. */
+function RecordingLinks({ test }: { readonly test: HistoryTest }) {
   const kept = test.attempts.flatMap((attempt, i) =>
     attempt.record ? [{ i, dir: attempt.record }] : [],
   )
 
-  if (kept.length === 0) return <styled.span color="ink.faint">–</styled.span>
+  if (kept.length === 0) return <styled.span color="ink.faint">not kept</styled.span>
 
   return (
     <HStack gap="3">
       {kept.map(({ i, dir }) => (
-        <Link key={dir} to="/records/$" params={{ _splat: dir }} data-link>
-          attempt {i + 1}
+        <Link
+          key={dir}
+          to="/tests/$testId"
+          params={{ testId: test.id }}
+          search={{ record: dir }}
+          data-link
+        >
+          {kept.length === 1 && test.attempts.length === 1 ? "Watch" : `Watch try ${i + 1}`}
         </Link>
       ))}
     </HStack>
@@ -63,17 +69,16 @@ function BrokenFiles({ run }: { readonly run: TestHistory }) {
 }
 
 function TestLine({
-  runId,
   test,
   current,
   picked,
 }: {
-  readonly runId: string
   readonly test: HistoryTest
   readonly current: boolean
   readonly picked: boolean
 }) {
   const error = test.attempts.find((a) => a.error)?.error
+  const kept = test.attempts.findLast((a) => a.record !== undefined)?.record
   const time = test.attempts.reduce((sum, a) => sum + a.durationMs, 0)
   const row = useRef<HTMLTableRowElement>(null)
 
@@ -89,11 +94,10 @@ function TestLine({
       <Td>
         <Stack gap="1">
           <Link
-            to="/runs/$runId"
-            params={{ runId }}
-            search={{ test: test.id }}
-            replace
-            title="A link to this test in this run"
+            to="/tests/$testId"
+            params={{ testId: test.id }}
+            search={kept === undefined ? {} : { record: kept }}
+            title="Open this test's page, on this run's recording"
           >
             <styled.span fontWeight="500" overflowWrap="anywhere">
               {test.id}
@@ -106,7 +110,7 @@ function TestLine({
           ) : null}
           {test.attempts.length > 1 ? (
             <styled.span color="ink.muted" fontSize="1">
-              {test.attempts.length} attempts
+              {test.attempts.length - 1} {test.attempts.length === 2 ? "retry" : "retries"}
             </styled.span>
           ) : null}
         </Stack>
@@ -118,7 +122,7 @@ function TestLine({
         {duration(time)}
       </Td>
       <Td>
-        <AttemptLinks test={test} />
+        <RecordingLinks test={test} />
       </Td>
       <Td w="6rem">
         <RerunTest testId={test.id} />
@@ -194,7 +198,7 @@ export function TestRun({
               <Th>Test</Th>
               <Th display={{ base: "none", lg: "table-cell" }}>Replay cache</Th>
               <Th textAlign="right">Time</Th>
-              <Th>Flight records</Th>
+              <Th>Recording</Th>
               <Th>
                 <styled.span srOnly>Run again</styled.span>
               </Th>
@@ -204,7 +208,6 @@ export function TestRun({
             {tests.map((test, i) => (
               <TestLine
                 key={test.id}
-                runId={run.id}
                 test={test}
                 current={i === current}
                 picked={test.id === focus}

@@ -1,5 +1,5 @@
 import { Icons } from "@danwo/ui/icons/base"
-import { Box, HStack, Stack, styled } from "@danwo/ui/jsx"
+import { HStack, styled } from "@danwo/ui/jsx"
 import { useNavigate } from "@tanstack/react-router"
 import { type FormEvent, type ReactNode, useState } from "react"
 
@@ -229,26 +229,5 @@ export function CancelRun({ runId }: { readonly runId: string }) {
         {state === "asking" ? "Stop it" : state === "stopping" ? "Stopping…" : "Cancel"}
       </Button>
     </HStack>
-  )
-}
-
-/** The actions on a flight record: run its test again, or its matrix, from where it is read. */
-export function RecordDock({ testId }: { readonly testId: string }) {
-  return (
-    <Box
-      position="fixed"
-      right={{ base: "3", md: "6" }}
-      bottom={{ base: "3", md: "6" }}
-      zIndex="5"
-      bg="surface.chip"
-      boxShadow="pop"
-      rounded="12px"
-      p="1.5"
-    >
-      <Stack direction="row" gap="1" alignItems="center">
-        <RerunTest testId={testId} look="grey" />
-        <RunMatrix testId={testId} />
-      </Stack>
-    </Box>
   )
 }

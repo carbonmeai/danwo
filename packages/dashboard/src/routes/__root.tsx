@@ -27,7 +27,7 @@ export const Route = createRootRoute({
   component: RootComponent,
   notFoundComponent: () => (
     <Page crumbs={["Not found"]} title="Not found">
-      <Empty title="Nothing at this address" hint={<Link to="/">Back to the runs</Link>} />
+      <Empty title="Nothing at this address" hint={<Link to="/">Back to the tests</Link>} />
     </Page>
   ),
 })

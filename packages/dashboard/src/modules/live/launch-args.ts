@@ -41,6 +41,12 @@ function findTest(known: readonly KnownTest[], id: string): KnownTest | undefine
 }
 
 /** The tests to run again, each one the project still has. */
+/**
+ * A run started from the dashboard keeps its recording whatever happens, so the test it reran
+ * always has one to watch on its page.
+ */
+const RECORD = ["--record", "always"] as const
+
 function rerunFailed(known: readonly KnownTest[], failed: readonly string[]): Launch {
   const tests = failed.flatMap((id) => findTest(known, id) ?? [])
 
@@ -50,7 +56,7 @@ function rerunFailed(known: readonly KnownTest[], failed: readonly string[]): La
   const count = tests.length
 
   return {
-    args: ["test", ...files, "--grep", exactly(tests.map((test) => test.id))],
+    args: ["test", ...files, "--grep", exactly(tests.map((test) => test.id)), ...RECORD],
     label: `rerun ${count} failed ${count === 1 ? "test" : "tests"}`,
   }
 }
@@ -60,7 +66,7 @@ function oneTest(known: readonly KnownTest[], id: string): Launch {
 
   if (test === undefined) return { error: `no test named ${id} in the project` }
 
-  return { args: ["test", test.file, "--grep", exactly([id])], label: `rerun ${id}` }
+  return { args: ["test", test.file, "--grep", exactly([id]), ...RECORD], label: `rerun ${id}` }
 }
 
 /** The `--faults` arguments for a filter matched literally; none for an empty one. */

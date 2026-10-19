@@ -15,7 +15,9 @@ import { Route as InsightsRouteImport } from './routes/insights'
 import { Route as ApiActiveRouteImport } from './routes/api.active'
 import { Route as MediaSplatRouteImport } from './routes/media.$'
 import { Route as RecordsSplatRouteImport } from './routes/records.$'
+import { Route as RunsIndexRouteImport } from './routes/runs.index'
 import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
+import { Route as TestsTestIdRouteImport } from './routes/tests.$testId'
 import { Route as ApiLiveRunIdRouteImport } from './routes/api.live.$runId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -48,9 +50,19 @@ const RecordsSplatRoute = RecordsSplatRouteImport.update({
   path: '/records/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RunsIndexRoute = RunsIndexRouteImport.update({
+  id: '/runs/',
+  path: '/runs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RunsRunIdRoute = RunsRunIdRouteImport.update({
   id: '/runs/$runId',
   path: '/runs/$runId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestsTestIdRoute = TestsTestIdRouteImport.update({
+  id: '/tests/$testId',
+  path: '/tests/$testId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiLiveRunIdRoute = ApiLiveRunIdRouteImport.update({
@@ -67,6 +79,8 @@ export interface FileRoutesByFullPath {
   '/media/$': typeof MediaSplatRoute
   '/records/$': typeof RecordsSplatRoute
   '/runs/$runId': typeof RunsRunIdRoute
+  '/tests/$testId': typeof TestsTestIdRoute
+  '/runs/': typeof RunsIndexRoute
   '/api/live/$runId': typeof ApiLiveRunIdRoute
 }
 export interface FileRoutesByTo {
@@ -77,6 +91,8 @@ export interface FileRoutesByTo {
   '/media/$': typeof MediaSplatRoute
   '/records/$': typeof RecordsSplatRoute
   '/runs/$runId': typeof RunsRunIdRoute
+  '/tests/$testId': typeof TestsTestIdRoute
+  '/runs': typeof RunsIndexRoute
   '/api/live/$runId': typeof ApiLiveRunIdRoute
 }
 export interface FileRoutesById {
@@ -88,6 +104,8 @@ export interface FileRoutesById {
   '/media/$': typeof MediaSplatRoute
   '/records/$': typeof RecordsSplatRoute
   '/runs/$runId': typeof RunsRunIdRoute
+  '/tests/$testId': typeof TestsTestIdRoute
+  '/runs/': typeof RunsIndexRoute
   '/api/live/$runId': typeof ApiLiveRunIdRoute
 }
 export interface FileRouteTypes {
@@ -100,6 +118,8 @@ export interface FileRouteTypes {
     | '/media/$'
     | '/records/$'
     | '/runs/$runId'
+    | '/tests/$testId'
+    | '/runs/'
     | '/api/live/$runId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -110,6 +130,8 @@ export interface FileRouteTypes {
     | '/media/$'
     | '/records/$'
     | '/runs/$runId'
+    | '/tests/$testId'
+    | '/runs'
     | '/api/live/$runId'
   id:
     | '__root__'
@@ -120,6 +142,8 @@ export interface FileRouteTypes {
     | '/media/$'
     | '/records/$'
     | '/runs/$runId'
+    | '/tests/$testId'
+    | '/runs/'
     | '/api/live/$runId'
   fileRoutesById: FileRoutesById
 }
@@ -131,6 +155,8 @@ export interface RootRouteChildren {
   MediaSplatRoute: typeof MediaSplatRoute
   RecordsSplatRoute: typeof RecordsSplatRoute
   RunsRunIdRoute: typeof RunsRunIdRoute
+  TestsTestIdRoute: typeof TestsTestIdRoute
+  RunsIndexRoute: typeof RunsIndexRoute
   ApiLiveRunIdRoute: typeof ApiLiveRunIdRoute
 }
 
@@ -178,11 +204,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RecordsSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/runs/': {
+      id: '/runs/'
+      path: '/runs'
+      fullPath: '/runs/'
+      preLoaderRoute: typeof RunsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/runs/$runId': {
       id: '/runs/$runId'
       path: '/runs/$runId'
       fullPath: '/runs/$runId'
       preLoaderRoute: typeof RunsRunIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tests/$testId': {
+      id: '/tests/$testId'
+      path: '/tests/$testId'
+      fullPath: '/tests/$testId'
+      preLoaderRoute: typeof TestsTestIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/live/$runId': {
@@ -203,6 +243,8 @@ const rootRouteChildren: RootRouteChildren = {
   MediaSplatRoute: MediaSplatRoute,
   RecordsSplatRoute: RecordsSplatRoute,
   RunsRunIdRoute: RunsRunIdRoute,
+  TestsTestIdRoute: TestsTestIdRoute,
+  RunsIndexRoute: RunsIndexRoute,
   ApiLiveRunIdRoute: ApiLiveRunIdRoute,
 }
 export const routeTree = rootRouteImport

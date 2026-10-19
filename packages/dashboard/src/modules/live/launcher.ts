@@ -99,8 +99,8 @@ export function listedTests(printed: string): KnownTest[] {
   return Array.isArray(parsed) ? parsed.filter(isKnownTest) : []
 }
 
-/** The project's tests, as `danwo test --list` finds them. */
-async function knownTests(root: string): Promise<readonly KnownTest[]> {
+/** The project's tests, as `danwo test --list` finds them, kept for a short while. */
+export async function knownTests(root: string): Promise<readonly KnownTest[]> {
   if (known !== undefined && Date.now() - known.at < KNOWN_FOR_MS) return known.tests
 
   const tests = listedTests(await runCli(root, ["test", "--list"]))

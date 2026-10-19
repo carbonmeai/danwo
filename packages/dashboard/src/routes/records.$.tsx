@@ -1,25 +1,24 @@
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, redirect } from "@tanstack/react-router"
 
-import { recordAnchor, useRecordAnchors } from "../lib/record-anchors.ts"
-import { RecordDock } from "../modules/live/run-actions.tsx"
-import { fetchRecord } from "../modules/record/record-api.ts"
-import { RecordPage } from "../modules/record/record-page.tsx"
+import { recordAnchor } from "../lib/record-anchors.ts"
+import { fetchRecordTest } from "../modules/tests/tests-api.ts"
 
-const RecordRoute = () => {
-  const view = Route.useLoaderData()
-
-  useRecordAnchors(Route.useSearch())
-
-  return (
-    <>
-      <RecordPage view={view} />
-      {view ? <RecordDock testId={view.record.test} /> : null}
-    </>
-  )
-}
-
+/**
+ * A flight record's old address. A record now plays on its test's page, so this sends the browser
+ * there with the record picked, keeping the step, section and moment it pointed at.
+ */
 export const Route = createFileRoute("/records/$")({
-  validateSearch: recordAnchor,
-  loader: ({ params }) => fetchRecord({ data: params._splat ?? "" }),
-  component: RecordRoute,
+  validateSearch: (search: Record<string, unknown>) => ({
+    ...recordAnchor(search),
+    ...(search.t !== undefined && { t: Number(search.t) }),
+  }),
+  loaderDeps: ({ search }) => search,
+  loader: async ({ params, deps }) => {
+    const dir = params._splat ?? ""
+    const testId = await fetchRecordTest({ data: dir })
+
+    if (testId === null) throw redirect({ to: "/" })
+
+    throw redirect({ to: "/tests/$testId", params: { testId }, search: { ...deps, record: dir } })
+  },
 })

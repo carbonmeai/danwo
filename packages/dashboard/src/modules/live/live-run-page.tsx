@@ -330,7 +330,7 @@ export function LiveRunPage({ initial }: { readonly initial: LiveView }) {
 
   return (
     <Page
-      crumbs={[<Link to="/">Runs</Link>, view.title]}
+      crumbs={[<Link to="/runs">Runs</Link>, view.title]}
       title={view.title}
       detail={
         <HStack gap="2" flexWrap="wrap" mt="1">

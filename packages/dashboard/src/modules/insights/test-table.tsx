@@ -140,7 +140,7 @@ function BreakdownLine({
     <tr data-row data-current={current || undefined}>
       <Td minW="14rem">
         <Stack gap="1">
-          <Link to="/runs/$runId" params={{ runId: row.lastRun }} search={{ test: row.id }}>
+          <Link to="/tests/$testId" params={{ testId: row.id }}>
             <styled.span fontWeight="500" overflowWrap="anywhere">
               {row.id}
             </styled.span>

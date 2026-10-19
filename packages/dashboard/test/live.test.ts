@@ -160,6 +160,8 @@ describe("what the dashboard may run", () => {
         "tests/home.danwo.ts",
         "--grep",
         "^(?:tests\\/home\\.danwo\\.ts › loads \\(fast\\))$",
+        "--record",
+        "always",
       ],
       label: "rerun 1 failed test",
     })

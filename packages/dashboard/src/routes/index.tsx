@@ -1,29 +1,30 @@
 import { createFileRoute } from "@tanstack/react-router"
 
-import { fetchRuns } from "../modules/runs/runs-api.ts"
-import { RunsPage } from "../modules/runs/runs-page.tsx"
+import { type TestFilter, isTestFilter } from "../modules/tests/test-values.ts"
+import { fetchTests } from "../modules/tests/tests-api.ts"
+import { TestsPage } from "../modules/tests/tests-page.tsx"
 
-/** The runs list's address: which page, and what the filter holds. */
-interface RunsSearch {
-  readonly page?: number
+/** The tests list's address: which tab, and what the filter holds. */
+interface TestsSearch {
+  readonly filter?: TestFilter
   readonly q?: string
 }
 
-function runsSearch(search: Record<string, unknown>): RunsSearch {
+function testsSearch(search: Record<string, unknown>): TestsSearch {
   return {
-    ...(typeof search.page === "number" && search.page > 0 && { page: search.page }),
+    ...(isTestFilter(search.filter) && search.filter !== "all" && { filter: search.filter }),
     ...(typeof search.q === "string" && search.q !== "" && { q: search.q }),
   }
 }
 
-const RunsRoute = () => {
+const TestsRoute = () => {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
 
   return (
-    <RunsPage
-      runs={Route.useLoaderData()}
-      page={search.page ?? 0}
+    <TestsPage
+      rows={Route.useLoaderData()}
+      filter={search.filter ?? "all"}
       query={{
         query: search.q ?? "",
         onChange: (q) =>
@@ -34,8 +35,7 @@ const RunsRoute = () => {
 }
 
 export const Route = createFileRoute("/")({
-  validateSearch: runsSearch,
-  loaderDeps: ({ search }) => ({ page: search.page ?? 0 }),
-  loader: ({ deps }) => fetchRuns({ data: deps.page }),
-  component: RunsRoute,
+  validateSearch: testsSearch,
+  loader: () => fetchTests(),
+  component: TestsRoute,
 })

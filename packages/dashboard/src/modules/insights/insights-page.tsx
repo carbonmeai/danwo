@@ -18,7 +18,7 @@ const TOP = 10
 
 function TestLink({ test }: { readonly test: TestInsight }) {
   return (
-    <Link to="/runs/$runId" params={{ runId: test.lastRun }} title={test.id}>
+    <Link to="/tests/$testId" params={{ testId: test.id }} title={test.id}>
       {test.id}
     </Link>
   )

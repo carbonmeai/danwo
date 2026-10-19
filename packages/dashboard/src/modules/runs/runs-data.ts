@@ -124,13 +124,25 @@ export interface RunPage {
   readonly health: Health
 }
 
-export async function listRuns(root: string, page = 0, size = 50): Promise<RunPage> {
-  const runs = await loadHistory(root)
+/** The two kinds of run: `danwo test` runs many tests once, `danwo matrix` one test per fault. */
+export type RunKind = RunHistory["kind"]
+
+/** A page of the runs (of one kind, when given), newest first, with how many of each kind there are. */
+export async function listRuns(
+  root: string,
+  page = 0,
+  size = 50,
+  kind?: RunKind,
+): Promise<RunPage & { readonly counts: Readonly<Record<RunKind, number>> }> {
+  const all = await loadHistory(root)
+  const runs = kind === undefined ? all : all.filter((run) => run.kind === kind)
+  const matrix = all.filter((run) => run.kind === "matrix").length
 
   return {
     rows: runs.slice(page * size, (page + 1) * size).map(rowOf),
     total: runs.length,
-    health: healthOf(runs),
+    health: healthOf(all),
+    counts: { test: all.length - matrix, matrix },
   }
 }
 

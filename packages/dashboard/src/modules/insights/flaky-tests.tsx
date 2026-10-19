@@ -51,7 +51,7 @@ export function FlakyTests({ insights }: { readonly insights: Insights }) {
             alignItems="center"
           >
             <Stack gap="0.5" minW="0">
-              <Link to="/runs/$runId" params={{ runId: test.lastRun }}>
+              <Link to="/tests/$testId" params={{ testId: test.id }}>
                 <styled.span fontWeight="500" overflowWrap="anywhere">
                   {test.id}
                 </styled.span>

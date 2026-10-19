@@ -132,7 +132,7 @@ export function Pager({ page, pages }: { readonly page: number; readonly pages: 
       css={{ "& a": { color: "ink.soft", _hover: { color: "ink.strong" } } }}
     >
       {page > 0 ? (
-        <Link to="/" search={page > 1 ? { page: page - 1 } : {}}>
+        <Link to="/runs" search={(prev) => ({ ...prev, page: page > 1 ? page - 1 : undefined })}>
           Newer
         </Link>
       ) : null}
@@ -140,7 +140,7 @@ export function Pager({ page, pages }: { readonly page: number; readonly pages: 
         Page {page + 1} of {pages}
       </span>
       {page + 1 < pages ? (
-        <Link to="/" search={{ page: page + 1 }}>
+        <Link to="/runs" search={(prev) => ({ ...prev, page: page + 1 })}>
           Older
         </Link>
       ) : null}
