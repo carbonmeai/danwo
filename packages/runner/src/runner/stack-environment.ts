@@ -41,6 +41,11 @@ export interface StackEnvironmentOptions extends UnroutedHosts {
    * `warn` (default) prints a warning per key (names only), `fail` refuses to start, `ignore`.
    */
   readonly secrets?: "warn" | "fail" | "ignore"
+  /**
+   * Put danwo's `node` shim first on each app's PATH (default true), so a start script that sets
+   * its own NODE_OPTIONS still loads the preload. Apps that start without it are warned about.
+   */
+  readonly nodeShim?: boolean
 }
 
 /** The apps in start order, as batches whose members may start together. */
@@ -115,7 +120,7 @@ export async function stackEnvironment(
       await Promise.all(
         batch.map(async (app) => {
           const env = ownEnv(app, urls)
-          const proxyEnv = services.proxy.env()
+          const proxyEnv = services.proxy.env(process.env, { nodeShim: options.nodeShim ?? true })
 
           report(
             await liveKeyWarnings({
@@ -149,7 +154,8 @@ export async function stackEnvironment(
     baseUrl: urls[browserApp] ?? options.apps[0]?.url,
     proxy: services.proxy,
     webhooks: services.webhooks,
-    fixtures: services.fixtures,
+    /* `apps`: every app's URL by name, for a test that reads a worker's state directly. */
+    fixtures: { ...services.fixtures, apps: urls },
     logs: () => Object.fromEntries([...started].map(([name, app]) => [name, app.logs()])),
     notes: () => warnings,
     state: () => services.state(),
