@@ -51,8 +51,11 @@ export interface ClerkErrorEntry {
 }
 
 /** Clerk's error answer: a list of errors and a trace id. */
-export function clerkErrorBody(errors: readonly ClerkErrorEntry[]) {
-  return { errors, clerk_trace_id: secretToken(16) }
+export function clerkErrorBody(
+  errors: readonly ClerkErrorEntry[],
+  meta?: Readonly<Record<string, unknown>>,
+) {
+  return { errors, ...(meta !== undefined && { meta }), clerk_trace_id: secretToken(16) }
 }
 
 /** A failure a handler throws; the error hook answers it in Clerk's error format. */

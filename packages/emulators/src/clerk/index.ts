@@ -1,11 +1,13 @@
 import { defineEmulator, type EmulatorContext } from "../define.ts"
 import { HttpError } from "../errors.ts"
-import { App, type ErrorHandler, type Middleware } from "../http.ts"
+import { App, type Context, type ErrorHandler, type Middleware } from "../http.ts"
 import { createSigningKey } from "../oauth/jwt.ts"
 import { SVIX_DELIVERY } from "../svix.ts"
 import { signedOnWallClock } from "../webhooks.ts"
 import { backendAuth } from "./backend-auth.ts"
+import { browserRequest, currentClient } from "./browser-request.ts"
 import { type ClerkContext, instanceOf, registerContext } from "./context.ts"
+import { browserClient } from "./frontend-json.ts"
 import { BAPI_HOST, ClerkFailure, clerkErrorBody } from "./helpers.ts"
 import { accountsRoutes } from "./routes/accounts.ts"
 import { attemptRoutes } from "./routes/attempts.ts"
@@ -36,32 +38,57 @@ export type { ClerkEventType } from "./webhooks.ts"
 export type { ClerkInstance, ClerkMessage } from "./store.ts"
 export type { ClerkUser } from "./entities.ts"
 
-/** Answers errors in Clerk's format: a list of `{message, long_message, code}` and a trace id. */
-const clerkErrors: ErrorHandler = (error, c) => {
-  if (error instanceof ClerkFailure) return c.json(clerkErrorBody([error.entry]), error.status)
+/** What an error answer carries under `meta`: the Frontend API puts the browser's client there. */
+type ErrorMeta = (c: Context) => Readonly<Record<string, unknown>> | undefined
 
-  const status = error instanceof HttpError ? error.status : 500
-  const message = error instanceof Error ? error.message : "Internal server error"
+/**
+ * An error handler answering in Clerk's format: a list of `{message, long_message, code}`, the
+ * `meta` from `meta` when it gives one, and a trace id.
+ */
+function clerkErrors(meta: ErrorMeta): ErrorHandler {
+  return (error, c) => {
+    if (error instanceof ClerkFailure)
+      return c.json(clerkErrorBody([error.entry], meta(c)), error.status)
 
-  return c.json(
-    clerkErrorBody([
-      {
-        message,
-        long_message: message,
-        code: status === 404 ? "resource_not_found" : "internal_clerk_error",
-      },
-    ]),
-    status,
-  )
+    const status = error instanceof HttpError ? error.status : 500
+    const message = error instanceof Error ? error.message : "Internal server error"
+
+    return c.json(
+      clerkErrorBody(
+        [
+          {
+            message,
+            long_message: message,
+            code: status === 404 ? "resource_not_found" : "internal_clerk_error",
+          },
+        ],
+        meta(c),
+      ),
+      status,
+    )
+  }
 }
 
 /** A sub-app with Clerk's error answers. */
-function clerkApp(): App {
+function clerkApp(meta: ErrorMeta = () => undefined): App {
   const app = new App()
 
-  app.onError(clerkErrors)
+  app.onError(clerkErrors(meta))
 
   return app
+}
+
+/** The browser's client, for a Frontend API error from a known dev browser. */
+function clientMeta(context: ClerkContext): ErrorMeta {
+  return (c) => {
+    try {
+      const request = browserRequest(c, context)
+
+      return { client: browserClient(context, currentClient(context, request), request.azp) }
+    } catch {
+      return undefined
+    }
+  }
 }
 
 /** Sends each request to the app for its host: the Backend API, the Frontend API or the portal. */
@@ -105,7 +132,11 @@ export const clerk = defineEmulator({
   name: "clerk",
   setup(emulator) {
     const context = contextFor(emulator)
-    const apps = { backend: clerkApp(), frontend: clerkApp(), accounts: clerkApp() }
+    const apps = {
+      backend: clerkApp(),
+      frontend: clerkApp(clientMeta(context)),
+      accounts: clerkApp(),
+    }
 
     emulator.app.use(byHost(context, apps))
     apps.backend.use(backendAuth(emulator.store))
