@@ -15,9 +15,20 @@ import { credential, emulatorTarget, liveTarget } from "../target.ts"
 
 const APP = "DANWO_FIDELITY_TIPTAP_APP_ID"
 const SECRET = "DANWO_FIDELITY_TIPTAP_API_SECRET"
+const PREFIX = "DANWO_FIDELITY_TIPTAP_DOC_PREFIX"
 const EMULATED = { app: "danwo-fidelity", secret: "danwo-fidelity-secret" }
 
 const DOC = object({ type: str, content: arrayOf(anything) })
+
+/** The prefix a live app's own documents are kept apart by, or none. */
+function prefixOf(target: Target): string {
+  return target.credentials["prefix"] ?? ""
+}
+
+/** The name of a document this run makes: the app's prefix, then the run's tag. */
+function documentName(target: Target, tag: string): string {
+  return `${prefixOf(target)}${tag}`
+}
 
 function call(
   context: Pick<ScenarioContext, "target">,
@@ -41,7 +52,7 @@ function call(
 const documents: Scenario = {
   name: "documents: create, read as JSON, delete",
   async run(context) {
-    const name = context.tag
+    const name = documentName(context.target, context.tag)
     const doc = {
       type: "doc",
       content: [{ type: "paragraph", content: [{ type: "text", text: "checked" }] }],
@@ -85,7 +96,7 @@ async function sweepDocuments(target: Target): Promise<Leftover[]> {
   return (isJsonArray(list) ? list : []).flatMap((item) => {
     const name = asJsonObject(item)?.["name"]
 
-    if (typeof name !== "string" || !isTagged(name)) return []
+    if (typeof name !== "string" || !isTagged(name) || !name.startsWith(prefixOf(target))) return []
 
     return [
       {
@@ -110,6 +121,12 @@ export const tiptapFidelity: FidelityProvider = {
       name: SECRET,
       description: "the app's REST API secret; the suite creates and deletes one document",
     },
+    {
+      name: PREFIX,
+      description:
+        "a prefix for the documents the suite creates, so they stay apart from the app's own",
+      optional: true,
+    },
   ],
   scenarios: [documents],
   sweep: sweepDocuments,
@@ -122,6 +139,10 @@ export const tiptapFidelity: FidelityProvider = {
 
     return found === undefined
       ? undefined
-      : liveTarget({ app: found[APP] ?? "", secret: found[SECRET] ?? "" })
+      : liveTarget({
+          app: found[APP] ?? "",
+          secret: found[SECRET] ?? "",
+          prefix: found[PREFIX] ?? "",
+        })
   },
 }

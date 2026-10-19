@@ -47,9 +47,31 @@ function send(context: ScenarioContext, from: string, to: string): Request {
   })
 }
 
+/**
+ * Skips the scenario unless the target holds Twilio's test credentials. Test credentials may not
+ * read the account (Twilio answers 403); live ones may, and a live account would send and bill a
+ * real message, so nothing is sent with them. The emulator stands for test credentials.
+ */
+async function requireTestCredentials(context: ScenarioContext): Promise<void> {
+  if (context.target.kind === "emulator") return
+
+  const sid = credential(context.target, "sid")
+  const basic = Buffer.from(`${sid}:${credential(context.target, "token")}`).toString("base64")
+  const account = await context.target.send(
+    new Request(`${API}/Accounts/${sid}.json`, { headers: { authorization: `Basic ${basic}` } }),
+  )
+
+  await account.body?.cancel()
+  if (account.status !== 403)
+    context.skip(
+      `the credentials read the account (${account.status}), so they are live ones; set Twilio's test credentials, which send nothing`,
+    )
+}
+
 const sendMessage: Scenario = {
   name: "messages: send from the test number",
   async run(context) {
+    await requireTestCredentials(context)
     await context.step("send a message", send(context, VALID_FROM, RECIPIENT), {
       literals: ["status", "direction"],
       doc: { operation: MESSAGES, status: 201, literals: { status: "queued" } },
@@ -62,6 +84,7 @@ const refusals: Scenario = {
   async run(context) {
     const literals = ["code", "status"]
 
+    await requireTestCredentials(context)
     await context.step("send to an invalid number", send(context, VALID_FROM, INVALID_TO), {
       literals,
       doc: errorDoc(400, 21211),
