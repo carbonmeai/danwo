@@ -123,23 +123,9 @@ function ImpactPage() {
               _last={{ borderBottomWidth: "0" }}
               css={{ "&[data-current]": { bg: "signal.accentSoft" } }}
             >
-              <Stack gap="1" minW="0">
-                <styled.span fontWeight="500" overflowWrap="anywhere">
-                  {row.test}
-                </styled.span>
-                {row.calls.length > 0 ? (
-                  <styled.details fontSize="1" color="signal.quiet">
-                    <styled.summary cursor="pointer" w="fit-content">
-                      {row.calls.length} provider {row.calls.length === 1 ? "call" : "calls"}
-                    </styled.summary>
-                    <Stack gap="0.5" mt="1">
-                      {row.calls.map((call) => (
-                        <Ident key={call}>{call}</Ident>
-                      ))}
-                    </Stack>
-                  </styled.details>
-                ) : null}
-              </Stack>
+              <styled.span fontWeight="500" overflowWrap="anywhere" minW="0">
+                {row.test}
+              </styled.span>
               <Box>
                 <Label>Providers</Label>
                 <Tags items={row.providers} kind="provider" />
@@ -152,6 +138,18 @@ function ImpactPage() {
                 <Label>Webhooks</Label>
                 <Tags items={row.webhooks} kind="webhook" />
               </Box>
+              {row.calls.length > 0 ? (
+                <styled.details fontSize="1" color="signal.quiet" gridColumn="1 / -1">
+                  <styled.summary cursor="pointer" w="fit-content">
+                    {row.calls.length} provider {row.calls.length === 1 ? "call" : "calls"}
+                  </styled.summary>
+                  <Stack gap="0.5" mt="1">
+                    {row.calls.map((call) => (
+                      <Ident key={call}>{call}</Ident>
+                    ))}
+                  </Stack>
+                </styled.details>
+              ) : null}
             </Grid>
           ))}
         </styled.ul>
