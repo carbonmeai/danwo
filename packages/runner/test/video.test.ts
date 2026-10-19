@@ -139,6 +139,7 @@ function filmedSession(): SessionFlight {
     steps: () =>
       RUN.steps.map((step) => ({
         ...step,
+        status: step.status === "passed" ? ("passed" as const) : ("failed" as const),
         id: `s${step.index}`,
         kind: "locator" as const,
         api: "locator.click",

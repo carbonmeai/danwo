@@ -31,6 +31,8 @@ export interface ShotOptions {
   /** Every secret value revealed so far. */
   readonly secrets: readonly string[]
   readonly timeout: number
+  /** Told when the page's text showed a secret, so no screenshot was taken. */
+  readonly onSecretShown?: () => void
 }
 
 /** Takes a masked screenshot to `dir/path`; resolves with `path`, or undefined when not taken. */
@@ -41,7 +43,11 @@ export async function takeScreenshot(options: ShotOptions): Promise<string | und
     if (options.secrets.length > 0) {
       const shown = await page.evaluate(markSecrets, [...options.secrets])
 
-      if (shown) return undefined
+      if (shown) {
+        options.onSecretShown?.()
+
+        return undefined
+      }
     }
 
     const file = join(options.dir, options.path)

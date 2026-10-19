@@ -58,6 +58,8 @@ export function createSessionFlight(
 ): SessionFlight & { onStep(step: StepRecord): void } {
   const shots = new Map<number, string>()
   let queue: Promise<void> = Promise.resolve()
+  /** A page showed a secret as text after some step: the video, which cannot hide it, is not kept. */
+  let secretShown = false
 
   /** One at a time, in step order. */
   const screenshot = (step: number) => {
@@ -70,6 +72,9 @@ export function createSessionFlight(
         path: `screenshots/${String(step).padStart(3, "0")}-step-${step}.png`,
         secrets: options.vault.values(),
         timeout: SCREENSHOT_TIMEOUT_MS,
+        onSecretShown: () => {
+          secretShown = true
+        },
       })
 
       if (path !== undefined) shots.set(step, path)
@@ -101,7 +106,7 @@ export function createSessionFlight(
       return withCandidates(evidence, error, redact)
     },
     settle: () => queue,
-    videos: () => options.videos?.() ?? [],
+    videos: () => (secretShown ? [] : (options.videos?.() ?? [])),
   }
 }
 
