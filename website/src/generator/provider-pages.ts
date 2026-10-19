@@ -4,7 +4,7 @@
  */
 import { type Provider, PROVIDERS } from "../lib/providers.ts"
 import { readGuide, type SpecEntry, type SpecSection } from "./danwo.ts"
-import { entryMarkdown, frontmatter, guidePage, section } from "./markdown.ts"
+import { frontmatter, guidePage, referenceEntry, section } from "./markdown.ts"
 
 /** The spec entries of `topic` that belong to `provider`, by their names' prefixes. */
 function entriesOf(
@@ -31,7 +31,7 @@ function guideText(provider: Provider): string | undefined {
 function entriesBlock(heading: string, entries: readonly SpecEntry[]): string[] {
   return entries.length === 0
     ? []
-    : [`## ${heading}`, ...entries.map((entry) => entryMarkdown(entry, 3))]
+    : [`## ${heading}`, ...entries.map((entry) => referenceEntry(entry, 3))]
 }
 
 /** How the emulator is checked against the real API, for providers with a fidelity suite. */
@@ -86,12 +86,31 @@ function cardIcon(provider: Provider): string {
     : img(provider.icon)
 }
 
-/** The Providers overview, under the sidebar section named `group`: a card per provider. */
-export function providerIndex(group: string): string {
-  const cards = PROVIDERS.map(
-    (provider) =>
-      `  <Card title=${JSON.stringify(provider.name)} href="/docs/providers/${provider.slug}" icon={${cardIcon(provider)}}>\n    ${provider.summary}\n  </Card>`,
-  )
+/** A kind of provider on the overview, and the providers of that kind by slug. */
+export interface ProviderGroup {
+  readonly title: string
+  readonly slugs: readonly string[]
+}
+
+/** One provider's card on the overview. */
+function card(provider: Provider): string {
+  return `  <Card title=${JSON.stringify(provider.name)} href="/docs/providers/${provider.slug}" icon={${cardIcon(provider)}}>\n    ${provider.summary}\n  </Card>`
+}
+
+/**
+ * The Providers overview, under the sidebar section named `group`: a heading per kind of
+ * provider, the way the sidebar groups them, with a card per provider under it.
+ */
+export function providerIndex(group: string, kinds: readonly ProviderGroup[]): string {
+  const sections = kinds.map((kind) => {
+    const cards = kind.slugs.flatMap((slug) => {
+      const found = PROVIDERS.find((provider) => provider.slug === slug)
+
+      return found ? [card(found)] : []
+    })
+
+    return `## ${kind.title}\n\n<Cards>\n${cards.join("\n")}\n</Cards>`
+  })
 
   return [
     frontmatter({
@@ -103,7 +122,7 @@ export function providerIndex(group: string): string {
       source: "website/src/lib/providers.ts",
     }),
     "Each emulator answers the provider's real hostnames, keeps state across calls, signs its webhooks and returns the error shapes the provider's SDK parses. [Emulators](/docs/emulators) covers how an environment starts them.",
-    `<Cards>\n${cards.join("\n")}\n</Cards>`,
+    ...sections,
     "",
   ].join("\n\n")
 }

@@ -117,27 +117,9 @@ export function frontmatter(fields: Readonly<Record<string, string | undefined>>
   return `---\n${lines.join("\n")}\n---\n`
 }
 
-/** A member line: its signature (which names it) in code, then what it does. */
-function memberLine(member: SpecMember): string {
-  const code = member.signature || member.name
-
-  return `- \`${code}\`${member.doc ? ` — ${oneLine(member.doc)}` : ""}`
-}
-
 /** The language a signature reads best in: shell for commands, TypeScript for the rest. */
 function fence(entry: SpecEntry): string {
   return entry.kind === "command" ? "sh" : "ts"
-}
-
-/** One spec entry as a heading, its signature, its doc and its members. */
-export function entryMarkdown(entry: SpecEntry, level = 3): string {
-  const parts = [`${"#".repeat(level)} \`${entry.name}\``, `_${entry.kind}_`]
-
-  if (entry.signature) parts.push(`\`\`\`${fence(entry)}\n${entry.signature}\n\`\`\``)
-  if (entry.doc) parts.push(entry.doc)
-  if (entry.members.length > 0) parts.push(entry.members.map(memberLine).join("\n"))
-
-  return parts.join("\n\n")
 }
 
 /** Text for one table cell: on one line, with the table's own bars escaped. */
@@ -146,25 +128,25 @@ function cell(text: string): string {
 }
 
 /** `text` as inline code, fenced with enough backticks for any it holds. */
-function code(text: string): string {
+function inlineCode(text: string): string {
   return text.includes("`") ? `\`\` ${cell(text)} \`\`` : `\`${cell(text)}\``
 }
 
 /** An entry's members as a table: each member's signature, which names it, and what it does. */
 function membersTable(members: readonly SpecMember[]): string {
   const rows = members.map(
-    (member) => `| ${code(member.signature || member.name)} | ${cell(member.doc) || " "} |`,
+    (member) => `| ${inlineCode(member.signature || member.name)} | ${cell(member.doc) || " "} |`,
   )
 
   return ["| Member | Description |", "| --- | --- |", ...rows].join("\n")
 }
 
 /**
- * One spec entry as a reference section: a `##` heading so the page's table of contents lists
- * it, its kind, its signature, its doc and its members in a table.
+ * One spec entry as a reference section: a heading (`##` unless `level` says otherwise) so the
+ * page's table of contents lists it, its kind, its signature, its doc and its members in a table.
  */
-export function referenceEntry(entry: SpecEntry): string {
-  const parts = [`## \`${entry.name}\``, `_${entry.kind}_`]
+export function referenceEntry(entry: SpecEntry, level = 2): string {
+  const parts = [`${"#".repeat(level)} ${entry.name}`, `_${entry.kind}_`]
 
   if (entry.signature) parts.push(`\`\`\`${fence(entry)}\n${entry.signature}\n\`\`\``)
   if (entry.doc) parts.push(entry.doc)
@@ -181,9 +163,9 @@ function tabular(entries: readonly SpecEntry[]): boolean {
 /** Entries as one table: name, kind, and what each is (with its signature when it has one). */
 function entriesTable(entries: readonly SpecEntry[]): string {
   const rows = entries.map((entry) => {
-    const about = [entry.signature && code(entry.signature), cell(entry.doc)].filter(Boolean)
+    const about = [entry.signature && inlineCode(entry.signature), cell(entry.doc)].filter(Boolean)
 
-    return `| ${code(entry.name)} | ${entry.kind} | ${about.join(" — ") || " "} |`
+    return `| ${inlineCode(entry.name)} | ${entry.kind} | ${about.join(" — ") || " "} |`
   })
 
   return ["| Name | Kind | Description |", "| --- | --- | --- |", ...rows].join("\n")
@@ -198,7 +180,7 @@ export function referenceBody(sections: readonly SpecSection[]): string {
     .map((spec) => {
       const entries = tabular(spec.entries)
         ? [entriesTable(spec.entries)]
-        : spec.entries.map(referenceEntry)
+        : spec.entries.map((entry) => referenceEntry(entry))
 
       return [spec.about, ...entries].join("\n\n")
     })

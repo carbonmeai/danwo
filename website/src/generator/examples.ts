@@ -126,7 +126,7 @@ export function examplesIndex(): string {
   const cards = EXAMPLES.map((example) => {
     const description = packageOf(example).description
 
-    return `  <Card title=${JSON.stringify(example.name)} href="/docs/examples/${example.slug}" icon={${mark(example, 24)}}>\n    ${description} ${example.runsOn}.\n  </Card>`
+    return `  <Card title=${JSON.stringify(example.name)} href="/docs/examples/${example.slug}" icon={${mark(example, 24)}}>\n    ${description}\n\n    **Runs on:** ${example.runsOn}\n  </Card>`
   })
 
   return [

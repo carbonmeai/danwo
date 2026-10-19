@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest"
 
 import {
-  entryMarkdown,
   frontmatter,
   guidePage,
   oneLine,
@@ -107,40 +106,6 @@ describe("plainText and oneLine", () => {
   })
 })
 
-describe("entryMarkdown", () => {
-  it("gives a spec entry its heading, kind, signature, doc and members", () => {
-    const text = entryMarkdown({
-      name: "settle",
-      kind: "function",
-      signature: "settle(): Promise<void>",
-      doc: "Plays pending webhooks.",
-      members: [
-        { name: "ms", signature: "ms: number", doc: "How far.\nIn milliseconds." },
-        { name: "--lint", signature: "", doc: "" },
-      ],
-    })
-
-    expect(text).toBe(
-      [
-        "### `settle`",
-        "_function_",
-        "```ts\nsettle(): Promise<void>\n```",
-        "Plays pending webhooks.",
-        "- `ms: number` — How far. In milliseconds.\n- `--lint`",
-      ].join("\n\n"),
-    )
-  })
-
-  it("fences a command's signature as shell", () => {
-    const text = entryMarkdown(
-      { name: "test", kind: "command", signature: "danwo test", doc: "", members: [] },
-      2,
-    )
-
-    expect(text).toBe("## `test`\n\n_command_\n\n```sh\ndanwo test\n```")
-  })
-})
-
 describe("referenceEntry", () => {
   it("gives an entry a section of its own, its members in a table with their bars escaped", () => {
     const text = referenceEntry({
@@ -156,7 +121,7 @@ describe("referenceEntry", () => {
 
     expect(text).toBe(
       [
-        "## `Locator`",
+        "## Locator",
         "_interface_",
         "```ts\nLocator extends Screen\n```",
         "An element on the screen.",
@@ -167,6 +132,25 @@ describe("referenceEntry", () => {
           "| `state: 'on' \\| 'off'` |   |",
         ].join("\n"),
       ].join("\n\n"),
+    )
+  })
+})
+
+describe("referenceEntry at another level", () => {
+  it("fences a command's signature as shell, under the heading level asked for", () => {
+    const text = referenceEntry(
+      {
+        name: "test",
+        kind: "command",
+        signature: "danwo test",
+        doc: "",
+        members: [{ name: "--lint", signature: "", doc: "" }],
+      },
+      3,
+    )
+
+    expect(text).toBe(
+      "### test\n\n_command_\n\n```sh\ndanwo test\n```\n\n| Member | Description |\n| --- | --- |\n| `--lint` |   |",
     )
   })
 })
@@ -190,7 +174,7 @@ describe("referenceBody", () => {
       },
     ])
 
-    expect(text.startsWith("Plain-English steps.\n\n## `Agent`")).toBe(true)
+    expect(text.startsWith("Plain-English steps.\n\n## Agent\n")).toBe(true)
   })
 
   it("lists one-line entries as a single table", () => {
@@ -201,7 +185,13 @@ describe("referenceBody", () => {
         about: "What each step's replay came to.",
         entries: [
           { name: "replayed", kind: "outcome", signature: "", doc: "as recorded", members: [] },
-          { name: "missed", kind: "outcome", signature: "exit 1", doc: "no recording", members: [] },
+          {
+            name: "missed",
+            kind: "outcome",
+            signature: "exit 1",
+            doc: "no recording",
+            members: [],
+          },
         ],
       },
     ])

@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { beforeAll, describe, expect, it } from "vitest"
 
 import { GUIDES_DIR, readGuide } from "../src/generator/danwo.ts"
+import { EXAMPLES, exampleFolders } from "../src/generator/examples.ts"
 import {
   CONTENT,
   type Inputs,
@@ -11,7 +12,6 @@ import {
   readInputs,
   WEBSITE,
 } from "../src/generator/generate.ts"
-import { EXAMPLES, exampleFolders } from "../src/generator/examples.ts"
 import {
   type PageSource,
   PLAN,
@@ -19,6 +19,7 @@ import {
   PROVIDER_GUIDE_SECTIONS,
 } from "../src/generator/plan.ts"
 import { docsSlugs, postSlugs, prerenderedPaths } from "../src/generator/routes.ts"
+import { resolveIcon } from "../src/lib/icons.tsx"
 import { markdownPath, slugsOfMarkdown } from "../src/lib/paths.ts"
 import { PROVIDERS } from "../src/lib/providers.ts"
 
@@ -75,6 +76,15 @@ describe("the docs plan", () => {
         tab.sections.flatMap((group) => group.pages).filter((other) => other.slug === page.slug),
       ).toHaveLength(1)
     }
+  })
+
+  it("names only icons that exist", () => {
+    const names = [
+      ...PLAN.map((tab) => tab.icon),
+      ...plannedPages().map(({ page }) => page.icon),
+    ].filter((icon) => icon !== "" && !icon.startsWith("/"))
+
+    expect(names.filter((icon) => resolveIcon(icon) === undefined)).toEqual([])
   })
 
   it("names only sections the providers guide has", () => {
@@ -141,7 +151,7 @@ describe("the docs tree", () => {
     const page = files.get(join("reference", "screen.md")) ?? ""
 
     expect(page).toContain('```ts title="tests/storefront.danwo.ts"')
-    expect(page).toMatch(/^## `Locator`$/m)
+    expect(page).toMatch(/^## Locator$/m)
     expect(page).toContain("| Member | Description |")
   })
 
@@ -180,9 +190,9 @@ describe("the logos", () => {
   })
 
   it("say where each came from", () => {
-    const sources = readFileSync(join(WEBSITE, "public", "icons", "SOURCES.md"), "utf8")
+    const listing = readFileSync(join(WEBSITE, "public", "icons", "SOURCES.md"), "utf8")
 
     for (const provider of PROVIDERS)
-      expect(sources, provider.icon).toContain(provider.icon.replace(/\..+$/, ""))
+      expect(listing, provider.icon).toContain(provider.icon.replace(/\..+$/, ""))
   })
 })

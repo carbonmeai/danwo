@@ -145,8 +145,13 @@ export const PLAN: readonly PlannedTab[] = [
       {
         title: "Core concepts",
         pages: [
-          guide("agent-and-locators", "Agent and locators", "MousePointerClick", "locators-vs-agent"),
-          file("replay-cache", "Replay cache", "History", "concepts/replay-cache.mdx"),
+          guide(
+            "agent-and-locators",
+            "Agent and locators",
+            "MousePointerClick",
+            "locators-vs-agent",
+          ),
+          file("replay-cache", "Replay cache", "RotateCcwClock", "concepts/replay-cache.mdx"),
           guide("emulators", "Emulators", "Server", "providers", PROVIDER_GUIDE_SECTIONS),
           guide("fault-matrix", "Fault matrix", "Grid3x3", "matrix"),
           guide("flight-records", "Flight records", "FileSearch", "debugging"),
@@ -188,9 +193,7 @@ export const PLAN: readonly PlannedTab[] = [
     sections: [
       {
         title: "Overview",
-        pages: [
-          { slug: "index", title: "Providers", icon: "Plug", source: { kind: "providers" } },
-        ],
+        pages: [{ slug: "index", title: "Providers", icon: "Plug", source: { kind: "providers" } }],
       },
       { title: "Payments", pages: ["stripe", "paystack", "flutterwave", "bachs"].map(provider) },
       { title: "Email and messaging", pages: ["resend", "twilio", "slack"].map(provider) },
@@ -227,7 +230,10 @@ export const PLAN: readonly PlannedTab[] = [
             only: (name) => !FIXTURE_TYPES.has(name),
             description:
               "Declares tests, their invariants, saved sessions and fresh values; what a `*.danwo.ts` file is built from.",
-            example: { file: "tests/buy-credits.danwo.ts", from: "examples/shop/tests/buy-credits.danwo.ts" },
+            example: {
+              file: "tests/buy-credits.danwo.ts",
+              from: "examples/shop/tests/buy-credits.danwo.ts",
+            },
           }),
           reference("fixtures", "Fixtures", "Puzzle", {
             topics: ["api", "fixtures"],
@@ -307,7 +313,7 @@ danwo serve --open`,
             topics: ["errors"],
             description: "Every error code a run reports, and what to do about it.",
           }),
-          reference("cache", "Cache outcomes", "History", {
+          reference("cache", "Cache outcomes", "RotateCcwClock", {
             topics: ["cache"],
             description: "What the replay cache did with each recorded step.",
           }),
@@ -352,14 +358,12 @@ danwo serve --open`,
             icon: "FolderOpen",
             source: { kind: "examples" },
           },
-          ...EXAMPLES.map(
-            (example): PlannedPage => ({
-              slug: example.slug,
-              title: example.name,
-              icon: exampleIcon(example),
-              source: { kind: "example", example: example.slug },
-            }),
-          ),
+          ...EXAMPLES.map((example): PlannedPage => ({
+            slug: example.slug,
+            title: example.name,
+            icon: exampleIcon(example),
+            source: { kind: "example", example: example.slug },
+          })),
         ],
       },
     ],

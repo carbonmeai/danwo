@@ -28,7 +28,7 @@ import {
   type ReferenceExample,
   urlDir,
 } from "./plan.ts"
-import { providerIndex, providerPage } from "./provider-pages.ts"
+import { type ProviderGroup, providerIndex, providerPage } from "./provider-pages.ts"
 
 /** The website package's folder. */
 export const WEBSITE = join(import.meta.dirname, "..", "..")
@@ -130,7 +130,10 @@ function referenceFile(
     referenceBody(referenceSections(inputs, source)),
   ]
 
-  return `${parts.join("\n").replaceAll(/\n{3,}/g, "\n\n").trim()}\n`
+  return `${parts
+    .join("\n")
+    .replaceAll(/\n{3,}/g, "\n\n")
+    .trim()}\n`
 }
 
 /** The Reference overview: a card per reference page, under its section's heading. */
@@ -161,43 +164,76 @@ function referenceIndex(place: Placement, tab: PlannedTab): string {
   ].join("\n\n")
 }
 
+/** The Providers tab's sections that hold provider pages, as kinds for its overview. */
+function providerKinds(tab: PlannedTab): ProviderGroup[] {
+  return tab.sections.flatMap((group) => {
+    const slugs = group.pages.flatMap((page) =>
+      page.source.kind === "provider" ? [page.source.provider] : [],
+    )
+
+    return slugs.length === 0 ? [] : [{ title: group.title, slugs }]
+  })
+}
+
+/** What building one page needs besides its source. */
+interface PageContext {
+  readonly place: Placement
+  readonly tab: PlannedTab
+  readonly inputs: Inputs
+}
+
+/** A page's text, and whether it is MDX (cards and other components) or plain markdown. */
+type Built = readonly [extension: "md" | "mdx", text: string]
+
+/** How each kind of source becomes a page. */
+const BUILDERS: {
+  readonly [K in PageSource["kind"]]: (
+    source: Extract<PageSource, { kind: K }>,
+    context: PageContext,
+  ) => Built
+} = {
+  file: (source, { place }) => ["mdx", copied(source.file, place)],
+  guide: (source, { place }) => ["md", guideFile(place, source.topic, source.drop)],
+  readme: (source, { place, inputs }) => [
+    "md",
+    `${head(place, source.description, "README.md")}\n${section(inputs.readme, source.heading)}\n`,
+  ],
+  reference: (source, { place, inputs }) => ["md", referenceFile(place, source, inputs)],
+  "reference-index": (_, { place, tab }) => ["mdx", referenceIndex(place, tab)],
+  providers: (_, { place, tab }) => ["mdx", providerIndex(place.section, providerKinds(tab))],
+  provider: (source, { place, inputs }) => {
+    const found = PROVIDERS.find((provider) => provider.slug === source.provider)
+
+    if (!found) throw new Error(`no provider "${source.provider}" for the docs`)
+
+    return ["md", providerPage(found, inputs.spec, place.section)]
+  },
+  examples: () => ["mdx", examplesIndex()],
+  example: (source) => {
+    const found = EXAMPLES.find((example) => example.slug === source.example)
+
+    if (!found) throw new Error(`no example "${source.example}" for the docs`)
+
+    return ["md", examplePage(found)]
+  },
+}
+
+/** Builds a page from its source with the builder for its kind. */
+function build<K extends PageSource["kind"]>(
+  source: Extract<PageSource, { kind: K }>,
+  context: PageContext,
+): Built {
+  const builder: (from: Extract<PageSource, { kind: K }>, given: PageContext) => Built =
+    BUILDERS[source.kind]
+
+  return builder(source, context)
+}
+
 /** A page's file name inside its tab's folder, and its text. */
-function pageFile(page: PlannedPage, place: Placement, tab: PlannedTab, inputs: Inputs): [string, string] {
-  const source = page.source
+function pageFile(page: PlannedPage, context: PageContext): [string, string] {
+  const [extension, text] = build(page.source, context)
 
-  switch (source.kind) {
-    case "file":
-      return [`${page.slug}.mdx`, copied(source.file, place)]
-    case "guide":
-      return [`${page.slug}.md`, guideFile(place, source.topic, source.drop)]
-    case "readme":
-      return [
-        `${page.slug}.md`,
-        `${head(place, source.description, "README.md")}\n${section(inputs.readme, source.heading)}\n`,
-      ]
-    case "reference":
-      return [`${page.slug}.md`, referenceFile(place, source, inputs)]
-    case "reference-index":
-      return [`${page.slug}.mdx`, referenceIndex(place, tab)]
-    case "providers":
-      return [`${page.slug}.mdx`, providerIndex(place.section)]
-    case "provider": {
-      const found = PROVIDERS.find((provider) => provider.slug === source.provider)
-
-      if (!found) throw new Error(`no provider "${source.provider}" for the docs`)
-
-      return [`${page.slug}.md`, providerPage(found, inputs.spec, place.section)]
-    }
-    case "examples":
-      return [`${page.slug}.mdx`, examplesIndex()]
-    default: {
-      const found = EXAMPLES.find((example) => example.slug === source.example)
-
-      if (!found) throw new Error(`no example "${source.example}" for the docs`)
-
-      return [`${page.slug}.md`, examplePage(found)]
-    }
-  }
+  return [`${page.slug}.${extension}`, text]
 }
 
 /** A page's title and icon, which provider pages take from the provider list. */
@@ -243,7 +279,7 @@ export function plannedFiles(inputs: Inputs): Files {
 
     for (const group of tab.sections)
       for (const page of group.pages) {
-        const [file, text] = pageFile(page, placement(page, group), tab, inputs)
+        const [file, text] = pageFile(page, { place: placement(page, group), tab, inputs })
 
         files.set(join(tab.dir, file), text)
       }
