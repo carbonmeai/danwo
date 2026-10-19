@@ -6,6 +6,8 @@
  */
 import { type ChildProcess, fork } from "node:child_process"
 
+import { own } from "@danwo/runner/children"
+
 import { isJobMessage, type Job, type JobPlace, type JobResults } from "./protocol.ts"
 
 const CHILD_ENTRY = new URL("./child.ts", import.meta.url)
@@ -50,12 +52,17 @@ export function stopAllJobs(): void {
  * group so stopping it takes everything it started.
  */
 export function forkInProject(entry: URL, place: JobPlace): ChildProcess {
-  return fork(entry, [], {
+  const child = fork(entry, [], {
     cwd: place.cwd,
     execArgv: HOOKS.flatMap((hook) => ["--import", hook]),
     stdio: ["ignore", "pipe", "pipe", "ipc"],
     detached: true,
   })
+
+  /* Owned by this server: its group ends with the server, however the server ends. */
+  own(child)
+
+  return child
 }
 
 function forkJob(place: JobPlace): ChildProcess {

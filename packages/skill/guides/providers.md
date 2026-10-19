@@ -76,6 +76,14 @@ environment: () =>
   }),
 ```
 
+danwo leaves nothing running. The app's command runs as the leader of its own process group, so
+stopping it stops what it started too (a dev command often runs the server as its own child): it gets
+SIGTERM, then SIGKILL five seconds later. The same happens when a run ends, fails, is interrupted
+(Ctrl-C, SIGTERM, SIGHUP) or is killed outright, since a small guardian process ends whatever a
+worker owned once the worker is gone. Have the app exit on SIGTERM. An environment that starts
+its own processes should start them with `spawnOwned()` from `@danwo/sdk`, which takes the same
+arguments as `spawn()` and returns the child with a `stop()`.
+
 ## Several providers
 
 `startServices([stripeService({ seed }), s3Service(), slackService({ seed }), githubService()])`

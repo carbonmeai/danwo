@@ -7,6 +7,7 @@
 import { fork } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
+import { type OwnedChild, own } from "../support/children.ts"
 import type { WorkerLiveEvent } from "./live.ts"
 import type { TestFileTask, TestReport, TrialReport, TrialTask, WorkerStart } from "./tasks.ts"
 import { linkWorker, type WorkerLink } from "./wire.ts"
@@ -32,6 +33,8 @@ export interface CrewOptions {
 interface Member {
   readonly index: number
   link: WorkerLink | undefined
+  /** The worker's process group: it and whatever it started that has no group of its own. */
+  process: OwnedChild | undefined
   /** Settles once `start` answered; rejects with why the worker could not start. */
   started: Promise<void> | undefined
 }
@@ -47,6 +50,7 @@ export class Crew {
     this.members = Array.from({ length: Math.max(1, options.size) }, (_, index) => ({
       index,
       link: undefined,
+      process: undefined,
       started: undefined,
     }))
     this.idle = [...this.members]
@@ -70,11 +74,14 @@ export class Crew {
   /** Stops every worker that started, letting each close its environment first. */
   async disband(): Promise<void> {
     await Promise.all(
-      this.members.map(async ({ link }) => {
-        if (link === undefined || !link.alive()) return
+      this.members.map(async ({ link, process: worker }) => {
+        if (link?.alive() === true) {
+          void link.call("stop").catch(() => undefined)
+          await link.ended(STOP_GRACE_MS)
+        }
 
-        void link.call("stop").catch(() => undefined)
-        await link.ended(STOP_GRACE_MS)
+        /* A worker that exited can leave children in its group, such as an app it never stopped. */
+        await worker?.stop(1_000)
       }),
     )
   }
@@ -107,9 +114,11 @@ export class Crew {
   /** The member's worker, started (again) when it has none or the last one died. */
   private async ready(member: Member): Promise<WorkerLink> {
     if (member.link === undefined || !member.link.alive()) {
-      const link = this.spawn()
+      const { link, process: worker } = this.spawn()
 
+      void member.process?.stop(1_000)
       member.link = link
+      member.process = worker
       member.started = link
         .call("start", { ...this.options.start, workerIndex: member.index })
         .catch((error: unknown) => {
@@ -124,16 +133,18 @@ export class Crew {
     return member.link
   }
 
-  private spawn(): WorkerLink {
+  private spawn(): { readonly link: WorkerLink; readonly process: OwnedChild } {
     const child = fork(WORKER_ENTRY, [], {
       execArgv: ["--import", INSTALLED_HOOK, "--import", TYPESCRIPT_HOOK],
       stdio: ["ignore", "inherit", "inherit", "ipc"],
       env: process.env,
+      detached: process.platform !== "win32",
     })
-
-    return linkWorker(child, (note) => {
+    const link = linkWorker(child, (note) => {
       if (note.topic === "tested") this.options.onTested?.(note.data)
       else this.options.onLive?.(note.data)
     })
+
+    return { link, process: own(child) }
   }
 }

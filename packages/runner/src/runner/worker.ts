@@ -602,11 +602,22 @@ const calls: WorkerCalls = {
   testFile,
   trial,
   async stop() {
-    await (await browser?.catch(() => undefined))?.close()
-    await bench?.env?.close()
-    process.disconnect?.()
-    process.exit(0)
+    stopping ??= closeAndExit()
+
+    return stopping
   },
 }
 
+let stopping: Promise<void> | undefined
+
+/** Closes the browser and the environment, then ends the worker. */
+async function closeAndExit(): Promise<void> {
+  await (await browser?.catch(() => undefined))?.close()
+  await bench?.env?.close()
+  if (process.connected) process.disconnect()
+  process.exit(0)
+}
+
 answerCalls(calls)
+/* The run is gone (it ended or was killed): close what this worker started rather than outlive it. */
+process.once("disconnect", () => void calls.stop())

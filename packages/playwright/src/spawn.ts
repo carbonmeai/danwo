@@ -2,9 +2,10 @@
  * Runs `playwright test` for one matrix trial: one worker, no retries, the trial's fault and
  * outcome file in its environment. Playwright's own CLI is the one the project installed.
  */
-import { spawn } from "node:child_process"
 import { createRequire } from "node:module"
 import { join } from "node:path"
+
+import { spawnOwned } from "@danwo/runner/children"
 
 import { OUTCOME_FILE, TRIAL_FAULT } from "./protocol.ts"
 
@@ -52,7 +53,8 @@ export function runPlaywright(run: PlaywrightRun): Promise<string> {
   const cwd = run.cwd ?? process.cwd()
 
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [playwrightCli(cwd), ...argsOf(run)], {
+    /* Owned: Playwright's workers and browsers go with it if this process ends first. */
+    const { child } = spawnOwned(process.execPath, [playwrightCli(cwd), ...argsOf(run)], {
       cwd,
       env: environmentOf(run),
       stdio: ["ignore", "pipe", "pipe"],
@@ -63,8 +65,8 @@ export function runPlaywright(run: PlaywrightRun): Promise<string> {
       output += chunk.toString()
     }
 
-    child.stdout.on("data", collect)
-    child.stderr.on("data", collect)
+    child.stdout?.on("data", collect)
+    child.stderr?.on("data", collect)
     child.once("error", reject)
     child.once("close", () => resolve(output))
   })

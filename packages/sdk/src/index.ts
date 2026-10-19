@@ -311,6 +311,11 @@ export type {
  * text is addressed by its phone number.
  */
 export { gmailMail, outlookMail, resendMail, totp, twilioSms } from "@danwo/runner/runner"
+/**
+ * `spawn()` for a process an environment starts (an app, a server): it leads its own process
+ * group and is stopped with what it started when the run stops it, ends, is interrupted or dies.
+ */
+export { type OwnedChild, spawnOwned } from "@danwo/runner/children"
 /** zod, for the schemas `agent.extract` checks its result against. */
 export { z } from "@danwo/runner/runner"
 /** A JUnit XML reporter for CI systems other than GitHub, and the config's change-impact rules. */

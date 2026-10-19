@@ -1,8 +1,8 @@
 /** Starts the benchmark app as its own process on free ports, the way an environment launches an app. */
-import { spawn } from "node:child_process"
-import { once } from "node:events"
 import { createInterface } from "node:readline"
 import { fileURLToPath } from "node:url"
+
+import { spawnOwned } from "@danwo/sdk"
 
 const SERVER = fileURLToPath(new URL("./server.ts", import.meta.url))
 
@@ -24,19 +24,15 @@ async function announcedPort(output: NodeJS.ReadableStream): Promise<string> {
 }
 
 export async function launchBenchApp(env: NodeJS.ProcessEnv): Promise<BenchApp> {
-  const child = spawn(process.execPath, [SERVER], {
+  /* Owned by danwo: stopped with the run even if it ends without calling stop(). */
+  const owned = spawnOwned(process.execPath, [SERVER], {
     env: { ...env, PORT: "0", WIDGET_PORT: "0" },
     stdio: ["ignore", "pipe", "inherit"],
   })
-  const port = await announcedPort(child.stdout)
 
-  return {
-    url: `http://127.0.0.1:${port}`,
-    async stop() {
-      if (child.exitCode !== null || child.signalCode !== null) return
+  if (owned.child.stdout === null) throw new Error("the benchmark app's output is not piped")
 
-      child.kill()
-      await once(child, "exit")
-    },
-  }
+  const port = await announcedPort(owned.child.stdout)
+
+  return { url: `http://127.0.0.1:${port}`, stop: () => owned.stop() }
 }

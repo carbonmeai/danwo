@@ -7,6 +7,8 @@
 import { type ChildProcess, execFile, spawn } from "node:child_process"
 import { existsSync } from "node:fs"
 
+import { own } from "@danwo/runner/children"
+
 import { getRun } from "../runs/runs-data.ts"
 import { type KnownTest, type Launch, launchOf, type RunRequest } from "./launch-args.ts"
 import { activeRuns, feedOfProcess, isAlive, liveRun } from "./live-data.ts"
@@ -144,6 +146,10 @@ function spawnRun(root: string, launch: Ready, bin: string): Started {
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env, NO_COLOR: "1" },
   })
+
+  /* A run the dashboard started ends with the dashboard, however the dashboard ends. */
+  own(child)
+
   const run: Started = { child, label: launch.label, runId: undefined, output: [] }
 
   child.stdout?.on("data", (chunk: Buffer) => keepOutput(run.output, chunk))

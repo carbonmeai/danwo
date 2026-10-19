@@ -4,8 +4,9 @@
  * services behind one proxy, starts the app through that proxy and hands the runner the worker
  * environment. Any app a command starts works, with no code of its own.
  */
-import { type ChildProcess, spawn } from "node:child_process"
+import type { ChildProcess } from "node:child_process"
 
+import { spawnOwned } from "../support/children.ts"
 import type { WorkerEnvironment } from "./environment.ts"
 import { type Service, startServices } from "./services.ts"
 
@@ -61,29 +62,8 @@ function tail(child: ChildProcess): () => string {
   return () => lines.join("\n")
 }
 
-/** Stops `child` and what it started: a dev command often runs the server as its own child. */
-async function stopTree(child: ChildProcess): Promise<void> {
-  if (child.exitCode !== null || child.signalCode !== null) return
-
-  const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()))
-
-  const signal = (name: NodeJS.Signals) => {
-    try {
-      /* A detached child leads its own process group: a negative pid signals the whole group. */
-      if (process.platform !== "win32" && child.pid !== undefined) process.kill(-child.pid, name)
-      else child.kill(name)
-    } catch {
-      /* Already gone. */
-    }
-  }
-
-  signal("SIGTERM")
-
-  const forced = setTimeout(() => signal("SIGKILL"), 5_000)
-
-  await exited
-  clearTimeout(forced)
-}
+/** How long the app and what it started get to exit on SIGTERM before they are killed. */
+const STOP_GRACE_MS = 5_000
 
 /** Resolves once `url` answers; rejects when the child exits first or `timeoutMs` passes. */
 async function untilAnswering(
@@ -122,23 +102,23 @@ export async function startApp(
     )
 
   const port = new URL(app.url).port
-  const child = spawn(app.command, {
+  /* Its own process group: a dev command often runs the server as its own child, and both go. */
+  const owned = spawnOwned(app.command, [], {
     shell: true,
     cwd: app.cwd,
     env: { ...env, ...(port !== "" && { PORT: port }), ...app.env },
     stdio: ["ignore", "pipe", "pipe"],
-    detached: process.platform !== "win32",
   })
-  const output = tail(child)
+  const output = tail(owned.child)
 
   try {
-    await untilAnswering(child, app.url, app.timeoutMs ?? DEFAULT_TIMEOUT_MS, output)
+    await untilAnswering(owned.child, app.url, app.timeoutMs ?? DEFAULT_TIMEOUT_MS, output)
   } catch (error) {
-    await stopTree(child)
+    await owned.stop(STOP_GRACE_MS)
     throw error
   }
 
-  return { url: app.url, stop: () => stopTree(child) }
+  return { url: app.url, stop: () => owned.stop(STOP_GRACE_MS) }
 }
 
 /** Options of `appEnvironment()`. */

@@ -1,6 +1,8 @@
 // Starts the shop as its own process on a free port, the way a test environment launches an app.
-import { type ChildProcess, spawn } from "node:child_process"
+import type { ChildProcess } from "node:child_process"
 import { fileURLToPath } from "node:url"
+
+import { spawnOwned } from "@danwo/sdk"
 
 const SERVER = fileURLToPath(new URL("./server.ts", import.meta.url))
 
@@ -12,10 +14,12 @@ export interface Shop {
 }
 
 export async function launchShop(env: NodeJS.ProcessEnv): Promise<Shop> {
-  const child = spawn(process.execPath, [SERVER], {
+  /* Owned by danwo: stopped with the run even if it ends without calling stop(). */
+  const owned = spawnOwned(process.execPath, [SERVER], {
     env: { ...env, PORT: "0" },
     stdio: ["ignore", "pipe", "inherit"],
   })
+  const { child } = owned
   const port = await new Promise<string>((resolve, reject) => {
     let out = ""
 
@@ -34,15 +38,6 @@ export async function launchShop(env: NodeJS.ProcessEnv): Promise<Shop> {
   return {
     url: `http://127.0.0.1:${port}`,
     child,
-    async stop() {
-      if (child.exitCode !== null) {
-        return
-      }
-
-      const exited = new Promise((resolve) => child.once("exit", resolve))
-
-      child.kill()
-      await exited
-    },
+    stop: () => owned.stop(),
   }
 }
