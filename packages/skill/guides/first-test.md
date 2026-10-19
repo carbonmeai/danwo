@@ -2,19 +2,40 @@
 
 Set up a config, write one `*.danwo.ts` file, run it and read the result.
 
-1. Create `danwo.config.ts` next to your tests (`danwo init --starter-config` writes one):
+1. Run `danwo init` in the project. It detects the package manager, framework, dev command and
+   the providers the app uses, asks what to set up, and writes `danwo.config.ts`, a passing
+   `tests/example.danwo.ts` and a `test:danwo` script. A coding agent runs it without prompts:
+
+   ```sh
+   danwo init --yes --engine web --model-source gateway --providers stripe,resend --skills claude
+   ```
+
+   The config it writes starts the app with its dev command through danwo's proxy, with the
+   chosen providers emulated (`APP_URL` set instead tests an app that already runs):
 
    ```ts
-   import { defineConfig } from "@danwo/sdk"
+   import { appEnvironment, defineConfig, stripeService } from "@danwo/sdk"
+
+   const app = process.env.APP_URL ?? { command: "npm run dev", url: "http://localhost:3000" }
 
    export default defineConfig({
      testDir: "tests",
-     baseUrl: "http://localhost:3000",
+     workers: 1,
+     model: "anthropic/claude-sonnet-5",
+     readiness: { mode: "page+backend", settle: true },
+     environment: () => appEnvironment({ app, services: [stripeService()] }),
    })
    ```
 
-   `baseUrl` is enough when the app already runs. To have danwo start the app with provider
-   emulators, give the config an `environment()` instead (see `danwo guide providers`).
+   A config with only `baseUrl: "http://localhost:3000"` also works when the app already runs and
+   nothing behind it needs emulating (`danwo guide providers` covers the rest).
+
+   `model` takes an AI Gateway id (key in `AI_GATEWAY_API_KEY`) or any AI SDK model:
+   `anthropic("claude-sonnet-5")` from `@ai-sdk/anthropic`, `openai(…)`, `google(…)`, or
+   `createOpenAICompatible({ baseURL, apiKey })` for OpenRouter, Ollama or a server of your own.
+   Only the gateway reports what a call cost; wrap another provider's model in
+   `priced(model, { input, output })` (dollars per million tokens) to see spend and use dollar
+   budgets.
 
 2. Write `tests/home.danwo.ts`:
 

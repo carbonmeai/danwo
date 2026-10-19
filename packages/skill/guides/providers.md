@@ -60,6 +60,22 @@ export default defineConfig({
 SDKs route through it without code changes. Seeds can be functions so they can point at the app
 once it runs, and they are applied again after every reset.
 
+## Any app, started by its own command
+
+`appEnvironment({ app, services })` is what `danwo init` writes: it starts the services behind one
+proxy, runs `app.command` (the dev server) through that proxy with `PORT` set from `app.url`, waits
+until it answers, and stops it when the worker ends. `app` can instead be the URL of an app that
+already runs, whose calls then reach the real providers. Resets put the services back to their
+seeds; the app keeps running.
+
+```ts
+environment: () =>
+  appEnvironment({
+    app: { command: "pnpm dev", url: "http://localhost:3000" },
+    services: [stripeService(), resendService()],
+  }),
+```
+
 ## Several providers
 
 `startServices([stripeService({ seed }), s3Service(), slackService({ seed }), githubService()])`

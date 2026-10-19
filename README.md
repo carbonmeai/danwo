@@ -6,6 +6,43 @@ Coding agents made writing code cheap; verifying it is now the bottleneck. danwo
 
 It drives the app through its UI like a user, while third-party services the app calls are emulated behind an egress proxy, so the app needs no code changes. Every run can be replayed deterministically, broken on purpose with a fault matrix, and explained by a flight recorder.
 
+## Quickstart
+
+In your app's folder:
+
+```sh
+npx danwo init
+```
+
+`danwo init` looks at the project (package manager, framework, dev command, the providers it
+uses) and asks what to set up:
+
+- **What tests drive**: a browser (Playwright), an Android device (Expo and React Native, with a
+  check of this machine's Android tools), both, or the app's HTTP API only.
+- **The model for agent steps**: the Vercel AI Gateway (one key for every provider), Anthropic,
+  OpenAI or Google directly, OpenRouter, an OpenAI-compatible server (Ollama, LM Studio, your
+  own), or none. It writes only the key's variable name, to `.env.example`, and says whether the
+  key is already set.
+- **Which providers to emulate**: the ones it found in the dependencies and environment files
+  are ticked.
+- **Which coding agents to teach**: Claude Code, Cursor, Codex or the shared `.agents/skills`,
+  with danwo's MCP server registered for them.
+
+It writes `danwo.config.ts`, a `tests/example.danwo.ts` that passes on a fresh project, a
+`test:danwo` script and a `.gitignore` entry, and installs what the files import. Run it again
+and it changes nothing; a config you edited is shown as a diff and replaced only if you say so
+(`--force` without prompts). Then:
+
+```sh
+npm run test:danwo                                  # danwo starts the dev server through its proxy
+APP_URL=http://localhost:3000 npm run test:danwo    # or test an app that already runs
+```
+
+For CI and coding agents, `danwo init --yes` asks nothing and takes flags for every choice:
+`--engine`, `--model-source`, `--model`, `--base-url`, `--key-env`, `--providers`, `--skills`,
+`--no-mcp`, `--dev-command`, `--app-url`, `--skip-install` and `--force`. Without a terminal it
+behaves the same.
+
 ## What works today
 
 - **`danwo test`**: tests in `*.danwo.ts` files with `test`, `describe`, hooks, fixtures and invariants, run in parallel workers. Steps use locators (`screen.getByRole(...)`) or an AI agent (`agent.act`, `agent.assert`, `agent.extract`) whose verified steps replay with zero model calls.
@@ -303,9 +340,9 @@ only about matrix trials that forged, aged or delayed a webhook.
 ## Coding agents (MCP)
 
 `danwo mcp` serves the project in the current folder to a coding agent over MCP (stdio).
-`npx danwo init` registers it for Claude Code (`.mcp.json`), Cursor (`.cursor/mcp.json`) and
-Codex (`.codex/config.toml`), merging into files that exist; `--starter-config` also writes a
-`danwo.config.ts` when there is none. By hand, with Claude Code:
+`npx danwo init` registers it for the agents you pick: Claude Code (`.mcp.json`), Cursor
+(`.cursor/mcp.json`) and Codex (`.codex/config.toml`), merging into files that exist
+(`--no-mcp` skips it). By hand, with Claude Code:
 
 ```bash
 claude mcp add danwo -- npx danwo mcp
@@ -316,7 +353,7 @@ claude mcp add danwo -- npx danwo mcp
 `danwo init` also installs danwo's skill (`SKILL.md`) into `.claude/skills/danwo` (Claude Code)
 and `.agents/skills/danwo` (Codex, Cursor and other agents that read the shared folder). It
 teaches the inspect → check locators → scaffold → run → failure page → fix → invariant → matrix
-loop and how to triage each error code. A copy you edited is kept; `--no-skill` skips it.
+loop and how to triage each error code. A copy you edited is kept; `--skills none` skips it.
 
 - `danwo spec [--topic <topic>] [--json]`: everything this danwo provides, generated from its code
   each time: the test API, fixtures, locators and matchers, agent methods, secrets, config keys,
