@@ -211,7 +211,7 @@ function Toggles<T extends number>({
 }: {
   readonly label: string
   readonly values: readonly T[]
-  readonly chosen: T
+  readonly chosen: number
   readonly words: (value: T) => string
   readonly onChoose: (value: T) => void
 }) {
@@ -257,7 +257,7 @@ function Controls({ playback, tabs }: { readonly playback: Playback; readonly ta
       <Toggles
         label="Speed"
         values={RATES}
-        chosen={playback.rate as (typeof RATES)[number]}
+        chosen={playback.rate}
         words={(rate) => `${rate}×`}
         onChoose={playback.setRate}
       />

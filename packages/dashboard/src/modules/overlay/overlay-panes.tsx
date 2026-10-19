@@ -110,7 +110,12 @@ export function ConsolePane({ view }: PaneProps) {
     <PaneFrame
       bar={
         <>
-          <Tabs value={level} onValueChange={(next) => setLevel(next as ConsoleLevel)}>
+          <Tabs
+            value={level}
+            onValueChange={(next) =>
+              setLevel(CONSOLE_LEVELS.find((each) => each === next) ?? "all")
+            }
+          >
             <TabsList aria-label="Log level">
               {CONSOLE_LEVELS.map((each) => (
                 <TabTrigger key={each} value={each}>
@@ -315,7 +320,10 @@ function ProviderTables({ view }: { readonly view: RecordView }) {
 
   return (
     <Stack gap="2" h="full" minH="0" pt="3">
-      <Tabs value={table} onValueChange={(next) => setTable(next as "calls" | "webhooks")}>
+      <Tabs
+        value={table}
+        onValueChange={(next) => setTable(next === "webhooks" ? "webhooks" : "calls")}
+      >
         <TabsList aria-label="Calls or webhooks">
           <TabTrigger value="calls" gap="1.5">
             Calls
