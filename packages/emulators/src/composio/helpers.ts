@@ -23,6 +23,41 @@ export function composioId(prefix: string, length = 12): string {
 
 export const newUuid = (): string => randomUUID()
 
+/** Where Composio's legacy flow registers a connection's app, as accounts started by a link record it. */
+export const AUTH_APPS_ADD = `${API_ORIGIN}/api/v1/auth-apps/add`
+
+const WORD_FIRST = [
+  "amber",
+  "brisk",
+  "calm",
+  "dusty",
+  "eager",
+  "fancy",
+  "gentle",
+  "hollow",
+  "lucky",
+]
+const WORD_SECOND = [
+  "acorn",
+  "badger",
+  "cedar",
+  "delta",
+  "ember",
+  "falcon",
+  "harbor",
+  "maple",
+  "otter",
+]
+
+function pick(words: readonly string[]): string {
+  return words[(randomBytes(1)[0] ?? 0) % words.length] ?? words[0] ?? ""
+}
+
+/** A connected account's readable id, `<toolkit>_<word>-<word>` as Composio names them. */
+export function wordId(toolkit: string): string {
+  return `${toolkit}_${pick(WORD_FIRST)}-${pick(WORD_SECOND)}`
+}
+
 /** A random secret of `bytes` bytes, hex. */
 export function secret(bytes = 24): string {
   return randomBytes(bytes).toString("hex")

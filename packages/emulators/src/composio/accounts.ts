@@ -14,6 +14,7 @@ import {
   iso,
   newUuid,
   notFound,
+  wordId,
 } from "./helpers.ts"
 import type { ComposioStore } from "./store.ts"
 
@@ -63,6 +64,7 @@ export function newAccount(
     readonly status: AccountStatus
     readonly val?: Record<string, unknown>
     readonly alias?: string | null
+    readonly statusReason?: string | null
   },
 ): ConnectedAccountRecord {
   const now = iso(context.clock())
@@ -75,9 +77,9 @@ export function newAccount(
       authConfigId: config.id,
       toolkit: config.toolkit,
       status: fields.status,
-      statusReason: null,
+      statusReason: fields.statusReason ?? null,
       alias: fields.alias ?? null,
-      wordId: null,
+      wordId: wordId(config.toolkit),
       disabled: false,
       val: fields.val ?? {},
       label: null,

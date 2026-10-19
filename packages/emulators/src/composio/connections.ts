@@ -7,7 +7,7 @@ import { changeAccount, newAccount, newLink } from "./accounts.ts"
 import { backendFor } from "./backends/index.ts"
 import type { ComposioRouteContext } from "./context.ts"
 import type { AuthConfigRecord, ConnectedAccountRecord, LinkRecord } from "./entities.ts"
-import { ComposioError, secret } from "./helpers.ts"
+import { AUTH_APPS_ADD, ComposioError, secret } from "./helpers.ts"
 
 type Context = Pick<ComposioRouteContext, "objects" | "clock">
 
@@ -71,8 +71,24 @@ export function startConnection(
   const { link, url } = newLink(context, account, options.callbackUrl)
 
   return {
-    account: changeAccount(context, account.id, { val: { redirectUrl: url } }),
+    account: changeAccount(context, account.id, {
+      val: {
+        redirectUrl: url,
+        callback_url: AUTH_APPS_ADD,
+        ...(options.callbackUrl && { finalRedirectUri: options.callbackUrl }),
+      },
+    }),
     link: { link, url },
+  }
+}
+
+/** The fields a link-started connection keeps once it is done: where it was registered and sent back. */
+function linkTrail(account: ConnectedAccountRecord): Record<string, unknown> {
+  const { callback_url: callbackUrl, finalRedirectUri } = account.val
+
+  return {
+    ...(callbackUrl !== undefined && { callback_url: callbackUrl }),
+    ...(finalRedirectUri !== undefined && { finalRedirectUri }),
   }
 }
 
@@ -86,7 +102,7 @@ export function completeConnection(
   return changeAccount(context, account.id, {
     status: "ACTIVE",
     statusReason: null,
-    val: { ...val },
+    val: { ...linkTrail(account), ...val },
     label,
   })
 }
@@ -97,7 +113,7 @@ export function failConnection(
   account: ConnectedAccountRecord,
   reason: string,
 ): ConnectedAccountRecord {
-  return changeAccount(context, account.id, { status: "FAILED", statusReason: reason, val: {} })
+  return changeAccount(context, account.id, { status: "FAILED", statusReason: reason })
 }
 
 /** Credentials for a connection made on the emulator's own page, with no backend behind it. */

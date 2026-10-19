@@ -45,6 +45,11 @@ export interface ToolDefinition {
   readonly input: JsonSchema
   readonly output?: JsonSchema
   readonly scopes?: readonly string[]
+  /**
+   * The scopes the tool needs, as groups that must all be met by any one of their scopes. Without
+   * it, any one of `scopes` will do.
+   */
+  readonly scopeRequirements?: readonly (readonly string[])[]
   readonly tags?: readonly string[]
   /** Runs without a connected account. */
   readonly noAuth?: boolean
@@ -64,6 +69,12 @@ export interface ToolkitDefinition {
   readonly appUrl?: string
   /** Scopes a Composio-managed connection asks for. */
   readonly defaultScopes?: readonly string[]
+  /** Where the toolkit's API lives, which proxied calls are relative to. */
+  readonly baseUrl?: string
+  /** The call Composio makes to learn who an account belongs to. */
+  readonly currentUser?: { readonly method: string; readonly url: string }
+  /** The provider's own OAuth endpoints, for an OAuth2 toolkit. */
+  readonly oauth?: { readonly authorizationUrl: string; readonly tokenUrl: string }
 }
 
 /** A trigger type in the catalogue. */
@@ -73,6 +84,8 @@ export interface TriggerTypeDefinition {
   readonly description: string
   readonly toolkit: string
   readonly type: "webhook" | "poll"
+  /** The app must register a webhook endpoint with the provider before it fires. */
+  readonly requiresWebhookSetup?: boolean
   readonly config: JsonSchema
   readonly payload: JsonSchema
 }
@@ -105,7 +118,7 @@ export interface ConnectedAccountRecord {
   readonly status: AccountStatus
   readonly statusReason: string | null
   readonly alias: string | null
-  readonly wordId: string | null
+  readonly wordId: string
   readonly disabled: boolean
   /** The connection's credentials and fields, as Composio's `state.val`. */
   readonly val: Readonly<Record<string, unknown>>

@@ -146,12 +146,28 @@ function configFor(store: Store, seed: ComposioSeedAccount): AuthConfigRecord {
   )
 }
 
+/** Why a seeded account is not active, worded as Composio words it. */
+const SEEDED_REASONS: Readonly<Record<string, string>> = {
+  EXPIRED: "Credentials expired; reconnect the account",
+  INACTIVE: "Connection disabled by the project",
+  FAILED: "Authorization failed at the provider",
+}
+
+/** A seeded account's credentials: an emulated token when active, none otherwise, unless given. */
+function seededCredentials(seed: ComposioSeedAccount, status: string): Record<string, unknown> {
+  if (seed.credentials) return { ...seed.credentials }
+
+  return status === "ACTIVE" ? { access_token: `emulated_${secret(16)}` } : {}
+}
+
 function seedAccount(store: Store, seed: ComposioSeedAccount): void {
   const objects = composioStore(store)
+  const status = seed.status ?? "ACTIVE"
   const account = newAccount({ objects, clock: store.clock }, configFor(store, seed), seed.userId, {
-    status: seed.status ?? "ACTIVE",
-    val: { ...(seed.credentials ?? { access_token: `emulated_${secret(16)}` }) },
+    status,
+    val: seededCredentials(seed, status),
     alias: seed.alias ?? null,
+    statusReason: SEEDED_REASONS[status] ?? null,
   })
 
   if (seed.id === undefined && seed.label === undefined) return

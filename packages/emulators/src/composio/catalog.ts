@@ -30,6 +30,12 @@ function schema(
 
 const GOOGLE = "https://www.googleapis.com/auth/"
 
+/** Google's OAuth endpoints, shared by every Google toolkit. */
+const GOOGLE_OAUTH = {
+  authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+  tokenUrl: "https://oauth2.googleapis.com/token",
+}
+
 export const TOOLKITS: readonly ToolkitDefinition[] = [
   {
     slug: "gmail",
@@ -39,6 +45,9 @@ export const TOOLKITS: readonly ToolkitDefinition[] = [
     authSchemes: ["OAUTH2"],
     managed: true,
     appUrl: "https://mail.google.com",
+    baseUrl: "https://www.googleapis.com",
+    currentUser: { method: "GET", url: "https://www.googleapis.com/gmail/v1/users/me/profile" },
+    oauth: GOOGLE_OAUTH,
     defaultScopes: [`${GOOGLE}gmail.modify`, `${GOOGLE}userinfo.email`],
   },
   {
@@ -49,6 +58,12 @@ export const TOOLKITS: readonly ToolkitDefinition[] = [
     authSchemes: ["OAUTH2"],
     managed: true,
     appUrl: "https://calendar.google.com",
+    baseUrl: "https://www.googleapis.com/calendar/v3",
+    currentUser: {
+      method: "GET",
+      url: "https://www.googleapis.com/calendar/v3/calendars/primary/events?maxResults=1",
+    },
+    oauth: GOOGLE_OAUTH,
     defaultScopes: [`${GOOGLE}calendar`, `${GOOGLE}userinfo.email`],
   },
   {
@@ -59,6 +74,9 @@ export const TOOLKITS: readonly ToolkitDefinition[] = [
     authSchemes: ["OAUTH2"],
     managed: true,
     appUrl: "https://drive.google.com",
+    baseUrl: "https://www.googleapis.com/drive/v3",
+    currentUser: { method: "GET", url: "https://www.googleapis.com/drive/v3/about?fields=user" },
+    oauth: GOOGLE_OAUTH,
     defaultScopes: [`${GOOGLE}drive`, `${GOOGLE}userinfo.email`],
   },
   {
@@ -69,6 +87,12 @@ export const TOOLKITS: readonly ToolkitDefinition[] = [
     authSchemes: ["OAUTH2", "BEARER_TOKEN"],
     managed: true,
     appUrl: "https://slack.com",
+    baseUrl: "https://slack.com/api",
+    currentUser: { method: "GET", url: "https://slack.com/api/auth.test" },
+    oauth: {
+      authorizationUrl: "https://slack.com/oauth/v2/authorize",
+      tokenUrl: "https://slack.com/api/oauth.v2.access",
+    },
     defaultScopes: [
       "chat:write",
       "chat:write.public",
@@ -85,6 +109,12 @@ export const TOOLKITS: readonly ToolkitDefinition[] = [
     authSchemes: ["OAUTH2", "API_KEY"],
     managed: true,
     appUrl: "https://github.com",
+    baseUrl: "https://api.github.com",
+    currentUser: { method: "GET", url: "https://api.github.com/user" },
+    oauth: {
+      authorizationUrl: "https://github.com/login/oauth/authorize",
+      tokenUrl: "https://github.com/login/oauth/access_token",
+    },
     defaultScopes: ["repo", "read:user"],
   },
   {
@@ -95,6 +125,12 @@ export const TOOLKITS: readonly ToolkitDefinition[] = [
     authSchemes: ["OAUTH2"],
     managed: true,
     appUrl: "https://outlook.office.com",
+    baseUrl: "https://graph.microsoft.com",
+    currentUser: { method: "GET", url: "https://graph.microsoft.com/v1.0/me" },
+    oauth: {
+      authorizationUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+      tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+    },
     defaultScopes: ["Mail.ReadWrite", "Mail.Send", "User.Read", "offline_access"],
   },
 ]
@@ -120,6 +156,14 @@ const gmailTools: ToolDefinition[] = [
       ["body"],
     ),
     scopes: [`${GOOGLE}gmail.send`],
+    scopeRequirements: [
+      [
+        "https://mail.google.com/",
+        `${GOOGLE}gmail.modify`,
+        `${GOOGLE}gmail.compose`,
+        `${GOOGLE}gmail.send`,
+      ],
+    ],
     tags: ["important"],
     sample: (_args, n) => ({ id: messageId(n), threadId: messageId(n), labelIds: ["SENT"] }),
   },
@@ -135,6 +179,9 @@ const gmailTools: ToolDefinition[] = [
       include_payload: flag("Include each message's headers and body."),
     }),
     scopes: [`${GOOGLE}gmail.readonly`],
+    scopeRequirements: [
+      ["https://mail.google.com/", `${GOOGLE}gmail.modify`, `${GOOGLE}gmail.readonly`],
+    ],
     tags: ["important"],
     sample: () => ({ messages: [], resultSizeEstimate: 0 }),
   },
@@ -153,6 +200,9 @@ const gmailTools: ToolDefinition[] = [
       ["body"],
     ),
     scopes: [`${GOOGLE}gmail.compose`],
+    scopeRequirements: [
+      ["https://mail.google.com/", `${GOOGLE}gmail.compose`, `${GOOGLE}gmail.modify`],
+    ],
     sample: (_args, n) => ({ id: `r${n}`, message: { id: messageId(n), labelIds: ["DRAFT"] } }),
   },
 ]
@@ -178,6 +228,9 @@ const calendarTools: ToolDefinition[] = [
       ["start_datetime"],
     ),
     scopes: [`${GOOGLE}calendar.events`],
+    scopeRequirements: [
+      [`${GOOGLE}calendar`, `${GOOGLE}calendar.events`, `${GOOGLE}calendar.events.owned`],
+    ],
     tags: ["important"],
     sample: (args, n) => ({
       id: `evt${n}`,
@@ -199,6 +252,14 @@ const calendarTools: ToolDefinition[] = [
       q: text("Free text to search events for."),
     }),
     scopes: [`${GOOGLE}calendar.readonly`],
+    scopeRequirements: [
+      [
+        `${GOOGLE}calendar`,
+        `${GOOGLE}calendar.events`,
+        `${GOOGLE}calendar.readonly`,
+        `${GOOGLE}calendar.events.readonly`,
+      ],
+    ],
     sample: () => ({ kind: "calendar#events", items: [] }),
   },
 ]
@@ -214,6 +275,14 @@ const driveTools: ToolDefinition[] = [
       page_size: number("At most this many files."),
     }),
     scopes: [`${GOOGLE}drive.readonly`],
+    scopeRequirements: [
+      [
+        `${GOOGLE}drive`,
+        `${GOOGLE}drive.file`,
+        `${GOOGLE}drive.metadata.readonly`,
+        `${GOOGLE}drive.readonly`,
+      ],
+    ],
     tags: ["important"],
     sample: () => ({ files: [] }),
   },
@@ -235,6 +304,7 @@ const slackTools: ToolDefinition[] = [
       ["channel"],
     ),
     scopes: ["chat:write"],
+    scopeRequirements: [["chat:write"]],
     tags: ["important"],
     sample: (args, n) => ({
       ok: true,
@@ -252,6 +322,7 @@ const slackTools: ToolDefinition[] = [
       types: text("Channel types, such as `public_channel,private_channel`."),
     }),
     scopes: ["channels:read"],
+    scopeRequirements: [["channels:read", "groups:read", "mpim:read", "im:read"]],
     sample: () => ({ ok: true, channels: [] }),
   },
 ]
@@ -274,6 +345,7 @@ const githubTools: ToolDefinition[] = [
       ["owner", "repo", "title"],
     ),
     scopes: ["repo"],
+    scopeRequirements: [["public_repo", "repo"]],
     tags: ["important"],
     sample: (args, n) => ({ number: n, title: args["title"], state: "open" }),
   },
@@ -286,6 +358,7 @@ const githubTools: ToolDefinition[] = [
       { owner: text("The repository's owner."), repo: text("The repository's name.") },
       ["owner", "repo"],
     ),
+    scopeRequirements: [["repo", "public_repo"]],
     sample: (args) => ({
       name: args["repo"],
       full_name: `${String(args["owner"])}/${String(args["repo"])}`,
@@ -311,6 +384,7 @@ const outlookTools: ToolDefinition[] = [
       ["to_email", "subject", "body"],
     ),
     scopes: ["Mail.Send"],
+    scopeRequirements: [["Mail.Send"]],
     tags: ["important"],
     sample: () => ({}),
   },
@@ -324,6 +398,7 @@ const outlookTools: ToolDefinition[] = [
       top: number("At most this many messages."),
     }),
     scopes: ["Mail.Read"],
+    scopeRequirements: [["Mail.ReadBasic", "Mail.Read", "Mail.ReadWrite"]],
     sample: () => ({ value: [] }),
   },
 ]
@@ -389,7 +464,7 @@ export const TRIGGER_TYPES: readonly TriggerTypeDefinition[] = [
     }),
   },
   {
-    slug: "GOOGLECALENDAR_EVENT_CREATED_TRIGGER",
+    slug: "GOOGLECALENDAR_GOOGLE_CALENDAR_EVENT_CREATED_TRIGGER",
     name: "Event Created",
     description: "Fires when an event is added to the user's calendar.",
     toolkit: "googlecalendar",
