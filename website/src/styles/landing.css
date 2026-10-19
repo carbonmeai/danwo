@@ -2374,17 +2374,71 @@
 .landing footer {
   background: var(--h-bg);
   color: var(--h-muted);
-  padding: 72px 0 44px;
+  padding: 40px 0 44px;
   font-size: 13.5px;
-  overflow: hidden;
+}
+
+.landing .foot {
+  display: grid;
+  grid-template-columns: 1.6fr repeat(4, 1fr);
+  gap: 32px;
+
+  & h4 {
+    margin: 0 0 12px;
+    color: var(--h-text);
+    font-weight: 500;
+    font-size: 13px;
+  }
+
+  & a {
+    display: block;
+    padding: 4px 0;
+    transition: color 0.15s;
+  }
+
+  & a:hover {
+    color: var(--h-text);
+  }
+
+  & a.home {
+    color: var(--h-text);
+    display: inline-flex;
+    padding: 0;
+  }
+}
+
+.landing .foot-b {
+  margin-top: 56px;
+  padding-top: 22px;
+  box-shadow: inset 0 1px 0 var(--h-line);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  font: 12px var(--mono);
+  color: var(--h-faint);
+}
+
+.landing .status-dot::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #00c950;
+  margin-right: 7px;
 }
 
 /*
- * The wordmark band: dim letters a few shades above the page, a spotlight that reveals the lit
- * layers where the pointer is, and a horizon line that cuts the letters and glows beneath.
+ * The wordmark band above the footer's links: dim letters a few shades above the page, a
+ * spotlight that reveals the lit layers where the pointer is, and a horizon line that cuts the
+ * letters and glows beneath.
  */
 .landing .wm {
   position: relative;
+  overflow: hidden;
+  margin: -104px 0 8px;
+  background: linear-gradient(var(--h-bg), #000 22%, #000 78%, var(--h-bg));
 }
 
 .landing .wm-clip {
@@ -2400,14 +2454,50 @@
 }
 
 .landing .wm-dim {
-  fill: #151517;
+  fill: #0c0c0d;
+}
+
+/* The lit letter: a faint lift inside it, under the spotlight. */
+.landing .wm-lift {
+  fill: #fff;
+  fill-opacity: 0.045;
+}
+
+/* The outline: one hairline, never filtered, so it stays sharp. */
+.landing .wm-line {
+  fill: none;
+  stroke: #fff;
+  stroke-opacity: 0.9;
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+  shape-rendering: geometricPrecision;
+}
+
+@media (min-resolution: 2dppx) {
+  .landing .wm-line {
+    stroke-width: 0.75px;
+  }
+}
+
+/* The glow beside the outline, tight and low, and a very faint wide haze. */
+.landing .wm-glow {
+  fill: none;
+  stroke: #fff;
+  stroke-opacity: 0.35;
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+}
+
+.landing .wm-haze {
+  fill: #fff;
+  fill-opacity: 0.05;
 }
 
 .landing .wm-under {
   position: relative;
-  height: 170px;
-  box-shadow: inset 0 1px 0 #ffffff1c;
-  background: radial-gradient(ellipse 52% 100% at 50% 0%, #ffffff0b, transparent 72%);
+  height: 150px;
+  box-shadow: inset 0 1px 0 #ffffff12;
+  background: radial-gradient(ellipse 38% 80% at 50% 0%, #ffffff07, transparent 70%);
   pointer-events: none;
 
   &::before {
@@ -2415,98 +2505,18 @@
     position: absolute;
     inset: 0;
     opacity: var(--gi, 0);
-    background: radial-gradient(ellipse 26% 90% at var(--gx, 60%) 0%, #ffffff12, transparent 70%);
+    background: radial-gradient(ellipse 16% 70% at var(--gx, 60%) 0%, #ffffff0c, transparent 70%);
   }
 }
 
-.landing .foot {
-  display: grid;
-  grid-template-columns: 1.6fr repeat(4, 1fr);
-  gap: 32px;
-  margin-top: 8px;
-
-  & h4 {
-    margin: 0 0 14px;
-    color: var(--h-text);
-    font-weight: 500;
-    font-size: 13.5px;
+@media (max-width: 640px) {
+  .landing .wm {
+    margin-top: -80px;
   }
 
-  & a {
-    display: block;
-    padding: 5px 0;
-    transition: color 0.15s;
+  .landing .wm-under {
+    height: 80px;
   }
-
-  & a:hover {
-    color: var(--h-text);
-  }
-
-  & a.home {
-    color: var(--h-text);
-    display: inline-flex;
-    padding: 0;
-  }
-}
-
-.landing .foot-brand {
-  & p {
-    margin: 14px 0 0;
-    max-width: 260px;
-  }
-}
-
-.landing .socials {
-  display: flex;
-  gap: 8px;
-  margin-top: 20px;
-
-  &:empty {
-    display: none;
-  }
-
-  & .social {
-    display: grid;
-    place-items: center;
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    border-radius: 50%;
-    background: #ffffff0d;
-    color: var(--h-text-2);
-    transition:
-      background 0.15s,
-      color 0.15s;
-  }
-
-  & .social:hover {
-    background: #ffffff1a;
-    color: var(--h-text);
-  }
-}
-
-.landing .foot-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 20px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: #ffffff0b;
-  color: var(--h-text-2);
-  font-size: 12.5px;
-}
-
-.landing .foot-b {
-  margin-top: 56px;
-  padding-top: 22px;
-  box-shadow: inset 0 1px 0 var(--h-line);
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  font: 12px var(--mono);
-  color: var(--h-faint);
 }
 
 /* ---------- reveal on scroll ---------- */
@@ -2720,14 +2730,6 @@
 
   .landing .foot {
     grid-template-columns: 1fr 1fr;
-  }
-
-  .landing footer {
-    padding-top: 48px;
-  }
-
-  .landing .wm-under {
-    height: 96px;
   }
 
   .landing .plan {

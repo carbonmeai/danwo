@@ -31,8 +31,45 @@ export function wordmarkShape(svg: string): WordmarkShape {
     throw new Error("the wordmark SVG needs a viewBox and one path")
 
   const [x = 0, y = 0, width = 0, height = 0] = box
+  const marks = [...svg.matchAll(/<line\b[^>]*>/g)].map(([line]) => capsule(line))
 
-  return { d, x, y, width, height }
+  return { d: [d, ...marks].join(" "), x, y, width, height }
+}
+
+/** A number attribute of an SVG element's markup. */
+function attribute(markup: string, name: string): number {
+  const value = Number(new RegExp(`\\s${name}="([^"]+)"`).exec(markup)?.[1])
+
+  if (!Number.isFinite(value)) throw new Error(`the wordmark's accent needs ${name}`)
+
+  return value
+}
+
+/** A point written for a path, to two decimals. */
+function at(x: number, y: number): string {
+  return `${x.toFixed(2)} ${y.toFixed(2)}`
+}
+
+/**
+ * A round-capped stroked line, such as the wordmark's accents, as the outline it paints: two sides
+ * and a half circle at each end, so it fills and takes an outline like the letters do.
+ */
+export function capsule(line: string): string {
+  const [x1 = 0, y1 = 0, x2 = 0, y2 = 0] = ["x1", "y1", "x2", "y2"].map((name) =>
+    attribute(line, name),
+  )
+  const r = attribute(line, "stroke-width") / 2
+  const length = Math.hypot(x2 - x1, y2 - y1) || 1
+  const nx = (-(y2 - y1) / length) * r
+  const ny = ((x2 - x1) / length) * r
+
+  return [
+    `M${at(x1 + nx, y1 + ny)}`,
+    `L${at(x2 + nx, y2 + ny)}`,
+    `A${r} ${r} 0 0 0 ${at(x2 - nx, y2 - ny)}`,
+    `L${at(x1 - nx, y1 - ny)}`,
+    `A${r} ${r} 0 0 0 ${at(x1 + nx, y1 + ny)}Z`,
+  ].join(" ")
 }
 
 /** Where a pointer at `client` falls in the wordmark's units, given where the SVG is on screen. */

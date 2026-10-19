@@ -1,11 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { useRef } from "react"
 
-import { Closing } from "../landing/closing.tsx"
+import { Closing, Footer } from "../landing/closing.tsx"
 import { CodeSection } from "../landing/code.tsx"
 import { Compare } from "../landing/compare.tsx"
 import { Features } from "../landing/features.tsx"
-import { Footer } from "../landing/footer.tsx"
 import { Hero } from "../landing/hero.tsx"
 import { HowItWorks } from "../landing/how.tsx"
 import { Logos } from "../landing/logos.tsx"

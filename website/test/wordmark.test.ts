@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   approach,
+  capsule,
   restingPoint,
   SWEEP_MS,
   sweepPoint,
@@ -24,6 +25,22 @@ describe("the footer's wordmark light", () => {
     expect(shape.d.startsWith("M")).toBe(true)
     expect(shape.width).toBeGreaterThan(shape.height)
     expect([shape.x, shape.y, shape.width, shape.height].every(Number.isFinite)).toBe(true)
+  })
+
+  it("keeps the accents, drawn as lines, as filled outlines beside the letters", () => {
+    const shape = wordmarkShape(WORDMARK)
+    const lines = WORDMARK.match(/<line\b/g)?.length ?? 0
+
+    expect(lines).toBeGreaterThan(0)
+    expect(shape.d.match(/A/g)?.length).toBe(lines * 2)
+  })
+
+  it("draws a round-capped line as two sides and two half circles around it", () => {
+    const outline = capsule('<line x1="0" y1="0" x2="100" y2="0" stroke-width="20"/>')
+
+    expect(outline).toBe(
+      "M0.00 10.00 L100.00 10.00 A10 10 0 0 0 100.00 -10.00 L0.00 -10.00 A10 10 0 0 0 0.00 10.00Z",
+    )
   })
 
   it("refuses an SVG with no path or no view box", () => {
