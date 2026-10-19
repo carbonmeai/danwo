@@ -132,6 +132,12 @@ environment: async () => {
 The first app (or `baseUrl: "<name>"`) is the one the browser opens; tests get every app's URL as
 the `apps` fixture. Each app's output goes into the flight record under its name.
 
+A test's flight record holds only what happened during that test, so what the apps did while they
+started is kept apart, in `.danwo/runs/<run>/environment-<worker>.json`: each app's startup output
+(redacted, the last lines), the calls they made through the proxy (host, method, path without its
+query, what the proxy did, the status; no headers or bodies), their sockets and danwo's notes. An
+app that fails to start fails its test file with the app's name and the last lines of its output.
+
 Two checks run as the apps start, and neither prints a value:
 
 - **The preload.** danwo routes a Node app through its proxy by adding its preload to

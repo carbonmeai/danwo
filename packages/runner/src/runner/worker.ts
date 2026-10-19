@@ -33,6 +33,7 @@ import { resultOf, worthRetrying } from "../tests/retry.ts"
 import { type AttemptResult, type AttemptSetup, runAttempt, type ReplayUse } from "./attempt.ts"
 import { loadTestFile, testIdOf } from "./catalog.ts"
 import { type LoadedConfig, loadConfig } from "./config.ts"
+import { writeEnvironmentRecord } from "./environment-record.ts"
 import type { WorkerEnvironment } from "./environment.ts"
 import { impactOf } from "./impact.ts"
 import { type Isolation, StartingPoint } from "./isolation.ts"
@@ -654,6 +655,8 @@ const calls: WorkerCalls = {
     const loaded = await loadConfig(start.cwd, start.configPath)
     const env = await loaded.config.environment?.({ workerIndex: start.workerIndex })
     const recording = start.record?.mode === "off" ? undefined : start.record
+
+    if (env && recording) await writeEnvironmentRecord(recording.runDir, env, start.workerIndex)
     const sessions = new SessionKeeper(async () => {
       if (keepSignIns) await bench?.start?.keep("session")
     })
