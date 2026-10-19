@@ -81,19 +81,23 @@ export function verifyApiRequest(
     )
 }
 
-/** The query a server SDK would sign for an API request, for tests that call the API by hand. */
+/**
+ * The query a server SDK would sign for an API request (with its own `query` parameters, such as
+ * `info`), for tests and checks that call the API by hand.
+ */
 export function signedQuery(
-  app: PusherApp,
+  app: Pick<PusherApp, "key" | "secret">,
   method: string,
   path: string,
   body: string,
   now: Date,
+  query: URLSearchParams = new URLSearchParams(),
 ): URLSearchParams {
-  const params = new URLSearchParams({
-    auth_key: app.key,
-    auth_timestamp: String(Math.floor(now.getTime() / 1000)),
-    auth_version: "1.0",
-  })
+  const params = new URLSearchParams(query)
+
+  params.set("auth_key", app.key)
+  params.set("auth_timestamp", String(Math.floor(now.getTime() / 1000)))
+  params.set("auth_version", "1.0")
 
   if (body !== "") params.set("body_md5", createHash("md5").update(body).digest("hex"))
   params.set("auth_signature", hmac(app.secret, stringToSign(method, path, params)))

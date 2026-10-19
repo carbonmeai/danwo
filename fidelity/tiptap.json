@@ -1,0 +1,37 @@
+{
+  "provider": "tiptap",
+  "source": "openapi",
+  "recorded": "2026-10-19",
+  "scenarios": {
+    "documents: create, read as JSON, delete": {
+      "steps": [
+        {
+          "step": "create a document from JSON",
+          "status": 204,
+          "shape": "d33e6a781203"
+        },
+        {
+          "step": "read it as JSON",
+          "status": 200,
+          "shape": "c36890da6666"
+        },
+        {
+          "step": "delete it",
+          "status": 204,
+          "shape": "d33e6a781203"
+        },
+        {
+          "step": "read a document that is gone",
+          "status": 404,
+          "shape": "86a1ea1cdf94"
+        }
+      ],
+      "facts": []
+    }
+  },
+  "shapes": {
+    "86a1ea1cdf94": {"t":"any"},
+    "c36890da6666": {"t":"object","keys":{"type":{"t":"literal","v":"doc"},"content":{"t":"array","of":{"t":"any"}}}},
+    "d33e6a781203": {"t":"null"}
+  }
+}

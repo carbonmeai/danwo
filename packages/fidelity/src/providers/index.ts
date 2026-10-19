@@ -11,11 +11,14 @@ import { geminiFidelity } from "./gemini.ts"
 import { githubFidelity } from "./github.ts"
 import { googleFidelity } from "./google.ts"
 import { microsoftFidelity } from "./microsoft.ts"
+import { novuFidelity } from "./novu.ts"
 import { paystackFidelity } from "./paystack.ts"
 import { perplexityFidelity } from "./perplexity.ts"
+import { pusherFidelity } from "./pusher.ts"
 import { resendFidelity } from "./resend.ts"
 import { slackFidelity } from "./slack.ts"
 import { stripeFidelity } from "./stripe.ts"
+import { tiptapFidelity } from "./tiptap.ts"
 import { twilioFidelity } from "./twilio.ts"
 
 export const FIDELITY_PROVIDERS: readonly FidelityProvider[] = [
@@ -38,6 +41,9 @@ export const FIDELITY_PROVIDERS: readonly FidelityProvider[] = [
   nangoFidelity,
   unipileFidelity,
   clerkFidelity,
+  pusherFidelity,
+  novuFidelity,
+  tiptapFidelity,
 ]
 
 /** The providers named in `names`, or all of them; an unknown name is an error. */

@@ -1,0 +1,47 @@
+{
+  "provider": "novu",
+  "source": "live",
+  "recorded": "2026-10-19",
+  "scenarios": {
+    "errors: an unknown key": {
+      "steps": [
+        {
+          "step": "read subscribers with a key Novu never issued",
+          "status": 401,
+          "shape": "4a695efe3603"
+        }
+      ],
+      "facts": []
+    },
+    "subscribers: create, read, patch, delete": {
+      "steps": [
+        {
+          "step": "create a subscriber",
+          "status": 201,
+          "shape": "deaa8e2261b4"
+        },
+        {
+          "step": "read it",
+          "status": 200,
+          "shape": "deaa8e2261b4"
+        },
+        {
+          "step": "patch it",
+          "status": 200,
+          "shape": "deaa8e2261b4"
+        },
+        {
+          "step": "delete it",
+          "status": 200,
+          "shape": "6eb3fd7cc14b"
+        }
+      ],
+      "facts": []
+    }
+  },
+  "shapes": {
+    "4a695efe3603": {"t":"object","keys":{"error":{"t":"literal","v":"Unauthorized"},"statusCode":{"t":"literal","v":401},"timestamp":{"t":"string"},"path":{"t":"string"},"message":{"t":"literal","v":"API Key not found"},"ctx":{"t":"object","keys":{"error":{"t":"string"},"statusCode":{"t":"number"}}}}},
+    "6eb3fd7cc14b": {"t":"object","keys":{"acknowledged":{"t":"boolean"},"status":{"t":"string"}}},
+    "deaa8e2261b4": {"t":"object","keys":{"subscriberId":{"t":"string"},"_organizationId":{"t":"string"},"_environmentId":{"t":"string"},"deleted":{"t":"boolean"},"createdAt":{"t":"string"},"updatedAt":{"t":"string"},"_id":{"t":"string"},"firstName":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"lastName":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"email":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"phone":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"avatar":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"locale":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"timezone":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"data":{"t":"union","of":[{"t":"object","keys":{},"open":true},{"t":"null"}]},"channels":{"t":"any"},"isOnline":{"t":"union","of":[{"t":"boolean"},{"t":"null"}]},"lastOnlineAt":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"__v":{"t":"number"}},"optional":["_id","firstName","lastName","email","phone","avatar","locale","timezone","data","channels","isOnline","lastOnlineAt","__v"]}
+  }
+}

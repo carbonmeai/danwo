@@ -149,15 +149,25 @@ export function subscriberNotification(
   }
 }
 
-/** Novu's error body: the status, what was wrong, when and where. */
+/** Novu's error body: the status, what was wrong, when and where, and the same again in `ctx`. */
 export function novuError(c: Context, status: number, message: string): Response {
+  const error =
+    status === 404
+      ? "Not Found"
+      : status === 401
+        ? "Unauthorized"
+        : status === 422
+          ? "Unprocessable Entity"
+          : "Bad Request"
+
   return c.json(
     {
       statusCode: status,
-      message,
-      error: status === 404 ? "Not Found" : status === 401 ? "Unauthorized" : "Bad Request",
       timestamp: new Date().toISOString(),
       path: c.req.path,
+      message,
+      error,
+      ctx: { statusCode: status, error },
     },
     status,
   )

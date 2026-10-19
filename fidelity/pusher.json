@@ -1,0 +1,47 @@
+{
+  "provider": "pusher",
+  "source": "openapi",
+  "recorded": "2026-10-19",
+  "scenarios": {
+    "events: trigger, with info, and a batch": {
+      "steps": [
+        {
+          "step": "trigger an event",
+          "status": 200,
+          "shape": "4836648e0c45"
+        },
+        {
+          "step": "trigger an event asking for its channel's subscriber count",
+          "status": 200,
+          "shape": "15868d05fd58"
+        },
+        {
+          "step": "trigger a batch",
+          "status": 200,
+          "shape": "4836648e0c45"
+        }
+      ],
+      "facts": []
+    },
+    "channels: one channel, and the occupied ones": {
+      "steps": [
+        {
+          "step": "read an empty channel",
+          "status": 200,
+          "shape": "669bc53f36d8"
+        },
+        {
+          "step": "list occupied channels",
+          "status": 200,
+          "shape": "15868d05fd58"
+        }
+      ],
+      "facts": []
+    }
+  },
+  "shapes": {
+    "15868d05fd58": {"t":"object","keys":{"channels":{"t":"object","keys":{},"open":true}}},
+    "4836648e0c45": {"t":"object","keys":{},"open":true},
+    "669bc53f36d8": {"t":"object","keys":{"occupied":{"t":"literal","v":false},"subscription_count":{"t":"number"}},"optional":["subscription_count"]}
+  }
+}
