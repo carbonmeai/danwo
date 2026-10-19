@@ -62,9 +62,22 @@ export function openingLine(tests: number, workers: number): string {
   return pc.dim(`Running ${count(tests, "test")} with ${count(workers, "worker")}`)
 }
 
-/** A file that could not run at all (it failed to load, or its worker died). */
+/** Lines of a file's error kept under its first, such as the output of an app that would not start. */
+const FILE_ERROR_DETAIL_LINES = 40
+
+/**
+ * A file that could not run at all (it failed to load, or its worker died): the error's first line,
+ * then the rest of it dimmed and indented (the last lines only), since that is often the only
+ * place an app's own startup error shows.
+ */
 export function fileErrorLine(file: string, error: string): string {
-  return `  ${pc.red("✗")} ${file}: ${error.split("\n")[0] ?? error}`
+  const [first = error, ...rest] = error.split("\n")
+  const detail = rest.filter((line) => line.trim() !== "").slice(-FILE_ERROR_DETAIL_LINES)
+
+  return [
+    `  ${pc.red("✗")} ${file}: ${first}`,
+    ...detail.map((line) => pc.dim(`      ${line}`)),
+  ].join("\n")
 }
 
 /** A flaky test: it passed only after failing, so its failed attempts are worth a look. */

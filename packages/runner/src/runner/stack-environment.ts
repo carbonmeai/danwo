@@ -126,7 +126,14 @@ async function startOne(app: StackApp, context: StackContext): Promise<StartedAp
     options.secrets,
   )
 
-  return startApp({ ...app, env }, proxyEnv)
+  try {
+    return await startApp({ ...app, env }, proxyEnv)
+  } catch (error) {
+    /* With several apps, "the app exited" says nothing: name the one that did. */
+    const message = error instanceof Error ? error.message : String(error)
+
+    throw new Error(`${app.name}: ${message.replace(/^the app /, "it ")}`, { cause: error })
+  }
 }
 
 /** Warns about every started app's Node processes that run without the preload. */
