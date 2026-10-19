@@ -27,11 +27,37 @@ const BAR_FILL = {
   webhook: "series.3",
 } as const
 
+/** What the waterfall does with the replay player: where it is, and seeking it to a bar. */
+export interface WaterfallPlayer {
+  readonly playheadMs?: number
+  readonly onSeek?: (ms: number) => void
+}
+
+/** A bar's words for a screen reader, when clicking it seeks the player. */
+function seekLabel(item: TimelineItem): string {
+  return `Go to ${KIND_WORDS[item.kind].toLowerCase()} ${item.label}${item.fault ? `, fault: ${item.fault}` : ""}`
+}
+
 /** One call, webhook or step on the waterfall's track, with a diamond where a fault landed. */
-function Bar({ item, span }: { readonly item: TimelineItem; readonly span: number }) {
+function Bar({
+  item,
+  span,
+  onSeek,
+}: {
+  readonly item: TimelineItem
+  readonly span: number
+  readonly onSeek?: ((ms: number) => void) | undefined
+}) {
   return (
     <>
       <Box
+        {...(onSeek && {
+          as: "button",
+          type: "button",
+          cursor: "pointer",
+          "aria-label": seekLabel(item),
+          onClick: () => onSeek(item.startMs),
+        })}
         position="absolute"
         top={item.kind === "step" ? "0" : "1"}
         bottom={item.kind === "step" ? "0" : "1"}
@@ -44,6 +70,7 @@ function Bar({ item, span }: { readonly item: TimelineItem; readonly span: numbe
       />
       {item.fault ? (
         <Box
+          {...(onSeek && { cursor: "pointer", onClick: () => onSeek(item.startMs) })}
           position="absolute"
           top="50%"
           w="2.5"
@@ -112,10 +139,12 @@ function LaneRow({
   lane,
   first,
   span,
+  player,
 }: {
   readonly lane: Lane
   readonly first: boolean
   readonly span: number
+  readonly player: WaterfallPlayer
 }) {
   const faults = lane.items.flatMap((item) => (item.fault ? [item.fault] : []))
   const end = laneEnd(lane)
@@ -145,8 +174,9 @@ function LaneRow({
           />
         ))}
         {lane.items.map((item, j) => (
-          <Bar key={j} item={item} span={span} />
+          <Bar key={j} item={item} span={span} onSeek={player.onSeek} />
         ))}
+        <Playhead ms={player.playheadMs} span={span} />
       </Box>
       <styled.span
         fontSize="1"
@@ -161,8 +191,32 @@ function LaneRow({
   )
 }
 
-/** Steps, provider calls and webhooks on one clock, with faults marked where they landed. */
-export function Waterfall({ timeline }: { readonly timeline: Timeline }) {
+/** Where the replay player is, as a line down a track; nothing without a player. */
+function Playhead({ ms, span }: { readonly ms: number | undefined; readonly span: number }) {
+  if (ms === undefined || ms < 0 || ms > span) return null
+
+  return (
+    <Box
+      position="absolute"
+      top="-1"
+      bottom="-1"
+      w="2px"
+      bg="series.1"
+      pointerEvents="none"
+      data-playhead
+      style={{ left: `${(ms / span) * 100}%`, transform: "translateX(-50%)" }}
+    />
+  )
+}
+
+/**
+ * Steps, provider calls and webhooks on one clock, with faults marked where they landed. With a
+ * replay player, a line follows where it is and clicking a bar seeks it there.
+ */
+export function Waterfall({
+  timeline,
+  ...player
+}: { readonly timeline: Timeline } & WaterfallPlayer) {
   const span = Math.max(timeline.spanMs, 1)
 
   return (
@@ -189,7 +243,13 @@ export function Waterfall({ timeline }: { readonly timeline: Timeline }) {
         </Grid>
         <styled.ol aria-label="Timeline">
           {lanesOf(timeline.items).map((lane, i) => (
-            <LaneRow key={`${lane.kind}-${i}`} lane={lane} first={i === 0} span={span} />
+            <LaneRow
+              key={`${lane.kind}-${i}`}
+              lane={lane}
+              first={i === 0}
+              span={span}
+              player={player}
+            />
           ))}
         </styled.ol>
       </Box>

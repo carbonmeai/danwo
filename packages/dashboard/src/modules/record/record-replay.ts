@@ -1,0 +1,176 @@
+/**
+ * What the replay player plays: the record's videos with their steps, calls and webhooks, or, with
+ * no video (turned off, or an older record), the step screenshots in time order. Every time here is
+ * on the record's clock, milliseconds after the record started, the clock the waterfall uses too.
+ */
+import type { FlightRecord, VideoMark } from "@danwo/runner/runner"
+
+import type { Timeline } from "./record-timeline.ts"
+
+/** A step, call or webhook on the player's scrubber. */
+export interface ReplayMark {
+  readonly kind: VideoMark["kind"]
+  readonly label: string
+  readonly atMs: number
+  readonly endMs: number
+  readonly bad: boolean
+  readonly fault?: string
+  /** The step's index, for steps. */
+  readonly step?: number
+}
+
+/** One tab's video (or the device's screen). */
+export interface ReplayVideo {
+  /** Where the dashboard serves the file. */
+  readonly src: string
+  readonly tab: number
+  /** When the video's first frame was taken. */
+  readonly startMs: number
+  readonly durationMs: number
+  readonly marks: readonly ReplayMark[]
+}
+
+/** A step's screenshot, shown from the moment its step ended. */
+export interface ReplayFrame {
+  readonly atMs: number
+  readonly step: number
+  readonly screenshot: string
+}
+
+export interface Replay {
+  readonly videos: readonly ReplayVideo[]
+  /** Screenshots to step through when there is no video. */
+  readonly frames: readonly ReplayFrame[]
+  /** Steps, calls and webhooks from the timeline, for the screenshot player's scrubber. */
+  readonly marks: readonly ReplayMark[]
+  /** The record's span, from its start to the last thing it timed. */
+  readonly spanMs: number
+}
+
+/** The URL prefix the dashboard serves a record's videos under. */
+const MEDIA_PREFIX = "/media/"
+
+/** The URL of `file` in the record folder `dir` (`.danwo/runs/...`, relative to the project). */
+export function mediaUrl(dir: string, file: string): string {
+  const inRuns = dir.replace(/^\.danwo\/runs\//, "")
+
+  return `${MEDIA_PREFIX}${[...inRuns.split("/"), ...file.split("/")].map(encodeURIComponent).join("/")}`
+}
+
+function millis(iso: string): number {
+  const at = Date.parse(iso)
+
+  return Number.isNaN(at) ? 0 : at
+}
+
+/** A video mark moved from the video's clock onto the record's. */
+function onRecordClock(mark: VideoMark, shift: number): ReplayMark {
+  return {
+    kind: mark.kind,
+    label: mark.label,
+    atMs: mark.startMs + shift,
+    endMs: mark.endMs + shift,
+    bad: mark.bad,
+    ...(mark.fault !== undefined && { fault: mark.fault }),
+    ...(mark.kind === "step" && { step: Number(mark.id) }),
+  }
+}
+
+/** The timeline's items as scrubber marks. */
+function timelineMarks(timeline: Timeline): ReplayMark[] {
+  return timeline.items.map((item) => ({
+    kind: item.kind,
+    label: item.label,
+    atMs: item.startMs,
+    endMs: item.startMs + item.durationMs,
+    bad: item.bad,
+    ...(item.fault !== undefined && { fault: item.fault }),
+    ...(item.kind === "step" && item.step !== undefined && { step: item.step }),
+  }))
+}
+
+/** Each step's screenshot from when its step ended, in time order. */
+function framesOf(record: Pick<FlightRecord, "startedAt" | "steps">): ReplayFrame[] {
+  const origin = millis(record.startedAt)
+
+  return record.steps
+    .flatMap((step) =>
+      step.screenshot === undefined
+        ? []
+        : [
+            {
+              atMs: millis(step.startedAt) - origin + step.durationMs,
+              step: step.index,
+              screenshot: step.screenshot,
+            },
+          ],
+    )
+    .toSorted((a, b) => a.atMs - b.atMs)
+}
+
+/** What the player plays for the record in `dir`. */
+export function replayOf(
+  dir: string,
+  record: Pick<FlightRecord, "startedAt" | "steps" | "videos">,
+  timeline: Timeline,
+): Replay {
+  const origin = millis(record.startedAt)
+  const videos = (record.videos ?? []).map((video) => {
+    const startMs = millis(video.startedAt) - origin
+
+    return {
+      src: mediaUrl(dir, video.file),
+      tab: video.tab,
+      startMs,
+      durationMs: video.durationMs,
+      marks: video.marks.map((mark) => onRecordClock(mark, startMs)),
+    }
+  })
+
+  return {
+    videos,
+    frames: framesOf(record),
+    marks: timelineMarks(timeline),
+    spanMs: timeline.spanMs,
+  }
+}
+
+/** The frame showing at `ms`: the last one whose step had ended, else the first. */
+export function frameAt(frames: readonly ReplayFrame[], ms: number): ReplayFrame | undefined {
+  return frames.findLast((frame) => frame.atMs <= ms) ?? frames[0]
+}
+
+/** The step running at `ms`, else the last one that started before it. */
+export function stepAt(marks: readonly ReplayMark[], ms: number): number | undefined {
+  const steps = marks.filter((mark) => mark.kind === "step")
+  const running = steps.find((mark) => ms >= mark.atMs && ms <= mark.endMs)
+
+  return (running ?? steps.findLast((mark) => mark.atMs <= ms))?.step
+}
+
+/** `ms` as the player's clock reads it: `m:ss.t`. */
+export function clock(ms: number): string {
+  const tenths = Math.max(Math.round(ms / 100), 0)
+  const minutes = Math.floor(tenths / 600)
+  const seconds = Math.floor((tenths % 600) / 10)
+
+  return `${minutes}:${String(seconds).padStart(2, "0")}.${tenths % 10}`
+}
+
+/**
+ * Where a link asks the player to start, on the player's own clock: `?t=12.5` is 12.5 seconds in,
+ * `#step-3` is where step 3 starts. Undefined when the link names neither.
+ */
+export function linkedMoment(
+  link: { readonly search: string; readonly hash: string },
+  marks: readonly ReplayMark[],
+  startMs: number,
+): number | undefined {
+  const step = /^#step-(\d+)$/.exec(link.hash)?.[1]
+
+  if (step !== undefined) return marks.find((mark) => mark.step === Number(step))?.atMs
+
+  const seconds = Number(new URLSearchParams(link.search).get("t") ?? Number.NaN)
+
+  return Number.isFinite(seconds) && seconds >= 0 ? startMs + seconds * 1000 : undefined
+}

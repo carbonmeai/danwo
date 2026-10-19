@@ -4,7 +4,8 @@ Every failed run keeps a flight record under `.danwo/runs/<run>/`; start from it
 
 1. `danwo show --format md` prints one page per failed test or matrix trial of the newest run
    (`danwo show <run-id> --format md` for another). Over MCP, `show_run` with `format: "md"` gives
-   the same page. `danwo show --open` opens the HTML report with screenshots.
+   the same page. `danwo show --open` opens the HTML report with screenshots and the run's video;
+   `danwo serve` replays the video with the steps and provider calls moving along with it.
 2. Read the top: the error code and class, the test file line the failure went through, and where
    the body stopped.
 3. Then the steps: each with its cache outcome (`replayed`, `relocated`, `handed-off`, `missed`,

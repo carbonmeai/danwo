@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ImpactRouteImport } from './routes/impact'
 import { Route as InsightsRouteImport } from './routes/insights'
+import { Route as MediaSplatRouteImport } from './routes/media.$'
 import { Route as RecordsSplatRouteImport } from './routes/records.$'
 import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
 
@@ -30,6 +31,11 @@ const InsightsRoute = InsightsRouteImport.update({
   path: '/insights',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MediaSplatRoute = MediaSplatRouteImport.update({
+  id: '/media/$',
+  path: '/media/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RecordsSplatRoute = RecordsSplatRouteImport.update({
   id: '/records/$',
   path: '/records/$',
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/impact': typeof ImpactRoute
   '/insights': typeof InsightsRoute
+  '/media/$': typeof MediaSplatRoute
   '/records/$': typeof RecordsSplatRoute
   '/runs/$runId': typeof RunsRunIdRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/impact': typeof ImpactRoute
   '/insights': typeof InsightsRoute
+  '/media/$': typeof MediaSplatRoute
   '/records/$': typeof RecordsSplatRoute
   '/runs/$runId': typeof RunsRunIdRoute
 }
@@ -60,21 +68,31 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/impact': typeof ImpactRoute
   '/insights': typeof InsightsRoute
+  '/media/$': typeof MediaSplatRoute
   '/records/$': typeof RecordsSplatRoute
   '/runs/$runId': typeof RunsRunIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/impact' | '/insights' | '/records/$' | '/runs/$runId'
+  fullPaths:
+    '/' | '/impact' | '/insights' | '/media/$' | '/records/$' | '/runs/$runId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/impact' | '/insights' | '/records/$' | '/runs/$runId'
-  id: '__root__' | '/' | '/impact' | '/insights' | '/records/$' | '/runs/$runId'
+  to: '/' | '/impact' | '/insights' | '/media/$' | '/records/$' | '/runs/$runId'
+  id:
+    | '__root__'
+    | '/'
+    | '/impact'
+    | '/insights'
+    | '/media/$'
+    | '/records/$'
+    | '/runs/$runId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ImpactRoute: typeof ImpactRoute
   InsightsRoute: typeof InsightsRoute
+  MediaSplatRoute: typeof MediaSplatRoute
   RecordsSplatRoute: typeof RecordsSplatRoute
   RunsRunIdRoute: typeof RunsRunIdRoute
 }
@@ -102,6 +120,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InsightsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/media/$': {
+      id: '/media/$'
+      path: '/media/$'
+      fullPath: '/media/$'
+      preLoaderRoute: typeof MediaSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/records/$': {
       id: '/records/$'
       path: '/records/$'
@@ -123,6 +148,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ImpactRoute: ImpactRoute,
   InsightsRoute: InsightsRoute,
+  MediaSplatRoute: MediaSplatRoute,
   RecordsSplatRoute: RecordsSplatRoute,
   RunsRunIdRoute: RunsRunIdRoute,
 }

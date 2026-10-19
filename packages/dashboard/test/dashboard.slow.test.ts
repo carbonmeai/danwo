@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { openWebSession, type WebSession } from "@danwo/runner"
-import { afterAll, beforeAll, describe, it } from "vitest"
+import { afterAll, beforeAll, describe, expect as check, it } from "vitest"
 
 import { type Dashboard, startDashboard } from "../src/index.ts"
 
@@ -117,6 +117,33 @@ describe("danwo serve", () => {
     await expect(
       screen.getByRole("listitem").filter({ hasText: "status 500 on POST api.stripe.com" }),
     ).toContainText("passed")
+  })
+
+  it("replays a failed test's video, seeking it from a step and from a link", async () => {
+    const { app, screen, expect } = session
+
+    await app.open("/")
+    await screen.getByRole("link", { name: "3 tests" }).click()
+    await screen.getByRole("link", { name: "attempt 1" }).click()
+
+    const seek = screen.getByRole("slider", { name: "Seek" })
+    const video = screen.getByLabel("Video of the run")
+
+    await expect(screen.getByRole("region", { name: "Replay" })).toBeVisible()
+    await expect(video).toHaveAttribute("src", /^\/media\/.+\/video\/tab-1\.webm$/)
+    await screen.getByRole("button", { name: /^Go to step 1, at / }).click()
+    await expect(seek).not.toHaveAttribute("aria-valuetext", "0:00.0")
+
+    const src = (await video.getAttribute("src")) ?? ""
+    const part = await fetch(new URL(src, dashboard.url), { headers: { range: "bytes=0-99" } })
+
+    check(part.status).toBe(206)
+    check(part.headers.get("content-type")).toBe("video/webm")
+
+    const record = `/records/.danwo/runs/${decodeURIComponent(src.replace(/^\/media\/|\/video\/tab-1\.webm$/g, ""))}`
+
+    await app.open(`${record}?t=0.5`)
+    await expect(seek).toHaveAttribute("aria-valuetext", "0:00.5")
   })
 
   it("shows the impact index and the insights", async () => {

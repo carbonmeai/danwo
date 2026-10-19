@@ -17,6 +17,7 @@ import {
 
 import { insideArea, isVersioned, readJson } from "../../lib/project-files.ts"
 import { type EffectLine, effectDiff } from "./record-effects.ts"
+import { type Replay, replayOf } from "./record-replay.ts"
 import { type Timeline, timelineOf } from "./record-timeline.ts"
 
 /** A step with what the page needs beside the record's own fields. */
@@ -49,6 +50,8 @@ export interface RecordView {
   readonly steps: readonly StepView[]
   /** Steps, calls and webhooks on one clock. */
   readonly timeline: Timeline
+  /** What the replay player plays: the run's video, else its screenshots. */
+  readonly replay: Replay
   readonly screen?: string
   /** The Markdown failure page, for failed records. */
   readonly page?: string
@@ -109,13 +112,16 @@ export async function getRecord(root: string, dir: string): Promise<RecordView |
         )
   const failed = record.status !== "passed"
   const { state, ...rest } = record
+  const shown = relative(root, full).split("\\").join("/")
+  const timeline = timelineOf(record)
 
   return {
-    dir: relative(root, full).split("\\").join("/"),
+    dir: shown,
     record: rest,
     state: JSON.stringify(state, null, 2),
     steps: record.steps.map(stepView),
-    timeline: timelineOf(record),
+    timeline,
+    replay: replayOf(shown, record, timeline),
     ...(screen !== undefined && { screen: redactCredentials(screen) }),
     ...(failed && { page: failurePage(record, screen) }),
   }

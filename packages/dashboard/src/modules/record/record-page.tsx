@@ -14,9 +14,11 @@ import { TimeAgo } from "../../components/time-ago.tsx"
 import { duration } from "../../lib/format.ts"
 import { Calls, ConsoleLog, Deliveries } from "./record-calls.tsx"
 import type { RecordView } from "./record-data.ts"
+import { RecordPlayer } from "./record-player.tsx"
 import { RecordSteps } from "./record-steps.tsx"
 import { divergenceLine, runName } from "./record-values.ts"
 import { TimelineLegend, Waterfall } from "./record-waterfall.tsx"
+import { usePlayback } from "./use-playback.ts"
 
 /** Copies the Markdown failure page, to paste into an issue or an agent's prompt. */
 function CopyPage({ text }: { readonly text: string }) {
@@ -110,6 +112,48 @@ export function RecordPage({ view }: { readonly view: RecordView | null }) {
       </Page>
     )
 
+  return <FoundRecord view={view} />
+}
+
+/** The run as it happened: the replay player, the steps and the waterfall, moving together. */
+function RunReplay({ view }: { readonly view: RecordView }) {
+  const playback = usePlayback(view.replay)
+  const replayed = view.replay.videos.length > 0 || view.replay.frames.length > 0
+
+  return (
+    <>
+      {replayed ? (
+        <Section
+          title="Replay"
+          aside={
+            <styled.span color="ink.muted" fontSize="1">
+              {view.replay.videos.length > 0
+                ? "Video of the run"
+                : "No video kept: the step screenshots"}
+            </styled.span>
+          }
+        >
+          <RecordPlayer dir={view.dir} replay={view.replay} playback={playback} />
+        </Section>
+      ) : null}
+      <Section title="Steps" count={view.steps.length} bare>
+        <RecordSteps view={view} playback={replayed ? playback : undefined} />
+      </Section>
+      <Section title="Timeline" aside={<TimelineLegend />}>
+        <OrNone none={view.timeline.items.length === 0 && "Nothing was timed in this run."}>
+          <Waterfall
+            timeline={view.timeline}
+            {...(replayed && { playheadMs: playback.ms, onSeek: playback.seek })}
+          />
+        </OrNone>
+      </Section>
+    </>
+  )
+}
+
+/** A record that was found: what went wrong, the run replayed, and what happened behind the app. */
+function FoundRecord({ view }: { readonly view: RecordView }) {
+  const runs = <Link to="/">Runs</Link>
   const { record } = view
   const logs = record.appLog.filter((log) => log.level === "error" || log.level === "warn")
 
@@ -129,14 +173,7 @@ export function RecordPage({ view }: { readonly view: RecordView | null }) {
       actions={view.page ? <CopyPage text={view.page} /> : <KeyHint />}
     >
       <Problem record={record} />
-      <Section title="Steps" count={view.steps.length} bare>
-        <RecordSteps view={view} />
-      </Section>
-      <Section title="Timeline" aside={<TimelineLegend />}>
-        <OrNone none={view.timeline.items.length === 0 && "Nothing was timed in this run."}>
-          <Waterfall timeline={view.timeline} />
-        </OrNone>
-      </Section>
+      <RunReplay view={view} />
       <Section title="Provider calls" count={record.exchanges.length}>
         <OrNone none={record.exchanges.length === 0 && "No calls went through the proxy."}>
           <Calls exchanges={record.exchanges} />
