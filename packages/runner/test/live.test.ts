@@ -9,12 +9,22 @@ import { type ShopEnvironment, startShopEnvironment } from "./environment.ts"
 
 /*
  * Live tests call real models and cost money, so they run only on request: `DANWO_LIVE=1`.
- * The Gateway key lives in the repo's git-ignored .env; without it they skip too.
+ * The Gateway key comes from the environment, the repo's git-ignored .env, or the fidelity key
+ * in .env.fidelity; without one they skip too.
  */
-const ENV_FILE = fileURLToPath(new URL("../../../.env", import.meta.url))
+const ENV_FILES = [".env", ".env.fidelity"].map((name) =>
+  fileURLToPath(new URL(`../../../${name}`, import.meta.url)),
+)
 const requested = process.env.DANWO_LIVE === "1"
 
-if (requested && existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE)
+if (requested) {
+  for (const file of ENV_FILES) if (existsSync(file)) process.loadEnvFile(file)
+
+  const fidelityKey = process.env.DANWO_FIDELITY_AI_GATEWAY_KEY
+
+  if (process.env.AI_GATEWAY_API_KEY === undefined && fidelityKey !== undefined)
+    process.env.AI_GATEWAY_API_KEY = fidelityKey
+}
 
 /** Gateway model ids, checked against https://ai-gateway.vercel.sh/v1/models on 2026-10-16. */
 const MODELS = {

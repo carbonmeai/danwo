@@ -389,6 +389,9 @@ bun run bench          # no model: locators, the UI bugs, the matrix; agent and 
 bun run bench --live   # every style with a real model (AI_GATEWAY_API_KEY; a dollar or two)
 ```
 
+Live runs take `AI_GATEWAY_API_KEY` from the environment, else from a git-ignored `.env`, else
+`DANWO_FIDELITY_AI_GATEWAY_KEY` from `.env.fidelity`; neither file has to exist.
+
 Results land in `benchmarks/results/`. The agent and mixed recordings are committed, so the
 benchmark replays them with no model calls and fails if a change makes a replay diverge.
 
@@ -403,12 +406,14 @@ as a missing field, extra field, type mismatch, status mismatch, error-code mism
 danwo fidelity                         # emulators against the committed goldens (in bun run check)
 danwo fidelity stripe --update-golden  # with DANWO_FIDELITY_STRIPE_KEY=sk_test_…: record the sandbox
 DANWO_FIDELITY_PUBLIC=1 danwo fidelity slack github google microsoft   # public endpoints, no keys
-danwo fidelity gateway                 # with AI_GATEWAY_API_KEY: the AI Gateway, a fraction of a cent
+danwo fidelity gateway                 # with DANWO_FIDELITY_AI_GATEWAY_KEY: the AI Gateway, a fraction of a cent
 ```
 
 Goldens live in `fidelity/<provider>.json` and hold structure only; accepted differences, each with
 its reason, are in `fidelity/known-differences.json`. Only test and sandbox keys run: a live-looking
-key stops the run. Keys come from the environment or a git-ignored `.env.fidelity` or `.env`. See
+key stops the run. Keys come from the environment, then a git-ignored `.env.fidelity`, then `.env`;
+neither file has to exist. The gateway suite takes `DANWO_FIDELITY_AI_GATEWAY_KEY`, else
+`AI_GATEWAY_API_KEY`. See
 `danwo guide fidelity`.
 
 ## Development

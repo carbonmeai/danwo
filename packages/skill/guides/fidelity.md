@@ -34,7 +34,7 @@ mismatch, a status mismatch, an error-code mismatch, an ordering difference or a
 | AI Gateway (`gateway`)           | language model text, tool call, structured output, stream events, embedding, errors (unknown model, no key, malformed prompt) | `DANWO_FIDELITY_AI_GATEWAY_KEY`, else `AI_GATEWAY_API_KEY`                                 |
 
 Keys come from the environment, or from `.env.fidelity` and then `.env` at the repository root,
-which git ignores. The gateway suite drives the AI SDK's own gateway provider, so each request is
+which git ignores; neither file has to exist. The gateway suite drives the AI SDK's own gateway provider, so each request is
 the one an app sends; it uses the cheapest models and 20 output tokens, so a live run costs a small
 fraction of a cent, which the gateway reports in each answer's cost metadata.
 
@@ -42,8 +42,8 @@ fraction of a cent, which the gateway reports in each answer's cost metadata.
 
 - Only test and sandbox credentials. A key that looks live (`sk_live_`, `rk_live_`, a Flutterwave
   key without `_TEST`, anything but `sk_sandbox_` for Bachs) stops the run with `CONFIG_INVALID`.
-  The AI Gateway has no sandbox, so its key is a real one; with `AI_GATEWAY_API_KEY` in `.env`, a
-  plain `danwo fidelity` runs that suite live too (use `--offline` to stay off the network).
+  The AI Gateway has no sandbox, so its key is a real one; with a gateway key in the environment,
+  `.env.fidelity` or `.env`, a plain `danwo fidelity` runs that suite live too (use `--offline` to stay off the network).
 - Keys are never printed or written. Every answer goes through the recorder's redaction before it
   is shaped, and goldens hold structure only.
 - Scenarios clean up what they create, and each makes a handful of requests.

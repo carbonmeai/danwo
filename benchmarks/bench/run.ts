@@ -8,7 +8,8 @@
  *   bun run bench --live --model openai/gpt-6-luna
  *   bun run bench --matrix-bugs no-dedupe,raw-429   only these provider bugs under the matrix
  *
- * Live runs spend money on the model (a few dollars at most) and need AI_GATEWAY_API_KEY.
+ * Live runs spend money on the model (a few dollars at most) and need AI_GATEWAY_API_KEY, from the
+ * environment, the repository's `.env`, or `DANWO_FIDELITY_AI_GATEWAY_KEY` in its `.env.fidelity`.
  */
 import { existsSync } from "node:fs"
 import { mkdir, readdir, writeFile } from "node:fs/promises"
@@ -200,8 +201,28 @@ export async function runBench(options: Options): Promise<BenchResults> {
   }
 }
 
+/**
+ * Gives a live run its AI Gateway key when the environment has none: from the repository's
+ * `.env`, or the fidelity key in `.env.fidelity`. Neither file has to exist.
+ */
+function loadGatewayKey(): void {
+  for (const name of [".env", ".env.fidelity"]) {
+    const file = join(BENCH_ROOT, "..", name)
+
+    if (existsSync(file)) process.loadEnvFile(file)
+  }
+
+  const fidelityKey = process.env["DANWO_FIDELITY_AI_GATEWAY_KEY"]
+
+  if (process.env["AI_GATEWAY_API_KEY"] === undefined && fidelityKey !== undefined)
+    process.env["AI_GATEWAY_API_KEY"] = fidelityKey
+}
+
 async function main() {
   const options = optionsFrom(process.argv.slice(2))
+
+  if (options.live) loadGatewayKey()
+
   const results = await runBench(options)
   const name = `${results.date}-${results.model.replaceAll("/", "-")}`
   const text = summary(results)

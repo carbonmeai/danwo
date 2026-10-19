@@ -26,7 +26,10 @@ const { balance } = await agent.extract("the account balance", z.object({ balanc
 await agent.waitFor("the order shows as paid")
 ```
 
-The agent needs a `model` in the config. Every verified step is recorded under `cache.dir`;
+The agent needs a `model` in the config. A model id such as `"anthropic/claude-sonnet-5"` goes
+through the Vercel AI Gateway with `AI_GATEWAY_API_KEY` from the environment: export it, or have
+your test command load a `.env`, since danwo reads no `.env` of its own. Every verified step is
+recorded under `cache.dir`;
 the next run replays it with no model call, finding each element again by what it was. A step
 whose page changed is handed back to the model and recorded afresh (`danwo guide debugging`
 explains the cache outcomes).
