@@ -62,7 +62,6 @@ export interface FieldProblem {
 export interface BachsErrorBody {
   readonly detail: string
   readonly error_code: string
-  readonly doc_url?: string
   readonly errors?: readonly FieldProblem[]
 }
 
@@ -75,7 +74,6 @@ export function errorBody(
   return {
     detail,
     error_code: code,
-    doc_url: "https://docs.bachs.io/api-reference/error-reference#general",
     ...(problems && { errors: problems }),
   }
 }

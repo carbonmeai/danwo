@@ -228,7 +228,6 @@ describe("Bachs API conventions", () => {
     expect(await cursor.json()).toEqual({
       detail: "Invalid cursor format. Expected 'cur_<offset>'.",
       error_code: "BAD_REQUEST",
-      doc_url: "https://docs.bachs.io/api-reference/error-reference#general",
     })
     expect(cursor.headers.get("x-request-id")).toMatch(/^[0-9a-f-]{36}$/)
   })
