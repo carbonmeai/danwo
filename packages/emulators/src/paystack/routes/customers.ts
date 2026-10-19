@@ -2,6 +2,7 @@ import type { Context } from "../../http.ts"
 import { requireIntegration } from "../auth.ts"
 import type { PaystackRouteContext } from "../context.ts"
 import type { Customer, Integration } from "../entities.ts"
+import { createdCustomerObject, type CustomerHistory, customerDetailObject } from "../formatters.ts"
 import { bodyOf, fail, metadataOf, ok, pageOf, text } from "../helpers.ts"
 import type { PaystackPayments } from "../payments.ts"
 import { PROBLEMS } from "../problems.ts"
@@ -54,7 +55,21 @@ async function create(
     updatedAt: context.clock().toISOString(),
   })
 
-  return ok(c, "Customer created", updated)
+  return ok(c, "Customer created", updated && createdCustomerObject(updated))
+}
+
+/** Everything the integration holds for a customer: its payments, plans, cards and accounts. */
+function historyOf(paystack: PaystackStore, customer: Customer): CustomerHistory {
+  const code = customer.customer_code
+
+  return {
+    transactions: paystack.transactions.where((t) => t.customer.customer_code === code),
+    subscriptions: paystack.subscriptions.where((s) => s.customer.customer_code === code),
+    authorizations: paystack.authorizations
+      .all()
+      .filter((a) => paystack.authorizations.extra(a.authorization_code)?.customer === code),
+    dedicatedAccounts: paystack.dedicated.where((d) => d.customer.customer_code === code),
+  }
 }
 
 /** Customers: create, list, fetch by email or code, and update. */
@@ -83,17 +98,9 @@ export function customerRoutes(context: PaystackRouteContext, payments: Paystack
 
   app.get(
     "/customer/:key",
-    withCustomer((c, customer) => {
-      const authorizations = paystack.authorizations
-        .all()
-        .filter(
-          (a) =>
-            paystack.authorizations.extra(a.authorization_code)?.customer ===
-            customer.customer_code,
-        )
-
-      return ok(c, "Customer retrieved", { ...customer, authorizations })
-    }),
+    withCustomer((c, customer) =>
+      ok(c, "Customer retrieved", customerDetailObject(customer, historyOf(paystack, customer))),
+    ),
   )
 
   app.put(

@@ -70,6 +70,65 @@ export function customerObject(input: CustomerInput): Customer {
   }
 }
 
+/**
+ * A customer as creating one answers: no history yet, and only the details the call set, since
+ * Paystack leaves out a name, phone or metadata nobody gave.
+ */
+export function createdCustomerObject(customer: Customer) {
+  const {
+    first_name: first,
+    last_name: last,
+    phone,
+    metadata,
+    international_format_phone: _,
+    ...always
+  } = customer
+
+  return {
+    transactions: [],
+    subscriptions: [],
+    authorizations: [],
+    ...(first !== null && { first_name: first }),
+    ...(last !== null && { last_name: last }),
+    ...(phone !== null && { phone }),
+    ...(metadata !== null && { metadata }),
+    ...always,
+    identifications: null,
+  }
+}
+
+/** What fetching a customer shows besides the customer: its payments, saved cards and accounts. */
+export interface CustomerHistory {
+  readonly transactions: readonly Transaction[]
+  readonly subscriptions: readonly Subscription[]
+  readonly authorizations: readonly Authorization[]
+  readonly dedicatedAccounts: readonly DedicatedAccount[]
+}
+
+/** A customer as fetching one answers, with its history and totals of what it has paid. */
+export function customerDetailObject(customer: Customer, history: CustomerHistory) {
+  const { international_format_phone: _, ...shown } = customer
+  const paid = history.transactions.filter((transaction) => transaction.status === "success")
+  const byCurrency = new Map<string, number>()
+
+  for (const { currency, amount } of paid)
+    byCurrency.set(currency, (byCurrency.get(currency) ?? 0) + amount)
+
+  return {
+    transactions: history.transactions,
+    subscriptions: history.subscriptions,
+    authorizations: history.authorizations,
+    ...shown,
+    created_at: customer.createdAt,
+    updated_at: customer.updatedAt,
+    total_transactions: paid.length,
+    total_transaction_value: [...byCurrency].map(([currency, amount]) => ({ currency, amount })),
+    dedicated_account: history.dedicatedAccounts[0] ?? null,
+    dedicated_accounts: history.dedicatedAccounts,
+    identifications: null,
+  }
+}
+
 export interface TransactionInput {
   readonly id: number
   readonly reference: string
