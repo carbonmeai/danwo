@@ -3,7 +3,7 @@ import type { SessionJSON } from "@clerk/backend"
 import type { App } from "../../http.ts"
 import { bodyOf, pageOf } from "../backend-auth.ts"
 import { type ClerkContext, now, signingKeyOf } from "../context.ts"
-import { ClerkFailure, invalidParameter, notFound, str } from "../helpers.ts"
+import { ClerkFailure, invalidParameter, missingParameter, notFound, str } from "../helpers.ts"
 import { endSession, isLive, newClient, sessionClaims, startSession } from "../sessions.ts"
 import { templateClaims } from "../templates.ts"
 import { userOf } from "./users.ts"
@@ -74,7 +74,7 @@ function writeRoutes(app: App, context: ClerkContext): void {
   app.post("/v1/sessions", async (c) => {
     const userId = str((await bodyOf(c)).user_id)
 
-    if (userId === undefined) throw invalidParameter("user_id")
+    if (userId === undefined) throw missingParameter("user_id")
 
     return c.json(startSession(context, newClient(context), userOf(context, userId).id))
   })

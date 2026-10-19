@@ -2,7 +2,7 @@ import type { App } from "../../http.ts"
 import { bodyOf } from "../backend-auth.ts"
 import { clientJson } from "../client-json.ts"
 import { type ClerkContext, instanceOf, now, signingKeyOf } from "../context.ts"
-import { clerkId, invalidParameter, notFound, num, record, secretToken, str } from "../helpers.ts"
+import { clerkId, missingParameter, notFound, num, record, secretToken, str } from "../helpers.ts"
 import { userOf } from "./users.ts"
 
 function keyRoutes(app: App, context: ClerkContext): void {
@@ -25,7 +25,7 @@ function templateRoutes(app: App, context: ClerkContext): void {
     const body = await bodyOf(c)
     const name = str(body.name)
 
-    if (name === undefined) throw invalidParameter("name")
+    if (name === undefined) throw missingParameter("name")
 
     const at = now(context)
     const template = context.clerk.jwtTemplates.add(

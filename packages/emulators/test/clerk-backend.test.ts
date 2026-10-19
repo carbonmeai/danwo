@@ -66,7 +66,7 @@ describe("the Clerk Backend API", () => {
 
     expect(answer.status).toBe(401)
     await expect(answer.json()).resolves.toMatchObject({
-      errors: [{ code: "authentication_invalid" }],
+      errors: [{ code: "clerk_key_invalid" }],
       clerk_trace_id: expect.any(String),
     })
 

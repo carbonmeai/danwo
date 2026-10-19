@@ -20,9 +20,9 @@ export function backendAuth(store: Store): Middleware {
     if (!instanceOf({ store }).secretKeys.includes(key))
       throw new ClerkFailure(
         401,
-        "authentication_invalid",
-        "Invalid authentication",
-        "Unable to authenticate the request, you need to supply an active secret key",
+        "clerk_key_invalid",
+        "Secret Key invalid",
+        "The provided Secret Key is invalid. Make sure that your Secret Key is correct.",
       )
 
     return next()

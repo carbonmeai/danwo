@@ -59,9 +59,20 @@ export function clerkErrorBody(errors: readonly ClerkErrorEntry[]) {
 export class ClerkFailure extends HttpError {
   readonly entry: ClerkErrorEntry
 
-  constructor(status: number, code: string, message: string, longMessage = message, meta = {}) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    longMessage = message,
+    meta: Readonly<Record<string, unknown>> = {},
+  ) {
     super(status, message)
-    this.entry = { message, long_message: longMessage, code, meta }
+    this.entry = {
+      message,
+      long_message: longMessage,
+      code,
+      ...(Object.keys(meta).length > 0 && { meta }),
+    }
   }
 }
 
@@ -76,6 +87,19 @@ export function notFound(what = "resource"): ClerkFailure {
 }
 
 /** 422 for a missing or unusable parameter. */
+/** 422 for a required body parameter the request left out. */
+export function missingParameter(name: string): ClerkFailure {
+  return new ClerkFailure(
+    422,
+    "form_param_missing",
+    `${name} must be included.`,
+    `${name} must be included.`,
+    {
+      param_name: name,
+    },
+  )
+}
+
 export function invalidParameter(name: string, message = `${name} is invalid.`): ClerkFailure {
   return new ClerkFailure(422, "form_param_format_invalid", "is invalid", message, {
     param_name: name,
