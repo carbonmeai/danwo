@@ -76,12 +76,18 @@ async function installInto(cwd: string, folder: string, shipped: string): Promis
   return { file, outcome: "updated" }
 }
 
-/** Installs or updates the skill in every agent folder, keeping files the user edited. */
-export async function installSkill(cwd: string): Promise<SkillChange[]> {
+/**
+ * Installs or updates the skill in each agent folder (every one in `SKILL_DIRS` by default),
+ * keeping files the user edited.
+ */
+export async function installSkill(
+  cwd: string,
+  folders: readonly string[] = SKILL_DIRS,
+): Promise<SkillChange[]> {
   const shipped = await readFile(SKILL_FILE, "utf8")
   const changes: SkillChange[] = []
 
-  for (const folder of SKILL_DIRS) changes.push(await installInto(cwd, folder, shipped))
+  for (const folder of new Set(folders)) changes.push(await installInto(cwd, folder, shipped))
 
   return changes
 }

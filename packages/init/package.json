@@ -1,0 +1,23 @@
+{
+  "name": "@danwo/init",
+  "version": "0.0.0",
+  "private": true,
+  "description": "danwo init: detects a project, asks what to set up, and writes the config, an example test and the agent skill.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./catalog": "./src/catalog.ts"
+  },
+  "dependencies": {
+    "@clack/prompts": "1.8.1",
+    "@danwo/device": "workspace:*",
+    "@danwo/mcp": "workspace:*",
+    "@danwo/skill": "workspace:*"
+  },
+  "devDependencies": {
+    "oxc-parser": "0.154.0"
+  }
+}

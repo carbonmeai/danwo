@@ -17,6 +17,7 @@
     "@danwo/expo": "workspace:*",
     "@danwo/fidelity": "workspace:*",
     "@danwo/github": "workspace:*",
+    "@danwo/init": "workspace:*",
     "@danwo/mcp": "workspace:*",
     "@danwo/recorder": "workspace:*",
     "@danwo/runner": "workspace:*",

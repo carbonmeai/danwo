@@ -7,6 +7,8 @@ import { resolve as resolvePath } from "node:path"
 
 import "@danwo/runner/register"
 import { github } from "@danwo/github"
+import type { InitFlags } from "@danwo/init"
+import { AGENTS, ENGINES, MODEL_SOURCES, PROVIDER_IDS } from "@danwo/init/catalog"
 import {
   type CacheAction,
   exitCodeForError,
@@ -254,19 +256,50 @@ program
 program
   .command("init")
   .description(
-    "register danwo's MCP server with Claude Code, Cursor and Codex in this project (.mcp.json, .cursor/mcp.json, .codex/config.toml) and install danwo's skill for them",
+    "set danwo up in this project: the engine, the model for agent steps, the providers to emulate and the coding agents to teach; writes danwo.config.ts, an example test and a test:danwo script, and installs what they import. Asks in a terminal; with --yes or no terminal it takes the flags and what it detects",
   )
-  .option("--starter-config", "also write a starter danwo.config.ts when there is none")
-  .option("--no-skill", "do not install danwo's skill into .claude/skills and .agents/skills")
-  .action(async (options: { starterConfig?: boolean; skill: boolean }) => {
-    const { initProject, initReport } = await import("@danwo/mcp")
-    const changes = await initProject({
-      cwd: process.cwd(),
-      starterConfig: options.starterConfig ?? false,
-      skill: options.skill,
-    })
+  .option("-y, --yes", "ask nothing: the flags, and the detected defaults for the rest")
+  .addOption(new Option("--engine <engine>", "what tests drive").choices(ENGINES))
+  .addOption(
+    new Option("--model-source <source>", "where agent steps get their model").choices(
+      MODEL_SOURCES,
+    ),
+  )
+  .option("--model <id>", "the model id, e.g. anthropic/claude-sonnet-5 on the AI Gateway")
+  .option(
+    "--base-url <url>",
+    "an OpenAI-compatible server's URL (--model-source openai-compatible)",
+  )
+  .option("--key-env <name>", "the variable holding that server's key, when it takes one")
+  .option(
+    "--providers <list>",
+    `providers to emulate, comma-separated, or none (${PROVIDER_IDS.join(", ")})`,
+  )
+  .option(
+    "--skills <list>",
+    `coding agents to install danwo's skill for, comma-separated, or none (${AGENTS.join(", ")})`,
+  )
+  .option("--no-mcp", "do not register danwo's MCP server with those agents")
+  .option("--dev-command <command>", "the command that starts the app, e.g. 'pnpm dev'")
+  .option("--app-url <url>", "where the app answers once started")
+  .option("--skip-install", "write the files but install no packages")
+  .option("--force", "replace a danwo.config.ts that differs from the one init writes")
+  .action(async (options: InitFlags) => {
+    const { InitCancelled, runInit, terminalPrompter } = await import("@danwo/init")
+    const interactive = options.yes !== true && process.stdin.isTTY && process.stdout.isTTY
 
-    console.log(initReport(changes))
+    try {
+      const outcome = await runInit({
+        cwd: process.cwd(),
+        flags: options,
+        ...(interactive && { prompter: terminalPrompter }),
+      })
+
+      if (!interactive) console.log(outcome.summary)
+    } catch (error) {
+      if (!(error instanceof InitCancelled)) throw error
+      process.exitCode = 130
+    }
   })
 
 program

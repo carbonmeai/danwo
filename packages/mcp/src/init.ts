@@ -21,6 +21,11 @@ export interface InitOptions {
   readonly starterConfig?: boolean
   /** Install danwo's skill into `.claude/skills` and `.agents/skills` (default true). */
   readonly skill?: boolean
+  /**
+   * The client configs to register the server in: `.mcp.json`, `.cursor/mcp.json`,
+   * `.codex/config.toml`. Default all three.
+   */
+  readonly clients?: readonly string[]
 }
 
 export interface InitChange {
@@ -128,14 +133,16 @@ export async function initProject(options: InitOptions): Promise<InitChange[]> {
   const command = options.command ?? ["npx", "danwo", "mcp"]
   const [program, ...args] = command
   const changes: InitChange[] = []
+  const clients = new Set(options.clients ?? [...JSON_FILES, CODEX_FILE])
 
-  for (const file of JSON_FILES)
+  for (const file of JSON_FILES.filter((name) => clients.has(name)))
     changes.push(
       await apply(options.cwd, file, (before) =>
         mergedJson(before, file, { command: program, args }),
       ),
     )
-  changes.push(await apply(options.cwd, CODEX_FILE, (before) => mergedToml(before, command)))
+  if (clients.has(CODEX_FILE))
+    changes.push(await apply(options.cwd, CODEX_FILE, (before) => mergedToml(before, command)))
 
   if (options.starterConfig === true && !existsSync(join(options.cwd, CONFIG_FILE)))
     changes.push(await apply(options.cwd, CONFIG_FILE, () => STARTER_CONFIG))
