@@ -23,13 +23,19 @@ import { type LintConfig, type LintFinding, lint } from "../lint/index.ts"
 import type { StepRecord } from "../record/index.ts"
 import { usageOf } from "../record/usage.ts"
 import { keepsVideo } from "../record/video.ts"
-import { type DeclaredTest, type FileDeclarations, suiteHooks } from "../tests/registry.ts"
+import {
+  type DeclaredTest,
+  type FileDeclarations,
+  isolationOf,
+  suiteHooks,
+} from "../tests/registry.ts"
 import { resultOf, worthRetrying } from "../tests/retry.ts"
 import { type AttemptResult, type AttemptSetup, runAttempt, type ReplayUse } from "./attempt.ts"
 import { loadTestFile, testIdOf } from "./catalog.ts"
 import { type LoadedConfig, loadConfig } from "./config.ts"
 import type { WorkerEnvironment } from "./environment.ts"
 import { impactOf } from "./impact.ts"
+import { type Isolation, StartingPoint } from "./isolation.ts"
 import { LiveTap } from "./live.ts"
 import { trialRace } from "./races.ts"
 import {
@@ -73,7 +79,15 @@ interface Bench {
   readonly sessions: SessionKeeper
   /** The integration lint's settings; undefined when the run does not lint. */
   readonly lint: LintConfig | undefined
+  /** Where every test and trial starts; undefined without an environment. */
+  readonly start: StartingPoint | undefined
 }
+
+/**
+ * Whether a saved session's sign-in is kept in the starting point: while tests run, so later
+ * tests reuse it after a restore. A matrix trial runs under a fault, so its sign-ins are not kept.
+ */
+let keepSignIns = false
 
 let bench: Bench | undefined
 /** The worker's browser, launched on first use; each attempt opens its own context in it. */
@@ -213,11 +227,25 @@ function keepRecord(
   return finishRecord(recordDir, recording.mode, failed, build)
 }
 
-/** A test with its retries; every retry loads the file afresh. */
+/** Whether the environment is at its starting point: nothing ran since the last clean, keep or restore. */
+let untouched = false
+
+/** Back to the starting point before an attempt, unless the environment is still there. */
+async function fromStart(): Promise<void> {
+  const { start } = benchOrFail()
+
+  if (start === undefined || untouched) return
+
+  await start.again()
+  untouched = true
+}
+
+/** A test with its retries; every retry loads the file afresh. `isolated` restores before each. */
 async function runTest(
   task: TestFileTask,
   first: FileDeclarations,
   id: string,
+  isolated: boolean,
 ): Promise<TestReport> {
   const { env, workerIndex } = benchOrFail()
   const replay: ReplayUse =
@@ -230,13 +258,21 @@ async function runTest(
 
   for (let n = 1; n <= tries; n++) {
     const declarations = n === 1 ? first : await loadTestFile(task.file)
+
+    if (isolated) await fromStart()
+    // A sign-in is kept as part of the starting point only when this attempt began from it.
+    keepSignIns = untouched
+    untouched = false
+
     const { result, recordDir, mark } = await attemptOnce(
       declarations,
       task.file,
       id,
       replay,
       `attempt-${n}`,
-    )
+    ).finally(() => {
+      keepSignIns = false
+    })
     const input: RecordInput = {
       test: id,
       run: { kind: "test", attempt: n },
@@ -288,13 +324,49 @@ async function runSuiteHooks(declarations: FileDeclarations, kind: "beforeAll" |
   for (const hook of suiteHooks(declarations, kind)) await hook.fn(SUITE_FIXTURES)
 }
 
+/**
+ * Puts the environment where a file starts: back to the seeded state unless every test of the
+ * file shares state (`none`), then the file's `beforeAll` hooks, kept as the point its isolated
+ * tests start from. Resolves to whether each test is restored before it runs.
+ */
+async function startFile(
+  declarations: FileDeclarations,
+  tests: readonly DeclaredTest[],
+): Promise<(test: DeclaredTest) => boolean> {
+  const { loaded, start } = benchOrFail()
+  const fallback: Isolation = loaded.config.isolation ?? "test"
+  const modeOf = (test: DeclaredTest) => isolationOf(declarations, test, fallback)
+  const setup = suiteHooks(declarations, "beforeAll").length > 0
+
+  if (start !== undefined && tests.some((test) => modeOf(test) !== "none")) {
+    await start.clean()
+    untouched = true
+  }
+
+  await runSuiteHooks(declarations, "beforeAll")
+  if (!setup) return (test) => modeOf(test) === "test"
+
+  untouched = false
+  if (start?.keeps !== true) return () => false
+
+  // The tests start from what the file's setup left, so it is kept for every later restore.
+  if (tests.some((test) => modeOf(test) === "test")) {
+    await start.keep("file")
+    untouched = true
+  }
+
+  return (test) => modeOf(test) === "test"
+}
+
 async function testFile(task: TestFileTask): Promise<TestReport[]> {
   const { loaded, workerIndex } = benchOrFail()
   const declarations = await loadTestFile(task.file)
   const selected = new Set(task.testIds)
   const reports: TestReport[] = []
-
-  await runSuiteHooks(declarations, "beforeAll")
+  const chosen = declarations.tests.filter(
+    (test) => selected.has(testIdOf(loaded.root, task.file, test)) && test.mode !== "skip",
+  )
+  const isolated = await startFile(declarations, chosen)
 
   for (const test of declarations.tests) {
     const id = testIdOf(loaded.root, task.file, test)
@@ -304,7 +376,7 @@ async function testFile(task: TestFileTask): Promise<TestReport[]> {
     const report =
       test.mode === "skip"
         ? { id, status: "skipped" as const, attempts: [], workerIndex }
-        : await runTest(task, declarations, id)
+        : await runTest(task, declarations, id, isolated(test))
 
     sendNote({ topic: "tested", data: report })
     reports.push(report)
@@ -534,31 +606,17 @@ async function runTrial(
   return record === undefined ? report : { ...report, record }
 }
 
-/** Whether this worker's environment has a snapshot to restore. */
-let snapshotted = false
-
 /**
  * Puts the environment where every trial starts. The worker's first trial resets it and, when
  * the environment can, keeps a snapshot; every later trial restores that snapshot instead of
  * resetting, which skips app restarts and reseeding.
  */
-async function startingPoint(env: TrialEnvironment): Promise<void> {
-  const keeps = env.snapshot !== undefined && env.restore !== undefined
-
-  if (snapshotted && keeps) return env.restore?.()
-
-  await env.reset?.()
-  if (!keeps) return
-
-  await env.snapshot?.()
-  snapshotted = true
-}
-
 async function trial(task: TrialTask): Promise<TrialReport> {
   const env = trialEnvironment()
   const timings = noTimings()
 
-  await timed(timings, "prepare", () => startingPoint(env))
+  await timed(timings, "prepare", async () => benchOrFail().start?.clean())
+  untouched = false
   // The app was reset with it: sign-ins saved before belong to the app as it was.
   benchOrFail().sessions.invalidate()
   applyFault(env, task.fault)
@@ -588,6 +646,9 @@ const calls: WorkerCalls = {
     const loaded = await loadConfig(start.cwd, start.configPath)
     const env = await loaded.config.environment?.({ workerIndex: start.workerIndex })
     const recording = start.record?.mode === "off" ? undefined : start.record
+    const sessions = new SessionKeeper(async () => {
+      if (keepSignIns) await bench?.start?.keep("session")
+    })
 
     bench = {
       loaded,
@@ -595,8 +656,9 @@ const calls: WorkerCalls = {
       workerIndex: start.workerIndex,
       recording,
       updateScreenshots: start.updateScreenshots,
-      sessions: new SessionKeeper(),
+      sessions,
       lint: lintSettings(loaded.config.lint, start.lint),
+      start: env && new StartingPoint(env, () => sessions.invalidate()),
     }
   },
   testFile,

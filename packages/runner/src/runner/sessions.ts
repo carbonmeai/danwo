@@ -16,6 +16,17 @@ export class SessionKeeper {
   readonly #states = new Map<string, BrowserState>()
   /** Setups that failed since the last reset; the next tests fail with the same reason at once. */
   readonly #failures = new Map<string, unknown>()
+  /** Told after a setup signs in, so the backend side of the sign-in can be kept too. */
+  readonly #onSignedIn: () => Promise<void>
+
+  constructor(onSignedIn: () => Promise<void> = async () => {}) {
+    this.#onSignedIn = onSignedIn
+  }
+
+  /** A setup signed in and its browser state was kept; the backend's side is kept next. */
+  signedIn(): Promise<void> {
+    return this.#onSignedIn()
+  }
 
   /** The state `name` left last time, unless the environment was reset since. */
   get(name: string): BrowserState | undefined {
@@ -154,6 +165,7 @@ export async function startingState(
     const { state, steps } = await signIn(name, setup, context)
 
     context.keeper.keep(name, state)
+    await context.keeper.signedIn()
 
     const note = `session ${name}: ${fresh ? "renewed" : "created"} (${steps} steps)`
 

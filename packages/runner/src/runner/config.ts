@@ -18,6 +18,7 @@ import type { SessionArgs, SessionDefinition } from "../tests/types.ts"
 import type { VisionSetting } from "../vision/desk.ts"
 import type { EnvironmentContext, WorkerEnvironment } from "./environment.ts"
 import type { ImpactConfig } from "./impact.ts"
+import type { Isolation } from "./isolation.ts"
 import type { RecordMode } from "./record.ts"
 import type { Reporter } from "./reporting.ts"
 
@@ -101,6 +102,15 @@ export interface DanwoConfig {
   readonly sessions?: Readonly<Record<string, SessionDefinition<SessionArgs>>>
   /** Starts what a worker's tests run against (app, emulators, proxy); called once per worker. */
   readonly environment?: (context: EnvironmentContext) => Promise<WorkerEnvironment>
+  /**
+   * How much state tests share. `test` (default) starts every test, and every retry, from the
+   * environment's seeded state: emulators back to their seeds, the clock to now, the proxy's log
+   * and webhook queues empty, and data stores restored, with a file's `beforeAll` work and saved
+   * sessions kept on top. `file` resets once per file, `none` never. A file or describe block can
+   * choose its own with `test.use({ isolation })`. The app's own memory is reset only by the
+   * environment's `restore` or `reset` (e.g. by calling a test-reset endpoint).
+   */
+  readonly isolation?: Isolation
   /**
    * The flight recorder: `always` (default) keeps what every run did under `.danwo/runs/<run>/`
    * with an HTML report; `on-failure` keeps failed runs only; `off` records nothing.

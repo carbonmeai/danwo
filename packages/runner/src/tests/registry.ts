@@ -2,6 +2,7 @@
  * What loading a test file declared: its tests, describe blocks and hooks, as plain records the
  * worker runs and the parent turns into a test list.
  */
+import type { Isolation } from "../runner/isolation.ts"
 import type {
   SessionArgs,
   SessionDefinition,
@@ -163,6 +164,23 @@ export function sessionOf(file: FileDeclarations, test: DeclaredTest): string | 
   }
 
   return undefined
+}
+
+/** How much state `test` shares: the innermost `test.use` around it that says, else `fallback`. */
+export function isolationOf(
+  file: FileDeclarations,
+  test: DeclaredTest,
+  fallback: Isolation,
+): Isolation {
+  for (const block of [...enclosing(test.block), undefined]) {
+    const use = file.uses.findLast(
+      (candidate) => candidate.block === block && candidate.options.isolation !== undefined,
+    )
+
+    if (use?.options.isolation !== undefined) return use.options.isolation
+  }
+
+  return fallback
 }
 
 /** The file's `beforeAll` hooks outermost first, or its `afterAll` hooks innermost first. */

@@ -6,6 +6,7 @@ import type { Agent } from "../agent/index.ts"
 import type { Expect } from "../assert/index.ts"
 import type { App } from "../browser/index.ts"
 import type { Screen } from "../locate/index.ts"
+import type { Isolation } from "../runner/isolation.ts"
 import type { Secret } from "../secrets/index.ts"
 import type { SessionTime } from "../time/index.ts"
 
@@ -66,6 +67,12 @@ export interface TestOptions {
 export interface UseOptions {
   /** The saved session the block's tests start in. */
   readonly session?: string
+  /**
+   * How much state the block's tests share, overriding the config's `isolation`: `test` starts
+   * each from the environment's seeded state, `file` lets a file's tests build on one another,
+   * `none` never resets.
+   */
+  readonly isolation?: Isolation
 }
 
 /** What a session's setup and check get besides a test's fixtures. */
