@@ -1,0 +1,37 @@
+{
+  "provider": "nylas",
+  "source": "openapi",
+  "recorded": "2026-10-19",
+  "scenarios": {
+    "errors: no key, unknown key": {
+      "steps": [
+        {
+          "step": "list grants without a key",
+          "status": 401,
+          "shape": "a98a82237310"
+        },
+        {
+          "step": "list grants with a key Nylas never issued",
+          "status": 401,
+          "shape": "d4deefef339b"
+        }
+      ],
+      "facts": []
+    },
+    "grants: list and read one": {
+      "steps": [
+        {
+          "step": "list grants",
+          "status": 200,
+          "shape": "546460c5624a"
+        }
+      ],
+      "facts": []
+    }
+  },
+  "shapes": {
+    "546460c5624a": {"t":"object","keys":{"request_id":{"t":"string"},"data":{"t":"array","of":{"t":"object","keys":{"id":{"t":"string"},"provider":{"t":"string"},"grant_status":{"t":"string"},"email":{"t":"string"},"scope":{"t":"array","of":{"t":"string"}},"created_at":{"t":"number"},"updated_at":{"t":"number"},"name":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"user_agent":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"ip":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"state":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"provider_user_id":{"t":"string"},"settings":{"t":"object","keys":{},"open":true}},"optional":["updated_at","name","user_agent","ip","state","provider_user_id","settings"]}}}},
+    "a98a82237310": {"t":"object","keys":{"success":{"t":"boolean"},"error":{"t":"object","keys":{"type":{"t":"literal","v":"invalid_request_error"},"message":{"t":"string"}}}}},
+    "d4deefef339b": {"t":"object","keys":{"request_id":{"t":"string"},"error":{"t":"object","keys":{"type":{"t":"literal","v":"api.invalid_request_error"},"message":{"t":"string"}}}}}
+  }
+}

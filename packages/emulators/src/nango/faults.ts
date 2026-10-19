@@ -1,6 +1,7 @@
 const json = { "content-type": "application/json" }
 
-const envelope = (code: string, message: string) => JSON.stringify({ error: { code, message } })
+const envelope = (code: string, message: string) =>
+  JSON.stringify({ error: { message, code, payload: {} } })
 
 const COMMON = [
   {

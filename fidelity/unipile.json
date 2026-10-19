@@ -1,0 +1,31 @@
+{
+  "provider": "unipile",
+  "source": "openapi",
+  "recorded": "2026-10-19",
+  "scenarios": {
+    "errors: unknown token": {
+      "steps": [
+        {
+          "step": "list accounts with a token Unipile never issued",
+          "status": 401,
+          "shape": "6e28e2f03809"
+        }
+      ],
+      "facts": []
+    },
+    "accounts: list": {
+      "steps": [
+        {
+          "step": "list accounts",
+          "status": 200,
+          "shape": "cb959ebd52dd"
+        }
+      ],
+      "facts": []
+    }
+  },
+  "shapes": {
+    "6e28e2f03809": {"t":"object","keys":{"status":{"t":"literal","v":401},"type":{"t":"string"},"title":{"t":"string"},"detail":{"t":"string"}},"optional":["detail"]},
+    "cb959ebd52dd": {"t":"object","keys":{"object":{"t":"literal","v":"AccountList"},"items":{"t":"array","of":{"t":"object","keys":{"object":{"t":"string"},"type":{"t":"string"},"id":{"t":"string"},"name":{"t":"string"},"created_at":{"t":"string"},"connection_params":{"t":"object","keys":{},"open":true},"groups":{"t":"array","of":{"t":"string"}},"sources":{"t":"array","of":{"t":"object","keys":{"id":{"t":"string"},"status":{"t":"string"}}}}},"optional":["connection_params","groups"]}},"cursor":{"t":"any"}}}
+  }
+}

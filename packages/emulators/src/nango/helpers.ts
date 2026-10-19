@@ -35,7 +35,7 @@ export class NangoError extends Error {
 
 /** Nango's error envelope: `{ error: { code, message } }`. */
 export function nangoError(c: Context, status: number, code: string, message: string): Response {
-  return c.json({ error: { code, message } }, status)
+  return c.json({ error: { message, code, payload: {} } }, status)
 }
 
 /** Whether the request carries one of the environment's secret keys. */
@@ -51,7 +51,11 @@ export function requireSecret(context: NangoRouteContext, c: Context): void {
       "Authentication failed. The request is missing the Authorization header.",
     )
   if (keys.length > 0 && !keys.includes(key))
-    throw new NangoError(401, "unknown_account", "The secret key is invalid.")
+    throw new NangoError(
+      401,
+      "unknown_account",
+      "Authentication failed. The provided authorization header does not match any account.",
+    )
 }
 
 /** An ISO time `ms` from now on the emulator's clock. */

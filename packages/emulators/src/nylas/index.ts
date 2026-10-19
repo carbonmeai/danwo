@@ -62,7 +62,8 @@ export const nylas = defineEmulator({
   name: "nylas",
   setup({ app, store, outbox, clock }) {
     app.onError((error, c) => {
-      if (error instanceof NylasError) return nylasError(c, error.status, error.type, error.message)
+      if (error instanceof NylasError)
+        return nylasError(c, error.status, error.type, error.message, error.unidentified)
 
       const status = error instanceof HttpError ? error.status : 500
       const message = error instanceof Error ? error.message : "Internal error"

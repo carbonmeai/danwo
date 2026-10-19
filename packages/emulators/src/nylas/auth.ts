@@ -11,8 +11,13 @@ export type NylasCaller =
   | { readonly kind: "application" }
   | { readonly kind: "grant"; readonly grantId: string }
 
+/** A credential Nylas cannot verify, as the live API words it. */
 const unauthorized = () =>
-  new NylasError(401, "unauthorized", "Unauthorized. Check the API key or access token.")
+  new NylasError(401, "api.invalid_request_error", "Could not verify access credential")
+
+/** No credential at all: answered before Nylas assigns a request id. */
+const missing = () =>
+  new NylasError(401, "invalid_request_error", "Could not verify access credential.", true)
 
 /** The bearer token a request carries, if any. */
 function bearerOf(c: Context): string | undefined {
@@ -25,7 +30,7 @@ function bearerOf(c: Context): string | undefined {
 export function callerOf(context: NylasRouteContext, c: Context): NylasCaller {
   const token = bearerOf(c)
 
-  if (token === undefined || token === "") throw unauthorized()
+  if (token === undefined || token === "") throw missing()
 
   const keys = context.objects.apiKeys()
 

@@ -24,12 +24,15 @@ export interface NylasRouteContext {
 export class NylasError extends Error {
   readonly status: number
   readonly type: string
+  /** Nylas answers a call with no credential at all before it assigns a request id. */
+  readonly unidentified: boolean
 
-  constructor(status: number, type: string, message: string) {
+  constructor(status: number, type: string, message: string, unidentified = false) {
     super(message)
     this.name = "NylasError"
     this.status = status
     this.type = type
+    this.unidentified = unidentified
   }
 }
 
@@ -42,8 +45,19 @@ export const badRequest = (message: string) => new NylasError(400, "invalid_requ
 export const requestId = () => randomUUID()
 
 /** Nylas's error envelope, as the SDK reads it into a `NylasApiError`. */
-export function nylasError(c: Context, status: number, type: string, message: string): Response {
-  return c.json({ request_id: requestId(), error: { type, message } }, status)
+export function nylasError(
+  c: Context,
+  status: number,
+  type: string,
+  message: string,
+  unidentified = false,
+): Response {
+  return c.json(
+    unidentified
+      ? { success: false, error: { type, message } }
+      : { request_id: requestId(), error: { type, message } },
+    status,
+  )
 }
 
 /** One object in Nylas's answer envelope. */

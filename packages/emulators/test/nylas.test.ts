@@ -87,7 +87,7 @@ describe("keys and errors", () => {
       .catch((e: unknown) => e)
 
     expect(error).toBeInstanceOf(NylasApiError)
-    expect(error).toMatchObject({ statusCode: 401, type: "unauthorized" })
+    expect(error).toMatchObject({ statusCode: 401, type: "api.invalid_request_error" })
   })
 
   it("answers an unknown grant with not_found_error", async () => {

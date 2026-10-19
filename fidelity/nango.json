@@ -1,0 +1,43 @@
+{
+  "provider": "nango",
+  "source": "openapi",
+  "recorded": "2026-10-19",
+  "scenarios": {
+    "errors: no key, unknown key": {
+      "steps": [
+        {
+          "step": "list connections without a key",
+          "status": 401,
+          "shape": "4ae1177d6cc3"
+        },
+        {
+          "step": "list connections with a key Nango never issued",
+          "status": 401,
+          "shape": "1ef39b347f3a"
+        }
+      ],
+      "facts": []
+    },
+    "project: integrations and connections": {
+      "steps": [
+        {
+          "step": "list integrations",
+          "status": 200,
+          "shape": "f8a2fafb018d"
+        },
+        {
+          "step": "list connections",
+          "status": 200,
+          "shape": "9aa0fc9a44ad"
+        }
+      ],
+      "facts": []
+    }
+  },
+  "shapes": {
+    "1ef39b347f3a": {"t":"object","keys":{"error":{"t":"object","keys":{"message":{"t":"string"},"code":{"t":"string"},"payload":{"t":"object","keys":{},"open":true}}}}},
+    "4ae1177d6cc3": {"t":"object","keys":{"error":{"t":"object","keys":{"message":{"t":"string"},"code":{"t":"literal","v":"missing_auth_header"},"payload":{"t":"object","keys":{},"open":true}}}}},
+    "9aa0fc9a44ad": {"t":"object","keys":{"connections":{"t":"array","of":{"t":"object","keys":{"id":{"t":"number"},"connection_id":{"t":"string"},"provider":{"t":"string"},"provider_config_key":{"t":"string"},"created":{"t":"string"},"metadata":{"t":"object","keys":{},"open":true},"errors":{"t":"array","of":{"t":"object","keys":{},"open":true}},"end_user":{"t":"union","of":[{"t":"object","keys":{},"open":true},{"t":"null"}]},"tags":{"t":"object","keys":{},"open":true}},"optional":["metadata","errors","end_user","tags"]}}}},
+    "f8a2fafb018d": {"t":"object","keys":{"data":{"t":"array","of":{"t":"object","keys":{"unique_key":{"t":"string"},"provider":{"t":"string"},"display_name":{"t":"string"},"logo":{"t":"string"},"created_at":{"t":"string"},"updated_at":{"t":"string"}},"optional":["display_name","logo","created_at","updated_at"]}}}}
+  }
+}
