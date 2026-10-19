@@ -78,6 +78,7 @@ export interface Emulator {
   readonly webhooks: WebhookDispatcher | undefined
   readonly fetch: (request: Request) => Promise<Response>
   snapshot(): StoreSnapshot
+  /** Puts the store back as `snapshot` kept it and drops the webhooks emitted since. */
   restore(snapshot: StoreSnapshot): void
   /** Clears all state and pending webhooks, then applies the seed again. */
   reset(): void
@@ -117,7 +118,11 @@ export function createEmulator(
     webhooks,
     fetch: (request) => context.app.fetch(request),
     snapshot: () => context.store.snapshot(),
-    restore: (snapshot) => context.store.restore(snapshot),
+    restore(snapshot) {
+      context.store.restore(snapshot)
+      // Webhooks the run emitted since the snapshot belong to that run, not to the next one.
+      context.outbox.clear()
+    },
     reset() {
       context.store.reset()
       context.outbox.clear()
