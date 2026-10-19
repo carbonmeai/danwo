@@ -19,6 +19,7 @@ export interface ComposioAccountView {
 /** One tool run, as the project's logs keep it. */
 export type ComposioExecution = ExecutionRecord
 
+/** A Composio project as tests read and drive it. */
 export interface ComposioProject {
   /** Every connected account, oldest first. */
   accounts(): ComposioAccountView[]
@@ -38,6 +39,7 @@ export interface ComposioProject {
   expire(connectedAccountId: string): void
 }
 
+/** The project a Composio emulator stands in for: its accounts, tool runs, triggers and expiries. */
 export function composioProject(emulator: Pick<Emulator, "store" | "outbox">): ComposioProject {
   const objects = composioStore(emulator.store)
   const events = new ComposioEvents(emulator.outbox, emulator.store.clock)

@@ -162,6 +162,34 @@ async function decide(context: ComposioRouteContext, c: Context, parts: Parts): 
   return finish(c, parts.link, parts.account)
 }
 
+/** Exchanges the code on the backend and completes the connection; why it failed, if it did. */
+async function exchange(
+  context: ComposioRouteContext,
+  parts: Parts,
+  connected: ConnectedBackend,
+  code: string,
+): Promise<string | undefined> {
+  const send = (request: Request) => connected.emulator.fetch(request)
+
+  try {
+    const tokens = await connected.backend.exchange(
+      send,
+      clientOf(parts.config, connected),
+      code,
+      parts.link.verifier,
+    )
+    const label = await connected.backend.whoami(send, tokens.access_token)
+
+    completeConnection(context, parts.account, { ...tokens }, label)
+
+    return undefined
+  } catch (error) {
+    failConnection(context, parts.account, error instanceof Error ? error.message : String(error))
+
+    return "token_exchange_failed"
+  }
+}
+
 /** The provider sent the user back: exchange the code on the backend and finish the connection. */
 async function callback(context: ComposioRouteContext, c: Context): Promise<Response> {
   const parts = partsOf(context, c.req.query("state") ?? "")
@@ -178,27 +206,9 @@ async function callback(context: ComposioRouteContext, c: Context): Promise<Resp
     return finish(c, parts.link, parts.account, denied ?? "no_code")
   }
 
-  const send = (request: Request) => connected.emulator.fetch(request)
+  const failure = await exchange(context, parts, connected, code)
 
-  try {
-    const tokens = await connected.backend.exchange(
-      send,
-      clientOf(parts.config, connected),
-      code,
-      parts.link.verifier,
-    )
-
-    completeConnection(
-      context,
-      parts.account,
-      { ...tokens },
-      await connected.backend.whoami(send, tokens.access_token),
-    )
-  } catch (error) {
-    failConnection(context, parts.account, error instanceof Error ? error.message : String(error))
-
-    return finish(c, parts.link, parts.account, "token_exchange_failed")
-  }
+  if (failure !== undefined) return finish(c, parts.link, parts.account, failure)
 
   context.objects.links.remove(parts.link.id)
 

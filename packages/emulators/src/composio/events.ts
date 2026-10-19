@@ -11,7 +11,7 @@ export const EVENT_TYPES = {
 } as const
 
 /** The project the emulator stands in for, as events name it. */
-export const PROJECT = { project_id: "pr_danwoEmulated", org_id: "ok_danwoEmulated" } as const
+const PROJECT = { project_id: "pr_danwoEmulated", org_id: "ok_danwoEmulated" } as const
 
 /** Queues Composio's webhook events, in the V3 shape the SDK's `verifyWebhook` parses. */
 export class ComposioEvents {

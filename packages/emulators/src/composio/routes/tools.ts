@@ -59,7 +59,18 @@ function toolNamed(context: ComposioRouteContext, slug: string): ToolDefinition 
   return tool
 }
 
-/** `{ name, value, type }` header and query parameters of a proxied call, applied to its request. */
+/** Applies a proxied call's `{ name, value, type }` parameters: headers, or the query. */
+function applyParameters(url: URL, headers: Headers, parameters: unknown): void {
+  for (const parameter of Array.isArray(parameters) ? parameters : []) {
+    const { name, value, type } = asRecord(parameter) ?? {}
+
+    if (typeof name !== "string") continue
+    if (type === "header") headers.set(name, String(value))
+    else url.searchParams.set(name, String(value))
+  }
+}
+
+/** A proxied call's request, with the account's token and the call's parameters. */
 function proxiedRequest(
   url: URL,
   body: Record<string, unknown>,
@@ -69,13 +80,7 @@ function proxiedRequest(
 
   if (token !== undefined) headers.set("authorization", `Bearer ${token}`)
 
-  for (const parameter of Array.isArray(body["parameters"]) ? body["parameters"] : []) {
-    const { name, value, type } = asRecord(parameter) ?? {}
-
-    if (typeof name !== "string") continue
-    if (type === "header") headers.set(name, String(value))
-    else url.searchParams.set(name, String(value))
-  }
+  applyParameters(url, headers, body["parameters"])
 
   const payload = body["body"]
 
@@ -88,9 +93,8 @@ function proxiedRequest(
   })
 }
 
-/** `POST /tools/execute/proxy`: a raw call to the toolkit's API with the account's credentials. */
-async function proxy(context: ComposioRouteContext, c: Context): Promise<Response> {
-  const body = await jsonBody(c)
+/** The account and backend a proxied call goes through, and the URL it goes to. */
+function proxyTarget(context: ComposioRouteContext, body: Record<string, unknown>) {
   const endpoint = textOf(body["endpoint"])
 
   if (endpoint === undefined) throw badRequest("endpoint is required")
@@ -117,15 +121,24 @@ async function proxy(context: ComposioRouteContext, c: Context): Promise<Respons
   )
   const token =
     typeof account.val["access_token"] === "string" ? account.val["access_token"] : undefined
-  const response = await connected.emulator.fetch(proxiedRequest(url, body, token))
-  const text = await response.text()
-  let data: unknown = text
 
+  return { connected, request: proxiedRequest(url, body, token) }
+}
+
+/** A body as JSON when it is, else the text as it came. */
+function parsed(text: string): unknown {
   try {
-    data = text === "" ? null : JSON.parse(text)
+    return text === "" ? null : JSON.parse(text)
   } catch {
-    /* Not JSON: the text as it came. */
+    return text
   }
+}
+
+/** `POST /tools/execute/proxy`: a raw call to the toolkit's API with the account's credentials. */
+async function proxy(context: ComposioRouteContext, c: Context): Promise<Response> {
+  const { connected, request } = proxyTarget(context, await jsonBody(c))
+  const response = await connected.emulator.fetch(request)
+  const data = parsed(await response.text())
 
   return c.json({
     data,

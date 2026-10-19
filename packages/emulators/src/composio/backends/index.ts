@@ -10,7 +10,7 @@ import { googleBackend } from "./google.ts"
 import { microsoftBackend } from "./microsoft.ts"
 import { slackBackend } from "./slack.ts"
 
-export type { Backend, BackendAnswer, BackendName, OAuthClient, Send, TokenSet } from "./backend.ts"
+export type { Backend, BackendAnswer, BackendName, OAuthClient } from "./backend.ts"
 
 const BACKENDS: readonly Backend[] = [googleBackend, slackBackend, githubBackend, microsoftBackend]
 

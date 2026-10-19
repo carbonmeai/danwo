@@ -7,7 +7,8 @@ import { asRecord } from "../json.ts"
 /** The hosts the Composio emulator answers: the API and the hosted connect page. */
 export const COMPOSIO_HOSTS = ["backend.composio.dev", "connect.composio.dev"]
 
-export const API_ORIGIN = "https://backend.composio.dev"
+const API_ORIGIN = "https://backend.composio.dev"
+
 export const CONNECT_ORIGIN = "https://connect.composio.dev"
 
 /** Where toolkits' OAuth providers send the user back to Composio after consent. */
@@ -72,13 +73,9 @@ export function badRequest(message: string): ComposioError {
 
 /** The JSON object a request sent, or an empty one for anything else. */
 export async function jsonBody(c: Context): Promise<Record<string, unknown>> {
-  try {
-    const parsed: unknown = JSON.parse((await c.req.text()) || "{}")
+  const parsed: unknown = await c.req.json().catch(() => undefined)
 
-    return asRecord(parsed) ?? {}
-  } catch {
-    return {}
-  }
+  return asRecord(parsed) ?? {}
 }
 
 export function textOf(value: unknown): string | undefined {

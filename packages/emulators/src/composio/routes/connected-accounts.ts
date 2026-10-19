@@ -50,6 +50,15 @@ function listed(context: ComposioRouteContext, c: Context): ConnectedAccountReco
   return c.req.query("order_direction") === "asc" ? sorted : sorted.toReversed()
 }
 
+/** Where the connection returns, its alias and given state, from the create body's `connection`. */
+function connectionOptions(connection: Record<string, unknown>) {
+  return {
+    callbackUrl: textOf(connection["callback_url"]) ?? textOf(connection["redirect_uri"]) ?? null,
+    alias: textOf(connection["alias"]) ?? null,
+    state: connection["state"],
+  }
+}
+
 /** `POST /connected_accounts`: connects with given credentials, or starts a hosted connection. */
 async function create(context: ComposioRouteContext, c: Context): Promise<Response> {
   const body = await jsonBody(c)
@@ -63,11 +72,7 @@ async function create(context: ComposioRouteContext, c: Context): Promise<Respon
     context,
     config,
     textOf(connection["user_id"]) ?? "default",
-    {
-      callbackUrl: textOf(connection["callback_url"]) ?? textOf(connection["redirect_uri"]) ?? null,
-      alias: textOf(connection["alias"]) ?? null,
-      state: connection["state"],
-    },
+    connectionOptions(connection),
   )
   const url = hosted?.url ?? null
 

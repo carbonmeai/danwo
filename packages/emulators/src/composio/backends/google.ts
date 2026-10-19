@@ -81,6 +81,29 @@ function describedMessage(message: Record<string, unknown>) {
   }
 }
 
+/** Reads each listed message, or the first failed read. */
+async function readMessages(
+  send: Send,
+  token: string,
+  ids: readonly unknown[],
+): Promise<unknown[] | BackendAnswer> {
+  const messages: unknown[] = []
+
+  for (const entry of ids) {
+    const read = await apiCall(
+      send,
+      token,
+      "GET",
+      `${GMAIL}/messages/${String(asRecord(entry)?.["id"])}`,
+    )
+
+    if (read.error !== undefined) return read
+    messages.push(describedMessage(asRecord(read.data) ?? {}))
+  }
+
+  return messages
+}
+
 const fetchEmails: Executor = async ({ args, token, send }) => {
   const listed = await apiCall(
     send,
@@ -96,19 +119,9 @@ const fetchEmails: Executor = async ({ args, token, send }) => {
 
   if (listed.error !== undefined || !Array.isArray(ids)) return listed
 
-  const messages: unknown[] = []
+  const messages = await readMessages(send, token, ids)
 
-  for (const entry of ids) {
-    const read = await apiCall(
-      send,
-      token,
-      "GET",
-      `${GMAIL}/messages/${String(asRecord(entry)?.["id"])}`,
-    )
-
-    if (read.error !== undefined) return read
-    messages.push(describedMessage(asRecord(read.data) ?? {}))
-  }
+  if (!Array.isArray(messages)) return messages
 
   return {
     status: 200,

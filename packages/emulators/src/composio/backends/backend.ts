@@ -130,7 +130,7 @@ export function failed(status: number, data: unknown): BackendAnswer {
 }
 
 /** Posts a form to a provider's token endpoint and reads the JSON it answers. */
-export async function tokenCall(
+async function tokenCall(
   send: Send,
   url: string,
   fields: Readonly<Record<string, string>>,
@@ -151,7 +151,7 @@ export async function tokenCall(
 }
 
 /** The tokens in a token endpoint's answer, or an error naming what the provider said. */
-export function tokensOf(answer: {
+function tokensOf(answer: {
   readonly ok: boolean
   readonly body: Record<string, unknown>
 }): TokenSet {

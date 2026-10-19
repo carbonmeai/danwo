@@ -9,7 +9,12 @@ import type { Context } from "../../http.ts"
 import { asRecord, isOneOf } from "../../json.ts"
 import { authConfigOf } from "../accounts.ts"
 import type { ComposioRouteContext } from "../context.ts"
-import { AUTH_SCHEMES, type AuthConfigRecord, type AuthScheme } from "../entities.ts"
+import {
+  AUTH_SCHEMES,
+  type AuthConfigRecord,
+  type AuthScheme,
+  type ToolkitDefinition,
+} from "../entities.ts"
 import { authConfigObject } from "../formatters.ts"
 import {
   api,
@@ -40,24 +45,34 @@ function credentialsOf(value: unknown): Record<string, unknown> {
   return rest
 }
 
+/** The toolkit an auth config is for, refused when it cannot have this kind of config. */
+function toolkitFor(
+  context: Pick<ComposioRouteContext, "objects">,
+  slug: string,
+  custom: boolean,
+): ToolkitDefinition {
+  const toolkit = toolkitOf(context.objects, slug)
+
+  if (!toolkit) throw notFound("Toolkit", slug, 1201, "Toolkit_NotFound")
+  if (!custom && !toolkit.managed)
+    throw badRequest(`${toolkit.name} has no Composio-managed auth; create a custom auth config`)
+
+  return toolkit
+}
+
+/** The scheme asked for, or the toolkit's first. */
+function schemeFor(toolkit: ToolkitDefinition, asked: unknown): AuthScheme {
+  return isOneOf(AUTH_SCHEMES, asked) ? asked : (toolkit.authSchemes[0] ?? "OAUTH2")
+}
+
 /** A new auth config for `toolkitSlug`, from the create body's `auth_config` part. */
 export function newAuthConfig(
   context: Pick<ComposioRouteContext, "objects" | "clock">,
   toolkitSlug: string,
   options: Record<string, unknown>,
 ): AuthConfigRecord {
-  const toolkit = toolkitOf(context.objects, toolkitSlug)
-
-  if (!toolkit) throw notFound("Toolkit", toolkitSlug, 1201, "Toolkit_NotFound")
-
   const custom = options["type"] === "use_custom_auth"
-  const scheme: AuthScheme = isOneOf(AUTH_SCHEMES, options["authScheme"])
-    ? options["authScheme"]
-    : (toolkit.authSchemes[0] ?? "OAUTH2")
-
-  if (!custom && !toolkit.managed)
-    throw badRequest(`${toolkit.name} has no Composio-managed auth; create a custom auth config`)
-
+  const toolkit = toolkitFor(context, toolkitSlug, custom)
   const credentials = asRecord(options["credentials"])
   const scopes = scopesOf(credentials?.["scopes"])
   const now = iso(context.clock())
@@ -69,7 +84,7 @@ export function newAuthConfig(
       name: textOf(options["name"]) ?? `${toolkit.name} Auth Config`,
       toolkit: toolkit.slug,
       type: custom ? "custom" : "default",
-      authScheme: scheme,
+      authScheme: schemeFor(toolkit, options["authScheme"]),
       managed: !custom,
       credentials: custom ? credentialsOf(credentials) : {},
       scopes: scopes.length > 0 ? scopes : [...(toolkit.defaultScopes ?? [])],

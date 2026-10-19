@@ -3,20 +3,30 @@ import {
   composioProject,
   type Emulator,
   gmailMailbox,
+  type SessionFixtures,
   test as base,
 } from "@danwo/sdk"
 
 const test = base.extend<ComposioFixtures & { readonly google: Emulator }>()
+
+/** Connects Ada's Gmail from the app's page, through Google's account chooser. */
+async function connectGmail({
+  app,
+  screen,
+  expect,
+}: Pick<SessionFixtures, "app" | "screen" | "expect">): Promise<void> {
+  await app.open("/")
+  await screen.getByRole("link", { name: "Connect Gmail" }).click()
+  await screen.getByRole("button", { name: "Continue as Ada Lovelace" }).click()
+  await expect(screen.getByRole("heading", { name: "Gmail: connected" })).toBeVisible()
+}
 
 test("connects Gmail through Composio and sends the summary from it", async ({
   app,
   screen,
   expect,
 }) => {
-  await app.open("/")
-  await screen.getByRole("link", { name: "Connect Gmail" }).click()
-  await screen.getByRole("button", { name: "Continue as Ada Lovelace" }).click()
-  await expect(screen.getByRole("heading", { name: "Gmail: connected" })).toBeVisible()
+  await connectGmail({ app, screen, expect })
 
   await screen.getByRole("button", { name: "Send the weekly summary" }).click()
   await expect(screen.getByRole("alert")).toHaveText(/Sent|Could not send, try again/)
@@ -36,10 +46,7 @@ test("counts a new-mail trigger only when Composio signed it", async ({
   settle,
   expect,
 }) => {
-  await app.open("/")
-  await screen.getByRole("link", { name: "Connect Gmail" }).click()
-  await screen.getByRole("button", { name: "Continue as Ada Lovelace" }).click()
-  await expect(screen.getByRole("heading", { name: "Gmail: connected" })).toBeVisible()
+  await connectGmail({ app, screen, expect })
 
   const [account] = composioProject(composio).accounts()
 

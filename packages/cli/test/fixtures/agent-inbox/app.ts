@@ -94,15 +94,22 @@ async function send(res: ServerResponse): Promise<void> {
   res.writeHead(303, { location: "/" }).end()
 }
 
+/** A request header's value, or empty. */
+function header(req: IncomingMessage, name: string): string {
+  const value = req.headers[name]
+
+  return typeof value === "string" ? value : ""
+}
+
 async function webhook(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const payload = await bodyOf(req)
 
   try {
     await composio.triggers.verifyWebhook({
       payload,
-      id: String(req.headers["webhook-id"] ?? ""),
-      timestamp: String(req.headers["webhook-timestamp"] ?? ""),
-      signature: String(req.headers["webhook-signature"] ?? ""),
+      id: header(req, "webhook-id"),
+      timestamp: header(req, "webhook-timestamp"),
+      signature: header(req, "webhook-signature"),
       secret: webhookSecret,
     })
   } catch {
@@ -115,20 +122,21 @@ async function webhook(req: IncomingMessage, res: ServerResponse): Promise<void>
   res.writeHead(200).end()
 }
 
+/** The app's routes by method and path; anything else is the home page. */
+const ROUTES: Readonly<
+  Record<string, (req: IncomingMessage, res: ServerResponse) => Promise<void>>
+> = {
+  "POST /send": (_req, res) => send(res),
+  "POST /webhooks/composio": webhook,
+  "GET /connect": (_req, res) => connect(res),
+  "GET /connected": async (_req, res) => void res.writeHead(302, { location: "/" }).end(),
+}
+
 createServer((req, res) => {
   const path = new URL(req.url ?? "/", "http://localhost").pathname
-  const route =
-    req.method === "POST" && path === "/send"
-      ? send(res)
-      : req.method === "POST" && path === "/webhooks/composio"
-        ? webhook(req, res)
-        : path === "/connect"
-          ? connect(res)
-          : path === "/connected"
-            ? Promise.resolve(void res.writeHead(302, { location: "/" }).end())
-            : home(res)
+  const route = ROUTES[`${req.method} ${path}`] ?? ((_req, page) => home(page))
 
-  route.catch((error: unknown) => {
+  route(req, res).catch((error: unknown) => {
     res.writeHead(500).end(error instanceof Error ? error.message : String(error))
   })
 }).listen(port, "127.0.0.1", () => console.log("listening"))

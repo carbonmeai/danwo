@@ -41,6 +41,7 @@ export interface ComposioTools {
   clear(): void
 }
 
+/** The tool handlers of a Composio emulator, to answer tools from test code. */
 export function composioTools(emulator: Pick<Emulator, "store">): ComposioTools {
   const handlers = HANDLERS.get(emulator.store) ?? new Map<string, ToolHandler>()
 
@@ -180,6 +181,27 @@ function accountFor(
   return tool.noAuth === true ? null : accountForCall(context.objects, tool.toolkit, request)
 }
 
+/** Who answers a call, first match wins: the test, a seed, the backend, the catalogue's sample. */
+async function answerFor(
+  context: ComposioRouteContext,
+  tool: ToolDefinition,
+  args: Readonly<Record<string, unknown>>,
+  account: ConnectedAccountRecord | null,
+  call: ToolCall,
+): Promise<{ readonly answer: ToolAnswer; readonly source: ExecutionRecord["source"] }> {
+  const fromTest = (await handled(context, tool, args, call)) ?? seeded(context, tool, args)
+
+  if (fromTest) return { answer: fromTest, source: "seeded" }
+
+  const fromBackend = account ? await onBackend(context, tool, args, account) : undefined
+
+  if (fromBackend) return { answer: fromBackend, source: "backend" }
+
+  const data = tool.sample?.(args, context.objects.next()) ?? {}
+
+  return { answer: { data, error: null, successful: true }, source: "sample" }
+}
+
 /** Runs a tool call and keeps it in the logs; throws for a call Composio refuses outright. */
 export async function execute(
   context: ComposioRouteContext,
@@ -197,14 +219,7 @@ export async function execute(
     userId: account?.userId ?? request.userId ?? null,
     connectedAccountId: account?.id ?? null,
   }
-  const fromTest = (await handled(context, tool, args, call)) ?? seeded(context, tool, args)
-  const fromBackend =
-    fromTest ?? (account ? await onBackend(context, tool, args, account) : undefined)
-  const answer = fromBackend ?? {
-    data: tool.sample?.(args, context.objects.next()) ?? {},
-    error: null,
-    successful: true,
-  }
+  const { answer, source } = await answerFor(context, tool, args, account, call)
   const record: ExecutionRecord = {
     id: composioId("log"),
     tool: tool.slug,
@@ -213,7 +228,7 @@ export async function execute(
     accountId: call.connectedAccountId,
     arguments: { ...args },
     ...answer,
-    source: fromTest ? "seeded" : fromBackend ? "backend" : "sample",
+    source,
     at: iso(context.clock()),
   }
 

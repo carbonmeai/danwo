@@ -163,7 +163,7 @@ export function authConfigObject(
 }
 
 /** A connected account's `state`: its scheme and credentials, with the status Composio nests in them. */
-export function accountState(account: ConnectedAccountRecord, scheme: string) {
+function accountState(account: ConnectedAccountRecord, scheme: string) {
   return { authScheme: scheme, val: { ...account.val, status: account.status } }
 }
 
