@@ -31,11 +31,14 @@ export interface PageAssertions {
   toHaveScreenshot(name?: string, options?: VisualOptions): Promise<void>
 }
 
-/** `expect(locator)` waits for the page; `expect(screen)` checks the page; `expect(value)` a value. */
+/**
+ * `expect(locator)` waits for the page; `expect(screen)` checks the page; `expect(value)` a value.
+ * A value's check takes a `message` too, printed with its failure, as in vitest.
+ */
 export interface Expect {
   (actual: Locator): LocatorAssertions
   (actual: Screen): PageAssertions
-  <T>(actual: T): Assertion<void, T>
+  <T>(actual: T, message?: string): Assertion<void, T>
 }
 
 /** Checks of the page the screen shows. */
@@ -58,16 +61,16 @@ function pageAssertions(screen: PageScreen): PageAssertions {
 }
 
 /** Jest-style matchers on a plain value. */
-function expectValue<T>(actual: T): Assertion<void, T> {
+function expectValue<T>(actual: T, message?: string): Assertion<void, T> {
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- @vitest/expect's plugins add the Jest matchers to chai's assertion at runtime, which chai's types don't know
-  return chai.expect(actual) as unknown as Assertion<void, T>
+  return chai.expect(actual, message) as unknown as Assertion<void, T>
 }
 
 /** The `expect` of danwo tests. */
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- one runtime function serves every overload of Expect, which picks the assertions by the argument's type
-export const expect = ((actual: unknown) => {
+export const expect = ((actual: unknown, message?: string) => {
   if (actual instanceof ElementLocator) return locatorAssertions(actual)
   if (actual instanceof PageScreen) return pageAssertions(actual)
 
-  return expectValue(actual)
+  return expectValue(actual, message)
 }) as Expect
