@@ -4,7 +4,7 @@ import type { Store } from "../store.ts"
 import type { WebhookEndpoint } from "../webhooks.ts"
 import { resendApiKey } from "./auth.ts"
 import type { ResendRouteContext } from "./context.ts"
-import { isEventType, type Region } from "./entities.ts"
+import { isEventType, type KeyPermission, type Region } from "./entities.ts"
 import { ResendEvents } from "./events.ts"
 import { domainObject } from "./formatters.ts"
 import { newUuid, resendError } from "./helpers.ts"
@@ -23,6 +23,15 @@ export type ResendSeedConfig = Partial<{
   /** When set, only these addresses may receive mail, as on a sandboxed account. */
   readonly allowlist: readonly string[]
   readonly domains: readonly { readonly name: string; readonly region?: Region }[]
+  /**
+   * API keys the account has issued. Any `re_` key is accepted anyway; seed one with
+   * `permission: "sending_access"` to have reads refused with it, as a sending-only key is.
+   */
+  readonly keys: readonly {
+    readonly name: string
+    readonly token: string
+    readonly permission?: KeyPermission
+  }[]
   /** Endpoints to deliver webhooks to; without a `secret`, a random one. */
   readonly webhooks: readonly {
     readonly endpoint: string
@@ -47,6 +56,12 @@ export function seedResend(store: Store, config: ResendSeedConfig): void {
         createdAt,
       }),
       null,
+    )
+
+  for (const key of config.keys ?? [])
+    objects.keys.add(
+      { id: newUuid(), name: key.name, created_at: createdAt, last_used_at: null },
+      { token: key.token, permission: key.permission ?? "full_access" },
     )
 
   for (const webhook of config.webhooks ?? [])
@@ -88,12 +103,14 @@ export const resend = defineEmulator({
     app.onError(
       providerErrors((c, status, message) => resendError(c, status, "application_error", message)),
     )
-    app.use(resendApiKey())
+    const objects = resendStore(store)
+
+    app.use(resendApiKey(objects))
     routes({
       app,
       store,
       clock,
-      objects: resendStore(store),
+      objects,
       events: new ResendEvents(outbox, clock),
     })
   },

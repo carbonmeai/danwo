@@ -1,5 +1,6 @@
 import type {
   ApiKey,
+  CreateApiKeyOptions,
   DomainRegion,
   GetDomainResponseSuccess,
   GetEmailResponseSuccess,
@@ -13,9 +14,13 @@ export type Domain = GetDomainResponseSuccess
 export type Webhook = GetWebhookResponseSuccess
 export type Key = ApiKey
 
-/** An API key's secret token, shown only when it is created. */
+/** What an API key may do: everything, or only send email. */
+export type KeyPermission = NonNullable<CreateApiKeyOptions["permission"]>
+
+/** An API key's secret token, shown only when it is created, and what the key may do. */
 export interface KeyToken {
   readonly token: string
+  readonly permission?: KeyPermission
 }
 
 export type Region = DomainRegion

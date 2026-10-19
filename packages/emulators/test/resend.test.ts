@@ -51,6 +51,33 @@ describe("API keys", () => {
     expect(data).toBeNull()
     expect(error).toMatchObject({ statusCode: 403, name: "invalid_api_key" })
   })
+
+  it("lets a seeded sending-only key send but not read", async () => {
+    seedResend(emulator.store, {
+      keys: [{ name: "sender", token: "re_sending_only", permission: "sending_access" }],
+    })
+    const r = client("re_sending_only")
+    const sent = await r.emails.send({
+      from: "app@danwo-mail.com",
+      to: "user@danwo-mail.com",
+      subject: "Hi",
+      html: "<p>Hi</p>",
+    })
+
+    expect(sent.error).toBeNull()
+
+    const read = await r.emails.get(sent.data?.id ?? "")
+
+    expect(read.data).toBeNull()
+    expect(read.error).toMatchObject({ statusCode: 401, name: "restricted_api_key" })
+  })
+
+  it("restricts a key created with sending access", async () => {
+    const created = await client().apiKeys.create({ name: "ci", permission: "sending_access" })
+    const { error } = await client(created.data?.token).domains.list()
+
+    expect(error).toMatchObject({ statusCode: 401, name: "restricted_api_key" })
+  })
 })
 
 describe("emails", () => {
