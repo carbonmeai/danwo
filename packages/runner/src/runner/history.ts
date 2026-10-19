@@ -13,6 +13,7 @@ import type { PlannedFault, RunOutcome } from "@danwo/matrix"
 import type { LintFinding, LintSeverity } from "../lint/index.ts"
 import { addUsage, type Usage } from "../record/usage.ts"
 import { redactCredentials } from "../secrets/index.ts"
+import { headCommit } from "./git-changes.ts"
 import type { MatrixRunReport, Reporter, RunContext, TestRunReport } from "./reporting.ts"
 import type { AttemptReport, TestReport } from "./tasks.ts"
 
@@ -73,6 +74,8 @@ interface HistoryBase {
   /** The run's flight-record folder name under `.danwo/runs`, when anything was kept. */
   readonly run?: string
   readonly usage: Usage
+  /** The commit checked out when the run ended; absent outside git. */
+  readonly commit?: string
 }
 
 export interface TestHistory extends HistoryBase {
@@ -238,8 +241,13 @@ async function prune(dir: string): Promise<void> {
 async function keep(root: string, summary: RunHistory): Promise<void> {
   const dir = historyDir(root)
 
+  const commit = await headCommit(root)
+
   await mkdir(dir, { recursive: true })
-  await writeFile(join(dir, `${summary.id}.json`), `${JSON.stringify(summary)}\n`)
+  await writeFile(
+    join(dir, `${summary.id}.json`),
+    `${JSON.stringify(commit === undefined ? summary : { ...summary, commit })}\n`,
+  )
   await prune(dir)
 }
 

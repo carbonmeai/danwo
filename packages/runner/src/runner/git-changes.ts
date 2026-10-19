@@ -20,6 +20,17 @@ async function git(root: string, args: readonly string[]): Promise<string[]> {
   }
 }
 
+/** The commit checked out in `root`, or undefined outside a git repository. */
+export async function headCommit(root: string): Promise<string | undefined> {
+  try {
+    const { stdout } = await run("git", ["-C", root, "rev-parse", "HEAD"])
+
+    return stdout.trim() || undefined
+  } catch {
+    return undefined
+  }
+}
+
 /**
  * Files changed since `since` (committed or not) plus untracked ones, relative to `root`, leaving
  * out danwo's own `.danwo/` folder. Files
