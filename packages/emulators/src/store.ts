@@ -209,6 +209,8 @@ export class Store {
   readonly clock: Clock
   private readonly collections = new Map<string, StoredCollection>()
   private values = new Map<string, unknown>()
+  /** What else a reset clears: state kept beside the store, such as handlers test code set. */
+  private readonly onReset = new Set<() => void>()
 
   constructor(clock: Clock = systemClock) {
     this.clock = clock
@@ -237,10 +239,16 @@ export class Store {
     this.values.set(key.name, value)
   }
 
-  /** Empties every collection and value; collections keep their indexes. */
+  /** Empties every collection and value; collections keep their indexes. A restore resets first. */
   reset(): void {
     for (const collection of this.collections.values()) collection.clear()
     this.values = new Map()
+    for (const clear of this.onReset) clear()
+  }
+
+  /** Runs `clear` on every reset and restore, for state that lives beside the store. */
+  whenReset(clear: () => void): void {
+    this.onReset.add(clear)
   }
 
   snapshot(): StoreSnapshot {

@@ -41,11 +41,18 @@ export interface ComposioTools {
   clear(): void
 }
 
-/** The tool handlers of a Composio emulator, to answer tools from test code. */
+/**
+ * The tool handlers of a Composio emulator, to answer tools from test code. A reset or restore
+ * drops them, so one test's handlers never answer the next test's calls.
+ */
 export function composioTools(emulator: Pick<Emulator, "store">): ComposioTools {
-  const handlers = HANDLERS.get(emulator.store) ?? new Map<string, ToolHandler>()
+  const known = HANDLERS.get(emulator.store)
+  const handlers = known ?? new Map<string, ToolHandler>()
 
-  HANDLERS.set(emulator.store, handlers)
+  if (known === undefined) {
+    HANDLERS.set(emulator.store, handlers)
+    emulator.store.whenReset(() => handlers.clear())
+  }
 
   return {
     handle: (tool, handler) => handlers.set(tool.toUpperCase(), handler),
