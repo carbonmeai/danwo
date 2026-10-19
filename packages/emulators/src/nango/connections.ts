@@ -16,7 +16,7 @@ import {
 const HOUR = 3600_000
 
 /** Fresh OAuth credentials, valid for an hour on the emulator's clock. */
-export function freshCredentials(clock: Clock, refreshToken?: string): NangoCredentials {
+function freshCredentials(clock: Clock, refreshToken?: string): NangoCredentials {
   const access = `ya29.danwo-${randomBytes(18).toString("base64url")}`
   const expiresAt = isoIn(clock, HOUR)
 

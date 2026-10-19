@@ -17,7 +17,7 @@ import type {
 } from "./entities.ts"
 
 /** Attachment bytes, kept beside the message that carries them. */
-export interface StoredFile {
+interface StoredFile {
   id: string
   grant_id: string
   message_id: string

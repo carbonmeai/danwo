@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto"
 
 import { Outbox } from "../outbox.ts"
 import type { Clock, Store } from "../store.ts"
-import type { NylasEmailName, NylasProvider } from "./entities.ts"
+import type { NylasContact, NylasEmailName, NylasGrant, NylasProvider } from "./entities.ts"
 import { NylasEvents, type NylasTrigger } from "./events.ts"
 import { addGrant } from "./grants.ts"
 import { seconds } from "./helpers.ts"
@@ -59,6 +59,8 @@ export type NylasSeedConfig = Partial<{
 }>
 
 /** A context for seeding: the real store, with events going nowhere. */
+type SeedContext = ReturnType<typeof seedContext>
+
 function seedContext(store: Store) {
   const objects = nylasStore(store)
   const clock: Clock = store.clock
@@ -73,7 +75,7 @@ function seedContext(store: Store) {
   }
 }
 
-function seedGrant(context: ReturnType<typeof seedContext>, seed: NylasSeedGrant): void {
+function seedGrant(context: SeedContext, seed: NylasSeedGrant): void {
   const { grant } = addGrant(context, {
     email: seed.email,
     ...(seed.id && { id: seed.id }),
@@ -82,7 +84,18 @@ function seedGrant(context: ReturnType<typeof seedContext>, seed: NylasSeedGrant
     ...(seed.scope && { scope: seed.scope }),
   })
 
-  for (const message of seed.messages ?? []) {
+  seedMessages(context, grant, seed.messages ?? [])
+  seedEvents(context, grant, seed.events ?? [])
+  for (const contact of seed.contacts ?? [])
+    context.objects.contacts.add(contactFor(grant, contact), null)
+}
+
+function seedMessages(
+  context: SeedContext,
+  grant: NylasGrant,
+  messages: readonly NylasSeedMessage[],
+): void {
+  for (const message of messages) {
     const filed = fileMessage(
       context,
       grant,
@@ -97,47 +110,55 @@ function seedGrant(context: ReturnType<typeof seedContext>, seed: NylasSeedGrant
 
     if (message.unread === false) context.objects.messages.change(filed.id, { unread: false })
   }
+}
 
+function seedEvents(
+  context: SeedContext,
+  grant: NylasGrant,
+  events: readonly NylasSeedEvent[],
+): void {
   const calendar = context.objects.calendars.where(
     (cal) => cal.grant_id === grant.id && cal.is_primary,
   )[0]
 
-  for (const event of seed.events ?? [])
-    if (calendar)
-      context.objects.events.add(
-        newEvent(context, grant, calendar, {
-          title: event.title,
-          when: { start_time: event.start, end_time: event.end },
-          participants: (event.participants ?? []).map((email) => ({ email })),
-        }),
-        null,
-      )
+  if (!calendar) return
 
-  for (const contact of seed.contacts ?? [])
-    context.objects.contacts.add(
-      {
-        id: randomBytes(8).toString("hex"),
-        grant_id: grant.id,
-        object: "contact",
-        given_name: contact.given_name ?? null,
-        middle_name: null,
-        surname: contact.surname ?? null,
-        nickname: null,
-        company_name: null,
-        job_title: null,
-        notes: null,
-        birthday: null,
-        emails: [{ email: contact.email, type: "work" }],
-        phone_numbers: [],
-        web_pages: [],
-        im_addresses: [],
-        physical_addresses: [],
-        groups: [],
-        picture_url: null,
-        source: "address_book",
-      },
+  for (const event of events)
+    context.objects.events.add(
+      newEvent(context, grant, calendar, {
+        title: event.title,
+        when: { start_time: event.start, end_time: event.end },
+        participants: (event.participants ?? []).map((email) => ({ email })),
+      }),
       null,
     )
+}
+
+function contactFor(
+  grant: NylasGrant,
+  contact: NonNullable<NylasSeedGrant["contacts"]>[number],
+): NylasContact {
+  return {
+    id: randomBytes(8).toString("hex"),
+    grant_id: grant.id,
+    object: "contact",
+    given_name: contact.given_name ?? null,
+    middle_name: null,
+    surname: contact.surname ?? null,
+    nickname: null,
+    company_name: null,
+    job_title: null,
+    notes: null,
+    birthday: null,
+    emails: [{ email: contact.email, type: "work" }],
+    phone_numbers: [],
+    web_pages: [],
+    im_addresses: [],
+    physical_addresses: [],
+    groups: [],
+    picture_url: null,
+    source: "address_book",
+  }
 }
 
 /** Loads `config` into a Nylas emulator's store. */

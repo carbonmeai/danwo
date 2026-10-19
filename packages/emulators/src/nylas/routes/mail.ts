@@ -24,28 +24,29 @@ type Filter = (message: NylasMessage) => boolean
 const hasEmail = (list: readonly { email: string }[], email: string) =>
   list.some((person) => person.email.toLowerCase() === email.toLowerCase())
 
+const everyone = (m: NylasMessage) => [...m.from, ...m.to, ...m.cc, ...m.bcc]
+
+/** The messages list's query filters: each parameter and the test its value makes. */
+const FILTERS: readonly (readonly [string, (value: string) => Filter])[] = [
+  ["subject", (v) => (m) => m.subject === v],
+  ["from", (v) => (m) => hasEmail(m.from, v)],
+  ["to", (v) => (m) => hasEmail(m.to, v)],
+  ["any_email", (v) => (m) => v.split(",").some((email) => hasEmail(everyone(m), email))],
+  ["in", (v) => (m) => m.folders.includes(v)],
+  ["thread_id", (v) => (m) => m.thread_id === v],
+  ["unread", (v) => (m) => m.unread === (v === "true")],
+  ["starred", (v) => (m) => m.starred === (v === "true")],
+  ["received_after", (v) => (m) => m.date > Number(v)],
+  ["received_before", (v) => (m) => m.date < Number(v)],
+]
+
 /** The filters a messages list asked for, from its query. */
 function filtersOf(c: Context): Filter[] {
-  const q = (name: string) => c.req.query(name)
-  const filters: (Filter | undefined)[] = [
-    q("subject") !== undefined ? (m) => m.subject === q("subject") : undefined,
-    q("from") !== undefined ? (m) => hasEmail(m.from, q("from") ?? "") : undefined,
-    q("to") !== undefined ? (m) => hasEmail(m.to, q("to") ?? "") : undefined,
-    q("any_email") !== undefined
-      ? (m) =>
-          (q("any_email") ?? "")
-            .split(",")
-            .some((email) => hasEmail([...m.from, ...m.to, ...m.cc, ...m.bcc], email))
-      : undefined,
-    q("in") !== undefined ? (m) => m.folders.includes(q("in") ?? "") : undefined,
-    q("thread_id") !== undefined ? (m) => m.thread_id === q("thread_id") : undefined,
-    q("unread") !== undefined ? (m) => m.unread === (q("unread") === "true") : undefined,
-    q("starred") !== undefined ? (m) => m.starred === (q("starred") === "true") : undefined,
-    q("received_after") !== undefined ? (m) => m.date > Number(q("received_after")) : undefined,
-    q("received_before") !== undefined ? (m) => m.date < Number(q("received_before")) : undefined,
-  ]
+  return FILTERS.flatMap(([name, make]) => {
+    const value = c.req.query(name)
 
-  return filters.filter((filter) => filter !== undefined)
+    return value === undefined ? [] : [make(value)]
+  })
 }
 
 /** Newest first, as Nylas lists them. */

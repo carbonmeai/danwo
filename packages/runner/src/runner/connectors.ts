@@ -54,8 +54,11 @@ export interface UnipileOptions {
   readonly seed?: Seed<UnipileSeedConfig>
 }
 
+/** What `nylasEnvironment()` starts: the Nylas emulator behind its own proxy. */
 export type NylasEnvironment = OAuthEnvironment<"nylas">
+/** What `nangoEnvironment()` starts: Nango, and any backends, behind one proxy. */
 export type NangoEnvironment = OAuthEnvironment<"nango">
+/** What `unipileEnvironment()` starts: the Unipile emulator behind its own proxy. */
 export type UnipileEnvironment = OAuthEnvironment<"unipile">
 
 const NYLAS: Provider<NylasSeedConfig> = {

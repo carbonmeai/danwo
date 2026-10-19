@@ -71,6 +71,42 @@ function chatOf(context: UnipileRouteContext, id: string): UnipileChatRecord {
   return chat
 }
 
+/** The providers a hosted link body offers: all of them for `*` or none named. */
+function providersOf(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((p): p is string => typeof p === "string")
+
+  return typeof value === "string" && value !== "*" ? [value] : ["*"]
+}
+
+/** Makes a hosted auth link from a create or reconnect body. */
+function hostedLink(context: UnipileRouteContext, body: Readonly<Record<string, unknown>>) {
+  const type = body["type"] === "reconnect" ? "reconnect" : "create"
+  const reconnect = typeof body["reconnect_account"] === "string" ? body["reconnect_account"] : null
+  const text = (key: string) => (typeof body[key] === "string" ? body[key] : null)
+  const notify = text("notify_url")
+
+  if (type === "reconnect") accountOf(context, reconnect ?? undefined)
+
+  const link = context.objects.links.add(
+    {
+      id: unipileId(),
+      type,
+      providers: providersOf(body["providers"]),
+      name: text("name"),
+      notify_url: notify,
+      success_redirect_url: text("success_redirect_url"),
+      failure_redirect_url: text("failure_redirect_url"),
+      reconnect_account: reconnect,
+      expires_on: text("expiresOn") ?? new Date(context.clock().getTime() + 3600_000).toISOString(),
+    },
+    null,
+  )
+
+  if (notify !== null) context.objects.addNotifyUrl(notify)
+
+  return { object: "HostedAuthUrl", url: `${HOSTED_ORIGIN}/${link.id}` }
+}
+
 function accountRoutes(context: UnipileRouteContext): void {
   const { app, objects } = context
 
@@ -96,42 +132,7 @@ function accountRoutes(context: UnipileRouteContext): void {
   app.post(`${API}/hosted/accounts/link`, async (c) => {
     requireToken(context, c)
 
-    const body = await jsonBody(c)
-    const type = body["type"] === "reconnect" ? "reconnect" : "create"
-    const reconnect =
-      typeof body["reconnect_account"] === "string" ? body["reconnect_account"] : null
-
-    if (type === "reconnect") accountOf(context, reconnect ?? undefined)
-
-    const id = unipileId()
-    const text = (key: string) => (typeof body[key] === "string" ? body[key] : null)
-    const providers =
-      body["providers"] === "*" || body["providers"] === undefined
-        ? ["*"]
-        : Array.isArray(body["providers"])
-          ? body["providers"].filter((p): p is string => typeof p === "string")
-          : typeof body["providers"] === "string"
-            ? [body["providers"]]
-            : ["*"]
-
-    objects.links.add(
-      {
-        id,
-        type,
-        providers,
-        name: text("name"),
-        notify_url: text("notify_url"),
-        success_redirect_url: text("success_redirect_url"),
-        failure_redirect_url: text("failure_redirect_url"),
-        reconnect_account: reconnect,
-        expires_on:
-          text("expiresOn") ?? new Date(context.clock().getTime() + 3600_000).toISOString(),
-      },
-      null,
-    )
-    if (text("notify_url")) objects.addNotifyUrl(text("notify_url") ?? "")
-
-    return c.json({ object: "HostedAuthUrl", url: `${HOSTED_ORIGIN}/${id}` }, 201)
+    return c.json(hostedLink(context, await jsonBody(c)), 201)
   })
 }
 

@@ -75,19 +75,11 @@ function connect(
   link: UnipileLinkRecord,
   form: Readonly<Record<string, unknown>>,
 ): Response {
-  const text = (key: string) => (typeof form[key] === "string" ? form[key] : "")
   const reconnected =
     link.reconnect_account === null
       ? undefined
       : context.objects.accounts.get(link.reconnect_account)
-  const type = PROVIDERS.find((p) => p.type === text("provider"))?.type ?? "LINKEDIN"
-  const account =
-    reconnected ??
-    addAccount(context, {
-      type,
-      name: text("name") || text("username"),
-      username: text("username"),
-    })
+  const account = reconnected ?? newAccount(context, form)
   const status = reconnected ? "RECONNECTED" : "CREATION_SUCCESS"
 
   if (reconnected) setStatus(context, reconnected, "OK")
@@ -102,6 +94,18 @@ function connect(
     })
 
   return finish(c, link, account.id)
+}
+
+/** The account the hosted page's form describes. */
+function newAccount(context: UnipileRouteContext, form: Readonly<Record<string, unknown>>) {
+  const text = (key: string) => (typeof form[key] === "string" ? form[key] : "")
+  const type = PROVIDERS.find((p) => p.type === text("provider"))?.type ?? "LINKEDIN"
+
+  return addAccount(context, {
+    type,
+    name: text("name") || text("username"),
+    username: text("username"),
+  })
 }
 
 const expired = (c: Context) =>

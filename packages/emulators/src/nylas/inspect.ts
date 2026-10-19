@@ -10,6 +10,7 @@ import { seconds } from "./helpers.ts"
 import { fileMessage } from "./mail.ts"
 import { nylasStore } from "./store.ts"
 
+/** The Nylas application a test reads and acts on; see `nylasApplication`. */
 export interface NylasApplication {
   /** Every connected grant. */
   grants(): NylasGrant[]

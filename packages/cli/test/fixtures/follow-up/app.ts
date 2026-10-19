@@ -66,26 +66,23 @@ async function home(res: ServerResponse): Promise<void> {
 <p role="status">${notice}</p>`)
 }
 
+/** A click on "Send follow-up": the follow-up in flight is shared, so a double submit sends once. */
+async function clicked(res: ServerResponse): Promise<void> {
+  const send = once
+    ? (sending ??= followUp().finally(() => {
+        sending = undefined
+      }))
+    : followUp()
+
+  notice = await send.catch((error: unknown) => `Could not send: ${String(error)}`)
+  res.writeHead(303, { location: "/" })
+  res.end()
+}
+
 createServer((req, res) => {
-  const route = async () => {
-    if (req.method === "POST" && req.url === "/follow-up") {
-      const send = once
-        ? (sending ??= followUp().finally(() => {
-            sending = undefined
-          }))
-        : followUp()
+  const handled = req.method === "POST" && req.url === "/follow-up" ? clicked(res) : home(res)
 
-      notice = await send.catch((error: unknown) => `Could not send: ${String(error)}`)
-      res.writeHead(303, { location: "/" })
-      res.end()
-
-      return
-    }
-
-    await home(res)
-  }
-
-  route().catch((error: unknown) => {
+  handled.catch((error: unknown) => {
     res.writeHead(500)
     res.end(String(error))
   })

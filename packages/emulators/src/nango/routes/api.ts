@@ -256,49 +256,69 @@ function seededAnswer(
     )
 }
 
-async function proxied(context: NangoRouteContext, c: Context): Promise<Response> {
-  const connection = headerConnection(context, c)
-  const url = new URL(c.req.url)
-  const path = url.pathname.replace(/^\/proxy/, "") || "/"
-  const raw = ["GET", "HEAD"].includes(c.req.method) ? undefined : await c.req.text()
-  const backend = backendFor(context.store, connection.provider)
-  const record = (status: number) =>
-    context.objects.calls.add(
-      {
-        id: `call_${context.objects.next()}`,
-        kind: "proxy",
-        connection_id: connection.connection_id,
-        integration: connection.provider_config_key,
-        method: c.req.method,
-        path: `${path}${url.search}`,
-        body: raw === undefined || raw === "" ? null : raw,
-        status,
-      },
-      null,
-    )
+/** One proxied call as the proxy received it. */
+interface ProxiedCall {
+  readonly connection: NangoConnection
+  readonly method: string
+  readonly path: string
+  readonly search: string
+  readonly body: string | undefined
+  readonly contentType: string
+}
 
-  if (backend) {
-    const answer = await backend.emulator.fetch(
-      new Request(`${backend.base}${path}${url.search}`, {
-        method: c.req.method,
+async function proxied(context: NangoRouteContext, c: Context): Promise<Response> {
+  const url = new URL(c.req.url)
+  const raw = ["GET", "HEAD"].includes(c.req.method) ? "" : await c.req.text()
+  const call: ProxiedCall = {
+    connection: headerConnection(context, c),
+    method: c.req.method,
+    path: url.pathname.replace(/^\/proxy/, "") || "/",
+    search: url.search,
+    body: raw === "" ? undefined : raw,
+    contentType: c.req.header("content-type") ?? "application/json",
+  }
+  const answer = await answerFor(context, call)
+
+  recordProxied(context, call, answer.status)
+
+  return answer
+}
+
+/** The backend emulator's answer to a proxied call, or the seeded one (an empty 200 when none matches). */
+async function answerFor(context: NangoRouteContext, call: ProxiedCall): Promise<Response> {
+  const backend = backendFor(context.store, call.connection.provider)
+
+  if (backend)
+    return backend.emulator.fetch(
+      new Request(`${backend.base}${call.path}${call.search}`, {
+        method: call.method,
         headers: {
-          authorization: `Bearer ${connection.credentials.access_token}`,
-          "content-type": c.req.header("content-type") ?? "application/json",
+          authorization: `Bearer ${call.connection.credentials.access_token}`,
+          "content-type": call.contentType,
         },
-        ...(raw !== undefined && raw !== "" && { body: raw }),
+        ...(call.body !== undefined && { body: call.body }),
       }),
     )
 
-    record(answer.status)
+  const seeded = seededAnswer(context, call.connection, call.method, call.path)
 
-    return answer
-  }
+  return Response.json(seeded?.body ?? {}, { status: seeded?.status ?? 200 })
+}
 
-  const seeded = seededAnswer(context, connection, c.req.method, path)
-
-  record(seeded?.status ?? 200)
-
-  return c.json(seeded?.body ?? {}, seeded?.status ?? 200)
+function recordProxied(context: NangoRouteContext, call: ProxiedCall, status: number): void {
+  context.objects.calls.add(
+    {
+      id: `call_${context.objects.next()}`,
+      kind: "proxy",
+      connection_id: call.connection.connection_id,
+      integration: call.connection.provider_config_key,
+      method: call.method,
+      path: `${call.path}${call.search}`,
+      body: call.body ?? null,
+      status,
+    },
+    null,
+  )
 }
 
 function proxyRoutes(context: NangoRouteContext): void {

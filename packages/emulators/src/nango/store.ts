@@ -3,7 +3,7 @@ import { objectTable } from "../objects.ts"
 import type { DataKey, Store } from "../store.ts"
 
 /** An integration: a provider set up in the Nango environment under a unique key. */
-export interface NangoIntegration {
+interface NangoIntegration {
   id: string
   unique_key: string
   provider: string
@@ -29,6 +29,7 @@ export interface NangoCredentials {
   raw: Record<string, unknown>
 }
 
+/** A connection: one end user's account at an integration, with its credentials. */
 export interface NangoConnection {
   /** The key the table uses: the integration and the connection id together. */
   id: string

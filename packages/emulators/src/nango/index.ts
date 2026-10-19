@@ -65,7 +65,6 @@ const silent = { push: () => ({ id: 0, topic: "", body: null, createdAt: "" }) }
 /** Loads `config` into a Nango emulator's store. */
 export function seedNango(store: Store, config: NangoSeedConfig): void {
   const objects = nangoStore(store)
-  const now = store.clock().toISOString()
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- seeding sends no webhooks and registers no routes
   const context = {
     objects,
@@ -76,39 +75,13 @@ export function seedNango(store: Store, config: NangoSeedConfig): void {
   } as unknown as NangoRouteContext
 
   if (config.secretKeys?.length) objects.secretKeys.add(config.secretKeys)
-  for (const integration of config.integrations ?? [])
-    objects.integrations.add(
-      {
-        id: integration.key,
-        unique_key: integration.key,
-        provider: integration.provider ?? integration.key,
-        display_name: integration.name ?? integration.key,
-        logo: `https://app.nango.dev/images/template-logos/${integration.provider ?? integration.key}.svg`,
-        created_at: now,
-        updated_at: now,
-      },
-      null,
-    )
+  for (const integration of config.integrations ?? []) seedIntegration(store, integration)
+  for (const seed of config.connections ?? []) seedConnection(context, seed)
+  seedExtras(objects, config)
+}
 
-  for (const seed of config.connections ?? []) {
-    const { connection } = connect(context, {
-      integration: seed.integration,
-      connectionId: seed.connectionId,
-      endUser: seed.endUser ?? null,
-    })
-
-    objects.connections.change(connection.id, {
-      ...(seed.metadata && { metadata: { ...seed.metadata } }),
-      ...(seed.accessToken && {
-        credentials: {
-          ...connection.credentials,
-          access_token: seed.accessToken,
-          raw: { access_token: seed.accessToken },
-        },
-      }),
-    })
-  }
-
+/** The webhook URL, proxy answers, actions and records a seed names. */
+function seedExtras(objects: ReturnType<typeof nangoStore>, config: NangoSeedConfig): void {
   if (config.webhook) objects.setWebhook(config.webhook)
   if (config.proxy) objects.answers.add(config.proxy)
   if (config.actions) objects.actions.add(config.actions)
@@ -120,6 +93,40 @@ export function seedNango(store: Store, config: NangoSeedConfig): void {
         records: [...r.records],
       })),
     )
+}
+
+function seedIntegration(store: Store, integration: NangoSeedIntegration): void {
+  const now = store.clock().toISOString()
+  const provider = integration.provider ?? integration.key
+
+  nangoStore(store).integrations.add(
+    {
+      id: integration.key,
+      unique_key: integration.key,
+      provider,
+      display_name: integration.name ?? integration.key,
+      logo: `https://app.nango.dev/images/template-logos/${provider}.svg`,
+      created_at: now,
+      updated_at: now,
+    },
+    null,
+  )
+}
+
+function seedConnection(context: NangoRouteContext, seed: NangoSeedConnection): void {
+  const { connection } = connect(context, {
+    integration: seed.integration,
+    connectionId: seed.connectionId,
+    endUser: seed.endUser ?? null,
+  })
+  const token = seed.accessToken
+
+  context.objects.connections.change(connection.id, {
+    ...(seed.metadata && { metadata: { ...seed.metadata } }),
+    ...(token && {
+      credentials: { ...connection.credentials, access_token: token, raw: { access_token: token } },
+    }),
+  })
 }
 
 /** Reading a Nango emulator from a test, and breaking a connection as a revoked app does. */

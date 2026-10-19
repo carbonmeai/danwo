@@ -28,25 +28,11 @@ import {
 const GRANT = "/v3/grants/:grant"
 
 /** An event's `when` from a request body; a span needs both ends, in order. */
-export function whenOf(value: unknown): NylasWhen {
+function whenOf(value: unknown): NylasWhen {
   const when = asRecord(value)
-  const start = when?.["start_time"]
-  const end = when?.["end_time"]
 
-  if (typeof start === "number" && typeof end === "number") {
-    if (end <= start) throw badRequest("when.end_time must be after when.start_time")
-
-    return {
-      object: "timespan",
-      start_time: start,
-      end_time: end,
-      ...(typeof when?.["start_timezone"] === "string" && {
-        start_timezone: when["start_timezone"],
-      }),
-      ...(typeof when?.["end_timezone"] === "string" && { end_timezone: when["end_timezone"] }),
-    }
-  }
-
+  if (typeof when?.["start_time"] === "number" && typeof when["end_time"] === "number")
+    return timespanOf(when, when["start_time"], when["end_time"])
   if (typeof when?.["date"] === "string") return { object: "date", date: when["date"] }
   if (typeof when?.["start_date"] === "string" && typeof when["end_date"] === "string")
     return { object: "datespan", start_date: when["start_date"], end_date: when["end_date"] }
@@ -54,8 +40,27 @@ export function whenOf(value: unknown): NylasWhen {
   throw badRequest("when must have start_time and end_time, a date, or start_date and end_date")
 }
 
+/** A span of time, in order, with the time zones the body gave. */
+function timespanOf(
+  when: Readonly<Record<string, unknown>>,
+  start: number,
+  end: number,
+): NylasWhen {
+  if (end <= start) throw badRequest("when.end_time must be after when.start_time")
+
+  const zone = (key: string) => (typeof when[key] === "string" ? { [key]: when[key] } : {})
+
+  return {
+    object: "timespan",
+    start_time: start,
+    end_time: end,
+    ...zone("start_timezone"),
+    ...zone("end_timezone"),
+  }
+}
+
 /** Where an event's span starts and ends, in Unix seconds; whole days count from midnight UTC. */
-export function spanOf(when: NylasWhen): { start: number; end: number } {
+function spanOf(when: NylasWhen): { start: number; end: number } {
   if (when.object === "timespan") return { start: when.start_time, end: when.end_time }
 
   const first = when.object === "date" ? when.date : when.start_date

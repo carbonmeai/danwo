@@ -75,19 +75,25 @@ function threadFor(
 
 /** The thread's summary fields, recomputed from its messages. */
 export function refreshThread(context: NylasRouteContext, threadId: string): void {
-  const thread = context.objects.threads.get(threadId)
+  if (!context.objects.threads.get(threadId)) return
 
-  if (!thread) return
+  context.objects.threads.change(
+    threadId,
+    threadSummary(context.objects.messages.where((m) => m.thread_id === threadId)),
+  )
+}
 
-  const messages = context.objects.messages.where((m) => m.thread_id === threadId)
+/** A thread's summary fields, from its messages oldest first. */
+function threadSummary(messages: readonly NylasMessage[]): Partial<NylasThread> {
   const latest = messages.at(-1) ?? null
   const seen = new Map<string, NylasEmailName>()
+  const sent = messages.filter((m) => m.folders.includes("SENT"))
+  const received = messages.filter((m) => !m.folders.includes("SENT"))
 
-  for (const message of messages)
-    for (const person of [...message.from, ...message.to, ...message.cc])
-      seen.set(person.email, person)
+  for (const person of messages.flatMap((m) => [...m.from, ...m.to, ...m.cc]))
+    seen.set(person.email, person)
 
-  context.objects.threads.change(threadId, {
+  return {
     message_ids: messages.map((m) => m.id),
     participants: [...seen.values()],
     folders: [...new Set(messages.flatMap((m) => m.folders))],
@@ -96,11 +102,9 @@ export function refreshThread(context: NylasRouteContext, threadId: string): voi
     has_attachments: messages.some((m) => m.attachments.length > 0),
     snippet: latest?.snippet ?? "",
     latest_draft_or_message: latest,
-    latest_message_received_date:
-      messages.filter((m) => !m.folders.includes("SENT")).at(-1)?.date ?? null,
-    latest_message_sent_date:
-      messages.filter((m) => m.folders.includes("SENT")).at(-1)?.date ?? null,
-  })
+    latest_message_received_date: received.at(-1)?.date ?? null,
+    latest_message_sent_date: sent.at(-1)?.date ?? null,
+  }
 }
 
 function attachmentsOf(

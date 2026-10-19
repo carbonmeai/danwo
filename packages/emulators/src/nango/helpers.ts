@@ -8,7 +8,6 @@ import type { NangoStore } from "./store.ts"
 /** The hosts the Nango emulator answers: the API and the hosted Connect UI. */
 export const NANGO_HOSTS: readonly string[] = ["api.nango.dev", "connect.nango.dev"]
 
-export const API_ORIGIN = "https://api.nango.dev"
 export const CONNECT_ORIGIN = "https://connect.nango.dev"
 
 /** What every group of Nango routes is registered with. */
