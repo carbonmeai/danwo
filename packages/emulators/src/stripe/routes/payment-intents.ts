@@ -4,6 +4,7 @@ import { paymentMethodFor } from "../cards.ts"
 import type { StripeRouteContext } from "../context.ts"
 import type { PaymentIntent } from "../entities.ts"
 import {
+  asRecord,
   badParam,
   clearableTexts,
   flag,
@@ -18,7 +19,12 @@ import {
   textOrNull,
   unix,
 } from "../helpers.ts"
-import { createIntent, type IntentFields, payIntent } from "../payments.ts"
+import {
+  type AutomaticPaymentMethods,
+  createIntent,
+  type IntentFields,
+  payIntent,
+} from "../payments.ts"
 
 type FutureUsage = "off_session" | "on_session" | null
 type CancelReason = "duplicate" | "fraudulent" | "requested_by_customer" | "abandoned"
@@ -29,6 +35,21 @@ const CANCEL_REASONS: readonly CancelReason[] = [
   "requested_by_customer",
   "abandoned",
 ]
+
+/**
+ * `automatic_payment_methods[enabled]` and `[allow_redirects]` from a create request, the way an
+ * account with dynamic payment methods asks for an intent instead of listing its methods.
+ */
+function automaticMethods(value: unknown): AutomaticPaymentMethods | null {
+  const setting = asRecord(value)
+
+  if (!setting) return null
+
+  return {
+    enabled: flag(setting.enabled) ?? false,
+    allow_redirects: setting.allow_redirects === "never" ? "never" : "always",
+  }
+}
 
 function futureUsage(value: unknown): FutureUsage {
   return value === "off_session" || value === "on_session" ? value : null
@@ -49,6 +70,7 @@ function intentFields(
     paymentMethod: textOrNull(params.payment_method),
     setupFutureUsage: futureUsage(params.setup_future_usage),
     receiptEmail: textOrNull(params.receipt_email),
+    automaticPaymentMethods: automaticMethods(params.automatic_payment_methods),
   }
 }
 

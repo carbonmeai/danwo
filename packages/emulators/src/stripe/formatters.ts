@@ -70,6 +70,8 @@ export function productObject(fields: {
   description: string | null
   active: boolean
   metadata: Metadata
+  /** The product tax code, e.g. `txcd_10000000`, as Stripe Tax uses it. */
+  taxCode?: string | null
 }): Product & { attributes: string[] } {
   return {
     id: fields.id,
@@ -87,7 +89,7 @@ export function productObject(fields: {
     package_dimensions: null,
     shippable: null,
     statement_descriptor: null,
-    tax_code: null,
+    tax_code: fields.taxCode ?? null,
     tax_details: null,
     type: "service",
     unit_label: null,
@@ -149,6 +151,7 @@ export function paymentIntentObject(fields: {
   setupFutureUsage: "off_session" | "on_session" | null
   metadata: Metadata
   receiptEmail: string | null
+  automaticPaymentMethods?: { enabled: boolean; allow_redirects: "always" | "never" } | null
 }): PaymentIntent {
   return {
     id: fields.id,
@@ -160,7 +163,7 @@ export function paymentIntentObject(fields: {
     amount_received: 0,
     application: null,
     application_fee_amount: null,
-    automatic_payment_methods: null,
+    automatic_payment_methods: fields.automaticPaymentMethods ?? null,
     canceled_at: null,
     cancellation_reason: null,
     capture_method: "automatic",

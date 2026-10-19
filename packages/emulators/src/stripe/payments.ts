@@ -15,6 +15,14 @@ export interface IntentFields {
   readonly paymentMethod: string | null
   readonly setupFutureUsage: "off_session" | "on_session" | null
   readonly receiptEmail: string | null
+  /** The intent's dynamic payment methods setting, when the request asked for it. */
+  readonly automaticPaymentMethods?: AutomaticPaymentMethods | null
+}
+
+/** `automatic_payment_methods`, as an intent reports it. */
+export interface AutomaticPaymentMethods {
+  readonly enabled: boolean
+  readonly allow_redirects: "always" | "never"
 }
 
 /** Stores a new PaymentIntent and emits `payment_intent.created`. */

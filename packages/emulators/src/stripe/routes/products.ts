@@ -44,6 +44,7 @@ export function productRoutes({ app, objects, events, clock }: StripeRouteContex
         description: text(params.description) ?? null,
         active: flag(params.active) ?? true,
         metadata: metadataOf(params.metadata) ?? {},
+        taxCode: text(params.tax_code) ?? null,
       }),
       null,
     )

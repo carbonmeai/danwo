@@ -68,6 +68,7 @@ function productFor(prices: Prices, params: Record<string, unknown>): string | u
       description: null,
       active: true,
       metadata: metadataOf(data?.metadata) ?? {},
+      taxCode: text(data?.tax_code) ?? null,
     }),
     null,
   )
