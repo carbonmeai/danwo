@@ -134,9 +134,22 @@ function wordsMatch(text: string, query: string): boolean {
     .every((word) => haystack.includes(word))
 }
 
-/** A list's filter: what was typed, the rows that match it, and the box `/` jumps to. */
-export function useFilter<T>(rows: readonly T[], textOf: (row: T) => string) {
-  const [query, setQuery] = useState("")
+/**
+ * A list's filter: what was typed, the rows that match it, and the box `/` jumps to. `kept` is a
+ * query to start from and to report each change to, so the page's address can hold it.
+ */
+export function useFilter<T>(
+  rows: readonly T[],
+  textOf: (row: T) => string,
+  kept?: { readonly query: string; readonly onChange: (query: string) => void },
+) {
+  const [query, setTyped] = useState(kept?.query ?? "")
+
+  const setQuery = (next: string) => {
+    setTyped(next)
+    kept?.onChange(next)
+  }
+
   const deferred = useDeferredValue(query.trim())
   const box = useRef<HTMLInputElement>(null)
   const shown = deferred === "" ? rows : rows.filter((row) => wordsMatch(textOf(row), deferred))

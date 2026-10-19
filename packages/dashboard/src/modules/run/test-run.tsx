@@ -2,7 +2,7 @@ import type { HistoryTest, TestHistory } from "@danwo/runner/runner"
 import { Icons } from "@danwo/ui/icons/base"
 import { HStack, Stack, styled } from "@danwo/ui/jsx"
 import { Link } from "@tanstack/react-router"
-import { type ReactNode, useRef } from "react"
+import { type ReactNode, useEffect, useRef } from "react"
 
 import { Ident } from "../../components/code.tsx"
 import { KeyHint } from "../../components/controls.tsx"
@@ -13,6 +13,7 @@ import { RowPanel, RowTable, Td, Th } from "../../components/table.tsx"
 import { TimeAgo } from "../../components/time-ago.tsx"
 import { dollars, duration } from "../../lib/format.ts"
 import { useListKeys } from "../../lib/list-keys.ts"
+import { RerunFailed, RerunTest } from "../live/run-actions.tsx"
 import { cacheLine, sortedTests, testFigures } from "./run-values.ts"
 
 /** Links to a test's kept flight records, one per attempt that kept one. */
@@ -61,20 +62,43 @@ function BrokenFiles({ run }: { readonly run: TestHistory }) {
   )
 }
 
-function TestLine({ test, current }: { readonly test: HistoryTest; readonly current: boolean }) {
+function TestLine({
+  runId,
+  test,
+  current,
+  picked,
+}: {
+  readonly runId: string
+  readonly test: HistoryTest
+  readonly current: boolean
+  readonly picked: boolean
+}) {
   const error = test.attempts.find((a) => a.error)?.error
   const time = test.attempts.reduce((sum, a) => sum + a.durationMs, 0)
+  const row = useRef<HTMLTableRowElement>(null)
+
+  useEffect(() => {
+    if (picked) row.current?.scrollIntoView({ block: "center" })
+  }, [picked])
 
   return (
-    <tr data-row data-current={current || undefined}>
+    <tr ref={row} data-row data-current={current || undefined} data-picked={picked || undefined}>
       <Td>
         <StatusBadge status={test.status} />
       </Td>
       <Td>
         <Stack gap="1">
-          <styled.span fontWeight="500" overflowWrap="anywhere">
-            {test.id}
-          </styled.span>
+          <Link
+            to="/runs/$runId"
+            params={{ runId }}
+            search={{ test: test.id }}
+            replace
+            title="A link to this test in this run"
+          >
+            <styled.span fontWeight="500" overflowWrap="anywhere">
+              {test.id}
+            </styled.span>
+          </Link>
           {error ? (
             <styled.span color="verdict.failed.fg" fontSize="1" lineClamp="2">
               <Ident>{error.code}</Ident> {error.message}
@@ -96,6 +120,9 @@ function TestLine({ test, current }: { readonly test: HistoryTest; readonly curr
       <Td>
         <AttemptLinks test={test} />
       </Td>
+      <Td w="6rem">
+        <RerunTest testId={test.id} />
+      </Td>
     </tr>
   )
 }
@@ -104,9 +131,12 @@ function TestLine({ test, current }: { readonly test: HistoryTest; readonly curr
 export function TestRun({
   run,
   crumbs,
+  focus,
 }: {
   readonly run: TestHistory
   readonly crumbs: ReactNode
+  /** The test the page's address points at. */
+  readonly focus?: string | undefined
 }) {
   const tests = sortedTests(run)
   const figures = testFigures(run)
@@ -122,7 +152,12 @@ export function TestRun({
           <Ident>danwo test</Ident> run, started <TimeAgo at={run.startedAt} />
         </>
       }
-      actions={<KeyHint />}
+      actions={
+        <>
+          <KeyHint />
+          <RerunFailed runId={run.id} failed={figures.failed} />
+        </>
+      }
     >
       <StatCards>
         <StatCard
@@ -160,11 +195,20 @@ export function TestRun({
               <Th display={{ base: "none", lg: "table-cell" }}>Replay cache</Th>
               <Th textAlign="right">Time</Th>
               <Th>Flight records</Th>
+              <Th>
+                <styled.span srOnly>Run again</styled.span>
+              </Th>
             </tr>
           </thead>
           <tbody ref={list}>
             {tests.map((test, i) => (
-              <TestLine key={test.id} test={test} current={i === current} />
+              <TestLine
+                key={test.id}
+                runId={run.id}
+                test={test}
+                current={i === current}
+                picked={test.id === focus}
+              />
             ))}
           </tbody>
         </RowTable>

@@ -13,6 +13,7 @@ import { LintLabel, Swatch } from "../../components/status-badge.tsx"
 import { TimeAgo } from "../../components/time-ago.tsx"
 import { duration } from "../../lib/format.ts"
 import { toneOf, wordOf } from "../../lib/verdicts.ts"
+import { RunMatrix } from "../live/run-actions.tsx"
 import { FaultHeatmap } from "./fault-heatmap.tsx"
 import { InvariantPanel } from "./invariant-panel.tsx"
 import { LEGEND } from "./matrix-values.ts"
@@ -73,10 +74,13 @@ export function MatrixRun({
   run,
   view,
   crumbs,
+  focus,
 }: {
   readonly run: MatrixHistory
   readonly view: MatrixView
   readonly crumbs: ReactNode
+  /** The trial the page's address points at, by its fault. */
+  readonly focus?: string | undefined
 }) {
   return (
     <Page
@@ -88,7 +92,12 @@ export function MatrixRun({
           <TimeAgo at={run.startedAt} />, took {duration(run.durationMs)}
         </>
       }
-      actions={<Command text={`danwo matrix ${run.file}`} />}
+      actions={
+        <>
+          <Command text={`danwo matrix ${run.file}`} />
+          <RunMatrix testId={run.testId} />
+        </>
+      }
     >
       <InvariantPanel run={run} />
       {run.trials.length === 0 ? (
@@ -103,7 +112,11 @@ export function MatrixRun({
             <Legend />
             <ViewSwitch runId={run.id} view={view} />
           </HStack>
-          {view === "list" ? <TrialList run={run} /> : <FaultHeatmap run={run} />}
+          {view === "list" ? (
+            <TrialList run={run} focus={focus} />
+          ) : (
+            <FaultHeatmap run={run} focus={focus} />
+          )}
         </Stack>
       )}
       {run.lint && run.lint.length > 0 ? (

@@ -1,16 +1,43 @@
 import { createFileRoute } from "@tanstack/react-router"
 
+import { fetchLiveRun } from "../modules/live/live-api.ts"
 import type { MatrixView } from "../modules/matrix/matrix-run.tsx"
 import { RunPage } from "../modules/run/run-page.tsx"
 import { fetchRun } from "../modules/runs/runs-api.ts"
 
-const RunRoute = () => (
-  <RunPage run={Route.useLoaderData()} view={Route.useSearch().view ?? "grid"} />
-)
+/** What a run's address can point at inside it: the matrix view, a test, a trial. */
+interface RunSearch {
+  readonly view?: MatrixView
+  readonly test?: string
+  readonly trial?: string
+}
+
+const text = (value: unknown) => (typeof value === "string" && value !== "" ? value : undefined)
+
+function runSearch(search: Record<string, unknown>): RunSearch {
+  const test = text(search.test)
+  const trial = text(search.trial)
+
+  return {
+    ...(search.view === "list" && { view: "list" }),
+    ...(test !== undefined && { test }),
+    ...(trial !== undefined && { trial }),
+  }
+}
+
+const RunRoute = () => {
+  const { run, live } = Route.useLoaderData()
+  const search = Route.useSearch()
+
+  return <RunPage run={run} live={live} view={search.view ?? "grid"} search={search} />
+}
 
 export const Route = createFileRoute("/runs/$runId")({
-  validateSearch: (search: Record<string, unknown>): { view?: MatrixView } =>
-    search.view === "list" ? { view: "list" } : {},
-  loader: ({ params }) => fetchRun({ data: params.runId }),
+  validateSearch: runSearch,
+  loader: async ({ params }) => {
+    const run = await fetchRun({ data: params.runId })
+
+    return { run, live: run === null ? await fetchLiveRun({ data: params.runId }) : null }
+  },
   component: RunRoute,
 })

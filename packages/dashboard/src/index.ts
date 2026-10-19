@@ -1,9 +1,10 @@
 /**
  * Starts the dashboard for a project: a local web server, on 127.0.0.1 only, that reads the
- * project's `.danwo` folder and never writes to it.
+ * project's `.danwo` folder and never writes to it. Runs started from its pages go through the
+ * danwo CLI, which writes as any run does.
  */
 import { spawn } from "node:child_process"
-import { dirname } from "node:path"
+import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { nearestConfig } from "@danwo/runner/runner"
@@ -14,6 +15,8 @@ export interface DashboardOptions {
   readonly root: string
   /** Default 4310; 0 picks a free port. */
   readonly port?: number
+  /** The danwo CLI runs started from the dashboard use; default the one installed beside it. */
+  readonly cli?: string
 }
 
 export interface Dashboard {
@@ -22,6 +25,8 @@ export interface Dashboard {
 }
 
 const CONFIG = fileURLToPath(new URL("../vite.config.ts", import.meta.url))
+/** The CLI beside this package, in the workspace and once installed alike. */
+const CLI = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "cli", "bin", "danwo.mjs")
 const DEFAULT_PORT = 4310
 
 /** The server's local URL once it listens. */
@@ -36,6 +41,7 @@ function urlOf(server: ViteDevServer): string {
 
 export async function startDashboard(options: DashboardOptions): Promise<Dashboard> {
   process.env.DANWO_PROJECT_ROOT = options.root
+  process.env.DANWO_CLI_BIN = options.cli ?? CLI
 
   const port = options.port ?? DEFAULT_PORT
   const server = await createServer({

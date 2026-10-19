@@ -33,6 +33,9 @@ const TONES: Readonly<Record<string, Tone>> = {
   invalid: "invalid",
   missed: "invalid",
   skipped: "invalid",
+  running: "notJudged",
+  stopped: "invalid",
+  queued: "invalid",
 }
 
 /** A status's colour; unknown statuses read neutral. */

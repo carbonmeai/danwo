@@ -1,6 +1,6 @@
 import type { HistoryTrial, MatrixHistory } from "@danwo/runner/runner"
 import { Box, Grid, HStack, styled } from "@danwo/ui/jsx"
-import { useNavigate } from "@tanstack/react-router"
+import { Link, useNavigate } from "@tanstack/react-router"
 import { Fragment, useState } from "react"
 
 import { Ident } from "../../components/code.tsx"
@@ -103,11 +103,21 @@ function ColumnHeads({ columns }: { readonly columns: readonly string[] }) {
 }
 
 /** The trials as a heatmap: what a fault landed on down the side, the kind of fault across. */
-export function FaultHeatmap({ run }: { readonly run: MatrixHistory }) {
+export function FaultHeatmap({
+  run,
+  focus,
+}: {
+  readonly run: MatrixHistory
+  /** The trial the page's address points at, by its fault. */
+  readonly focus?: string | undefined
+}) {
   const grid = faultGrid(run.trials)
   const groups = gridGroups(grid)
   const [picked, setPicked] = useState<HistoryTrial | undefined>(
-    () => run.trials.find((t) => toneOf(t.status) === "failed") ?? run.trials[0],
+    () =>
+      run.trials.find((t) => t.fault === focus) ??
+      run.trials.find((t) => toneOf(t.status) === "failed") ??
+      run.trials[0],
   )
   const at = (row: string, column: string) =>
     grid.cells.filter((cell) => cell.row === row && cell.column === column)
@@ -174,6 +184,19 @@ export function FaultHeatmap({ run }: { readonly run: MatrixHistory }) {
       <Panel position={{ xl: "sticky" }} top="16" aria-live="polite" aria-label="Trial">
         <Item p="4">
           <TrialDetail trial={picked} />
+          {picked?.fault ? (
+            <Box mt="3" fontSize="1">
+              <Link
+                to="/runs/$runId"
+                params={{ runId: run.id }}
+                search={{ trial: picked.fault }}
+                replace
+                data-link
+              >
+                Link to this trial
+              </Link>
+            </Box>
+          ) : null}
         </Item>
       </Panel>
     </Grid>

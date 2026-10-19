@@ -12,9 +12,11 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ImpactRouteImport } from './routes/impact'
 import { Route as InsightsRouteImport } from './routes/insights'
+import { Route as ApiActiveRouteImport } from './routes/api.active'
 import { Route as MediaSplatRouteImport } from './routes/media.$'
 import { Route as RecordsSplatRouteImport } from './routes/records.$'
 import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
+import { Route as ApiLiveRunIdRouteImport } from './routes/api.live.$runId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -29,6 +31,11 @@ const ImpactRoute = ImpactRouteImport.update({
 const InsightsRoute = InsightsRouteImport.update({
   id: '/insights',
   path: '/insights',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiActiveRoute = ApiActiveRouteImport.update({
+  id: '/api/active',
+  path: '/api/active',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MediaSplatRoute = MediaSplatRouteImport.update({
@@ -46,55 +53,85 @@ const RunsRunIdRoute = RunsRunIdRouteImport.update({
   path: '/runs/$runId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiLiveRunIdRoute = ApiLiveRunIdRouteImport.update({
+  id: '/api/live/$runId',
+  path: '/api/live/$runId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/impact': typeof ImpactRoute
   '/insights': typeof InsightsRoute
+  '/api/active': typeof ApiActiveRoute
   '/media/$': typeof MediaSplatRoute
   '/records/$': typeof RecordsSplatRoute
   '/runs/$runId': typeof RunsRunIdRoute
+  '/api/live/$runId': typeof ApiLiveRunIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/impact': typeof ImpactRoute
   '/insights': typeof InsightsRoute
+  '/api/active': typeof ApiActiveRoute
   '/media/$': typeof MediaSplatRoute
   '/records/$': typeof RecordsSplatRoute
   '/runs/$runId': typeof RunsRunIdRoute
+  '/api/live/$runId': typeof ApiLiveRunIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/impact': typeof ImpactRoute
   '/insights': typeof InsightsRoute
+  '/api/active': typeof ApiActiveRoute
   '/media/$': typeof MediaSplatRoute
   '/records/$': typeof RecordsSplatRoute
   '/runs/$runId': typeof RunsRunIdRoute
+  '/api/live/$runId': typeof ApiLiveRunIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/impact' | '/insights' | '/media/$' | '/records/$' | '/runs/$runId'
+    | '/'
+    | '/impact'
+    | '/insights'
+    | '/api/active'
+    | '/media/$'
+    | '/records/$'
+    | '/runs/$runId'
+    | '/api/live/$runId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/impact' | '/insights' | '/media/$' | '/records/$' | '/runs/$runId'
+  to:
+    | '/'
+    | '/impact'
+    | '/insights'
+    | '/api/active'
+    | '/media/$'
+    | '/records/$'
+    | '/runs/$runId'
+    | '/api/live/$runId'
   id:
     | '__root__'
     | '/'
     | '/impact'
     | '/insights'
+    | '/api/active'
     | '/media/$'
     | '/records/$'
     | '/runs/$runId'
+    | '/api/live/$runId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ImpactRoute: typeof ImpactRoute
   InsightsRoute: typeof InsightsRoute
+  ApiActiveRoute: typeof ApiActiveRoute
   MediaSplatRoute: typeof MediaSplatRoute
   RecordsSplatRoute: typeof RecordsSplatRoute
   RunsRunIdRoute: typeof RunsRunIdRoute
+  ApiLiveRunIdRoute: typeof ApiLiveRunIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -120,6 +157,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InsightsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/active': {
+      id: '/api/active'
+      path: '/api/active'
+      fullPath: '/api/active'
+      preLoaderRoute: typeof ApiActiveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/media/$': {
       id: '/media/$'
       path: '/media/$'
@@ -141,6 +185,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RunsRunIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/live/$runId': {
+      id: '/api/live/$runId'
+      path: '/api/live/$runId'
+      fullPath: '/api/live/$runId'
+      preLoaderRoute: typeof ApiLiveRunIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -148,19 +199,12 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ImpactRoute: ImpactRoute,
   InsightsRoute: InsightsRoute,
+  ApiActiveRoute: ApiActiveRoute,
   MediaSplatRoute: MediaSplatRoute,
   RecordsSplatRoute: RecordsSplatRoute,
   RunsRunIdRoute: RunsRunIdRoute,
+  ApiLiveRunIdRoute: ApiLiveRunIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
