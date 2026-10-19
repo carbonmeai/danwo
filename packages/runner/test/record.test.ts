@@ -78,6 +78,16 @@ describe("flight recorder redaction", () => {
     )
   })
 
+  it("redacts Gemini, Perplexity and Bedrock keys, and a Gemini key in a URL", () => {
+    const text = redactor.text(
+      "REDACTED-TEST-VALUE pplx-danwoEmulatedKey000000 REDACTED-TEST-VALUE https://generativelanguage.googleapis.com/v1beta/models/m:generateContent?alt=sse&key=abc123",
+    )
+
+    expect(text).toBe(
+      "AIza[redacted] pplx-[redacted] ABSK[redacted] https://generativelanguage.googleapis.com/v1beta/models/m:generateContent?alt=sse&key=[redacted]",
+    )
+  })
+
   it("redacts OAuth codes, tokens, verifiers and client secrets in URLs, forms and JSON", () => {
     const idToken = "REDACTED-TEST-VALUE"
 
