@@ -8,7 +8,7 @@ import { randomBytes } from "node:crypto"
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises"
 import { join, relative, resolve } from "node:path"
 
-import type { PlannedFault, RunOutcome } from "@danwo/matrix"
+import type { PlannedFault, PlanSummary, RunOutcome } from "@danwo/matrix"
 
 import type { LintFinding, LintSeverity } from "../lint/index.ts"
 import { addUsage, type Usage } from "../record/usage.ts"
@@ -94,6 +94,8 @@ export interface MatrixHistory extends HistoryBase {
   readonly file: string
   readonly clean: HistoryTrial
   readonly trials: readonly HistoryTrial[]
+  /** What the plan left out and why; absent when every fault the run allowed was tried. */
+  readonly plan?: PlanSummary
 }
 
 export type RunHistory = TestHistory | MatrixHistory
@@ -226,6 +228,7 @@ function matrixHistory(run: MatrixRunReport): MatrixHistory {
     file: run.file,
     clean: trialOf(run, run.result.clean),
     trials: run.result.runs.map((outcome) => trialOf(run, outcome)),
+    ...(run.result.plan !== undefined && { plan: run.result.plan }),
     ...(run.judgedBy !== undefined && { judgedBy: run.judgedBy }),
     ...(run.lint?.length && { lint: lintCounts(run.lint.flatMap((trial) => trial.findings)) }),
   }

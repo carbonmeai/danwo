@@ -2,7 +2,12 @@ import type { HistoryTrial, MatrixHistory, TestHistory, Usage } from "@danwo/run
 import { describe, expect, it } from "vitest"
 
 import { toneOf, wordOf } from "../src/lib/verdicts.ts"
-import { invariantSummary, listedTrials, ruleOf } from "../src/modules/matrix/matrix-values.ts"
+import {
+  invariantSummary,
+  listedTrials,
+  planNote,
+  ruleOf,
+} from "../src/modules/matrix/matrix-values.ts"
 import { cacheTone, statusColor } from "../src/modules/record/record-values.ts"
 import { cacheLine, sortedTests, testFigures } from "../src/modules/run/run-values.ts"
 import type { RunRow } from "../src/modules/runs/runs-data.ts"
@@ -160,6 +165,22 @@ describe("a matrix run", () => {
     expect(invariantSummary(run).shares.map((share) => share.count)).toEqual([1, 1, 1, 1])
     expect(listedTrials(run).map((t) => t.fault)).toEqual(["b", "c", "d", "a"])
     expect(ruleOf(run)).toContain("invariant must hold")
+  })
+
+  it("says how the plan was focused: planned of all, skipped as setup and by budget", () => {
+    const run = {
+      ...matrixRun([trial("a", "passed")], "invariant"),
+      plan: {
+        total: 2039,
+        planned: 40,
+        skipped: { setup: 1608, background: 0, repeats: 278, kinds: 71, budget: 42 },
+      },
+    }
+
+    expect(planNote(run)).toBe(
+      "40 planned of 2039: 1608 skipped as setup, 42 skipped by budget, 278 repeats folded, 71 lesser kinds",
+    )
+    expect(planNote(matrixRun([]))).toBeUndefined()
   })
 
   it("reads as held when no fault broke it", () => {

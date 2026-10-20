@@ -18,7 +18,7 @@ import { toneOf, wordOf } from "../../lib/verdicts.ts"
 import { RunMatrix } from "../live/run-actions.tsx"
 import { FaultHeatmap } from "./fault-heatmap.tsx"
 import { InvariantPanel } from "./invariant-panel.tsx"
-import { LEGEND } from "./matrix-values.ts"
+import { LEGEND, planNote } from "./matrix-values.ts"
 import { TrialList } from "./trial-list.tsx"
 
 /** How the trials show: the heatmap, or a list with the failures first. */
@@ -85,6 +85,7 @@ export function MatrixRun({
         <>
           <Ident>danwo matrix</Ident> run of {run.trials.length} faults, started{" "}
           <TimeAgo at={run.startedAt} />, took {duration(run.durationMs)}
+          {planNote(run) === undefined ? null : ` (${planNote(run)})`}
         </>
       }
       actions={

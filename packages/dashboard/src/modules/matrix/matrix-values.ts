@@ -11,6 +11,28 @@ export const LEGEND: readonly (readonly [string, string])[] = [
   ["invalid", "the fault never applied"],
 ]
 
+/**
+ * How the run's plan was focused, in a few words: how many faults it planned of all the clean
+ * run allowed, and what it left out and why. Undefined when every fault was tried.
+ */
+export function planNote(run: MatrixHistory): string | undefined {
+  const { plan } = run
+
+  if (plan === undefined) return undefined
+
+  const { skipped } = plan
+  const reasons = [
+    [skipped.setup, "skipped as setup"],
+    [skipped.budget, "skipped by budget"],
+    [skipped.repeats, "repeats folded"],
+    [skipped.kinds, "lesser kinds"],
+    [skipped.background, "background work"],
+  ] as const
+  const parts = reasons.filter(([count]) => count > 0).map(([count, why]) => `${count} ${why}`)
+
+  return `${plan.planned} planned of ${plan.total}${parts.length > 0 ? `: ${parts.join(", ")}` : ""}`
+}
+
 /** The order the list shows trials in: what broke first. */
 const LIST_ORDER = ["failed", "environment-error", "not-judged", "invalid", "passed"]
 
