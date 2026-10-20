@@ -10,7 +10,7 @@ import type { LanguageModel } from "ai"
 import type { Budgets } from "../agent/budget.ts"
 import type { ReadinessMode } from "../browser/readiness.ts"
 import type { LintConfig } from "../lint/index.ts"
-import type { VideoMode } from "../record/video.ts"
+import type { VideoSetting } from "../record/video.ts"
 import type { RelocationPolicy } from "../replay/policy.ts"
 import type { EffectsSetting, SessionSecret } from "../session.ts"
 import { DanwoError } from "../support/codes.ts"
@@ -122,9 +122,10 @@ export interface DanwoConfig {
    * webhook on its clock: `on` (default) keeps it with every record kept; `retain-on-failure` films
    * every run and keeps the video of runs that did not pass (a matrix keeps failing and invalid
    * trials'); `off` films nothing. Secret fields show as dots, but a secret the app prints as
-   * text is on screen: turn video off for suites that show one.
+   * text is on screen: turn video off for suites that show one. As an object, `{ mode, cursor }`;
+   * `cursor: false` films without the pointer drawn at each action.
    */
-  readonly video?: VideoMode
+  readonly video?: VideoSetting
   /** Reporters told about every run besides the console, e.g. `github()` from `@danwo/github`. */
   readonly reporters?: readonly Reporter[]
   /**

@@ -1,6 +1,7 @@
 /** The things the agent does to the page, shared by live steps and replays. */
 import type { Locator, Page } from "playwright-core"
 
+import { pointAt, type PointerKind } from "../browser/pointer.ts"
 import type { OpenDialog, Tabs } from "../browser/tabs.ts"
 
 /** One action on one element. */
@@ -38,12 +39,28 @@ async function upload(element: Locator, paths: readonly string[], timeout: numbe
   await chooser.setFiles([...paths], { timeout })
 }
 
+/** The pointer a filmed page shows for each operation; scrolling shows none. */
+const POINTER_OF: Readonly<Partial<Record<Operation["kind"], PointerKind>>> = {
+  click: "click",
+  select: "click",
+  check: "click",
+  upload: "click",
+  drag: "click",
+  fill: "type",
+  press: "type",
+  hover: "hover",
+}
+
 /** Performs `operation` on `element`, waiting up to `timeout` for it to be ready. */
 export async function operate(
   element: Locator,
   operation: Operation,
   timeout: number,
 ): Promise<void> {
+  const kind = POINTER_OF[operation.kind]
+
+  if (kind !== undefined) await pointAt(element, kind)
+
   switch (operation.kind) {
     case "click":
       return element.click({ timeout })

@@ -6,6 +6,7 @@
  */
 import type { Locator, Page } from "playwright-core"
 
+import { HIDE_POINTER } from "../browser/pointer.ts"
 import type { Box } from "./image.ts"
 
 /** A numbered region of the screenshot, and what the page says it is. */
@@ -142,6 +143,7 @@ export async function screenshot(page: Page, spots: SecretSpots): Promise<Buffer
     scale: "css",
     mask: spots.masks(page),
     animations: "disabled",
+    style: HIDE_POINTER,
   })
 }
 

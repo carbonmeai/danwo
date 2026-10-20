@@ -7,6 +7,7 @@ import type { Page, Locator as PlaywrightLocator } from "playwright-core"
 
 import { filePaths, type Files } from "../agent/files.ts"
 import type { ScreenshotEvent, ScreenshotSettings } from "../assert/screenshot.ts"
+import { pointAt, type PointerKind } from "../browser/pointer.ts"
 import { checkSecretField, markSecretField } from "../secrets/fields.ts"
 import { isSecret, type Secret } from "../secrets/index.ts"
 import { filterCall, roleCall, shown, textCall } from "./describe.ts"
@@ -54,6 +55,20 @@ export interface LocateContext {
   readonly shots: ScreenshotDesk
   /** Waits, after an action, for the page and the backend to go quiet (see readiness.ts). */
   readonly ready?: () => Promise<void>
+}
+
+/** The pointer each action shows; actions not listed show none. */
+const POINTER_OF: Readonly<Record<string, PointerKind>> = {
+  click: "click",
+  check: "click",
+  uncheck: "click",
+  selectOption: "click",
+  setInputFiles: "click",
+  dragTo: "click",
+  fill: "type",
+  clear: "type",
+  press: "type",
+  hover: "hover",
 }
 
 /** The session's screenshot checks: their settings, a counter, and a note per comparison. */
@@ -190,8 +205,19 @@ export class ElementLocator extends Finder implements Locator {
   ): Promise<void> {
     const api = `locator.${action}`
 
+    const kind = POINTER_OF[action]
+
+    const pointed =
+      kind === undefined
+        ? perform
+        : async (target: PlaywrightLocator, timeout: number) => {
+            await pointAt(target, kind)
+
+            return perform(target, timeout)
+          }
+
     const body = async () => {
-      await this.attempt(api, this.timeout(options), perform)
+      await this.attempt(api, this.timeout(options), pointed)
       /* A wait is itself a check of the page; anything else is followed by readiness. */
       if (!verifies) await this.context.ready?.()
     }

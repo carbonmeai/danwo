@@ -12,6 +12,29 @@
  */
 export type VideoMode = "retain-on-failure" | "on" | "off"
 
+/** Video as an object: when it is kept, and whether the film shows a pointer at each action. */
+export interface VideoOptions {
+  readonly mode?: VideoMode
+  /**
+   * Draw a cursor that moves to each element, with a ripple on clicks and a badge while typing
+   * (default true). It costs about 0.2 s an action and is never in a compared screenshot.
+   */
+  readonly cursor?: boolean
+}
+
+/** The `video` setting, a mode or the object form. */
+export type VideoSetting = VideoMode | VideoOptions
+
+/** The mode a `video` setting names, if it names one. */
+export function videoModeOf(setting: VideoSetting | undefined): VideoMode | undefined {
+  return typeof setting === "object" ? setting.mode : setting
+}
+
+/** Whether a `video` setting draws the pointer: unless it turns the cursor off. */
+export function videoCursorOf(setting: VideoSetting | undefined): boolean {
+  return typeof setting !== "object" || setting.cursor !== false
+}
+
 /** A video the session captured, before the recorder lines it up with the run. */
 export interface CapturedVideo {
   /** Relative to the attempt's directory, e.g. `video/tab-1.webm`. */

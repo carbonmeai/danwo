@@ -14,6 +14,7 @@ import type { CheckPace } from "./assert/pace.ts"
 import type { BaselineUpdate } from "./assert/screenshot.ts"
 import type { AppErrorOptions } from "./browser/app-errors.ts"
 import { type App, type BrowserFlags, launchBrowser } from "./browser/index.ts"
+import { showPointer } from "./browser/pointer.ts"
 import type { Backend, ReadinessMode } from "./browser/readiness.ts"
 import { hideSecretText, TabFilm, videoContextOptions } from "./browser/video.ts"
 import { createSessionFlight, type SessionFlight } from "./flight.ts"
@@ -214,9 +215,14 @@ interface RecordOptions {
   readonly artifactsDir?: string
   /**
    * Take a screenshot after every step (see `flight`), and film every tab into
-   * `<artifactsDir>/video` when `video` is set.
+   * `<artifactsDir>/video` when `video` is set; the film draws a pointer at each action unless
+   * `cursor` is false.
    */
-  readonly record?: { readonly stepScreenshots: boolean; readonly video?: boolean }
+  readonly record?: {
+    readonly stepScreenshots: boolean
+    readonly video?: boolean
+    readonly cursor?: boolean
+  }
   /** Hears every step as it starts (status `running`) and again as it ends, redacted. */
   readonly onStep?: (step: StepRecord) => void
   /**
@@ -303,9 +309,15 @@ async function newContext(
     ...(film !== undefined && videoContextOptions(film)),
   })
 
-  if (film !== undefined) await hideSecretText(context)
+  if (film !== undefined) await filmContext(context, options.record?.cursor !== false)
 
   return context
+}
+
+/** Readies a filmed context: secret fields as dots, and the pointer when `cursor` is on. */
+async function filmContext(context: BrowserContext, cursor: boolean): Promise<void> {
+  await hideSecretText(context)
+  if (cursor) await showPointer(context)
 }
 
 /** The browser the attempt opens in: the one given, else one launched for it alone. */
@@ -435,6 +447,8 @@ interface UserDesk {
   readonly userAgent: () => Promise<string>
   readonly users: OpenUser[]
   readonly filming: string | undefined
+  /** Whether filmed browsers draw the pointer at each action. */
+  readonly cursor: boolean
 }
 
 /** Throws unless `name` can label a new person in this session. */
@@ -466,7 +480,7 @@ async function openUserBrowser(
     ...(desk.filming !== undefined && videoContextOptions(desk.filming, name)),
   })
 
-  if (desk.filming !== undefined) await hideSecretText(context)
+  if (desk.filming !== undefined) await filmContext(context, desk.cursor)
   await shared.options.onContext?.(context)
   await showTime(context, shared.machine)
 
@@ -564,6 +578,7 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
     userAgent: userAgentOf(page),
     users,
     filming: film === undefined ? undefined : artifactsDir,
+    cursor: options.record?.cursor !== false,
   }
   let closed = false
 

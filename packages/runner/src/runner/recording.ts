@@ -4,7 +4,7 @@
  */
 import { relative } from "node:path"
 
-import type { VideoMode } from "../record/video.ts"
+import { type VideoMode, videoModeOf } from "../record/video.ts"
 import type { LoadedConfig } from "./config.ts"
 import { newRunDir, type RecordMode, type RecordOptions, type RecordSettings } from "./record.ts"
 import { DEFAULT_KEEP_RUNS, finishRun } from "./report.ts"
@@ -36,7 +36,7 @@ export function openRecording(
     : {
         runDir: newRunDir(loaded.root),
         mode: chosen,
-        video: video ?? loaded.config.video ?? "on",
+        video: video ?? videoModeOf(loaded.config.video) ?? "on",
         keepRuns: keepRunsOf(loaded, keepRuns),
       }
 }

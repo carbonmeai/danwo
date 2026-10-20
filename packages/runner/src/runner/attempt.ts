@@ -11,6 +11,7 @@ import { openDeviceSession } from "../device/session.ts"
 import type { DeviceTarget } from "../device/types.ts"
 import type { SessionFlight } from "../flight.ts"
 import type { FailureEvidence, StepRecord } from "../record/index.ts"
+import { videoCursorOf } from "../record/video.ts"
 import {
   type BrowserState,
   openWebSession,
@@ -437,7 +438,11 @@ function recordOptions(setup: AttemptSetup): Partial<WebSessionOptions> {
     ? {}
     : {
         artifactsDir: recordDir,
-        record: { stepScreenshots: true, video: setup.recordVideo === true },
+        record: {
+          stepScreenshots: true,
+          video: setup.recordVideo === true,
+          cursor: videoCursorOf(setup.config.video),
+        },
       }
 }
 

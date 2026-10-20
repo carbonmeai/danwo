@@ -9,7 +9,14 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { startDeviceFilm } from "../src/device/film.ts"
 import type { DeviceTarget } from "../src/device/types.ts"
 import type { SessionFlight } from "../src/flight.ts"
-import { keepsVideo, type MarkedRun, videoMarks } from "../src/record/video.ts"
+import {
+  keepsVideo,
+  type MarkedRun,
+  videoCursorOf,
+  videoMarks,
+  videoModeOf,
+  type VideoSetting,
+} from "../src/record/video.ts"
 import type { WorkerEnvironment } from "../src/runner/environment.ts"
 import { buildRecord, finishRecord, type RecordInput } from "../src/runner/record.ts"
 import { openRecording } from "../src/runner/recording.ts"
@@ -64,7 +71,7 @@ const RUN: MarkedRun = {
 }
 
 /** A loaded config with `video` set, or none. */
-function loaded(video?: "on" | "off") {
+function loaded(video?: VideoSetting) {
   return { config: video === undefined ? {} : { video }, path: undefined, root: "/project" }
 }
 
@@ -123,6 +130,19 @@ describe("video marks", () => {
       "retain-on-failure",
     )
     expect(openRecording(loaded(), "off", "on")).toBeUndefined()
+    expect(openRecording(loaded({ mode: "off" }), undefined)?.video).toBe("off")
+    expect(openRecording(loaded({ cursor: false }), undefined)?.video).toBe("on")
+  })
+
+  it("reads the mode and the pointer from either form of the setting, the pointer on by default", () => {
+    expect(videoModeOf(undefined)).toBeUndefined()
+    expect(videoModeOf("retain-on-failure")).toBe("retain-on-failure")
+    expect(videoModeOf({ mode: "off", cursor: true })).toBe("off")
+    expect(videoModeOf({ cursor: false })).toBeUndefined()
+    expect(videoCursorOf(undefined)).toBe(true)
+    expect(videoCursorOf("on")).toBe(true)
+    expect(videoCursorOf({ mode: "on" })).toBe(true)
+    expect(videoCursorOf({ cursor: false })).toBe(false)
   })
 })
 

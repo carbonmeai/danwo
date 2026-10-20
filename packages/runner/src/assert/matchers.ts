@@ -1,3 +1,4 @@
+import { HIDE_POINTER } from "../browser/pointer.ts"
 import { shown } from "../locate/describe.ts"
 /*
  * `expect(locator)`: checks that wait for the page to get there, each recorded as a step that
@@ -178,6 +179,7 @@ export function pictureOptions(options: Parameters<Subject["take"]>[0]) {
     animations: options.animations,
     caret: "hide" as const,
     scale: "css" as const,
+    style: HIDE_POINTER,
     timeout: options.timeout,
   }
 }
