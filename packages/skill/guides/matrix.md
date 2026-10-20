@@ -51,6 +51,40 @@ trials: `upgrade refused on WS <host>/<path>` and `connection dropped on WS <hos
 (accepted, but the answer lost, so an app that retries sends it twice) and a slow send on
 `POST inngest.danwo.test/e/<key>`.
 
+## What gets planned
+
+A real app's clean run can make hundreds of calls and thousands of statements, most of them
+repeats or set-up work. The matrix plans faults on the test's **body** only: everything before
+the body began (the saved session signing in, fixtures, `beforeEach` hooks) is setup and gets
+no faults. A trial arms its fault when the body starts, and counts occurrences from there, so a
+route the session also called is still the body's first. `--include-setup` faults setup too.
+
+A plan within its budget (40 trials by default: `--budget n`, or `matrix.budget`) runs whole.
+Over it, the plan is narrowed step by step, the same way every time, until it fits:
+
+1. background work dropped: health checks, metrics, static assets, token refreshes and job-runner
+   housekeeping (signing keys are kept: an app that cannot fetch them must refuse tokens);
+2. a route or statement repeated in the body faulted on its first occurrence only;
+3. each call or statement keeps its most telling faults: a decline, a 5xx and the answer lost
+   after the provider acted for a provider write; a 5xx and a slow answer for a read; the answer
+   lost after the commit and a serialization failure for a database write; a duplicate, a forgery
+   and a late delivery for a webhook;
+4. what is still over the budget is cut: races and webhooks first, then writes, then sockets,
+   then reads.
+
+The run says what it left out, e.g. `1999 of 2039 faults left out: 1608 on setup, 278 on repeats
+of a route or statement, 71 lesser fault kinds, 42 over the budget`, and the dashboard's matrix
+page shows the same counts. `--all` runs every fault on the body, `--thorough` keeps every fault
+kind, `--every-occurrence` faults every repeat.
+
+`danwo matrix <file> --plan` runs the clean trial, prints every planned trial, what was left out,
+and about how long the trials would take on the crew, then stops without running a fault.
+
+When the environment can snapshot, a saved session's sign-in from the clean trial is kept in the
+worker's starting point, so later trials restore it instead of signing in again. A fault armed at
+the body never touched that sign-in. With `--include-setup` every trial signs in afresh, under its
+fault.
+
 ## Races
 
 Beside the one-call faults, the matrix plans races from what the clean run did, and only where
