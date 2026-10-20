@@ -1,0 +1,135 @@
+---
+description: S3 object storage for apps on AWS S3 or Tigris, with the AWS SDK and the Tigris SDK, presigned URLs, multipart uploads and signature checks.
+---
+
+danwo's S3 emulator answers Tigris's endpoints (`t3.storage.dev`, `fly.storage.tigris.dev`) and
+AWS's (`s3.amazonaws.com`, `s3.us-east-1.amazonaws.com`), path-style and virtual-hosted. Both
+`@aws-sdk/client-s3` and `@tigrisdata/storage` work against it unchanged.
+
+## Set up
+
+Add `s3Service` with your bucket, and hand the app the variables `env()` gives:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, s3Service } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  environment: () => {
+    const s3 = s3Service({ seed: { buckets: [{ name: "avatars" }] } })
+
+    return appEnvironment({
+      app: { command: "npm run dev", url: "http://localhost:3000", env: s3.env() },
+      services: [s3],
+    })
+  },
+})
+```
+
+`env()` points both SDKs at the emulator with a key it accepts:
+
+| Variable | For |
+| --- | --- |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` | The AWS SDK's credentials, region `auto`. |
+| `AWS_ENDPOINT_URL_S3`, `AWS_ENDPOINT_URL` | Where the AWS SDK sends S3 calls. |
+| `TIGRIS_STORAGE_ACCESS_KEY_ID`, `TIGRIS_STORAGE_SECRET_ACCESS_KEY`, `TIGRIS_STORAGE_ENDPOINT` | The same, for the Tigris SDK. |
+| `TIGRIS_STORAGE_BUCKET` | The first seeded bucket. |
+
+Pass `env({ endpoint })` to point them at another endpoint the emulator answers, such as
+`https://s3.amazonaws.com`.
+
+## Seed it
+
+```ts title="danwo.config.ts · the seed"
+s3Service({
+  seed: {
+    buckets: [
+      {
+        name: "avatars",
+        acl: "public-read",
+        objects: [{ key: "default.png", body: "…", contentType: "image/png" }],
+      },
+    ],
+    credentials: [{ accessKeyId: "tid_danwo", secretAccessKey: "tsec_danwo" }],
+  },
+})
+```
+
+| Field | What it seeds |
+| --- | --- |
+| `buckets` | Buckets by name, with a region, an ACL and objects already in them. |
+| `credentials` | Access keys whose signatures are checked. Without any, any well-formed key is accepted. |
+
+The S3 seed is a plain object, not a function.
+
+## Use it in a test
+
+Upload an avatar, then read what landed in the bucket:
+
+```ts title="tests/avatar.danwo.ts"
+import { type S3Fixtures, s3Objects, test as base } from "@danwo/sdk"
+
+const test = base.extend<S3Fixtures>()
+
+test("stores the uploaded avatar", async ({ app, screen, expect, s3 }) => {
+  await app.open("/settings")
+  await screen.getByLabel("Avatar").setInputFiles("tests/fixtures/ada.png")
+  await screen.getByRole("button", { name: "Save" }).click()
+  await expect(screen.getByText("Avatar saved")).toBeVisible()
+
+  const [avatar] = s3Objects(s3).list("avatars", "users/")
+
+  expect(avatar?.contentType).toBe("image/png")
+  expect(avatar?.size).toBeGreaterThan(0)
+})
+```
+
+`s3Objects(s3)` reads `buckets()`, `list(bucket, prefix)` and `get(bucket, key)`. Each object has
+its `key`, `size`, `contentType`, `etag`, `metadata` and `acl`, and `bytes()` and `text()` for its
+body.
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Objects | put, head, get with ranges, copy, delete, delete many, ACLs, metadata, browser form uploads |
+| Listing | `ListObjectsV2` with prefixes, delimiters and pages |
+| Multipart | create, upload parts, list parts and uploads, complete, abort |
+| Presigned URLs | GET and PUT, with expiry |
+| Conditional requests | `If-Match`, `If-None-Match`, `If-Modified-Since`, `If-Unmodified-Since` |
+| Buckets | create, head, list, delete |
+| Signatures | SigV4 headers and query strings checked against seeded keys |
+| Tigris | the presign call `getPresignedUrl` makes, and renames with `X-Tigris-Rename` |
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| A write, such as `PUT /avatars/users/ada.png` | 500, 503, connection reset, answer lost after the object was stored |
+| A read, such as `GET /avatars/users/ada.png` | 500, 503, connection reset |
+
+Errors are S3's XML, so both SDKs raise the error they would for real.
+
+## Fidelity
+
+**Live.** `danwo fidelity s3` runs 7 scenarios against real Tigris storage: objects, listings,
+multipart, presigned URLs, conditional requests, errors, and Tigris's presign call and renames.
+All 7 match.
+
+## Not covered yet
+
+- Versioning, lifecycle rules and replication
+- Bucket policies, CORS and website hosting
+- Object tagging and Object Lock
+- Other AWS services: use [MiniStack](/docs/providers/aws)
+
+## Next
+
+<Cards>
+  <Card title="MiniStack (AWS)" href="/docs/providers/aws">
+    SQS, DynamoDB and the rest of AWS beside S3.
+  </Card>
+  <Card title="Fault matrix" href="/docs/fault-matrix">
+    What a lost upload answer does to your app.
+  </Card>
+</Cards>

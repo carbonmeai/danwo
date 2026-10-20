@@ -1,0 +1,152 @@
+---
+description: A Clerk development instance on its real hosts, with the Backend API, the Frontend API serving ClerkJS and <SignIn/>, the Account Portal, stable ids and Svix-signed webhooks.
+---
+
+danwo's Clerk emulator is a development instance. Your server reaches the Backend API on
+`api.clerk.com`; the browser loads ClerkJS and `<SignIn/>` from the Frontend API on
+`<slug>.clerk.accounts.dev`, or signs in on the Account Portal at `<slug>.accounts.dev`.
+`@clerk/nextjs`, `@clerk/backend` and `@clerk/clerk-react` work against it unchanged.
+
+## Set up
+
+Add `clerkService` and hand the app the instance's keys. `clerkInstance(…).env()` gives every
+variable Clerk's SDKs read:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, clerkInstance, clerkService, defineConfig } from "@danwo/sdk"
+
+const url = "http://localhost:3000"
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  environment: () => {
+    const clerk = clerkService({
+      seed: {
+        instance: { slug: "my-app", origin: url },
+        users: [{ email: "ada@example.com", password: "correct-horse-battery", firstName: "Ada" }],
+        webhooks: [{ endpoint: `${url}/api/webhooks/clerk`, events: ["user.created"] }],
+      },
+    })
+
+    return appEnvironment({
+      app: { command: "npm run dev", url, env: clerkInstance(clerk.emulator).env() },
+      services: [clerk],
+    })
+  },
+})
+```
+
+| Variable | Holds |
+| --- | --- |
+| `CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_…`, `VITE_…` | The publishable key, derived from the slug. |
+| `CLERK_SECRET_KEY` | The secret key your server sends. |
+| `CLERK_JWT_KEY`, `CLERK_PEM_PUBLIC_KEY` | The public key, so tokens verify without a network call. |
+| `CLERK_WEBHOOK_SIGNING_SECRET` | The webhook secret, when there's one endpoint. |
+
+## Seed it
+
+| Field | What it seeds |
+| --- | --- |
+| `instance` | The slug, the secret key, the app's `origin`, a `signingKey` of your own, and `password: false` for emailed codes only. |
+| `users` | Users with a password, names, username, `externalId` and metadata. |
+| `organizations` | Organizations and their members' roles. |
+| `jwtTemplates` | JWT templates by name, with claims and lifetime. |
+| `webhooks` | Endpoints, events, secret and extra headers. |
+| `announce` | Send `user.created` and the like for the seeded records, so an app that builds its rows from webhooks has them. |
+
+### Stable ids
+
+A seeded user's id is derived from their email, and an organization's from its slug or name, so
+`user_…` is the same on every run. Rows in your own database that point at a Clerk user keep
+pointing at the right one after a reset. Give an `id` to choose it yourself.
+
+### A key that stays put
+
+The emulator signs session tokens with its own key. If your app pins Clerk's public key
+(`CLERK_JWT_KEY`) in a file rather than reading it from `env()`, seed `instance.signingKey` with a
+PKCS#8 PEM so tokens keep verifying across runs. `clerkInstance(clerk).publicKeyPem()` reads the
+public half.
+
+## Use it in a test
+
+Sign in on the Account Portal, then check the session:
+
+```ts title="tests/sign-in.danwo.ts"
+import { type ClerkFixtures, clerkInstance, test as base } from "@danwo/sdk"
+
+const test = base.extend<ClerkFixtures>()
+
+test("signs in with a password", async ({ app, screen, expect, clerk }) => {
+  await app.open("/dashboard")
+  await screen.getByLabel("Email address").fill("ada@example.com")
+  await screen.getByLabel("Password").fill("correct-horse-battery")
+  await screen.getByRole("button", { name: "Continue" }).click()
+
+  await expect(screen.getByText("Welcome, Ada")).toBeVisible()
+  expect(clerkInstance(clerk).sessions("ada@example.com")).toHaveLength(1)
+})
+```
+
+With emailed codes, read the code with `await clerkInstance(clerk).code("ada@example.com")` and
+type it into "Verification code". Addresses with `+clerk_test` take the code `424242` and get no
+email, as on a development instance. `clerkMail(clerk)` gives the codes to the `mail` fixture.
+
+`clerkInstance(clerk)` also reads `user(email)`, `messages(to)`, `organizations()` and
+`webhookSecret()`, and `revokeSessions(email)` signs a user out mid-test.
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Backend API | users (create, list, update, ban, delete, metadata), sessions and tokens, organizations, members and invitations, JWT templates, the instance's keys |
+| Frontend API | the dev browser, the client, sign-up and sign-in attempts by password or email code, session tokens and their refresh, the handshake |
+| ClerkJS | `clerk-js` and `@clerk/ui` served from the Frontend API, so `<ClerkProvider>`, `<SignIn/>` and `<UserButton/>` load |
+| Account Portal | sign-in with a password or a code, sign-up with a code |
+| Tokens | session tokens with `azp`, `sid`, `org_*` claims and your templates, signed with the instance's key |
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| A Backend API write, such as `POST /v1/users` | 429, 500, 503, a 10-second delay, connection reset, answer lost after Clerk acted |
+| A Backend API read | 429, 500, 503, a 10-second delay, connection reset |
+| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+
+The Frontend API and the Account Portal are left alone, so the browser can always sign in.
+
+## Webhooks
+
+Deliveries are signed the Svix way, with `svix-id`, `svix-timestamp` and `svix-signature`, so
+`verifyWebhook` from `@clerk/nextjs/webhooks` and the `svix` package accept them.
+
+| Event family | Events |
+| --- | --- |
+| Users | `user.created`, `.updated`, `.deleted` |
+| Sessions | `session.created`, `.ended`, `.removed`, `.revoked` |
+| Organizations | `organization.created`, `.updated`, `.deleted` |
+| Memberships | `organizationMembership.created`, `.updated`, `.deleted` |
+
+## Fidelity
+
+**Live.** `danwo fidelity clerk` runs 5 scenarios against a real development instance: users,
+organizations, sessions and keys, errors, and the Frontend API's sign-up and sign-in with test
+addresses and `424242`. All 5 match. Webhooks are checked offline.
+
+## Not covered yet
+
+- Social and enterprise sign-in (OAuth, SAML)
+- Phone numbers, SMS codes and passkeys
+- Production instances, satellite domains and the Clerk Dashboard
+- Billing
+
+## Next
+
+<Cards>
+  <Card title="Sessions" href="/docs/sessions">
+    Sign in once, save the session, reuse it across tests.
+  </Card>
+  <Card title="Auth0" href="/docs/providers/auth0">
+    Universal Login, MFA and the Management API.
+  </Card>
+</Cards>

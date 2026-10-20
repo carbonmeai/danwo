@@ -1,0 +1,106 @@
+---
+title: Providers
+description: The third-party APIs danwo emulates, how to add one to your config, seed it and read what it saw.
+---
+
+A **provider emulator** is a stand-in for a service your app calls, such as Stripe, Resend or
+Clerk. It answers the provider's real hostnames, keeps state between calls, signs its webhooks
+and returns the errors the provider's SDK knows how to read.
+
+Your app doesn't change. It keeps its own SDK, its own `sk_test_` key and its own code. danwo's
+**egress proxy** sits between your app and the internet, and sends each call to the right
+emulator.
+
+<ProviderFlow />
+
+## Add a provider
+
+Name the services your app uses in `danwo.config.ts`. Each one is a `*Service`, started behind
+one proxy with your app:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, resendService, stripeService } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  environment: () =>
+    appEnvironment({
+      app: { command: "npm run dev", url: "http://localhost:3000" },
+      services: [stripeService(), resendService()],
+    }),
+})
+```
+
+`appEnvironment` starts your app with the proxy's settings in its environment. When your app
+calls `api.stripe.com`, the Stripe emulator answers.
+
+## Seed it
+
+Most apps expect some data to exist already: a product, a webhook endpoint, a signed-up user.
+Give each service a `seed`. It's applied when the run starts and again before every test:
+
+```ts title="danwo.config.ts · a seed"
+stripeService({
+  seed: () => ({
+    products: [{ name: "Credits" }],
+    prices: [{ product_name: "Credits", unit_amount: 500, currency: "usd" }],
+  }),
+})
+```
+
+Each provider's page shows what its seed takes.
+
+## Read what happened
+
+Every service gives your tests a **fixture** named after it: `stripe`, `resend`, `clerk` and so
+on. Pair it with the provider's read helper to check what your app really did:
+
+```ts title="tests/welcome.danwo.ts"
+import { type ResendFixtures, resendInbox, test as base } from "@danwo/sdk"
+
+const test = base.extend<ResendFixtures>()
+
+test("sends a welcome email", async ({ app, screen, expect, resend }) => {
+  await app.open("/signup")
+  await screen.getByLabel("Email").fill("ada@example.com")
+  await screen.getByRole("button", { name: "Sign up" }).click()
+
+  const email = await resendInbox(resend).waitFor("ada@example.com")
+
+  expect(email.subject).toBe("Welcome to the app")
+})
+```
+
+`base.extend<ResendFixtures>()` tells TypeScript which fixtures the test receives.
+
+## Faults and fidelity
+
+Two things come with every provider:
+
+| | What it is |
+| --- | --- |
+| **Faults** | The failures the [fault matrix](/docs/fault-matrix) tries on that provider's calls: rate limits, 500s, timeouts, a dropped answer after the provider acted, a webhook that arrives twice. |
+| **Fidelity** | A check that the emulator answers like the real API. `danwo fidelity` compares the two, field by field; see [Fidelity](/docs/fidelity). |
+
+<Callout type="info">
+  Calls to hosts no service answers pass through to the internet unless you set `unmatched:
+  "block"`. See [Real stacks](/docs/real-stacks) to block them.
+</Callout>
+
+## Every provider
+
+{/* provider cards */}
+
+## Next
+
+<Cards>
+  <Card title="Test a provider" href="/docs/test-a-provider">
+    Buy something through Stripe in a test, then try to break it.
+  </Card>
+  <Card title="Fault matrix" href="/docs/fault-matrix">
+    What the faults on each provider page do to your app.
+  </Card>
+  <Card title="Emulator helpers" href="/docs/reference/emulator-helpers">
+    Every read helper, with its full signature.
+  </Card>
+</Cards>
