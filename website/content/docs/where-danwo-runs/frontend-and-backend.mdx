@@ -1,0 +1,78 @@
+---
+title: Frontend and backend, both local
+description: A frontend and an API in separate apps, both started by danwo behind one proxy.
+icon: Split
+---
+
+Your frontend and your API are separate apps: a React or Vue frontend and a Node API, perhaps
+with a background worker. danwo starts all of them, in order, behind one proxy. You get the same
+coverage as a [full-stack app](/docs/full-stack-local).
+
+<Setup kind="split" />
+
+## Set it up
+
+List each app with its start command and address. `dependsOn` says what must be up first, and
+`env` hands one app another's address:
+
+```ts title="danwo.config.ts"
+import { clerkService, defineConfig, stackEnvironment, stripeService } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  environment: () =>
+    stackEnvironment({
+      baseUrl: "web",
+      services: [stripeService(), clerkService()],
+      apps: [
+        {
+          name: "api",
+          command: "npm run dev --prefix api",
+          url: "http://127.0.0.1:4000",
+          ready: { path: "/health" },
+        },
+        {
+          name: "web",
+          command: "npm run dev --prefix web",
+          url: "http://127.0.0.1:3000",
+          dependsOn: ["api"],
+          env: (urls) => ({ VITE_API_URL: urls.api ?? "" }),
+        },
+      ],
+    }),
+})
+```
+
+danwo starts `api`, waits for `/health` to answer, then starts `web` with `VITE_API_URL` pointing
+at it. `baseUrl` names the app the browser opens; without it, tests open the first app listed.
+
+## What you get
+
+- **Both sides of every provider emulated.** Give both apps the Clerk emulator's keys, and the
+  browser signs in with the emulator while the API checks the token against it. The two agree.
+- **Faults on the frontend's calls to the API**, as well as on the API's calls to providers and
+  its database.
+- **Background work.** Add [`inngestService()`](/docs/real-stacks) and `settle()` waits for jobs
+  the API started.
+
+## Pitfalls
+
+- **Ports.** Each app needs a fixed address, so run one worker per machine, or give each worker
+  its own ports.
+- **Start-up time.** A large API can take a minute to boot. Raise `timeoutMs` on that app.
+- **Calls that skip the proxy.** A Node WebSocket client that ignores proxy settings (the `ws`
+  package, for example) needs a proxy agent. Browser sockets always go through.
+
+## Next
+
+<Cards>
+  <Card title="Real stacks" href="/docs/real-stacks">
+    Readiness, background jobs, sockets and databases in depth.
+  </Card>
+  <Card title="Frontend only" href="/docs/frontend-only">
+    When you can't run the backend yourself.
+  </Card>
+  <Card title="Which should I use?" href="/docs/which-setup">
+    Pick a setup for each purpose.
+  </Card>
+</Cards>

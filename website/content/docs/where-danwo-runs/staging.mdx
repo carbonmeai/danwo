@@ -1,0 +1,78 @@
+---
+title: A deployed staging environment
+description: Test the real deployment, with your providers' real sandboxes, before you release.
+icon: CloudUpload
+---
+
+Staging is your app as it really runs: deployed, with its own database and your providers' test
+accounts. danwo drives the browser against it. It can't emulate anything there, but it still
+records every run and can break the browser's own calls.
+
+<Setup kind="staging" />
+
+## Set it up
+
+Give danwo the staging address instead of a start command. danwo still puts its proxy in front of
+the browser, so it records the browser's calls:
+
+```ts title="danwo.staging.config.ts"
+import { appEnvironment, defineConfig } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  environment: () => appEnvironment({ app: "https://staging.example.com" }),
+})
+```
+
+Run it with that config:
+
+```sh
+npx danwo test --config danwo.staging.config.ts
+```
+
+## Use real test accounts
+
+Nothing is emulated, so your app talks to the real services. Make sure each one is in test mode:
+
+- **Payments:** Stripe test mode, Paystack and Flutterwave test keys, and their test cards.
+- **Sign-in:** a development Clerk or Auth0 instance, with test users for your tests.
+- **Email and SMS:** a sandbox domain or test numbers, so nothing reaches a real person.
+
+Sign in once and reuse it with [saved sessions](/docs/sessions), with the passwords in
+[secrets](/docs/secrets), never in the test.
+
+## What danwo still adds
+
+- **Tests in plain English or with locators,** on the real deployment.
+- **Recordings and video** of every run, with the browser's calls and console.
+- **Faults on the browser's calls.** The matrix can make the staging API fail from the browser's
+  point of view. Every fault still hits a real, shared server, so run it with test accounts and
+  narrow it with `--faults`.
+
+## What it can't do
+
+| On staging                               | Why                                            |
+| ---------------------------------------- | ---------------------------------------------- |
+| Emulate providers                        | The server calls them directly, outside danwo. |
+| Fault the server's calls or its database | danwo doesn't see them.                        |
+| Reset data between tests                 | Staging's database is shared and persistent.   |
+| Move the server's clock                  | Only the page's clock moves.                   |
+
+<Callout type="warn">
+  Tests on staging change real, shared data. Write them to create their own records with unique
+  names, and to tidy up after themselves.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Production" href="/docs/production">
+    A smoke test after each deploy.
+  </Card>
+  <Card title="Saved sessions" href="/docs/sessions">
+    Sign in with a test account once, per worker.
+  </Card>
+  <Card title="Which should I use?" href="/docs/which-setup">
+    Where staging fits next to local runs.
+  </Card>
+</Cards>

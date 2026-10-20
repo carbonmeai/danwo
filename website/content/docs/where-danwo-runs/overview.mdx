@@ -1,0 +1,69 @@
+---
+title: Where danwo runs
+description: What danwo can emulate and break depends on where your app runs. One rule decides it.
+icon: Map
+---
+
+danwo can test an app on your laptop, a deployed staging site, or production. What it can do
+there depends on one thing: whether the app's traffic goes through **danwo's proxy**, the local
+server danwo puts between your app and the internet.
+
+## The one rule
+
+danwo can only emulate and break what passes through its proxy.
+
+<ProxyBoundary />
+
+Three things go through the proxy:
+
+- **The browser or Android device danwo drives.** Always.
+- **Apps danwo starts.** When your config gives a start command (`npm run dev`), danwo runs it
+  with its proxy settings, so every call the app makes reaches the proxy. No code changes.
+- **Databases behind danwo's data proxies.** Postgres and Redis, when your config puts them
+  there.
+
+Everything else is outside: a staging server, a remote API, the real Stripe it calls. danwo
+can't see those calls, so it can't emulate or break them.
+
+## What works where
+
+| Setup                                                          | UI tests and agent | Recording and video | Server-side providers emulated | Browser-side providers emulated | Provider and webhook faults | Frontend→API faults | Database faults | Isolation and reset |
+| -------------------------------------------------------------- | :----------------: | :-----------------: | :----------------------------: | :-----------------------------: | :-------------------------: | :-----------------: | :-------------: | :-----------------: |
+| [Full-stack app, run locally](/docs/full-stack-local)          |         ✓          |          ✓          |               ✓                |                ✓                |              ✓              |          ✓          |       ✓¹        |          ✓          |
+| [Frontend and backend, both local](/docs/frontend-and-backend) |         ✓          |          ✓          |               ✓                |                ✓                |              ✓              |          ✓          |       ✓¹        |          ✓          |
+| [Frontend only, against a remote API](/docs/frontend-only)     |         ✓          |          ✓          |               ✗                |            partial²             |          partial³           |          ✓          |        ✗        |      partial⁴       |
+| [A deployed staging environment](/docs/staging)                |         ✓          |          ✓          |               ✗                |                ✗                |              ✗              |      partial⁵       |        ✗        |      partial⁴       |
+| [Production](/docs/production)                                 |     smoke only     |          ✓          |               ✗                |                ✗                |              ✗              |          ✗          |        ✗        |          ✗          |
+| Mobile app (Android)                                           |         ✓          |          ✓          |         as its backend         |                ✓                |       as its backend        |          ✓          | as its backend  |   as its backend    |
+
+1. When the database sits behind one of danwo's [data proxies](/docs/data-faults).
+2. Only providers the remote API doesn't also talk to. See the [one-provider rule](/docs/frontend-only#emulate-a-provider-everywhere-or-nowhere).
+3. Faults on the browser's own calls to emulated providers. Webhooks go to the remote API, which danwo can't see.
+4. The browser and any emulators reset between tests. The remote backend's data doesn't.
+5. Possible, but every fault hits a real shared server. Use test accounts.
+
+A mobile app goes through the proxy itself (danwo sets the emulator's proxy). Its backend is
+whichever row above matches it: run it locally for the full set, or point at staging.
+
+## Which one is for you
+
+- **On every pull request:** run your app locally, as a [full-stack app](/docs/full-stack-local)
+  or a [frontend and backend](/docs/frontend-and-backend) pair. You get everything.
+- **Before a release:** [staging](/docs/staging), with your providers' real sandboxes.
+- **After a deploy:** a short [smoke test on production](/docs/production).
+
+[Which should I use?](/docs/which-setup) walks through the choice.
+
+## Next
+
+<Cards>
+  <Card title="Full-stack app" href="/docs/full-stack-local">
+    Next.js, Remix, Nuxt or SvelteKit, started by danwo.
+  </Card>
+  <Card title="Frontend and backend" href="/docs/frontend-and-backend">
+    Several apps behind one proxy, wired together.
+  </Card>
+  <Card title="Which should I use?" href="/docs/which-setup">
+    A few questions, and a setup for each purpose.
+  </Card>
+</Cards>

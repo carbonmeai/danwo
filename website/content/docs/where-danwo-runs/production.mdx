@@ -1,0 +1,69 @@
+---
+title: Production
+description: A short smoke test after each deploy, with a dedicated test account. Never the matrix.
+icon: Globe
+---
+
+On production, danwo checks that your main pages work after a deploy. It drives a real browser
+against the live site and records what it saw. It emulates nothing and breaks nothing: production
+is for smoke tests only.
+
+<Setup kind="production" />
+
+## Set it up
+
+Point danwo at the live site with `baseUrl`, and no environment. With no environment there's no
+proxy, so nothing can be faulted by accident:
+
+```ts title="danwo.production.config.ts"
+import { defineConfig } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests/smoke",
+  baseUrl: "https://example.com",
+})
+```
+
+Keep smoke tests in their own folder, and keep them short: the home page loads, a test user can
+sign in, the main page they need shows.
+
+```ts title="tests/smoke/home.danwo.ts"
+import { test } from "@danwo/sdk"
+
+test("the home page loads", async ({ app, screen, expect }) => {
+  await app.open("/")
+  await expect(screen.getByRole("link", { name: "Sign in" })).toBeVisible()
+})
+```
+
+```sh
+npx danwo test --config danwo.production.config.ts
+```
+
+## Rules for production
+
+- **Read, don't write.** Don't buy, send or delete anything a real customer would see.
+- **Use a dedicated test account,** created for this, with its password in
+  [secrets](/docs/secrets).
+- **Never run `danwo matrix` here.** It refuses anyway: with no environment, there's no proxy to
+  put faults in.
+- **No emulators.** Production must talk to the real services.
+
+## Running it on a schedule
+
+danwo doesn't have scheduled monitoring yet. Run the smoke tests from your CI after each deploy,
+or on a timer in your CI's scheduler.
+
+## Next
+
+<Cards>
+  <Card title="Staging" href="/docs/staging">
+    The full flows, with real sandboxes, before you release.
+  </Card>
+  <Card title="CI and GitHub" href="/docs/ci">
+    Run tests on every deploy and post the results.
+  </Card>
+  <Card title="Which should I use?" href="/docs/which-setup">
+    Where production fits next to the others.
+  </Card>
+</Cards>

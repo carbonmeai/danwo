@@ -1,0 +1,72 @@
+---
+title: Which should I use?
+description: A few questions to find your setup, and which one to use for each purpose.
+icon: Signpost
+---
+
+Most teams use more than one setup: local runs on every pull request, staging before a release,
+and a smoke test after each deploy. Answer these questions to find the setup for what you're
+doing now.
+
+## Find your setup
+
+<Steps>
+<Step>
+
+### Is it production?
+
+Use a [smoke test on production](/docs/production): a few short checks, a test account, no
+matrix.
+
+</Step>
+<Step>
+
+### Is it a deployed environment, such as staging?
+
+Use [staging](/docs/staging), with your providers' real test accounts.
+
+</Step>
+<Step>
+
+### Can you start the backend on your machine?
+
+- **One app serves pages and API** (Next.js, Remix, Nuxt, SvelteKit): use a
+  [full-stack app](/docs/full-stack-local).
+- **Separate frontend and API:** use [frontend and backend](/docs/frontend-and-backend).
+
+</Step>
+<Step>
+
+### You can only run the frontend?
+
+Use [frontend only](/docs/frontend-only), against a remote API. Emulate only what the browser
+alone uses.
+
+</Step>
+</Steps>
+
+## By purpose
+
+| Purpose                                    | Setup                                                                                          | Why                                                            |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Every pull request, in CI                  | [Full-stack app](/docs/full-stack-local) or [frontend and backend](/docs/frontend-and-backend) | Everything emulated and breakable, the same result every time. |
+| Finding the bugs only failures cause       | the same, with [`danwo matrix`](/docs/fault-matrix)                                            | The matrix needs the calls to go through danwo.                |
+| Before a release                           | [Staging](/docs/staging), with real sandboxes                                                  | Checks the real deployment and real provider configuration.    |
+| After a deploy                             | [Production](/docs/production), smoke tests only                                               | Confirms the live site works, without touching real data.      |
+| A frontend team without a runnable backend | [Frontend only](/docs/frontend-only)                                                           | Covers the browser's side today.                               |
+
+<Callout type="info">
+  For frontend teams, an emulator of your own API built from its OpenAPI description is planned. It
+  isn't built yet.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Where danwo runs" href="/docs/where-danwo-runs">
+    The one rule, and the full table.
+  </Card>
+  <Card title="Quickstart" href="/docs/quickstart">
+    Set up a local run in five minutes.
+  </Card>
+</Cards>

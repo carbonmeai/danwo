@@ -1,0 +1,87 @@
+---
+title: Frontend only, against a remote API
+description: You run the frontend; the API runs somewhere else. danwo covers the browser's side.
+icon: MonitorSmartphone
+---
+
+You work on the frontend, and the API runs elsewhere: a shared dev server, a staging API, or a
+service another team owns. danwo starts your frontend and drives the browser. It sees every call
+the browser makes, but nothing the remote API does.
+
+<Setup kind="frontend-only" />
+
+## Set it up
+
+Start the frontend behind danwo's proxy and point it at the remote API. Hosts with no emulator
+pass through to the real thing:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  environment: () =>
+    appEnvironment({
+      app: {
+        command: "npm run dev",
+        url: "http://localhost:3000",
+        env: { VITE_API_URL: "https://api.dev.example.com" },
+      },
+      services: [],
+    }),
+})
+```
+
+`services` is empty here on purpose. Why is in the next section.
+
+## Emulate a provider everywhere, or nowhere
+
+A provider must be the same on both sides. If the browser talks to an emulator and the remote API
+talks to the real service, they won't agree:
+
+| Provider | If you emulate it in the browser only                                                                                   |
+| -------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Clerk    | The browser gets a token the emulator signed. The remote API checks it with real Clerk and refuses it.                  |
+| Stripe   | The remote API creates a real payment; the browser's Stripe.js asks the emulator about it, which has never heard of it. |
+| Webhooks | The real provider sends them to the remote API. danwo never sees them, so it can't fault them.                          |
+
+So leave a provider out of `services` when the remote API also talks to it. Its calls pass
+through to the real service. Use its test mode and test accounts.
+
+Emulate a provider only when just the browser uses it, such as an upload that goes straight from
+the browser to S3 with a presigned URL your frontend makes itself.
+
+## What you get
+
+- **UI tests, the agent, recordings and video.** All of it.
+- **Faults on the browser's calls to the API.** The matrix can make the API answer 500, drop the
+  connection, or lose the answer after the server acted. That tests your frontend's error
+  handling. The last one really reaches the remote API, so use test accounts.
+- **Clean state in the browser.** Cookies, storage and any emulators reset between tests.
+
+## What you don't get
+
+- **The remote API's calls.** danwo can't emulate or fault what the remote server sends to Stripe
+  or its database.
+- **Clean data on the server.** Tests that create records leave them there. Use unique names, or
+  clean up through the API.
+- **Time travel on the server.** Only the page's clock moves.
+
+<Callout type="info">
+  A frontend team with no runnable backend could use an emulator of the API itself, built from its
+  OpenAPI description. That's planned; it isn't built yet.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Frontend and backend" href="/docs/frontend-and-backend">
+    If you can run the API locally, you get everything.
+  </Card>
+  <Card title="Staging" href="/docs/staging">
+    Testing a whole deployed environment.
+  </Card>
+  <Card title="Saved sessions" href="/docs/sessions">
+    Sign in once with a real test account, reuse it.
+  </Card>
+</Cards>

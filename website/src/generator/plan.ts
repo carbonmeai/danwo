@@ -195,6 +195,38 @@ export const PLAN: readonly PlannedTab[] = [
         ],
       },
       {
+        title: "Where danwo runs",
+        pages: [
+          file("where-danwo-runs", "Overview", "Map", "where-danwo-runs/overview.mdx"),
+          file(
+            "full-stack-local",
+            "Full-stack app",
+            "Boxes",
+            "where-danwo-runs/full-stack-local.mdx",
+          ),
+          file(
+            "frontend-and-backend",
+            "Frontend and backend",
+            "Split",
+            "where-danwo-runs/frontend-and-backend.mdx",
+          ),
+          file(
+            "frontend-only",
+            "Frontend only",
+            "MonitorSmartphone",
+            "where-danwo-runs/frontend-only.mdx",
+          ),
+          file("staging", "Staging", "CloudUpload", "where-danwo-runs/staging.mdx"),
+          file("production", "Production", "Globe", "where-danwo-runs/production.mdx"),
+          file(
+            "which-setup",
+            "Which should I use?",
+            "Signpost",
+            "where-danwo-runs/which-setup.mdx",
+          ),
+        ],
+      },
+      {
         title: "Core concepts",
         pages: [
           guide(

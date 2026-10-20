@@ -1,0 +1,90 @@
+---
+title: Full-stack app, run locally
+description: One app that serves both pages and API, started by danwo. Everything works.
+icon: Boxes
+---
+
+Your app serves its pages and its API from one server: Next.js with API routes and server
+actions, Remix, Nuxt, SvelteKit, or a plain Node server. danwo starts it, so every call it makes
+goes through danwo's proxy. This is the setup with the most coverage.
+
+<Setup kind="full-stack" />
+
+## Set it up
+
+Give danwo the command that starts your app and where it answers. List the services your app
+calls:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, resendService, stripeService } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  environment: () =>
+    appEnvironment({
+      app: { command: "npm run dev", url: "http://localhost:3000" },
+      services: [stripeService(), resendService()],
+    }),
+})
+```
+
+danwo runs `npm run dev` with its proxy settings and a test certificate. When your server calls
+`api.stripe.com`, the Stripe emulator answers. Your code doesn't change.
+
+## What you get
+
+| You can                                       | How                                                                           |
+| --------------------------------------------- | ----------------------------------------------------------------------------- |
+| Drive pages, with locators or the agent       | [Agent and locators](/docs/agent-and-locators)                                |
+| Emulate what the server and the browser call  | the `services` list                                                           |
+| Break any call, webhook or database statement | [`danwo matrix`](/docs/fault-matrix)                                          |
+| Start every test from clean state             | [Isolation](/docs/isolation)                                                  |
+| Move time forward                             | [Time travel](/docs/time-travel): the app's clock, the emulators', the page's |
+
+## Next.js: routes, edge, middleware and server actions
+
+We checked Next.js 16.4.2 under both `next dev` and `next start`. These all reached the Stripe
+emulator through danwo's proxy:
+
+| Where the call is made            | `next dev` | `next start` |
+| --------------------------------- | :--------: | :----------: |
+| Route handler, Node runtime       |     ✓      |      ✓       |
+| Route handler, `runtime = "edge"` |     ✓      |      ✓       |
+| Server component                  |     ✓      |      ✓       |
+| Middleware                        |     ✓      |      ✓       |
+
+The same app started without danwo reached the real Stripe from all four. Edge routes and
+middleware work because, on your machine, Next.js runs them inside its own Node server process,
+which danwo started.
+
+Server actions run in that same server process, like server components, so their calls go
+through the proxy too.
+
+<Callout type="warn">
+  This holds when danwo starts the server on your machine. A deployment to an edge network (Vercel,
+  Netlify, Cloudflare) runs outside danwo: test it as [staging](/docs/staging).
+</Callout>
+
+## Pitfalls
+
+- **A build that fetches during start-up.** Fonts or remote config fetched at build time go
+  through the proxy too. Pass `unmatched: "passthrough"` (the default) or add those hosts to
+  `allow` when you block the rest.
+- **A start script that sets `NODE_OPTIONS`.** danwo keeps its settings anyway, through a small
+  `node` wrapper on the app's `PATH`. See [Real stacks](/docs/real-stacks).
+- **Other runtimes.** danwo covers Node and Bun servers. We haven't checked Deno, or
+  `wrangler dev` for Cloudflare Workers, yet.
+
+## Next
+
+<Cards>
+  <Card title="Test a provider" href="/docs/test-a-provider">
+    A Stripe payment, checked from both sides.
+  </Card>
+  <Card title="Frontend and backend" href="/docs/frontend-and-backend">
+    When your frontend and API are separate apps.
+  </Card>
+  <Card title="Fault matrix" href="/docs/fault-matrix">
+    Break every call your test makes, one at a time.
+  </Card>
+</Cards>
