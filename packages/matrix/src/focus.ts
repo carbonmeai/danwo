@@ -133,20 +133,11 @@ export function tierOf(planned: PlannedFault): number {
 
 /** What a fault is placed on, without which occurrence: a route, a statement, a topic, a socket. */
 function placeOf(planned: PlannedFault): string {
-  switch (planned.target) {
-    case "outbound":
-    case "socket":
-    case "page":
-      return `${planned.target} ${planned.route}`
-    case "data":
-      return `data ${planned.service} ${planned.operation}`
-    case "webhook":
-      return `webhook ${planned.service ?? ""} ${planned.topic}`
-    case "redirect":
-      return `redirect ${planned.via?.route ?? ""}`
-    default:
-      return "users"
-  }
+  if ("route" in planned) return `${planned.target} ${planned.route}`
+  if (planned.target === "data") return `data ${planned.service} ${planned.operation}`
+  if (planned.target === "webhook") return `webhook ${planned.service ?? ""} ${planned.topic}`
+
+  return planned.target === "redirect" ? `redirect ${planned.via?.route ?? ""}` : planned.target
 }
 
 /** Which occurrence of its place a fault lands on; races on the whole run have none. */

@@ -374,6 +374,29 @@ function previewLines(focused: FocusedPlan, cleanMs: number, workers: number): s
   ]
 }
 
+/**
+ * Plans the faulted trials from the clean one and says so: how many, what was left out and, for
+ * a preview, each trial and the time they would take. The trials, and the plan's summary for the
+ * result when it left anything out.
+ */
+function announcePlan(
+  clean: RunOutcome,
+  setup: TrialsSetup,
+  cleanMs: number,
+): { plan: readonly PlannedFault[]; summary: { plan?: PlanSummary } } {
+  const { write } = setup
+  const { focused, of } = planAll(clean, setup)
+  const plan = focused.trials
+
+  setup.planned?.(plan.length)
+  write(planLine(plan.length, of, setup.filter))
+  for (const line of focusLines(focused)) write(line)
+  if (setup.focus.preview)
+    for (const line of previewLines(focused, cleanMs, setup.dispatch.workers)) write(line)
+
+  return { plan, summary: focused.total === plan.length ? {} : { plan: summaryOf(focused) } }
+}
+
 /** The clean trial, then every planned fault's; the result and the exit code. */
 async function runTrials(
   run: (fault: PlannedFault | null) => Promise<RunOutcome>,
@@ -391,20 +414,9 @@ async function runTrials(
     return { result, code: matrixExitCode([clean]) || 1 }
   }
 
-  const cleanMs = Date.now() - began
-  const { focused, of } = planAll(clean, setup)
-  const plan = focused.trials
-  const summary = focused.total === plan.length ? {} : { plan: summaryOf(focused) }
+  const { plan, summary } = announcePlan(clean, setup, Date.now() - began)
 
-  setup.planned?.(plan.length)
-  write(planLine(plan.length, of, setup.filter))
-  for (const line of focusLines(focused)) write(line)
-
-  if (setup.focus.preview) {
-    for (const line of previewLines(focused, cleanMs, setup.dispatch.workers)) write(line)
-
-    return { result: { clean, runs: [], ...summary }, code: 0 }
-  }
+  if (setup.focus.preview) return { result: { clean, runs: [], ...summary }, code: 0 }
 
   write(judgingLine(setup.test))
 
