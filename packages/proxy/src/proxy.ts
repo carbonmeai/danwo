@@ -12,6 +12,7 @@ import {
 } from "mockttp"
 
 import { type AppClock, createAppClock } from "./app-clock.ts"
+import { isAssetKind, type LoadKind, loadKind } from "./assets.ts"
 import { type CapturedMessage, captureMessage } from "./capture.ts"
 import { clientOf, userField } from "./clients.ts"
 import {
@@ -75,6 +76,14 @@ export interface ProxyOptions {
    * a run neither sends real data out nor fills its record with noise; `passthrough` lets them go.
    */
   readonly telemetry?: "block" | "passthrough"
+  /**
+   * What happens, while `unmatched` is `block`, to a page's images, fonts, stylesheets and media
+   * from a host no route answers (told by `Sec-Fetch-Dest`, or by the file's extension and
+   * `Accept`): `passthrough` (default) lets them load, so a page looks as it should; `block`
+   * refuses them with the rest. Scripts, documents, frames, workers and `fetch()` calls never pass
+   * this way, and telemetry and `blocked` hosts stay blocked.
+   */
+  readonly assets?: "passthrough" | "block"
 }
 
 /** A request to a routed host, as a fault rule sees it. */
@@ -187,6 +196,11 @@ export interface Exchange {
    * call the app makes: readiness, effects and the matrix leave these out.
    */
   asset?: boolean
+  /**
+   * What the request loads, from the headers a browser sends with it (`Sec-Fetch-Dest`): an image,
+   * a font, a script, the page, a `fetch()` call (`request`). Absent for a server's own calls.
+   */
+  readonly load?: LoadKind
 }
 
 export interface Proxy {
@@ -372,9 +386,11 @@ interface HostPolicy {
   readonly isRouted: (host: string) => boolean
   readonly isBlocked: (host: string) => boolean
   readonly isAllowed: (host: string) => boolean
+  /** A page asset from an unrouted, unblocked host, which passes even while `unmatched` is `block`. */
+  readonly passesAsAsset: (host: string, kind: LoadKind | undefined, method: string) => boolean
   readonly unmatched: "passthrough" | "block"
   readonly upstreamOf: (host: string) => string | undefined
-  dispositionOf(host: string): Exchange["disposition"]
+  dispositionOf(host: string, kind?: LoadKind, method?: string): Exchange["disposition"]
 }
 
 function matchesAny(patterns: readonly string[], host: string): boolean {
@@ -392,20 +408,33 @@ function hostPolicy(options: ProxyOptions, isRouted: (host: string) => boolean):
     !isAllowed(host) && (matchesAny(listed, host) || matchesAny(telemetry, host))
   const unmatched = options.unmatched ?? "passthrough"
   const upstreams = socketUpstreams(options.routes)
+  const assets = options.assets ?? "passthrough"
+  const passesAsAsset = (host: string, kind: LoadKind | undefined, method: string) =>
+    assets === "passthrough" && method === "GET" && isAssetKind(kind) && !isBlocked(host)
 
   return {
     isRouted,
     isBlocked,
     isAllowed,
+    passesAsAsset,
     unmatched,
     upstreamOf: (host) => upstreams.find((route) => route.matches(host))?.upstream,
-    dispositionOf(host) {
+    dispositionOf(host, kind, method = "GET") {
       if (isRouted(host)) return "routed"
-      if (isAllowed(host)) return "passthrough"
+      if (isAllowed(host) || passesAsAsset(host, kind, method)) return "passthrough"
 
       return unmatched === "block" || isBlocked(host) ? "blocked" : "passthrough"
     },
   }
+}
+
+/** An unrouted request that passes while `unmatched` is `block`: an allowed host, or a page asset. */
+function passesBlock(hosts: HostPolicy, req: CompletedRequest): boolean {
+  const host = req.destination.hostname
+
+  return (
+    hosts.isAllowed(host) || hosts.passesAsAsset(host, loadKind(req.path, req.headers), req.method)
+  )
 }
 
 /**
@@ -443,7 +472,7 @@ async function placeUnrouted(server: Mockttp, options: ProxyOptions, hosts: Host
 
   await server
     .forAnyRequest()
-    .matching((req) => unrouted(req) && hosts.isAllowed(req.destination.hostname))
+    .matching((req) => unrouted(req) && passesBlock(hosts, req))
     .always()
     .thenPassThrough()
   await server
@@ -585,14 +614,16 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   // `request-initiated` always comes first; `request` can arrive after a fast `response`.
   await server.on("request-initiated", (req) => {
     const host = req.destination.hostname
+    const load = loadKind(req.path, req.headers)
 
     log.set(req.id, {
       id: req.id,
       host,
       method: req.method,
       path: req.path,
-      disposition: hosts.dispositionOf(host),
-      ...((isPageAsset(req.path) || isScriptHost(host)) && { asset: true }),
+      disposition: hosts.dispositionOf(host, load, req.method),
+      ...((isPageAsset(req.path) || isScriptHost(host) || isAssetKind(load)) && { asset: true }),
+      ...(load && { load }),
       startedAt: new Date(req.timingEvents.startTime).toISOString(),
       client: clientOf(req.headers["user-agent"]),
       ...userField(req.headers["user-agent"]),
