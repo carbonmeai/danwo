@@ -16,8 +16,14 @@ import type { WorkerEnvironment } from "./environment.ts"
  */
 export type Isolation = "test" | "file" | "none"
 
-/** What the starting point needs from the environment: its reset and, optionally, snapshots. */
-type Resettable = Pick<WorkerEnvironment, "reset" | "snapshot" | "restore" | "snapshotSlots">
+/**
+ * What the starting point needs from the environment: its reset, optionally snapshots, and how
+ * to let background work finish before a state is kept.
+ */
+type Resettable = Pick<
+  WorkerEnvironment,
+  "reset" | "snapshot" | "restore" | "snapshotSlots" | "settle" | "proxy"
+>
 
 /** The state a base starts from: the seeded one, or a file's setup on top of it. */
 type Base = "pristine" | "file"
@@ -124,6 +130,7 @@ export class StartingPoint {
     if (what === "file") {
       this.#base = "file"
       this.#forgetFile()
+      await this.#settled()
       await this.#snapshot("file")
 
       return
@@ -182,6 +189,16 @@ export class StartingPoint {
     this.#kept.clear()
     this.#base = "pristine"
     this.#onReset()
+    await this.#settled()
+  }
+
+  /**
+   * Lets the environment's background work finish, such as the webhooks a reset announces, so
+   * a kept state holds it whole and no test sees it land late, on top of its own work.
+   */
+  async #settled(): Promise<void> {
+    await this.#env.settle?.()
+    await this.#env.proxy?.settled().catch(() => undefined)
   }
 }
 

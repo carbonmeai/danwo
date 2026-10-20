@@ -32,7 +32,12 @@ import { stripeService } from "../src/runner/stripe.ts"
 
 /** An environment that counts what the starting point asks of it, with the slot it names. */
 function countingEnv(
-  options: { readonly keeps?: boolean; readonly resets?: boolean; readonly slots?: boolean } = {},
+  options: {
+    readonly keeps?: boolean
+    readonly resets?: boolean
+    readonly slots?: boolean
+    readonly settles?: boolean
+  } = {},
 ) {
   const calls: string[] = []
 
@@ -46,6 +51,7 @@ function countingEnv(
     ...(options.resets !== false && { reset: record("reset") }),
     ...(options.keeps !== false && { snapshot: record("snapshot"), restore: record("restore") }),
     ...(options.slots === true && { snapshotSlots: true }),
+    ...(options.settles === true && { settle: record("settle") }),
   }
 
   return { env, calls }
@@ -65,6 +71,17 @@ describe("StartingPoint", () => {
 
     expect(calls).toEqual(["reset", "snapshot", "restore", "restore"])
     expect(forgotten).toBe(1)
+  })
+
+  it("lets a reset's background work and a file's setup finish before keeping them", async () => {
+    const { env, calls } = countingEnv({ settles: true })
+    const start = new StartingPoint(env, () => {})
+
+    await start.clean()
+    start.touch()
+    await start.keep("file")
+
+    expect(calls).toEqual(["reset", "settle", "snapshot", "settle", "snapshot"])
   })
 
   it("restores nothing when the environment is still where it was put", async () => {
