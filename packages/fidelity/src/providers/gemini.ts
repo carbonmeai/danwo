@@ -9,6 +9,7 @@ import { llm, seedLlm } from "@danwo/emulators"
 import { type FidelityProvider, requiredCredentials } from "../provider.ts"
 import type { Scenario, ScenarioContext, StepDoc, StepOptions } from "../scenario.ts"
 import { credential, emulatorTarget, liveTarget } from "../target.ts"
+import { COLOUR_JSON_SCRIPT, WEATHER_TOOL_SCRIPT } from "./model-scripts.ts"
 
 const KEY = "DANWO_FIDELITY_GEMINI_KEY"
 const API = "https://generativelanguage.googleapis.com/v1beta"
@@ -194,13 +195,7 @@ export const geminiFidelity: FidelityProvider = {
     emulatorTarget(llm, { key: "REDACTED-TEST-VALUE" }, (emulator) => {
       seedLlm(emulator.store, {
         models: [MODEL, EMBEDDING_MODEL],
-        scripts: [
-          {
-            match: { tool: "weather" },
-            reply: { toolCalls: [{ name: "weather", arguments: { city: "Lagos" } }] },
-          },
-          { match: { user: "colour" }, reply: { json: { colour: "blue" } } },
-        ],
+        scripts: [WEATHER_TOOL_SCRIPT, COLOUR_JSON_SCRIPT],
       })
     }),
   live(env) {

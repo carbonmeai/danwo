@@ -12,6 +12,7 @@ import { type FidelityProvider, requiredCredentials } from "../provider.ts"
 import type { Answer, Scenario, ScenarioContext, StepOptions } from "../scenario.ts"
 import { asJsonObject, type Json } from "../shape.ts"
 import { credential, emulatorTarget, liveTarget } from "../target.ts"
+import { COLOUR_JSON_SCRIPT, WEATHER_TOOL_SCRIPT } from "./model-scripts.ts"
 
 const KEY = "DANWO_FIDELITY_AI_GATEWAY_KEY"
 const SHARED_KEY = "AI_GATEWAY_API_KEY"
@@ -227,13 +228,7 @@ export const gatewayFidelity: FidelityProvider = {
         models: [LANGUAGE_MODEL, EMBEDDING_MODEL],
         knownModelsOnly: true,
         prices: { [LANGUAGE_MODEL]: { input: 0.1, output: 0.4 } },
-        scripts: [
-          {
-            match: { tool: "weather" },
-            reply: { toolCalls: [{ name: "weather", arguments: { city: "Lagos" } }] },
-          },
-          { match: { user: "colour" }, reply: { json: { colour: "blue" } } },
-        ],
+        scripts: [WEATHER_TOOL_SCRIPT, COLOUR_JSON_SCRIPT],
       })
     }),
   live(env) {

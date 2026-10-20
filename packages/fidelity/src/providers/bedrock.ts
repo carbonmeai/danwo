@@ -12,6 +12,7 @@ import { llm, seedLlm } from "@danwo/emulators"
 import { type FidelityProvider, requiredCredentials } from "../provider.ts"
 import type { Scenario, ScenarioContext, StepDoc, StepOptions } from "../scenario.ts"
 import { credential, emulatorTarget, liveTarget } from "../target.ts"
+import { WEATHER_TOOL_SCRIPT } from "./model-scripts.ts"
 
 const KEY = "DANWO_FIDELITY_BEDROCK_API_KEY"
 const REGION = "DANWO_FIDELITY_BEDROCK_REGION"
@@ -184,12 +185,7 @@ export const bedrockFidelity: FidelityProvider = {
     emulatorTarget(llm, { key: "REDACTED-TEST-VALUE" }, (emulator) => {
       seedLlm(emulator.store, {
         models: [MODEL],
-        scripts: [
-          {
-            match: { tool: "weather" },
-            reply: { toolCalls: [{ name: "weather", arguments: { city: "Lagos" } }] },
-          },
-        ],
+        scripts: [WEATHER_TOOL_SCRIPT],
       })
     }),
   live(env) {
