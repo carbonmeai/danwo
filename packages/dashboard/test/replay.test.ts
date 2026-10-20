@@ -4,11 +4,14 @@ import { join } from "node:path"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
+import { tabMovesBefore, transcriptOf } from "../src/modules/overlay/overlay-values.ts"
 import { byteRange, serveMedia } from "../src/modules/record/record-media.ts"
 import {
   clock,
+  followedVideo,
   frameAt,
   inTail,
+  isPopup,
   linkedMoment,
   mediaUrl,
   replayOf,
@@ -173,6 +176,139 @@ describe("the replay player's data", () => {
     expect(clock(0)).toBe("0:00.0")
     expect(clock(1_250)).toBe("0:01.3")
     expect(clock(83_400)).toBe("1:23.4")
+  })
+})
+
+/** A step of the popup run, started `at` seconds in (`1.000`), in tab `tab`. */
+function tabStep(index: number, label: string, at: string, durationMs: number, tab: number) {
+  return {
+    index,
+    label,
+    status: "passed" as const,
+    phase: "body" as const,
+    startedAt: `2026-10-19T10:00:0${at}Z`,
+    durationMs,
+    tab,
+  }
+}
+
+/** The steps as a video that began at `startedAt` marks them, on its own clock. */
+function marksFrom(startedAt: string, steps: readonly ReturnType<typeof tabStep>[]) {
+  const origin = Date.parse(startedAt)
+
+  return steps.map((step) => {
+    const startMs = Date.parse(step.startedAt) - origin
+
+    return {
+      kind: "step" as const,
+      id: String(step.index),
+      label: step.label,
+      startMs,
+      endMs: startMs + step.durationMs,
+      bad: false,
+    }
+  })
+}
+
+/**
+ * A test that connects an account: it clicks Connect in the app (tab 1), the provider's page opens
+ * in a popup (tab 2) where it fills the email and clicks Allow, and the popup closes back to the app.
+ */
+function popupReplay() {
+  const steps = [
+    tabStep(0, "Connect", "0.300", 400, 1),
+    tabStep(1, "Email", "1.000", 300, 2),
+    tabStep(2, "Allow", "1.500", 500, 2),
+    tabStep(3, "Connected", "2.500", 300, 1),
+  ]
+  const app = "2026-10-19T10:00:00.200Z"
+  const popup = "2026-10-19T10:00:00.800Z"
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a test double: the replay reads times, steps and videos
+  const record = {
+    ...RECORD,
+    durationMs: 4_000,
+    steps,
+    videos: [
+      {
+        file: "video/tab-1.webm",
+        startedAt: app,
+        durationMs: 3_800,
+        tab: 1,
+        marks: marksFrom(app, steps),
+      },
+      {
+        file: "video/tab-2.webm",
+        startedAt: popup,
+        durationMs: 1_400,
+        tab: 2,
+        opener: 1,
+        host: "accounts.provider.test",
+        closed: true,
+        marks: marksFrom(popup, steps),
+      },
+    ],
+  } as unknown as Parameters<typeof replayOf>[1]
+
+  return { replay: replayOf(DIR, record, timelineOf(RECORD)), steps }
+}
+
+describe("the player following the action across tabs", () => {
+  it("shows each step in the video of the tab it ran in, and where the popup opened and closed", () => {
+    const { replay: played } = popupReplay()
+
+    expect(played.stepVideos).toEqual({ 0: 0, 1: 1, 2: 1, 3: 0 })
+    expect(played.videos.map((video) => [video.tab, video.opener, video.host])).toEqual([
+      [1, undefined, undefined],
+      [2, 0, "accounts.provider.test"],
+    ])
+    expect(isPopup(played.videos, 1)).toBe(true)
+    expect(isPopup(played.videos, 0)).toBe(false)
+    expect(played.tabMarks).toEqual([
+      { kind: "opened", label: "Popup opened: accounts.provider.test", atMs: 800, video: 1 },
+      { kind: "closed", label: "Back to the app", atMs: 2_200, video: 0 },
+    ])
+  })
+
+  it("moves to the popup's video for its steps, and back to the app's once it closes", () => {
+    const { replay: played } = popupReplay()
+
+    expect(followedVideo(played, 0, 400)).toBe(0)
+    /* The popup opened during Connect, but the player moves when a step runs in it. */
+    expect(followedVideo(played, 0, 900)).toBe(0)
+    expect(followedVideo(played, 0, 1_100)).toBe(1)
+    expect(followedVideo(played, 1, 1_600)).toBe(1)
+    /* Allow is still running when the popup closes: its video has ended, so back to the app. */
+    expect(followedVideo(played, 1, 2_200)).toBe(0)
+    expect(followedVideo(played, 1, 2_600)).toBe(0)
+    expect(followedVideo(played, 0, 2_600)).toBe(0)
+  })
+
+  it("jumps to a step in its tab's video, badges the popup's steps, and lists the moves between", () => {
+    const { replay: played, steps } = popupReplay()
+    const transcript = transcriptOf(
+      { steps: steps.map((step) => ({ ...step, kind: "locator" as const, api: "locator.click" })) },
+      played,
+    )
+
+    expect(transcript.map((step) => [step.label, step.video, step.atMs, step.popup])).toEqual([
+      ["Connect", 0, 300, undefined],
+      ["Email", 1, 1_000, true],
+      ["Allow", 1, 1_500, true],
+      ["Connected", 0, 2_500, undefined],
+    ])
+    expect(
+      transcript.map((_, at) =>
+        tabMovesBefore(transcript, at, played.tabMarks).map((mark) => mark.label),
+      ),
+    ).toEqual([[], ["Popup opened: accounts.provider.test"], [], ["Back to the app"]])
+  })
+
+  it("keeps a record from before steps kept their tab on its first video", () => {
+    const older = replay()
+
+    expect(older.stepVideos).toEqual({ 0: 0, 1: 0 })
+    expect(older.tabMarks).toEqual([])
+    expect(followedVideo(older, 0, 1_500)).toBe(0)
   })
 })
 

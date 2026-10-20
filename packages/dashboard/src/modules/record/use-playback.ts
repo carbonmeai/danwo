@@ -6,12 +6,15 @@
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react"
 
 import {
+  followedVideo,
   inTail,
   linkedMoment,
   type Replay,
   type ReplayMark,
   type ReplaySegment,
+  type ReplayTabMark,
   type ReplayVideo,
+  stepAt,
 } from "./record-replay.ts"
 
 export interface Playback {
@@ -33,6 +36,8 @@ export interface Playback {
   readonly videoRef: RefObject<HTMLVideoElement | null>
   /** The scrubber's steps, calls and webhooks. */
   readonly marks: readonly ReplayMark[]
+  /** Popups opening and the run coming back from them, flagged on the scrubber. */
+  readonly tabMarks: readonly ReplayTabMark[]
   /** Which of the record's videos plays. */
   readonly tab: number
   readonly seek: (ms: number) => void
@@ -100,6 +105,7 @@ function useVideoEvent(
 
 const LENGTH_EVENTS = ["loadedmetadata", "durationchange"]
 const STATE_EVENTS = ["play", "pause", "ended"]
+const ENDED = ["ended"]
 
 /** How long the video runs: what the file says once loaded, else what the record says. */
 function useVideoLength(video: ReplayVideo | undefined, ref: RefObject<HTMLVideoElement | null>) {
@@ -208,14 +214,19 @@ function nextMs(
 
 /** The clock while it plays, and the timer stopping at the end of the screenshots. */
 function useTicks(
-  state: ControlState & { readonly playing: boolean; readonly rate: number },
+  state: ControlState & {
+    readonly playing: boolean
+    readonly rate: number
+    /** While the player moves to another tab's video, whose clock is not this one's yet. */
+    readonly held: RefObject<boolean>
+  },
 ): void {
-  const { videoRef, span, ms, setMs, setPlaying, playing, rate } = state
+  const { videoRef, span, ms, setMs, setPlaying, playing, rate, held } = state
 
   useFrames(playing, (elapsed) => {
     const element = videoRef.current
 
-    setMs(nextMs(element, ms, elapsed * rate, span))
+    if (!held.current) setMs(nextMs(element, ms, elapsed * rate, span))
   })
 
   useEffect(() => {
@@ -230,31 +241,73 @@ interface Switching {
   readonly endMs: number
   readonly seek: (ms: number) => void
   readonly pickTab: (index: number) => void
+  readonly videoRef: RefObject<HTMLVideoElement | null>
+  /** Set while a switch waits for its video, so the clock does not read the new one too soon. */
+  readonly held: RefObject<boolean>
 }
 
 /**
  * Seeks the player to a moment of any of its videos: at once in the one playing, else once the
  * other has loaded far enough to know its length (before that, a seek would stop at its start).
+ * The second function moves to another video and keeps playing there, as following the action does.
  */
-function useSwitchedSeek({ tab, startMs, endMs, seek, pickTab }: Switching) {
-  const pending = useRef<number>(undefined)
+function useSwitchedSeek({ tab, startMs, endMs, seek, pickTab, videoRef, held }: Switching) {
+  const pending = useRef<{ readonly ms: number; readonly play: boolean }>(undefined)
 
   useEffect(() => {
-    if (pending.current === undefined || endMs <= startMs) return
+    const waiting = pending.current
 
-    seek(pending.current)
+    if (waiting === undefined || endMs <= startMs) return
+
+    seek(waiting.ms)
     pending.current = undefined
-  }, [tab, startMs, endMs, seek])
+    held.current = false
+    if (waiting.play) void videoRef.current?.play().catch(() => undefined)
+  }, [tab, startMs, endMs, seek, videoRef, held])
 
-  return useCallback(
+  const showAt = useCallback(
     (to: number, ms: number) => {
       if (to === tab) return seek(ms)
 
-      pending.current = ms
+      pending.current = { ms, play: false }
       pickTab(to)
     },
     [tab, seek, pickTab],
   )
+
+  return { showAt, pending }
+}
+
+/**
+ * Follows the action while it plays: when a step starts that ran in another tab (a popup the app
+ * opened), or the popup playing has closed, moves to that tab's video and plays on there. A tab
+ * picked by hand stays until the next step.
+ */
+function useFollow(state: {
+  readonly replay: Replay
+  readonly tab: number
+  readonly ms: number
+  readonly playing: boolean
+  readonly marks: readonly ReplayMark[]
+  readonly follow: (to: number, ms: number) => void
+  readonly held: RefObject<boolean>
+}): RefObject<number | undefined> {
+  const { replay, tab, ms, playing, marks, follow, held } = state
+  const followed = useRef<number>(undefined)
+  const step = stepAt(marks, ms)
+
+  useEffect(() => {
+    if (!playing || held.current || step === followed.current) return
+
+    followed.current = step
+
+    const to = followedVideo(replay, tab, ms)
+
+    if (to !== tab) follow(to, ms)
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- a new step, not each frame, moves the player
+  }, [playing, step])
+
+  return followed
 }
 
 /**
@@ -297,7 +350,11 @@ export function usePlayback(replay: Replay): Playback {
   const speed = useSpeed(replay.segments, ms, videoRef, video)
   const { rate, shownRate } = speed
 
-  useVideoEvent(videoRef, video, STATE_EVENTS, (element) => setPlaying(isPlaying(element)))
+  const held = useRef(false)
+
+  useVideoEvent(videoRef, video, STATE_EVENTS, (element) => {
+    if (!held.current) setPlaying(isPlaying(element))
+  })
 
   useTicks({
     videoRef,
@@ -307,6 +364,7 @@ export function usePlayback(replay: Replay): Playback {
     setPlaying,
     playing,
     rate: shownRate,
+    held,
   })
 
   const { seek, toggle } = useControls({
@@ -329,7 +387,44 @@ export function usePlayback(replay: Replay): Playback {
     [forgetLink],
   )
 
-  const showAt = useSwitchedSeek({ tab, startMs, endMs, seek, pickTab })
+  const { showAt, pending } = useSwitchedSeek({
+    tab,
+    startMs,
+    endMs,
+    seek,
+    pickTab,
+    videoRef,
+    held,
+  })
+
+  const follow = useCallback(
+    (to: number, at: number) => {
+      forgetLink()
+      held.current = true
+      pending.current = { ms: at, play: true }
+      setMs(at)
+      setTab(to)
+    },
+    [forgetLink, pending],
+  )
+
+  const followed = useFollow({ replay, tab, ms, playing, marks, follow, held })
+
+  /* A popup's video ends where it closed: the run goes on in the tab that opened it. */
+  useVideoEvent(videoRef, video, ENDED, () => {
+    const at = startMs + length
+    const to = followedVideo(replay, tab, at)
+
+    if (to !== tab) follow(to, at)
+  })
+
+  const pickByHand = useCallback(
+    (index: number) => {
+      followed.current = stepAt(marks, ms)
+      pickTab(index)
+    },
+    [followed, marks, ms, pickTab],
+  )
 
   return {
     ms,
@@ -343,12 +438,13 @@ export function usePlayback(replay: Replay): Playback {
     video,
     videoRef,
     marks,
+    tabMarks: replay.tabMarks,
     tab,
     seek,
     toggle,
     setRate: speed.setRate,
     setFastTail: speed.setFastTail,
-    pickTab,
+    pickTab: pickByHand,
     showAt,
   }
 }

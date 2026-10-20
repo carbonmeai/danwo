@@ -12,6 +12,7 @@ import {
   type Replay,
   type ReplayMark,
   type ReplaySegment,
+  type ReplayTabMark,
   type ReplayVideo,
   stepAt,
   videoName,
@@ -108,6 +109,34 @@ function FaultMark({ mark, playback }: { readonly mark: ReplayMark; readonly pla
   )
 }
 
+/** A flag where a popup opened or the run came back from it; clicking it shows that tab there. */
+function TabFlag({
+  mark,
+  playback,
+}: {
+  readonly mark: ReplayTabMark
+  readonly playback: Playback
+}) {
+  if (mark.atMs < playback.startMs || mark.atMs > playback.endMs) return null
+
+  return (
+    <Box
+      position="absolute"
+      top="-1"
+      w="2"
+      h="2"
+      rounded="full"
+      bg={mark.kind === "opened" ? "series.2" : "ink.faint"}
+      borderWidth="2px"
+      borderColor="surface.item"
+      role="img"
+      aria-label={mark.label}
+      title={mark.label}
+      style={{ left: at(playback, mark.atMs), transform: "translateX(-50%)" }}
+    />
+  )
+}
+
 /** Where the pointer is along `track`, on the record's clock. */
 function pointedMs(playback: Playback, track: HTMLElement, clientX: number): number {
   const box = track.getBoundingClientRect()
@@ -190,6 +219,9 @@ function Scrubber({ playback }: { readonly playback: Playback }) {
       {playback.marks.map((mark, i) =>
         mark.fault ? <FaultMark key={`f${i}`} mark={mark} playback={playback} /> : null,
       )}
+      {playback.tabMarks.map((mark) => (
+        <TabFlag key={`${mark.kind}-${mark.video}-${mark.atMs}`} mark={mark} playback={playback} />
+      ))}
       <Box
         position="absolute"
         top="50%"
@@ -375,6 +407,25 @@ function GoToSegment({
   )
 }
 
+/** The tab the player shows, named when it is a popup: `In the popup: accounts.provider.test`. */
+function PopupNote({ video }: { readonly video: ReplayVideo | undefined }) {
+  if (video?.opener === undefined) return null
+
+  return (
+    <Span
+      px="1.5"
+      rounded="4px"
+      bg="surface.hover"
+      color="ink.soft"
+      fontSize="1"
+      fontWeight="600"
+      flexShrink="0"
+    >
+      In the popup{video.host === undefined ? "" : `: ${video.host}`}
+    </Span>
+  )
+}
+
 /** What is happening at the player's moment: the step running, or settling and the checks. */
 function NowLine({ playback }: { readonly playback: Playback }) {
   const index = stepAt(playback.marks, playback.ms)
@@ -383,6 +434,7 @@ function NowLine({ playback }: { readonly playback: Playback }) {
 
   return (
     <HStack gap="2" mt="2" fontSize="1" color="ink.soft" minH="5" aria-live="polite">
+      <PopupNote video={playback.video} />
       <NowWords playback={playback} step={step} index={index} segment={segment} />
       {playback.segments.length > 0 ? (
         <HStack gap="1" ml="auto" role="group" aria-label="After the body">

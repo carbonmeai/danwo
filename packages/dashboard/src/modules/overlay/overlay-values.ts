@@ -7,7 +7,7 @@ import type { FailureVerdict } from "@danwo/runner/runner"
 import { fixAdvice, VERDICT_LABELS } from "@danwo/runner/verdict"
 
 import type { RecordView, StepView } from "../record/record-data.ts"
-import type { Replay } from "../record/record-replay.ts"
+import { isPopup, type Replay, type ReplayTabMark } from "../record/record-replay.ts"
 import { CACHE_WORDS, divergenceLine } from "../record/record-values.ts"
 
 type Record_ = RecordView["record"]
@@ -16,17 +16,26 @@ type Record_ = RecordView["record"]
 export interface TranscriptStep extends Omit<StepView, "cache"> {
   /** Where the step starts on the player's clock, when the run can be replayed. */
   readonly atMs?: number
-  /** Which of the record's videos shows the step: its person's browser. */
+  /** Which of the record's videos shows the step: the tab it ran in, in its person's browser. */
   readonly video?: number
+  /** It ran in a popup or a tab the app opened, not the app's first tab. */
+  readonly popup?: boolean
   /** What the replay cache did for an agent step, as its tag words it. */
   readonly cache?: string
 }
 
-/** Where each step starts on the player's clock, and in which video, from the replay's marks. */
+/**
+ * Where each step starts on the player's clock, and in which video: the one of the tab it ran in,
+ * from the replay's marks (the timeline's, when the run kept no video).
+ */
 function stepStarts(replay: Replay): Map<number, { atMs: number; video?: number }> {
   const starts = new Map<number, { atMs: number; video?: number }>()
   const marked = [
-    ...replay.videos.flatMap((video, at) => video.marks.map((mark) => ({ mark, video: at }))),
+    ...replay.videos.flatMap((video, at) =>
+      video.marks.flatMap((mark) =>
+        mark.step !== undefined && replay.stepVideos[mark.step] === at ? [{ mark, video: at }] : [],
+      ),
+    ),
     ...replay.marks.map((mark) => ({ mark, video: undefined })),
   ]
 
@@ -51,11 +60,30 @@ export function transcriptOf(view: Pick<RecordView, "steps">, replay: Replay): T
       ...step,
       ...(start !== undefined && { atMs: start.atMs }),
       ...(start?.video !== undefined && { video: start.video }),
+      ...(isPopup(replay.videos, start?.video) && { popup: true }),
       ...(step.cache !== undefined && {
         cache: CACHE_WORDS[step.cache] ?? step.cache,
       }),
     }
   })
+}
+
+/**
+ * Where the run moved between tabs just before step `at`: a popup that opened, or the run coming
+ * back from one, since the step before it started.
+ */
+export function tabMovesBefore(
+  steps: readonly Pick<TranscriptStep, "atMs">[],
+  at: number,
+  marks: readonly ReplayTabMark[],
+): ReplayTabMark[] {
+  const startMs = steps[at]?.atMs
+
+  if (startMs === undefined) return []
+
+  const after = at === 0 ? Number.NEGATIVE_INFINITY : (steps[at - 1]?.atMs ?? startMs)
+
+  return marks.filter((mark) => mark.atMs > after && mark.atMs <= startMs)
 }
 
 /** Whether a step ran after the body: the wait for background work, or the invariant's checks. */

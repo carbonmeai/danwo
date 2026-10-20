@@ -1,6 +1,7 @@
 import type { FailureVerdict } from "@danwo/runner/runner"
 import { Icons } from "@danwo/ui/icons/base"
 import { Box, HStack, Stack } from "@danwo/ui/jsx"
+import { Badge } from "@danwo/ui/primitives/badge"
 import { Button } from "@danwo/ui/primitives/button"
 import { ButtonGroup } from "@danwo/ui/primitives/button-group"
 import { DialogTitle } from "@danwo/ui/primitives/dialog"
@@ -20,7 +21,7 @@ import { duration } from "../../lib/format.ts"
 import { toneOf } from "../../lib/verdicts.ts"
 import { RerunTest } from "../live/run-actions.tsx"
 import type { RecordView } from "../record/record-data.ts"
-import { clock, stepAt } from "../record/record-replay.ts"
+import { clock, type ReplayTabMark, stepAt } from "../record/record-replay.ts"
 import type { Playback } from "../record/use-playback.ts"
 import { sendFeedback } from "./feedback-api.ts"
 import {
@@ -29,6 +30,7 @@ import {
   afterBody,
   checkWords,
   fixPrompt,
+  tabMovesBefore,
   transcriptOf,
   warningsOf,
 } from "./overlay-values.ts"
@@ -141,16 +143,55 @@ function UserSwitch({ who }: { readonly who: string }) {
   )
 }
 
+/** The line above a step where a popup opened or the run came back from one; it jumps there. */
+function TabMove({
+  mark,
+  playback,
+}: {
+  readonly mark: ReplayTabMark
+  readonly playback: Playback | undefined
+}) {
+  const icon =
+    mark.kind === "opened" ? <Icons.exportSquare size={12} /> : <Icons.cornerDownLeft size={12} />
+
+  return (
+    <HStack gap="2" px="2" pt="1.5" pb="0.5" color="ink.muted" fontSize="1">
+      {playback ? (
+        <Button
+          variant="ghost"
+          size="xs"
+          h="5"
+          px="1.5"
+          aria-label={`${mark.label}, at ${clock(mark.atMs - playback.startMs)}`}
+          onClick={() => playback.showAt(mark.video, mark.atMs)}
+        >
+          {icon}
+          {mark.label}
+        </Button>
+      ) : (
+        <HStack gap="1.5">
+          {icon}
+          <Span>{mark.label}</Span>
+        </HStack>
+      )}
+      <Box flex="1" h="1px" bg="hairline" />
+    </HStack>
+  )
+}
+
 /** One step of the transcript: its number, what it did, and a jump to it in the replay. */
 function StepLine({
   step,
   current,
   switched,
+  moves = [],
   playback,
 }: {
   readonly step: TranscriptStep
   readonly current: boolean
   readonly switched: string | undefined
+  /** Popups that opened, or closed, just before this step. */
+  readonly moves?: readonly ReplayTabMark[]
   readonly playback: Playback | undefined
 }) {
   const failed = toneOf(step.status) === "failed"
@@ -158,6 +199,9 @@ function StepLine({
   return (
     <Box role="listitem">
       {switched === undefined ? null : <UserSwitch who={switched} />}
+      {moves.map((mark) => (
+        <TabMove key={`${mark.kind}-${mark.video}`} mark={mark} playback={playback} />
+      ))}
       <StepBody step={step} current={current} failed={failed} playback={playback} />
     </Box>
   )
@@ -311,6 +355,11 @@ function StepBody({
             </Button>
           ) : null}
           {step.user === undefined ? null : <Span fontWeight="600">{step.user}</Span>}
+          {step.popup ? (
+            <Badge look="soft" size="sm" colorPalette="palette.blue">
+              popup
+            </Badge>
+          ) : null}
           <Span>{step.api}</Span>
           {step.cache ? <Span>cache: {step.cache}</Span> : null}
           <Span>{duration(step.durationMs)}</Span>
@@ -383,6 +432,7 @@ export function Transcript({
               step={step}
               current={step.index === playing}
               switched={switchedTo(body, at)}
+              moves={tabMovesBefore(body, at, view.replay.tabMarks)}
               playback={playback}
             />
           ))}

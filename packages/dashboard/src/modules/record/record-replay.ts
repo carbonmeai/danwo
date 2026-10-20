@@ -30,6 +30,23 @@ export interface ReplayVideo {
   readonly startMs: number
   readonly durationMs: number
   readonly marks: readonly ReplayMark[]
+  /** For a popup or a tab the app opened: the index of the video of the tab that opened it. */
+  readonly opener?: number
+  /** The host of the first web page the tab showed. */
+  readonly host?: string
+  /** The tab closed before the browser did, and the run went back to its opener. */
+  readonly closed?: boolean
+}
+
+/**
+ * Where the run moved between tabs: a popup opening (`Popup opened: accounts.provider.test`) and
+ * the run coming back once it closed. `video` is the index of the video the run moved to.
+ */
+export interface ReplayTabMark {
+  readonly kind: "opened" | "closed"
+  readonly label: string
+  readonly atMs: number
+  readonly video: number
 }
 
 /** A step's screenshot, shown from the moment its step ended. */
@@ -60,6 +77,10 @@ export interface Replay {
   readonly marks: readonly ReplayMark[]
   /** The settle wait and the checks, in order; empty for records made before they were kept. */
   readonly segments: readonly ReplaySegment[]
+  /** Which video shows each step, by step index: the tab it ran in, in its person's browser. */
+  readonly stepVideos: Readonly<Record<number, number>>
+  /** Popups opening and the run coming back from them, in time order. */
+  readonly tabMarks: readonly ReplayTabMark[]
   /** The record's span, from its start to the last thing it timed. */
   readonly spanMs: number
 }
@@ -184,6 +205,88 @@ export function inTail(segments: readonly ReplaySegment[], ms: number): boolean 
   return first !== undefined && ms >= first.atMs
 }
 
+type Filmed = NonNullable<FlightRecord["videos"]>[number]
+
+/** The index of the video of tab `tab` in `user`'s browser, or -1. */
+function videoOfTab(
+  videos: readonly Pick<Filmed, "tab" | "user">[],
+  tab: number,
+  user: string | undefined,
+): number {
+  return videos.findIndex((video) => video.tab === tab && video.user === user)
+}
+
+/**
+ * Which video shows each step: the one of the tab it ran in, else (a record from before steps
+ * kept their tab) the first video of its person's browser that marks it.
+ */
+function stepVideosOf(
+  steps: readonly Pick<FlightRecord["steps"][number], "index" | "tab" | "user">[],
+  videos: readonly ReplayVideo[],
+): Record<number, number> {
+  const shown: Record<number, number> = {}
+
+  for (const step of steps) {
+    const own = step.tab === undefined ? -1 : videoOfTab(videos, step.tab, step.user)
+    const marked = videos.findIndex((video) =>
+      video.marks.some((mark) => mark.kind === "step" && mark.step === step.index),
+    )
+    const video = own >= 0 ? own : marked
+
+    if (video >= 0) shown[step.index] = video
+  }
+
+  return shown
+}
+
+/** The popups opening, and the run going back to the tab that opened each once it closed. */
+function tabMarksOf(videos: readonly ReplayVideo[]): ReplayTabMark[] {
+  return videos
+    .flatMap((video, at): ReplayTabMark[] => {
+      if (video.opener === undefined) return []
+
+      const opened = {
+        kind: "opened" as const,
+        label: `Popup opened: ${video.host ?? "a new tab"}`,
+        atMs: video.startMs,
+        video: at,
+      }
+      const back = videos[video.opener]
+
+      if (video.closed !== true || back === undefined) return [opened]
+
+      return [
+        opened,
+        {
+          kind: "closed",
+          label:
+            back.opener === undefined ? "Back to the app" : `Back to ${back.host ?? "its opener"}`,
+          atMs: video.startMs + video.durationMs,
+          video: video.opener,
+        },
+      ]
+    })
+    .toSorted((a, b) => a.atMs - b.atMs)
+}
+
+/** A recorded video as the player plays it, on the record's clock. */
+function replayVideo(dir: string, origin: number, video: Filmed, videos: readonly Filmed[]) {
+  const startMs = millis(video.startedAt) - origin
+  const opener = video.opener === undefined ? -1 : videoOfTab(videos, video.opener, video.user)
+
+  return {
+    src: mediaUrl(dir, video.file),
+    tab: video.tab,
+    ...(video.user !== undefined && { user: video.user }),
+    startMs,
+    durationMs: video.durationMs,
+    marks: video.marks.map((mark) => onRecordClock(mark, startMs)),
+    ...(opener >= 0 && { opener }),
+    ...(video.host !== undefined && { host: video.host }),
+    ...(video.closed === true && { closed: true }),
+  }
+}
+
 /** What the player plays for the record in `dir`. */
 export function replayOf(
   dir: string,
@@ -191,18 +294,8 @@ export function replayOf(
   timeline: Timeline,
 ): Replay {
   const origin = millis(record.startedAt)
-  const videos = (record.videos ?? []).map((video) => {
-    const startMs = millis(video.startedAt) - origin
-
-    return {
-      src: mediaUrl(dir, video.file),
-      tab: video.tab,
-      ...(video.user !== undefined && { user: video.user }),
-      startMs,
-      durationMs: video.durationMs,
-      marks: video.marks.map((mark) => onRecordClock(mark, startMs)),
-    }
-  })
+  const filmed = record.videos ?? []
+  const videos = filmed.map((video) => replayVideo(dir, origin, video, filmed))
 
   return {
     videos,
@@ -210,7 +303,38 @@ export function replayOf(
     marks: timelineMarks(timeline),
     segments: segmentsOf(record),
     spanMs: timeline.spanMs,
+    stepVideos: stepVideosOf(record.steps, videos),
+    tabMarks: tabMarksOf(videos),
   }
+}
+
+/** Whether `video` was filming at `ms`. */
+function films(video: ReplayVideo | undefined, ms: number): boolean {
+  return video !== undefined && ms >= video.startMs && ms < video.startMs + video.durationMs
+}
+
+/**
+ * The video the player follows the action to at `ms`, playing video `current`: the one of the tab
+ * the step running then ran in, once that tab is open; else, when `current` has stopped filming
+ * (its popup closed), the video of the tab that opened it. Otherwise it stays on `current`.
+ */
+export function followedVideo(replay: Replay, current: number, ms: number): number {
+  const playing = replay.videos[current]
+
+  if (playing === undefined) return current
+
+  const step = stepAt(playing.marks, ms)
+  const wanted = step === undefined ? undefined : replay.stepVideos[step]
+
+  if (wanted !== undefined && wanted !== current && films(replay.videos[wanted], ms)) return wanted
+  if (films(playing, ms) || playing.opener === undefined) return current
+
+  return playing.opener
+}
+
+/** Whether video `index` shows a popup or a tab the app opened, rather than the app's first tab. */
+export function isPopup(videos: readonly ReplayVideo[], index: number | undefined): boolean {
+  return index !== undefined && videos[index]?.opener !== undefined
 }
 
 /** Who the test's own browser is, beside the other people a test opened browsers for. */

@@ -361,6 +361,8 @@ describe("the run overlay", () => {
       marks: [{ kind: "step" as const, label: "Buy", atMs: 120, endMs: 200, bad: false, step: 0 }],
       segments: [],
       spanMs: 200,
+      stepVideos: {},
+      tabMarks: [],
     }
 
     expect(transcriptOf({ steps }, replay)[0]?.atMs).toBe(120)
