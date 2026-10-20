@@ -22,6 +22,7 @@ import {
   type DataPlannedFault,
   planDataFaults,
 } from "./data-faults.ts"
+import type { SetupSpan } from "./focus.ts"
 import { occurrenceOf } from "./occurrence.ts"
 import { applySocketFault, planSocketFaults, type SocketPlannedFault } from "./socket-faults.ts"
 
@@ -131,12 +132,33 @@ export interface RunOutcome {
    * or delivery, so the run reports it.
    */
   readonly fired?: boolean | undefined
+  /**
+   * How much of the run came before the test's body (a saved session signing in, fixtures,
+   * `beforeEach`): those calls get no faults unless the matrix is asked to include setup.
+   */
+  readonly setup?: SetupSpan | undefined
 }
 
 export interface FaultMatrixResult {
   readonly clean: RunOutcome
   /** Empty when the clean run did not pass: faults are only meaningful on a working journey. */
   readonly runs: readonly RunOutcome[]
+  /** How the plan was focused: what it left out and why. Absent when nothing was left out. */
+  readonly plan?: PlanSummary | undefined
+}
+
+/** What a matrix's plan left out, in counts, for reports and the dashboard. */
+export interface PlanSummary {
+  /** Faults the whole clean run allowed, setup included. */
+  readonly total: number
+  readonly planned: number
+  readonly skipped: {
+    readonly setup: number
+    readonly background: number
+    readonly repeats: number
+    readonly kinds: number
+    readonly budget: number
+  }
 }
 
 export interface FaultMatrixOptions<E extends RunEnvironment> {

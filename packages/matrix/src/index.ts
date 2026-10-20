@@ -9,6 +9,7 @@ export {
   type FaultMatrixResult,
   formatMatrix,
   type PlannedFault,
+  type PlanSummary,
   planFaults,
   pollPositions,
   type RaceFault,
@@ -34,6 +35,18 @@ export {
   socketRoute,
   type SocketPlannedFault,
 } from "./socket-faults.ts"
+export {
+  bodyOf,
+  DEFAULT_BUDGET,
+  type FocusedPlan,
+  focusLines,
+  type FocusOptions,
+  focusPlan,
+  isBackground,
+  type SetupSpan,
+  setupSize,
+  tierOf,
+} from "./focus.ts"
 export {
   appRoute,
   planRaceFaults,
