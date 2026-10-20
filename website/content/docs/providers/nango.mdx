@@ -2,8 +2,8 @@
 description: Nango integrations, connect sessions with the hosted Connect UI, connections whose tokens refresh, the proxy, actions and records, routed to danwo's other emulators.
 ---
 
-danwo's Nango emulator answers `api.nango.dev` and the hosted Connect UI on `connect.nango.dev`.
-`@nangohq/node` and `@nangohq/frontend` work against it unchanged.
+danwo's Nango emulator answers Nango's API and its hosted Connect UI. `@nangohq/node` and
+`@nangohq/frontend` work against it unchanged.
 
 Like [Composio](/docs/providers/composio), it can route to danwo's other emulators: give it the
 Google, Microsoft, Slack or GitHub service as a backend, and a connection's proxied calls reach
@@ -81,18 +81,21 @@ test("asks to reconnect when access is revoked", async ({ app, screen, expect, t
 })
 ```
 
-`nangoProject(nango)` reads `connections()`, `connection(integration, id)` and every proxied or
-action `calls()`, with its status, and `revoke` makes a connection's next token refresh fail.
+| `nangoProject(nango)`            | What it's for                                       |
+| -------------------------------- | --------------------------------------------------- |
+| `connections()`, `connection(…)` | The connections.                                    |
+| `calls()`                        | Every proxied call and action run, with its status. |
+| `revoke(integration, id)`        | Make a connection's next token refresh fail.        |
 
 ## What's covered
 
 | Area                | Covered                                                                     |
 | ------------------- | --------------------------------------------------------------------------- |
-| Integrations        | list, get                                                                   |
-| Connect             | connect sessions, reconnect sessions, the hosted Connect UI                 |
-| Connections         | list, get, metadata; tokens that expire and refresh on the emulator's clock |
-| Proxy               | calls forwarded to a backend emulator, or answered from the seed            |
-| Actions and records | triggering actions; reading synced records                                  |
+| Integrations        | The environment's integrations.                                             |
+| Connect             | Connect and reconnect sessions, and the hosted Connect UI.                  |
+| Connections         | Connections and metadata, with tokens that refresh on the emulator's clock. |
+| Proxy               | Calls forwarded to a backend emulator, or answered from the seed.           |
+| Actions and records | Running actions and reading synced records.                                 |
 
 ## Faults
 

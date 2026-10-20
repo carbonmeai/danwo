@@ -90,9 +90,10 @@ test("pays for an order once", async ({ app, screen, expect, paystack }) => {
 })
 ```
 
-`paystackLedger` also lists `transfers()`, `refunds()`, `customers()` and `subscriptions()`.
-To pay into a dedicated account as the customer's bank would, call
-`paystackBank(paystack).transferTo(accountNumber, amount)`.
+| Helper                     | What it's for                                                                   |
+| -------------------------- | ------------------------------------------------------------------------------- |
+| `paystackLedger(paystack)` | Transactions, transfers, refunds, customers and subscriptions, and totals paid. |
+| `paystackBank(paystack)`   | Paying into a dedicated account, as the customer's bank would.                  |
 
 ## Test cards
 
@@ -109,15 +110,15 @@ back to your callback URL.
 
 ## What's covered
 
-| Area                    | Covered                                                                           |
-| ----------------------- | --------------------------------------------------------------------------------- |
-| Transactions            | initialize, verify, fetch, list, totals, `charge_authorization` with a saved card |
-| Hosted page             | card with PIN and OTP steps, bank transfer, USSD, cancel                          |
-| Customers               | create, fetch, update, list                                                       |
-| Plans and subscriptions | create, fetch, list, enable, disable; renewals on the emulator's clock            |
-| Transfers               | recipients, transfers, `finalize_transfer` with an OTP, verify; they settle later |
-| Refunds                 | create, fetch, list; they settle later                                            |
-| Banks                   | list, account resolution, balance, dedicated accounts                             |
+| Area                    | Covered                                                             |
+| ----------------------- | ------------------------------------------------------------------- |
+| Transactions            | Initialize, verify, list and total them; charge a saved card again. |
+| Hosted page             | Cards with PIN and OTP steps, bank transfer, USSD, cancelling.      |
+| Customers               | Create, read, update and list them.                                 |
+| Plans and subscriptions | Plans, subscriptions, and renewals on the emulator's clock.         |
+| Transfers               | Recipients and transfers, with an OTP if asked; they settle later.  |
+| Refunds                 | Full and partial refunds; they settle later.                        |
+| Banks                   | Bank lists, account resolution, the balance, dedicated accounts.    |
 
 ## Faults
 
@@ -133,10 +134,13 @@ Events go to the integration's `webhookUrl`, signed with `x-paystack-signature`:
 the body under the secret key. There is no timestamp, as on Paystack, so a stale event is only
 caught by your own checks.
 
-Events: `charge.success`, `transfer.success`, `transfer.failed`, `transfer.reversed`,
-`refund.processed`,
-`subscription.create`, `subscription.disable`, `invoice.create`, `invoice.update` and
-`invoice.payment_failed`.
+| Events             | Sent when                                       |
+| ------------------ | ----------------------------------------------- |
+| `charge.success`   | A payment goes through.                         |
+| `transfer.*`       | A transfer succeeds, fails or is reversed.      |
+| `refund.processed` | A refund settles.                               |
+| `subscription.*`   | A subscription is created or disabled.          |
+| `invoice.*`        | A renewal invoice is created, updated or fails. |
 
 ## Fidelity
 

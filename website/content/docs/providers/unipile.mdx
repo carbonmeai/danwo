@@ -43,11 +43,11 @@ Every call needs the token in `X-API-KEY`, as on Unipile.
 
 ## Seed it
 
-| Field      | What it seeds                                                                          |
-| ---------- | -------------------------------------------------------------------------------------- |
-| `tokens`   | Access tokens the API accepts.                                                         |
-| `accounts` | Connected accounts: `LINKEDIN`, `WHATSAPP`, `GOOGLE_OAUTH` or `MAIL`.                  |
-| `webhooks` | Where `messaging`, `email` and `account_status` events go, with your own auth headers. |
+| Field      | What it seeds                                                             |
+| ---------- | ------------------------------------------------------------------------- |
+| `tokens`   | Access tokens the API accepts.                                            |
+| `accounts` | Connected LinkedIn, WhatsApp, Google or mail accounts.                    |
+| `webhooks` | Where messaging, email and account events go, with your own auth headers. |
 
 ## Use it in a test
 
@@ -71,19 +71,22 @@ test("shows a new LinkedIn message", async ({ app, screen, expect, settle, unipi
 })
 ```
 
-`unipileWorkspace(unipile)` reads `accounts()`, `messages(accountId)` and `emails(accountId)`,
-writes as the other side with `receive` and `receiveEmail`, and `disconnect(accountId)` drops an
-account, as when its credentials expire.
+| `unipileWorkspace(unipile)`     | What it's for                                    |
+| ------------------------------- | ------------------------------------------------ |
+| `accounts()`                    | The connected accounts.                          |
+| `messages(id)`, `emails(id)`    | An account's messages and email.                 |
+| `receive(…)`, `receiveEmail(…)` | Write to the user, as the other side.            |
+| `disconnect(id)`                | Drop an account, as when its credentials expire. |
 
 ## What's covered
 
-| Area      | Covered                                                    |
-| --------- | ---------------------------------------------------------- |
-| Accounts  | hosted auth links and pages, list, get, delete             |
-| Messaging | chats, attendees, messages: list, read, start a chat, send |
-| Email     | list, read, send                                           |
-| Users     | profiles and posts, `users/me`                             |
-| Webhooks  | create, list, delete                                       |
+| Area      | Covered                                                     |
+| --------- | ----------------------------------------------------------- |
+| Accounts  | Hosted auth links and pages; listing and removing accounts. |
+| Messaging | Chats, attendees and messages: read, start a chat, send.    |
+| Email     | Reading and sending email.                                  |
+| Users     | Profiles, posts and the signed-in user.                     |
+| Webhooks  | Webhook subscriptions.                                      |
 
 ## Faults
 

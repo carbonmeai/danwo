@@ -2,10 +2,9 @@
 description: Sign in with Google on accounts.google.com, with seeded accounts, OAuth clients, tokens that refresh and access a user can revoke mid-test.
 ---
 
-danwo's Google emulator answers Google's real hosts: the sign-in page on `accounts.google.com`,
-tokens on `oauth2.googleapis.com`, OpenID Connect discovery and keys, and the Gmail, Calendar and
-Drive APIs. `googleapis`, `google-auth-library` and any OpenID Connect library work against it
-unchanged.
+danwo's Google emulator answers Google's real hosts: the sign-in page, tokens, OpenID Connect,
+and the Gmail, Calendar and Drive APIs. `googleapis`, `google-auth-library` and any OpenID
+Connect library work against it unchanged.
 
 This page covers signing in. Gmail, Calendar and Drive have their own page,
 [Gmail, Calendar, Drive](/docs/providers/google-workspace).
@@ -52,11 +51,11 @@ An unknown client gets `invalid_client`, and a redirect URI that isn't listed ge
 
 ## Seed it
 
-| Field                                  | What it seeds                                                                                          |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `users`                                | Google accounts by email, with name, picture, locale, `email_verified` and the Workspace domain `hd`.  |
-| `oauth_clients`                        | Your OAuth clients, with their redirect URIs.                                                          |
-| `gmail`, `calendar`, `drive`, `pubsub` | Each account's mail, events and files; see [Gmail, Calendar, Drive](/docs/providers/google-workspace). |
+| Field               | What it seeds                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| `users`             | Google accounts by email, with name, picture, locale and Workspace domain.           |
+| `oauth_clients`     | Your OAuth clients, with their redirect URIs.                                        |
+| Mail, events, files | Each account's data; see [Gmail, Calendar, Drive](/docs/providers/google-workspace). |
 
 ## Use it in a test
 
@@ -88,12 +87,12 @@ tokens stop working and refreshes fail with `invalid_grant`.
 
 ## What's covered
 
-| Area           | Covered                                                                                  |
-| -------------- | ---------------------------------------------------------------------------------------- |
-| Sign-in        | the account chooser, consent, Cancel, `access_type=offline`, `include_granted_scopes`    |
-| Tokens         | code exchange, refresh, revoke, ID tokens signed with the published keys                 |
-| OpenID Connect | discovery document, `certs`, `userinfo`                                                  |
-| Scopes         | every Gmail, Calendar and Drive call checks the token's scopes, as Google documents them |
+| Area           | Covered                                                                          |
+| -------------- | -------------------------------------------------------------------------------- |
+| Sign-in        | The account chooser, consent, cancelling, offline access and incremental scopes. |
+| Tokens         | Code exchange, refresh, revoke, and ID tokens signed with the published keys.    |
+| OpenID Connect | Discovery, signing keys and user info.                                           |
+| Scopes         | Every Gmail, Calendar and Drive call checks the token's scopes.                  |
 
 ## Faults
 

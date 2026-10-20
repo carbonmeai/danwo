@@ -2,10 +2,9 @@
 description: A Clerk development instance on its real hosts, with the Backend API, the Frontend API serving ClerkJS and <SignIn/>, the Account Portal, stable ids and Svix-signed webhooks.
 ---
 
-danwo's Clerk emulator is a development instance. Your server reaches the Backend API on
-`api.clerk.com`; the browser loads ClerkJS and `<SignIn/>` from the Frontend API on
-`<slug>.clerk.accounts.dev`, or signs in on the Account Portal at `<slug>.accounts.dev`.
-`@clerk/nextjs`, `@clerk/backend` and `@clerk/clerk-react` work against it unchanged.
+danwo's Clerk emulator is a development instance on Clerk's real hosts. Your server reaches the
+Backend API, and the browser loads ClerkJS and `<SignIn/>` from the Frontend API or signs in on
+the Account Portal. Clerk's SDKs work against it unchanged.
 
 ## Set up
 
@@ -63,10 +62,9 @@ pointing at the right one after a reset. Give an `id` to choose it yourself.
 
 ### A key that stays put
 
-The emulator signs session tokens with its own key. If your app pins Clerk's public key
-(`CLERK_JWT_KEY`) in a file rather than reading it from `env()`, seed `instance.signingKey` with a
-PKCS#8 PEM so tokens keep verifying across runs. `clerkInstance(clerk).publicKeyPem()` reads the
-public half.
+The emulator signs session tokens with its own key. If your app pins Clerk's public key in a
+file, seed `instance.signingKey` with a PKCS#8 PEM so tokens keep verifying across runs.
+`clerkInstance(clerk).publicKeyPem()` reads the public half.
 
 ## Use it in a test
 
@@ -88,22 +86,29 @@ test("signs in with a password", async ({ app, screen, expect, clerk }) => {
 })
 ```
 
-With emailed codes, read the code with `await clerkInstance(clerk).code("ada@example.com")` and
-type it into "Verification code". Addresses with `+clerk_test` take the code `424242` and get no
-email, as on a development instance. `clerkMail(clerk)` gives the codes to the `mail` fixture.
+With emailed codes, read the code with `clerkInstance(clerk).code(email)` and type it into
+"Verification code". Addresses with `+clerk_test` take the code `424242` and get no email, as on a
+development instance.
 
-`clerkInstance(clerk)` also reads `user(email)`, `messages(to)`, `organizations()` and
-`webhookSecret()`, and `revokeSessions(email)` signs a user out mid-test.
+| `clerkInstance(clerk)`                       | What it's for                        |
+| -------------------------------------------- | ------------------------------------ |
+| `user(email)`, `sessions(email)`             | A user, and their sessions.          |
+| `code(to)`, `messages(to)`                   | The codes and emails Clerk sent.     |
+| `organizations()`                            | The organizations.                   |
+| `revokeSessions(email)`                      | Sign a user out mid-test.            |
+| `env()`, `publicKeyPem()`, `webhookSecret()` | The keys and secrets your app needs. |
+
+`clerkMail(clerk)` gives the codes to the `mail` fixture.
 
 ## What's covered
 
-| Area           | Covered                                                                                                                                              |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Backend API    | users (create, list, update, ban, delete, metadata), sessions and tokens, organizations, members and invitations, JWT templates, the instance's keys |
-| Frontend API   | the dev browser, the client, sign-up and sign-in attempts by password or email code, session tokens and their refresh, the handshake                 |
-| ClerkJS        | `clerk-js` and `@clerk/ui` served from the Frontend API, so `<ClerkProvider>`, `<SignIn/>` and `<UserButton/>` load                                  |
-| Account Portal | sign-in with a password or a code, sign-up with a code                                                                                               |
-| Tokens         | session tokens with `azp`, `sid`, `org_*` claims and your templates, signed with the instance's key                                                  |
+| Area           | Covered                                                                                  |
+| -------------- | ---------------------------------------------------------------------------------------- |
+| Backend API    | Users, sessions and tokens, organizations and invitations, JWT templates, keys.          |
+| Frontend API   | The client, sign-up and sign-in by password or email code, token refresh, the handshake. |
+| ClerkJS        | Served from the Frontend API, so `<ClerkProvider>` and Clerk's components load.          |
+| Account Portal | Sign-in with a password or a code, sign-up with a code.                                  |
+| Tokens         | Session tokens with organization claims and your templates.                              |
 
 ## Faults
 
@@ -117,15 +122,15 @@ The Frontend API and the Account Portal are left alone, so the browser can alway
 
 ## Webhooks
 
-Deliveries are signed the Svix way, with `svix-id`, `svix-timestamp` and `svix-signature`, so
-`verifyWebhook` from `@clerk/nextjs/webhooks` and the `svix` package accept them.
+Deliveries are signed the Svix way, so `verifyWebhook` from `@clerk/nextjs/webhooks` and the
+`svix` package accept them.
 
-| Event family  | Events                                                   |
-| ------------- | -------------------------------------------------------- |
-| Users         | `user.created`, `.updated`, `.deleted`                   |
-| Sessions      | `session.created`, `.ended`, `.removed`, `.revoked`      |
-| Organizations | `organization.created`, `.updated`, `.deleted`           |
-| Memberships   | `organizationMembership.created`, `.updated`, `.deleted` |
+| Events                     | Sent when                                       |
+| -------------------------- | ----------------------------------------------- |
+| `user.*`                   | A user is created, updated or deleted.          |
+| `session.*`                | A session starts, ends, is removed or revoked.  |
+| `organization.*`           | An organization is created, updated or deleted. |
+| `organizationMembership.*` | A member joins, changes role or leaves.         |
 
 ## Fidelity
 

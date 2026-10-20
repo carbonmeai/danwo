@@ -2,11 +2,9 @@
 description: Pusher Channels, the API your server triggers events on and the socket pusher-js keeps open, with private and presence channels, subscription counting, signed webhooks and Beams.
 ---
 
-danwo's Pusher emulator answers the Channels API on `api-<cluster>.pusher.com`, the socket
-`pusher-js` connects to on `ws-<cluster>.pusher.com`, and Beams on
-`<instance>.pushnotifications.pusher.com`. Your server's `pusher` package and the browser's
-`pusher-js` work against it unchanged, and an event your server triggers reaches the page danwo
-drives.
+danwo's Pusher emulator answers the Channels API, the socket `pusher-js` connects to, and Beams.
+Your server's `pusher` package and the browser's `pusher-js` work against it unchanged. An event
+your server triggers reaches the page danwo drives.
 
 ## Set up
 
@@ -90,20 +88,23 @@ test("shows a new order without a reload", async ({ app, screen, expect, pusher 
 })
 ```
 
-`pusherChannels(pusher)` reads `events(filter)`, waits with `waitFor(channel, name)`, lists live
-`connections()`, and publishes from the test with `trigger(channel, name, data)`. Each event says
-which sockets it was `delivered_to`. `pusherBeams(pusher)` reads Beams `publishes()` and
-registered `devices()`.
+| Helper                                          | What it's for                                       |
+| ----------------------------------------------- | --------------------------------------------------- |
+| `pusherChannels(pusher).events(filter)`         | Every event, and which sockets it was delivered to. |
+| `pusherChannels(pusher).waitFor(channel, name)` | Wait for one event.                                 |
+| `pusherChannels(pusher).connections()`          | The live sockets.                                   |
+| `pusherChannels(pusher).trigger(…)`             | Publish from the test.                              |
+| `pusherBeams(pusher)`                           | Beams publishes and registered devices.             |
 
 ## What's covered
 
-| Area                  | Covered                                                                                                        |
-| --------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Channels API          | `events`, `batch_events`, channel info, occupied channels, presence users, terminating a user's connections    |
-| Socket                | public, private and presence channels with your auth endpoint's signatures, client events, user sign-in, pings |
-| Subscription counting | `subscription_count` in channel info and webhooks, when turned on                                              |
-| Webhooks              | `channel_occupied`, `channel_vacated`, `member_added`, `member_removed`, `client_event`, `subscription_count`  |
-| Beams                 | publish to interests and users, devices and their interests, deleting users                                    |
+| Area                  | Covered                                                                             |
+| --------------------- | ----------------------------------------------------------------------------------- |
+| Channels API          | Events and batches, channel info, presence users, terminating a user's connections. |
+| Socket                | Public, private and presence channels, client events, user sign-in.                 |
+| Subscription counting | Subscription counts in channel info and webhooks, when turned on.                   |
+| Webhooks              | Channels occupied and vacated, members added and removed, client events, counts.    |
+| Beams                 | Publishing to interests and users, and devices.                                     |
 
 ## Faults
 

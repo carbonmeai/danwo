@@ -71,11 +71,11 @@ test("cites its sources", async ({ app, screen, expect, llm }) => {
 
 ## What's covered
 
-| API        | Covered                                                                                                                                                                 |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Gemini     | `generateContent` and `streamGenerateContent` (text, function calls, structured output), `countTokens`, `embedContent`, `batchEmbedContents`, models; `v1beta` and `v1` |
-| Perplexity | the Agent API (`/v1/agent`, which the AI SDK uses), the Sonar API (`/v1/sonar` and `/chat/completions`) with citations and cost                                         |
-| Bedrock    | Converse and ConverseStream; InvokeModel and its stream in each family's own body: Anthropic's Messages for Claude, Nova, Titan text and embeddings, Cohere embeddings  |
+| API        | Covered                                                                                           |
+| ---------- | ------------------------------------------------------------------------------------------------- |
+| Gemini     | Generating text, function calls and structured output, streamed or not; token counts; embeddings. |
+| Perplexity | The Agent API the AI SDK uses, and the Sonar API with citations and cost.                         |
+| Bedrock    | Converse and InvokeModel, streamed or not, in each model family's own body.                       |
 
 ## Faults
 

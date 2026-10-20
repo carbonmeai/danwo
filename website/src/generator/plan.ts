@@ -135,7 +135,7 @@ function provider(slug: string): PlannedPage {
  * the provider's logo, and its mark for dark surfaces when it has one.
  */
 function part(slug: string, title: string, logo: string, dark?: string): PlannedPage {
-  const icon = [logo, dark].flatMap((file) => (file ? [`/icons/${file}`] : [])).join("|")
+  const icon = [logo, dark].flatMap((mark) => (mark ? [`/icons/${mark}`] : [])).join("|")
 
   return file(slug, title, icon, `providers/${slug}.mdx`)
 }

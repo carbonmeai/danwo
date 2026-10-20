@@ -76,21 +76,26 @@ test("replies to a new booking request", async ({ expect, settle, nylas }) => {
 })
 ```
 
-`nylasApplication(nylas)` reads `grants()`, `grant(email)`, `messages(email, folder)`,
-`sent(email)` and `events(email)`, delivers mail with `receive`, and expires a grant with
-`expire(email)`, as when the user's provider token is revoked. Mail sent between two seeded
-grants lands in the other's inbox.
+| `nylasApplication(nylas)`        | What it's for                                                 |
+| -------------------------------- | ------------------------------------------------------------- |
+| `grants()`, `grant(email)`       | The connected accounts.                                       |
+| `messages(email)`, `sent(email)` | A grant's mail, and what it sent.                             |
+| `events(email)`                  | A grant's events.                                             |
+| `receive(to, mail)`              | Deliver an email, as if someone wrote in.                     |
+| `expire(email)`                  | Expire a grant, as when the user's provider token is revoked. |
+
+Mail sent between two seeded grants lands in the other's inbox.
 
 ## What's covered
 
-| Area      | Covered                                                                                    |
-| --------- | ------------------------------------------------------------------------------------------ |
-| Auth      | hosted auth, the consent step, token exchange, `tokeninfo`, revoke; grants listed and read |
-| Email     | messages, send, threads, drafts, folders, attachments                                      |
-| Calendar  | calendars, events, free/busy                                                               |
-| Contacts  | create, list, update, delete                                                               |
-| Scheduler | configurations, availability, bookings: create, confirm, reschedule, cancel                |
-| Webhooks  | create, update, delete, rotate the secret                                                  |
+| Area      | Covered                                                      |
+| --------- | ------------------------------------------------------------ |
+| Auth      | Hosted auth, consent, token exchange and revoke; grants.     |
+| Email     | Messages, sending, threads, drafts, folders and attachments. |
+| Calendar  | Calendars, events and free/busy.                             |
+| Contacts  | Contacts.                                                    |
+| Scheduler | Configurations, availability and bookings.                   |
+| Webhooks  | Subscriptions, and rotating their secret.                    |
 
 ## Faults
 
@@ -103,9 +108,14 @@ grants lands in the other's inbox.
 ## Webhooks
 
 Notifications carry `X-Nylas-Signature`, an HMAC of the body with the subscription's secret.
-Triggers include `message.created`, `message.updated`, `thread.replied`, `event.created`,
-`event.updated`, `event.deleted`, `grant.created`, `grant.expired`, `contact.updated` and
-`booking.created`.
+
+| Triggers                                    | Sent when                                           |
+| ------------------------------------------- | --------------------------------------------------- |
+| `message.*`, `thread.replied`               | Mail arrives, changes, or gets a reply.             |
+| `event.*`                                   | An event is created, updated or deleted.            |
+| `grant.*`                                   | A grant is created, updated, expires or is deleted. |
+| `contact.*`, `calendar.*`, `folder.created` | Contacts, calendars and folders change.             |
+| `booking.*`                                 | A booking is made, rescheduled or cancelled.        |
 
 ## Fidelity
 

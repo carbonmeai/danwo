@@ -2,7 +2,7 @@
 description: Slack app installs through OAuth, the Web API with its scope checks, incoming webhooks, and signed events, slash commands and interactions sent to your app.
 ---
 
-danwo's Slack emulator answers `slack.com`, `hooks.slack.com` and `files.slack.com`. Your app
+danwo's Slack emulator answers Slack's API, its incoming webhooks and file uploads. Your app
 installs through OAuth, calls the Web API with `@slack/web-api` or Bolt, and receives events,
 slash commands and button clicks signed with its signing secret.
 
@@ -82,21 +82,26 @@ test("announces a deploy in the channel", async ({ expect, settle, slack }) => {
 })
 ```
 
-`slackWorkspace` acts as members, with `post`, `react`, `join`, `command`, `click` on a button and
-`submit` on a modal, and reads back `messages`, `thread`, `ephemeral`, `views` and uploaded
-`file`s. `verifyEventsUrl()` sends Slack's `url_verification` challenge to your events URL.
+| `slackWorkspace(slack)`           | What it's for                              |
+| --------------------------------- | ------------------------------------------ |
+| `post`, `react`, `join`           | Act as a member in a channel.              |
+| `command`                         | Run a slash command as a member.           |
+| `click`, `submit`                 | Click a button, or submit a modal.         |
+| `messages`, `thread`, `ephemeral` | Read what was posted.                      |
+| `views`, `file`                   | Read opened views and uploaded files.      |
+| `verifyEventsUrl()`               | Send Slack's challenge to your events URL. |
 
 ## What's covered
 
-| Area                    | Covered                                                                                |
-| ----------------------- | -------------------------------------------------------------------------------------- |
-| OAuth v2                | the consent page, `oauth.v2.access`, token rotation, `auth.test`, `auth.revoke`        |
-| Chat                    | `postMessage`, `postEphemeral`, `update`, `delete`, `scheduleMessage`, threads, blocks |
-| Conversations           | `create`, `list`, `info`, `history`, `replies`, `join`, `invite`, `members`, `open`    |
-| Users                   | `list`, `info`, `lookupByEmail`                                                        |
-| Reactions, views, files | `reactions.add` and `.remove`; `views.open`, `.update`, `.publish`; external uploads   |
-| Incoming                | incoming webhooks and `response_url`s                                                  |
-| Sent to your app        | Events API callbacks, slash commands, interactive payloads                             |
+| Area                    | Covered                                                                          |
+| ----------------------- | -------------------------------------------------------------------------------- |
+| OAuth v2                | The consent page, token exchange and rotation, testing and revoking tokens.      |
+| Chat                    | Post, update, delete and schedule messages, ephemeral messages, threads, blocks. |
+| Conversations           | Create, list, read history and replies, join, invite and open DMs.               |
+| Users                   | List users, read one, look one up by email.                                      |
+| Reactions, views, files | Reactions, modals and home tabs, and external file uploads.                      |
+| Incoming                | Incoming webhooks and response URLs.                                             |
+| Sent to your app        | Events API callbacks, slash commands and interactive payloads.                   |
 
 Every method checks the token's scopes and answers `{ ok: false, error }` as Slack does, such as
 `missing_scope` or `channel_not_found`.

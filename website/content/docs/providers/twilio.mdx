@@ -78,9 +78,11 @@ test("signs in with a texted code", async ({ app, screen, expect, twilio }) => {
 })
 ```
 
-To text your app as a person would, call `twilioPhone(twilio).send(from, to, body)`: the emulator
-POSTs it to the number's `smsUrl` and sends any `<Message>` in your TwiML reply back to the phone.
-`twilioSms(twilio)` gives the texts to the `mail` fixture, addressed by phone number.
+| Helper                        | What it's for                                                           |
+| ----------------------------- | ----------------------------------------------------------------------- |
+| `twilioInbox(twilio)`         | The texts each phone got, with the code in each.                        |
+| `twilioPhone(twilio).send(…)` | Text your app's number as a person would; any TwiML reply is sent back. |
+| `twilioSms(twilio)`           | The texts, as a source for the `mail` fixture.                          |
 
 ## Trial accounts
 
@@ -111,13 +113,13 @@ A template id in the body is sent as the template's text, as on Twilio.
 
 ## What's covered
 
-| Area      | Covered                                                                                            |
-| --------- | -------------------------------------------------------------------------------------------------- |
-| Messages  | send, fetch, list, update, delete; media; Twilio's magic test numbers                              |
-| Statuses  | `queued` to `sent` to `delivered` or `undelivered`, on the emulator's clock, with status callbacks |
-| Incoming  | texts to the account's numbers POSTed to their SMS URL, TwiML replies sent                         |
-| Verify v2 | services, verifications that text a code, verification checks                                      |
-| Accounts  | fetch, incoming phone numbers, API keys                                                            |
+| Area      | Covered                                                                                  |
+| --------- | ---------------------------------------------------------------------------------------- |
+| Messages  | Send, read, list, update and delete; media; Twilio's magic test numbers.                 |
+| Statuses  | From queued to delivered or undelivered, on the emulator's clock, with status callbacks. |
+| Incoming  | Texts to your numbers posted to your SMS URL, and your TwiML replies sent.               |
+| Verify v2 | Services, codes sent by text, and checking them.                                         |
+| Accounts  | The account, its numbers and API keys.                                                   |
 
 ## Faults
 

@@ -2,10 +2,9 @@
 description: Tiptap Cloud collaboration, the socket editors sync documents over and the documents REST API, with a test that reads what a document says and makes the server misbehave.
 ---
 
-danwo's Tiptap emulator answers every collaboration app on `<appId>.collab.tiptap.cloud`: the
-WebSocket server `TiptapCollabProvider` and `@hocuspocus/provider` sync documents with, and the
-documents REST API on `/api`. Several editors of one document see each other's changes, and a
-test reads what the document says.
+danwo's Tiptap emulator answers every Tiptap Cloud collaboration app: the WebSocket server
+editors sync documents with, and the documents REST API. Several editors of one document see each
+other's changes, and a test reads what the document says.
 
 ## Set up
 
@@ -77,18 +76,21 @@ test("saves what was typed", async ({ app, screen, expect, tiptap }) => {
 })
 ```
 
-`tiptapCollab(tiptap)` lists document `names()`, reads one as `json(name)` or `text(name)`, waits
-with `waitForText`, writes a document as another editor would with `write(name, doc)`, and counts
-the `editors(name)` connected. `trouble({ permissionDenied: true })` refuses tokens and
-`trouble({ syncDelayMs })` answers syncs late, so you can test how your editor shows it.
+| `tiptapCollab(tiptap)`                | What it's for                                                         |
+| ------------------------------------- | --------------------------------------------------------------------- |
+| `names()`, `json(name)`, `text(name)` | The documents, as JSON or text.                                       |
+| `waitForText(name, text)`             | Wait until a document says something.                                 |
+| `write(name, doc)`                    | Change a document, as another editor would.                           |
+| `editors(name)`                       | How many editors are connected.                                       |
+| `trouble(…)`                          | Refuse tokens or answer syncs late, to test how your editor shows it. |
 
 ## What's covered
 
-| Area      | Covered                                                                                                |
-| --------- | ------------------------------------------------------------------------------------------------------ |
-| Socket    | the Yjs sync protocol, awareness, Tiptap's stateless messages, tokens checked against the app's secret |
-| REST API  | documents: list, get, create, update, delete                                                           |
-| Documents | ProseMirror JSON in and out, fragments                                                                 |
+| Area      | Covered                                                                       |
+| --------- | ----------------------------------------------------------------------------- |
+| Socket    | The Yjs sync protocol, awareness and stateless messages, with tokens checked. |
+| REST API  | Documents: list, read, create, update, delete.                                |
+| Documents | ProseMirror JSON in and out, and fragments.                                   |
 
 ## Faults
 

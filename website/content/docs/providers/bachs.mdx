@@ -2,10 +2,9 @@
 description: Bachs checkout sessions, subscriptions, card recovery, refunds and payouts on its sandbox and live hosts, settling on the emulator's clock.
 ---
 
-danwo's Bachs emulator answers the API on `sandbox-api.bachs.io` and `api.bachs.io`, the hosted
-checkout on `checkout.bachs.io`, its overlay script, the card recovery page and the customer
-portal on `portal.bachs.io`. Payments settle, subscriptions renew and payouts complete on the
-emulator's clock.
+danwo's Bachs emulator answers Bachs's live and sandbox APIs, its hosted checkout and overlay
+script, the card recovery page and the customer portal. Payments settle, subscriptions renew and
+payouts complete on the emulator's clock.
 
 ## Set up
 
@@ -87,12 +86,21 @@ test("asks for a new card when a renewal fails", async ({ app, screen, expect, t
 })
 ```
 
-`bachsLedger` reads `payments()`, `succeeded()`, `checkouts()`, `subscriptions()`, `refunds()`,
-`payouts()` and `balance(currency)`, and drives the account with `deposit`, `failCard`,
-`updateCard` and `catchUp`.
+| `bachsLedger(bachs)`             | What it's for                                   |
+| -------------------------------- | ----------------------------------------------- |
+| `payments()`, `succeeded()`      | Every payment, or only those that went through. |
+| `checkouts()`, `subscriptions()` | Checkout sessions and subscriptions.            |
+| `refunds()`, `payouts()`         | Money going back to customers and out to you.   |
+| `balance(currency)`              | The account's balance.                          |
+| `failCard(id)`, `updateCard(id)` | Make a subscription's card decline, or fix it.  |
+| `deposit(…)`                     | Money arriving in a virtual account.            |
 
-On the hosted checkout, `bachs-pay` pays, `bachs-cancel` goes back, `bachs-total` shows the total
-and `bachs-update-card` is the recovery page's button.
+| Test id             | On the hosted pages         |
+| ------------------- | --------------------------- |
+| `bachs-pay`         | Pays.                       |
+| `bachs-cancel`      | Goes back to your app.      |
+| `bachs-total`       | The total.                  |
+| `bachs-update-card` | The recovery page's button. |
 
 ## Test cards
 
@@ -107,16 +115,16 @@ The checkout's card field starts with `4242 4242 4242 4242`, which succeeds. The
 
 ## What's covered
 
-| Area                 | Covered                                                                    |
-| -------------------- | -------------------------------------------------------------------------- |
-| Catalog              | products: create, update, list, archive and unarchive                      |
-| Checkout             | sessions, the hosted page, the overlay script `bachs.js`                   |
-| Customers            | create, update, list, portal sessions                                      |
-| Subscriptions        | list, update, cancel; renewals, trials, failed cards and the recovery page |
-| Payments and refunds | payments listed; full and partial refunds, by charge                       |
-| Payouts              | destinations, quotes, payouts, account resolution, banks                   |
-| Money in             | virtual accounts and deposits                                              |
-| Requests             | idempotency keys, request ids, the sandbox's rate-limit headers            |
+| Area                 | Covered                                                    |
+| -------------------- | ---------------------------------------------------------- |
+| Catalog              | Products: create, update, list, archive.                   |
+| Checkout             | Sessions, the hosted page and the overlay script.          |
+| Customers            | Customers and their portal sessions.                       |
+| Subscriptions        | Renewals, trials, failed cards and the recovery page.      |
+| Payments and refunds | Payments, and full or partial refunds.                     |
+| Payouts              | Destinations, quotes and payouts, with account resolution. |
+| Money in             | Virtual accounts and deposits.                             |
+| Requests             | Idempotency keys, request ids and rate-limit headers.      |
 
 ## Faults
 
@@ -128,17 +136,17 @@ The checkout's card field starts with `4242 4242 4242 4242`, which succeeds. The
 
 ## Webhooks
 
-Deliveries carry `x-bachs-timestamp`, the signature, and `X-Bachs-Signature-V2` in the
-`t=…,v1=…` form, made with the endpoint's `secret`.
+Each delivery is signed with the endpoint's `secret`. The `X-Bachs-Signature-V2` header holds the
+timestamp and the signature, in the `t=…,v1=…` form.
 
-| Event family | Events                                                 |
-| ------------ | ------------------------------------------------------ |
-| Checkout     | `checkout.opened`, `.completed`, `.closed`, `.expired` |
-| Collections  | `collection.succeeded`, `.failed`                      |
-| Customers    | `customer.created`, `.updated`                         |
-| Invoices     | `invoice.created`, `.paid`, `.payment_failed`          |
-| Payouts      | `payout.created`, `.paid`, `.failed`                   |
-| Refunds      | `refund.created`, `.paid`, `.failed`                   |
+| Events         | Sent when                                       |
+| -------------- | ----------------------------------------------- |
+| `checkout.*`   | A checkout opens, completes, closes or expires. |
+| `collection.*` | Money is collected, or collecting it fails.     |
+| `customer.*`   | A customer is created or updated.               |
+| `invoice.*`    | A renewal invoice is created, paid, or fails.   |
+| `payout.*`     | A payout is created, paid or fails.             |
+| `refund.*`     | A refund is created, paid or fails.             |
 
 ## Fidelity
 

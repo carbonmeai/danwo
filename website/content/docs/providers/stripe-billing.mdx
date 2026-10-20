@@ -98,14 +98,14 @@ A `past_due` subscription stays that way until `POST /v1/invoices/:id/pay` succe
 
 ## What's covered
 
-| Area           | Covered                                                                                                  |
-| -------------- | -------------------------------------------------------------------------------------------------------- |
-| Setup intents  | create, confirm, retrieve, cancel, list                                                                  |
-| Subscriptions  | create, retrieve, update (price swaps), cancel, list; trials, `cancel_at_period_end`, `payment_behavior` |
-| Statuses       | `incomplete`, `trialing`, `active`, `past_due`, `canceled`, `incomplete_expired`                         |
-| Invoices       | retrieve, list by subscription, `pay`, `create_preview`                                                  |
-| Billing portal | sessions, and a hosted page that cancels at the period's end                                             |
-| Checkout       | subscription mode, with `subscription_data.trial_period_days`                                            |
+| Area           | Covered                                                              |
+| -------------- | -------------------------------------------------------------------- |
+| Setup intents  | Saving a card for later, with or without authentication.             |
+| Subscriptions  | Start, change plan, cancel now or at the period's end, with trials.  |
+| Statuses       | Every status Stripe uses, from incomplete to past due and canceled.  |
+| Invoices       | Read and list them, pay one by hand, preview the next.               |
+| Billing portal | Portal sessions, and a hosted page that cancels at the period's end. |
+| Checkout       | Subscription mode, with a trial.                                     |
 
 ## Faults
 
@@ -119,12 +119,12 @@ Stripe acted on a write. Each billing webhook can also arrive twice, late, forge
 
 ## Webhooks
 
-| Event family  | Events                                                                                                        |
-| ------------- | ------------------------------------------------------------------------------------------------------------- |
-| Subscriptions | `customer.subscription.created`, `.updated`, `.deleted`, `.trial_will_end`                                    |
-| Invoices      | `invoice.created`, `.finalized`, `.paid`, `.payment_succeeded`, `.payment_failed`, `.payment_action_required` |
-| Setup intents | `setup_intent.created`, `.succeeded`, `.setup_failed`, `.requires_action`                                     |
-| Checkout      | `checkout.session.completed` for subscription mode                                                            |
+| Events                       | Sent when                                                                    |
+| ---------------------------- | ---------------------------------------------------------------------------- |
+| `customer.subscription.*`    | A subscription is created, updated or deleted, and before a trial ends.      |
+| `invoice.*`                  | An invoice is created, finalized, paid, fails, or needs the customer to act. |
+| `setup_intent.*`             | A card is saved, fails to save, or needs authentication.                     |
+| `checkout.session.completed` | A subscription Checkout is paid.                                             |
 
 Webhooks are signed on your app's clock, so a delivery after time travel isn't refused as stale.
 

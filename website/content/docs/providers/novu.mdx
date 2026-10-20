@@ -2,9 +2,9 @@
 description: Novu's server API, workflows run through your app's bridge or from seeded templates, the Inbox API and socket the browser uses, and emails sent through the Resend emulator.
 ---
 
-danwo's Novu emulator answers `api.novu.co` and the Inbox's socket on `socket.novu.co`, and their
-EU hosts. Your server triggers workflows with `@novu/api`, code-first workflows run through your
-app's `@novu/framework` bridge, and the browser's `@novu/react` Inbox shows each message live.
+danwo's Novu emulator answers Novu's API and the Inbox's socket, US and EU. Your server triggers
+workflows with `@novu/api`, code-first workflows run through your app's bridge, and the browser's
+`@novu/react` Inbox shows each message live.
 
 ## Set up
 
@@ -50,13 +50,13 @@ With no seed, the API key and application identifier are `NOVU_DEFAULTS`'.
 
 ## Seed it
 
-| Field                             | What it seeds                                                                                                   |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `apiKey`, `applicationIdentifier` | The environment's keys.                                                                                         |
-| `bridgeUrl`                       | Your app's `@novu/framework` endpoint: workflows are discovered and run through it.                             |
-| `hmac`                            | Require the Inbox's subscriber hash, as with HMAC encryption turned on.                                         |
-| `subscribers`                     | Subscribers with names, email, phone and data.                                                                  |
-| `workflows`                       | Dashboard-style workflows, with `in_app`, `email`, `sms`, `push`, `chat`, `delay`, `digest` and `custom` steps. |
+| Field                             | What it seeds                                                                           |
+| --------------------------------- | --------------------------------------------------------------------------------------- |
+| `apiKey`, `applicationIdentifier` | The environment's keys.                                                                 |
+| `bridgeUrl`                       | Your app's `@novu/framework` endpoint: workflows are discovered and run through it.     |
+| `hmac`                            | Require the Inbox's subscriber hash, as with HMAC encryption turned on.                 |
+| `subscribers`                     | Subscribers with names, email, phone and data.                                          |
+| `workflows`                       | Dashboard-style workflows, with in-app, email, SMS, push, chat, delay and digest steps. |
 
 ## Use it in a test
 
@@ -81,20 +81,24 @@ test("tells Ada her order shipped", async ({ app, screen, expect, settle, novu }
 })
 ```
 
-`novuProject(novu)` reads `subscribers()`, workflow `executions()`, every step's `messages()`, a
-subscriber's `inbox()` and the `openInboxes()` sockets, waits with `waitForMessage`, and
-`idle()` waits until every run has finished. `settle` waits for the runs too.
+| `novuProject(novu)`             | What it's for                                         |
+| ------------------------------- | ----------------------------------------------------- |
+| `subscribers()`, `executions()` | Subscribers, and workflow runs.                       |
+| `messages(filter)`, `inbox(id)` | Every step's message, and a subscriber's Inbox.       |
+| `waitForMessage(id)`            | Wait for a subscriber's next message.                 |
+| `openInboxes()`                 | The Inbox sockets open now.                           |
+| `idle()`                        | Wait until every run has finished; `settle` does too. |
 
 ## What's covered
 
-| Area        | Covered                                                                                                         |
-| ----------- | --------------------------------------------------------------------------------------------------------------- |
-| Events      | trigger, bulk, broadcast, cancel                                                                                |
-| Subscribers | create, list, get, update, delete, credentials, their notifications                                             |
-| Topics      | create, get, subscriptions                                                                                      |
-| Workflows   | code-first through the bridge's discover and execute; seeded templates; delays and digests run straight through |
-| Inbox       | session, notifications, counts, read, seen, archive, delete, preferences; the realtime socket                   |
-| Email       | email steps sent through a Resend service, so they land in `resendInbox(resend)`                                |
+| Area        | Covered                                                                             |
+| ----------- | ----------------------------------------------------------------------------------- |
+| Events      | Trigger, bulk, broadcast and cancel.                                                |
+| Subscribers | Subscribers, their credentials and notifications.                                   |
+| Topics      | Topics and their subscriptions.                                                     |
+| Workflows   | Code-first through your bridge, or seeded; delays and digests run straight through. |
+| Inbox       | Sessions, notifications, counts, read and seen, archive, preferences, the socket.   |
+| Email       | Email steps sent through a Resend service, so they land in its inbox.               |
 
 ## Faults
 

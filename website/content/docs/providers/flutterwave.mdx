@@ -79,9 +79,11 @@ test("pays for an order once", async ({ app, screen, expect, flutterwave }) => {
 })
 ```
 
-`flutterwaveLedger` also gives `refunds()`, `transfers()`, `subscriptions()`, `balance(currency)`
-and `renewDue()`, which charges every subscription that's due. For bank transfers into a virtual
-account, call `flutterwaveBank(flutterwave).transferIn({ accountNumber, amount })`.
+| Helper                            | What it's for                                                 |
+| --------------------------------- | ------------------------------------------------------------- |
+| `flutterwaveLedger(flutterwave)`  | Transactions, refunds, transfers, subscriptions and balances. |
+| `flutterwaveLedger(…).renewDue()` | Charge every subscription that's due now.                     |
+| `flutterwaveBank(flutterwave)`    | Pay into a virtual account, as the customer's bank would.     |
 
 ## Test cards
 
@@ -99,15 +101,15 @@ mobile money, and "Cancel payment" goes back to your `redirect_url`.
 
 ## What's covered
 
-| Area                    | Covered                                                                                              |
-| ----------------------- | ---------------------------------------------------------------------------------------------------- |
-| Payments                | Standard payment links, the hosted page, disabling a link                                            |
-| Transactions            | verify by id or `tx_ref`, list, events, fees, `resend-hook`                                          |
-| Refunds                 | create, fetch, list                                                                                  |
-| Plans and subscriptions | create, update, cancel plans; list, activate, cancel subscriptions; renewals on the emulator's clock |
-| Transfers               | create, fetch, list, fees, retries; they settle as the test-mode references say                      |
-| Money in                | virtual account numbers, bank transfers into them                                                    |
-| Lookups                 | banks by country, account resolution, beneficiaries, balances                                        |
+| Area                    | Covered                                                                |
+| ----------------------- | ---------------------------------------------------------------------- |
+| Payments                | Standard payment links, the hosted page, disabling a link.             |
+| Transactions            | Verify, list, events, fees, and sending the webhook again.             |
+| Refunds                 | Full and partial refunds.                                              |
+| Plans and subscriptions | Plans, subscriptions, and renewals on the emulator's clock.            |
+| Transfers               | Transfers, fees and retries, settling as the test-mode references say. |
+| Money in                | Virtual account numbers and bank transfers into them.                  |
+| Lookups                 | Banks, account resolution, beneficiaries and balances.                 |
 
 ## Faults
 
@@ -120,8 +122,13 @@ mobile money, and "Cancel payment" goes back to your `redirect_url`.
 ## Webhooks
 
 Each delivery carries the secret hash in `verif-hash` and an HMAC of the body in
-`flutterwave-signature`, as Flutterwave sends them. Events: `charge.completed`,
-`transfer.completed` and `subscription.cancelled`.
+`flutterwave-signature`, as Flutterwave sends them.
+
+| Event                    | Sent when                       |
+| ------------------------ | ------------------------------- |
+| `charge.completed`       | A payment ends, paid or failed. |
+| `transfer.completed`     | A transfer settles.             |
+| `subscription.cancelled` | A subscription is cancelled.    |
 
 ## Fidelity
 

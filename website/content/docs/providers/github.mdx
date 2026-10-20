@@ -70,24 +70,25 @@ test("opens an issue for a bug report", async ({ app, screen, expect, github }) 
 })
 ```
 
-`githubRepo(github, "owner/name")` reads `issues()`, `comments(number)`, `checkRuns(sha)`,
-`file(path, branch)` and `commits(branch)`. For GitHub Apps, `installGithubApp` and
-`uninstallGithubApp` install and remove an app as a person would, sending the `installation`
-webhook, and `githubAppKey(github, slug)` gives an app's private key for signing its JWT.
-`githubSignIns(github)` lists who signed in.
+| Helper                                   | What it's for                                                   |
+| ---------------------------------------- | --------------------------------------------------------------- |
+| `githubRepo(github, "owner/name")`       | A repository's issues, comments, check runs, files and commits. |
+| `installGithubApp`, `uninstallGithubApp` | Install or remove an app as a person would, with its webhook.   |
+| `githubAppKey(github, slug)`             | An app's private key, for signing its JWT.                      |
+| `githubSignIns(github)`                  | Who signed in.                                                  |
 
 ## What's covered
 
-| Area          | Covered                                                                         |
-| ------------- | ------------------------------------------------------------------------------- |
-| Sign-in       | OAuth Apps and GitHub Apps on `github.com/login/oauth`, expiring user tokens    |
-| Apps          | `/app`, installations, installation access tokens, `/installation/repositories` |
-| Repositories  | get, create, list for a user or org, branches, commits, contents, refs          |
-| Issues        | create, update, list, comments, labels                                          |
-| Pull requests | get, update, files, commits, reviews, merge                                     |
-| Checks        | check runs and their annotations                                                |
-| Webhooks      | repository hooks: create, update, delete, ping; App webhooks                    |
-| Users         | `/user`, `/user/emails`, `/users/:username`                                     |
+| Area          | Covered                                                |
+| ------------- | ------------------------------------------------------ |
+| Sign-in       | OAuth Apps and GitHub Apps, with expiring user tokens. |
+| Apps          | Installations and installation access tokens.          |
+| Repositories  | Repos, branches, commits, file contents and refs.      |
+| Issues        | Issues, comments and labels.                           |
+| Pull requests | Files, commits, reviews and merging.                   |
+| Checks        | Check runs and their annotations.                      |
+| Webhooks      | Repository hooks, pings and App webhooks.              |
+| Users         | The signed-in user, their emails, and public profiles. |
 
 Every call checks the token's scopes or the app's permissions and answers with GitHub's error
 shapes.
@@ -106,8 +107,8 @@ The 403 and 429 are GitHub's secondary rate limit, with `Retry-After: 60`.
 
 ## Webhooks
 
-Deliveries carry `X-GitHub-Event`, `X-GitHub-Delivery`, and `X-Hub-Signature-256` made with the
-webhook's secret, so `@octokit/webhooks` verifies them.
+Deliveries carry `X-GitHub-Event` and `X-Hub-Signature-256`, made with the webhook's secret, so
+`@octokit/webhooks` verifies them.
 
 ## Fidelity
 

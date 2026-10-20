@@ -2,7 +2,7 @@
 description: Customers, products and prices, payment intents, refunds and Checkout with its hosted page, plus Stripe's signed webhooks.
 ---
 
-danwo's Stripe emulator answers `api.stripe.com` and `checkout.stripe.com`. The official
+danwo's Stripe emulator answers Stripe's API and its hosted Checkout page. The official
 `stripe` package works against it unchanged, and your app keeps its own `sk_test_` key.
 
 This page covers payments and Checkout. Subscriptions and invoices have their own page,
@@ -91,16 +91,16 @@ On the emulator's Checkout page, `checkout-pay` pays and `checkout-cancel` goes 
 
 ## What's covered
 
-| Area                | Covered                                                   |
-| ------------------- | --------------------------------------------------------- |
-| Customers           | create, retrieve, update, delete, list, customer sessions |
-| Products and prices | create, retrieve, update, list, lookup keys               |
-| Payment intents     | create, update, confirm, cancel, retrieve, list           |
-| Payment methods     | create, attach, detach, list a customer's                 |
-| Charges and refunds | charges retrieved and listed; full and partial refunds    |
-| Checkout Sessions   | payment and subscription mode, the hosted page, `expire`  |
-| Webhook endpoints   | create, list, delete, signed deliveries with retries      |
-| Requests            | idempotency keys, `expand`, Stripe's error shapes         |
+| Area                | Covered                                                            |
+| ------------------- | ------------------------------------------------------------------ |
+| Customers           | Create, read, update, delete and list them, and customer sessions. |
+| Products and prices | One-off and recurring prices, found by lookup key.                 |
+| Payment intents     | The whole life of a payment: create, confirm, cancel.              |
+| Payment methods     | Saved cards, attached to and detached from customers.              |
+| Charges and refunds | Charges, and full or partial refunds.                              |
+| Checkout            | Sessions in payment or subscription mode, the hosted page, expiry. |
+| Webhook endpoints   | Endpoints, and signed deliveries with retries.                     |
+| Requests            | Idempotency keys, expansion and Stripe's error shapes.             |
 
 ## Faults
 
@@ -119,10 +119,16 @@ Deliveries carry a `Stripe-Signature` header made with the endpoint's `secret`, 
 `stripe.webhooks.constructEvent` accepts them. A failed delivery is retried after 5 minutes, 30
 minutes and 2 hours, on the emulator's clock.
 
-Events include `checkout.session.completed`, `checkout.session.expired`,
-`payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.succeeded`,
-`charge.refunded`, `customer.created` and the billing events on
-[Stripe billing](/docs/providers/stripe-billing).
+| Event                           | Sent when                                 |
+| ------------------------------- | ----------------------------------------- |
+| `checkout.session.completed`    | A customer pays on the Checkout page.     |
+| `checkout.session.expired`      | A session expires unpaid.                 |
+| `payment_intent.succeeded`      | A payment goes through.                   |
+| `payment_intent.payment_failed` | A payment is declined.                    |
+| `charge.refunded`               | A charge is refunded, in full or in part. |
+| `customer.created`              | A customer is created.                    |
+
+The billing events are on [Stripe billing](/docs/providers/stripe-billing#webhooks).
 
 ## Fidelity
 

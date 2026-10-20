@@ -64,13 +64,13 @@ On the server side, use Stripe's test payment methods instead; see
 
 ## What's covered
 
-| Area        | Covered                                                                                                        |
-| ----------- | -------------------------------------------------------------------------------------------------------------- |
-| Elements    | card, card number, expiry, CVC, payment, address, link authentication and express checkout, each a plain input |
-| Confirming  | `confirmCardPayment`, `confirmCardSetup`, `confirmPayment`, `confirmSetup`                                     |
-| Other calls | `createPaymentMethod`, `retrievePaymentIntent`, `retrieveSetupIntent`                                          |
-| Checkout    | `redirectToCheckout({ sessionId })` opens the emulator's hosted page                                           |
-| Wallets     | `paymentRequest()` reports that no wallet is available                                                         |
+| Area        | Covered                                                                         |
+| ----------- | ------------------------------------------------------------------------------- |
+| Elements    | Card, payment, address, link and express checkout Elements, each a plain input. |
+| Confirming  | Confirming payments and setups, for cards and the Payment Element.              |
+| Other calls | Creating payment methods and reading intents back.                              |
+| Checkout    | `redirectToCheckout` opens the emulator's hosted page.                          |
+| Wallets     | `paymentRequest()` reports that no wallet is available.                         |
 
 The emulator accepts a `pk_test_` key only on these calls, and an intent only with its own client
 secret, as Stripe does.

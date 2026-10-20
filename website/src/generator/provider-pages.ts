@@ -6,7 +6,7 @@
 import { type Provider, PROVIDERS } from "../lib/providers.ts"
 
 /** Where the overview puts the grid of provider cards. */
-export const PROVIDER_CARDS = "{/* provider cards */}"
+const PROVIDER_CARDS = "{/* provider cards */}"
 
 /** A provider's logo path for the sidebar and its heading: one image, or `light|dark`. */
 export function providerIcon(provider: Provider): string {
@@ -40,7 +40,7 @@ function card(provider: Provider): string {
 }
 
 /** The overview's grid: a `###` heading per kind of provider with a card per provider under it. */
-export function providerCards(kinds: readonly ProviderGroup[]): string {
+function providerCards(kinds: readonly ProviderGroup[]): string {
   return kinds
     .map((kind) => {
       const cards = kind.slugs.flatMap((slug) => {

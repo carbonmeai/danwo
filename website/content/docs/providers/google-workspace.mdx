@@ -101,17 +101,17 @@ test("files a new invoice email", async ({ app, screen, expect, settle, google }
 | `googleCalendar(google, email)` | `events()`                             | `add(event)`, `cancel(id)`, `expireSyncTokens()` |
 | `googleDrive(google, email)`    | `files()`, `read(id)`                  | `add(file)`, `remove(id)`                        |
 
-`expireHistory()` and `expireSyncTokens()` make the next incremental sync fail, as Google does
-after a while, so you can test that your app falls back to a full sync. `gmailMail(google)`
-gives the mail to the `mail` fixture.
+The two `expire` helpers make the next incremental sync fail, as Google does after a while, so
+you can test that your app falls back to a full sync. `gmailMail(google)` gives the mail to the
+`mail` fixture.
 
 ## What's covered
 
-| Area     | Covered                                                                                                                                                               |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Gmail    | messages: list with search queries, get, send, insert, import, modify, trash, delete, batch; threads; labels; drafts; attachments; history; `watch` with Pub/Sub push |
-| Calendar | calendar list, calendars, events with recurrence and instances, `quickAdd`, free/busy, sync tokens, `watch`                                                           |
-| Drive    | files: list with queries, get, create, copy, update, delete; uploads; permissions; changes and `watch`                                                                |
+| Area     | Covered                                                                                              |
+| -------- | ---------------------------------------------------------------------------------------------------- |
+| Gmail    | Messages with search, sending, labels, threads, drafts, attachments, history, and push with `watch`. |
+| Calendar | Calendars, events with recurrence, quick add, free/busy, sync tokens and `watch`.                    |
+| Drive    | Files with queries, uploads, copies, permissions, changes and `watch`.                               |
 
 ## Faults
 

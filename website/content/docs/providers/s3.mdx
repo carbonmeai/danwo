@@ -2,8 +2,7 @@
 description: S3 object storage for apps on AWS S3 or Tigris, with the AWS SDK and the Tigris SDK, presigned URLs, multipart uploads and signature checks.
 ---
 
-danwo's S3 emulator answers Tigris's endpoints (`t3.storage.dev`, `fly.storage.tigris.dev`) and
-AWS's (`s3.amazonaws.com`, `s3.us-east-1.amazonaws.com`), path-style and virtual-hosted. Both
+danwo's S3 emulator answers Tigris's and AWS's S3 endpoints, path-style and virtual-hosted. Both
 `@aws-sdk/client-s3` and `@tigrisdata/storage` work against it unchanged.
 
 ## Set up
@@ -84,22 +83,24 @@ test("stores the uploaded avatar", async ({ app, screen, expect, s3 }) => {
 })
 ```
 
-`s3Objects(s3)` reads `buckets()`, `list(bucket, prefix)` and `get(bucket, key)`. Each object has
-its `key`, `size`, `contentType`, `etag`, `metadata` and `acl`, and `bytes()` and `text()` for its
-body.
+| `s3Objects(s3)`        | What it's for                                           |
+| ---------------------- | ------------------------------------------------------- |
+| `buckets()`            | The buckets.                                            |
+| `list(bucket, prefix)` | The objects in a bucket, under a prefix.                |
+| `get(bucket, key)`     | One object, with its type, size, metadata and `text()`. |
 
 ## What's covered
 
-| Area                 | Covered                                                                                     |
-| -------------------- | ------------------------------------------------------------------------------------------- |
-| Objects              | put, head, get with ranges, copy, delete, delete many, ACLs, metadata, browser form uploads |
-| Listing              | `ListObjectsV2` with prefixes, delimiters and pages                                         |
-| Multipart            | create, upload parts, list parts and uploads, complete, abort                               |
-| Presigned URLs       | GET and PUT, with expiry                                                                    |
-| Conditional requests | `If-Match`, `If-None-Match`, `If-Modified-Since`, `If-Unmodified-Since`                     |
-| Buckets              | create, head, list, delete                                                                  |
-| Signatures           | SigV4 headers and query strings checked against seeded keys                                 |
-| Tigris               | the presign call `getPresignedUrl` makes, and renames with `X-Tigris-Rename`                |
+| Area                 | Covered                                                                                       |
+| -------------------- | --------------------------------------------------------------------------------------------- |
+| Objects              | Put, read with ranges, copy and delete objects, with ACLs and metadata; browser form uploads. |
+| Listing              | Listings with prefixes, delimiters and pages.                                                 |
+| Multipart            | Multipart uploads, from start to complete or abort.                                           |
+| Presigned URLs       | Presigned reads and writes, with expiry.                                                      |
+| Conditional requests | Reads and writes on an ETag or a date.                                                        |
+| Buckets              | Create, list and delete buckets.                                                              |
+| Signatures           | SigV4 signatures checked against the seeded keys.                                             |
+| Tigris               | The Tigris SDK's presign call, and renames.                                                   |
 
 ## Faults
 

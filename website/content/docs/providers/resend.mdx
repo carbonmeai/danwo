@@ -73,18 +73,23 @@ test("verifies the email address", async ({ app, screen, expect, resend }) => {
 })
 ```
 
-Each email has `subject`, `text`, `html`, `from` and `to`, plus `code()` for a one-time code and
-`links()` for the links in it. `resendInbox(resend).list(to)` gives every email sent to an
-address, oldest first.
+| On each email             | What it's for             |
+| ------------------------- | ------------------------- |
+| `subject`, `text`, `html` | What the email says.      |
+| `from`, `to`              | Who sent it, and to whom. |
+| `code()`                  | The one-time code in it.  |
+| `links()`                 | The links in it.          |
+
+`resendInbox(resend).list(to)` gives every email sent to an address, oldest first.
 
 ## What's covered
 
-| Area     | Covered                                                                                       |
-| -------- | --------------------------------------------------------------------------------------------- |
-| Emails   | send, batch send, retrieve, list, scheduled sends and cancelling them, tags, idempotency keys |
-| Domains  | create, retrieve, list, verify, delete                                                        |
-| API keys | create, list, delete; `sending_access` and `full_access`                                      |
-| Webhooks | create, retrieve, update, list, delete; signed deliveries                                     |
+| Area     | Covered                                                                           |
+| -------- | --------------------------------------------------------------------------------- |
+| Emails   | Send one or a batch, read them back, schedule and cancel, tags, idempotency keys. |
+| Domains  | Add, verify, list and delete sending domains.                                     |
+| API keys | Create, list and delete keys, full or sending-only.                               |
+| Webhooks | Manage endpoints, and signed deliveries.                                          |
 
 ## Faults
 
@@ -98,9 +103,14 @@ real.
 
 ## Webhooks
 
-Deliveries are signed the Svix way, with `webhook-id`, `webhook-timestamp` and
-`webhook-signature`, so Resend's `webhooks.verify` accepts them. The emulator sends
-`email.sent`, `email.scheduled`, `email.delivered`, `domain.created` and `domain.deleted`.
+Deliveries are signed the Svix way, so Resend's `webhooks.verify` accepts them.
+
+| Event                              | Sent when                        |
+| ---------------------------------- | -------------------------------- |
+| `email.sent`                       | Resend accepts an email.         |
+| `email.scheduled`                  | An email is scheduled for later. |
+| `email.delivered`                  | The email reaches the inbox.     |
+| `domain.created`, `domain.deleted` | A domain is added or removed.    |
 
 ## Fidelity
 

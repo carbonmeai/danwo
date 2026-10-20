@@ -94,24 +94,37 @@ test("the agent emails the customer", async ({ app, screen, expect, composio, go
 })
 ```
 
-`composioProject(composio)` reads `accounts()` and `executions()`, each run saying whether a
-seed, a backend or sample data answered it; fires a trigger with
-`fire(trigger, data)` and expires an account with `expire(id)`. `composioTools(composio)`
-answers a tool from the test with `handle(tool, handler)`, before any seeded result or backend.
+| Helper                                   | What it's for                                                             |
+| ---------------------------------------- | ------------------------------------------------------------------------- |
+| `composioProject(composio).executions()` | Every tool run, and whether a seed, a backend or sample data answered it. |
+| `composioProject(composio).accounts()`   | The connected accounts.                                                   |
+| `composioProject(composio).fire(…)`      | Fire a trigger, as the toolkit would.                                     |
+| `composioProject(composio).expire(id)`   | Expire a connected account.                                               |
+| `composioTools(composio).handle(…)`      | Answer a tool from the test, before any seed or backend.                  |
 
 Pair it with the [model API emulator](/docs/providers/model-apis) to script the tool calls the
 model makes.
 
 ## What's covered
 
-| Area         | Covered                                                                                                                                                                                                                                                                                                         |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Catalogue    | toolkits, tools, tool enums, trigger types                                                                                                                                                                                                                                                                      |
-| Execution    | `tools/execute/:slug`, the proxy execute call                                                                                                                                                                                                                                                                   |
-| Accounts     | auth configs; connected accounts, connect links and the hosted page, refresh, status                                                                                                                                                                                                                            |
-| Triggers     | trigger instances: upsert, list, enable, disable, delete; firing them                                                                                                                                                                                                                                           |
-| Webhooks     | webhook subscriptions, event types, secret rotation                                                                                                                                                                                                                                                             |
-| Backed tools | `GMAIL_SEND_EMAIL`, `GMAIL_FETCH_EMAILS`, `GMAIL_CREATE_EMAIL_DRAFT`, `GOOGLECALENDAR_CREATE_EVENT`, `GOOGLECALENDAR_EVENTS_LIST`, `GOOGLEDRIVE_FIND_FILE`, `SLACK_SEND_MESSAGE`, `SLACK_LIST_ALL_CHANNELS`, `GITHUB_CREATE_AN_ISSUE`, `GITHUB_GET_A_REPOSITORY`, `OUTLOOK_SEND_EMAIL`, `OUTLOOK_LIST_MESSAGES` |
+| Area         | Covered                                                                         |
+| ------------ | ------------------------------------------------------------------------------- |
+| Catalogue    | Toolkits, tools and trigger types.                                              |
+| Execution    | Running tools, and the proxy call.                                              |
+| Accounts     | Auth configs, connected accounts, connect links and the hosted page.            |
+| Triggers     | Trigger instances, and firing them.                                             |
+| Webhooks     | The webhook subscription, its event types and secret.                           |
+| Backed tools | Gmail, Calendar, Drive, Slack, GitHub and Outlook tools act on their emulators. |
+
+The backed tools:
+
+| Toolkit            | Tools                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------ |
+| Gmail              | `GMAIL_SEND_EMAIL`, `GMAIL_FETCH_EMAILS`, `GMAIL_CREATE_EMAIL_DRAFT`                 |
+| Calendar and Drive | `GOOGLECALENDAR_CREATE_EVENT`, `GOOGLECALENDAR_EVENTS_LIST`, `GOOGLEDRIVE_FIND_FILE` |
+| Slack              | `SLACK_SEND_MESSAGE`, `SLACK_LIST_ALL_CHANNELS`                                      |
+| GitHub             | `GITHUB_CREATE_AN_ISSUE`, `GITHUB_GET_A_REPOSITORY`                                  |
+| Outlook            | `OUTLOOK_SEND_EMAIL`, `OUTLOOK_LIST_MESSAGES`                                        |
 
 ## Faults
 

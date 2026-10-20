@@ -88,27 +88,28 @@ test("sends the weekly summary from Outlook", async ({ app, screen, expect, micr
 })
 ```
 
-| Helper                                      | What it does                                                                     |
-| ------------------------------------------- | -------------------------------------------------------------------------------- |
-| `outlookMailbox(microsoft, email)`          | `messages(folder)`, `latest(folder)`, and `receive(message)` to deliver new mail |
-| `outlookCalendar(microsoft, email)`         | `between(from, to)` and `add(event)`                                             |
-| `oneDrive(microsoft, email)`                | `list()`, `read(path)`, `put(file)`, `remove(path)`                              |
-| `graphSubscriptions(microsoft)`             | the change subscriptions apps made, live or expired                              |
-| `microsoftSignIns(microsoft)`               | who signed in to which app                                                       |
-| `revokeMicrosoftSessions(microsoft, email)` | signs the user out everywhere: refreshes fail with `invalid_grant`               |
+| Helper                                      | What it's for                                        |
+| ------------------------------------------- | ---------------------------------------------------- |
+| `outlookMailbox(microsoft, email)`          | Read a user's mail by folder, and deliver new mail.  |
+| `outlookCalendar(microsoft, email)`         | Read events in a range, and add one.                 |
+| `oneDrive(microsoft, email)`                | List, read, write and remove files.                  |
+| `graphSubscriptions(microsoft)`             | The change subscriptions apps made, live or expired. |
+| `microsoftSignIns(microsoft)`               | Who signed in to which app.                          |
+| `revokeMicrosoftSessions(microsoft, email)` | Sign the user out everywhere, so refreshes fail.     |
 
 `outlookMail(microsoft)` gives the mail to the `mail` fixture.
 
 ## What's covered
 
-| Area          | Covered                                                                                                                                                  |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sign-in       | authorize with the account chooser, tokens, refresh, logout, OpenID discovery and keys, `userinfo`                                                       |
-| Mail          | messages, mail folders, `sendMail`, drafts, replies and forwards, delta; `$filter` (comparisons joined by `and`), `$orderby`, `$top`, `$skip`, `$select` |
-| Calendar      | events, `calendarView`, recurrence, time zones, delta sync                                                                                               |
-| OneDrive      | items by id and path, uploads and upload sessions, downloads, delta                                                                                      |
-| Subscriptions | create, renew, delete; change notifications with `clientState` and validation                                                                            |
-| Users         | `/me`, `revokeSignInSessions`                                                                                                                            |
+| Area          | Covered                                                                  |
+| ------------- | ------------------------------------------------------------------------ |
+| Sign-in       | The account chooser, tokens, refresh, logout, OpenID discovery and keys. |
+| Mail          | Messages, folders, sending, drafts, replies and forwards, delta sync.    |
+| Queries       | Filters with plain comparisons, ordering, paging and selected fields.    |
+| Calendar      | Events, calendar views, recurrence, time zones and delta sync.           |
+| OneDrive      | Items by id or path, uploads and upload sessions, downloads, delta.      |
+| Subscriptions | Change notifications, with validation and your `clientState`.            |
+| Users         | The signed-in user, and revoking their sessions.                         |
 
 ## Faults
 

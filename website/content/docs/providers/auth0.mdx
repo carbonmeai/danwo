@@ -2,10 +2,9 @@
 description: Auth0's Universal Login with sign-up, MFA and social connections, the authentication API's grants, and the Management API v2, on your tenant's own domain.
 ---
 
-danwo's Auth0 emulator answers your tenant's domain, such as `my-app.us.auth0.com`. The browser
-logs in, signs up and passes MFA on Universal Login, and your server uses the authentication API
-and the Management API, through `@auth0/nextjs-auth0`, `express-openid-connect`, `auth0` or plain
-OpenID Connect.
+danwo's Auth0 emulator answers your tenant's own domain. The browser logs in, signs up and
+passes MFA on Universal Login. Your server uses the authentication API and the Management API,
+through Auth0's SDKs or plain OpenID Connect.
 
 ## Set up
 
@@ -95,19 +94,25 @@ test("logs in with a password", async ({ app, screen, expect, auth0 }) => {
 })
 ```
 
-`auth0Tenant(auth0)` reads `users()`, `user(email)`, `logins(email)`, `liveRefreshTokens()` and
-the verification `emails(to)` the tenant sent, and `block(email)` blocks a user mid-test. For a
-user seeded with an `mfa_secret`, type `auth0OtpAt(secret, new Date())` into "Enter your
+| `auth0Tenant(auth0)`     | What it's for                                           |
+| ------------------------ | ------------------------------------------------------- |
+| `users()`, `user(email)` | The tenant's users.                                     |
+| `logins(email)`          | Each login, with its method and whether MFA was passed. |
+| `liveRefreshTokens()`    | How many refresh tokens still work.                     |
+| `emails(to)`             | The verification emails the tenant sent.                |
+| `block(email)`           | Block a user mid-test.                                  |
+
+For a user seeded with an `mfa_secret`, type `auth0OtpAt(secret, new Date())` into "Enter your
 one-time code".
 
 ## What's covered
 
-| Area               | Covered                                                                                                                                  |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Universal Login    | log in, sign up, MFA with a one-time code, email verification, social connections                                                        |
-| Authentication API | `/authorize`, `/oauth/token` (authorization code with PKCE, refresh, client credentials, password), `/oauth/revoke`, `/userinfo`, logout |
-| OpenID Connect     | discovery, JWKS, ID and access tokens with your claims                                                                                   |
-| Management API v2  | users, users by email, roles and permissions, organizations and members, user blocks, verification-email jobs                            |
+| Area               | Covered                                                                                         |
+| ------------------ | ----------------------------------------------------------------------------------------------- |
+| Universal Login    | Log in, sign up, MFA with a one-time code, email verification, social logins.                   |
+| Authentication API | Authorization code with PKCE, refresh, client credentials, password, revoke, user info, logout. |
+| OpenID Connect     | Discovery, signing keys, and tokens with your claims.                                           |
+| Management API v2  | Users, roles and permissions, organizations, blocks, verification emails.                       |
 
 ## Faults
 

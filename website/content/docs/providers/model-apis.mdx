@@ -2,10 +2,9 @@
 description: The model APIs your app calls, OpenAI, Anthropic, the Vercel AI Gateway, Gemini, Perplexity and Bedrock, answered from scripts, with token counts and cost a test can check.
 ---
 
-danwo's model API emulator answers the hosts your app's AI features call: `api.openai.com`,
-`api.anthropic.com`, `ai-gateway.vercel.sh`, `generativelanguage.googleapis.com`,
-`api.perplexity.ai` and `bedrock-runtime.<region>.amazonaws.com`. The `openai` and
-`@anthropic-ai/sdk` packages and the AI SDK work against it unchanged, streaming or not.
+danwo's model API emulator answers the APIs your app's AI features call: OpenAI, Anthropic, the
+Vercel AI Gateway, Gemini, Perplexity and Bedrock. The `openai` and `@anthropic-ai/sdk` packages
+and the AI SDK work against it unchanged, streaming or not.
 
 Each call is answered from a **script** you write, so a test knows exactly what the model will
 say. That makes AI features testable like any other: same input, same answer, every run.
@@ -78,9 +77,12 @@ test("summarises the week in one call", async ({ app, screen, expect, llm }) => 
 })
 ```
 
-Each call has its `provider`, `api`, `model`, `system` prompt, `messages`, the `tools` it
-offered, whether it streamed, the `reply`, the `script` that answered, its `usage` in tokens and
-its `cost`.
+| On each call                  | What it holds                            |
+| ----------------------------- | ---------------------------------------- |
+| `provider`, `model`           | Which API and model the app called.      |
+| `system`, `messages`, `tools` | The prompt, and the tools offered.       |
+| `reply`, `script`             | The answer, and the script that gave it. |
+| `usage`, `cost`               | Tokens in and out, and dollars.          |
 
 ## Cost
 
@@ -91,12 +93,12 @@ metadata, as the real gateway's do.
 
 ## What's covered
 
-| API                         | Covered                                                                                 |
-| --------------------------- | --------------------------------------------------------------------------------------- |
-| OpenAI                      | Chat Completions and Responses, streaming, tools, structured output, embeddings, models |
-| Anthropic                   | Messages, streaming, tools, `count_tokens`                                              |
-| AI Gateway                  | the AI SDK's language model and embedding model calls, cost metadata, unknown models    |
-| Gemini, Perplexity, Bedrock | see [More model APIs](/docs/providers/model-providers)                                  |
+| API                         | Covered                                                                          |
+| --------------------------- | -------------------------------------------------------------------------------- |
+| OpenAI                      | Chat Completions and Responses, streaming, tools, structured output, embeddings. |
+| Anthropic                   | Messages, streaming, tools and token counting.                                   |
+| AI Gateway                  | The AI SDK's language and embedding models, with cost metadata.                  |
+| Gemini, Perplexity, Bedrock | See [More model APIs](/docs/providers/model-providers).                          |
 
 ## Faults
 
@@ -110,7 +112,8 @@ The last row is what only an emulator can do: the real API won't refuse on cue.
 ## Fidelity
 
 **Live for the AI Gateway.** `danwo fidelity gateway` runs 6 scenarios against the real
-gateway: text, a tool call, structured output, a stream, embeddings and errors. All 6 match.
+gateway, from text and tool calls to streams, embeddings and errors. All 6 match.
+
 Gemini, Perplexity and Bedrock are checked offline, against their published descriptions.
 OpenAI and Anthropic have no suite of their own yet.
 
