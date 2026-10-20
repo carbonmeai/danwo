@@ -258,12 +258,20 @@ export const PLAN: readonly PlannedTab[] = [
       {
         title: "Real stacks",
         pages: [
-          sections("real-stacks", "Apps and services", "Network", {
-            topic: "providers",
-            keep: REAL_STACK_SECTIONS,
-            description:
-              "Running a real app under danwo: its own start command, several apps behind one proxy, background jobs, sockets and the hosts no emulator answers.",
-          }),
+          file("real-stacks", "When you need it", "Network", "real-stacks/overview.mdx"),
+          file("stack-environment", "Several apps", "Boxes", "real-stacks/several-apps.mdx"),
+          file("background-jobs", "Background jobs", "Workflow", "real-stacks/background-jobs.mdx"),
+          file("sockets-and-streams", "WebSockets and SSE", "Radio", "real-stacks/sockets.mdx"),
+          file("outside-hosts", "Outside hosts", "Globe", "real-stacks/outside-hosts.mdx"),
+          file("node-preload", "The Node preload", "Cpu", "real-stacks/preload.mdx"),
+          file("processes", "Processes", "Activity", "real-stacks/processes.mdx"),
+          file("stack-databases", "Databases", "Database", "real-stacks/databases.mdx"),
+          file(
+            "stack-example",
+            "A worked example",
+            "BookOpenCheck",
+            "real-stacks/worked-example.mdx",
+          ),
         ],
       },
       {
@@ -287,16 +295,37 @@ export const PLAN: readonly PlannedTab[] = [
       {
         title: "Platforms",
         pages: [
-          guide("mobile", "Mobile", "Smartphone"),
-          guide("playwright", "Playwright Test", "FlaskConical"),
+          file("web", "Web", "Globe", "platforms/web.mdx"),
+          file("mobile", "Android setup", "Smartphone", "platforms/android-setup.mdx"),
+          file("android-build", "Android builds", "Hammer", "platforms/android-build.mdx"),
+          file("android-tests", "Android tests", "TabletSmartphone", "platforms/android-tests.mdx"),
+          file(
+            "parallel-emulators",
+            "Parallel emulators",
+            "Layers",
+            "platforms/parallel-emulators.mdx",
+          ),
+          file("playwright", "Playwright Test", "FlaskConical", "platforms/playwright.mdx"),
         ],
       },
       {
         title: "Running",
         pages: [
-          guide("ci", "CI and GitHub", "GitPullRequest"),
-          guide("dashboard", "Dashboard", "LayoutDashboard"),
-          guide("fidelity", "Fidelity", "Scale"),
+          file("ci", "CI and GitHub", "GitPullRequest", "running/ci.mdx"),
+          file("pr-comment", "Pull request comment", "MessageSquare", "running/pr-comment.mdx"),
+          file("shards", "Shards and JUnit", "Split", "running/shards.mdx"),
+          file("dashboard", "Dashboard", "LayoutDashboard", "running/dashboard.mdx"),
+          file("recordings", "Recordings", "Video", "running/recordings.mdx"),
+          file("live-runs", "Live runs and reruns", "Radio", "running/live-runs.mdx"),
+          file("impact", "Changed tests", "GitCompare", "running/impact.mdx"),
+          file("fidelity", "Fidelity", "Scale", "running/fidelity.mdx"),
+          file(
+            "fidelity-cleanup",
+            "Cleaning up sandboxes",
+            "Eraser",
+            "running/fidelity-cleanup.mdx",
+          ),
+          file("configuration", "Configuration", "SlidersHorizontal", "running/configuration.mdx"),
         ],
       },
       {
@@ -323,6 +352,17 @@ export const PLAN: readonly PlannedTab[] = [
           guide("agents-time", "Time guide", "Bot", "time"),
           guide("agents-infrastructure", "Infrastructure guide", "Bot", "infrastructure"),
           guide("agents-lint", "Lint guide", "Bot", "lint"),
+          sections("agents-real-stacks", "Real stacks guide", "Bot", {
+            topic: "providers",
+            keep: REAL_STACK_SECTIONS,
+            description:
+              "The coding agents' guide to running a real app under danwo: its own start command, several apps behind one proxy, background jobs, sockets and the hosts no emulator answers.",
+          }),
+          guide("agents-mobile", "Mobile guide", "Bot", "mobile"),
+          guide("agents-playwright", "Playwright guide", "Bot", "playwright"),
+          guide("agents-ci", "CI guide", "Bot", "ci"),
+          guide("agents-dashboard", "Dashboard guide", "Bot", "dashboard"),
+          guide("agents-fidelity", "Fidelity guide", "Bot", "fidelity"),
         ],
       },
     ],
