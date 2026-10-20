@@ -98,7 +98,8 @@ export function tiptapRoutes(ctx: TiptapRouteContext): void {
 
     const name = c.req.param("name")
 
-    existing(ctx, name)
+    /* Tiptap Cloud answers a read of a document it does not have with a bare 404. */
+    if (!documents.has(name)) return c.body(null, 404)
 
     if (formatOf(c) === "yjs")
       return c.body(Buffer.from(documents.update(name)), 200, {
