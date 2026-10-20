@@ -93,8 +93,9 @@ export class TabFilm {
   }
 
   /**
-   * Names each tab's file once the context has closed (`closedAt`), and drops the browser's own
-   * copies. Never throws: a video that could not be saved is left out.
+   * Names each tab's file once the context has closed (it began closing at `closedAt`; a tab that
+   * closed before then is marked closed), and drops the browser's own copies. Never throws: a
+   * video that could not be saved is left out.
    */
   async save(closedAt: number): Promise<void> {
     const saved: CapturedVideo[] = []
@@ -117,7 +118,7 @@ export class TabFilm {
           ...(this.user !== undefined && { user: this.user }),
           ...(entry.opener !== undefined && { opener: entry.opener }),
           ...(entry.host !== undefined && { host: entry.host }),
-          ...(entry.closedAt !== undefined && { closed: true }),
+          ...(entry.closedAt !== undefined && entry.closedAt < closedAt && { closed: true }),
         })
       } catch {
         /* The tab never painted a frame, or its file is gone: there is nothing to show. */

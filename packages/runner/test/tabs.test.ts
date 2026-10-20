@@ -131,7 +131,7 @@ describe("tab attribution", () => {
     popup.go("https://accounts.provider.test/connect?client=app")
     popup.go("http://app.test/callback")
     popup.close()
-    await film.save(Date.now())
+    await film.save(Date.now() + 1)
 
     expect(
       film
