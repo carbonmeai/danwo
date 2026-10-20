@@ -53,7 +53,20 @@ const DONE = new Set(["completed", "failed", "cancelled"])
  * server takes a few seconds to schedule what an event triggers.
  */
 const NO_RUNS_MS = 5_000
+/**
+ * How long a run the SDK checkpoints itself must send no checkpoint before `settle()` takes it as
+ * finished: the dev server lists such a run as completed, with no end time, while its steps run.
+ */
+const CHECKPOINT_QUIET_MS = 1_500
 const POLL_MS = 150
+/** A checkpoint call's path, with the run it belongs to. */
+const CHECKPOINT = /^\/v1\/checkpoint\/([^/?]+)/
+
+/** A run as the dev server lists it, and whether the dev server gave it an end time. */
+interface ListedRun {
+  readonly run: InngestRun
+  readonly ended: boolean
+}
 
 /** The ids the dev server gave the events in one recorded send (`{ "ids": [...] }`). */
 function eventIds(body: string | null | undefined): string[] {
@@ -69,7 +82,7 @@ function eventIds(body: string | null | undefined): string[] {
 }
 
 /** A run from the dev server's `/v1/events/<id>/runs`, or undefined when it is not one. */
-function runOf(event: string, value: unknown): InngestRun | undefined {
+function runOf(event: string, value: unknown): ListedRun | undefined {
   if (typeof value !== "object" || value === null) return undefined
 
   const field = (name: string) => {
@@ -82,15 +95,18 @@ function runOf(event: string, value: unknown): InngestRun | undefined {
   const ended = Date.parse(field("ended_at"))
 
   return {
-    event,
-    runId: field("run_id"),
-    functionId: field("function_id"),
-    status: field("status").toLowerCase(),
-    durationMs: Number.isNaN(started) || Number.isNaN(ended) ? null : ended - started,
+    run: {
+      event,
+      runId: field("run_id"),
+      functionId: field("function_id"),
+      status: field("status").toLowerCase(),
+      durationMs: Number.isNaN(started) || Number.isNaN(ended) ? null : ended - started,
+    },
+    ended: !Number.isNaN(ended),
   }
 }
 
-async function runsOf(url: string, event: string): Promise<InngestRun[]> {
+async function runsOf(url: string, event: string): Promise<ListedRun[]> {
   try {
     const response = await fetch(new URL(`/v1/events/${encodeURIComponent(event)}/runs`, url))
     const body: unknown = await response.json()
@@ -139,6 +155,37 @@ async function startDevServer(
   return owned
 }
 
+/** Notes when each id first showed, for the ids not seen before. */
+function markSeen(firstSeen: Map<string, number>, ids: readonly string[]): void {
+  const now = Date.now()
+
+  for (const id of ids) if (!firstSeen.has(id)) firstSeen.set(id, now)
+}
+
+/**
+ * Whether settling waits on: an event that has shown no runs yet, for a while, or a run that has
+ * not finished. `firstSeen` holds when each event and run first showed, `checkpoints` when each
+ * run last checkpointed.
+ */
+function stillWaiting(
+  events: readonly string[],
+  listed: readonly ListedRun[],
+  firstSeen: ReadonlyMap<string, number>,
+  checkpoints: ReadonlyMap<string, number>,
+): boolean {
+  const now = Date.now()
+  const going = ({ run, ended }: ListedRun) =>
+    !DONE.has(run.status) ||
+    (!ended &&
+      now - (checkpoints.get(run.runId) ?? firstSeen.get(run.runId) ?? now) < CHECKPOINT_QUIET_MS)
+
+  return events.some((event) => {
+    const own = listed.filter(({ run }) => run.event === event)
+
+    return own.length === 0 ? now - (firstSeen.get(event) ?? now) < NO_RUNS_MS : own.some(going)
+  })
+}
+
 /**
  * Inngest for `startServices`: events the apps send to `inngest.danwo.test` reach the dev server
  * through the proxy, `settle` waits for the runs they triggered, and `state` lists those runs.
@@ -155,9 +202,24 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
       .filter((e) => e.host === INNGEST_HOST && e.method === "POST" && e.path.startsWith("/e/"))
       .flatMap((e) => eventIds(e.response?.body))
 
+  /** When each run last checkpointed through the proxy (`/v1/checkpoint/<run id>/...`). */
+  const lastCheckpoints = () => {
+    const last = new Map<string, number>()
+
+    for (const e of proxy?.exchanges() ?? []) {
+      const run = e.host === INNGEST_HOST ? CHECKPOINT.exec(e.path)?.[1] : undefined
+
+      if (run !== undefined) last.set(run, Math.max(last.get(run) ?? 0, Date.parse(e.startedAt)))
+    }
+
+    return last
+  }
+
   /**
    * Waits until every event sent so far has finished its runs, the ones those runs send included:
    * the sent events are read again on every poll, and each event gets its own time to show runs.
+   * A run listed as finished with no end time is one the SDK checkpoints itself, and counts as
+   * finished once it has sent no checkpoint for a while.
    */
   const settle = async () => {
     const deadline = Date.now() + (options.settleTimeoutMs ?? 30_000)
@@ -165,21 +227,17 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
 
     for (;;) {
       const events = sentEvents()
-      const now = Date.now()
 
-      for (const event of events) if (!firstSeen.has(event)) firstSeen.set(event, now)
+      markSeen(firstSeen, events)
 
-      const all = (await Promise.all(events.map((event) => runsOf(url, event)))).flat()
-      const waiting = events.some((event) => {
-        const own = all.filter((run) => run.event === event)
+      const listed = (await Promise.all(events.map((event) => runsOf(url, event)))).flat()
 
-        return own.length === 0
-          ? Date.now() - (firstSeen.get(event) ?? now) < NO_RUNS_MS
-          : own.some((r) => !DONE.has(r.status))
-      })
-
-      runs = all
-      if (!waiting) return
+      markSeen(
+        firstSeen,
+        listed.map(({ run }) => run.runId),
+      )
+      runs = listed.map(({ run }) => run)
+      if (!stillWaiting(events, listed, firstSeen, lastCheckpoints())) return
       if (Date.now() > deadline)
         throw new Error(
           `Inngest runs were still going after ${options.settleTimeoutMs ?? 30_000} ms`,

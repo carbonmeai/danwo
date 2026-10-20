@@ -111,8 +111,21 @@ describe("live provider keys", () => {
   })
 })
 
-/** The run an event accepted at `at` triggered, finished once `runMs` has passed. */
-function runOf(id: string, at: number, runMs: number) {
+/**
+ * The run an event accepted at `at` triggered, finished once `runMs` has passed. A checkpointed
+ * one is listed as completed with no end time from the start, as the dev server lists a run whose
+ * SDK checkpoints its steps.
+ */
+function runOf(id: string, at: number, runMs: number, checkpointed = false) {
+  if (checkpointed)
+    return {
+      run_id: `run_${id}`,
+      function_id: "provision-workspace",
+      status: "Completed",
+      run_started_at: new Date(at).toISOString(),
+      ended_at: null,
+    }
+
   const done = Date.now() - at >= runMs
 
   return {
@@ -133,7 +146,11 @@ function json(res: ServerResponse, value: unknown): void {
  * run, which finishes `runMs` later and shows up only `lagMs` after the event, as a busy dev
  * server schedules it.
  */
-async function devServer(runMs: number, lagMs = 0): Promise<{ server: Server; url: string }> {
+async function devServer(
+  runMs: number,
+  lagMs = 0,
+  checkpointed = false,
+): Promise<{ server: Server; url: string }> {
   const accepted = new Map<string, number>()
   const server = createServer((req, res) => {
     if (req.method === "POST" && req.url?.startsWith("/e/")) {
@@ -148,7 +165,9 @@ async function devServer(runMs: number, lagMs = 0): Promise<{ server: Server; ur
     const id = /^\/v1\/events\/([^/]+)\/runs$/.exec(req.url ?? "")?.[1] ?? ""
     const at = accepted.get(id)
 
-    json(res, { data: at === undefined || Date.now() - at < lagMs ? [] : [runOf(id, at, runMs)] })
+    json(res, {
+      data: at === undefined || Date.now() - at < lagMs ? [] : [runOf(id, at, runMs, checkpointed)],
+    })
   })
 
   server.listen(0, "127.0.0.1")
@@ -221,6 +240,34 @@ describe("Inngest", () => {
     }
   }, 20_000)
 
+  it("waits for a run the SDK checkpoints until its checkpoints stop", async () => {
+    const dev = await devServer(0, 0, true)
+    const inngest = await inngestService({ url: dev.url })
+    const services = await startServices([inngest])
+
+    try {
+      await sendThrough(services.proxy.url)
+
+      /* The function's steps checkpoint for a second while the dev server lists it as completed. */
+      let lastCheckpoint = 0
+      const steps = (async () => {
+        for (let step = 0; step < 4; step++) {
+          await new Promise((resolve) => setTimeout(resolve, 250))
+          await sendThrough(services.proxy.url, "/v1/checkpoint/run_evt_1/async")
+          lastCheckpoint = Date.now()
+        }
+      })()
+
+      await services.settle()
+      expect(lastCheckpoint).toBeGreaterThan(0)
+      expect(Date.now() - lastCheckpoint).toBeGreaterThanOrEqual(1_000)
+      await steps
+    } finally {
+      await services.close()
+      dev.server.close()
+    }
+  }, 20_000)
+
   it("faults event sends: down, accepted but unanswered, and slow", () => {
     const kinds = inngestOutboundFaults({
       host: INNGEST_HOST,
@@ -240,7 +287,7 @@ describe("Inngest", () => {
  * Sends one event to the Inngest host through the proxy, the way an app's SDK would: the test
  * process itself is not routed, so it speaks to the proxy directly.
  */
-async function sendThrough(proxyUrl: string): Promise<void> {
+async function sendThrough(proxyUrl: string, path = "/e/test-key"): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const target = new URL(proxyUrl)
     const req = request(
@@ -248,7 +295,7 @@ async function sendThrough(proxyUrl: string): Promise<void> {
         host: target.hostname,
         port: target.port,
         method: "POST",
-        path: `http://${INNGEST_HOST}/e/test-key`,
+        path: `http://${INNGEST_HOST}${path}`,
         headers: { host: INNGEST_HOST, "content-type": "application/json" },
       },
       (res) => {
