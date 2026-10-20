@@ -434,12 +434,31 @@ program
     console.log(options.json ? specJson(shown) : renderSpec(shown))
   })
 
+/** `danwo fidelity login <provider>`: signs a test account in and keeps its refresh token. */
+async function fidelityLogin(
+  provider: string,
+  root: string,
+  options: { redirectUri?: string; port?: number },
+): Promise<number> {
+  const { loginCommand } = await import("@danwo/fidelity")
+
+  return loginCommand({
+    provider,
+    root,
+    ...(options.redirectUri !== undefined && { redirectUri: options.redirectUri }),
+    ...(options.port !== undefined && { port: options.port }),
+  })
+}
+
 program
   .command("fidelity")
   .description(
     "check the emulators against the real providers' sandboxes (with DANWO_FIDELITY_* credentials) or the committed goldens",
   )
-  .argument("[providers...]", "providers to check (default: all)")
+  .argument(
+    "[providers...]",
+    "providers to check (default: all); `login google|microsoft` signs a test account in instead",
+  )
   .option(
     "--update-golden",
     "keep the sandbox's (or the API description's) structure as the new golden",
@@ -459,6 +478,11 @@ program
   )
   .option("--yes", "with --sweep, remove the tagged leftovers it lists")
   .option("--root <dir>", "the danwo repository holding fidelity/ (default: the current folder)")
+  .option(
+    "--redirect-uri <uri>",
+    "with login: the redirect URI the OAuth client registers (default: DANWO_FIDELITY_<PROVIDER>_REDIRECT_URI, else http://127.0.0.1:8765/callback)",
+  )
+  .option("--port <port>", "with login: the port of the default redirect URI", Number)
   .action(
     async (
       providers: string[],
@@ -470,10 +494,18 @@ program
         sweep?: boolean
         yes?: boolean
         root?: string
+        redirectUri?: string
+        port?: number
       },
     ) => {
       const { fidelityCommand, sweepCommand } = await import("@danwo/fidelity")
       const root = options.root ?? process.cwd()
+
+      if (providers[0] === "login") {
+        process.exitCode = await fidelityLogin(providers[1] ?? "", root, options)
+
+        return
+      }
 
       process.exitCode =
         options.sweep === true
