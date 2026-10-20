@@ -55,6 +55,8 @@ export interface MarkedRun {
   }[]
   readonly exchanges: readonly {
     readonly user?: string
+    /** `browser` or `server`, as the proxy told them apart; a call without it counts as the test's own. */
+    readonly client?: "browser" | "server"
     readonly id: string
     readonly method: string
     readonly host: string
@@ -148,14 +150,18 @@ function webhookMarks(origin: number, run: MarkedRun): VideoMark[] {
 }
 
 /**
- * The part of `run` one person's video shows: their own steps and their browser's calls, and every
- * call no one person's browser made (the app's backend). Without other people, that is all of it.
+ * The part of `run` one person's video shows: their own steps and their browser's calls, and the
+ * calls of the app's backend, which serve everyone. The test's own browser sends no name, so its
+ * calls are the untagged browser ones. Without other people, that is all of the run.
  */
 function seenBy(run: MarkedRun, user: string | undefined): MarkedRun {
+  const theirs = (call: MarkedRun["exchanges"][number]) =>
+    user === undefined ? call.user === undefined : call.user === user || call.client === "server"
+
   return {
     ...run,
     steps: run.steps.filter((step) => step.user === user),
-    exchanges: run.exchanges.filter((call) => call.user === undefined || call.user === user),
+    exchanges: run.exchanges.filter(theirs),
   }
 }
 
