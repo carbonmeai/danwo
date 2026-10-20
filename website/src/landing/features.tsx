@@ -30,9 +30,18 @@ const CHIPS: readonly (LogoFiles & { readonly name: string; readonly wordmark?: 
   { name: "Bachs", src: "bachs.png" },
   { name: "Auth0", src: "auth0.svg" },
   { name: "Clerk", src: "clerk.svg", dark: "clerk-on-dark.svg" },
+  { name: "Nylas", src: "nylas.png" },
+  { name: "Nango", src: "nango.png", dark: "nango-on-dark.png" },
+  { name: "Unipile", src: "unipile.png" },
+  { name: "Pusher", src: "pusher.svg", dark: "pusher-on-dark.svg" },
+  { name: "Novu", src: "novu.svg", dark: "novu-on-dark.svg" },
+  { name: "Tiptap", src: "tiptap.png", dark: "tiptap-on-dark.png" },
   { name: "Composio", src: "composio.svg", dark: "composio-on-dark.svg" },
   { name: "OpenAI", src: "openai.svg", dark: "openai-on-dark.svg" },
   { name: "Anthropic", src: "anthropic.svg", dark: "anthropic-on-dark.svg" },
+  { name: "Gemini", src: "gemini.svg" },
+  { name: "Perplexity", src: "perplexity.svg" },
+  { name: "Bedrock", src: "bedrock.svg" },
 ]
 
 /** Calls scrolling under the chips: status, path, time or fault. */
@@ -104,8 +113,9 @@ function EmulatorsTile() {
       <h3>Provider emulators</h3>
       <p>
         Stateful stand-ins for the {PROVIDERS.length} providers your app pays for, with real
-        hostnames, signed webhooks and the error shapes your code has to handle. No sandbox keys, no
-        rate limits, no flakes.
+        hostnames, signed webhooks, sockets and the error shapes your code has to handle, for your
+        frontend, API and workers together behind one proxy. No sandbox keys, no rate limits, no
+        flakes.
       </p>
       <div className="art">
         <div className="emu-grid">
@@ -146,7 +156,10 @@ function FaultsTile() {
   return (
     <Reveal as="article" className="tile t-dark t-faults c2">
       <h3>Fault matrix</h3>
-      <p>Every fault the run could meet, planned from what it actually called.</p>
+      <p>
+        The faults the test's own steps could meet, planned from what they called, grouped and kept
+        within a budget.
+      </p>
       <div className="art">
         <div className="faults">
           {FAULTS.map(([fault, broke]) => (
@@ -350,7 +363,14 @@ const FIDELITY: readonly (LogoFiles & {
     result: "matched live",
     tone: "ok",
   },
-  { src: "slack.svg", what: "chat.postMessage errors", result: "matched live", tone: "ok" },
+  { src: "s3.svg", what: "PUT and GET an object on Tigris", result: "matched live", tone: "ok" },
+  {
+    src: "clerk.svg",
+    dark: "clerk-on-dark.svg",
+    what: "sign-in by emailed code",
+    result: "matched live",
+    tone: "ok",
+  },
   { src: "paystack.svg", what: "GET /transaction/verify", result: "matched live", tone: "ok" },
 ]
 

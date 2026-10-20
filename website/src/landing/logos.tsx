@@ -26,9 +26,18 @@ const WALL: readonly WallLogo[] = [
   { name: "Bachs", src: `${W}bachs.png`, dark: `${W}bachs-on-dark.png`, height: 15 },
   { name: "Auth0", src: "auth0.svg", height: 22, label: true },
   { name: "Clerk", src: `${W}clerk.svg`, dark: `${W}clerk-on-dark.svg`, height: 22 },
+  { name: "Nylas", src: "nylas.png", height: 22, label: true },
+  { name: "Nango", src: "nango.png", dark: "nango-on-dark.png", height: 22, label: true },
+  { name: "Unipile", src: "unipile.png", height: 22, label: true },
+  { name: "Pusher", src: "pusher.svg", dark: "pusher-on-dark.svg", height: 22, label: true },
+  { name: "Novu", src: "novu.svg", dark: "novu-on-dark.svg", height: 20, label: true },
+  { name: "Tiptap", src: "tiptap.png", dark: "tiptap-on-dark.png", height: 20, label: true },
   { name: "Composio", src: "composio.svg", dark: "composio-on-dark.svg", height: 22, label: true },
   { name: "OpenAI", src: `${W}openai.svg`, dark: `${W}openai-on-dark.svg`, height: 24 },
   { name: "Anthropic", src: `${W}anthropic.svg`, dark: `${W}anthropic-on-dark.svg`, height: 13 },
+  { name: "Gemini", src: "gemini.svg", height: 22, label: true },
+  { name: "Perplexity", src: "perplexity.svg", height: 22, label: true },
+  { name: "Bedrock", src: "bedrock.svg", height: 22, label: true },
   { name: "AI Gateway", src: "vercel.svg", dark: "vercel-on-dark.svg", height: 16, label: true },
 ]
 

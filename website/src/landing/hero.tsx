@@ -138,7 +138,7 @@ export const Hero = forwardRef<HTMLElement>(function Hero(_props, ref) {
             danwo is {SITE.licence.openSource ? "the open-source" : "the"} testing platform for the
             agentic era. It clicks through your web and mobile app like a user,{" "}
             <strong>
-              while emulated Stripe, Resend, Slack and a dozen more providers record every call
+              while emulated Stripe, Clerk, Resend and twenty more providers record every call
             </strong>
             , then breaks the run on purpose, once per fault you should survive.
           </p>
