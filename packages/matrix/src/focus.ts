@@ -18,8 +18,22 @@ import type { DataCall } from "@danwo/infra"
 import type { PlannedFault, RunOutcome } from "./fault-matrix.ts"
 
 /**
+ * What setup set off that came only once the body began, by place in the run's lists: a webhook a
+ * sign-in or fixture sent that is delivered later, the calls and statements made while the app
+ * handled it, the rest of a transaction setup opened. Places are indexes into the whole run's
+ * `exchanges`, `deliveries`, `dataCalls` and `sockets`.
+ */
+export interface SetupCaused {
+  readonly exchanges: readonly number[]
+  readonly deliveries: readonly number[]
+  readonly data: readonly number[]
+  readonly sockets: readonly number[]
+}
+
+/**
  * How much of a clean run was setup rather than the test's body: the leading calls, deliveries
- * and sockets made before the body began, and per data service its leading statements.
+ * and sockets made before the body began, per data service its leading statements, and what
+ * setup set off that came after.
  */
 export interface SetupSpan {
   readonly exchanges: number
@@ -27,48 +41,80 @@ export interface SetupSpan {
   readonly sockets: number
   /** By data proxy service name. */
   readonly data: Readonly<Record<string, number>>
+  readonly caused?: SetupCaused | undefined
 }
 
-/** The calls of one data service from its `skip`-th on, the others' kept in their order. */
-function dataAfter(calls: readonly DataCall[], skip: Readonly<Record<string, number>>): DataCall[] {
+/** The indexes of the data calls from each service's `skip`-th on, in their order. */
+function dataAfter(calls: readonly DataCall[], skip: Readonly<Record<string, number>>): number[] {
   const seen = new Map<string, number>()
 
-  return calls.filter((call) => {
+  return calls.flatMap((call, index) => {
     const at = seen.get(call.service) ?? 0
 
     seen.set(call.service, at + 1)
 
-    return at >= (skip[call.service] ?? 0)
+    return at >= (skip[call.service] ?? 0) ? [index] : []
   })
 }
 
+/** `places` moved into a list that keeps only the items at `kept` (whole-run indexes, in order). */
+function rebased(places: readonly number[] | undefined, kept: readonly number[]): number[] {
+  const at = new Map(kept.map((index, position) => [index, position]))
+
+  return (places ?? []).flatMap((place) => at.get(place) ?? [])
+}
+
+/** The indexes from `from` up to `length`. */
+function from(start: number, length: number): number[] {
+  return Array.from({ length: Math.max(0, length - start) }, (_, offset) => start + offset)
+}
+
 /**
- * The clean run as its body saw it: everything from before the body began left out. Faults
- * planned from it count their occurrences from the body's start, where a trial arms them.
+ * The clean run as its body saw it: everything from before the body began left out, and what
+ * setup set off after it marked (`caused`). Faults planned from it count their occurrences from
+ * the body's start, where a trial arms them, counting what setup set off but placing none on it.
  */
 export function bodyOf(outcome: RunOutcome): RunOutcome {
   const { setup } = outcome
 
   if (setup === undefined) return outcome
 
+  const sockets = from(setup.sockets, outcome.sockets?.length ?? 0)
+  const data =
+    outcome.dataCalls === undefined ? undefined : dataAfter(outcome.dataCalls, setup.data)
+
   return {
     ...outcome,
     exchanges: outcome.exchanges.slice(setup.exchanges),
     deliveries: outcome.deliveries.slice(setup.deliveries),
     sockets: outcome.sockets?.slice(setup.sockets),
-    dataCalls:
-      outcome.dataCalls === undefined ? undefined : dataAfter(outcome.dataCalls, setup.data),
+    dataCalls: data?.flatMap((index) => outcome.dataCalls?.[index] ?? []),
     setup: undefined,
+    caused: {
+      exchanges: rebased(setup.caused?.exchanges, from(setup.exchanges, outcome.exchanges.length)),
+      deliveries: rebased(
+        setup.caused?.deliveries,
+        from(setup.deliveries, outcome.deliveries.length),
+      ),
+      data: rebased(setup.caused?.data, data ?? []),
+      sockets: rebased(setup.caused?.sockets, sockets),
+    },
   }
 }
 
-/** How many calls, deliveries, statements and sockets a span holds in all. */
+/** How many calls, deliveries, statements and sockets a span holds in all, what setup set off included. */
 export function setupSize(setup: SetupSpan | undefined): number {
   if (setup === undefined) return 0
 
   const data = Object.values(setup.data).reduce((sum, count) => sum + count, 0)
+  const caused = setup.caused
+  const later =
+    (caused?.exchanges.length ?? 0) +
+    (caused?.deliveries.length ?? 0) +
+    (caused?.data.length ?? 0) +
+    (caused?.sockets.length ?? 0)
 
-  return setup.exchanges + setup.deliveries + setup.sockets + data
+  return setup.exchanges + setup.deliveries + setup.sockets + data + later
 }
 
 /**

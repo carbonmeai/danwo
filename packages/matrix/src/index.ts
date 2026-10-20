@@ -43,6 +43,7 @@ export {
   type FocusOptions,
   focusPlan,
   isBackground,
+  type SetupCaused,
   type SetupSpan,
   setupSize,
   tierOf,

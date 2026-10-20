@@ -38,8 +38,14 @@ export function socketRoute(socket: Pick<SocketExchange, "host" | "path" | "user
   return `WS ${socket.host}${path}${user}`
 }
 
-/** Each socket the clean run opened (and the proxy let through) × each socket fault. */
-export function planSocketFaults(sockets: readonly SocketExchange[]): SocketPlannedFault[] {
+/**
+ * Each socket the clean run opened (and the proxy let through) × each socket fault. A socket in
+ * `setupCaused` is counted but gets no faults.
+ */
+export function planSocketFaults(
+  sockets: readonly SocketExchange[],
+  setupCaused: ReadonlySet<SocketExchange> = new Set(),
+): SocketPlannedFault[] {
   const occurrences = new Map<string, number>()
 
   return sockets
@@ -50,6 +56,7 @@ export function planSocketFaults(sockets: readonly SocketExchange[]): SocketPlan
       const nth = occurrence > 0 ? ` #${occurrence + 1}` : ""
 
       occurrences.set(route, occurrence + 1)
+      if (setupCaused.has(socket)) return []
 
       return SOCKET_FAULTS.map((fault) => ({
         target: "socket" as const,

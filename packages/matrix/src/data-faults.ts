@@ -55,11 +55,13 @@ function repeats(calls: readonly DataCall[]): boolean[] {
 
 /**
  * Every data call of the clean run × each fault `catalogue` gives it. A call that never got an
- * answer (the run ended first) is skipped, as is the housekeeping a driver does on its own.
+ * answer (the run ended first) is skipped, as is the housekeeping a driver does on its own. A call
+ * in `setupCaused` is counted but gets no faults.
  */
 export function planDataFaults(
   calls: readonly DataCall[],
   catalogue: DataFaultCatalogue,
+  setupCaused: ReadonlySet<DataCall> = new Set(),
 ): DataPlannedFault[] {
   const counts = new Map<string, number>()
   const polls = repeats(calls)
@@ -70,6 +72,7 @@ export function planDataFaults(
 
     counts.set(key, occurrence + 1)
     if (polls[index] === true || call.role === "other" || call.outcome === "pending") return []
+    if (setupCaused.has(call)) return []
 
     const nth = occurrence > 0 ? ` #${occurrence + 1}` : ""
     const poll = polls[index + 1] === true ? " (poll)" : ""

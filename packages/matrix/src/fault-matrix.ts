@@ -22,7 +22,7 @@ import {
   type DataPlannedFault,
   planDataFaults,
 } from "./data-faults.ts"
-import type { SetupSpan } from "./focus.ts"
+import type { SetupCaused, SetupSpan } from "./focus.ts"
 import { occurrenceOf } from "./occurrence.ts"
 import { applySocketFault, planSocketFaults, type SocketPlannedFault } from "./socket-faults.ts"
 
@@ -137,6 +137,13 @@ export interface RunOutcome {
    * `beforeEach`): those calls get no faults unless the matrix is asked to include setup.
    */
   readonly setup?: SetupSpan | undefined
+  /**
+   * Calls, deliveries, statements and sockets of the run that setup set off although they came
+   * once the body began (a webhook a sign-in sent, the calls its handler made, the rest of a
+   * transaction setup opened), by their place in the run's lists. They are counted where a fault
+   * counts the calls it lands on, but get no faults: a trial that skips the setup never makes them.
+   */
+  readonly caused?: SetupCaused | undefined
 }
 
 export interface FaultMatrixResult {
@@ -415,10 +422,14 @@ function webhookLabel(fault: WebhookFault, attempt: ServiceDelivery, occurrence:
   return `${describeWebhookFault(fault)} on ${service}webhook ${attempt.topic}${nth}`
 }
 
-/** Each webhook message's first delivery in the clean run × each webhook fault. */
+/**
+ * Each webhook message's first delivery in the clean run × each webhook fault. Deliveries in
+ * `setupCaused` are counted but get none.
+ */
 function planWebhookFaults(
   deliveries: readonly ServiceDelivery[],
   webhookFaults: readonly WebhookFault[],
+  setupCaused: ReadonlySet<ServiceDelivery> = new Set(),
 ): PlannedFault[] {
   const occurrences = new Map<string, number>()
 
@@ -427,6 +438,7 @@ function planWebhookFaults(
     const occurrence = occurrences.get(topic) ?? 0
 
     occurrences.set(topic, occurrence + 1)
+    if (setupCaused.has(attempt)) return []
 
     return webhookFaults.map((fault) => ({
       target: "webhook" as const,
@@ -484,7 +496,7 @@ function runLengths(routes: readonly (string | undefined)[]): number[] {
  * delivered (first attempt, per topic occurrence) × each webhook fault, and every call to the
  * app's own database or cache × each data fault. A poll gets faults on its first call only: how
  * many times it repeats depends on timing, so a fault on a later repeat may fall on a call the
- * next run never makes.
+ * next run never makes. What setup set off (`clean.caused`) is counted but gets no faults.
  */
 export function planFaults(
   clean: RunOutcome,
@@ -493,6 +505,7 @@ export function planFaults(
   dataFaults?: DataFaultCatalogue,
 ): PlannedFault[] {
   const plan: PlannedFault[] = []
+  const caused = causedItems(clean)
   const routed = clean.exchanges.filter((e) => e.disposition === "routed")
   const polls = pollPositions(routed)
   const routeCounts = new Map<string, number>()
@@ -505,7 +518,7 @@ export function planFaults(
     const poll = polls[index] === "first" ? " (poll)" : ""
 
     routeCounts.set(route, occurrence + 1)
-    if (polls[index] === "repeat") return
+    if (polls[index] === "repeat" || caused.exchanges.has(exchange)) return
 
     for (const fault of outboundFaults(call))
       plan.push({
@@ -518,11 +531,29 @@ export function planFaults(
       })
   })
 
-  plan.push(...planWebhookFaults(clean.deliveries, webhookFaults))
-  if (dataFaults !== undefined) plan.push(...planDataFaults(clean.dataCalls ?? [], dataFaults))
-  plan.push(...planSocketFaults(clean.sockets ?? []))
+  plan.push(...planWebhookFaults(clean.deliveries, webhookFaults, caused.deliveries))
+  if (dataFaults !== undefined)
+    plan.push(...planDataFaults(clean.dataCalls ?? [], dataFaults, caused.data))
+  plan.push(...planSocketFaults(clean.sockets ?? [], caused.sockets))
 
   return plan
+}
+
+/** The items at `at` in `items`, as a set of the items themselves. */
+function pick<T>(items: readonly T[] | undefined, at: readonly number[] | undefined): Set<T> {
+  return new Set((at ?? []).flatMap((index) => items?.[index] ?? []))
+}
+
+/** The run's items setup set off (`outcome.caused`), as sets of the items themselves. */
+function causedItems(outcome: RunOutcome) {
+  const { caused } = outcome
+
+  return {
+    exchanges: pick(outcome.exchanges, caused?.exchanges),
+    deliveries: pick(outcome.deliveries, caused?.deliveries),
+    data: pick(outcome.dataCalls, caused?.data),
+    sockets: pick(outcome.sockets, caused?.sockets),
+  }
 }
 
 /**

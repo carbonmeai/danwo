@@ -135,6 +135,39 @@ describe("bodyOf", () => {
     expect(faults.length).toBeGreaterThan(0)
     expect(faults.every((fault) => "occurrence" in fault && fault.occurrence === 0)).toBe(true)
   })
+
+  it("plans nothing on what setup set off, still counting it for the body's own occurrences", () => {
+    const run = outcome({
+      exchanges: [
+        exchange("POST", "a.test", "/sign_in", 1),
+        exchange("POST", "api.stripe.com", "/v1/customers", 2),
+        exchange("POST", "api.stripe.com", "/v1/customers", 3),
+      ],
+      dataCalls: [
+        statement("INSERT sessions", "write"),
+        statement("INSERT users", "write"),
+        statement("INSERT users", "write"),
+      ],
+      setup: {
+        exchanges: 1,
+        deliveries: 0,
+        sockets: 0,
+        data: { postgres: 1 },
+        caused: { exchanges: [1], deliveries: [], data: [1], sockets: [] },
+      },
+    })
+    const body = bodyOf(run)
+    const faults = plan(body)
+    const customers = faults.filter((fault) => fault.label.includes("/v1/customers"))
+    const users = faults.filter((fault) => fault.label.includes("INSERT users"))
+
+    expect(body.caused).toEqual({ exchanges: [0], deliveries: [], data: [0], sockets: [] })
+    expect(customers.length).toBeGreaterThan(0)
+    expect(customers.every((fault) => "occurrence" in fault && fault.occurrence === 1)).toBe(true)
+    expect(users.length).toBeGreaterThan(0)
+    expect(users.every((fault) => "occurrence" in fault && fault.occurrence === 1)).toBe(true)
+    expect(setupSize(run.setup)).toBe(4)
+  })
 })
 
 describe("focusPlan", () => {
