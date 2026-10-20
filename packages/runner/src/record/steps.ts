@@ -12,7 +12,24 @@ import type { Effects } from "../replay/effects.ts"
 import { classOf, codeOf } from "../support/codes.ts"
 import { callerLine, type SourceLine } from "./source.ts"
 
-export type StepKind = "locator" | "assertion" | "app" | "agent"
+/**
+ * What a step was: a locator action, a locator or page check, an app call (`app.open`, time
+ * travel), an agent step, a `check` of a plain value (an invariant's `expect(count).toBe(1)`), or
+ * the `settle` wait for background work before the invariant ran.
+ */
+export type StepKind = "locator" | "assertion" | "app" | "agent" | "check" | "settle"
+
+/**
+ * Which part of the attempt a step ran in: the `setup` hooks, the test's `body`, the `settle` wait
+ * for background work, the invariant's `checks`, or the `teardown` hooks.
+ */
+export type AttemptPhase = "setup" | "body" | "settle" | "checks" | "teardown"
+
+/** A value check's two sides, previewed and redacted: what it got, and what it wanted. */
+export interface CheckValues {
+  readonly actual?: string
+  readonly expected?: string
+}
 
 /** How a finished step ended. */
 export type StepVerdict = "passed" | "failed" | "blocked" | "inconclusive"
@@ -134,6 +151,12 @@ export interface StepRecord {
   readonly cache?: CacheNote
   /** The person whose browser the step ran in, when the test opened more than one person's. */
   readonly user?: string
+  /** The part of the attempt it ran in; absent in records made before phases were kept. */
+  readonly phase?: AttemptPhase
+  /** For a `check` step: the value it looked at and the value it wanted. */
+  readonly check?: CheckValues
+  /** For a `settle` step: the background work it waited for, one line each. */
+  readonly waitedOn?: readonly string[]
 }
 
 /** One line the app wrote to its console, an uncaught page error, or a navigation. */
@@ -168,6 +191,8 @@ interface Shared {
   readonly log: AppLogRecord[]
   /** Indexes of checks that passed and verify what came before them. */
   readonly verified: number[]
+  /** The part of the attempt running now, stamped on every step that starts. */
+  phase: AttemptPhase
 }
 
 /**
@@ -178,28 +203,31 @@ export class StepRecorder implements StepLog {
   private readonly steps: Running[]
   private readonly log: AppLogRecord[]
   private readonly verified: number[]
+  private readonly shared: Shared
   private readonly options: StepRecorderOptions
   private readonly user: string | undefined
 
   constructor(
     options: StepRecorderOptions,
-    shared: Shared = { steps: [], log: [], verified: [] },
+    shared: Shared = { steps: [], log: [], verified: [], phase: "body" },
     user?: string,
   ) {
     this.options = options
     this.steps = shared.steps
     this.log = shared.log
     this.verified = shared.verified
+    this.shared = shared
     this.user = user
   }
 
   /** A recorder of `user`'s steps, written to this attempt's list and tagged with their name. */
   forUser(user: string): StepRecorder {
-    return new StepRecorder(
-      this.options,
-      { steps: this.steps, log: this.log, verified: this.verified },
-      user,
-    )
+    return new StepRecorder(this.options, this.shared, user)
+  }
+
+  /** Marks the part of the attempt that starts now; every person's later steps are stamped with it. */
+  enter(phase: AttemptPhase): void {
+    this.shared.phase = phase
   }
 
   /** The latest step of this recorder's person: events and cache notes belong to it. */
@@ -215,6 +243,72 @@ export class StepRecorder implements StepLog {
     body: () => Promise<T>,
     options: { readonly verifies?: boolean } = {},
   ): Promise<T> {
+    const running = this.begin(kind, api, label)
+    const started = Date.now()
+
+    try {
+      const result = await body()
+
+      this.finish(running, started, { status: "passed" }, options.verifies === true)
+
+      return result
+    } catch (error) {
+      this.finish(running, started, { status: verdictOf(error), error: this.errorOf(error) }, false)
+      throw error
+    }
+  }
+
+  /**
+   * Records a check of a plain value: `body` runs the matcher, synchronously or as a promise
+   * (`resolves`, `rejects`), and the step keeps both sides. A failed check is rethrown as it was.
+   */
+  check<T>(api: string, label: string, values: CheckValues, body: () => T): T {
+    const running = this.begin("check", api, label)
+    const started = Date.now()
+
+    const failed = (error: unknown): never => {
+      running.record = { ...running.record, check: this.valuesOf(values, error) }
+      this.finish(running, started, { status: "failed", error: this.errorOf(error) }, false)
+      throw error
+    }
+
+    const passed = <V>(value: V): V => {
+      running.record = { ...running.record, check: this.valuesOf(values) }
+      this.finish(running, started, { status: "passed" }, false)
+
+      return value
+    }
+
+    try {
+      const result = body()
+
+      if (!isThenable(result)) return passed(result)
+
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a promise in is a promise out: the same value, settled
+      return Promise.resolve(result).then(passed, failed) as T
+    } catch (error) {
+      return failed(error)
+    }
+  }
+
+  /** Records the wait for background work, with what it waited on, as a `settle` step. */
+  async settle(wait: () => Promise<readonly string[]>): Promise<void> {
+    const running = this.begin("settle", "settle", "waiting for background work")
+    const started = Date.now()
+
+    try {
+      const waitedOn = (await wait()).map((line) => this.options.redact(line))
+
+      running.record = { ...running.record, waitedOn }
+      this.finish(running, started, { status: "passed" }, false)
+    } catch (error) {
+      this.finish(running, started, { status: verdictOf(error), error: this.errorOf(error) }, false)
+      throw error
+    }
+  }
+
+  /** Starts a step of `kind`, stamped with the phase, the caller's line and the person. */
+  private begin(kind: StepKind, api: string, label: string): Running {
     const source = callerLine(this.options.projectRoot)
     const running: Running = {
       record: {
@@ -229,24 +323,15 @@ export class StepRecorder implements StepLog {
         ...(source && { source }),
         events: [],
         ...(this.user !== undefined && { user: this.user }),
+        phase: this.shared.phase,
       },
       events: [],
     }
-    const started = Date.now()
 
     this.steps.push(running)
     this.options.onStart?.(running.record)
 
-    try {
-      const result = await body()
-
-      this.finish(running, started, { status: "passed" }, options.verifies === true)
-
-      return result
-    } catch (error) {
-      this.finish(running, started, { status: verdictOf(error), error: this.errorOf(error) }, false)
-      throw error
-    }
+    return running
   }
 
   /** Adds an event to the step running now (the latest one started). */
@@ -307,9 +392,73 @@ export class StepRecorder implements StepLog {
     this.options.onEnd?.({ ...running.record, events: [...running.events] })
   }
 
+  /** A check's sides, redacted; a failed matcher's own actual and expected win where it has them. */
+  private valuesOf(values: CheckValues, error?: unknown): CheckValues {
+    const fromError = (key: "actual" | "expected"): string | undefined =>
+      typeof error === "object" && error !== null && key in error
+        ? preview(Reflect.get(error, key))
+        : undefined
+    const actual = fromError("actual") ?? values.actual
+    const expected = fromError("expected") ?? values.expected
+
+    return {
+      ...(actual !== undefined && { actual: this.options.redact(actual) }),
+      ...(expected !== undefined && { expected: this.options.redact(expected) }),
+    }
+  }
+
   private errorOf(error: unknown): NonNullable<StepRecord["error"]> {
     const message = error instanceof Error ? error.message : String(error)
 
     return { code: codeOf(error), message: this.options.redact(message) }
   }
+}
+
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "then" in value &&
+    typeof Reflect.get(value, "then") === "function"
+  )
+}
+
+/** How long a previewed value may be in a step. */
+const PREVIEW_CHARS = 160
+
+/** A value as one line: a string quoted, anything else as JSON where it can be. */
+function asText(value: unknown): string {
+  if (typeof value === "function") return value.name === "" ? "function" : `${value.name}()`
+  if (typeof value === "object" && value !== null) return objectText(value)
+
+  return primitiveText(value)
+}
+
+/** A primitive as written in code: a string quoted, a bigint with its `n`. */
+function primitiveText(value: unknown): string {
+  if (typeof value === "string") return JSON.stringify(value)
+  if (typeof value === "bigint") return `${value}n`
+  if (typeof value === "symbol") return value.toString()
+
+  if (typeof value === "number") return String(value)
+
+  return JSON.stringify(value) ?? "undefined"
+}
+
+/** An object as JSON, a promise by name, and one JSON cannot hold by its tag. */
+function objectText(value: object): string {
+  if (isThenable(value)) return "promise"
+
+  try {
+    return JSON.stringify(value) ?? "{}"
+  } catch {
+    return Object.prototype.toString.call(value)
+  }
+}
+
+/** A value as one short line for a step's label or sides, cut to length. */
+export function preview(value: unknown): string {
+  const text = asText(value)
+
+  return text.length > PREVIEW_CHARS ? `${text.slice(0, PREVIEW_CHARS - 1)}…` : text
 }

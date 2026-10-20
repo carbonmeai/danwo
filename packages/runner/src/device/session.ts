@@ -222,6 +222,8 @@ function deviceFlight(
       })
     },
     steps: () => steps.all(),
+    enter: (phase) => steps.enter(phase),
+    waiting: (wait) => steps.settle(wait),
     appLog: () => steps.appLogs(),
     screenshots: () => shots,
     redact: (text) => vault.redact(text),

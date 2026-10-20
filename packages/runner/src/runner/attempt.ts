@@ -181,9 +181,11 @@ export async function runAttempt(
     stage(
       async () => {
         if (start?.error !== undefined) throw start.error
+        session.flight.enter?.("setup")
         await fixtures.prepare(wantedByAll(everyUser(file, test)))
         for (const hook of hooksAround(file, test, "beforeEach")) await call(hook.fn)()
         setup.onBodyStart?.()
+        session.flight.enter?.("body")
         await call(test.body)()
       },
       deadline,
@@ -226,6 +228,8 @@ interface Ending {
 async function endAttempt(file: FileDeclarations, test: DeclaredTest, ending: Ending) {
   const { session, setup, fixtures, call } = ending
   let { verdict } = ending
+
+  session.flight.enter?.("teardown")
 
   if (verdict.status !== "timed-out") {
     const afterEach = hooksAround(file, test, "afterEach").map((hook) => call(hook.fn))
@@ -288,6 +292,7 @@ async function openStarted(
 
   if (!start.reused || check === undefined) return { session, start }
 
+  session.flight.enter?.("setup")
   const checked = await stage(() => context.call(check, session), deadline, "body")
 
   if (checked.status === "passed") return { session, start }
@@ -328,9 +333,24 @@ async function judge(
   const stopped = broke(body) ? whereItBroke(body, judging) : undefined
 
   await setup.beforeInvariant?.()
-  await setup.env?.settle?.()
+  await settled(judging.session, setup.env)
+  judging.session.flight.enter?.("checks")
 
   return { verdict: await stage(judging.run(invariant), judging.deadline, "invariant"), stopped }
+}
+
+/**
+ * Lets the environment's background work finish before the invariant reads it, as a `settle`
+ * step of the record that says what was waited for.
+ */
+async function settled(session: WebSession, env: WorkerEnvironment | undefined): Promise<void> {
+  if (env?.settle === undefined) return
+
+  const wait = async () => (await env.settle?.()) ?? []
+
+  session.flight.enter?.("settle")
+  if (session.flight.waiting === undefined) await wait()
+  else await session.flight.waiting(wait)
 }
 
 /** The body's breaking point: the step whose replay diverged, else the line it threw at. */

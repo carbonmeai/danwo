@@ -40,8 +40,12 @@ export interface WorkerEnvironment {
    * fixture, and the agent reads codes and links from it that replays read again.
    */
   readonly mail?: readonly MailSource[]
-  /** Lets pending background work finish (e.g. webhook deliveries on a manual clock) before a matrix run's evidence is read. */
-  settle?(): Promise<void>
+  /**
+   * Lets pending background work finish (e.g. webhook deliveries on a manual clock) before a
+   * test's invariant or a matrix run's evidence is read. It may say what it waited for, one line
+   * each; the flight record shows that on the settle step.
+   */
+  settle?(): Promise<void | readonly string[]>
   /**
    * Moves time forward by `ms` for everything behind the app: the apps' clocks (through the
    * proxy) and every emulator's clock, running renewals, retries and expiries as they fall due.

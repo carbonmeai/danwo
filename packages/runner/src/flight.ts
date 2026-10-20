@@ -7,6 +7,7 @@ import type { Page } from "playwright-core"
 import { LocatorError } from "./locate/index.ts"
 import {
   type AppLogRecord,
+  type AttemptPhase,
   captureEvidence,
   type FailureEvidence,
   type StepRecord,
@@ -22,6 +23,10 @@ const SCREENSHOT_TIMEOUT_MS = 5_000
 export interface SessionFlight {
   /** Every step of the attempt, its labels and errors redacted. */
   steps(): readonly StepRecord[]
+  /** Marks the part of the attempt that starts now (setup, body, settle, checks, teardown). */
+  enter?(phase: AttemptPhase): void
+  /** Runs the wait for background work as a `settle` step, keeping what `wait` says it waited on. */
+  waiting?(wait: () => Promise<readonly string[]>): Promise<void>
   /** Console messages, page errors and navigations, each with its step. */
   appLog(): readonly AppLogRecord[]
   /** Step index → screenshot taken right after it, relative to the artifacts directory. */
@@ -83,9 +88,13 @@ export function createSessionFlight(
 
   return {
     onStep(step) {
-      if (options.stepScreenshots) screenshot(step.index)
+      /* A value check or the settle wait changes nothing on the page, so it gets no screenshot. */
+      if (options.stepScreenshots && step.kind !== "check" && step.kind !== "settle")
+        screenshot(step.index)
     },
     steps: () => options.steps.all(),
+    enter: (phase) => options.steps.enter(phase),
+    waiting: (wait) => options.steps.settle(wait),
     appLog: () => options.steps.appLogs(),
     screenshots: () => shots,
     redact: (text) => options.vault.redact(text),

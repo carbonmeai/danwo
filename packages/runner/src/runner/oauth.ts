@@ -50,6 +50,7 @@ import {
   type Service,
   type Services,
   servicesLifecycle,
+  settleFixture,
   startServices,
 } from "./services.ts"
 
@@ -138,7 +139,7 @@ export interface OAuthEnvironment<Name extends string> {
   /** Where the mail it sends lands, for the `mail` fixture (Clerk's codes). */
   readonly mail?: Services["mail"]
   /** Plays every pending push notification and retry to the end. */
-  readonly settle: () => Promise<void>
+  readonly settle: () => Promise<readonly string[]>
   /** Moves the app's clock and the emulator's time forward by `ms`; see `time.travel`. */
   readonly travel: (ms: number) => Promise<void>
   /** Emulator back to its seed, proxy log and fault rules cleared. */
@@ -274,7 +275,7 @@ export async function oauthEnvironment<Name extends string>(
     ...own,
     [name]: service.emulator,
     proxy,
-    settle,
+    settle: settleFixture(settle),
   } as OAuthEnvironment<Name>["fixtures"]
 
   return {

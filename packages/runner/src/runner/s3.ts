@@ -8,7 +8,13 @@ import {
 } from "@danwo/emulators"
 import type { Proxy } from "@danwo/proxy"
 
-import { keptEmulator, type Service, servicesLifecycle, startServices } from "./services.ts"
+import {
+  keptEmulator,
+  type Service,
+  servicesLifecycle,
+  settleFixture,
+  startServices,
+} from "./services.ts"
 
 const DEFAULT_ENDPOINTS = [...TIGRIS_ENDPOINTS, "s3.amazonaws.com", "s3.us-east-1.amazonaws.com"]
 
@@ -132,6 +138,6 @@ export async function s3Environment(
     emulator: service.emulator,
     proxy,
     env: (env) => service.env(env),
-    fixtures: { s3: service.emulator, proxy, settle },
+    fixtures: { s3: service.emulator, proxy, settle: settleFixture(settle) },
   }
 }

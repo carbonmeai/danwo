@@ -73,8 +73,23 @@ function settledWithRuns(service: OAuthService, emulator: Emulator): OAuthServic
 
   return Object.assign(service, {
     async settle() {
-      await novuProject(emulator).idle()
-      await settle?.()
+      const project = novuProject(emulator)
+      /* Runs already over before the wait are not what it waited for. */
+      const before = new Set(
+        project
+          .executions()
+          .filter((run) => run.status !== "pending")
+          .map((run) => run.id),
+      )
+
+      await project.idle()
+
+      const runs = project
+        .executions()
+        .filter((run) => !before.has(run.id))
+        .map((run) => `workflow ${run.workflow_id} ${run.status}`)
+
+      return [...runs, ...((await settle?.()) ?? [])]
     },
   })
 }

@@ -24,7 +24,11 @@ export interface Service {
   readonly mail?: readonly MailSource[]
   /** What the flight recorder keeps of this service when a run ends (an emulator's snapshot). */
   state?(): unknown
-  settle?(): Promise<void>
+  /**
+   * Lets the service's background work finish; it may say what it waited for, one line each,
+   * which the flight record shows on the settle step.
+   */
+  settle?(): Promise<void | readonly string[]>
   /**
    * Moves the service's time forward by `ms`, running what falls due on the way in order
    * (renewals, retries, expiries) and letting each step's deliveries land before the next.
@@ -79,8 +83,8 @@ export interface Services {
   readonly mail?: readonly MailSource[]
   /** Every service's `state()`, by service name. */
   state(): Readonly<Record<string, unknown>>
-  /** Lets every service's background work finish. */
-  settle(): Promise<void>
+  /** Lets every service's background work finish, and says what each waited for and how long. */
+  settle(): Promise<readonly string[]>
   /** Moves the apps' clocks (through the proxy) and every service's time forward by `ms`. */
   travel(ms: number): Promise<void>
   /** Every service back to its seed; proxy log, fault rules and the apps' clock offset cleared. */
@@ -110,9 +114,7 @@ export async function startServices(
   const webhooks = webhooksByService(services)
   const mail = services.flatMap((s) => s.mail ?? [])
 
-  const settle = async () => {
-    for (const service of services) await service.settle?.()
-  }
+  const settle = () => settleEach(services)
 
   const clearRun = async () => {
     proxy.clear()
@@ -132,7 +134,7 @@ export async function startServices(
     fixtures: {
       ...Object.fromEntries(services.flatMap((s) => Object.entries(s.fixtures ?? {}))),
       proxy,
-      settle,
+      settle: settleFixture(settle),
     },
     ...(mail.length > 0 && { mail }),
     travel,
@@ -160,6 +162,40 @@ export async function startServices(
       for (const service of services) await service.close()
     },
   }
+}
+
+/**
+ * The `settle` fixture tests call: it just waits. What was waited on is for the record's settle
+ * step, which the environment's own `settle` reports.
+ */
+export function settleFixture(settle: () => Promise<unknown>): () => Promise<void> {
+  return async () => {
+    await settle()
+  }
+}
+
+/** A settle shorter than this, with nothing to say, is left out of the settle step's list. */
+const NOTABLE_SETTLE_MS = 50
+
+/**
+ * Settles every service in turn, and lists what each waited for: `inngest · 3.2 s · 2 runs
+ * completed`. A service that had nothing to wait for and was quick is not listed.
+ */
+async function settleEach(services: readonly Service[]): Promise<readonly string[]> {
+  const lines: string[] = []
+
+  for (const service of services) {
+    if (service.settle === undefined) continue
+
+    const started = Date.now()
+    const said = (await service.settle()) ?? []
+    const ms = Date.now() - started
+
+    if (said.length === 0 && ms < NOTABLE_SETTLE_MS) continue
+    lines.push([service.name, `${(ms / 1000).toFixed(1)} s`, ...said].join(" · "))
+  }
+
+  return lines
 }
 
 function webhooksByService(
@@ -247,7 +283,15 @@ const FOREGROUND = { background: false } as const
  * Business events in the background, such as a trial that ends in five minutes or a renewal,
  * stay queued: only time travel reaches them.
  */
-async function settleWebhooks(emulator: Emulator, clock: ManualClock): Promise<void> {
+async function settleWebhooks(emulator: Emulator, clock: ManualClock): Promise<readonly string[]> {
+  const before = emulator.webhooks?.attempts().length ?? 0
+
+  const delivered = () => {
+    const n = (emulator.webhooks?.attempts().length ?? 0) - before
+
+    return n > 0 ? [`${n} webhook ${n === 1 ? "delivery" : "deliveries"}`] : []
+  }
+
   let left = SETTLE_HORIZON_MS
 
   for (let i = 0; i < 100; i++) {
@@ -255,7 +299,7 @@ async function settleWebhooks(emulator: Emulator, clock: ManualClock): Promise<v
 
     const next = clock.nextIn(FOREGROUND)
 
-    if (next === undefined || next > left) return
+    if (next === undefined || next > left) return delivered()
 
     clock.advance(next, FOREGROUND)
     left -= next

@@ -208,7 +208,7 @@ function deliveryCount(webhooks: RunWebhooks | undefined): number {
 
 /** Delivers what the provider has queued, waiting up to `WEBHOOK_WAIT_MS` for one to land. */
 async function deliverPending(
-  settle: (() => Promise<void>) | undefined,
+  settle: (() => Promise<unknown>) | undefined,
   webhooks: RunWebhooks | undefined,
 ): Promise<number> {
   const before = deliveryCount(webhooks)
@@ -231,7 +231,7 @@ function redirectsTo(location: string, host: string, app: string): boolean {
 /** What a redirect race needs of the trial's environment. */
 interface Backend {
   readonly proxy: Proxy
-  readonly settle?: (() => Promise<void>) | undefined
+  readonly settle?: (() => Promise<void | readonly string[]>) | undefined
   readonly webhooks?: RunWebhooks | undefined
 }
 

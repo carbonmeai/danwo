@@ -8,7 +8,13 @@ import {
 } from "@danwo/emulators"
 import type { Proxy } from "@danwo/proxy"
 
-import { emulatorLifecycle, type Service, servicesLifecycle, startServices } from "./services.ts"
+import {
+  emulatorLifecycle,
+  type Service,
+  servicesLifecycle,
+  settleFixture,
+  startServices,
+} from "./services.ts"
 
 /** Options of `stripeService()` and `stripeEnvironment()`. */
 export interface StripeOptions {
@@ -27,7 +33,7 @@ export interface StripeEnvironment {
   readonly proxy: Proxy
   readonly clock: ManualClock
   /** Plays every pending webhook delivery and retry to the end on the manual clock. */
-  readonly settle: () => Promise<void>
+  readonly settle: () => Promise<readonly string[]>
   /** Moves the app's clock and the emulator's time forward by `ms`; see `time.travel`. */
   readonly travel: (ms: number) => Promise<void>
   /** Emulator back to its seed, proxy log and fault rules cleared. */
@@ -104,6 +110,6 @@ export async function stripeEnvironment(
     proxy,
     clock: service.clock,
     ...lifecycle,
-    fixtures: { stripe: service.emulator, proxy, settle: lifecycle.settle },
+    fixtures: { stripe: service.emulator, proxy, settle: settleFixture(lifecycle.settle) },
   }
 }

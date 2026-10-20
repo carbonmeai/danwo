@@ -106,6 +106,23 @@ function runOf(event: string, value: unknown): ListedRun | undefined {
   }
 }
 
+/**
+ * What a settle waited for, one line each: every run with its function, status and duration, and
+ * each event that triggered none.
+ */
+function waitedFor(events: readonly string[], runs: readonly InngestRun[]): string[] {
+  const ran = runs.map((run) => {
+    const took = run.durationMs === null ? "" : ` in ${(run.durationMs / 1000).toFixed(1)} s`
+
+    return `${run.functionId || "a function"} ${run.status}${took}`
+  })
+  const idle = events
+    .filter((event) => !runs.some((run) => run.event === event))
+    .map((event) => `event ${event} started no run`)
+
+  return [...ran, ...idle]
+}
+
 async function runsOf(url: string, event: string): Promise<ListedRun[]> {
   try {
     const response = await fetch(new URL(`/v1/events/${encodeURIComponent(event)}/runs`, url))
@@ -237,7 +254,8 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
         listed.map(({ run }) => run.runId),
       )
       runs = listed.map(({ run }) => run)
-      if (!stillWaiting(events, listed, firstSeen, lastCheckpoints())) return
+      if (!stillWaiting(events, listed, firstSeen, lastCheckpoints()))
+        return waitedFor(events, runs)
       if (Date.now() > deadline)
         throw new Error(
           `Inngest runs were still going after ${options.settleTimeoutMs ?? 30_000} ms`,

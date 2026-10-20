@@ -8,6 +8,7 @@ import type { Browser, BrowserContext, Page } from "playwright-core"
 
 import type { Budgets } from "./agent/budget.ts"
 import type { Agent, ReplayDivergence } from "./agent/index.ts"
+import { recordingExpect } from "./assert/checks.ts"
 import { type Expect, expect } from "./assert/index.ts"
 import type { CheckPace } from "./assert/pace.ts"
 import type { BaselineUpdate } from "./assert/screenshot.ts"
@@ -475,7 +476,8 @@ async function openUserBrowser(
   film?.watch(page)
   shared.contexts.push(context)
 
-  const handles = handlesFor(shared, { context, page, steps: desk.steps.forUser(name), film })
+  const steps = desk.steps.forUser(name)
+  const handles = handlesFor(shared, { context, page, steps, film })
   const open: OpenUser = { name, context, film, agent: handles.agent, closed: false }
 
   desk.users.push(open)
@@ -484,7 +486,7 @@ async function openUserBrowser(
     name,
     app: handles.app,
     screen: handles.screen,
-    expect,
+    expect: recordingExpect(expect, steps),
     agent: handles.agent,
     mail: handles.mail,
     secret: (secret) => shared.vault.handle(secret),
@@ -567,7 +569,7 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
 
   return {
     screen: handles.screen,
-    expect,
+    expect: recordingExpect(expect, steps),
     agent: handles.agent,
     divergence: () =>
       handles.agent.diverged() ?? users.map((user) => user.agent.diverged()).find(Boolean),

@@ -3,7 +3,7 @@ import { promisify } from "node:util"
 
 import type { Proxy } from "@danwo/proxy"
 
-import { type Service, startServices } from "./services.ts"
+import { type Service, settleFixture, startServices } from "./services.ts"
 
 const run = promisify(execFile)
 
@@ -148,7 +148,7 @@ export async function awsEnvironment(
     proxy,
     travel: (ms: number) => services.travel(ms),
     reset: () => services.reset(),
-    fixtures: { aws: { endpoint: service.endpoint }, proxy, settle },
+    fixtures: { aws: { endpoint: service.endpoint }, proxy, settle: settleFixture(settle) },
     close: () => services.close(),
   }
 }

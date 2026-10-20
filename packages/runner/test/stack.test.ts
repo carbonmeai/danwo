@@ -268,6 +268,48 @@ describe("Inngest", () => {
     }
   }, 20_000)
 
+  it("says what it waited for: each run with its function, status and time", async () => {
+    const dev = await devServer(400)
+    const inngest = await inngestService({ url: dev.url })
+    const services = await startServices([inngest])
+
+    try {
+      await sendThrough(services.proxy.url)
+
+      const [line = ""] = await services.settle()
+
+      expect(line).toMatch(/^inngest · \d+\.\d s · provision-workspace completed in 0\.4 s$/)
+    } finally {
+      await services.close()
+      dev.server.close()
+    }
+  })
+
+  it("does not wait on an app that keeps registering its functions", async () => {
+    const dev = await devServer(400)
+    const inngest = await inngestService({ url: dev.url })
+    const services = await startServices([inngest])
+    /* The SDK registers with the dev server again and again while the app runs. */
+    const registering = setInterval(
+      () => void sendThrough(services.proxy.url, "/fn/register").catch(() => undefined),
+      50,
+    )
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 200))
+
+      const began = Date.now()
+      const waited = await services.settle()
+
+      expect(Date.now() - began).toBeLessThan(500)
+      expect(waited).toEqual([])
+    } finally {
+      clearInterval(registering)
+      await services.close()
+      dev.server.close()
+    }
+  })
+
   it("faults event sends: down, accepted but unanswered, and slow", () => {
     const kinds = inngestOutboundFaults({
       host: INNGEST_HOST,
