@@ -6,6 +6,7 @@ export {
   type SweepCommandOptions,
 } from "./command.ts"
 export { compareShapes, type Difference, type DifferenceKind } from "./compare.ts"
+export { loginCommand, LoginError, type LoginOptions } from "./login.ts"
 export {
   type Golden,
   type GoldenScenario,
