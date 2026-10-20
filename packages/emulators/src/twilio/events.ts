@@ -142,6 +142,7 @@ export class TwilioMessaging {
         direction: "outbound-api",
         status: "queued",
         now: clock(),
+        trial: draft.account.type === "Trial",
       }),
       {
         statusCallback: draft.statusCallback,

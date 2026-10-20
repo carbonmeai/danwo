@@ -23,7 +23,7 @@ type Nullable<T, K extends keyof T> = Omit<T, K> & { [P in K]: T[P] | null }
 /** A message as the Messages API answers it. */
 export type Message = Nullable<
   Wire<Payload<typeof MessageInstance>>,
-  "error_code" | "error_message" | "messaging_service_sid" | "date_sent" | "price"
+  "error_code" | "error_message" | "messaging_service_sid" | "date_sent" | "price" | "price_unit"
 >
 /** An account as `GET /2010-04-01/Accounts/{sid}.json` answers it. */
 export type AccountResource = Wire<Payload<typeof AccountInstance>>

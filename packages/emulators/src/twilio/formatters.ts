@@ -20,6 +20,8 @@ export function messageObject(fields: {
   readonly direction: Message["direction"]
   readonly status: MessageStatus
   readonly now: Date
+  /** Sent by a trial account. */
+  readonly trial?: boolean
 }): Message {
   const uri = `/${API_VERSION}/Accounts/${fields.accountSid}/Messages/${fields.sid}.json`
   const created = rfc2822(fields.now)
@@ -37,7 +39,8 @@ export function messageObject(fields: {
     num_segments: String(Math.max(1, Math.ceil(fields.body.length / 160))),
     num_media: String(fields.media.length),
     price: null,
-    price_unit: "USD",
+    /* A trial account's messages carry no price unit. */
+    price_unit: fields.trial === true ? null : "USD",
     error_code: null,
     error_message: null,
     date_created: created,

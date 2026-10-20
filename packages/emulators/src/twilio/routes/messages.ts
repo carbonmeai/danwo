@@ -145,7 +145,10 @@ async function create(c: Context, context: TwilioRouteContext, messaging: Twilio
   /* A trial account's message carries the text of the template its body names. */
   const body = account.type === "Trial" ? (trialTemplateText(draft.body) ?? draft.body) : draft.body
 
-  return c.json(messaging.send({ ...draft, body, from, account }), 201)
+  const sent = messaging.send({ ...draft, body, from, account })
+
+  /* The answer to a send names only the media link; later reads add the feedback one. */
+  return c.json({ ...sent, subresource_uris: { media: sent.subresource_uris["media"] } }, 201)
 }
 
 /** Whether `message` was sent on `day` (`YYYY-MM-DD`). */
