@@ -110,6 +110,29 @@ describe("failure verdicts", () => {
     ).toMatchObject({ verdict: "app", confidence: "likely" })
   })
 
+  it("leaves a failed check after a step the model carried out undecided, naming the step", () => {
+    const act = (mode: string) =>
+      step(1, 1, { kind: "agent", api: "agent.act", label: "add Bob", cache: { mode } })
+    const check = step(2, 3, { kind: "check", api: "expect.toBe", status: "failed" })
+    const failed = error("EXPECTATION_FAILED", "Bob on the task: expected '0' to be '1'")
+
+    expect(
+      failureVerdict(evidence({ error: failed, steps: [act("handed-off"), check] })),
+    ).toMatchObject({
+      verdict: "undecided",
+      confidence: "likely",
+      reason: expect.stringContaining('"add Bob"'),
+    })
+    expect(
+      failureVerdict(evidence({ error: failed, steps: [act("replayed"), check] })),
+    ).toMatchObject({ verdict: "app", confidence: "likely" })
+    expect(
+      failureVerdict(
+        evidence({ error: failed, steps: [act("missed"), check], calls: [createTask(2)] }),
+      ),
+    ).toMatchObject({ verdict: "app", confidence: "certain" })
+  })
+
   it("calls the test's own crash a test issue, naming its line", () => {
     const found = failureVerdict(
       evidence({

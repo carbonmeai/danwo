@@ -35,6 +35,10 @@ export interface VerdictStep {
   readonly status: string
   readonly startedAt: string
   readonly durationMs: number
+  /** The call as written; for an agent step, its instruction. */
+  readonly label?: string
+  /** For an agent step: whether it replayed its recording or the model carried it out. */
+  readonly cache?: { readonly mode: string }
 }
 
 /** A line the app's page logged, as the verdict reads it. */
@@ -263,6 +267,25 @@ function pageError(
   return line === undefined ? undefined : { line, inWindow: during.includes(line) }
 }
 
+/** Cache outcomes of an `agent.act` step that replayed its recording rather than ask the model. */
+const REPLAYED = new Set(["replayed", "relocated", "diverged"])
+
+/**
+ * The last `agent.act` step before the failure that the model carried out: what it did is only
+ * as good as the model's word for it, so a check failing after it may be the step's fault.
+ */
+function modelAct(steps: readonly VerdictStep[]): VerdictStep | undefined {
+  const failing = steps.findLastIndex(
+    (step) => step.status !== "passed" && step.status !== "running",
+  )
+  const before = failing === -1 ? steps : steps.slice(0, failing)
+
+  return before.findLast(
+    (step) =>
+      step.api === "agent.act" && step.status === "passed" && !REPLAYED.has(step.cache?.mode ?? ""),
+  )
+}
+
 /** The first line of a message, trimmed for a reason. */
 function brief(text: string): string {
   const first = (text.split("\n")[0] ?? "").trim()
@@ -380,6 +403,15 @@ function weighedVerdict(evidence: VerdictEvidence, error: TestError): FailureVer
   if (error.code === "TIMED_OUT")
     return judged("undecided", "likely", "the test ran past its deadline with no app errors")
 
+  const act = modelAct(evidence.steps ?? [])
+
+  if (act !== undefined)
+    return judged(
+      "undecided",
+      "likely",
+      `${error.code} with no app errors after the model carried out ${act.label === undefined ? `step ${act.index}` : JSON.stringify(act.label)}: it may not have done what the step asked; the record's calls show what it did`,
+    )
+
   return judged(
     "app",
     "likely",
@@ -393,7 +425,8 @@ function weighedVerdict(evidence: VerdictEvidence, error: TestError): FailureVer
  * danwo's when thrown inside danwo, else the test's; then the app's own errors (a 5xx, an
  * uncaught page error, an app that stopped) make it the app's. A judged claim that failed with no
  * app error while its work ran is undecided; without app errors a missing element is likely the
- * test's while a failed check is likely the app's.
+ * test's, a failed check after an `agent.act` step the model carried out is undecided (the model
+ * may only have claimed the step done), and any other failed check is likely the app's.
  */
 export function failureVerdict(evidence: VerdictEvidence): FailureVerdict {
   const { error } = evidence
