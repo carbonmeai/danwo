@@ -14,32 +14,62 @@ to it, so it can stay open while you run tests; reload a page to see new runs.
 
 ## Pages
 
-- **Runs**: every `danwo test` and `danwo matrix` run, newest first, with pass, fail, flaky,
-  not-judged and invalid counts, how long it took, and the model calls and money it spent.
-- **A test run**: each test with its status, attempts and how its agent steps used the replay
-  cache, and a link to every attempt whose flight record was kept.
-- **A matrix run**: the clean run and a card per fault, failures first. Not-judged and invalid
-  runs read apart from failures. A card opens its trial's flight record.
-- **A flight record**: the error and where the body stopped, the replay player, the steps (with
-  each step's cache outcome, its expected and observed effects, and the screenshot taken after it),
-  the screen at failure, console errors, every call through the proxy with redacted headers and
-  bodies, webhook deliveries, the emulators' state and the failure page.
-- **The replay player**: the run's video (or, when it kept none, its step screenshots in time
-  order) with play, pause, speed and a scrubber marking every step and fault. "Go to" on a step
-  seeks there; the step on screen is highlighted and a line follows it down the waterfall, and
-  clicking a call, webhook or fault in the waterfall seeks the video to it. A link opens the player
-  at a moment: `?t=12.5` is 12.5 seconds in, `#step-3` is where step 3 starts; the player's link
-  button copies one.
-- **Insights**: tests that flip between passing and failing across runs, the slowest tests and the
-  ones that cost the most model money.
+The sidebar holds Overview, Tests, Runs, Matrix, Insights, Impact and Settings; it collapses to an
+icon rail (`Cmd+B` or `Ctrl+B`). Every page, filter and open recording has its own address, and
+"Copy link" in the top bar copies it.
+
+- **Overview**: pass rate, runs, failed tests and average run time over 7, 30 or 90 days, each
+  against the window before; runs per day (a bar opens that day's runs); pass rate and run time
+  trends; "Worth a look" (the latest failing runs) and "Breaks under faults".
+- **Tests**: every test in the project, grouped by file, with its latest result, last run, pass
+  rate, the matrix's verdict ("breaks under …", "held under all", or none yet) and a thumbnail of
+  its latest recording. "Run selected" and "Run all" start `danwo test` from the page.
+- **Runs**: every `danwo test` and `danwo matrix` run in one table, filtered by status, kind and
+  date, with the time, model spend and a menu per row. Runs still going show under "Running now".
+- **A run**: a test run lists each test with its attempts and cache outcomes; a matrix run shows
+  the invariant's verdict, the clean run and the fault grid (or list), with planned and skipped
+  counts. Clicking a test or a trial opens its recording.
+- **Matrix**: each test's latest matrix verdict and the faults that broke it, with "Run the
+  matrix" (optionally limited to faults matching a filter).
+- **Insights**: the table of every test (runs, pass rate, flake rate, median time, spend and the
+  faults that break it, sortable), flaky tests, the slowest and costliest tests, the replay cache
+  and integration lint findings.
 - **Impact**: the providers, app routes, webhooks and calls each test touched, the index
   `danwo test --changed` picks tests from.
+- **Settings**: the project folder, the config file, what `.danwo` keeps and the keyboard
+  shortcuts.
+
+### The recording
+
+A recording opens over the page it was opened from (`?open=<record>`; Esc closes it). On the left
+are the numbered steps, each with a "Go to" that seeks the video to it, and pinned under them the
+error, where the body stopped, the faults and lint findings, "Copy prompt to fix" (the failure
+page as a prompt for a coding agent, or as Markdown) and a vote on whether it helped (kept in
+`.danwo/feedback.jsonl` on this machine). On the right are tabs (`&pane=`):
+
+- **Replay**: the video (or the step screenshots when no video was kept) with play, speed and a
+  scrubber marking steps and faults; `&t=12.5` opens it 12.5 seconds in, `#step-3` where step 3
+  starts.
+- **Console** with level filters, and **Network** with the page's requests.
+- **Providers**: the waterfall of steps, provider calls, webhooks and faults, then the calls and
+  webhooks as tables; a call opens its redacted request and response.
+- **Emulator state** and **Effects** (what each step was expected to change and what it did).
+- **Matrix**, on a trial: the fault it ran under and the trial's verdict.
+
+### Live runs and running from the page
+
+While `danwo test` or `danwo matrix` runs, the run streams into the dashboard: tests and trials as
+they start and finish, each step and the calls, webhooks and faults behind it, with the elapsed
+time and model spend; the tab's title and icon show the state. A run started from a terminal shows
+up too. From the page you can rerun a run's failed tests or one test, run the matrix for a test,
+run selected tests, and cancel a run in progress; the dashboard starts the CLI with fixed
+arguments for tests the project lists, one run at a time, with further requests queued.
 
 ## Where the data comes from
 
 Every run adds a small summary to `.danwo/history/` (the latest 200 are kept), whatever its record
-mode. Flight records under `.danwo/runs/` are kept for failed runs by default, or every run with
-`record: "always"`; the latest 20 runs keep theirs. Nothing the dashboard shows is new data: the
+mode. Flight records under `.danwo/runs/` are kept for every run by default (`record: "always"`), or
+only failed runs with `record: "on-failure"`; the latest 20 runs keep theirs. Nothing the dashboard shows is new data: the
 summaries and records are redacted when danwo writes them, so secrets never reach the page.
 
 ## Video

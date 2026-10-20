@@ -1,6 +1,6 @@
 # Emulating a provider
 
-danwo runs fake Stripe, Resend, S3 and Tigris, Auth0, Google, Microsoft, Slack, GitHub, Twilio, Composio, Nylas, Nango and Unipile behind
+danwo runs fake Stripe, Resend, S3 and Tigris, Auth0, Clerk, Google, Microsoft, Slack, GitHub, Twilio, Paystack, Flutterwave, Bachs, Composio, Nylas, Nango, Unipile, Pusher, Novu, Tiptap and the model APIs behind
 an egress proxy, so the app talks to the real hostnames, unchanged, and tests can read and fault
 what it did.
 
@@ -186,22 +186,6 @@ The page loading itself (static files, and a dev server's modules and hot reload
 and the matrix. A response that streams for as long as the client listens (server-sent events,
 NDJSON) is recorded once its headers arrive and never holds readiness up.
 
-### Stripe.js
-
-`stripeService` also answers `js.stripe.com`, with a stand-in for Stripe.js: the real script
-talks to Stripe's own iframes and cannot run against an emulator. A page that loads it (directly,
-or through `loadStripe` and `@stripe/react-stripe-js`) gets `Stripe(key)` with `elements()`, and
-card, card number, expiry, CVC, payment, address and link elements mounted as plain inputs a test
-fills by label ("Card number", "Expiration date", "Security code"; the address element's "Full
-name", "Address line 1" and so on). Stripe's test numbers decide the outcome: `4242 4242 4242 4242`
-succeeds, `4000 0000 0000 0002` is declined, `4000 0025 0000 3155` needs authentication.
-`createPaymentMethod`, `confirmCardPayment`, `confirmCardSetup`, `confirmPayment`, `confirmSetup`,
-`retrievePaymentIntent` and `retrieveSetupIntent` call the emulator with the publishable key and
-the intent's client secret, as Stripe.js does; `redirectToCheckout({ sessionId })` opens the hosted
-page, and `paymentRequest()` reports no wallet. The emulator accepts a `pk_test_` key only on those
-calls, and on an intent only with its own client secret. Loading the script counts as the page
-loading, so it stays out of effects and the matrix.
-
 ### WebSockets
 
 WebSockets go through the proxy too. Sockets to this machine and to passthrough hosts are passed
@@ -299,6 +283,64 @@ against Tigris live (`danwo fidelity s3`). `s3Objects(s3.emulator)` reads what t
 Not emulated: versioning, object lock, tagging, lifecycle, CORS and the other bucket
 subresources (answered 501), server-side encryption headers, bucket management through
 Tigris's own API, and the Tigris SDK's snapshots, forks and bundles.
+
+## Stripe
+
+`stripeService()` (or `stripeEnvironment()`) answers `api.stripe.com` and `checkout.stripe.com`:
+customers, products and prices, payment intents and refunds, Checkout Sessions with the hosted
+page, events and webhooks signed as Stripe signs them, so `stripe` and `@stripe/stripe-js` work
+unchanged.
+
+### Subscriptions and billing
+
+- **Setup intents**: create, confirm, retrieve, cancel and list.
+- **Subscriptions**: create, retrieve, update, cancel and list, with `trial_period_days` or
+  `trial_end`, `payment_behavior` (including `default_incomplete`), `cancel_at_period_end`,
+  `trial_end=now` and price swaps. Statuses move through `incomplete`, `trialing`, `active`,
+  `past_due`, `canceled` and `incomplete_expired`.
+- **Invoices**: `pay`, `create_preview`, and lists filtered by subscription.
+- **The billing portal**: sessions, with a hosted page that cancels at the period's end.
+- **Checkout** in subscription mode, with `subscription_data.trial_period_days`.
+- **Webhooks**: `customer.subscription.created`, `.updated`, `.deleted` and `.trial_will_end`;
+  `invoice.created`, `.finalized`, `.paid`, `.payment_succeeded`, `.payment_failed` and
+  `.payment_action_required`; `setup_intent.created`, `.succeeded`, `.setup_failed` and
+  `.requires_action`; and `checkout.session.completed` for subscriptions. They are signed on the
+  apps' clock, so deliveries after time travel are not refused as stale.
+
+Renewals, trial ends, trial-ending notices and incomplete expiry run on the emulator's clock, so
+time travel bills each period. Stripe's test payment methods decide the outcome:
+`pm_card_chargeDeclined` is declined even when saving the card, `pm_card_chargeCustomerFail`
+saves but every charge is declined (a renewal goes `past_due` until `invoices.pay` succeeds), and
+`pm_card_authenticationRequired` leaves the intent `requires_action`. Seed prices as `recurring`,
+with a `lookup_key` and a `nickname`, so an app's plans table can match them.
+
+### Stripe.js
+
+`stripeService` also answers `js.stripe.com`, with a stand-in for Stripe.js: the real script
+talks to Stripe's own iframes and cannot run against an emulator. A page that loads it (directly,
+or through `loadStripe` and `@stripe/react-stripe-js`) gets `Stripe(key)` with `elements()`, and
+card, card number, expiry, CVC, payment, address and link elements mounted as plain inputs a test
+fills by label ("Card number", "Expiration date", "Security code"; the address element's "Full
+name", "Address line 1" and so on). Stripe's test numbers decide the outcome: `4242 4242 4242 4242`
+succeeds, `4000 0000 0000 0002` is declined, `4000 0025 0000 3155` needs authentication.
+`createPaymentMethod`, `confirmCardPayment`, `confirmCardSetup`, `confirmPayment`, `confirmSetup`,
+`retrievePaymentIntent` and `retrieveSetupIntent` call the emulator with the publishable key and
+the intent's client secret, as Stripe.js does; `redirectToCheckout({ sessionId })` opens the hosted
+page, and `paymentRequest()` reports no wallet. The emulator accepts a `pk_test_` key only on those
+calls, and on an intent only with its own client secret. Loading the script counts as the page
+loading, so it stays out of effects and the matrix.
+
+## Twilio
+
+`twilioService()` answers the Messages API and Verify on Twilio's hosts, and keeps every text a
+test can read like mail, so SMS codes replay too. It also answers the account
+(`/2010-04-01/Accounts/{sid}.json`) and its phone numbers (`IncomingPhoneNumbers.json`).
+
+Seed an account as `Trial` or `Full` (`Full` by default). A trial account sends only to its
+verified recipients and refuses as Twilio's trial accounts do, in Twilio's order: no recipient
+(21604), a malformed parameter (`0`), a missing body (`0`), then an unverified recipient (422,
+`572002`). A full account refuses an invalid recipient with 21211 and a sender it does not own
+with 21606.
 
 ## Auth0
 
@@ -476,12 +518,14 @@ Not emulated: Tool Router sessions and MCP servers, files, custom tools defined 
 triggers watching the backend on their own (fire them with `fire`), V1 and V2 webhook payloads,
 and the exact error codes beyond the two key errors, which are approximations.
 
-## Nylas, Nango and Unipile
+## Connector platforms
 
-Apps that reach their users' mailboxes, calendars, CRMs and LinkedIn or WhatsApp inboxes through a
-connector platform get each one emulated on its real hosts, for the app's server and the browser's
-hosted connect pages alike. Their own SDKs (`nylas`, `@nylas/connect`, `@nangohq/node`,
-`@nangohq/frontend`, `unipile-node-sdk`) work against them unchanged.
+Apps that reach their users' mailboxes, calendars, CRMs and LinkedIn or WhatsApp inboxes
+through a connector platform get each one emulated on its real hosts, for the app's server and the
+browser's hosted connect pages alike. `danwo matrix` faults their sends and writes (rate limits,
+the provider's own refusals, a revoked or disconnected account, slow answers, dropped connections,
+a dropped answer after the provider acted) and their reads with rate limits and server errors; the
+hosted pages are left alone. Error codes beyond the key errors are approximations. The three are seeded together like this:
 
 ```ts
 stackEnvironment({
@@ -514,48 +558,66 @@ stackEnvironment({
 })
 ```
 
-- **Nylas v3** (`api.us.nylas.com`, `api.eu.nylas.com`): hosted auth (`/v3/connect/auth`, the
-  token exchange with the API key or a PKCE verifier as `@nylas/connect` sends, token info,
-  revoke) and grants; messages, threads, drafts, folders and attachments; calendars, events and
-  free/busy; contacts; the scheduler's configurations, availability and bookings; webhooks signed
-  with `X-Nylas-Signature`. Mail sent between two seeded grants lands in the other's inbox. Seed
-  grant ids to match the app's database; they survive resets. `nylasApplication(nylas)` reads
-  grants, mail and events, delivers mail from outside (`receive`) and expires a grant (`expire`,
-  which sends `grant.expired`).
-- **Nango** (`api.nango.dev`, with the Connect UI on `connect.nango.dev`): integrations, connect
-  and reconnect sessions, the Connect UI the frontend SDK opens (it answers the `ready` /
-  `session_token` handshake and posts `connect` back), connections whose tokens refresh on the
-  emulator's clock, the proxy, actions and records, and `auth` webhooks signed with both
-  `X-Nango-Signature` and `X-Nango-Hmac-Sha256`. Proxied calls answer from the seeded `proxy`
-  answers, or go to a backend emulator: `nangoService({ backends: [...] })` with the Google,
-  Microsoft, Slack or GitHub service forwards a connection's calls with its access token, so seed
-  the connection with a token that emulator issued. `nangoProject(nango)` reads connections and
-  every proxied call and action, and `revoke` makes a connection's next refresh fail with Nango's
-  refresh error and an `auth` webhook.
-- **Unipile** (every `*.unipile.com` DSN, and the hosted auth pages on `account.unipile.com`):
-  hosted auth links that notify the link's `notify_url` and send the browser to the success URL;
-  LinkedIn, WhatsApp and mail accounts; the owner's and other profiles; chats, messages and
-  attendees; mail; and webhooks for `messaging`, `email` and `account_status`, each delivered with
-  the headers its subscription named (Unipile signs nothing). Answers match the shapes the SDK
-  validates with `validateRequestPayload`. `unipileWorkspace(unipile)` lets a lead message the
-  account (`receive`, which sends `message_received`), delivers mail (`receiveEmail`) and
-  disconnects an account (`disconnect`, which sends `CREDENTIALS`).
+Nylas, Nango and Unipile each have a section of their own.
 
-`danwo matrix` faults all three on their sends and writes (rate limits, the provider's own
-refusals, a revoked or disconnected account, slow answers, dropped connections, a dropped answer
-after the provider acted) and their reads with rate limits and server errors; the hosted pages are
-left alone. Recordings redact `nyk_` keys, the tokens Nylas hands out and Nango session tokens.
+## Nylas
 
-Not emulated: Nylas's notetakers, smart compose and ICS, and Nylas grants backed by the Google or
-Microsoft emulators; Nango's syncs running on their own and its MCP endpoints; Unipile's posts
-beyond empty lists, invitations, attachments and calendar. Error codes beyond the key errors are
-approximations.
+The `nylas` and `@nylas/connect` SDKs work against it unchanged.
 
-## Pusher, Novu and Tiptap
+**Nylas v3** (`api.us.nylas.com`, `api.eu.nylas.com`): hosted auth (`/v3/connect/auth`, the
+token exchange with the API key or a PKCE verifier as `@nylas/connect` sends, token info,
+revoke) and grants; messages, threads, drafts, folders and attachments; calendars, events and
+free/busy; contacts; the scheduler's configurations, availability and bookings; webhooks signed
+with `X-Nylas-Signature`. Mail sent between two seeded grants lands in the other's inbox. Seed
+grant ids to match the app's database; they survive resets. `nylasApplication(nylas)` reads
+grants, mail and events, delivers mail from outside (`receive`) and expires a grant (`expire`,
+which sends `grant.expired`).
+
+Recordings redact `nyk_` keys and the `nyat`, `nyrt` and `nyid` tokens Nylas hands out.
+
+Not emulated: notetakers, smart compose and ICS, and grants backed by the Google or Microsoft emulators.
+
+## Nango
+
+The `@nangohq/node` and `@nangohq/frontend` SDKs work against it unchanged.
+
+**Nango** (`api.nango.dev`, with the Connect UI on `connect.nango.dev`): integrations, connect
+and reconnect sessions, the Connect UI the frontend SDK opens (it answers the `ready` /
+`session_token` handshake and posts `connect` back), connections whose tokens refresh on the
+emulator's clock, the proxy, actions and records, and `auth` webhooks signed with both
+`X-Nango-Signature` and `X-Nango-Hmac-Sha256`. Proxied calls answer from the seeded `proxy`
+answers, or go to a backend emulator: `nangoService({ backends: [...] })` with the Google,
+Microsoft, Slack or GitHub service forwards a connection's calls with its access token, so seed
+the connection with a token that emulator issued. `nangoProject(nango)` reads connections and
+every proxied call and action, and `revoke` makes a connection's next refresh fail with Nango's
+refresh error and an `auth` webhook.
+
+Recordings redact Nango's connect session tokens.
+
+Not emulated: syncs running on their own, and Nango's MCP endpoints.
+
+## Unipile
+
+The `unipile-node-sdk` works against it unchanged.
+
+**Unipile** (every `*.unipile.com` DSN, and the hosted auth pages on `account.unipile.com`):
+hosted auth links that notify the link's `notify_url` and send the browser to the success URL;
+LinkedIn, WhatsApp and mail accounts; the owner's and other profiles; chats, messages and
+attendees; mail; and webhooks for `messaging`, `email` and `account_status`, each delivered with
+the headers its subscription named (Unipile signs nothing). Answers match the shapes the SDK
+validates with `validateRequestPayload`. `unipileWorkspace(unipile)` lets a lead message the
+account (`receive`, which sends `message_received`), delivers mail (`receiveEmail`) and
+disconnects an account (`disconnect`, which sends `CREDENTIALS`).
+
+Not emulated: posts beyond empty lists, invitations, attachments and calendar.
+
+## Realtime providers
 
 Three providers apps use for realtime features, each with a socket the browser keeps open. The
 proxy sends a WebSocket upgrade to one of their hosts to a local port the emulator serves, so
 `pusher-js`, Novu's Inbox and Tiptap's collaboration provider connect with no change to the app.
+`danwo matrix` faults every socket the clean run opened (upgrade refused, connection dropped), and a
+reset closes the open sockets so clients reconnect to the seeded state.
 
 ```ts
 import { novuService, pusherService, stackEnvironment, tiptapService } from "@danwo/sdk"
@@ -571,6 +633,10 @@ const services = [
 ]
 ```
 
+Pusher, Novu and Tiptap each have a section of their own.
+
+## Pusher
+
 **Pusher** (`*.pusher.com`) answers the Channels API the server SDKs sign (triggers, batches,
 channel info, presence users, ending a user's connections) and checks each signature, body hash
 and timestamp. On the socket it speaks the protocol `pusher-js` does: public, private and
@@ -584,6 +650,13 @@ answers for `PUSHER_DEFAULTS`. In tests, `pusherChannels(pusher)` lists what was
 which channel and which connections it reached, lists open connections, and publishes from the
 test; `pusherBeams(pusher)` reads push publishes and registered devices.
 
+`danwo matrix` faults triggers with 429, 500 and lost answers, as well as the sockets. Recordings redact
+Pusher's signatures.
+
+Not emulated: encrypted channels, watchlist events and the SockJS fallback.
+
+## Novu
+
 **Novu** (`api.novu.co`, `socket.novu.co`, and the EU hosts) answers `@novu/api`: triggers
 (one, bulk, broadcast, cancel), v2 subscribers, credentials, topics and a subscriber's
 notifications, with each write replayed under its `idempotency-key` as Novu does. A workflow
@@ -592,6 +665,14 @@ seeded as templates runs at once; a code-first workflow runs step by step throug
 In-app messages reach the Inbox the browser opened (`@novu/react`, `@novu/js`) and its socket;
 email steps go through a Resend service given as `email`. `settle` waits for the workflow runs.
 `novuProject(novu)` reads runs (with each step's status and outputs), messages and Inboxes.
+
+`danwo matrix` faults triggers with 429, 500, a reset and a lost answer, and the Inbox session with a
+failure. Recordings redact Novu's `ApiKey` header and Inbox tokens.
+
+Not emulated: digests and delays (run straight through), preferences beyond the defaults, and SMS, chat
+and push delivery (kept, not sent).
+
+## Tiptap
 
 **Tiptap Cloud** (`<appId>.collab.tiptap.cloud`) is the collaboration server: editors connected
 with `@hocuspocus/provider` or `TiptapCollabProvider` sync a document over the Yjs protocol,
@@ -602,13 +683,6 @@ document as JSON or a Yjs update, creates, replaces (editors receive the change)
 editors, and makes trouble: `trouble({ permissionDenied: true })` refuses tokens and
 `trouble({ syncDelayMs })` slows syncs.
 
-`danwo matrix` faults their API calls (Pusher: 429, 500 and lost answers on triggers; Novu: 429,
-500, reset and a lost answer on triggers, a failed Inbox session; Tiptap: 429, 500 and resets on
-the REST API) and every socket the clean run opened (upgrade refused, connection dropped). A
-reset closes the open sockets; clients reconnect to the seeded state. Recordings redact Novu's
-`ApiKey` header and Inbox tokens and Pusher's signatures.
+`danwo matrix` faults the REST API with 429, 500 and resets, as well as the sockets.
 
-Not emulated: Pusher's encrypted channels, watchlist events and the SockJS fallback; Novu's
-digests and delays (run straight through), preferences beyond the defaults, SMS, chat and push
-delivery (kept, not sent); Tiptap's document versions, AI and conversion APIs. Pusher's and
-Tiptap's answers are checked against their API references, not live yet.
+Not emulated: document versions, AI and the conversion APIs.
