@@ -30,6 +30,9 @@ export interface NylasGrant {
   ip: string | null
   state: string | null
   provider_user_id: string
+  /** The connector credential the grant was made with. */
+  credential_id: string
+  blocked: boolean
   settings: Record<string, unknown>
   created_at: number
   updated_at: number
