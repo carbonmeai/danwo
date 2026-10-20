@@ -1,7 +1,7 @@
 {
   "provider": "tiptap",
-  "source": "openapi",
-  "recorded": "2026-10-19",
+  "source": "live",
+  "recorded": "2026-10-20",
   "scenarios": {
     "documents: create, read as JSON, delete": {
       "steps": [
@@ -13,7 +13,7 @@
         {
           "step": "read it as JSON",
           "status": 200,
-          "shape": "c36890da6666"
+          "shape": "9c2e6f7390e2"
         },
         {
           "step": "delete it",
@@ -23,15 +23,14 @@
         {
           "step": "read a document that is gone",
           "status": 404,
-          "shape": "86a1ea1cdf94"
+          "shape": "d33e6a781203"
         }
       ],
       "facts": []
     }
   },
   "shapes": {
-    "86a1ea1cdf94": {"t":"any"},
-    "c36890da6666": {"t":"object","keys":{"type":{"t":"literal","v":"doc"},"content":{"t":"array","of":{"t":"any"}}}},
+    "9c2e6f7390e2": {"t":"object","keys":{"type":{"t":"literal","v":"doc"},"content":{"t":"array","of":{"t":"object","keys":{"type":{"t":"string"},"content":{"t":"array","of":{"t":"object","keys":{"type":{"t":"string"},"text":{"t":"string"}}}}}}}}},
     "d33e6a781203": {"t":"null"}
   }
 }

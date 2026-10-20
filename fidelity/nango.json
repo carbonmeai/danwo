@@ -1,19 +1,19 @@
 {
   "provider": "nango",
-  "source": "openapi",
-  "recorded": "2026-10-19",
+  "source": "live",
+  "recorded": "2026-10-20",
   "scenarios": {
     "errors: no key, unknown key": {
       "steps": [
         {
           "step": "list connections without a key",
           "status": 401,
-          "shape": "4ae1177d6cc3"
+          "shape": "bc72f1f728ec"
         },
         {
           "step": "list connections with a key Nango never issued",
           "status": 401,
-          "shape": "1ef39b347f3a"
+          "shape": "57af467b5a80"
         }
       ],
       "facts": []
@@ -23,21 +23,21 @@
         {
           "step": "list integrations",
           "status": 200,
-          "shape": "f8a2fafb018d"
+          "shape": "20032cab7d5a"
         },
         {
           "step": "list connections",
           "status": 200,
-          "shape": "9aa0fc9a44ad"
+          "shape": "ac6029a08e0a"
         }
       ],
       "facts": []
     }
   },
   "shapes": {
-    "1ef39b347f3a": {"t":"object","keys":{"error":{"t":"object","keys":{"message":{"t":"string"},"code":{"t":"string"},"payload":{"t":"object","keys":{},"open":true}}}}},
-    "4ae1177d6cc3": {"t":"object","keys":{"error":{"t":"object","keys":{"message":{"t":"string"},"code":{"t":"literal","v":"missing_auth_header"},"payload":{"t":"object","keys":{},"open":true}}}}},
-    "9aa0fc9a44ad": {"t":"object","keys":{"connections":{"t":"array","of":{"t":"object","keys":{"id":{"t":"number"},"connection_id":{"t":"string"},"provider":{"t":"string"},"provider_config_key":{"t":"string"},"created":{"t":"string"},"metadata":{"t":"object","keys":{},"open":true},"errors":{"t":"array","of":{"t":"object","keys":{},"open":true}},"end_user":{"t":"union","of":[{"t":"object","keys":{},"open":true},{"t":"null"}]},"tags":{"t":"object","keys":{},"open":true}},"optional":["metadata","errors","end_user","tags"]}}}},
-    "f8a2fafb018d": {"t":"object","keys":{"data":{"t":"array","of":{"t":"object","keys":{"unique_key":{"t":"string"},"provider":{"t":"string"},"display_name":{"t":"string"},"logo":{"t":"string"},"created_at":{"t":"string"},"updated_at":{"t":"string"}},"optional":["display_name","logo","created_at","updated_at"]}}}}
+    "20032cab7d5a": {"t":"object","keys":{"data":{"t":"array","of":{"t":"object","keys":{"unique_key":{"t":"string"},"provider":{"t":"string"},"display_name":{"t":"string"},"logo":{"t":"string"},"forward_webhooks":{"t":"boolean"},"missing_fields":{"t":"array","of":null},"created_at":{"t":"string"},"updated_at":{"t":"string"}}}}}},
+    "57af467b5a80": {"t":"object","keys":{"error":{"t":"object","keys":{"message":{"t":"string"},"code":{"t":"string"},"payload":{"t":"object","keys":{}}}}}},
+    "ac6029a08e0a": {"t":"object","keys":{"connections":{"t":"array","of":{"t":"object","keys":{"id":{"t":"number"},"connection_id":{"t":"string"},"provider_config_key":{"t":"string"},"provider":{"t":"string"},"errors":{"t":"array","of":null},"end_user":{"t":"object","keys":{"id":{"t":"string"},"display_name":{"t":"string"},"email":{"t":"string"},"tags":{"t":"union","of":[{"t":"null"},{"t":"object","keys":{"origin":{"t":"string"}}}]},"organization":{"t":"union","of":[{"t":"object","keys":{"id":{"t":"string"},"display_name":{"t":"string"}}},{"t":"null"}]}}},"tags":{"t":"object","keys":{},"open":true},"metadata":{"t":"union","of":[{"t":"null"},{"t":"object","keys":{},"open":true}]},"created":{"t":"string"}}}}}},
+    "bc72f1f728ec": {"t":"object","keys":{"error":{"t":"object","keys":{"message":{"t":"string"},"code":{"t":"literal","v":"missing_auth_header"},"payload":{"t":"object","keys":{}}}}}}
   }
 }
