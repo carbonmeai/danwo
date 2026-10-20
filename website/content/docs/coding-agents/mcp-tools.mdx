@@ -1,0 +1,82 @@
+---
+title: MCP tools
+description: Every tool, resource and prompt danwo's MCP server gives a coding agent, and what each is for.
+icon: Wrench
+---
+
+danwo's MCP server is what your agent calls to work with your project. Start it with
+`npx danwo mcp`; [Set up your agent](/docs/agent-setup) registers it for you. This page lists
+everything it offers.
+
+## Run and explain tests
+
+The tools an agent uses most. They work on the project's tests as `danwo test` would:
+
+| Tool              | What it does                                                                                                   |
+| ----------------- | -------------------------------------------------------------------------------------------------------------- |
+| `list_tests`      | Lists the tests by file, with skip/only, and whether each has an invariant.                                    |
+| `run_tests`       | Runs all tests, or some by file, grep or name, and reports each failure's step, error and record.              |
+| `run_matrix`      | Runs the [fault matrix](/docs/fault-matrix) on one test: a clean run, then a run per fault, judged.            |
+| `show_run`        | Explains a recorded run: the error, the steps, console errors, provider calls and webhooks.                    |
+| `read_screenshot` | Returns a screenshot from a flight record: the screen at failure, or after a step.                             |
+| `scaffold_test`   | Writes a new `*.danwo.ts` file: the page it opens, its steps, and an invariant stub.                           |
+| `inspect_page`    | Opens one page of your app through the project's environment and returns its accessibility tree and its calls. |
+
+Pass `format: "md"` to `show_run` to get the same failure page `danwo show --format md` prints.
+
+## Drive the app step by step
+
+A **session** is your app opened in danwo's browser, with its emulators and proxy, for the agent
+to explore before it writes a test. Every action answers with the page as it is now:
+
+| Tool                                                 | What it does                                                                      |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `open_session`, `close_session`                      | Starts the app, emulators and browser, or stops them.                             |
+| `navigate`                                           | Goes to a path or URL, or back, forward, reload.                                  |
+| `click`, `hover`, `fill`, `press`, `select`, `check` | Acts on an element, by a ref from the last snapshot or by a locator.              |
+| `fill_secret`                                        | Fills a field with a configured secret by name. The value never appears anywhere. |
+| `snapshot`, `screenshot`                             | The page as an accessibility tree with refs, or as an image with secrets masked.  |
+| `check_locator`                                      | Checks a locator matches exactly one element, and returns the line to paste.      |
+| `start_recording`, `stop_recording`                  | Records the session's screenshots, and video when no secret was filled.           |
+
+## Look behind the app
+
+These show what the app did at its providers during a session. They're how an agent finds the
+right invariant:
+
+| Tool               | What it does                                                                                 |
+| ------------------ | -------------------------------------------------------------------------------------------- |
+| `exchanges`        | The calls the app and browser made through danwo's proxy since the last look.                |
+| `deliver_webhooks` | Delivers the webhooks the emulators have queued, then lists the deliveries.                  |
+| `emulator_state`   | What each emulated service holds now: Stripe objects, sent mail, Slack messages, S3 objects. |
+| `inject_fault`     | Arms one fault, named as the matrix names it, to fire on the next matching call or delivery. |
+| `clear_faults`     | Disarms the faults that haven't fired yet.                                                   |
+
+## Resources and the prompt
+
+The server also offers **resources** your agent can read, and one **prompt**:
+
+| Name                    | What it is                                                                     |
+| ----------------------- | ------------------------------------------------------------------------------ |
+| `danwo://config`        | Where tests live, how the app runs, the model, and your secrets' names.        |
+| `danwo://runs/latest`   | The newest run, with its failures explained.                                   |
+| `danwo://spec`          | Every API, option, fault label and error code, generated from danwo's code.    |
+| `danwo://guide/<topic>` | A task guide, such as `first-test`, `matrix` or `debugging`.                   |
+| `write-danwo-test`      | A prompt: inspect the app, scaffold a test, run it and fix it until it passes. |
+
+<Callout type="info">
+  Secrets stay hidden from the agent everywhere: answers, screenshots, recordings and records are
+  all redacted. A video can't mask a typed secret, so `start_recording` refuses video once one is
+  filled.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Fix a failure" href="/docs/fix-with-an-agent">
+    Watch these tools work together on a failing test.
+  </Card>
+  <Card title="Fault kinds" href="/docs/fault-kinds">
+    The fault names `inject_fault` and the matrix understand.
+  </Card>
+</Cards>

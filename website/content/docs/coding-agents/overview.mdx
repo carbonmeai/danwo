@@ -1,0 +1,77 @@
+---
+title: Coding agents
+description: Your coding agent can write danwo tests, run them, read why they failed and fix the cause, through danwo's skill and MCP server.
+icon: Bot
+---
+
+danwo comes with everything a coding agent needs to work with it: a **skill** that teaches it how
+danwo tests are written, and an **MCP server** that lets it run tests, drive your app and read
+flight records. It works with Claude Code, Cursor, Codex, GitHub Copilot and any agent that reads
+skills or speaks MCP.
+
+## Why give your agent danwo
+
+An agent that writes code can now check its own work the way a user would. It can open your app,
+click through a flow, see which provider calls happened behind it, and run the fault matrix. When a
+test fails, it reads the same failure page you would, and fixes the cause.
+
+## Set it up in one command
+
+`danwo init` asks which agents you use and sets each one up:
+
+```sh
+npx danwo init
+```
+
+```text
+Coding agents
+  created   .claude/skills/danwo/SKILL.md
+  created   .agents/skills/danwo/SKILL.md
+  created   .mcp.json
+  created   .cursor/mcp.json
+  created   .vscode/mcp.json
+  created   .codex/config.toml
+```
+
+[Set up your agent](/docs/agent-setup) shows each agent's files, and how to add one by hand.
+
+## What your agent gets
+
+| Piece             | What it is                                                                   | Where it lives                                         |
+| ----------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------ |
+| The skill         | How to write a danwo test, run the matrix, and debug a failure.              | `.claude/skills/danwo`, `.agents/skills/danwo`         |
+| The MCP server    | Tools to run tests, drive the app step by step, and read records.            | `npx danwo mcp`, registered in your agent's MCP config |
+| `danwo spec`      | Every API, config option, fault and error code, generated from danwo's code. | the CLI, and the `danwo://spec` MCP resource           |
+| `danwo guide`     | Task guides: first test, providers, matrix, debugging and more.              | the CLI, and `danwo://guide/<topic>`                   |
+| The failure pages | Each failed test as one page of evidence, ready to paste into a prompt.      | `danwo show --format md`, the dashboard                |
+
+The [MCP tools](/docs/mcp-tools) page lists every tool and what it's for.
+
+## Ask it to write a test
+
+With the MCP server connected, ask in plain words:
+
+```text
+Write a danwo test for buying 500 credits through Stripe Checkout,
+then run the matrix on it.
+```
+
+The agent opens a session in danwo's browser, walks the flow, checks each locator, scaffolds the
+test with an invariant, runs it, and fixes it until it passes. The server's `write-danwo-test`
+prompt gives it those steps.
+
+<Callout type="info">
+  The agent never sees your secrets. It fills a password with `fill_secret` by the secret's name,
+  and every answer, screenshot and record is redacted.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Set up your agent" href="/docs/agent-setup">
+    Claude Code, Cursor, Codex, Copilot or Windsurf: what goes where.
+  </Card>
+  <Card title="Fix a failure" href="/docs/fix-with-an-agent">
+    From a red test to a fix your agent has verified.
+  </Card>
+</Cards>

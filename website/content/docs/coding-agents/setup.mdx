@@ -1,0 +1,158 @@
+---
+title: Set up your agent
+description: Which files danwo writes for each coding agent, and how to add the skill and MCP server by hand.
+icon: Settings2
+---
+
+`danwo init` sets up your agent for you. This page shows what it writes for each one, so you can
+check it, commit it, or do it by hand.
+
+## The quick way
+
+Pass the agents you use to `--skills`, or pick them when `danwo init` asks:
+
+```sh
+npx danwo init --skills claude,cursor,codex,copilot
+```
+
+Each agent gets two things: **the skill**, a folder of instructions it reads, and **the MCP
+server**, an entry in its MCP config that starts `npx danwo mcp`. Running `init` again changes
+nothing, and your agents' other MCP servers are kept.
+
+## Each agent
+
+<Tabs items={["Claude Code", "Cursor", "Codex", "GitHub Copilot", "Windsurf", "Others"]}>
+  <Tab value="Claude Code">
+
+Claude Code reads the skill from `.claude/skills/danwo/` and the server from `.mcp.json`:
+
+```json title=".mcp.json"
+{
+  "mcpServers": {
+    "danwo": { "command": "npx", "args": ["danwo", "mcp"] }
+  }
+}
+```
+
+`danwo init --skills claude` writes both. Open Claude Code in the project and approve the `danwo`
+server when it asks.
+
+  </Tab>
+  <Tab value="Cursor">
+
+Cursor reads the server from `.cursor/mcp.json`. The skill goes in the shared
+`.agents/skills/danwo/` folder:
+
+```json title=".cursor/mcp.json"
+{
+  "mcpServers": {
+    "danwo": { "command": "npx", "args": ["danwo", "mcp"] }
+  }
+}
+```
+
+`danwo init --skills cursor` writes both. Turn the `danwo` server on in Cursor's MCP settings.
+
+  </Tab>
+  <Tab value="Codex">
+
+Codex reads the server from `.codex/config.toml`, and the skill from `.agents/skills/danwo/`:
+
+```toml title=".codex/config.toml"
+[mcp_servers.danwo]
+command = "npx"
+args = ["danwo","mcp"]
+```
+
+`danwo init --skills codex` adds this table and keeps every other table in the file.
+
+  </Tab>
+  <Tab value="GitHub Copilot">
+
+Copilot's agent mode in VS Code reads MCP servers from `.vscode/mcp.json`, under `servers`:
+
+```json title=".vscode/mcp.json"
+{
+  "servers": {
+    "danwo": { "type": "stdio", "command": "npx", "args": ["danwo", "mcp"] }
+  }
+}
+```
+
+`danwo init --skills copilot` writes it, and the skill to `.agents/skills/danwo/`. Start the
+`danwo` server from VS Code's MCP view, then use it in Copilot Chat's agent mode.
+
+  </Tab>
+  <Tab value="Windsurf">
+
+`danwo init` doesn't write Windsurf's config, which lives in your home folder. Add the server to
+`~/.codeium/windsurf/mcp_config.json` yourself:
+
+```json title="~/.codeium/windsurf/mcp_config.json"
+{
+  "mcpServers": {
+    "danwo": { "command": "npx", "args": ["danwo", "mcp"] }
+  }
+}
+```
+
+Run `danwo init --skills agents` for the skill in `.agents/skills/danwo/`. Then refresh the server
+list in Windsurf's MCP settings.
+
+  </Tab>
+  <Tab value="Others">
+
+Any agent that speaks MCP can use danwo. Start the server over stdio from the project folder:
+
+```sh
+npx danwo mcp
+```
+
+`danwo init --skills agents` puts the skill in `.agents/skills/danwo/`, the folder many agents
+share. If yours reads instructions from elsewhere, point it at `.agents/skills/danwo/SKILL.md`.
+
+  </Tab>
+</Tabs>
+
+## Where each file goes
+
+| Agent                    | Skill                  | MCP config                            | Written by `init` |
+| ------------------------ | ---------------------- | ------------------------------------- | ----------------- |
+| Claude Code              | `.claude/skills/danwo` | `.mcp.json`                           | yes               |
+| Cursor                   | `.agents/skills/danwo` | `.cursor/mcp.json`                    | yes               |
+| Codex                    | `.agents/skills/danwo` | `.codex/config.toml`                  | yes               |
+| GitHub Copilot (VS Code) | `.agents/skills/danwo` | `.vscode/mcp.json`                    | yes               |
+| Windsurf                 | `.agents/skills/danwo` | `~/.codeium/windsurf/mcp_config.json` | skill only        |
+| Any other                | `.agents/skills/danwo` | your agent's MCP config               | skill only        |
+
+## Keep the skill current
+
+The skill is copied from the `@danwo/skill` package. When you upgrade danwo, run `danwo init`
+again to refresh it.
+
+<Callout type="info">
+  If you've edited your copy of `SKILL.md`, `init` keeps your version and says so (`kept`). Delete
+  it to take danwo's again.
+</Callout>
+
+## Check it works
+
+Ask your agent:
+
+```text
+Use danwo to list this project's tests.
+```
+
+It should call the `list_tests` tool and answer with your test files. If it can't find the tool,
+restart the agent so it reloads its MCP config.
+
+## Next
+
+<Cards>
+  <Card title="MCP tools" href="/docs/mcp-tools">
+    Every tool your agent can call, and when it uses each.
+  </Card>
+  <Card title="Fix a failure" href="/docs/fix-with-an-agent">
+    Hand a failing test to your agent and get a verified fix.
+  </Card>
+</Cards>

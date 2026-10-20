@@ -1,0 +1,124 @@
+---
+title: Fix a failure with an agent
+description: Hand a failing test to your coding agent with its failure page, and get back a fix it has checked with danwo.
+icon: Stethoscope
+---
+
+When a test fails, danwo writes a **failure page**: the error, the step it stopped at, the screen,
+and every provider call and webhook behind it. Give that page to your coding agent and it has
+everything it needs to find the cause, fix it, and prove the fix.
+
+## Start from the failure
+
+You can start from three places. Each gives the agent the same page.
+
+<Tabs items={["Dashboard", "Terminal", "Pull request"]}>
+  <Tab value="Dashboard">
+
+Open the failed test in `danwo serve` and click **Copy prompt to fix**. You get the failure page,
+with two lines on top asking the agent to find the cause and run the test again:
+
+```text
+The danwo test "tests/buy-credits.danwo.ts › buys 500 credits through Stripe Checkout"
+failed. Its failure page follows: the error, the step it stopped at, the provider calls
+and webhooks behind it, and the faults injected.
+Find the cause. Change the app when the record shows a bug, and the test only when the
+app's behaviour changed on purpose. Then run the test again with `danwo test`.
+```
+
+Paste it into your agent.
+
+  </Tab>
+  <Tab value="Terminal">
+
+Print the newest run's failure pages as Markdown:
+
+```sh
+npx danwo show --format md
+```
+
+Copy the page for the failing test into your agent, or let the agent read it with the `show_run`
+MCP tool.
+
+  </Tab>
+  <Tab value="Pull request">
+
+danwo's comment on the pull request lists each failure with its error, failing step and record.
+Paste a failure's section into your agent. For the whole page, download the run's records from
+the CI artifact into `.danwo/runs/`, and the agent reads them with `show_run`.
+
+  </Tab>
+</Tabs>
+
+## What the agent reads
+
+Here is the top of a real failure page, from a matrix trial that sent Stripe's webhook twice:
+
+```text
+# ✗ tests/buy-credits.danwo.ts › buys 500 credits through Stripe Checkout
+
+fault: duplicate on webhook checkout.session.completed · failed · EXPECTATION_FAILED (test) · 2.7 s
+
+**Error at tests/buy-credits.danwo.ts:19:**
+invariant: expected 1000 to be 500 // Object.is equality
+
+## Webhook deliveries
+
+| topic                      | attempt | status | fault     |
+| checkout.session.completed | 1       | 200    | duplicate |
+| checkout.session.completed | 1       | 200    |           |
+```
+
+The page shows the cause plainly: the same webhook arrived twice, and the app granted credits
+both times.
+
+## The agent fixes the cause
+
+A good agent changes the app, not the test, when the record shows a bug. Here it makes the webhook
+handler skip an event it has already seen:
+
+```ts title="src/webhooks.ts · the fix"
+if (await seen(event.id)) return new Response(null, { status: 200 })
+await remember(event.id)
+await grantCredits(session.metadata.user, 500)
+```
+
+## The agent proves the fix
+
+Then it runs what failed, with danwo's MCP tools or the CLI:
+
+```sh
+npx danwo matrix tests/buy-credits.danwo.ts --faults duplicate
+```
+
+```text
+clean run passed; 1 of 18 planned faults match /duplicate/
+
+PASS  clean run
+PASS  duplicate on webhook checkout.session.completed
+faults: 1 passed
+```
+
+Last, it runs the whole matrix and the test suite again, so the fix didn't break another path.
+
+<Callout type="idea">
+  Ask for the proof explicitly: "fix it, then show me the matrix passing". The agent then reports
+  the danwo output, not just its own summary.
+</Callout>
+
+## When the test is the problem
+
+Sometimes the app changed on purpose: a button was renamed, a step moved. Then the agent updates
+the test. It checks the new locator with `check_locator` before writing it, so the fixed test
+matches exactly one element.
+
+## Next
+
+<Cards>
+  <Card title="Debugging a failure" href="/docs/debugging">
+    Read a failure page yourself, part by part.
+  </Card>
+  <Card title="Common findings" href="/docs/common-findings">
+    The bugs the matrix finds most, and their fixes.
+  </Card>
+</Cards>
