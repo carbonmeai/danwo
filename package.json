@@ -20,7 +20,7 @@
     "check": "bun run ui:codegen && bun run format:check && bun run plain-js && bun run lint && bun run fallow && bun run typecheck && bun run test",
     "test:slow": "vitest run --project slow --maxWorkers=4",
     "test:all": "vitest run",
-    "fallow": "fallow",
+    "fallow": "fallow --fail-on-issues",
     "plain-js": "node scripts/plain-js.ts",
     "bench": "bun run --cwd benchmarks bench",
     "website:dev": "bun run --cwd website dev",
