@@ -80,9 +80,12 @@ export class CleanupLedger {
     return this.#undone
   }
 
-  /** Writes down something made, to undo later. */
+  /**
+   * Writes down something made, to undo later. An entry without an id is dropped: it comes from a
+   * create the provider refused, which made nothing to undo.
+   */
   add(created: Created): void {
-    this.#entries.push(created)
+    if (created.id !== "") this.#entries.push(created)
   }
 
   /** Everything still to undo, as kept: for `--keep`, which leaves the sandbox as the run left it. */

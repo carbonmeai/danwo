@@ -141,6 +141,34 @@ describe("the cleanup ledger", () => {
     expect(calls).toEqual(["final", "stuck", "stuck", "flaky", "flaky", "gone"])
   })
 
+  it("drops an undo whose create was refused, leaving nothing behind", async () => {
+    const calls: string[] = []
+    const refused: Target = {
+      kind: "live",
+      credentials: {},
+      send: () =>
+        Promise.resolve(Response.json({ error: { code: "BadRequest" } }, { status: 400 })),
+    }
+    const scenario: Scenario = {
+      name: "a refused create",
+      async run(context) {
+        const created = await context.step("create an event", new Request("https://example.test"))
+        const id = fieldOf(created.body, "id")
+
+        context.created({
+          kind: "event",
+          id: typeof id === "string" ? id : "",
+          undo: undoing("event", calls, 400),
+        })
+      },
+    }
+    const run = await runScenario(scenario, refused)
+
+    expect(calls).toEqual([])
+    expect(run.leftBehind).toBeUndefined()
+    expect(run.undone).toBeUndefined()
+  })
+
   it("keeps everything when asked, undoing nothing", () => {
     const calls: string[] = []
     const ledger = new CleanupLedger()
