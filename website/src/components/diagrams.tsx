@@ -436,6 +436,50 @@ export function Setup(props: { readonly kind: keyof typeof SETUPS }): ReactNode 
 }
 
 /**
+ * Where an AWS SDK call goes: S3 to danwo's S3 emulator, the Bedrock runtime to the model API
+ * emulator, every other AWS host to MiniStack.
+ */
+export function AwsRouting(): ReactNode {
+  return (
+    <Figure
+      width={760}
+      height={250}
+      label="Your app's AWS SDK calls amazonaws.com; danwo's proxy sends S3 calls to danwo's S3 emulator, Bedrock runtime calls to danwo's model API emulator, and every other AWS call to MiniStack."
+      caption="The most specific host wins, so S3 and Bedrock stay with danwo whatever order the services are listed in."
+    >
+      <Box x={10} y={100} width={170} label="Your app" note="AWS SDK, real hosts" />
+      <Arrow from={[180, 125]} to={[246, 125]} />
+      <Box
+        x={250}
+        y={100}
+        width={150}
+        label="danwo proxy"
+        note="routes by hostname"
+        stroke={TEXT}
+      />
+      <Arrow from={[400, 115]} to={[486, 50]} />
+      <Arrow from={[400, 125]} to={[486, 125]} />
+      <Arrow from={[400, 135]} to={[486, 200]} />
+      <Box
+        x={490}
+        y={25}
+        width={260}
+        label="danwo's S3 emulator"
+        note="s3.amazonaws.com, if s3Service runs"
+      />
+      <Box
+        x={490}
+        y={100}
+        width={260}
+        label="danwo's model API emulator"
+        note="bedrock-runtime.*, if llmService runs"
+      />
+      <Box x={490} y={175} width={260} label="MiniStack" note="every other *.amazonaws.com" />
+    </Figure>
+  )
+}
+
+/**
  * One provider call: the app's own SDK calls the real hostname, the proxy sends it to the
  * emulator, the emulator keeps the state a test reads, and its webhook comes back to the app.
  */

@@ -4,6 +4,7 @@ import defaultMdxComponents from "fumadocs-ui/mdx"
 import type { MDXComponents } from "mdx/types"
 
 import {
+  AwsRouting,
   EmulatorFlow,
   HowItWorks,
   IsolationSlots,
@@ -28,6 +29,7 @@ export function useMdxComponents(components?: MDXComponents) {
     Tabs,
     HowItWorks,
     MatrixFlow,
+    AwsRouting,
     ProviderFlow,
     ProxyBoundary,
     Setup,
