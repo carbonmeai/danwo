@@ -151,6 +151,11 @@ export interface StepRecord {
   readonly cache?: CacheNote
   /** The person whose browser the step ran in, when the test opened more than one person's. */
   readonly user?: string
+  /**
+   * The tab it ran in, counting from 1 in the order the tabs opened, as the videos are numbered
+   * (`video/tab-<n>.webm`); absent for a step with no browser, and in older records.
+   */
+  readonly tab?: number
   /** The part of the attempt it ran in; absent in records made before phases were kept. */
   readonly phase?: AttemptPhase
   /** For a `check` step: the value it looked at and the value it wanted. */
@@ -206,6 +211,8 @@ export class StepRecorder implements StepLog {
   private readonly shared: Shared
   private readonly options: StepRecorderOptions
   private readonly user: string | undefined
+  /** The tab this person's steps run in, read when each starts. */
+  private tab: (() => number | undefined) | undefined
 
   constructor(
     options: StepRecorderOptions,
@@ -223,6 +230,11 @@ export class StepRecorder implements StepLog {
   /** A recorder of `user`'s steps, written to this attempt's list and tagged with their name. */
   forUser(user: string): StepRecorder {
     return new StepRecorder(this.options, this.shared, user)
+  }
+
+  /** Stamps every later step of this recorder's person with the tab `tab` names when it starts. */
+  followTabs(tab: () => number | undefined): void {
+    this.tab = tab
   }
 
   /** Marks the part of the attempt that starts now; every person's later steps are stamped with it. */
@@ -310,6 +322,8 @@ export class StepRecorder implements StepLog {
   /** Starts a step of `kind`, stamped with the phase, the caller's line and the person. */
   private begin(kind: StepKind, api: string, label: string): Running {
     const source = callerLine(this.options.projectRoot)
+    /* A value check or the settle wait runs in no tab: the browser only waits through them. */
+    const tab = kind === "check" || kind === "settle" ? undefined : this.tab?.()
     const running: Running = {
       record: {
         id: randomUUID(),
@@ -323,6 +337,7 @@ export class StepRecorder implements StepLog {
         ...(source && { source }),
         events: [],
         ...(this.user !== undefined && { user: this.user }),
+        ...(tab !== undefined && { tab }),
         phase: this.shared.phase,
       },
       events: [],

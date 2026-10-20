@@ -309,6 +309,8 @@ export function handlesFor(shared: SharedDesk, browsing: Browsing): Handles {
   const tabs = new Tabs(browsing.context, browsing.page)
   const appErrors = appErrorsOf(options)
 
+  steps.followTabs(() => tabs.activeNumber)
+
   tabs.onEveryPage((opened) => {
     recordAppLog(opened, steps)
     appErrors.watch(opened)

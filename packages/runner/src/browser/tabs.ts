@@ -48,6 +48,21 @@ export class Tabs {
     return this.open.filter((page) => !page.isClosed())
   }
 
+  /**
+   * Which tab `page` is, counting from 1 in the order the tabs opened, closed ones included: the
+   * number its video is filmed under (`video/tab-<n>.webm`). Undefined for a page not of these tabs.
+   */
+  numberOf(page: Page): number | undefined {
+    const at = this.open.indexOf(page)
+
+    return at < 0 ? undefined : at + 1
+  }
+
+  /** The number of the tab actions and reads go to now. */
+  get activeNumber(): number | undefined {
+    return this.numberOf(this.active)
+  }
+
   /** Makes tab `index` (as `list()` numbers them) the active one. */
   switchTo(index: number): void {
     const page = this.list()[index]

@@ -46,6 +46,12 @@ export interface CapturedVideo {
   readonly tab: number
   /** The person whose browser it shows, when the test opened more than one person's. */
   readonly user?: string
+  /** The tab that opened this one, for a popup or a link the app opened in a new tab. */
+  readonly opener?: number
+  /** The host of the first web page the tab showed, e.g. the provider's sign-in page. */
+  readonly host?: string
+  /** True when the tab closed before the browser did, so the run went back to another tab. */
+  readonly closed?: boolean
 }
 
 /** A step, call or webhook placed on a video's clock. */

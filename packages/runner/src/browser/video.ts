@@ -38,6 +38,21 @@ interface Filmed {
   readonly page: Page
   readonly startedAt: number
   closedAt?: number
+  /** The tab that opened this one, for a popup. */
+  opener?: number
+  /** The host of the first web page it showed. */
+  host?: string | undefined
+}
+
+/** The host of `url`, for a web page; undefined for `about:blank` and the like. */
+export function webHost(url: string): string | undefined {
+  try {
+    const { protocol, host } = new URL(url)
+
+    return protocol === "http:" || protocol === "https:" ? host : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /** The tabs being filmed, in the order they opened. */
@@ -63,6 +78,18 @@ export class TabFilm {
     page.once("close", () => {
       entry.closedAt = Date.now()
     })
+    entry.host = webHost(page.url())
+    page.on("framenavigated", (frame) => {
+      if (entry.host === undefined && frame === page.mainFrame()) entry.host = webHost(frame.url())
+    })
+    void page
+      .opener()
+      .then((opener) => {
+        const at = this.filmed.findIndex((each) => each.page === opener)
+
+        if (at >= 0) entry.opener = at + 1
+      })
+      .catch(() => undefined)
   }
 
   /**
@@ -88,6 +115,9 @@ export class TabFilm {
           durationMs: Math.max((entry.closedAt ?? closedAt) - entry.startedAt, 0),
           tab: at + 1,
           ...(this.user !== undefined && { user: this.user }),
+          ...(entry.opener !== undefined && { opener: entry.opener }),
+          ...(entry.host !== undefined && { host: entry.host }),
+          ...(entry.closedAt !== undefined && { closed: true }),
         })
       } catch {
         /* The tab never painted a frame, or its file is gone: there is nothing to show. */
