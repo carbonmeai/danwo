@@ -15,6 +15,8 @@ import type { PusherStore } from "./store.ts"
 
 /** Interest names Beams accepts. */
 const INTEREST = /^[a-zA-Z0-9_\-=@,.;]{1,164}$/
+/** The pattern Beams names when an interest does not match it. */
+const INTEREST_PATTERN = String.raw`^[a-zA-Z0-9_\-=@,.;]+$`
 
 export interface BeamsRouteContext {
   readonly app: App
@@ -46,20 +48,29 @@ function authorised(ctx: BeamsRouteContext, c: Context): BeamsInstance {
   const instance = instanceOf(ctx, c)
 
   if (c.req.header("authorization") !== `Bearer ${instance.secret_key}`)
-    throw new HttpError(401, "Incorrect API Key")
+    throw new HttpError(401, "Incorrect Secret Key")
 
   return instance
 }
 
+/** A publish's list of names, refused in the words Beams' request validation uses. */
 function strings(value: unknown, field: string): string[] {
-  if (
-    !Array.isArray(value) ||
-    value.length === 0 ||
-    !value.every((item) => typeof item === "string")
-  )
-    throw new HttpError(422, `${field} must be a non-empty list of strings`)
+  if (!Array.isArray(value)) throw new HttpError(422, `\`${field}\`: Expected array`)
+  if (value.length === 0) throw new HttpError(422, `\`${field}\`: Array must have at least 1 items`)
+
+  const index = value.findIndex((item) => typeof item !== "string")
+
+  if (index !== -1) throw new HttpError(422, `\`${field}.${index}\`: Expected string`)
 
   return value
+}
+
+/** Refuses the first interest Beams would not accept, naming its place in the list. */
+function checkInterests(names: readonly string[]): void {
+  const index = names.findIndex((name) => !INTEREST.test(name))
+
+  if (index !== -1)
+    throw new HttpError(422, `\`interests.${index}\`: Does not match pattern '${INTEREST_PATTERN}'`)
 }
 
 /** The device a device API call names, in its instance. */
@@ -79,8 +90,7 @@ function publishRoutes(ctx: BeamsRouteContext): void {
     const { interests, ...request } = await jsonObjectOf(c)
     const names = strings(interests, "interests")
 
-    if (!names.every((name) => INTEREST.test(name)))
-      throw new HttpError(422, "Invalid interest name")
+    checkInterests(names)
 
     const publish = ctx.objects.publishes.add(
       {
@@ -115,16 +125,18 @@ function publishRoutes(ctx: BeamsRouteContext): void {
     return c.json({ publishId: publish.id })
   })
 
-  ctx.app.delete("/user_api/v1/instances/:instanceId/users/:userId", (c) => {
-    const instance = authorised(ctx, c)
+  /* The server SDKs delete a user on `customer_api`; Beams answers the older `user_api` path too. */
+  for (const api of ["customer_api", "user_api"])
+    ctx.app.delete(`/${api}/v1/instances/:instanceId/users/:userId`, (c) => {
+      const instance = authorised(ctx, c)
 
-    for (const device of ctx.objects.devices.where(
-      (found) => found.instance_id === instance.id && found.user_id === c.req.param("userId"),
-    ))
-      ctx.objects.devices.remove(device.id)
+      for (const device of ctx.objects.devices.where(
+        (found) => found.instance_id === instance.id && found.user_id === c.req.param("userId"),
+      ))
+        ctx.objects.devices.remove(device.id)
 
-    return c.body(null, 200)
-  })
+      return c.body(null, 200)
+    })
 }
 
 function deviceRoutes(ctx: BeamsRouteContext): void {

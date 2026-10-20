@@ -34,6 +34,16 @@ export const PUSHER_HOSTS: readonly string[] = [
   "ws.pusherapp.com",
 ]
 
+/** Beams' path prefixes, whose errors are JSON; the Channels API answers in plain text. */
+const BEAMS_APIS = ["/publish_api/", "/device_api/", "/customer_api/", "/user_api/"]
+
+/** The `error` word Beams puts in an error body, by status. */
+const BEAMS_ERRORS: Readonly<Record<number, string>> = {
+  401: "Unauthorized",
+  404: "Not Found",
+  422: "Unprocessable Entity",
+}
+
 /** The app id rides along to pick the endpoint's app; Pusher posts only `time_ms` and `events`. */
 function posted(body: string): string {
   const { app_id: _app, ...rest } = asRecord(JSON.parse(body)) ?? {}
@@ -75,18 +85,8 @@ export const pusher = defineEmulator({
       const status = error instanceof HttpError ? error.status : 500
       const message = error instanceof Error ? error.message : "Internal Server Error"
 
-      /* Beams answers in JSON; the Channels API in plain text, as the SDKs expect. */
-      if (
-        c.req.path.startsWith("/publish_api/") ||
-        c.req.path.startsWith("/device_api/") ||
-        c.req.path.startsWith("/user_api/")
-      )
-        return beamsError(
-          c,
-          status,
-          status === 401 ? "Unauthorized" : status === 404 ? "Not Found" : "Bad Request",
-          message,
-        )
+      if (BEAMS_APIS.some((prefix) => c.req.path.startsWith(prefix)))
+        return beamsError(c, status, BEAMS_ERRORS[status] ?? "Bad Request", message)
 
       return c.text(message, status)
     })
