@@ -11,12 +11,17 @@ import type { BrowserContext, BrowserContextOptions, Page } from "playwright-cor
 import { type CapturedVideo, VIDEO_DIR, VIDEO_SIZE } from "../record/video.ts"
 import { SECRET_FIELD } from "../secrets/fields.ts"
 
-/** Where the browser writes video while it films, before each tab's file is named. */
-const RAW_DIR = join(VIDEO_DIR, "raw")
+/**
+ * Where the browser writes video while it films, before each tab's file is named; each extra
+ * person's browser films into its own, so saving one context's tabs leaves the others' alone.
+ */
+function rawDir(user: string | undefined): string {
+  return join(VIDEO_DIR, user === undefined ? "raw" : `raw-${user}`)
+}
 
 /** The context options that film every tab into the attempt's directory. */
-export function videoContextOptions(artifactsDir: string): BrowserContextOptions {
-  return { recordVideo: { dir: join(artifactsDir, RAW_DIR), size: VIDEO_SIZE } }
+export function videoContextOptions(artifactsDir: string, user?: string): BrowserContextOptions {
+  return { recordVideo: { dir: join(artifactsDir, rawDir(user)), size: VIDEO_SIZE } }
 }
 
 /** Shows a secret field's characters as dots, in every page the context opens. */
@@ -40,9 +45,12 @@ export class TabFilm {
   private readonly filmed: Filmed[] = []
   private saved: CapturedVideo[] = []
   private readonly artifactsDir: string
+  /** The person whose browser this films, for a test that opened more than one person's. */
+  private readonly user: string | undefined
 
-  constructor(artifactsDir: string) {
+  constructor(artifactsDir: string, user?: string) {
     this.artifactsDir = artifactsDir
+    this.user = user
   }
 
   /** Starts keeping `page`'s video, filmed from `startedAt` (when the tab opened). */
@@ -69,7 +77,8 @@ export class TabFilm {
 
       if (video === null) continue
 
-      const file = join(VIDEO_DIR, `tab-${at + 1}.webm`)
+      const name = this.user === undefined ? `tab-${at + 1}` : `${this.user}-tab-${at + 1}`
+      const file = join(VIDEO_DIR, `${name}.webm`)
 
       try {
         await video.saveAs(join(this.artifactsDir, file))
@@ -78,13 +87,14 @@ export class TabFilm {
           startedAt: new Date(entry.startedAt).toISOString(),
           durationMs: Math.max((entry.closedAt ?? closedAt) - entry.startedAt, 0),
           tab: at + 1,
+          ...(this.user !== undefined && { user: this.user }),
         })
       } catch {
         /* The tab never painted a frame, or its file is gone: there is nothing to show. */
       }
     }
 
-    await rm(join(this.artifactsDir, RAW_DIR), { recursive: true, force: true })
+    await rm(join(this.artifactsDir, rawDir(this.user)), { recursive: true, force: true })
     this.saved = saved
   }
 

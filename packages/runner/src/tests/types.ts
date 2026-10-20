@@ -8,8 +8,24 @@ import type { App } from "../browser/index.ts"
 import type { Screen } from "../locate/index.ts"
 import type { Isolation } from "../runner/isolation.ts"
 import type { Secret } from "../secrets/index.ts"
-import type { SessionMail } from "../session.ts"
+import type { SessionMail, UserSession } from "../session.ts"
 import type { SessionTime } from "../time/index.ts"
+
+/** How `users.open` starts a person's browser. */
+export interface UserOptions {
+  /** The saved session they start in (see `test.session`); without it they start signed out. */
+  readonly session?: string
+}
+
+/**
+ * Other people's browsers in this test, beside the test's own: `const bob = await
+ * users.open("bob", { session: "bob-signed-in" })` gives Bob's `app`, `screen`, `expect` and
+ * `agent`, working on a browser context of his own behind the same proxy. His steps, calls and
+ * video are recorded under his name, and his browser closes when the test ends. Web only.
+ */
+export interface Users {
+  open(name: string, options?: UserOptions): Promise<UserSession>
+}
 
 /** What every test body, hook and invariant receives before environment and extended fixtures. */
 export interface TestFixtures {
@@ -21,6 +37,8 @@ export interface TestFixtures {
    * (renewals, retries and expiries run as they fall due) and the page's clock forward together.
    */
   readonly time: SessionTime
+  /** Other people's browsers in the same test, for flows more than one person takes part in. */
+  readonly users: Users
   readonly platform: "web" | "android"
 }
 

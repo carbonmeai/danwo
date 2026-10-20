@@ -132,6 +132,8 @@ export interface StepRecord {
   readonly error?: { readonly code: string; readonly message: string }
   readonly events: readonly StepEvent[]
   readonly cache?: CacheNote
+  /** The person whose browser the step ran in, when the test opened more than one person's. */
+  readonly user?: string
 }
 
 /** One line the app wrote to its console, an uncaught page error, or a navigation. */
@@ -142,6 +144,8 @@ export interface AppLogRecord {
   readonly text: string
   /** The step that was running (or last ran) when it was logged. */
   readonly step: number
+  /** The person whose browser logged it, when the test opened more than one person's. */
+  readonly user?: string
 }
 
 interface Running {
@@ -158,16 +162,49 @@ export interface StepRecorderOptions {
   readonly onEnd?: (step: StepRecord) => void
 }
 
-/** Records the steps of one attempt in the order they started. */
-export class StepRecorder implements StepLog {
-  private readonly steps: Running[] = []
-  private readonly log: AppLogRecord[] = []
+/** What every person's recorder of one attempt writes to: one list of steps, one app log. */
+interface Shared {
+  readonly steps: Running[]
+  readonly log: AppLogRecord[]
   /** Indexes of checks that passed and verify what came before them. */
-  private readonly verified: number[] = []
-  private readonly options: StepRecorderOptions
+  readonly verified: number[]
+}
 
-  constructor(options: StepRecorderOptions) {
+/**
+ * Records the steps of one attempt in the order they started. A test that opens more people's
+ * browsers records each person's steps through `forUser`, into the same list.
+ */
+export class StepRecorder implements StepLog {
+  private readonly steps: Running[]
+  private readonly log: AppLogRecord[]
+  private readonly verified: number[]
+  private readonly options: StepRecorderOptions
+  private readonly user: string | undefined
+
+  constructor(
+    options: StepRecorderOptions,
+    shared: Shared = { steps: [], log: [], verified: [] },
+    user?: string,
+  ) {
     this.options = options
+    this.steps = shared.steps
+    this.log = shared.log
+    this.verified = shared.verified
+    this.user = user
+  }
+
+  /** A recorder of `user`'s steps, written to this attempt's list and tagged with their name. */
+  forUser(user: string): StepRecorder {
+    return new StepRecorder(
+      this.options,
+      { steps: this.steps, log: this.log, verified: this.verified },
+      user,
+    )
+  }
+
+  /** The latest step of this recorder's person: events and cache notes belong to it. */
+  private latest(): Running | undefined {
+    return this.steps.findLast((running) => running.record.user === this.user)
   }
 
   /** Runs `body` as a step; a failure is recorded with its error and rethrown. */
@@ -191,6 +228,7 @@ export class StepRecorder implements StepLog {
         durationMs: 0,
         ...(source && { source }),
         events: [],
+        ...(this.user !== undefined && { user: this.user }),
       },
       events: [],
     }
@@ -213,7 +251,7 @@ export class StepRecorder implements StepLog {
 
   /** Adds an event to the step running now (the latest one started). */
   event(event: StepEvent): void {
-    const running = this.steps.at(-1)
+    const running = this.latest()
 
     if (running === undefined) return
     running.events.push(
@@ -223,7 +261,7 @@ export class StepRecorder implements StepLog {
 
   /** Notes how the running agent step used the replay cache. */
   cache(mode: CacheOutcome, detail: Omit<CacheNote, "mode"> = {}): void {
-    const running = this.steps.at(-1)
+    const running = this.latest()
 
     if (running !== undefined) running.record = { ...running.record, cache: { mode, ...detail } }
   }
@@ -249,6 +287,7 @@ export class StepRecorder implements StepLog {
       ...entry,
       text: this.options.redact(entry.text),
       step: Math.max(0, this.steps.length - 1),
+      ...(this.user !== undefined && { user: this.user }),
     })
   }
 

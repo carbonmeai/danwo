@@ -392,6 +392,13 @@ export async function openDeviceSession(
       Promise.reject(
         new DanwoError("CONFIG_INVALID", "saved sessions are not supported on Android yet"),
       ),
+    openUser: () =>
+      Promise.reject(
+        new DanwoError(
+          "CONFIG_INVALID",
+          "a second person's device in one test is not supported on Android yet",
+        ),
+      ),
     /* The device's own clock stays where it is; the services behind the app move. */
     time: sessionTime(
       options.time ?? timeMachineOf(undefined),

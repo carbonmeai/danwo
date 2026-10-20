@@ -42,6 +42,7 @@ import {
   startingState,
 } from "./sessions.ts"
 import { noTimings, type TrialPhase, timed } from "./timings.ts"
+import { usersFixture } from "./users.ts"
 
 /**
  * How an attempt uses the replay cache: `learn` replays what it can and records new steps;
@@ -170,7 +171,10 @@ export async function runAttempt(
   const { session, start } = await timed(timings, "open", () =>
     openStarted(file, test, setup, deadline),
   )
-  const fixtures = fixtureScope(test.fixtures, builtInFixtures(session, setup.env))
+  const fixtures = fixtureScope(
+    test.fixtures,
+    builtInFixtures(session, setup.env, sessionContext(file, setup, deadline)),
+  )
   const call = (fn: StoredBody) => async () => fn(fixtures.values)
 
   const body = await timed(timings, "body", () =>
@@ -507,8 +511,15 @@ async function openSession(
   })
 }
 
-/** What every test receives: the session's handles, then whatever the environment adds. */
-function builtInFixtures(session: WebSession, env: WorkerEnvironment | undefined) {
+/**
+ * What every test receives: the session's handles, then whatever the environment adds. `sessions`
+ * lets `users.open` start another person in a saved session; a session's own setup has none.
+ */
+function builtInFixtures(
+  session: WebSession,
+  env: WorkerEnvironment | undefined,
+  sessions?: SessionContext,
+) {
   const platform: "web" | "android" =
     "platform" in session && session.platform === "android" ? "android" : "web"
 
@@ -520,6 +531,7 @@ function builtInFixtures(session: WebSession, env: WorkerEnvironment | undefined
     secret: (name: string) => session.secret(name),
     mail: session.mail,
     time: session.time,
+    users: usersFixture(session, sessions),
     platform,
     ...env?.fixtures,
   }

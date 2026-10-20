@@ -2,24 +2,32 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
+import { taggedUserAgent } from "@danwo/proxy"
 import type { LanguageModel } from "ai"
 import type { Browser, BrowserContext, Page } from "playwright-core"
 
 import type { Budgets } from "./agent/budget.ts"
-import { type Agent, createAgent, type ReplayDivergence } from "./agent/index.ts"
+import type { Agent, ReplayDivergence } from "./agent/index.ts"
 import { type Expect, expect } from "./assert/index.ts"
-import { type CheckPace, checkKey, pacedTimeout } from "./assert/pace.ts"
-import type { BaselineUpdate, ScreenshotEvent } from "./assert/screenshot.ts"
-import { type AppErrorOptions, AppErrors } from "./browser/app-errors.ts"
+import type { CheckPace } from "./assert/pace.ts"
+import type { BaselineUpdate } from "./assert/screenshot.ts"
+import type { AppErrorOptions } from "./browser/app-errors.ts"
 import { type App, type BrowserFlags, launchBrowser } from "./browser/index.ts"
-import { type Backend, Readiness, type ReadinessMode } from "./browser/readiness.ts"
-import { Tabs } from "./browser/tabs.ts"
+import type { Backend, ReadinessMode } from "./browser/readiness.ts"
 import { hideSecretText, TabFilm, videoContextOptions } from "./browser/video.ts"
 import { createSessionFlight, type SessionFlight } from "./flight.ts"
-import { createScreen, registerValueEngine, type Screen } from "./locate/index.ts"
+import {
+  type BrowserAgent,
+  type EffectsSetting,
+  handlesFor,
+  type SessionMail,
+  type Settings,
+  type SharedDesk,
+} from "./handles.ts"
+import { registerValueEngine, type Screen } from "./locate/index.ts"
 import { MailDesk } from "./mail/desk.ts"
-import type { MailMessage, MailSource } from "./mail/index.ts"
-import { recordAppLog, type StepRecord, StepRecorder } from "./record/index.ts"
+import type { MailSource } from "./mail/index.ts"
+import { type StepRecord, StepRecorder } from "./record/index.ts"
 import { type CacheMode, ReplayStore } from "./replay/index.ts"
 import { type RelocationPolicy, relocationOf } from "./replay/policy.ts"
 import { type Secret, SecretVault, type SessionSecret } from "./secrets/index.ts"
@@ -31,9 +39,10 @@ import {
   type TimeMachine,
   timeMachineOf,
 } from "./time/index.ts"
-import { type VisionSetting, visionModelOf, visionModeOf } from "./vision/desk.ts"
+import type { VisionSetting } from "./vision/desk.ts"
 
 export type { ReplayDivergence } from "./agent/index.ts"
+export { type EffectsSetting, effectsOptions, pacer, type SessionMail } from "./handles.ts"
 
 /**
  * What a browser context remembers of the sites it visited: cookies, and each origin's
@@ -149,18 +158,6 @@ interface ModelOptions {
   readonly mail?: readonly MailSource[]
 }
 
-/** The mail the app sent, as a test reads it. */
-export interface SessionMail {
-  /** The newest email to `to`, if one arrived. */
-  latest(to: string): MailMessage | undefined
-  /** The code in the newest email to `to`, waiting for the email when it has not arrived yet. */
-  code(to: string, options?: { readonly digits?: number }): Promise<string>
-  /** A link in the newest email to `to`: the first, or the one whose text or URL has `match`. */
-  link(to: string, options?: { readonly match?: string }): Promise<string>
-  /** Shows the newest email to `to` in the active tab, to click its links. */
-  open(to: string): Promise<void>
-}
-
 /** Where recorded `agent.act` steps live; a step that replays needs no model call. */
 interface CacheOptions {
   readonly dir: string
@@ -203,36 +200,6 @@ interface ReplayOptions {
    * leaves text matching a pattern out of page effects, for content that changes on its own.
    */
   readonly effects?: EffectsSetting
-}
-
-/** Effects on or off, or on with text to leave out. */
-export type EffectsSetting = boolean | { readonly ignore?: readonly (string | RegExp)[] }
-
-/** What the agent takes of the effects setting. */
-function effectsOf(setting: EffectsSetting | undefined) {
-  if (setting === false) return { enabled: false, ignore: [] }
-
-  const patterns = typeof setting === "object" ? (setting.ignore ?? []) : []
-
-  return {
-    enabled: true,
-    ignore: patterns.map((pattern) =>
-      typeof pattern === "string" ? new RegExp(pattern) : pattern,
-    ),
-  }
-}
-
-/** The agent's effect settings and where it reads the backend's history from. */
-export function effectsOptions(options: {
-  readonly effects?: EffectsSetting
-  readonly backend?: Backend
-}) {
-  const { backend } = options
-  const effects = effectsOf(options.effects)
-
-  if (backend?.activity === undefined) return { effects }
-
-  return { effects, activity: () => backend.activity?.() ?? { calls: [], deliveries: [] } }
 }
 
 /** What the flight recorder keeps of the attempt. */
@@ -284,7 +251,31 @@ export interface WebSession {
   browserState(): Promise<BrowserState>
   /** Time travel: moves the app, the emulators and the page forward together. */
   readonly time: SessionTime
+  /**
+   * Opens another person's browser in the same test, e.g. a teammate who should see a change
+   * live: a context of its own in the same browser, behind the same proxy, signed out or in
+   * `state`. Their steps, calls and video are recorded under `name`; it closes with the session.
+   */
+  openUser(name: string, options?: { readonly state?: BrowserState }): Promise<UserSession>
   /** Ends the attempt and closes the browser. */
+  close(): Promise<void>
+}
+
+/**
+ * Another person's browser in a test, from `WebSession.openUser`: the same handles a test has for
+ * its own browser, working on that person's context.
+ */
+export interface UserSession {
+  /** Who this is, as their steps, calls and video are labelled in the flight record. */
+  readonly name: string
+  readonly app: App
+  readonly screen: Screen
+  readonly expect: Expect
+  readonly agent: Agent
+  /** Mail the app sent, as the test's own `mail` reads it; `mail.open` shows it in this browser. */
+  readonly mail: SessionMail
+  secret(name: string): Secret
+  /** Closes this person's browser now; the session closes any still open when it ends. */
   close(): Promise<void>
 }
 
@@ -394,7 +385,7 @@ function timeoutsOf(options: WebSessionOptions) {
 }
 
 /** The session's options with their defaults filled in. */
-function settingsOf(options: WebSessionOptions) {
+function settingsOf(options: WebSessionOptions): Settings & { readonly stepScreenshots: boolean } {
   const projectRoot = options.projectRoot ?? process.cwd()
 
   return {
@@ -409,113 +400,106 @@ function settingsOf(options: WebSessionOptions) {
   }
 }
 
-/** The session's screenshot checks: baselines folder, a counter, and their notes on the step. */
-function screenshotDesk(
-  options: WebSessionOptions,
-  projectRoot: string,
-  artifactsDir: string,
-  steps: StepRecorder,
-) {
-  let count = 0
+/** A person's name as it labels their steps, calls and video: letters, digits, `.`, `_` and `-`. */
+const USER_NAME = /^[\w.-]{1,40}$/
 
-  return {
-    settings: {
-      dir: resolve(projectRoot, options.screenshots?.dir ?? "__screenshots__"),
-      update: options.screenshots?.update ?? "missing",
-      artifactsDir,
-    },
-    next: () => ++count,
-    note: (event: ScreenshotEvent) => steps.event(event),
+/** Another person's open browser, kept so the session can close it and keep its film. */
+interface OpenUser {
+  readonly name: string
+  readonly context: BrowserContext
+  readonly film: TabFilm | undefined
+  readonly agent: BrowserAgent
+  closed: boolean
+}
+
+/** Closes a person's context, takes it off the clock and saves its film; idempotent. */
+async function closeUser(user: OpenUser, contexts: BrowserContext[]): Promise<void> {
+  if (user.closed) return
+  user.closed = true
+
+  const closedAt = Date.now()
+  const at = contexts.indexOf(user.context)
+
+  if (at >= 0) contexts.splice(at, 1)
+  await user.context.close()
+  await user.film?.save(closedAt)
+}
+
+/** What opening another person's browser needs from its session. */
+interface UserDesk {
+  readonly shared: SharedDesk
+  readonly browser: Browser
+  readonly steps: StepRecorder
+  /** The user agent the session's own browser sends, which each person's adds their tag to. */
+  readonly userAgent: () => Promise<string>
+  readonly users: OpenUser[]
+  readonly filming: string | undefined
+}
+
+/** Throws unless `name` can label a new person in this session. */
+function checkUserName(name: string, users: readonly OpenUser[]): void {
+  if (!USER_NAME.test(name)) {
+    throw new DanwoError(
+      "CONFIG_INVALID",
+      `openUser: "${name}" is not a usable name; use letters, digits, ".", "_" or "-"`,
+    )
+  }
+
+  if (users.some((user) => user.name === name && !user.closed)) {
+    throw new DanwoError("CONFIG_INVALID", `openUser: "${name}" already has a browser open`)
   }
 }
 
-/** `app` of a session: the base URL, and opening a path of it on the active tab. */
-function appOf(
-  tabs: Tabs,
-  steps: StepRecorder,
-  page: {
-    readonly baseUrl: string
-    readonly loadTimeout: number
-    readonly ready: () => Promise<void>
-  },
-): App {
-  const { baseUrl } = page
+/** Opens `name`'s browser context in the session's browser, behind the same proxy. */
+async function openUserBrowser(
+  desk: UserDesk,
+  name: string,
+  state: BrowserState | undefined,
+): Promise<UserSession> {
+  checkUserName(name, desk.users)
 
-  return {
-    baseUrl,
-    open: (path) =>
-      steps.run("app", "app.open", path ?? "/", async () => {
-        await tabs.page.goto(new URL(path ?? "/", baseUrl).href, { timeout: page.loadTimeout })
-        await page.ready()
-      }),
-  }
-}
-
-/** A value read from mail, or the failure of a test that needed it. */
-function need(to: string, what: string, found: string | undefined): string {
-  if (found === undefined)
-    throw new DanwoError("TEST_FAILED", `no mail to ${to} with ${what} arrived`)
-
-  return found
-}
-
-/** `mail` of a session: reading the app's mail, and showing a message in the active tab. */
-function mailOf(
-  desk: MailDesk,
-  tabs: Tabs,
-  steps: StepRecorder,
-  page: { readonly timeout: number; readonly ready: () => Promise<void> },
-): SessionMail {
-  return {
-    latest: (to) => desk.latest(to),
-    code: async (to, options = {}) =>
-      need(
-        to,
-        "a code",
-        await desk.value(to, { kind: "code", digits: options.digits }, page.timeout),
-      ),
-    link: async (to, options = {}) =>
-      need(
-        to,
-        "a link",
-        await desk.value(to, { kind: "link", match: options.match }, page.timeout),
-      ),
-    open: (to) =>
-      steps.run("app", "mail.open", to, async () => {
-        if (!(await desk.open(tabs.page, to, page.timeout)))
-          throw new DanwoError("TEST_FAILED", `no mail to ${to} arrived`)
-
-        await page.ready()
-      }),
-  }
-}
-
-/** The session's readiness, from its settings: `page+backend` by default when a backend is given. */
-function readinessOf(options: WebSessionOptions): Readiness {
-  const setting = options.readiness
-  const fallback: ReadinessMode = options.backend === undefined ? "page" : "page+backend"
-  const mode = typeof setting === "string" ? setting : (setting?.mode ?? fallback)
-  const capMs = typeof setting === "object" ? setting.capMs : undefined
-
-  return new Readiness({
-    mode,
-    ...(options.backend && { backend: options.backend }),
-    ...(capMs !== undefined && { capMs }),
+  const { shared } = desk
+  const context = await desk.browser.newContext({
+    userAgent: taggedUserAgent(await desk.userAgent(), name),
+    ...(state !== undefined && { storageState: state }),
+    ...(desk.filming !== undefined && videoContextOptions(desk.filming, name)),
   })
+
+  if (desk.filming !== undefined) await hideSecretText(context)
+  await shared.options.onContext?.(context)
+  await showTime(context, shared.machine)
+
+  const page = await context.newPage()
+  const film = desk.filming === undefined ? undefined : new TabFilm(desk.filming, name)
+
+  film?.watch(page)
+  shared.contexts.push(context)
+
+  const handles = handlesFor(shared, { context, page, steps: desk.steps.forUser(name), film })
+  const open: OpenUser = { name, context, film, agent: handles.agent, closed: false }
+
+  desk.users.push(open)
+
+  return {
+    name,
+    app: handles.app,
+    screen: handles.screen,
+    expect,
+    agent: handles.agent,
+    mail: handles.mail,
+    secret: (secret) => shared.vault.handle(secret),
+    close: () => closeUser(open, shared.contexts),
+  }
 }
 
-/** The next check's timeout under `pace`, keyed as the step recorder will record that check. */
-export function pacer(pace: CheckPace, steps: StepRecorder, redact: (text: string) => string) {
-  return (api: string, label: string, fallback: number) =>
-    pacedTimeout(pace, checkKey(steps.next, api, redact(label)), fallback)
-}
+/** The user agent `page`'s browser sends, read once. */
+function userAgentOf(page: Page): () => Promise<string> {
+  let read: Promise<string> | undefined
 
-/** Waits for the active tab to be ready and notes the wait on the step that is running. */
-function readyStep(readiness: Readiness, tabs: Tabs, steps: StepRecorder): () => Promise<void> {
-  return async () => {
-    const wait = await readiness.after(tabs.page)
+  return () => {
+    read ??= page.evaluate(() => navigator.userAgent)
 
-    if (wait !== undefined) steps.event({ kind: "ready", at: new Date().toISOString(), ...wait })
+    return read
   }
 }
 
@@ -528,15 +512,14 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
   const ownsArtifacts = options.artifactsDir === undefined
   const artifactsDir = options.artifactsDir ?? (await mkdtemp(join(tmpdir(), "danwo-attempt-")))
   const { browser, context, page, own, film } = await openBrowser(options, artifactsDir)
-  const tabs = new Tabs(context, page)
   const settings = settingsOf(options)
-  const { projectRoot, files, actionTimeout } = settings
   const vault = new SecretVault(options.secrets)
   const stopped = new AbortController()
+  const users: OpenUser[] = []
   /* The recorder tells the flight about each step that ends; the flight reads the recorder. */
   const ended: { onStep?: (step: StepRecord) => void } = {}
   const steps = new StepRecorder({
-    projectRoot,
+    projectRoot: settings.projectRoot,
     redact: vault.redact,
     onStart: (step) => options.onStep?.(step),
     onEnd: (step) => {
@@ -544,92 +527,62 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
       options.onStep?.(step)
     },
   })
+  const machine = options.time ?? timeMachineOf(undefined)
+  const shared: SharedDesk = {
+    options,
+    settings,
+    store,
+    vault,
+    desk: new MailDesk(options.mail ?? []),
+    machine,
+    signal: stopped.signal,
+    artifactsDir,
+    contexts: [context],
+  }
+  const handles = handlesFor(shared, { context, page, steps, film })
   const flight = createSessionFlight({
-    page: () => tabs.page,
+    page: () => handles.tabs.page,
     vault,
     steps,
     artifactsDir,
     stepScreenshots: settings.stepScreenshots,
-    videos: () => film?.videos() ?? [],
+    videos: () => [
+      ...(film?.videos() ?? []),
+      ...users.flatMap((user) => user.film?.videos() ?? []),
+    ],
   })
-
-  const { backend } = options
-  const providerFailures = backend?.failures && (() => backend.failures?.() ?? [])
-  const appErrors = new AppErrors(options.baseUrl, options.appErrors, providerFailures)
 
   ended.onStep = (step) => flight.onStep(step)
-  tabs.onEveryPage((opened) => {
-    recordAppLog(opened, steps)
-    appErrors.watch(opened)
-    film?.watch(opened)
-  })
-
-  const ready = readyStep(readinessOf(options), tabs, steps)
-  const machine = options.time ?? timeMachineOf(undefined)
-
   await showTime(context, machine)
-  const desk = new MailDesk(options.mail ?? [])
-  const agent = createAgent({
-    ready,
-    travel: async (ms) => {
-      await machine.travel(ms)
-      await showTime(context, machine)
-    },
-    appErrors,
-    mail: desk,
-    ...effectsOptions(options),
-    tabs,
-    appUrl: options.baseUrl,
-    files,
-    projectRoot,
+
+  const desk: UserDesk = {
+    shared,
+    browser,
     steps,
-    vault,
-    store,
-    strict: settings.strict,
-    relocation: settings.relocation,
-    model: options.model,
-    judge: options.judge,
-    ...(options.judgeScreenshot !== undefined && { judgeScreenshot: options.judgeScreenshot }),
-    vision: {
-      mode: visionModeOf(options.vision, options.model),
-      model: visionModelOf(options.vision),
-    },
-    ...(options.budget !== undefined && { budgets: options.budget }),
-    ...(options.transcriptBudget !== undefined && { transcriptBudget: options.transcriptBudget }),
-    context: options.agentContext,
-    actionTimeout,
-    assertionTimeout: settings.assertionTimeout,
-    signal: stopped.signal,
-  })
-  const screen = createScreen({
-    page: () => tabs.page,
-    steps,
-    files,
-    secrets: { resolve: (secret) => vault.reveal(secret) },
-    ready,
-    actionTimeout,
-    assertionTimeout: settings.assertionTimeout,
-    ...(options.checkPace && { checkTimeout: pacer(options.checkPace, steps, vault.redact) }),
-    shots: screenshotDesk(options, projectRoot, artifactsDir, steps),
-  })
+    userAgent: userAgentOf(page),
+    users,
+    filming: film === undefined ? undefined : artifactsDir,
+  }
   let closed = false
 
   return {
-    screen,
+    screen: handles.screen,
     expect,
-    agent,
-    divergence: () => agent.diverged(),
+    agent: handles.agent,
+    divergence: () =>
+      handles.agent.diverged() ?? users.map((user) => user.agent.diverged()).find(Boolean),
     secret: (name) => vault.handle(name),
-    mail: mailOf(desk, tabs, steps, { timeout: actionTimeout, ready }),
+    mail: handles.mail,
     flight,
-    app: appOf(tabs, steps, { baseUrl: options.baseUrl, loadTimeout: settings.loadTimeout, ready }),
+    app: handles.app,
     browserState: () => context.storageState({ indexedDB: true }),
     time: sessionTime(
       machine,
-      context,
+      shared.contexts,
       (label, act) => steps.run("app", "time.travel", label, act),
-      ready,
+      handles.ready,
     ),
+    openUser: (name, opened = {}) => openUserBrowser(desk, name, opened.state),
     async close() {
       if (closed) return
       closed = true
@@ -641,6 +594,7 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
       const closedAt = Date.now()
 
       try {
+        for (const user of users) await closeUser(user, shared.contexts)
         await context.close()
         await film?.save(closedAt)
       } finally {

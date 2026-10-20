@@ -367,6 +367,9 @@ export {
   bachsService,
   unique,
   type UseOptions,
+  type UserOptions,
+  type Users,
+  type UserSession,
   type WorkerEnvironment,
 } from "@danwo/runner/runner"
 export type {

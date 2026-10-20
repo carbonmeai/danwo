@@ -44,7 +44,7 @@ export {
   clerkMail,
 } from "../mail/index.ts"
 export { backendOf } from "./backend.ts"
-export type { SessionMail } from "../session.ts"
+export type { SessionMail, UserSession } from "../session.ts"
 export { totp } from "../secrets/totp.ts"
 export { z } from "zod"
 export { unique } from "../replay/index.ts"
@@ -65,6 +65,8 @@ export type {
   TestFixtures,
   TestOptions,
   UseOptions,
+  UserOptions,
+  Users,
 } from "../tests/types.ts"
 export { catalogOf, type CatalogEntry, testFilesOf } from "./catalog.ts"
 export {

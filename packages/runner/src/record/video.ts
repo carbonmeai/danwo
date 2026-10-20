@@ -21,6 +21,8 @@ export interface CapturedVideo {
   readonly durationMs: number
   /** The tab it shows, 1 for the first; a device's screen is 1. */
   readonly tab: number
+  /** The person whose browser it shows, when the test opened more than one person's. */
+  readonly user?: string
 }
 
 /** A step, call or webhook placed on a video's clock. */
@@ -49,8 +51,10 @@ export interface MarkedRun {
     readonly status: string
     readonly startedAt: string
     readonly durationMs: number
+    readonly user?: string
   }[]
   readonly exchanges: readonly {
+    readonly user?: string
     readonly id: string
     readonly method: string
     readonly host: string
@@ -144,18 +148,36 @@ function webhookMarks(origin: number, run: MarkedRun): VideoMark[] {
 }
 
 /**
- * Every step, call and webhook of `run` on `video`'s clock, in the order they started. A delivery is
- * placed by the wall clock it was sent at, so a held emulator clock does not move it.
+ * The part of `run` one person's video shows: their own steps and their browser's calls, and every
+ * call no one person's browser made (the app's backend). Without other people, that is all of it.
  */
-export function videoMarks(video: Pick<CapturedVideo, "startedAt">, run: MarkedRun): VideoMark[] {
+function seenBy(run: MarkedRun, user: string | undefined): MarkedRun {
+  return {
+    ...run,
+    steps: run.steps.filter((step) => step.user === user),
+    exchanges: run.exchanges.filter((call) => call.user === undefined || call.user === user),
+  }
+}
+
+/**
+ * Every step, call and webhook of `run` on `video`'s clock, in the order they started. A delivery is
+ * placed by the wall clock it was sent at, so a held emulator clock does not move it. A video of
+ * one person's browser carries their steps and calls, not another person's.
+ */
+export function videoMarks(
+  video: Pick<CapturedVideo, "startedAt" | "user">,
+  run: MarkedRun,
+): VideoMark[] {
   const origin = Date.parse(video.startedAt)
 
   if (Number.isNaN(origin)) return []
 
+  const seen = seenBy(run, video.user)
+
   return [
-    ...stepMarks(origin, run),
-    ...callMarks(origin, run),
-    ...webhookMarks(origin, run),
+    ...stepMarks(origin, seen),
+    ...callMarks(origin, seen),
+    ...webhookMarks(origin, seen),
   ].toSorted((a, b) => a.startMs - b.startMs)
 }
 

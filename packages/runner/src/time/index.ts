@@ -116,21 +116,24 @@ export async function showTime(context: BrowserContext, machine: TimeMachine): P
 
 /**
  * The session's `time`: every travel is a step, after which the page shows the new time. Without
- * a browser `context` (a device session) only the services behind the app move.
+ * a browser `context` (a device session) only the services behind the app move. Given a list (the
+ * test's browser and every other person's it opened), each of them shows the new time.
  */
 export function sessionTime(
   machine: TimeMachine,
-  context: BrowserContext | undefined,
+  context: BrowserContext | readonly BrowserContext[] | undefined,
   run: RunStep,
   ready: () => Promise<void>,
 ): SessionTime {
+  const contexts = context === undefined ? [] : Array.isArray(context) ? context : [context]
+
   const travel = async (ms: number) => {
     if (!Number.isFinite(ms) || ms < 0)
       throw new DanwoError("CONFIG_INVALID", `time only moves forward; cannot travel ${ms} ms`)
 
     await run(describeSpan(ms), async () => {
       await machine.travel(ms)
-      if (context !== undefined) await showTime(context, machine)
+      for (const shown of contexts) await showTime(shown, machine)
       await ready()
     })
   }
