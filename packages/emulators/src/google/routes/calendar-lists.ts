@@ -59,7 +59,7 @@ export function calendarListRoutes(context: GoogleRouteContext): void {
   const known = (id: string) => calendars().findOneBy("calendarId", id)
 
   app.get(`${V3}/users/me/calendarList`, (c) => {
-    const caller = requireAccess(c, context, SCOPES.calendarRead)
+    const caller = requireAccess(c, context, SCOPES.calendarList)
 
     primaryCalendar(context, caller.user)
 
@@ -74,7 +74,7 @@ export function calendarListRoutes(context: GoogleRouteContext): void {
   })
 
   app.get(`${V3}/users/me/calendarList/:calendarId`, (c) => {
-    const caller = requireAccess(c, context, SCOPES.calendarRead)
+    const caller = requireAccess(c, context, SCOPES.calendarList)
 
     return c.json(calendarListEntry(calendarOf(context, caller, c.req.param("calendarId"))))
   })

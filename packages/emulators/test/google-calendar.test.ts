@@ -154,6 +154,18 @@ describe("Calendar events", () => {
       "nobody@danwo.test": { errors: [{ domain: "global", reason: "notFound" }], busy: [] },
     })
   })
+
+  it("lists calendars only for the calendar-list scopes, not for events alone", async () => {
+    emulator = googleWith()
+    const events = await calendarAs("ada@danwo.test", [`${AUTH}calendar.events`])
+    const list = await calendarAs("ada@danwo.test", [
+      `${AUTH}calendar.events`,
+      `${AUTH}calendar.calendarlist.readonly`,
+    ])
+
+    expect(await failure(events.calendarList.list())).toMatchObject({ status: 403 })
+    expect((await list.calendarList.list()).data.items?.[0]?.primary).toBe(true)
+  })
 })
 
 describe("Calendar sync and push", () => {

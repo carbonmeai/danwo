@@ -27,6 +27,13 @@ export const SCOPES = {
   ),
   calendarWrite: calendar("calendar", "calendar.events"),
   calendarManage: calendar("calendar"),
+  /** The calendar list: a token for events alone cannot list the calendars it may use. */
+  calendarList: calendar(
+    "calendar",
+    "calendar.calendarlist",
+    "calendar.calendarlist.readonly",
+    "calendar.readonly",
+  ),
   calendarFreeBusy: calendar("calendar", "calendar.readonly", "calendar.freebusy"),
   driveRead: drive("drive", "drive.readonly", "drive.file", "drive.metadata.readonly"),
   driveContent: drive("drive", "drive.readonly", "drive.file"),
