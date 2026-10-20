@@ -101,11 +101,7 @@ describe("Stripe.js from the emulator", () => {
     const script = proxy.exchanges().find((exchange) => exchange.host === "js.stripe.com")
 
     expect(script).toMatchObject({ status: 200, asset: true })
-    expect(
-      await page.evaluate(
-        () => (window as unknown as { Stripe: { version: unknown } }).Stripe.version,
-      ),
-    ).toBe(3)
+    expect(await page.evaluate("String(window.Stripe.version)")).toBe("3")
   }, 60_000)
 
   it("reports the version a versioned script URL names, as @stripe/stripe-js expects", async () => {
@@ -114,11 +110,7 @@ describe("Stripe.js from the emulator", () => {
     await page.setContent("<!doctype html><p>no script yet</p>")
     await page.addScriptTag({ url: "https://js.stripe.com/dahlia/stripe.js" })
 
-    expect(
-      await page.evaluate(
-        () => (window as unknown as { Stripe: { version: unknown } }).Stripe.version,
-      ),
-    ).toBe("dahlia")
+    expect(await page.evaluate("String(window.Stripe.version)")).toBe("dahlia")
   }, 60_000)
 
   it("declines with Stripe's decline test card, and refuses a publishable key without the client secret", async () => {
