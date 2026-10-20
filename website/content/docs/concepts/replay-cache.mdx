@@ -18,6 +18,17 @@ keeps what the step changed, on the page and behind it.
 
 On the next run, danwo finds each element again by that description and repeats the actions.
 
+The other agent steps are recorded too:
+
+| Step            | What's recorded                                     | What the replay does                   |
+| --------------- | --------------------------------------------------- | -------------------------------------- |
+| `agent.assert`  | A short text on the page that shows the claim holds | Waits for that text to be shown        |
+| `agent.waitFor` | The same, for the condition                         | Waits for that text to be shown        |
+| `agent.extract` | The elements each value was read from               | Reads them again and checks the schema |
+
+A count with no text that states it, such as the number of cards on a board, is recorded as the
+kind of element counted. The replay counts them again.
+
 ## Read the cache line
 
 Every run with agent steps prints a `cache:` line, counting what each step came to:
@@ -37,6 +48,27 @@ cache: 12 replayed · 1 relocated · 1 handed off · 0 missed
 | `off`        | The session has no cache.                                             |
 
 A `handed-off` step is recorded afresh once it passes, so the next run replays again.
+
+## Why a step was re-asked
+
+A step is handed back to the model only when its recording stopped matching the page. The failure
+page and the report say what stopped matching, next to the outcome:
+
+```text
+| 3 | assign Review Q3 plan to Bob | passed | handed-off: action 4 (click): getByRole("option", name: "Bob Babbage") is no longer on the page |
+| 4 | Bob is assigned to Review Q3 plan | passed | handed-off: "Assigned: Bob Babbage" was not shown within 5000 ms |
+```
+
+| Reason                          | What changed                                                       |
+| ------------------------------- | ------------------------------------------------------------------ |
+| `… is no longer on the page`    | The element was renamed or removed.                                |
+| `… matches 2 elements`          | The description now fits more than one element.                    |
+| `effect: expected …, saw none`  | Every action ran, but the change it made last time didn't happen.  |
+| `"…" was not shown within … ms` | The text that proved a claim or a wait isn't on the page any more. |
+
+A reason that names a real change in your app means the replay caught it. The model's new run is
+recorded once it passes. A provider call that background work makes, such as a queued job sending
+a notification, is waited for up to 10 seconds before it counts as missing.
 
 ## When a recording goes stale
 

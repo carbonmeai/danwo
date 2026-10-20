@@ -9,7 +9,8 @@ Every failed run keeps a flight record under `.danwo/runs/<run>/`; start from it
 2. Read the top: the error code and class, the test file line the failure went through, and where
    the body stopped.
 3. Then the steps: each with its cache outcome (`replayed`, `relocated`, `handed-off`, `missed`,
-   `stale`, `diverged`), its model calls and cost. "Checks" follows: the wait for background work
+   `stale`, `diverged`; a `handed-off` or `diverged` one says what stopped matching), its model
+   calls and cost. "Checks" follows: the wait for background work
    with how long it took and what it waited for (a run that took long, or an event that started
    no run), then each value check of the invariant or test, ✓ or ✗, with expected vs actual.
    Every step in the record carries its phase (`setup`, `body`, `settle`, `checks`, `teardown`);

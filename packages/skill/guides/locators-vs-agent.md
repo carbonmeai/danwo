@@ -34,6 +34,23 @@ the next run replays it with no model call, finding each element again by what i
 whose page changed is handed back to the model and recorded afresh (`danwo guide debugging`
 explains the cache outcomes).
 
+Every kind of agent step replays:
+
+- `act`: its actions, found again by what each element was; a replay must also have the step's
+  recorded effects on the page and behind it (a provider call made by background work is waited
+  for up to 10 s).
+- `assert` and `waitFor`: the judge names a short text on the page that shows the claim holds; a
+  replay waits for that text. A claim with no such text (something is absent) asks the judge each
+  run.
+- `extract`: the elements each value was read from. For how many of something the page lists
+  when no text says the number, the model reads `as: "count"` by pointing at one item; a replay
+  counts the shown elements with its test id, or its role.
+
+A step whose recording no longer matches is re-asked (`handed-off`), and its record says why: an
+element no longer on the page or matching several, an effect that did not happen, evidence not
+shown. Read that reason before rewriting the step; a reason that names an app change means the
+replay caught it.
+
 Values in braces come from `params`: `unique(...)` gives a fresh value each run that replays still
 accept, `secret(name)` keeps the value from the model, and values the agent reads from mail are
 recorded by where they came from, not as text.
