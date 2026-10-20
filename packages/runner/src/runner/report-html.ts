@@ -130,8 +130,9 @@ function cacheFact(cache: NonNullable<RecordedStep["cache"]>): string {
   const saved = cache.saved ? ", recorded" : ""
   const changed = cache.changed ? ` (${cache.changed.join(", ")} changed)` : ""
   const because = cache.because === undefined ? "" : ` (${cache.because})`
+  const reason = cache.reason === undefined ? "" : `: ${cache.reason}`
 
-  return `cache ${cache.mode}${because}${saved}${changed}`
+  return `cache ${cache.mode}${because}${saved}${changed}${reason}`
 }
 
 function stepsBlock(loaded: Loaded): string {

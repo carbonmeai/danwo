@@ -85,7 +85,9 @@ function cacheText(cache: RecordedStep["cache"]): string {
   if (cache === undefined) return ""
   if (cache.changed) return `${cache.mode} (${cache.changed.join(", ")} changed)`
 
-  return cache.because === undefined ? cache.mode : `${cache.mode} (${cache.because})`
+  const mode = cache.because === undefined ? cache.mode : `${cache.mode} (${cache.because})`
+
+  return cache.reason === undefined ? mode : `${mode}: ${cache.reason}`
 }
 
 function stepRow(step: RecordedStep): string {
