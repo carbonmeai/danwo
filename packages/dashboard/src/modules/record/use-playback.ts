@@ -20,9 +20,14 @@ import {
 export interface Playback {
   /** Where the run is, in milliseconds on the record's clock. */
   readonly ms: number
-  /** The span the scrubber covers. */
+  /** The span the scrubber covers: the video playing. */
   readonly startMs: number
   readonly endMs: number
+  /**
+   * Where the player's clock reads 0:00: the first video's first frame, so a step reads the same
+   * time whichever tab's video plays it.
+   */
+  readonly originMs: number
   readonly playing: boolean
   readonly rate: number
   /** The settle wait and the checks, shaded on the scrubber. */
@@ -430,6 +435,7 @@ export function usePlayback(replay: Replay): Playback {
     ms,
     startMs,
     endMs,
+    originMs: replay.videos.reduce((first, each) => Math.min(first, each.startMs), startMs),
     playing,
     rate,
     segments: replay.segments,

@@ -178,10 +178,10 @@ function Scrubber({ playback }: { readonly playback: Playback }) {
       role="slider"
       tabIndex={0}
       aria-label="Seek"
-      aria-valuemin={0}
-      aria-valuemax={Math.round((playback.endMs - playback.startMs) / 100) / 10}
-      aria-valuenow={Math.round((playback.ms - playback.startMs) / 100) / 10}
-      aria-valuetext={clock(playback.ms - playback.startMs)}
+      aria-valuemin={Math.round((playback.startMs - playback.originMs) / 100) / 10}
+      aria-valuemax={Math.round((playback.endMs - playback.originMs) / 100) / 10}
+      aria-valuenow={Math.round((playback.ms - playback.originMs) / 100) / 10}
+      aria-valuetext={clock(playback.ms - playback.originMs)}
       position="relative"
       flex="1"
       minW="8rem"
@@ -285,7 +285,7 @@ function CopyMoment({ playback }: { readonly playback: Playback }) {
         const url = new URL(window.location.href)
 
         url.hash = ""
-        url.searchParams.set("t", ((playback.ms - playback.startMs) / 1000).toFixed(1))
+        url.searchParams.set("t", ((playback.ms - playback.originMs) / 1000).toFixed(1))
         copy(url.href)
       }}
     >
@@ -350,7 +350,7 @@ function Controls({
         minW="6.5rem"
         aria-live="off"
       >
-        {clock(playback.ms - playback.startMs)} / {clock(playback.endMs - playback.startMs)}
+        {clock(playback.ms - playback.originMs)} / {clock(playback.endMs - playback.originMs)}
       </Span>
       <Scrubber playback={playback} />
       <Toggles
@@ -398,7 +398,7 @@ function GoToSegment({
     <Button
       variant="soft"
       size="xs"
-      aria-label={`Go to ${segment.label.toLowerCase()}, at ${clock(segment.atMs - playback.startMs)}`}
+      aria-label={`Go to ${segment.label.toLowerCase()}, at ${clock(segment.atMs - playback.originMs)}`}
       onClick={() => playback.seek(segment.atMs)}
     >
       <Icons.play size={10} />
@@ -475,7 +475,7 @@ function NowWords({
     <>
       {step ? (
         <>
-          <Span color="ink.muted">Step {index}</Span>
+          <Span color="ink.muted">Step {index === undefined ? "" : index + 1}</Span>
           <Span fontWeight="500" color={step.bad ? "verdict.failed.fg" : "ink.strong"} truncate>
             {step.label}
           </Span>

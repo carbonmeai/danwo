@@ -162,7 +162,7 @@ function TabMove({
           size="xs"
           h="5"
           px="1.5"
-          aria-label={`${mark.label}, at ${clock(mark.atMs - playback.startMs)}`}
+          aria-label={`${mark.label}, at ${clock(mark.atMs - playback.originMs)}`}
           onClick={() => playback.showAt(mark.video, mark.atMs)}
         >
           {icon}
@@ -347,11 +347,11 @@ function StepBody({
               size="xs"
               h="5"
               px="1.5"
-              aria-label={`Go to ${stepNoun(step)}, at ${clock(step.atMs - playback.startMs)}`}
+              aria-label={`Go to ${stepNoun(step)}, at ${clock(step.atMs - playback.originMs)}`}
               onClick={() => playback.showAt(step.video ?? playback.tab, step.atMs ?? 0)}
             >
               <Icons.play size={10} />
-              {clock(step.atMs - playback.startMs)}
+              {clock(step.atMs - playback.originMs)}
             </Button>
           ) : null}
           {step.user === undefined ? null : <Span fontWeight="600">{step.user}</Span>}

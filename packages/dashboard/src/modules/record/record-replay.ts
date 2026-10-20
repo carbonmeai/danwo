@@ -359,10 +359,13 @@ export function frameAt(frames: readonly ReplayFrame[], ms: number): ReplayFrame
   return frames.findLast((frame) => frame.atMs <= ms) ?? frames[0]
 }
 
-/** The step running at `ms`, else the last one that started before it. */
+/**
+ * The step running at `ms`, else the last one that started before it. Where one step ends as the
+ * next starts, the one starting wins.
+ */
 export function stepAt(marks: readonly ReplayMark[], ms: number): number | undefined {
   const steps = marks.filter((mark) => mark.kind === "step")
-  const running = steps.find((mark) => ms >= mark.atMs && ms <= mark.endMs)
+  const running = steps.findLast((mark) => ms >= mark.atMs && ms <= mark.endMs)
 
   return (running ?? steps.findLast((mark) => mark.atMs <= ms))?.step
 }
