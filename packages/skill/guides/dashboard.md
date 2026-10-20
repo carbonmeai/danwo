@@ -12,6 +12,10 @@ danwo serve -p 0     # any free port
 folder of the nearest `danwo.config.ts`). It reads the project's `.danwo` folder and never writes
 to it, so it can stay open while you run tests; reload a page to see new runs.
 
+The server keeps its pre-built dependencies in a folder keyed by the installed packages
+(`node_modules/.vite/deps-<hash>` beside the dashboard) and loads React once, so upgrading danwo
+under a running dashboard needs only a restart, never a cleared cache.
+
 ## Pages
 
 The sidebar holds Overview, Tests, Runs, Matrix, Insights, Impact and Settings; it collapses to an
