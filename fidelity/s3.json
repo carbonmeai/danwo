@@ -1,0 +1,300 @@
+{
+  "provider": "s3",
+  "source": "live",
+  "recorded": "2026-10-20",
+  "scenarios": {
+    "objects: put, head, get, range, copy, delete": {
+      "steps": [
+        {
+          "step": "put an object with a type, metadata and a checksum",
+          "status": 200,
+          "shape": "5487bffaea34"
+        },
+        {
+          "step": "head it",
+          "status": 200,
+          "shape": "f2f1523e7f5b"
+        },
+        {
+          "step": "get it with its checksum",
+          "status": 200,
+          "shape": "e87188e5dd78"
+        },
+        {
+          "step": "get the first five bytes",
+          "status": 206,
+          "shape": "b86b0eaaf58e"
+        },
+        {
+          "step": "copy it",
+          "status": 200,
+          "shape": "f00e940bbb29"
+        },
+        {
+          "step": "delete both at once",
+          "status": 200,
+          "shape": "ec79b4bb3863"
+        }
+      ],
+      "facts": [
+        {
+          "name": "the SDK reads the body back",
+          "value": "hello fidelity"
+        },
+        {
+          "name": "a range reads only its bytes",
+          "value": "hello"
+        },
+        {
+          "name": "delete-many reports both keys",
+          "value": 2
+        }
+      ]
+    },
+    "listing: prefixes, delimiter, pages": {
+      "steps": [
+        {
+          "step": "list with a delimiter",
+          "status": 200,
+          "shape": "192dfa23b229"
+        },
+        {
+          "step": "list page 1 of two keys",
+          "status": 200,
+          "shape": "df59f25914f6"
+        },
+        {
+          "step": "list page 2 of two keys",
+          "status": 200,
+          "shape": "df59f25914f6"
+        },
+        {
+          "step": "list page 3 of two keys",
+          "status": 200,
+          "shape": "86794a266c12"
+        },
+        {
+          "step": "list (v1) two keys",
+          "status": 200,
+          "shape": "ca0421f6334f"
+        }
+      ],
+      "facts": [
+        {
+          "name": "pages list every key once, in order",
+          "value": "d/1,d/2,e/1,f,g"
+        }
+      ]
+    },
+    "multipart: parts, listings, complete, abort": {
+      "steps": [
+        {
+          "step": "start an upload",
+          "status": 200,
+          "shape": "646d078bdeee"
+        },
+        {
+          "step": "upload part 1",
+          "status": 200,
+          "shape": "63be0de222dd"
+        },
+        {
+          "step": "upload part 2",
+          "status": 200,
+          "shape": "63be0de222dd"
+        },
+        {
+          "step": "list its parts",
+          "status": 200,
+          "shape": "e78cd423cfb1"
+        },
+        {
+          "step": "list the uploads under way",
+          "status": 200,
+          "shape": "458108e66d69"
+        },
+        {
+          "step": "complete it",
+          "status": 200,
+          "shape": "44eb302ed254"
+        },
+        {
+          "step": "head the joined object",
+          "status": 200,
+          "shape": "30aa6ec8e2ec"
+        },
+        {
+          "step": "list an aborted upload's parts",
+          "status": 404,
+          "shape": "4b9c94ae5e36"
+        }
+      ],
+      "facts": [
+        {
+          "name": "the joined object is both parts",
+          "value": 5242884
+        },
+        {
+          "name": "its ETag counts the parts",
+          "value": "-2\""
+        },
+        {
+          "name": "lib-storage uploads a large body in parts",
+          "value": 5242881
+        }
+      ]
+    },
+    "presigned URLs: put, get, expired": {
+      "steps": [
+        {
+          "step": "put through a presigned URL",
+          "status": 200,
+          "shape": "e372d66d2f37"
+        },
+        {
+          "step": "get through a presigned URL",
+          "status": 200,
+          "shape": "4476b327e918"
+        },
+        {
+          "step": "get through an expired presigned URL",
+          "status": 403,
+          "shape": "2ecfab087d92"
+        }
+      ],
+      "facts": [
+        {
+          "name": "a presigned GET reads what the presigned PUT wrote",
+          "value": "via presign"
+        }
+      ]
+    },
+    "conditional requests: if-match, if-none-match, dates": {
+      "steps": [
+        {
+          "step": "get with another ETag in If-Match",
+          "status": 412,
+          "shape": "42ca81bacbe7"
+        },
+        {
+          "step": "get unmodified since 1970",
+          "status": 412,
+          "shape": "42ca81bacbe7"
+        },
+        {
+          "step": "put over it with If-None-Match: *",
+          "status": 412,
+          "shape": "42ca81bacbe7"
+        },
+        {
+          "step": "put over another ETag with If-Match",
+          "status": 412,
+          "shape": "42ca81bacbe7"
+        }
+      ],
+      "facts": []
+    },
+    "errors: missing key and bucket, bad range, signatures, malformed body": {
+      "steps": [
+        {
+          "step": "get a missing key",
+          "status": 404,
+          "shape": "b5851cdf60fa"
+        },
+        {
+          "step": "head a missing key",
+          "status": 404,
+          "shape": "e9db4bad0fb6"
+        },
+        {
+          "step": "get a range past the end",
+          "status": 416,
+          "shape": "e82e6d4eecdd"
+        },
+        {
+          "step": "list a bucket that does not exist",
+          "status": 404,
+          "shape": "076608039f59"
+        },
+        {
+          "step": "get with a wrong secret",
+          "status": 403,
+          "shape": "585f7092d684"
+        },
+        {
+          "step": "get with an unknown key",
+          "status": 403,
+          "shape": "14b88bff0b08"
+        },
+        {
+          "step": "get without a signature",
+          "status": 403,
+          "shape": "2ecfab087d92"
+        },
+        {
+          "step": "delete with a malformed body",
+          "status": 400,
+          "shape": "27f9860bba51"
+        }
+      ],
+      "facts": []
+    },
+    "tigris: the presign call and renames": {
+      "steps": [
+        {
+          "step": "ask the service for a presigned GET",
+          "status": 200,
+          "shape": "eb6c6b604f01"
+        },
+        {
+          "step": "get through the service's URL",
+          "status": 200,
+          "shape": "6cdc79c5579e"
+        },
+        {
+          "step": "rename with X-Tigris-Rename",
+          "status": 200,
+          "shape": "f00e940bbb29"
+        },
+        {
+          "step": "head the renamed source",
+          "status": 404,
+          "shape": "e9db4bad0fb6"
+        }
+      ],
+      "facts": []
+    }
+  },
+  "shapes": {
+    "076608039f59": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"Error":{"t":"object","keys":{"Code":{"t":"literal","v":"NoSuchBucket"},"Message":{"t":"string"},"Resource":{"t":"string"},"RequestId":{"t":"string"},"BucketName":{"t":"string"}}}}}}},
+    "14b88bff0b08": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"Error":{"t":"object","keys":{"Code":{"t":"literal","v":"InvalidAccessKeyId"},"Message":{"t":"string"},"Resource":{"t":"string"},"RequestId":{"t":"string"},"Key":{"t":"string"},"BucketName":{"t":"string"}}}}}}},
+    "192dfa23b229": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"ListBucketResult":{"t":"object","keys":{"Name":{"t":"string"},"Prefix":{"t":"string"},"MaxKeys":{"t":"string"},"Delimiter":{"t":"string"},"IsTruncated":{"t":"literal","v":"false"},"Contents":{"t":"array","of":{"t":"object","keys":{"Key":{"t":"string"},"ETag":{"t":"string"},"Size":{"t":"string"},"Owner":{"t":"object","keys":{"ID":{"t":"string"}}},"StorageClass":{"t":"literal","v":"STANDARD"},"LastModified":{"t":"string"}}}},"CommonPrefixes":{"t":"array","of":{"t":"object","keys":{"Prefix":{"t":"string"}}}},"ContinuationToken":{"t":"string"},"KeyCount":{"t":"string"}}}}}}},
+    "27f9860bba51": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"Error":{"t":"object","keys":{"Code":{"t":"literal","v":"MalformedXML"},"Message":{"t":"string"},"Resource":{"t":"string"},"RequestId":{"t":"string"},"BucketName":{"t":"string"}}}}}}},
+    "2ecfab087d92": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"Error":{"t":"object","keys":{"Code":{"t":"literal","v":"AccessDenied"},"Message":{"t":"string"},"Resource":{"t":"string"},"RequestId":{"t":"string"},"Key":{"t":"string"},"BucketName":{"t":"string"}}}}}}},
+    "30aa6ec8e2ec": {"t":"object","keys":{"headers":{"t":"object","keys":{"accept-ranges":{"t":"literal","v":"bytes"},"content-length":{"t":"string"},"content-type":{"t":"string"},"etag":{"t":"string"},"last-modified":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"null"}}},
+    "42ca81bacbe7": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"Error":{"t":"object","keys":{"Code":{"t":"literal","v":"PreconditionFailed"},"Message":{"t":"string"},"Resource":{"t":"string"},"RequestId":{"t":"string"},"Key":{"t":"string"},"BucketName":{"t":"string"}}}}}}},
+    "4476b327e918": {"t":"object","keys":{"headers":{"t":"object","keys":{"accept-ranges":{"t":"literal","v":"bytes"},"content-length":{"t":"string"},"content-type":{"t":"string"},"etag":{"t":"string"},"last-modified":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"string"}}},
+    "44eb302ed254": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"CompleteMultipartUploadResult":{"t":"object","keys":{"Bucket":{"t":"string"},"Key":{"t":"string"},"ETag":{"t":"string"}}}}}}},
+    "458108e66d69": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"ListMultipartUploadsResult":{"t":"object","keys":{"Bucket":{"t":"string"},"Prefix":{"t":"string"},"KeyMarker":{"t":"string"},"UploadIdMarker":{"t":"string"},"IsTruncated":{"t":"literal","v":"false"},"MaxUploads":{"t":"string"},"Upload":{"t":"array","of":{"t":"object","keys":{"Key":{"t":"string"},"UploadId":{"t":"string"},"ChecksumAlgorithm":{"t":"string"},"Initiated":{"t":"string"}}}}}}}}}},
+    "4b9c94ae5e36": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"Error":{"t":"object","keys":{"Code":{"t":"literal","v":"NoSuchUpload"},"Message":{"t":"string"},"Resource":{"t":"string"},"RequestId":{"t":"string"},"Key":{"t":"string"},"BucketName":{"t":"string"}}}}}}},
+    "5487bffaea34": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"etag":{"t":"string"},"x-amz-checksum-crc32":{"t":"string"},"x-amz-checksum-type":{"t":"literal","v":"FULL_OBJECT"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"null"}}},
+    "585f7092d684": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"Error":{"t":"object","keys":{"Code":{"t":"literal","v":"SignatureDoesNotMatch"},"Message":{"t":"string"},"Resource":{"t":"string"},"RequestId":{"t":"string"},"Key":{"t":"string"},"BucketName":{"t":"string"}}}}}}},
+    "63be0de222dd": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"etag":{"t":"string"},"x-amz-checksum-crc32":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"null"}}},
+    "646d078bdeee": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"InitiateMultipartUploadResult":{"t":"object","keys":{"Bucket":{"t":"string"},"Key":{"t":"string"},"UploadId":{"t":"string"}}}}}}},
+    "6cdc79c5579e": {"t":"object","keys":{"headers":{"t":"object","keys":{"accept-ranges":{"t":"literal","v":"bytes"},"content-length":{"t":"string"},"content-type":{"t":"string"},"etag":{"t":"string"},"last-modified":{"t":"string"},"x-amz-checksum-crc32":{"t":"string"},"x-amz-checksum-type":{"t":"literal","v":"FULL_OBJECT"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"string"}}},
+    "86794a266c12": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"ListBucketResult":{"t":"object","keys":{"Name":{"t":"string"},"Prefix":{"t":"string"},"MaxKeys":{"t":"string"},"IsTruncated":{"t":"literal","v":"false"},"Contents":{"t":"array","of":{"t":"object","keys":{"Key":{"t":"string"},"ETag":{"t":"string"},"Size":{"t":"string"},"Owner":{"t":"object","keys":{"ID":{"t":"string"}}},"StorageClass":{"t":"literal","v":"STANDARD"},"LastModified":{"t":"string"}}}},"ContinuationToken":{"t":"string"},"KeyCount":{"t":"string"}}}}}}},
+    "b5851cdf60fa": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"Error":{"t":"object","keys":{"Code":{"t":"literal","v":"NoSuchKey"},"Message":{"t":"string"},"Resource":{"t":"string"},"RequestId":{"t":"string"},"Key":{"t":"string"},"BucketName":{"t":"string"}}}}}}},
+    "b86b0eaaf58e": {"t":"object","keys":{"headers":{"t":"object","keys":{"accept-ranges":{"t":"literal","v":"bytes"},"content-length":{"t":"string"},"content-range":{"t":"string"},"content-type":{"t":"string"},"etag":{"t":"string"},"last-modified":{"t":"string"},"x-amz-meta-purpose":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"string"}}},
+    "ca0421f6334f": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"ListBucketResult":{"t":"object","keys":{"Name":{"t":"string"},"Prefix":{"t":"string"},"Marker":{"t":"string"},"NextMarker":{"t":"string"},"MaxKeys":{"t":"string"},"IsTruncated":{"t":"literal","v":"true"},"Contents":{"t":"array","of":{"t":"object","keys":{"Key":{"t":"string"},"ETag":{"t":"string"},"Size":{"t":"string"},"Owner":{"t":"object","keys":{"ID":{"t":"string"}}},"StorageClass":{"t":"literal","v":"STANDARD"},"LastModified":{"t":"string"}}}}}}}}}},
+    "df59f25914f6": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"ListBucketResult":{"t":"object","keys":{"Name":{"t":"string"},"Prefix":{"t":"string"},"MaxKeys":{"t":"string"},"IsTruncated":{"t":"literal","v":"true"},"Contents":{"t":"array","of":{"t":"object","keys":{"Key":{"t":"string"},"ETag":{"t":"string"},"Size":{"t":"string"},"Owner":{"t":"object","keys":{"ID":{"t":"string"}}},"StorageClass":{"t":"literal","v":"STANDARD"},"LastModified":{"t":"string"}}}},"ContinuationToken":{"t":"string"},"NextContinuationToken":{"t":"string"},"KeyCount":{"t":"string"}}}}}}},
+    "e372d66d2f37": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"etag":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"null"}}},
+    "e78cd423cfb1": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"ListPartsResult":{"t":"object","keys":{"Bucket":{"t":"string"},"Key":{"t":"string"},"UploadId":{"t":"string"},"PartNumberMarker":{"t":"string"},"NextPartNumberMarker":{"t":"string"},"MaxParts":{"t":"string"},"IsTruncated":{"t":"literal","v":"false"},"Part":{"t":"array","of":{"t":"object","keys":{"ETag":{"t":"string"},"LastModified":{"t":"string"},"PartNumber":{"t":"string"},"Size":{"t":"string"}}}}}}}}}},
+    "e82e6d4eecdd": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"Error":{"t":"object","keys":{"Code":{"t":"literal","v":"InvalidRange"},"Message":{"t":"string"},"Resource":{"t":"string"},"RequestId":{"t":"string"},"Key":{"t":"string"},"BucketName":{"t":"string"}}}}}}},
+    "e87188e5dd78": {"t":"object","keys":{"headers":{"t":"object","keys":{"accept-ranges":{"t":"literal","v":"bytes"},"content-length":{"t":"string"},"content-type":{"t":"string"},"etag":{"t":"string"},"last-modified":{"t":"string"},"x-amz-checksum-crc32":{"t":"string"},"x-amz-checksum-type":{"t":"literal","v":"FULL_OBJECT"},"x-amz-meta-purpose":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"string"}}},
+    "e9db4bad0fb6": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"null"}}},
+    "eb6c6b604f01": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"bucket":{"t":"string"},"key":{"t":"string"},"type":{"t":"string"},"url":{"t":"string"},"custom_domain_url":{"t":"string"},"key_id":{"t":"string"},"key_secret":{"t":"string"}}}}},
+    "ec79b4bb3863": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"DeleteResult":{"t":"object","keys":{"Deleted":{"t":"array","of":{"t":"object","keys":{"Key":{"t":"string"}}}}}}}}}},
+    "f00e940bbb29": {"t":"object","keys":{"headers":{"t":"object","keys":{"content-length":{"t":"string"},"content-type":{"t":"string"},"etag":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"object","keys":{"CopyObjectResult":{"t":"object","keys":{"LastModified":{"t":"string"},"ETag":{"t":"string"}}}}}}},
+    "f2f1523e7f5b": {"t":"object","keys":{"headers":{"t":"object","keys":{"accept-ranges":{"t":"literal","v":"bytes"},"content-length":{"t":"string"},"content-type":{"t":"string"},"etag":{"t":"string"},"last-modified":{"t":"string"},"x-amz-checksum-crc32":{"t":"string"},"x-amz-checksum-type":{"t":"literal","v":"FULL_OBJECT"},"x-amz-meta-purpose":{"t":"string"},"x-amz-request-id":{"t":"string"}}},"body":{"t":"null"}}}
+  }
+}

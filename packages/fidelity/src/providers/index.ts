@@ -16,6 +16,7 @@ import { paystackFidelity } from "./paystack.ts"
 import { perplexityFidelity } from "./perplexity.ts"
 import { pusherFidelity } from "./pusher.ts"
 import { resendFidelity } from "./resend.ts"
+import { s3Fidelity } from "./s3.ts"
 import { slackFidelity } from "./slack.ts"
 import { stripeFidelity } from "./stripe.ts"
 import { tiptapFidelity } from "./tiptap.ts"
@@ -24,6 +25,7 @@ import { twilioFidelity } from "./twilio.ts"
 export const FIDELITY_PROVIDERS: readonly FidelityProvider[] = [
   stripeFidelity,
   resendFidelity,
+  s3Fidelity,
   twilioFidelity,
   paystackFidelity,
   flutterwaveFidelity,
