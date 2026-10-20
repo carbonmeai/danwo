@@ -76,17 +76,13 @@ const LOOK = "the settings page looks as it did, the pointer drawn or not"
 
 let dashboard: Dashboard | undefined
 let session: WebSession | undefined
+/** What the two runs printed: the baseline's with no video, then the filmed one's. */
+const outs: string[] = []
 
 beforeAll(async () => {
   /* The baseline is taken with no video, so no pointer is drawn into the page. */
-  const baseline = await danwo(["test", "--video", "off", "--grep", "looks as it did"])
-
-  expect(baseline.out).toContain("1 passed")
-
-  const filmed = await danwo(["test"])
-
-  expect(filmed.out).toContain("2 passed")
-  expect(filmed.code).toBe(0)
+  outs.push((await danwo(["test", "--video", "off", "--grep", "looks as it did"])).out)
+  outs.push((await danwo(["test"])).out)
 }, 180_000)
 
 afterAll(async () => {
@@ -122,6 +118,8 @@ describe("a popup in the recording", () => {
   it("matches a baseline taken with no pointer, with the pointer on the page", async () => {
     const { record } = await newestRecord(LOOK)
 
+    expect(outs[0]).toContain("1 passed")
+    expect(outs[1]).toContain("2 passed")
     expect(record.status).toBe("passed")
     expect(record.videos?.map((video) => video.file)).toEqual(["video/tab-1.webm"])
     expect(
@@ -165,5 +163,6 @@ describe("a popup in the recording", () => {
     await screen.getByRole("button", { name: "Play" }).click()
     await see(video).toHaveAttribute("aria-label", "Video of the run, tab 2", { timeout: 15_000 })
     await see(video).toHaveAttribute("aria-label", "Video of the run, tab 1", { timeout: 15_000 })
+    expect(await video.getAttribute("src")).toMatch(/\/video\/tab-1\.webm$/)
   }, 180_000)
 })
