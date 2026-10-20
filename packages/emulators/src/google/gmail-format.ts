@@ -108,6 +108,11 @@ export function messageResource(
   }
 }
 
+/** What sending a message and changing its labels answer: its ids and its labels, nothing more. */
+export function messageLabels(message: GmailMessageRecord): gmail_v1.Schema$Message {
+  return { id: message.messageId, threadId: message.threadId, labelIds: message.labelIds }
+}
+
 /** The id pair lists and history entries use. */
 export function messageRef(message: GmailMessageRecord): gmail_v1.Schema$Message {
   return { id: message.messageId, threadId: message.threadId }

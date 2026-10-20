@@ -4,7 +4,7 @@ import type { Context } from "../../http.ts"
 import { badRequest, isRecord, jsonBody, notFound, pageOf, pageSize, queryAll } from "../api.ts"
 import type { GoogleRouteContext } from "../context.ts"
 import type { GmailMessageRecord } from "../entities.ts"
-import { formatOf, messageRef, messageResource, partById } from "../gmail-format.ts"
+import { formatOf, messageLabels, messageRef, messageResource, partById } from "../gmail-format.ts"
 import { searchMessages } from "../gmail-query.ts"
 import {
   addMessage,
@@ -130,7 +130,7 @@ export function gmailMessageRoutes(context: GoogleRouteContext): void {
     const { raw, body } = await rawMessage(c)
     const threadId = typeof body.threadId === "string" ? body.threadId : null
 
-    return c.json(messageResource(sendMessage(context, caller.user, raw, threadId), "minimal"))
+    return c.json(messageLabels(sendMessage(context, caller.user, raw, threadId)))
   }
 
   app.post(`${USER}/messages/send`, send)
@@ -167,7 +167,7 @@ export function gmailMessageRoutes(context: GoogleRouteContext): void {
       labelList(body.removeLabelIds),
     )
 
-    return c.json(messageResource(changed, "minimal"))
+    return c.json(messageLabels(changed))
   })
 
   for (const [action, add, remove] of [
@@ -177,7 +177,7 @@ export function gmailMessageRoutes(context: GoogleRouteContext): void {
     app.post(`${USER}/messages/:id/${action}`, (c) => {
       const message = pathMessage(c, SCOPES.gmailModify)
 
-      return c.json(messageResource(changeLabels(context, message, add, remove), "minimal"))
+      return c.json(messageLabels(changeLabels(context, message, add, remove)))
     })
 
   app.delete(`${USER}/messages/:id`, (c) => {

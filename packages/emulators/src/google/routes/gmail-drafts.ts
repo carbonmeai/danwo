@@ -6,7 +6,7 @@ import type { Context } from "../../http.ts"
 import { jsonBody, notFound, pageOf, pageSize } from "../api.ts"
 import type { GoogleRouteContext } from "../context.ts"
 import type { GmailDraftRecord } from "../entities.ts"
-import { formatOf, messageRef, messageResource } from "../gmail-format.ts"
+import { formatOf, messageLabels, messageRef, messageResource } from "../gmail-format.ts"
 import { addMessage, deleteMessage, mailboxOwner, messageOf, sendMessage } from "../gmail.ts"
 import { SCOPES } from "../scopes.ts"
 import { googleStore } from "../store.ts"
@@ -124,9 +124,7 @@ export function gmailDraftRoutes(context: GoogleRouteContext): void {
 
     deleteMessage(context, message)
 
-    return c.json(
-      messageResource(sendMessage(context, caller.user, message.raw, message.threadId), "minimal"),
-    )
+    return c.json(messageLabels(sendMessage(context, caller.user, message.raw, message.threadId)))
   }
 
   app.post(`${USER}/drafts/send`, send)
