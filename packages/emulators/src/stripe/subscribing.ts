@@ -116,7 +116,7 @@ export function changeSubscription(
 }
 
 /** Wakes the clock for the subscription's next due moment: its trial notice or period end. */
-function scheduleNext(billing: Billing, subscription: Subscription): void {
+export function scheduleNext(billing: Billing, subscription: Subscription): void {
   billing.wakeAt(new Date(currentPeriodEnd(subscription) * 1000))
   if (subscription.trial_end !== null)
     billing.wakeAt(new Date((subscription.trial_end - 3 * DAY_S) * 1000))

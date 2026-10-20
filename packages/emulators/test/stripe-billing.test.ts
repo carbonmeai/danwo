@@ -207,6 +207,23 @@ describe("subscriptions", () => {
     })
   })
 
+  it("still ends a trial when time moves on after a restore that dropped the clock's work", async () => {
+    const price = await proPrice()
+    const customer = await customerWith("pm_card_visa")
+    const subscription = await api.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: price.id }],
+      trial_period_days: 7,
+    })
+    const kept = emulator.snapshot()
+
+    clock.restart(clock.clock())
+    emulator.restore(kept)
+    clock.advance(8 * DAY_MS)
+
+    expect((await api.subscriptions.retrieve(subscription.id)).status).toBe("active")
+  })
+
   it("falls past due when a renewal's charge is declined, and recovers when the invoice is paid", async () => {
     const price = await proPrice()
     const customer = await customerWith("pm_card_chargeCustomerFail")

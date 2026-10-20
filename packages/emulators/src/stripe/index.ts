@@ -36,7 +36,7 @@ import { webhookEndpointRoutes } from "./routes/webhook-endpoints.ts"
 import { STRIPE_SANDBOX_DELIVERY, stripeWebhookHeaders } from "./signature.ts"
 import { stripeStore } from "./store.ts"
 import { STRIPE_JS } from "./stripe-js.ts"
-import { runDue } from "./subscribing.ts"
+import { runDue, scheduleNext } from "./subscribing.ts"
 
 export type * from "./entities.ts"
 export { STRIPE_API_VERSION } from "./events.ts"
@@ -268,6 +268,9 @@ function endpointsOf(store: Store): WebhookEndpoint[] {
  * The Stripe API (`api.stripe.com`) and its hosted Checkout and invoice pages, in test mode.
  * Webhooks are signed like Stripe's and retried on a short schedule.
  */
+/** Each emulator's billing, for `restored` to schedule its subscriptions' work again. */
+const billings = new WeakMap<object, Parameters<typeof runDue>[0]>()
+
 export const stripe = defineEmulator({
   name: "stripe",
   setup(context) {
@@ -303,6 +306,15 @@ export const stripe = defineEmulator({
     const billing = { app, objects, events, baseUrl: context.baseUrl, clock: context.clock, wakeAt }
 
     routes(billing)
+    billings.set(context, billing)
+  },
+  restored(context) {
+    const billing = billings.get(context)
+
+    if (billing === undefined) return
+    for (const subscription of billing.objects.subscriptions.all())
+      if (["active", "trialing", "past_due", "incomplete"].includes(subscription.status))
+        scheduleNext(billing, subscription)
   },
   seed: seedDefaults,
   webhooks: ({ store, clock, wallClock }) => ({

@@ -48,6 +48,11 @@ export interface EmulatorDefinition {
   readonly webhooks?: (context: EmulatorContext) => WebhookSetup
   /** Answers the provider's WebSockets (realtime channels, collaboration) for clients that keep one open. */
   readonly sockets?: (context: EmulatorContext) => SocketHandler
+  /**
+   * Schedules again, on the timer, the work the restored state has coming (a renewal, a trial's
+   * end): whoever restores an emulator drops what its timer had queued for the state it left.
+   */
+  readonly restored?: (context: EmulatorContext) => void
 }
 
 /** Checks a definition's name and returns it, typed. */
@@ -130,6 +135,7 @@ export function createEmulator(
       context.store.restore(snapshot)
       // Webhooks the run emitted since the snapshot belong to that run, not to the next one.
       context.outbox.clear()
+      definition.restored?.(context)
     },
     reset() {
       context.store.reset()
