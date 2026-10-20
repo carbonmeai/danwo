@@ -1,6 +1,6 @@
 import type { S3RouteContext, S3ObjectCall } from "../context.ts"
 import type { PartRecord, UploadRecord } from "../entities.ts"
-import { uploadCompleted, uploadStarted } from "../formatters.ts"
+import { partList, uploadCompleted, uploadList, uploadStarted } from "../formatters.ts"
 import {
   aclFrom,
   badRequest,
@@ -11,7 +11,8 @@ import {
   metadataFrom,
   multipartEtag,
   newUploadId,
-  readBody,
+  onTigris,
+  readWrite,
   S3Error,
   xmlTexts,
 } from "../helpers.ts"
@@ -82,6 +83,7 @@ export function multipartUploadRoutes({ router, store, clock }: S3RouteContext):
 
       s3().uploads.insert({
         uploadId,
+        initiated: clock().toISOString(),
         bucket,
         key,
         contentType: contentTypeFrom(c),
@@ -100,7 +102,7 @@ export function multipartUploadRoutes({ router, store, clock }: S3RouteContext):
     async (call) => {
       const upload = requireUpload(s3(), call)
       const number = Number(call.c.req.query("partNumber"))
-      const bytes = await readBody(call.c)
+      const { bytes, checksum } = await readWrite(call.c)
       const etag = md5Hex(bytes)
       const previous = s3()
         .parts.findBy("uploadId", upload.uploadId)
@@ -113,9 +115,14 @@ export function multipartUploadRoutes({ router, store, clock }: S3RouteContext):
         body: bytes.toString("base64"),
         size: bytes.length,
         etag,
+        modified: clock().toISOString(),
       })
 
-      return call.c.body(null, 200, { etag: `"${etag}"` })
+      // A part's checksum covers that part only, so it comes back without a checksum type.
+      const echoed =
+        checksum === undefined ? {} : { [`x-amz-checksum-${checksum.algorithm}`]: checksum.value }
+
+      return call.c.body(null, 200, { etag: `"${etag}"`, ...echoed })
     },
     hasQuery("uploadId"),
   )
@@ -133,9 +140,40 @@ export function multipartUploadRoutes({ router, store, clock }: S3RouteContext):
 
       discard(s3(), upload)
 
-      return call.c.body(uploadCompleted(`/${upload.bucket}/${upload.key}`, object), 200, xml)
+      const location = onTigris(call.c) ? undefined : `/${upload.bucket}/${upload.key}`
+
+      return call.c.body(uploadCompleted(location, object), 200, xml)
     },
     hasQuery("uploadId"),
+  )
+
+  router.object(
+    "GET",
+    (call) => {
+      const upload = requireUpload(s3(), call)
+      const parts = s3()
+        .parts.findBy("uploadId", upload.uploadId)
+        .toSorted((a, b) => a.number - b.number)
+
+      return call.c.body(partList(upload, parts), 200, xml)
+    },
+    hasQuery("uploadId"),
+  )
+
+  router.bucket(
+    "GET",
+    ({ c, bucket }) => {
+      requireBucket(s3(), bucket)
+
+      const prefix = c.req.query("prefix") ?? ""
+      const uploads = s3()
+        .uploads.all()
+        .filter((upload) => upload.bucket === bucket && upload.key.startsWith(prefix))
+        .toSorted((a, b) => (a.key < b.key ? -1 : 1))
+
+      return c.body(uploadList(bucket, prefix, uploads, onTigris(c)), 200, xml)
+    },
+    hasQuery("uploads"),
   )
 
   router.object(

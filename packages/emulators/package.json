@@ -51,6 +51,7 @@
     "@octokit/webhooks": "14.2.0",
     "@slack/bolt": "5.1.0",
     "@slack/web-api": "8.2.0",
+    "@tigrisdata/storage": "3.23.0",
     "@types/ws": "8.18.2",
     "ai": "7.0.143",
     "auth0": "7.5.0",

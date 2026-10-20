@@ -2,7 +2,15 @@ import type { Context } from "../../http.ts"
 import type { S3RouteContext } from "../context.ts"
 import type { Acl, BucketRecord, ObjectRecord } from "../entities.ts"
 import { bucketList, bucketLocation, deleteResult, document, listedObject } from "../formatters.ts"
-import { aclFrom, badRequest, hasQuery, noSuchBucket, S3Error, xmlTexts } from "../helpers.ts"
+import {
+  aclFrom,
+  badRequest,
+  hasQuery,
+  noSuchBucket,
+  onTigris,
+  S3Error,
+  xmlTexts,
+} from "../helpers.ts"
 import { bucketNamed, objectAt, type S3Store, s3Store } from "../store.ts"
 
 const xml = (c: Context, body: string, status = 200) =>
@@ -71,14 +79,19 @@ function entriesOf(objects: readonly ObjectRecord[], listing: Listing): Entry[] 
   return [...entries.values()]
 }
 
-/** One page of a listing; `last` is where the next page starts when the listing is truncated. */
-function pageOf(objects: readonly ObjectRecord[], listing: Listing) {
+/**
+ * One page of a listing; `last` is where the next page starts when the listing is truncated.
+ * Tigris lists each object with an empty `Owner`.
+ */
+function pageOf(objects: readonly ObjectRecord[], listing: Listing, tigris: boolean) {
   const entries = entriesOf(objects, listing).filter((entry) => entry.at > listing.after)
   const page = entries.slice(0, listing.maxKeys)
   const truncated = entries.length > listing.maxKeys
 
   return {
-    contents: page.flatMap((entry) => ("object" in entry ? [listedObject(entry.object)] : [])),
+    contents: page.flatMap((entry) =>
+      "object" in entry ? [listedObject(entry.object, tigris)] : [],
+    ),
     prefixes: page.flatMap((entry) => ("prefix" in entry ? [{ Prefix: entry.prefix }] : [])),
     truncated,
     last: truncated ? page.at(-1)?.at : undefined,
@@ -101,12 +114,16 @@ const token = {
   read: (value: string) => Buffer.from(value, "base64url").toString("utf8"),
 }
 
-/** ListObjectsV2: continuation tokens, `start-after`, and `KeyCount` counting prefixes too. */
+/**
+ * ListObjectsV2: continuation tokens, `start-after`, and `KeyCount` counting prefixes too.
+ * Tigris answers with a `ContinuationToken` element even on the first page.
+ */
 function listV2(c: Context, bucket: string, objects: readonly ObjectRecord[]): Response {
-  const continuation = c.req.query("continuation-token")
+  const tigris = onTigris(c)
+  const continuation = c.req.query("continuation-token") ?? (tigris ? "" : undefined)
   const startAfter = c.req.query("start-after")
   const listing = listingFrom(c, continuation ? token.read(continuation) : (startAfter ?? ""))
-  const page = pageOf(objects, listing)
+  const page = pageOf(objects, listing, tigris)
 
   return xml(
     c,
@@ -126,11 +143,15 @@ function listV2(c: Context, bucket: string, objects: readonly ObjectRecord[]): R
   )
 }
 
-/** ListObjects (v1): `marker`, and `NextMarker` when a delimiter is used. */
+/**
+ * ListObjects (v1): `marker`, and `NextMarker` when a delimiter is used. Tigris gives
+ * `NextMarker` on every truncated page.
+ */
 function listV1(c: Context, bucket: string, objects: readonly ObjectRecord[]): Response {
+  const tigris = onTigris(c)
   const marker = c.req.query("marker") ?? ""
   const listing = listingFrom(c, marker)
-  const page = pageOf(objects, listing)
+  const page = pageOf(objects, listing, tigris)
 
   return xml(
     c,
@@ -141,10 +162,25 @@ function listV1(c: Context, bucket: string, objects: readonly ObjectRecord[]): R
       Delimiter: listing.delimiter || undefined,
       MaxKeys: listing.maxKeys,
       IsTruncated: page.truncated,
-      NextMarker: listing.delimiter ? page.last : undefined,
+      NextMarker: listing.delimiter || tigris ? page.last : undefined,
       Contents: page.contents,
       CommonPrefixes: page.prefixes,
     }),
+  )
+}
+
+/**
+ * Whether a DeleteObjects body is a whole `<Delete>` document whose every `<Object>` is closed
+ * and names a `<Key>`: enough to refuse the truncated or garbled bodies S3 calls MalformedXML.
+ */
+function isDeleteDocument(body: string): boolean {
+  const opened = (body.match(/<Object>/g) ?? []).length
+  const closed = (body.match(/<\/Object>/g) ?? []).length
+
+  return (
+    /<Delete[\s>][\s\S]*<\/Delete>\s*$/.test(body.trim()) &&
+    opened === closed &&
+    xmlTexts(body, "Key").length === opened
   )
 }
 
@@ -208,7 +244,15 @@ export function bucketRoutes({ router, store }: S3RouteContext): void {
     async ({ c, bucket }) => {
       existing(bucket)
 
-      const keys = xmlTexts(await c.req.text(), "Key")
+      const body = await c.req.text()
+
+      if (!isDeleteDocument(body))
+        throw badRequest(
+          "MalformedXML",
+          "The XML you provided was not well-formed or did not validate against our published schema.",
+        )
+
+      const keys = xmlTexts(body, "Key")
 
       for (const key of keys) {
         const object = objectAt(s3(), bucket, key)

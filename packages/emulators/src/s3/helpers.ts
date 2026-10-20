@@ -3,7 +3,12 @@ import { createHash, randomBytes } from "node:crypto"
 import { HttpError } from "../errors.ts"
 import type { Context } from "../http.ts"
 import { oneOf } from "../json.ts"
-import type { Acl, ObjectHeaders } from "./entities.ts"
+import {
+  type Acl,
+  CHECKSUM_ALGORITHMS,
+  type ObjectChecksum,
+  type ObjectHeaders,
+} from "./entities.ts"
 
 /** An S3 failure, answered with S3's error document: its code (`NoSuchKey`) names it. */
 export class S3Error extends HttpError {
@@ -66,6 +71,15 @@ export function isS3Host(host: string): boolean {
 }
 
 /**
+ * Whether `host` is on a Tigris endpoint. Tigris answers a few details differently from AWS
+ * (an empty `Owner` in listings, a `ContinuationToken` element always present), and the emulator
+ * answers each host the way its service does.
+ */
+export function isTigrisHost(host: string): boolean {
+  return TIGRIS_ENDPOINTS.some((endpoint) => host === endpoint || host.endsWith(`.${endpoint}`))
+}
+
+/**
  * The bucket and key a URL addresses. On an S3 or Tigris host, a bucket in front of the endpoint
  * (`media.t3.storage.dev/a.txt`) is virtual-hosted style; anywhere else, and on the bare
  * endpoint, the first path segment is the bucket.
@@ -95,8 +109,25 @@ export function s3Hosts(
 
 // --- request reading ---
 
-/** Undoes `aws-chunked` framing: `<hex size>[;ext]\r\n<bytes>\r\n` … `0\r\n` and trailers. */
-function unchunk(framed: Buffer): Buffer {
+/** The `name:value` trailer lines after an `aws-chunked` body's last chunk. */
+function trailersOf(framed: Buffer, at: number): Record<string, string> {
+  return Object.fromEntries(
+    framed
+      .subarray(at)
+      .toString("latin1")
+      .split("\r\n")
+      .flatMap((line) => {
+        const colon = line.indexOf(":")
+
+        return colon > 0
+          ? [[line.slice(0, colon).trim().toLowerCase(), line.slice(colon + 1).trim()]]
+          : []
+      }),
+  )
+}
+
+/** Undoes `aws-chunked` framing: `<hex size>[;ext]\r\n<bytes>\r\n` … `0\r\n`, then trailers. */
+function unchunk(framed: Buffer): { bytes: Buffer; trailers: Record<string, string> } {
   const pieces: Buffer[] = []
   let at = 0
 
@@ -107,20 +138,45 @@ function unchunk(framed: Buffer): Buffer {
       16,
     )
 
-    if (lineEnd < 0 || !Number.isFinite(size) || size === 0) return Buffer.concat(pieces)
+    if (lineEnd < 0 || !Number.isFinite(size) || size === 0)
+      return {
+        bytes: Buffer.concat(pieces),
+        trailers: lineEnd < 0 ? {} : trailersOf(framed, lineEnd + 2),
+      }
 
     pieces.push(framed.subarray(lineEnd + 2, lineEnd + 2 + size))
     at = lineEnd + 2 + size + 2
   }
 }
 
-/** The object bytes a request carries, with the SDK's streaming framing removed. */
-export async function readBody(c: Context): Promise<Buffer> {
+/** What a write carries: its bytes, without the SDK's streaming framing, and its checksum. */
+export interface WriteBody {
+  readonly bytes: Buffer
+  readonly checksum: ObjectChecksum | undefined
+}
+
+/** The first `x-amz-checksum-<algorithm>` among `values`, read from headers or trailers. */
+function checksumIn(values: (name: string) => string | undefined): ObjectChecksum | undefined {
+  for (const algorithm of CHECKSUM_ALGORITHMS) {
+    const value = values(`x-amz-checksum-${algorithm}`)
+
+    if (value) return { algorithm, value }
+  }
+
+  return undefined
+}
+
+/** The bytes and checksum a write carries, in a plain or an `aws-chunked` body. */
+export async function readWrite(c: Context): Promise<WriteBody> {
   const raw = Buffer.from(await c.req.arrayBuffer())
   const encoding = c.req.header("content-encoding") ?? ""
   const hashing = c.req.header("x-amz-content-sha256") ?? ""
+  const chunked = encoding.includes("aws-chunked") || hashing.startsWith("STREAMING-")
+  const { bytes, trailers } = chunked ? unchunk(raw) : { bytes: raw, trailers: {} }
+  const headerOf = (name: string) => c.req.header(name)
+  const trailerOf = (name: string): string | undefined => trailers[name]
 
-  return encoding.includes("aws-chunked") || hashing.startsWith("STREAMING-") ? unchunk(raw) : raw
+  return { bytes, checksum: checksumIn(headerOf) ?? checksumIn(trailerOf) }
 }
 
 /** `x-amz-meta-*` headers as metadata, keyed without the prefix. */
@@ -158,6 +214,11 @@ export const ACLS: readonly Acl[] = ["private", "public-read", "public-read-writ
 /** The canned ACL in `x-amz-acl`, or `fallback`. */
 export function aclFrom(c: Context, fallback: Acl = "private"): Acl {
   return oneOf(ACLS, c.req.header("x-amz-acl"), fallback)
+}
+
+/** Whether the request came to a Tigris host, which answers a few details its own way. */
+export function onTigris(c: Context): boolean {
+  return isTigrisHost(new URL(c.req.url).hostname)
 }
 
 export function contentTypeFrom(c: Context): string {

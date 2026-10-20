@@ -3,7 +3,7 @@
  * element names, then written out by one serializer: arrays repeat their element, dates are ISO
  * timestamps and text is escaped.
  */
-import type { BucketRecord, ObjectRecord } from "./entities.ts"
+import type { BucketRecord, ObjectRecord, PartRecord, UploadRecord } from "./entities.ts"
 
 const NAMESPACE = "http://s3.amazonaws.com/doc/2006-03-01/"
 
@@ -52,9 +52,32 @@ export function document(
   return `<?xml version="1.0" encoding="UTF-8"?>\n${open}${writeFields(fields)}</${root}>`
 }
 
-/** S3's error document. */
-export function errorDocument(code: string, message: string, requestId: string): string {
-  return document("Error", { Code: code, Message: message, RequestId: requestId }, false)
+/** What an error document names besides its code: the path asked for, the bucket and the key. */
+export interface ErrorSubject {
+  readonly resource: string
+  readonly bucket?: string | undefined
+  readonly key?: string | undefined
+}
+
+/** S3's error document, naming the resource, and the bucket and key when the request had them. */
+export function errorDocument(
+  code: string,
+  message: string,
+  requestId: string,
+  subject: ErrorSubject = { resource: "/" },
+): string {
+  return document(
+    "Error",
+    {
+      Code: code,
+      Message: message,
+      Resource: subject.resource,
+      RequestId: requestId,
+      Key: subject.key,
+      BucketName: subject.bucket,
+    },
+    false,
+  )
 }
 
 const OWNER = { ID: "danwo", DisplayName: "danwo" }
@@ -81,15 +104,61 @@ export function bucketLocation(region: string): string {
 
 const quoted = (etag: string) => `"${etag}"`
 
-/** One object in a listing. */
-export function listedObject(object: ObjectRecord) {
+/** One object in a listing; Tigris adds an empty `Owner` to each. */
+export function listedObject(object: ObjectRecord, withOwner = false) {
   return {
     Key: object.key,
     LastModified: new Date(object.modified),
     ETag: quoted(object.etag),
     Size: object.size,
+    ...(withOwner && { Owner: { ID: "" } }),
     StorageClass: "STANDARD",
   }
+}
+
+/** ListParts: an upload's parts in number order. */
+export function partList(upload: UploadRecord, parts: readonly PartRecord[]): string {
+  return document("ListPartsResult", {
+    Bucket: upload.bucket,
+    Key: upload.key,
+    UploadId: upload.uploadId,
+    PartNumberMarker: 0,
+    NextPartNumberMarker: parts.at(-1)?.number ?? 0,
+    MaxParts: 1000,
+    IsTruncated: false,
+    Part: parts.map((part) => ({
+      ETag: quoted(part.etag),
+      LastModified: new Date(part.modified),
+      PartNumber: part.number,
+      Size: part.size,
+    })),
+  })
+}
+
+/**
+ * ListMultipartUploads: the uploads under way in a bucket, by key. Tigris names each upload's
+ * checksum algorithm, empty when it has none.
+ */
+export function uploadList(
+  bucket: string,
+  prefix: string,
+  uploads: readonly UploadRecord[],
+  tigris = false,
+): string {
+  return document("ListMultipartUploadsResult", {
+    Bucket: bucket,
+    Prefix: prefix,
+    KeyMarker: "",
+    UploadIdMarker: "",
+    IsTruncated: false,
+    MaxUploads: 1000,
+    Upload: uploads.map((upload) => ({
+      Key: upload.key,
+      UploadId: upload.uploadId,
+      ...(tigris && { ChecksumAlgorithm: "" }),
+      Initiated: new Date(upload.initiated),
+    })),
+  })
 }
 
 export function copyResult(object: ObjectRecord): string {
@@ -107,7 +176,8 @@ export function uploadStarted(bucket: string, key: string, uploadId: string): st
   return document("InitiateMultipartUploadResult", { Bucket: bucket, Key: key, UploadId: uploadId })
 }
 
-export function uploadCompleted(location: string, object: ObjectRecord): string {
+/** CompleteMultipartUpload's answer; Tigris leaves out the `Location`. */
+export function uploadCompleted(location: string | undefined, object: ObjectRecord): string {
   return document("CompleteMultipartUploadResult", {
     Location: location,
     Bucket: object.bucket,
@@ -122,6 +192,16 @@ export function formPosted(location: string, object: ObjectRecord): string {
     { Location: location, Bucket: object.bucket, Key: object.key, ETag: quoted(object.etag) },
     false,
   )
+}
+
+/** The checksum headers of an object written with one: the value and how it covers the object. */
+export function checksumHeaders(object: Pick<ObjectRecord, "checksum">): Record<string, string> {
+  return object.checksum === undefined
+    ? {}
+    : {
+        [`x-amz-checksum-${object.checksum.algorithm}`]: object.checksum.value,
+        "x-amz-checksum-type": "FULL_OBJECT",
+      }
 }
 
 /** The headers a GET or HEAD of `object` answers with. */

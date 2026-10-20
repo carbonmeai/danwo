@@ -1,9 +1,10 @@
 import type { Context } from "../../http.ts"
 import { asRecord, oneOf } from "../../json.ts"
 import type { Clock } from "../../store.ts"
+import { checkWrite, readNotModified } from "../conditions.ts"
 import type { S3RouteContext, S3ObjectCall } from "../context.ts"
-import type { ObjectContent, ObjectRecord } from "../entities.ts"
-import { copyResult, formPosted, objectHeaders } from "../formatters.ts"
+import type { ObjectChecksum, ObjectContent, ObjectRecord } from "../entities.ts"
+import { checksumHeaders, copyResult, formPosted, objectHeaders } from "../formatters.ts"
 import {
   ACLS,
   aclFrom,
@@ -14,17 +15,19 @@ import {
   md5Hex,
   metadataFrom,
   noSuchKey,
-  readBody,
+  onTigris,
+  readWrite,
   S3Error,
 } from "../helpers.ts"
 import { objectAt, objectBytes, type S3Store, s3Store, storeObject } from "../store.ts"
 import { requireBucket } from "./buckets.ts"
 
-/** What an object written from `bytes` is described with. */
+/** What an object written from `bytes` is described with, keeping the checksum the writer sent. */
 export function contentOf(
   bytes: Buffer,
   fields: Pick<ObjectContent, "contentType" | "metadata" | "headers" | "acl">,
   clock: Clock,
+  checksum?: ObjectChecksum,
 ): ObjectContent {
   return {
     ...fields,
@@ -32,6 +35,7 @@ export function contentOf(
     size: bytes.length,
     etag: md5Hex(bytes),
     modified: clock().toISOString(),
+    ...(checksum && { checksum }),
   }
 }
 
@@ -89,11 +93,30 @@ function overrides(c: Context): Record<string, string> {
   )
 }
 
-/** GetObject and HeadObject, with single byte ranges. */
+/**
+ * Whether a read answers with the object's checksum: when asked (`x-amz-checksum-mode`), and on
+ * Tigris always; never for a range, since a checksum covers the whole object.
+ */
+function wantsChecksum(c: Context, range: string | undefined): boolean {
+  if (range !== undefined) return false
+
+  return c.req.header("x-amz-checksum-mode") === "ENABLED" || onTigris(c)
+}
+
+/** The headers of a 304: the object's validators only. */
+function notModifiedHeaders(object: ObjectRecord): Record<string, string> {
+  return { etag: `"${object.etag}"`, "last-modified": new Date(object.modified).toUTCString() }
+}
+
+/** GetObject and HeadObject, with conditions, single byte ranges and checksums on request. */
 function readObject({ c, bucket, key }: S3ObjectCall, s3: S3Store, withBody: boolean): Response {
   const object = requireObject(s3, bucket, key)
-  const headers = { ...objectHeaders(object), ...overrides(c) }
+
+  if (readNotModified(c, object)) return c.body(null, 304, notModifiedHeaders(object))
+
   const wanted = c.req.header("range")
+  const checksums = wantsChecksum(c, wanted) ? checksumHeaders(object) : {}
+  const headers = { ...objectHeaders(object), ...checksums, ...overrides(c) }
   const bytes = objectBytes(object)
 
   if (wanted === undefined) return c.body(withBody ? new Uint8Array(bytes) : null, 200, headers)
@@ -145,7 +168,12 @@ function copyObject({ c, bucket, key }: S3ObjectCall, s3: S3Store, clock: Clock)
   if (c.req.header("x-tigris-rename") === "true" && (from.bucket !== bucket || from.key !== key))
     s3.objects.delete(source.id)
 
-  return c.body(copyResult(copy), 200, { "content-type": "application/xml" })
+  const headers: Record<string, string> = { "content-type": "application/xml" }
+
+  // Tigris also gives the copy's ETag as a header, beside the copy result document.
+  if (onTigris(c)) headers["etag"] = `"${copy.etag}"`
+
+  return c.body(copyResult(copy), 200, headers)
 }
 
 async function putObject(
@@ -154,9 +182,11 @@ async function putObject(
   clock: Clock,
 ): Promise<Response> {
   requireBucket(s3, bucket)
+  checkWrite(c, objectAt(s3, bucket, key))
 
+  const { bytes, checksum } = await readWrite(c)
   const content = contentOf(
-    await readBody(c),
+    bytes,
     {
       contentType: contentTypeFrom(c),
       metadata: metadataFrom(c),
@@ -164,9 +194,11 @@ async function putObject(
       acl: aclFrom(c),
     },
     clock,
+    checksum,
   )
+  const stored = storeObject(s3, bucket, key, content)
 
-  return c.body(null, 200, { etag: `"${storeObject(s3, bucket, key, content).etag}"` })
+  return c.body(null, 200, { etag: `"${stored.etag}"`, ...checksumHeaders(stored) })
 }
 
 /** A browser form upload's policy conditions, from its base64 `Policy` field. */

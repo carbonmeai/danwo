@@ -1,5 +1,6 @@
 import type { Store } from "../store.ts"
 import type {
+  AccessKeyRecord,
   BucketRecord,
   ObjectContent,
   ObjectRecord,
@@ -14,6 +15,7 @@ export function s3Store(store: Store) {
     objects: store.collection<ObjectRecord>("s3.objects", ["bucket", "path"]),
     uploads: store.collection<UploadRecord>("s3.uploads", ["uploadId"]),
     parts: store.collection<PartRecord>("s3.parts", ["uploadId"]),
+    keys: store.collection<AccessKeyRecord>("s3.keys", ["accessKeyId"]),
   }
 }
 
