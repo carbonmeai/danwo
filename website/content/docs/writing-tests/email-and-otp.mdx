@@ -1,0 +1,116 @@
+---
+title: Email and 2FA codes
+description: Read sign-in codes and magic links from the mail your app sent, type authenticator codes, and replay it all with no model.
+icon: Mail
+---
+
+Sign-up and sign-in often go through an inbox: a code to type, a magic link to click, a text
+message. danwo reads them from the emulators your app sends through, so your test never polls a
+real inbox.
+
+## Tell danwo where mail lands
+
+A **mail source** tells danwo where your app's mail lands. `clerkService()` adds its own. For
+the others, add the source to the environment's `mail`:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, resendMail, resendService } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  async environment() {
+    const resend = resendService()
+    const env = await appEnvironment({
+      app: { command: "npm run dev", url: "http://localhost:3000" },
+      services: [resend],
+    })
+
+    return { ...env, mail: [...(env.mail ?? []), resendMail(resend.emulator)] }
+  },
+})
+```
+
+Tests then get a `mail` fixture that reads every source.
+
+| Source                  | What it reads                                   |
+| ----------------------- | ----------------------------------------------- |
+| `resendMail(emulator)`  | emails your app sent through Resend             |
+| `gmailMail(emulator)`   | mail delivered to a Gmail mailbox               |
+| `outlookMail(emulator)` | mail delivered to an Outlook mailbox            |
+| `twilioSms(emulator)`   | texts sent to phones; the address is the number |
+| `clerkMail(emulator)`   | Clerk's sign-in and sign-up codes               |
+
+## Type a code from an email
+
+`mail.code(address)` waits for the newest email to that address and returns the code in it:
+
+```ts title="tests/sign-in-code.danwo.ts"
+import { test } from "@danwo/sdk"
+
+test("signs in with an emailed code", async ({ app, screen, mail, expect }) => {
+  await app.open("/login")
+  await screen.getByLabel("Email").fill("ada@shop.test")
+  await screen.getByRole("button", { name: "Send code" }).click()
+  await screen.getByLabel("Code").fill(await mail.code("ada@shop.test"))
+  await expect(screen.getByRole("heading", { name: "Welcome" })).toBeVisible()
+})
+```
+
+## Follow a magic link
+
+`mail.link(address)` returns a link from the newest email. Pass `match` to pick one by its text:
+
+```ts title="tests/magic-link.danwo.ts · the link"
+await app.open(await mail.link("ada@shop.test", { match: "Sign in" }))
+```
+
+Or open the email itself in the browser, and click in it like a user: `await mail.open(address)`.
+
+## Let the agent read the mail
+
+The agent can read codes and links too. Its recording keeps **where** the value came from, never
+the value, so a replay with a fresh address reads the new code:
+
+```ts title="tests/sign-up.danwo.ts"
+import { test, unique } from "@danwo/sdk"
+
+test("signs up and confirms by email", async ({ app, agent }) => {
+  await app.open("/sign-up")
+  await agent.act("sign up as {email} and confirm with the emailed code", {
+    params: { email: unique("ada@shop.test") },
+  })
+})
+```
+
+## Type an authenticator code
+
+For 2FA with an authenticator app, configure the base32 key your app showed at enrolment as a
+`totp` secret:
+
+```ts title="danwo.config.ts · the 2FA key"
+secrets: { otpKey: { value: process.env.TOTP_KEY ?? "", purpose: "totp" } },
+```
+
+Filling it types the code for that moment. The key and the codes are redacted everywhere:
+
+```ts title="tests/two-factor.danwo.ts · the code"
+await screen.getByLabel("Authentication code").fill(secret("otpKey"))
+```
+
+`totp(key)` computes a code directly, when a test needs the number itself.
+
+<Callout type="info">
+  Codes are read from the emulators, so the same test replays on every run with no model call, even
+  though each run gets a new code.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Saved sessions" href="/docs/sessions">
+    Do the sign-in once per worker.
+  </Card>
+  <Card title="Secrets" href="/docs/secrets">
+    Keep passwords and 2FA keys out of every record.
+  </Card>
+</Cards>

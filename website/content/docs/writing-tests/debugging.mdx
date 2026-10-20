@@ -1,0 +1,137 @@
+---
+title: Debugging a failure
+description: Read a failed run's page from top to bottom, and know what each error code asks you to look at.
+icon: ScanSearch
+---
+
+Every failed run keeps a [flight record](/docs/flight-records). Start from its **failure page**: the
+error, the steps, the screen, and what happened behind it, in one place.
+
+## Open the failure page
+
+<Tabs items={["Terminal", "Dashboard", "Coding agent"]}>
+  <Tab value="Terminal">
+
+```sh
+npx danwo show --format md
+```
+
+It prints one page per failed test or matrix trial of the newest run. Pass a run id for an older
+one.
+
+  </Tab>
+  <Tab value="Dashboard">
+
+```sh
+npx danwo serve --open
+```
+
+Click the failed test. The video plays with the steps and provider calls moving along with it.
+
+  </Tab>
+  <Tab value="Coding agent">
+
+The `show_run` MCP tool with `format: "md"` returns the same page. See [Fix a
+failure](/docs/fix-with-an-agent).
+
+  </Tab>
+</Tabs>
+
+## Read it top to bottom
+
+<Steps>
+<Step>
+
+### The top: what failed, and where
+
+The test, the fault if a matrix trial, the error code, and the line the failure went through:
+
+```text
+fault: duplicate on webhook checkout.session.completed · failed · EXPECTATION_FAILED (test) · 2.7 s
+
+**Error at tests/buy-credits.danwo.ts:19:**
+invariant: expected 1000 to be 500 // Object.is equality
+```
+
+</Step>
+<Step>
+
+### The steps
+
+Each step with its status, its [cache](/docs/replay-cache) outcome, model calls, time and line:
+
+```text
+| 4 | getByRole("heading", name: "Thank you for your purchase") toBeVisible() | passed | … | tests/buy-credits.danwo.ts:15 |
+| 5 | getByText(/^Credits: /) toHaveText("Credits: 500") | failed: EXPECTATION_FAILED | … | tests/buy-credits.danwo.ts:16 |
+```
+
+</Step>
+<Step>
+
+### The screen at failure
+
+What the page showed, as an accessibility tree:
+
+```text
+- main:
+  - heading "Thank you for your purchase" [level=1]
+  - paragraph: "Credits: 1000"
+```
+
+</Step>
+<Step>
+
+### What was behind the page
+
+Console errors, failed or faulted provider calls, webhook deliveries, and each emulator's state at
+the end. Here, the same webhook arrived twice and the app answered both:
+
+```text
+| topic                      | attempt | status | fault     |
+| checkout.session.completed | 1       | 200    | duplicate |
+| checkout.session.completed | 1       | 200    |           |
+```
+
+That's the bug: the app credited the account once per delivery.
+
+</Step>
+</Steps>
+
+## What the error code says to check
+
+| Code                                        | Look at                                                                 |
+| ------------------------------------------- | ----------------------------------------------------------------------- |
+| `LOCATOR_NOT_FOUND`, `LOCATOR_AMBIGUOUS`    | the screen at failure, and the nearest candidates it lists              |
+| `EXPECTATION_FAILED`                        | expected against received: is the app wrong, or the test?               |
+| `CLAIM_FAILED`                              | the judge's reason. The claim may be too strict.                        |
+| `APP_ERROR`                                 | your app's own 5xx or uncaught error: an app bug                        |
+| `PROVIDER_ERROR`                            | the failed provider call, and whether your app recovered                |
+| `STALE_RECORDING`, `NOTHING_RECORDED`       | run `danwo test` once to record, then the matrix                        |
+| `AGENT_LOOPING`, `BUDGET_EXCEEDED`          | a vague instruction or a changed page. Split the step, or use locators. |
+| `MODEL_OUTPUT_INVALID`, `MODEL_UNAVAILABLE` | the model provider, not your app. Retry, or change model.               |
+| `BROWSER_FAILED`, `ENVIRONMENT_FAILED`      | the browser or the environment: app start-up, emulators, ports          |
+| `CONFIG_INVALID`                            | the config, or the call the message names                               |
+
+`danwo spec --topic errors` lists every code with its exit code.
+
+## Connection noise
+
+A browser dropping a socket as a page closes (`ECONNRESET`, `EPIPE`, `socket hang up`) is expected,
+so danwo doesn't print it. To see those lines while chasing a connection problem:
+
+```sh
+DANWO_DEBUG=proxy npx danwo test
+```
+
+Every other proxy error always prints.
+
+## Next
+
+<Cards>
+  <Card title="Fix a failure with an agent" href="/docs/fix-with-an-agent">
+    Hand the failure page to your coding agent.
+  </Card>
+  <Card title="Flight records" href="/docs/flight-records">
+    Everything a record keeps, and how to replay it.
+  </Card>
+</Cards>

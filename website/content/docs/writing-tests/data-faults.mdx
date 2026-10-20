@@ -1,0 +1,134 @@
+---
+title: Database and cache faults
+description: Put a fault proxy in front of your own Postgres and Redis, and let the matrix break the calls your tests make.
+icon: Database
+---
+
+Providers aren't the only thing that fails. A COMMIT's reply gets lost, a transaction hits a
+serialization failure, the database restarts, Redis runs out of memory. `danwo matrix` can break
+your own Postgres and Redis calls too. Your app connects through a **fault proxy**, and the matrix
+plans faults on the statements and commands your tests sent.
+
+## Wire the proxies
+
+Start a proxy in front of each store, give your app the proxy's URL, and list the proxies under
+`data`. Add a snapshot so every test starts from the same rows:
+
+```ts title="danwo.config.ts"
+import {
+  appEnvironment,
+  defineConfig,
+  postgresSnapshot,
+  postgresWorkerDatabase,
+  startPostgresProxy,
+  startRedisProxy,
+  stripeService,
+} from "@danwo/sdk"
+
+const REDIS_URL = process.env.REDIS_URL ?? ""
+
+export default defineConfig({
+  testDir: "tests",
+  async environment({ workerIndex }) {
+    const url = await postgresWorkerDatabase(process.env.DATABASE_URL ?? "", workerIndex)
+    const postgres = await startPostgresProxy({ upstream: url })
+    const cache = await startRedisProxy({ upstream: REDIS_URL, service: "cache" })
+    const db = postgresSnapshot({ url })
+    const env = await appEnvironment({
+      app: {
+        command: "npm run dev",
+        url: "http://localhost:3000",
+        env: { DATABASE_URL: postgres.url(url), REDIS_URL: cache.url(REDIS_URL) },
+      },
+      services: [stripeService()],
+    })
+
+    return {
+      ...env,
+      data: [postgres, cache],
+      async snapshot(slot) {
+        await env.snapshot?.(slot)
+        await db.snapshot(slot)
+      },
+      async restore(slot) {
+        await env.restore?.(slot)
+        await db.restore(slot)
+      },
+      async close() {
+        await env.close()
+        await Promise.all([postgres.close(), cache.close(), db.close()])
+      },
+    }
+  },
+})
+```
+
+- `postgresWorkerDatabase` gives each worker its own copy of your database, so parallel tests
+  never share rows.
+- `proxy.url(realUrl)` swaps in the proxy's host and port, and keeps the user, password and
+  database. Snapshots keep using the real URL.
+- `service` names the proxy in fault labels. It defaults to `postgres` or `redis`.
+
+## The faults
+
+Labels read `<fault> on <operation> (<service>)`:
+
+| Fault                        | Example label                                       | What your app sees                                        |
+| ---------------------------- | --------------------------------------------------- | --------------------------------------------------------- |
+| `reset`                      | `reset on INSERT orders (postgres)`                 | the connection drops before the server sees the call      |
+| `reset-after`                | `reset-after on COMMIT (postgres)`                  | the call runs, then the connection drops before the reply |
+| `delay`                      | `delay 5000ms on UPDATE stock (postgres)`           | the call arrives late, like a timeout                     |
+| `serialization_failure`      | `serialization_failure on UPDATE orders (postgres)` | SQLSTATE 40001                                            |
+| `deadlock_detected`          | `deadlock_detected on INSERT orders (postgres)`     | SQLSTATE 40P01                                            |
+| `down`                       | `down 3000ms on BEGIN (postgres)`                   | new connections are refused for 3 seconds                 |
+| `too_many_connections`       | `too_many_connections 3000ms on BEGIN (postgres)`   | each new connection gets FATAL 53300                      |
+| `OOM`, `LOADING`, `READONLY` | `OOM on INCR rate:login:* (cache)`                  | a Redis error in place of the reply                       |
+
+Faults are planned only on calls your test caused, never on the driver's housekeeping or on a
+reset. Run only some with a filter:
+
+```sh
+npx danwo matrix --faults "COMMIT"
+```
+
+## What each call gets
+
+| Call                  | Faults                                                              |
+| --------------------- | ------------------------------------------------------------------- |
+| A Postgres write      | reset, reset-after, delay, serialization_failure, deadlock_detected |
+| A COMMIT              | reset, reset-after, serialization_failure                           |
+| A BEGIN               | down, too_many_connections                                          |
+| A Redis write or EXEC | reset, reset-after, delay, OOM, READONLY                            |
+| A Redis read          | reset, LOADING                                                      |
+
+Replace the list with `matrix.dataFaults: (call) => DataFault[]` in the config.
+
+## What a correct app does
+
+| Fault                 | Handle it by                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------------- |
+| A lost COMMIT reply   | giving the work a key and inserting with `ON CONFLICT (key) DO NOTHING`, so a retry is safe |
+| 40001 or 40P01        | rolling back and running the whole transaction again, with backoff                          |
+| Database down or full | retrying the connection for a few seconds, then saying so                                   |
+| Cache errors          | choosing to fail open or closed. A rate limiter that fails open lets everyone through       |
+
+The lint rule `data/no-retry-on-serialization` flags a transaction given up after 40001 or 40P01.
+
+## Limits
+
+- No TLS between your app and the store: Postgres with `sslmode=disable` or `prefer`, no
+  `rediss://`.
+- Statements are classified from their SQL text. Unusual ones such as `CALL`, `DO` and `LOCK`
+  aren't faulted.
+- MySQL isn't supported yet.
+
+## Next
+
+<Cards>
+  <Card title="Isolation" href="/docs/isolation">
+    How snapshots give every test the same rows.
+  </Card>
+  <Card title="Integration lint" href="/docs/integration-lint">
+    Risky usage danwo spots in every run.
+  </Card>
+</Cards>

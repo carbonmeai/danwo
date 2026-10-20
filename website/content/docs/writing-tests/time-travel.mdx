@@ -1,0 +1,92 @@
+---
+title: Time travel
+description: Jump days ahead in a test, so trials end, subscriptions renew, retries run and tokens expire in seconds.
+icon: Clock
+---
+
+A trial that ends in 14 days, a renewal next month, a link that expires in an hour: you can't wait
+for those in a test. `time.travel` jumps ahead, and everything that falls due on the way runs, in
+order.
+
+## Jump ahead
+
+```ts title="tests/trial.danwo.ts"
+import { type StripeFixtures, test as base } from "@danwo/sdk"
+
+const test = base.extend<StripeFixtures>()
+
+test("a trial turns into a paid plan", async ({ app, screen, expect, time, settle }) => {
+  await app.open("/")
+  await screen.getByRole("button", { name: "Start 14-day trial" }).click()
+
+  await time.travel({ days: 15 })
+  await settle()
+
+  await app.open("/account")
+  await expect(screen.getByRole("status")).toHaveText("Plan: active")
+})
+```
+
+`settle()` delivers anything still pending, such as the webhooks the renewal sent.
+
+| Call                | What it does                                                         |
+| ------------------- | -------------------------------------------------------------------- |
+| `time.travel(span)` | moves forward by `{ days, hours, minutes, seconds }` or milliseconds |
+| `time.set(date)`    | moves forward to a moment                                            |
+| `time.now()`        | the time everything is at now                                        |
+
+Time only moves forward. Each jump is a step in the flight record.
+
+## Three clocks move together
+
+| Clock            | What happens                                                                            |
+| ---------------- | --------------------------------------------------------------------------------------- |
+| Your app's       | its `Date` runs ahead by the offset. Your code doesn't change.                          |
+| Every emulator's | renewals, retries, expiries and scheduled messages run in order, each with its webhooks |
+| The page's       | the browser's `Date` jumps too                                                          |
+
+## An offset, not frozen time
+
+Only `Date` jumps. Timers and `performance.now()` keep running on real time, because sockets,
+retries, database pools and animations rely on real durations. Freezing them would break your app
+in ways real users never see. An offset changes **what** time it is, never how fast it passes.
+
+## Faults after a jump
+
+`danwo matrix` plans faults on the webhooks that fall due after a jump, like any others. A
+duplicated `invoice.paid` after the trial ends, or a late renewal webhook, is judged by your
+[invariant](/docs/invariants).
+
+## Let the agent wait
+
+Give the agent `{ time: true }` and it can travel too. Each jump is recorded, so a replay travels
+the same way with no model:
+
+```ts title="tests/trial.danwo.ts · the agent waits"
+await agent.act("wait until the trial has ended", { time: true })
+```
+
+## What moves
+
+| Setup                             | Moves                                                      |
+| --------------------------------- | ---------------------------------------------------------- |
+| Node apps                         | everything, through the preload in `NODE_OPTIONS`          |
+| Bun apps                          | everything, through `BUN_OPTIONS`                          |
+| Apps in other languages           | the page and the emulators, not the app's own `Date`       |
+| An environment you built yourself | only the app and page clocks, unless it passes on `travel` |
+
+<Callout type="info">
+  Time stays where a test left it for the rest of that worker. `danwo matrix` restores every trial,
+  so each one starts at real time.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Database and cache faults" href="/docs/data-faults">
+    Fault your own Postgres and Redis in the matrix.
+  </Card>
+  <Card title="Fault matrix" href="/docs/fault-matrix">
+    Every fault danwo plans, and how to filter them.
+  </Card>
+</Cards>

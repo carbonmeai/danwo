@@ -1,0 +1,99 @@
+---
+title: Integration lint
+description: Every run is checked for risky provider usage, from the calls and webhooks danwo already saw, with nothing to write.
+icon: ShieldCheck
+---
+
+**Integration lint** reviews every run for mistakes that tests rarely catch: a secret key sent from
+the browser, a payment trusted on its redirect, a retry that charges twice. It reads the calls and
+webhooks danwo already recorded, so there's nothing to write.
+
+## What you see
+
+Findings print after `danwo test` and `danwo matrix`:
+
+```text
+integration lint: 2 errors, 1 warning
+  error   secrets/key-in-browser  the browser sent a server-only key (sk_test_…) to POST api.stripe.com/v1/customers
+          at tests/checkout.danwo.ts:9; Call the provider from your server with the secret key; …
+```
+
+They also go into the flight record, the failure page, GitHub check annotations and JUnit. A rule
+runs only when the run used a provider it's about, so it stays quiet otherwise.
+
+<Callout type="info">
+  Some rules need a fault to see anything. The webhook signature and freshness rules, and
+  `payments/unconfirmed`, read `danwo matrix` trials that forged, aged or delayed a delivery. Run
+  the matrix on payment and webhook journeys to get them.
+</Callout>
+
+## The rules
+
+| Rule                             | Level   | Flags                                                                  |
+| -------------------------------- | ------- | ---------------------------------------------------------------------- |
+| `webhooks/accepts-forged`        | error   | a webhook signed with the wrong secret was accepted                    |
+| `payments/unconfirmed`           | error   | value given after a hosted payment, with no verify call and no webhook |
+| `resilience/duplicate-create`    | error   | a create retried without the first call's Idempotency-Key              |
+| `secrets/key-in-browser`         | error   | the browser sent a server-only key                                     |
+| `secrets/key-in-url`             | error   | a server-only key in a URL query string                                |
+| `stripe/idempotency-key`         | warning | a Stripe call that moves money, without an Idempotency-Key             |
+| `flutterwave/verify-transaction` | warning | a Flutterwave payment trusted without verifying the transaction        |
+| `webhooks/accepts-stale`         | warning | a webhook with a signed timestamp too old to be fresh was accepted     |
+| `webhooks/rejects-valid`         | warning | a correctly signed webhook was refused                                 |
+| `webhooks/slow-answer`           | warning | a webhook answered slower than the provider waits                      |
+| `resilience/retry-after-ignored` | warning | a 429 retried sooner than its Retry-After allowed                      |
+| `oauth/missing-state`            | warning | a sign-in started without a `state` parameter                          |
+| `messages/duplicate-send`        | warning | the same email, text or chat message sent twice for one action         |
+| `data/no-retry-on-serialization` | warning | a transaction given up after 40001 or 40P01                            |
+| `resilience/no-retry-on-read`    | info    | a read that failed transiently and wasn't tried again                  |
+| `oauth/missing-pkce`             | info    | a sign-in started without PKCE                                         |
+| `secrets/publishable-on-server`  | info    | the server called a provider with a publishable key                    |
+
+Each finding says how to fix it, and points at the test line where the call happened.
+
+## Change levels
+
+```ts title="danwo.config.ts"
+import { defineConfig } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  lint: {
+    rules: { "stripe/idempotency-key": "error", "resilience/no-retry-on-read": "off" },
+    failOn: "error",
+  },
+})
+```
+
+| Setting  | Values                                        | Default           |
+| -------- | --------------------------------------------- | ----------------- |
+| `rules`  | each rule to `error`, `warn`, `info` or `off` | the levels above  |
+| `failOn` | `error`, `warning`                            | never fails a run |
+
+Turn it off for one run with `--no-lint`, or for good with `lint: false`.
+
+## Lint a past run
+
+`danwo lint` runs the current rules again over a run's flight records, without running anything:
+
+```sh
+npx danwo lint
+```
+
+```text
+integration lint: no findings
+```
+
+Pass a run id to lint an older one. It needs the run's records, so it can't lint a run made with
+`record: "off"`.
+
+## Next
+
+<Cards>
+  <Card title="Debugging a failure" href="/docs/debugging">
+    Where a finding shows on the failure page.
+  </Card>
+  <Card title="Fault matrix" href="/docs/fault-matrix">
+    The faults the webhook rules need.
+  </Card>
+</Cards>

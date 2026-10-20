@@ -1,0 +1,110 @@
+---
+title: Saved sessions
+description: Sign in once per worker, and start every test that needs it already signed in.
+icon: UserCheck
+---
+
+Most tests start with a signed-in user. Signing in on every test is slow, and it isn't what those
+tests are about. A **saved session** signs in once per worker, keeps the result, and starts each
+test that names it already signed in.
+
+## Define a session
+
+Add it to `danwo.config.ts`. `setup` signs in, and `check` (optional) confirms a kept sign-in still
+works:
+
+```ts title="danwo.config.ts"
+import { defineConfig } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  secrets: { password: { value: process.env.APP_PASSWORD ?? "", purpose: "password" } },
+  sessions: {
+    ada: {
+      async setup({ app, screen, secret }) {
+        await app.open("/login")
+        await screen.getByLabel("Email").fill("ada@shop.test")
+        await screen.getByLabel("Password").fill(secret("password"))
+        await screen.getByRole("button", { name: "Sign in" }).click()
+      },
+      async check({ app, screen, expect }) {
+        await app.open("/account")
+        await expect(screen.getByRole("heading", { name: "Account" })).toBeVisible()
+      },
+    },
+  },
+})
+```
+
+The setup gets the same `app`, `screen`, `agent`, `mail` and `secret` a test does, so an emailed
+code or an agent step works in it too.
+
+## Use it
+
+<Tabs items={["A whole file", "One test"]}>
+  <Tab value="A whole file">
+
+```ts title="tests/account.danwo.ts"
+import { test } from "@danwo/sdk"
+
+test.use({ session: "ada" })
+
+test("shows the order history", async ({ app, screen, expect }) => {
+  await app.open("/account/orders")
+  await expect(screen.getByRole("heading", { name: "Your orders" })).toBeVisible()
+})
+```
+
+  </Tab>
+  <Tab value="One test">
+
+```ts title="tests/basket.danwo.ts"
+import { test } from "@danwo/sdk"
+
+test("keeps the basket after sign-in", { session: "ada" }, async ({ app, screen, expect }) => {
+  await app.open("/basket")
+  await expect(screen.getByText("Your basket is empty")).toBeVisible()
+})
+```
+
+  </Tab>
+</Tabs>
+
+Opt a test out with `{ session: false }`. A file can also define a session of its own, with
+`test.session(name, setup)`.
+
+## What's kept
+
+| Part               | Kept how                                                                               |
+| ------------------ | -------------------------------------------------------------------------------------- |
+| Browser state      | cookies, localStorage and IndexedDB, loaded into each test's fresh browser             |
+| The backend's side | the user and session in the emulators and your database, in a snapshot slot of its own |
+| Flight records     | never hold the browser state                                                           |
+
+Each session has its own [snapshot slot](/docs/isolation), so a test that uses no session still
+starts signed out, even right after one that used Ada.
+
+## When it runs again
+
+- The first test that names the session runs its setup.
+- When `check` throws, the session is set up again.
+- A full reset drops every kept session.
+- In `danwo matrix`, `--include-setup` signs in afresh for every trial, so faults reach the
+  sign-in too.
+
+## When setup fails
+
+A setup that throws fails every test that uses the session, with `SESSION_SETUP_FAILED` and the
+setup's own error. It's reported once, pointing at the setup's line, and not run again for each
+test.
+
+## Next
+
+<Cards>
+  <Card title="A second person" href="/docs/two-people">
+    Open another user's browser in the same test.
+  </Card>
+  <Card title="Email and 2FA codes" href="/docs/email-and-otp">
+    Sign in with an emailed code or an authenticator.
+  </Card>
+</Cards>
