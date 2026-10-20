@@ -1,0 +1,90 @@
+---
+title: Real stacks
+description: Test an app that is more than one process, a frontend, an API and a worker, with every outside call emulated.
+icon: Network
+---
+
+Most apps are more than one process. A frontend calls an API, the API hands slow work to a
+background worker, and all three talk to Stripe, a database and a job queue. danwo can start the
+whole stack, put every process behind its proxy, and test it end to end.
+
+## When you need it
+
+Use the setup that matches what your app is:
+
+| Your app                                       | Use                                                            |
+| ---------------------------------------------- | -------------------------------------------------------------- |
+| One process with a dev command (`npm run dev`) | [`appEnvironment`](/docs/quickstart), what `danwo init` writes |
+| A frontend, an API, workers                    | [`stackEnvironment`](/docs/stack-environment)                  |
+| Background jobs on Inngest                     | [`inngestService`](/docs/background-jobs)                      |
+| Its own Postgres or Redis                      | [data proxies](/docs/stack-databases)                          |
+
+You can mix them: a stack with an Inngest worker and a Postgres database is one config.
+
+## How it fits together
+
+<StackFlow />
+
+1. **danwo starts every app** in the order you give, each with its own command and folder.
+2. **Each app is pointed at the proxy.** Their calls to `api.stripe.com` or `api.clerk.com` reach
+   emulators. Your code doesn't change.
+3. **Local services stay local.** The apps reach each other, the Inngest dev server and your
+   databases on this machine as usual.
+4. **Everything is recorded.** Every app's calls, webhooks, sockets and log lines go into the test's
+   flight record.
+
+## A small stack
+
+Here is a frontend that calls an API, with Stripe emulated and every other outside host blocked:
+
+```ts title="danwo.config.ts"
+import { defineConfig, stackEnvironment, stripeService } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  environment: () =>
+    stackEnvironment({
+      unmatched: "block",
+      services: [stripeService()],
+      apps: [
+        {
+          name: "web",
+          command: "npm run dev",
+          cwd: "apps/web",
+          url: "http://localhost:3000",
+          dependsOn: ["api"],
+          env: ({ api }) => ({ VITE_API_URL: api ?? "" }),
+        },
+        {
+          name: "api",
+          command: "npm start",
+          cwd: "apps/api",
+          url: "http://localhost:4000",
+          ready: { path: "/health" },
+        },
+      ],
+    }),
+})
+```
+
+danwo starts `api` first, waits until `/health` answers, then starts `web` with the API's address
+in `VITE_API_URL`. The browser opens the first app, `web`.
+
+<Callout type="info">
+  Tests stay the same. A test opens pages and clicks buttons as before; the stack runs underneath.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Several apps" href="/docs/stack-environment">
+    Every option an app takes: start order, readiness and wiring.
+  </Card>
+  <Card title="Background jobs" href="/docs/background-jobs">
+    Wait for Inngest runs, and fault the events that start them.
+  </Card>
+  <Card title="A worked example" href="/docs/stack-example">
+    A frontend, an API and a worker, tested end to end with a matrix.
+  </Card>
+</Cards>

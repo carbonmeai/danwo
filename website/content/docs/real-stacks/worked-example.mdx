@@ -1,0 +1,172 @@
+---
+title: A worked example
+description: A frontend, an API and a background worker, started together, tested end to end, then broken with the fault matrix.
+icon: BookOpenCheck
+---
+
+This page puts the Real stacks pages together. The app is a task list:
+
+- **web**, the page you click, which calls the API and shows live updates over a WebSocket;
+- **api**, which saves a task, creates a Stripe customer for it and sends an Inngest event;
+- **worker**, an Inngest function that provisions each new task.
+
+## The config
+
+```ts title="danwo.config.ts"
+import { defineConfig, inngestService, stackEnvironment, stripeService } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  async environment() {
+    const inngest = await inngestService({
+      start: true,
+      apps: ["http://localhost:4100/api/inngest"],
+    })
+
+    return stackEnvironment({
+      unmatched: "block",
+      services: [stripeService(), inngest],
+      apps: [
+        {
+          name: "web",
+          command: "pnpm --filter web start",
+          url: "http://localhost:3000",
+          dependsOn: ["api"],
+          env: ({ api }) => ({ VITE_API_URL: api ?? "" }),
+        },
+        {
+          name: "api",
+          command: "pnpm --filter api start",
+          url: "http://localhost:4000",
+          dependsOn: ["worker"],
+          env: { ...inngest.env, STRIPE_SECRET_KEY: "sk_test_tasks" },
+        },
+        {
+          name: "worker",
+          command: "pnpm --filter worker start",
+          url: "http://localhost:4100",
+          ready: { log: "worker ready" },
+          env: { ...inngest.env },
+        },
+      ],
+    })
+  },
+})
+```
+
+The start order is `worker`, then `api`, then `web`. Every outside host is blocked except Stripe,
+which is emulated, and Inngest, which runs locally.
+
+## The test
+
+The body adds a task in the browser. The **invariant**, a check that runs after the test, waits for
+the background job and asks the worker what it provisioned:
+
+```ts title="tests/tasks.danwo.ts"
+import { test as base, z } from "@danwo/sdk"
+
+const test = base.extend<{
+  readonly apps: Readonly<Record<string, string>>
+  readonly settle: () => Promise<void>
+}>()
+
+const Provisioned = z.array(z.string())
+
+test("adds a task across the frontend, the API and the worker", async ({ app, screen, expect }) => {
+  await app.open("/")
+  await expect(screen.getByText("live: pong")).toBeVisible()
+  await screen.getByRole("button", { name: "Add task" }).click()
+  await expect(screen.getByRole("status")).toHaveText("Task saved")
+}).invariant(async ({ apps, settle, expect }) => {
+  await settle()
+
+  const provisioned = await fetch(`${apps.worker ?? ""}/provisioned`)
+
+  expect(Provisioned.parse(await provisioned.json())).toEqual(["Write the report"])
+})
+```
+
+## Run it
+
+```sh
+npx danwo test tests/tasks.danwo.ts
+```
+
+```text
+Running 1 test with 1 worker
+  ✓ tests/tasks.danwo.ts › adds a task across the frontend, the API and the worker 1445 ms, worker 0
+
+1 passed
+```
+
+The recording's **Providers** tab shows the Stripe call, the Inngest event and the WebSocket,
+each tagged with the app that made it.
+
+## Plan the matrix
+
+Ask what the matrix would try before running it:
+
+```sh
+npx danwo matrix tests/tasks.danwo.ts --plan
+```
+
+```text
+clean run passed; 9 faults planned
+  status 500 on POST api.stripe.com/v1/customers
+  status 429 on POST api.stripe.com/v1/customers
+  reset on POST api.stripe.com/v1/customers
+  reset-after on POST api.stripe.com/v1/customers
+  status 500 on POST inngest.danwo.test/e/dev
+  reset-after on POST inngest.danwo.test/e/dev
+  delay 3000ms on POST inngest.danwo.test/e/dev
+  upgrade refused on WS 127.0.0.1/live
+  connection dropped on WS 127.0.0.1/live
+about 1 min for 9 trials on 8 workers
+```
+
+Faults land on every layer: Stripe, the job queue and the live socket.
+
+## Run it and read what broke
+
+```sh
+npx danwo matrix tests/tasks.danwo.ts
+```
+
+```text
+FAIL  status 500 on POST api.stripe.com/v1/customers
+        body stopped at tests/tasks.danwo.ts:14: expect(getByRole("status")).toHaveText("Task saved") failed after 1500 ms
+        invariant: expected [] to deeply equal [ 'Write the report' ]
+FAIL  status 429 on POST api.stripe.com/v1/customers
+        invariant: expected [] to deeply equal [ 'Write the report' ]
+PASS  reset on POST api.stripe.com/v1/customers
+PASS  reset-after on POST api.stripe.com/v1/customers
+FAIL  status 500 on POST inngest.danwo.test/e/dev
+        invariant: expected [] to deeply equal [ 'Write the report' ]
+PASS  reset-after on POST inngest.danwo.test/e/dev
+PASS  delay 3000ms on POST inngest.danwo.test/e/dev
+PASS  upgrade refused on WS 127.0.0.1/live
+PASS  connection dropped on WS 127.0.0.1/live
+faults: 6 passed, 3 failed
+10 runs in 16 s
+```
+
+Three real bugs:
+
+| Trial                     | What happened                             | Fix                                                  |
+| ------------------------- | ----------------------------------------- | ---------------------------------------------------- |
+| Stripe answers 500 or 429 | the API gave up, the task was never saved | retry Stripe with backoff; Stripe asks for it on 429 |
+| Inngest answers 500       | the task was saved, but the job never ran | retry the send, or send from an outbox table         |
+
+The socket faults passed: the page reconnected on its own.
+
+## Next
+
+<Cards>
+  <Card title="Reading results" href="/docs/matrix-results">
+    Open a failed trial's recording and see why.
+  </Card>
+  <Card title="CI and GitHub" href="/docs/ci">
+    Run the same matrix on every pull request.
+  </Card>
+</Cards>

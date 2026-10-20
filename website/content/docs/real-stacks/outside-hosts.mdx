@@ -1,0 +1,92 @@
+---
+title: Outside hosts
+description: Decide what happens to calls no emulator answers, keep analytics out of your runs, and catch live keys before they leak.
+icon: Globe
+---
+
+danwo emulates the providers you list. Your app may call other hosts too: a search service, a
+logo API, an analytics tracker. You decide what happens to those calls, so a test run never
+sends real data out by accident.
+
+## Pass through or block
+
+`unmatched` sets what happens to hosts no service answers:
+
+| `unmatched`             | Calls to unemulated hosts | Use it when                 |
+| ----------------------- | ------------------------- | --------------------------- |
+| `passthrough` (default) | go to the real host       | you're starting out         |
+| `block`                 | get a 502 from the proxy  | you want the run sealed off |
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, stripeService } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  environment: () =>
+    appEnvironment({
+      app: { command: "npm run dev", url: "http://localhost:3000" },
+      services: [stripeService()],
+      unmatched: "block",
+      allow: ["fonts.googleapis.com"],
+    }),
+})
+```
+
+<Callout type="idea">
+  Start with `block`. A 502 in the flight record names every host your app needs, so you know what
+  to emulate, allow or start locally.
+</Callout>
+
+## This machine always passes
+
+Calls to `localhost`, `127.0.0.1` and `::1` always go through, even under `block`. That's where
+your other apps, the Inngest dev server and your databases answer.
+
+If nothing listens on the port, the call gets a 502 that says so:
+
+```text
+nothing is listening on 127.0.0.1:8108; start that service or route the host
+```
+
+That usually means a service your app needs, such as a search server, isn't running.
+
+## Allow and block by name
+
+| Option      | What it does                                                                        |
+| ----------- | ----------------------------------------------------------------------------------- |
+| `allow`     | hosts that always pass, even under `block`                                          |
+| `blocked`   | hosts that always get 502, even under `passthrough`; beats `allow` and this machine |
+| `telemetry` | `block` (default) or `passthrough` for analytics hosts                              |
+
+## Analytics and telemetry stay out
+
+PostHog, Sentry, Segment, Amplitude, Datadog, hosted trace backends, Google Analytics and the like
+are blocked by default. A test run sends them no real data, and your flight records stay free of
+their noise. Set `telemetry: "passthrough"` to let them through.
+
+## Live keys are caught
+
+With hosts passing through, a live-looking key for a provider the run doesn't emulate would reach
+the real provider. When a [stack](/docs/stack-environment) starts, danwo looks for them:
+
+- `sk_live_…`, OpenAI and Anthropic keys, AWS access keys and similar;
+- in an app's environment, or a `.env` file in its folder that the run doesn't override.
+
+Each one is a warning naming the variable and the file, never the value.
+
+| `secrets` (stack option) | Live-looking key found           |
+| ------------------------ | -------------------------------- |
+| `warn` (default)         | a warning per key                |
+| `fail`                   | the environment refuses to start |
+| `ignore`                 | nothing                          |
+
+## Next
+
+<Cards>
+  <Card title="The Node preload" href="/docs/node-preload">
+    How Node apps are routed through the proxy without code changes.
+  </Card>
+  <Card title="Emulators" href="/docs/emulators">
+    The providers danwo emulates, and how.
+  </Card>
+</Cards>

@@ -1,0 +1,131 @@
+---
+title: Databases
+description: Put your app's Postgres and Redis behind danwo, so every test starts from clean data and the matrix can fault the statements.
+icon: Database
+---
+
+Your stack has its own database and cache. Put them behind danwo and you get two things: every
+test starts from the same rows, and `danwo matrix` can break the statements your app sends, such as
+a `COMMIT` whose reply is lost.
+
+## The two pieces
+
+| Piece                                                      | What it does                                                                 |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| a **data proxy** (`startPostgresProxy`, `startRedisProxy`) | sits between your app and the server, records each statement, injects faults |
+| a **snapshot** (`postgresSnapshot`, `redisSnapshot`)       | keeps the database's state and puts it back before each test                 |
+
+Your app connects to the proxy instead of the server. Snapshots talk to the server directly.
+
+## Wire Postgres into a stack
+
+Give each worker its own database, put a proxy in front of it, and hand the app the proxy's URL:
+
+```ts title="danwo.config.ts"
+import {
+  defineConfig,
+  postgresSnapshot,
+  postgresWorkerDatabase,
+  stackEnvironment,
+  startPostgresProxy,
+  stripeService,
+} from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  async environment({ workerIndex }) {
+    const url = await postgresWorkerDatabase(process.env.DATABASE_URL ?? "", workerIndex)
+    const postgres = await startPostgresProxy({ upstream: url })
+    const db = postgresSnapshot({ url, strategy: "rows" })
+    const stack = await stackEnvironment({
+      services: [stripeService()],
+      apps: [
+        {
+          name: "api",
+          command: "pnpm start",
+          url: "http://localhost:4000",
+          env: { DATABASE_URL: postgres.url(url) },
+        },
+      ],
+    })
+
+    return {
+      ...stack,
+      data: [postgres],
+      snapshotSlots: true,
+      async snapshot(slot) {
+        await stack.snapshot?.(slot)
+        await db.snapshot(slot)
+      },
+      async restore(slot) {
+        await stack.restore?.(slot)
+        await db.restore(slot)
+      },
+      async close() {
+        await stack.close?.()
+        await db.close()
+        await postgres.close()
+      },
+    }
+  },
+})
+```
+
+Three things happen here:
+
+- `postgresWorkerDatabase` copies your migrated base database into `<base>_w0`, `<base>_w1`…, so
+  parallel workers never share rows. Migrate and seed the base first.
+- `postgres.url(url)` swaps in the proxy's host and port and keeps the user, password and
+  database.
+- `snapshot` and `restore` pass each **slot** on, so a signed-in session's rows are kept apart from
+  the seeded rows. See [Isolation](/docs/isolation).
+
+## Pick a snapshot strategy
+
+| `strategy`           | How a restore works                                   | Pick it when                                              |
+| -------------------- | ----------------------------------------------------- | --------------------------------------------------------- |
+| `recreate` (default) | moves the database aside and copies the snapshot back | most apps; tens of milliseconds for a test-sized database |
+| `swap`               | keeps a spare copy ready, so a restore is two renames | a large database or long trials                           |
+| `rows`               | copies every table's rows back in one transaction     | your app's pool treats a closed connection as fatal       |
+
+`recreate` and `swap` close the app's connections while they restore. Many ORMs handle that, but
+some pools crash on it. `rows` closes nothing, so it's the safe choice for those, at the cost of
+speed on big databases.
+
+<Callout type="warn">
+  `postgresSnapshot` needs a role that may create databases, and Postgres 14 or later.
+</Callout>
+
+## Add Redis
+
+A cache goes the same way:
+
+```ts title="danwo.config.ts · Redis"
+const cache = await startRedisProxy({ upstream: process.env.REDIS_URL ?? "", service: "cache" })
+const kept = redisSnapshot({ url: process.env.REDIS_URL ?? "" })
+// give the app REDIS_URL: cache.url(process.env.REDIS_URL ?? ""), list it under data,
+// and call kept.snapshot(slot) and kept.restore(slot) beside db's
+```
+
+## What the matrix can then do
+
+With the proxy in `data`, `danwo matrix` plans faults on the statements your test caused:
+
+```text
+  reset-after on INSERT tasks (postgres)
+  serialization_failure on INSERT tasks (postgres)
+  reset-after on COMMIT (postgres)
+```
+
+[Database and cache](/docs/data-faults) lists every fault and what a correct app does about each.
+
+## Next
+
+<Cards>
+  <Card title="Database and cache faults" href="/docs/data-faults">
+    Every data fault, and how to handle it.
+  </Card>
+  <Card title="A worked example" href="/docs/stack-example">
+    A whole stack tested end to end.
+  </Card>
+</Cards>

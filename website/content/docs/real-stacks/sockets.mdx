@@ -1,0 +1,82 @@
+---
+title: WebSockets and streams
+description: Live updates over WebSockets and server-sent events go through danwo's proxy, are recorded, and can be broken on purpose.
+icon: Radio
+---
+
+Live features run on long-lived connections: a WebSocket for a chat or a board, server-sent events
+(SSE) for a progress feed. Both go through danwo's proxy like any other call. They are recorded,
+they never hold a test up, and the matrix can drop them.
+
+## What you need to do
+
+Nothing, for the browser. A page's WebSockets and event streams always go through the proxy.
+
+```ts title="tests/live.danwo.ts"
+import { test } from "@danwo/sdk"
+
+test("the board updates live", async ({ app, screen, expect }) => {
+  await app.open("/")
+  await expect(screen.getByText("live: connected")).toBeVisible()
+})
+```
+
+## Where each socket goes
+
+| The socket is to…                       | danwo                                      |
+| --------------------------------------- | ------------------------------------------ |
+| this machine (`localhost`, `127.0.0.1`) | passes it on                               |
+| a host that passes through              | passes it on                               |
+| an emulated provider (Pusher, Tiptap…)  | sends it to the emulator's socket endpoint |
+| an emulated provider with no socket API | refuses the upgrade with 501               |
+| a blocked host                          | refuses the upgrade with 403               |
+
+Each socket is in the flight record under `sockets`, with how many frames went each way and their
+sizes. The frames themselves are never kept.
+
+## Streams don't hold tests up
+
+After each action danwo waits for the page and the backend to settle. A response that streams for
+as long as the page listens (SSE, NDJSON) would never settle, so danwo records it once its headers
+arrive and stops waiting for it.
+
+## Break a socket
+
+`danwo matrix` tries every socket the clean run opened twice more:
+
+```text
+PASS  upgrade refused on WS 127.0.0.1/live
+        body stopped at tests/stack.danwo.ts:13: expect(getByText("live: pong")).toBeVisible() failed after 1500 ms
+PASS  connection dropped on WS 127.0.0.1/live
+```
+
+| Fault                | What your app meets                            |
+| -------------------- | ---------------------------------------------- |
+| `upgrade refused`    | the socket never opens                         |
+| `connection dropped` | it opens, then drops; a good client reconnects |
+
+A trial can pass even though the body stopped: the invariant decided the app's state was still
+right. When a test opens a [second person's browser](/docs/sessions), socket faults are planned
+per person, such as `connection dropped on WS 127.0.0.1/live for bob`.
+
+## Server-side sockets need a proxy agent
+
+Node doesn't send WebSockets through an HTTP proxy on its own. A WebSocket client in your **server**
+(the `ws` package, for example) reaches danwo's proxy only when you give it a proxy agent. HTTP
+calls from Node don't need this: danwo's [preload](/docs/node-preload) routes those.
+
+<Callout type="warn">
+  Without a proxy agent, a server-side socket goes straight to the real host, and danwo can't see or
+  fault it.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Outside hosts" href="/docs/outside-hosts">
+    Which hosts pass through and which are blocked.
+  </Card>
+  <Card title="Pusher" href="/docs/providers/pusher">
+    The realtime provider danwo emulates, socket and all.
+  </Card>
+</Cards>

@@ -1,0 +1,70 @@
+---
+title: Processes
+description: danwo stops everything it starts, when a run passes, fails, is interrupted or is killed. Here's how, and what your app should do.
+icon: Activity
+---
+
+A run starts browsers, workers, your apps and their children. When it ends, nothing it started is
+left running, whether it passed, failed, was interrupted with Ctrl-C or was killed outright.
+
+## What danwo cleans up
+
+| Started by danwo                    | Stopped when                            |
+| ----------------------------------- | --------------------------------------- |
+| your apps and everything they spawn | the worker ends                         |
+| test workers                        | the run ends, or their parent goes away |
+| browsers and their contexts         | each test ends                          |
+| emulators and the proxy             | the worker ends                         |
+
+## How an app is stopped
+
+Each app's command runs as the leader of its own **process group**. A dev command often starts the
+real server as its child, and stopping the group stops both:
+
+1. the group gets `SIGTERM`;
+2. five seconds later, anything still running gets `SIGKILL`.
+
+The same happens on Ctrl-C, `SIGTERM` or `SIGHUP`. If the worker itself is killed, a small guardian
+process notices and ends what the worker owned.
+
+<Callout type="info">
+  Have your app exit on `SIGTERM`: close its server and database pool, then exit. It will stop in
+  well under five seconds.
+</Callout>
+
+## Start your own processes the same way
+
+An environment that starts a process itself, such as a search server or a mock service, should use
+`spawnOwned`. It takes the same arguments as Node's `spawn` and gives the child a `stop()`:
+
+```ts title="search.ts"
+import { spawnOwned } from "@danwo/sdk"
+
+export async function startSearch(): Promise<() => Promise<void>> {
+  const search = spawnOwned(
+    "typesense-server",
+    ["--data-dir", "/tmp/search", "--api-key", "test"],
+    {
+      stdio: "inherit",
+    },
+  )
+
+  return async () => {
+    await search.stop()
+  }
+}
+```
+
+The child gets the same treatment as your apps: its own group, `SIGTERM` then `SIGKILL`, and the
+guardian if the worker dies.
+
+## Next
+
+<Cards>
+  <Card title="Several apps" href="/docs/stack-environment">
+    Start your apps with stackEnvironment.
+  </Card>
+  <Card title="Databases" href="/docs/stack-databases">
+    Put Postgres and Redis behind danwo.
+  </Card>
+</Cards>

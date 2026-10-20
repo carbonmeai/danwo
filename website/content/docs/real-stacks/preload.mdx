@@ -1,0 +1,69 @@
+---
+title: The Node preload
+description: How danwo routes a Node app's calls through its proxy without code changes, and what to do when a start script gets in the way.
+icon: Cpu
+---
+
+Your app calls `api.stripe.com` and gets danwo's emulator, without a line of code changed. For a
+Node app, a small **preload** does that: a module Node loads before your app starts, which sends
+every outgoing HTTP call through danwo's proxy and trusts its certificate.
+
+## How it gets in
+
+danwo adds the preload to `NODE_OPTIONS` in each app's environment, together with the proxy's
+address and the run's CA certificate. Calls made with `fetch`, `http`, `https`, axios and most SDKs
+then go through the proxy. That includes clients that build their own agent:
+
+| Client                                     | Routed                                                     |
+| ------------------------------------------ | ---------------------------------------------------------- |
+| `fetch`, `http`, `https`                   | ✓                                                          |
+| Stripe's client with its own `https.Agent` | ✓                                                          |
+| axios with a custom agent                  | ✓                                                          |
+| `fetch` with an undici `Agent`             | ✓                                                          |
+| a server-side WebSocket client             | only with a proxy agent ([why](/docs/sockets-and-streams)) |
+
+## When a start script sets `NODE_OPTIONS`
+
+Many start scripts set `NODE_OPTIONS` themselves:
+
+```json title="package.json · a start script"
+{ "scripts": { "start": "NODE_OPTIONS=--max-old-space-size=8192 nest start" } }
+```
+
+That replaces danwo's value, and the preload is lost. danwo handles it for you: it puts a small
+`node` shim first on each app's `PATH`, which loads the preload whatever `NODE_OPTIONS` says. Your
+script keeps its own flags too.
+
+A `NODE_OPTIONS` you set in an app's `env` in the config is joined with danwo's, not replaced:
+
+```ts title="danwo.config.ts · joined flags"
+{ name: "api", command: "pnpm start", url: "http://localhost:4000",
+  env: { NODE_OPTIONS: "--max-old-space-size=4096" } }
+```
+
+## When a process still escapes
+
+Each process the preload is in leaves a heartbeat. After the apps start, danwo warns about any Node
+process of an app that runs without it, and says how to fix it. The usual causes:
+
+| Cause                                                      | Fix                                                     |
+| ---------------------------------------------------------- | ------------------------------------------------------- |
+| the script runs Node by an absolute path (`/usr/bin/node`) | call `node` from `PATH`                                 |
+| the app spawns Node with a clean environment               | pass `process.env` to the child                         |
+| the shim is off (`nodeShim: false`)                        | turn it back on, or set `NODE_OPTIONS` in `env` instead |
+
+<Callout type="warn">
+  A process without the preload calls the real hosts. With `unmatched: "block"` those calls still
+  can't leave this machine through the proxy, but a client that ignores proxies can.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Outside hosts" href="/docs/outside-hosts">
+    What happens to calls no emulator answers.
+  </Card>
+  <Card title="Processes" href="/docs/processes">
+    What danwo stops when a run ends.
+  </Card>
+</Cards>

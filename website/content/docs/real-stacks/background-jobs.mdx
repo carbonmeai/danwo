@@ -1,0 +1,136 @@
+---
+title: Background jobs
+description: Route your app's Inngest events through danwo, wait for the runs they start, and fault the sends.
+icon: Workflow
+---
+
+Your API sends an event, and a background job does the slow part later: provisioning an account,
+sending a receipt. `inngestService` routes those events through danwo, so a test can wait for the
+jobs to finish and the matrix can break the sends.
+
+## Add Inngest to the stack
+
+Give `stackEnvironment` an `inngestService`, and give every app that sends or serves Inngest
+functions its `env`:
+
+```ts title="danwo.config.ts"
+import { defineConfig, inngestService, stackEnvironment } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  async environment() {
+    const inngest = await inngestService({
+      start: true,
+      apps: ["http://localhost:4100/api/inngest"],
+    })
+
+    return stackEnvironment({
+      services: [inngest],
+      apps: [
+        {
+          name: "api",
+          command: "pnpm start",
+          url: "http://localhost:4000",
+          dependsOn: ["worker"],
+          env: { ...inngest.env },
+        },
+        {
+          name: "worker",
+          command: "pnpm worker",
+          url: "http://localhost:4100",
+          ready: { log: "worker ready" },
+          env: { ...inngest.env },
+        },
+      ],
+    })
+  },
+})
+```
+
+`inngest.env` turns on Inngest's dev mode and points the SDK at `inngest.danwo.test`. The proxy
+routes that host to the dev server, so every event a test sends is recorded.
+
+## Use a dev server you already run
+
+Leave out `start` and danwo uses a dev server at `url`:
+
+| Option            | What it does                                                      | Default                 |
+| ----------------- | ----------------------------------------------------------------- | ----------------------- |
+| `url`             | where the dev server answers                                      | `http://127.0.0.1:8288` |
+| `start`           | `true` runs `npx --yes inngest-cli dev`; a string is your command | off                     |
+| `apps`            | your apps' Inngest endpoints, which the dev server calls          | none                    |
+| `settleTimeoutMs` | how long `settle()` waits for runs to finish                      | 30 seconds              |
+
+## Wait for the jobs
+
+An invariant often checks what a job wrote. Call `settle()` first: it waits until every run the
+test's events started has finished.
+
+```ts title="tests/tasks.danwo.ts"
+import { test as base, z } from "@danwo/sdk"
+
+const test = base.extend<{
+  readonly apps: Readonly<Record<string, string>>
+  readonly settle: () => Promise<void>
+}>()
+
+const Provisioned = z.array(z.string())
+
+test("adds a task", async ({ app, screen, expect }) => {
+  await app.open("/")
+  await screen.getByRole("button", { name: "Add task" }).click()
+  await expect(screen.getByRole("status")).toHaveText("Task saved")
+}).invariant(async ({ apps, settle, expect }) => {
+  await settle()
+
+  const provisioned = await fetch(`${apps.worker ?? ""}/provisioned`)
+
+  expect(Provisioned.parse(await provisioned.json())).toEqual(["Write the report"])
+})
+```
+
+With `readiness: { settle: true }`, each step also waits for the runs it started. The flight
+record lists every run under `inngest`, with its function, status and duration.
+
+## Break the sends
+
+`danwo matrix` faults each event your app sends during the test:
+
+```text
+  status 500 on POST inngest.danwo.test/e/dev
+  reset-after on POST inngest.danwo.test/e/dev
+  delay 3000ms on POST inngest.danwo.test/e/dev
+```
+
+| Fault          | What your app meets                                                            |
+| -------------- | ------------------------------------------------------------------------------ |
+| `status 500`   | the dev server is down                                                         |
+| `reset-after`  | the event was accepted, but the answer was lost; a retrying app sends it twice |
+| `delay 3000ms` | a slow send                                                                    |
+
+An app that sends the event once and gives up on a 500 loses the job:
+
+```text
+FAIL  status 500 on POST inngest.danwo.test/e/dev
+        invariant: expected [] to deeply equal [ 'Write the report' ]
+```
+
+The fix is to retry the send, or to write the job to your own outbox table first and send it from
+there.
+
+<Callout type="info">
+  danwo faults the event send, not a single step inside a running function. Fault a step by having
+  it call a provider danwo emulates.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="A worked example" href="/docs/stack-example">
+    A frontend, an API and this worker, tested with a matrix.
+  </Card>
+  <Card title="Fault kinds" href="/docs/fault-kinds">
+    Every fault the matrix can plan.
+  </Card>
+</Cards>

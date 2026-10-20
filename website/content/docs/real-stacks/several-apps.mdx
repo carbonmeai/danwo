@@ -1,0 +1,141 @@
+---
+title: Several apps
+description: Start a frontend, an API and workers together with stackEnvironment, in order, wired to each other, behind one proxy.
+icon: Boxes
+---
+
+`stackEnvironment` starts several apps for each worker: a frontend, the API it calls, background
+workers, a local dev server. It puts them all behind one proxy and stops them when the run ends.
+
+## List the apps
+
+Each app is a command danwo runs, the address it answers on, and a name:
+
+```ts title="danwo.config.ts"
+import { defineConfig, stackEnvironment, stripeService } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  environment: () =>
+    stackEnvironment({
+      services: [stripeService()],
+      apps: [
+        { name: "web", command: "pnpm dev", cwd: "apps/web", url: "http://localhost:3000" },
+        { name: "api", command: "pnpm start", cwd: "apps/api", url: "http://localhost:4000" },
+      ],
+    }),
+})
+```
+
+The command runs in a shell, in `cwd`, with `PORT` set to the port of its `url`. It inherits the
+proxy's environment, so its calls to Stripe reach the emulator.
+
+## Start them in order
+
+An API usually needs its worker up first, and a frontend needs the API. Say so with `dependsOn`:
+
+```ts title="danwo.config.ts · start order"
+apps: [
+  { name: "web", command: "pnpm dev", url: "http://localhost:3000", dependsOn: ["api"] },
+  { name: "api", command: "pnpm start", url: "http://localhost:4000", dependsOn: ["worker"] },
+  { name: "worker", command: "pnpm worker", url: "http://localhost:4100" },
+]
+```
+
+danwo starts `worker`, then `api`, then `web`. Apps with nothing between them start together. A
+cycle, or a name that isn't in the list, fails with an error naming it.
+
+## Say when an app is ready
+
+By default an app is ready when its `url` answers. Change that with `ready`:
+
+| `ready`                   | Ready when                                      | Use it for                   |
+| ------------------------- | ----------------------------------------------- | ---------------------------- |
+| left out                  | `url` answers any HTTP request                  | most servers                 |
+| `{ path: "/health" }`     | that path answers                               | an app with a health check   |
+| `{ log: "worker ready" }` | that text (or a `RegExp`) appears in its output | a worker that serves nothing |
+
+An app has two minutes to be ready, for a dev server's first build. Change it with `timeoutMs`.
+
+## Wire one app to another
+
+`env` adds variables to an app's environment. Make it a function and it receives every app's
+address by name:
+
+```ts title="danwo.config.ts · wiring"
+{
+  name: "web",
+  command: "pnpm dev",
+  url: "http://localhost:3000",
+  dependsOn: ["api"],
+  env: ({ api }) => ({ VITE_API_URL: api ?? "" }),
+}
+```
+
+The frontend now calls the API that this worker started, not one on a fixed port. A
+`NODE_OPTIONS` you set here is joined with danwo's, not replaced.
+
+## Choose the page the browser opens
+
+The browser opens the **first** app's address. Name another with `baseUrl`:
+
+```ts title="danwo.config.ts · the page to open"
+stackEnvironment({ baseUrl: "web", apps: [api, web] })
+```
+
+Tests get every app's address as the `apps` fixture, so an invariant can ask the API directly:
+
+```ts title="tests/tasks.danwo.ts"
+import { test as base } from "@danwo/sdk"
+
+const test = base.extend<{ readonly apps: Readonly<Record<string, string>> }>()
+
+test("adds a task", async ({ app, screen, expect }) => {
+  await app.open("/")
+  await screen.getByRole("button", { name: "Add task" }).click()
+  await expect(screen.getByRole("status")).toHaveText("Task saved")
+}).invariant(async ({ apps, expect }) => {
+  const tasks = await fetch(`${apps.api ?? ""}/tasks`)
+
+  expect(tasks.status).toBe(200)
+})
+```
+
+## When an app fails to start
+
+The test file fails with the app's name, why it stopped, and the last lines of its output. The
+run exits with code 2:
+
+```text
+✗ tests/tasks.danwo.ts: worker 0 failed to start: Error: api: it exited with code 1 before http://localhost:4000 answered
+    Error [ERR_MODULE_NOT_FOUND]: Cannot find module '…/apps/api/dist/main.js'
+```
+
+What each app printed while it started is kept in `.danwo/runs/<run>/environment-<worker>.json`,
+apart from the tests' own records.
+
+## Options
+
+| Option                          | What it does                                                         | Default                                  |
+| ------------------------------- | -------------------------------------------------------------------- | ---------------------------------------- |
+| `apps`                          | the apps to start                                                    | required                                 |
+| `services`                      | the emulators behind the proxy (`stripeService()`, `clerkService()`) | none                                     |
+| `baseUrl`                       | the name of the app the browser opens                                | the first app                            |
+| `unmatched`                     | what happens to hosts no service answers: `passthrough` or `block`   | `passthrough`                            |
+| `allow`, `blocked`, `telemetry` | which outside hosts pass or are refused                              | see [Outside hosts](/docs/outside-hosts) |
+| `secrets`                       | live-looking keys an app would use: `warn`, `fail` or `ignore`       | `warn`                                   |
+| `nodeShim`                      | keep danwo's preload even when a script sets `NODE_OPTIONS`          | `true`                                   |
+
+## Next
+
+<Cards>
+  <Card title="Background jobs" href="/docs/background-jobs">
+    Add an Inngest worker and wait for its runs.
+  </Card>
+  <Card title="Outside hosts" href="/docs/outside-hosts">
+    Block, allow or pass through the hosts danwo doesn't emulate.
+  </Card>
+  <Card title="Processes" href="/docs/processes">
+    What danwo stops when a run ends, and how.
+  </Card>
+</Cards>
