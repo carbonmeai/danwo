@@ -16,11 +16,32 @@ Click a test, a run's row or a matrix cell. The recording opens on top, and Esc 
 On the left are the steps. Each has **Go to**, which moves the video to that step. Under them are
 the error, where the test stopped, the faults and any lint findings.
 
+## Read the checks
+
+After the steps comes **Checks**: what ran once the browser was done. First, the wait for
+background work, such as webhooks and Inngest runs, with how long it took and what it waited for.
+Then each check your invariant made, with a ✓ or ✗.
+
+```ts title="tests/checkout.danwo.ts (fragment)"
+}).invariant(async ({ app, stripe, expect }) => {
+  expect(await grantedCredits(app.baseUrl, "u1"), "credits granted").toBe(500)
+})
+```
+
+This check shows as `expect(credits granted).toBe(500)` with the value it got. When it fails, it
+shows what it wanted too. Give a check a message, as above, so its row reads well.
+
+## Skip the idle tail
+
+The browser sits still while danwo waits and checks. The scrubber shades these stretches as
+"settling" and "checks", each with a **Go to** button. The video plays through them at 4× by
+default; turn off **Idle at 4×** to watch them at normal speed.
+
 ## The tabs
 
 | Tab            | What it shows                                                                        |
 | -------------- | ------------------------------------------------------------------------------------ |
-| Replay         | the video, with step and fault markers on the scrubber                               |
+| Replay         | the video, with steps, faults, settling and checks marked on the scrubber            |
 | Console        | the page's console, filtered by level                                                |
 | Network        | the page's own requests                                                              |
 | Providers      | a waterfall of steps, provider calls, webhooks and faults; then the calls as a table |

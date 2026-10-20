@@ -46,14 +46,20 @@ icon rail (`Cmd+B` or `Ctrl+B`). Every page, filter and open recording has its o
 ### The recording
 
 A recording opens over the page it was opened from (`?open=<record>`; Esc closes it). On the left
-are the numbered steps, each with a "Go to" that seeks the video to it, and pinned under them the
-error, where the body stopped, the faults and lint findings, "Copy prompt to fix" (the failure
-page as a prompt for a coding agent, or as Markdown) and a vote on whether it helped (kept in
-`.danwo/feedback.jsonl` on this machine). On the right are tabs (`&pane=`):
+are the numbered steps, each with a "Go to" that seeks the video to it, then a **Checks** section
+for what ran after the body: "Waiting for background work" (the settle wait, its time and each run
+or delivery it waited for, e.g. `inngest · 2.3 s · notify completed in 0.4 s`) and every `expect()`
+of a plain value in the invariant or the test, a ✓ or ✗ with what it got and, on failure, what it
+wanted. Locator checks stay with the steps. Pinned under them are the error, where the body
+stopped, the faults and lint findings, "Copy prompt to fix" (the failure page as a prompt for a
+coding agent, or as Markdown) and a vote on whether it helped (kept in `.danwo/feedback.jsonl` on
+this machine). On the right are tabs (`&pane=`):
 
 - **Replay**: the video (or the step screenshots when no video was kept) with play, speed and a
   scrubber marking steps and faults; `&t=12.5` opens it 12.5 seconds in, `#step-3` where step 3
-  starts.
+  starts. The scrubber shades "settling" and "checks", the idle tail after the last step, with a
+  "Go to" for each; the tail plays at 4× unless "Idle at 4×" is turned off or the chosen speed is
+  faster.
 - **Console** with level filters, and **Network** with the page's requests.
 - **Providers**: the waterfall of steps, provider calls, webhooks and faults, then the calls and
   webhooks as tables; a call opens its redacted request and response.
