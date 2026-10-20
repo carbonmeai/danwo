@@ -5,6 +5,7 @@
  * teammate whose connection dropped never sees the post.
  */
 import { createServer, type ServerResponse } from "node:http"
+import { text } from "node:stream/consumers"
 
 import { WebSocketServer } from "ws"
 
@@ -55,12 +56,7 @@ function json(res: ServerResponse, value: unknown): void {
 
 const server = createServer((req, res) => {
   if (req.method === "POST" && req.url === "/posts") {
-    let body = ""
-
-    req.on("data", (chunk: Buffer) => {
-      body += chunk.toString("utf8")
-    })
-    req.on("end", () => {
+    void text(req).then((body) => {
       posts.push(body)
       for (const client of live.clients) client.send(body)
       res.writeHead(204).end()
