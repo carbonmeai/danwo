@@ -110,6 +110,29 @@ describe("hosts a run always reaches", () => {
     }
   })
 
+  it("passes a request a client proxied itself through once, not back to the proxy", async () => {
+    const proxy = await startProxy({ routes: [], unmatched: "block" })
+    const self = fileURLToPath(new URL("./fixtures/plain-agent-client.ts", import.meta.url))
+    const send = async (env: NodeJS.ProcessEnv) =>
+      (
+        await run(process.execPath, [self, `http://localhost:${app.port}/ok`], {
+          env,
+          timeout: 20_000,
+        })
+      ).stdout.trim()
+
+    try {
+      expect(await send(proxy.env())).toBe("[200,200,200]")
+      expect(proxy.exchanges().map((e) => `${e.disposition} ${e.host} ${e.status}`)).toEqual([
+        "passthrough localhost 200",
+        "passthrough localhost 200",
+        "passthrough localhost 200",
+      ])
+    } finally {
+      await proxy.stop()
+    }
+  })
+
   it("blocks telemetry hosts by default, and lets them go when asked", async () => {
     const blocking = await startProxy({ routes: [] })
     const passing = await startProxy({ routes: [], telemetry: "passthrough" })

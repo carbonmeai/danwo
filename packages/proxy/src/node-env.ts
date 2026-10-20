@@ -64,6 +64,18 @@ export interface EnvOptions {
   readonly nodeShim?: boolean
 }
 
+/**
+ * The proxy's own address, as `NO_PROXY` entries. A client that proxies a request itself (axios
+ * reads HTTP_PROXY) sends it to the proxy's address; without these entries the app's agent, which
+ * the preload makes proxy-aware too, proxies that request a second time, and the proxy receives a
+ * request for itself and refuses it as a loop.
+ */
+function ownAddresses(url: string): string[] {
+  const { port } = new URL(url)
+
+  return [`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`]
+}
+
 /** The proxy variables, CA and preload over `base`, as `Proxy.env()` returns them. */
 export function proxyEnvironment(
   inputs: ProxyEnvironmentInputs,
@@ -72,6 +84,9 @@ export function proxyEnvironment(
 ): NodeJS.ProcessEnv {
   const preloadUrl = pathToFileURL(PRELOAD).href
   const shim = (options.nodeShim ?? true) && process.platform !== "win32"
+  const noProxy = [base.NO_PROXY ?? base.no_proxy, ...ownAddresses(inputs.url)]
+    .filter(Boolean)
+    .join(",")
 
   return {
     ...base,
@@ -79,6 +94,8 @@ export function proxyEnvironment(
     HTTP_PROXY: inputs.url,
     https_proxy: inputs.url,
     http_proxy: inputs.url,
+    NO_PROXY: noProxy,
+    no_proxy: noProxy,
     NODE_USE_ENV_PROXY: "1",
     NODE_EXTRA_CA_CERTS: inputs.caCertPath,
     NODE_OPTIONS: [base.NODE_OPTIONS, `--import=${preloadUrl}`].filter(Boolean).join(" "),
