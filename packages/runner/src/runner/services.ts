@@ -236,24 +236,28 @@ export function servicesLifecycle(services: Services) {
   }
 }
 
-/**
- * How far ahead `settle` plays an emulator's clock: far enough for every provider's webhook
- * retries, short of business events such as renewals, which only time travel reaches.
- */
+/** How far ahead `settle` plays an emulator's clock: far enough for every provider's webhook retries. */
 const SETTLE_HORIZON_MS = 24 * 60 * 60 * 1000
 
-/** Plays pending webhook deliveries and retries of `emulator` on `clock`, up to a day ahead. */
+/** What `settle` runs of a clock's queue: deliveries and retries, not background business events. */
+const FOREGROUND = { background: false } as const
+
+/**
+ * Plays pending webhook deliveries and retries of `emulator` on `clock`, up to a day ahead.
+ * Business events in the background, such as a trial that ends in five minutes or a renewal,
+ * stay queued: only time travel reaches them.
+ */
 async function settleWebhooks(emulator: Emulator, clock: ManualClock): Promise<void> {
   let left = SETTLE_HORIZON_MS
 
   for (let i = 0; i < 100; i++) {
     await emulator.webhooks?.idle()
 
-    const next = clock.nextIn()
+    const next = clock.nextIn(FOREGROUND)
 
     if (next === undefined || next > left) return
 
-    clock.advance(next)
+    clock.advance(next, FOREGROUND)
     left -= next
   }
 

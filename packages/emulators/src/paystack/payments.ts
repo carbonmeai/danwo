@@ -228,7 +228,9 @@ export class PaystackPayments {
 
     if (Number.isNaN(due)) return
 
-    timer.setTimeout(() => this.renew(subscription.subscription_code), due - clock().getTime())
+    timer.setTimeout(() => this.renew(subscription.subscription_code), due - clock().getTime(), {
+      background: true,
+    })
   }
 
   /** One renewal: an invoice, a charge on the saved authorization, then the invoice's outcome. */

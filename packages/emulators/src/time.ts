@@ -51,6 +51,14 @@ interface Pending {
   readonly id: number
   readonly at: number
   readonly callback: () => void
+  /** A business event such as a renewal, which only time travel reaches, not settling. */
+  readonly background: boolean
+}
+
+/** Which callbacks `advance` and `nextIn` take: all, or only those not in the background. */
+export interface DueOptions {
+  /** `false` leaves background callbacks queued, for a later `advance` that takes them. */
+  readonly background?: boolean
 }
 
 /**
@@ -81,10 +89,15 @@ export class ManualClock {
   }
 
   readonly timer: Timer = {
-    setTimeout: (callback, ms) => {
+    setTimeout: (callback, ms, options) => {
       const id = this.nextId++
 
-      this.queue.push({ id, at: this.nowMs + Math.max(0, ms), callback })
+      this.queue.push({
+        id,
+        at: this.nowMs + Math.max(0, ms),
+        callback,
+        background: options?.background === true,
+      })
 
       return id
     },
@@ -93,13 +106,16 @@ export class ManualClock {
     },
   }
 
-  /** Moves time forward by `ms`, running callbacks as they fall due. */
-  advance(ms: number): void {
+  /**
+   * Moves time forward by `ms`, running callbacks as they fall due. With `background: false`,
+   * background ones are left queued: they run, late, on the next `advance` that takes them.
+   */
+  advance(ms: number, options: DueOptions = {}): void {
     const target = this.nowMs + ms
 
     for (;;) {
       const due = this.queue
-        .filter((p) => p.at <= target)
+        .filter((p) => p.at <= target && this.takes(p, options))
         .toSorted((a, b) => a.at - b.at || a.id - b.id)[0]
 
       if (!due) break
@@ -123,13 +139,17 @@ export class ManualClock {
     this.travelledMs = 0
   }
 
-  /** Milliseconds until the next scheduled callback, or undefined if none. */
-  nextIn(): number | undefined {
+  /** Milliseconds until the next scheduled callback `options` takes, or undefined if none. */
+  nextIn(options: DueOptions = {}): number | undefined {
     const next = this.queue.reduce<number | undefined>(
-      (min, p) => (min === undefined || p.at < min ? p.at : min),
+      (min, p) => (this.takes(p, options) && (min === undefined || p.at < min) ? p.at : min),
       undefined,
     )
 
     return next === undefined ? undefined : Math.max(0, next - this.nowMs)
+  }
+
+  private takes(pending: Pending, options: DueOptions): boolean {
+    return options.background !== false || !pending.background
   }
 }

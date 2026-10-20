@@ -77,6 +77,29 @@ describe("travelling services", () => {
       await services.close()
     }
   })
+
+  it("settles deliveries but leaves a background event minutes away for time travel", async () => {
+    const stripe = stripeService()
+    const services = await startServices([stripe])
+
+    try {
+      const ran: string[] = []
+      const { timer } = stripe.clock
+
+      timer.setTimeout(() => ran.push("trial ends at 5m"), 5 * 60_000, { background: true })
+      timer.setTimeout(() => ran.push("retry at 1h"), 3_600_000)
+
+      await services.settle()
+
+      expect(ran).toEqual(["retry at 1h"])
+
+      await services.travel(DAY)
+
+      expect(ran).toEqual(["retry at 1h", "trial ends at 5m"])
+    } finally {
+      await services.close()
+    }
+  })
 })
 
 describe("a session's time", () => {
