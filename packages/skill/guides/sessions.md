@@ -37,3 +37,32 @@ one with `test.session(name, setup)`.
 - Agent steps in a setup record and replay like any others.
 - A failing setup fails the tests that use it with `SESSION_SETUP_FAILED`, once.
 - The browser state is never written to flight records.
+
+## A second person in one test
+
+`users.open(name)` opens another person's browser beside the test's own, for "a teammate sees it
+live" tests. It returns that person's own `app`, `screen`, `expect`, `agent`, `mail` and `secret`,
+scoped to their browser; `{ session }` starts it from a saved session, else signed out.
+
+```ts
+test("a teammate sees a post the moment it is made", async ({ app, screen, expect, users }) => {
+  const bob = await users.open("bob", { session: "bob-in-workspace" })
+
+  await bob.app.open("/")
+  await app.open("/")
+  await screen.getByRole("textbox", { name: "Message" }).fill("Lunch at noon")
+  await screen.getByRole("button", { name: "Post" }).click()
+  await bob.expect(bob.screen.getByText("Lunch at noon")).toBeVisible()
+})
+```
+
+- Names are letters, digits, `.`, `_` or `-`, and one name opens once per test (`CONFIG_INVALID`
+  otherwise). `bob.close()` closes it early; every browser closes when the test ends.
+- Each person's browser goes through the same proxy, emulators and clock (`time.travel` moves every
+  browser). Their user agent ends in `danwo-user/<name>`, which is how the record tells their calls
+  and sockets apart; no header is added, so no CORS preflight changes.
+- The flight record tags their steps, calls, sockets and console lines with `user`, and films them
+  apart (`video/<name>-tab-<n>.webm`).
+- A session saved earlier in the worker is reused; otherwise its setup runs for this test alone and
+  is not kept.
+- Not supported on Android yet: `users.open` fails with `CONFIG_INVALID`.

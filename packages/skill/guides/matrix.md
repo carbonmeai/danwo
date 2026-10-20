@@ -46,7 +46,9 @@ statements and commands the test sent: `reset-after on COMMIT (postgres)`,
 defaults.
 
 Every WebSocket the clean run opened (a realtime channel, a collaboration session) gets two
-trials: `upgrade refused on WS <host>/<path>` and `connection dropped on WS <host>/<path>`. With
+trials: `upgrade refused on WS <host>/<path>` and `connection dropped on WS <host>/<path>`. A
+socket another person's browser opened (`users.open`) is faulted for that person alone: `connection
+dropped on WS <host>/<path> for bob` (`--faults "for bob"` runs only theirs). With
 `inngestService()` in the environment, each event the test sent gets `status 500`, `reset-after`
 (accepted, but the answer lost, so an app that retries sends it twice) and a slow send on
 `POST inngest.danwo.test/e/<key>`.

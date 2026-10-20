@@ -30,3 +30,9 @@ Every failed run keeps a flight record under `.danwo/runs/<run>/`; start from it
 
 `danwo spec --topic errors` lists every code with its class and exit code. `danwo cache ls`,
 `stats` and `clear` show and reset recordings.
+
+## Proxy noise
+
+A browser dropping a stream or socket as a page or test closes (`read ECONNRESET`, `EPIPE`,
+`socket hang up`) is expected and not printed. Set `DANWO_DEBUG=proxy` (a comma-separated list, or
+`*`) to see those lines when chasing a connection problem; every other proxy error always prints.

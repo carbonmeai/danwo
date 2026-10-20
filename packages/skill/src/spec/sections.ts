@@ -179,6 +179,8 @@ export function apiSections(index = new SourceIndex()): SpecSection[] {
       entries: [
         ...sdk.filter((d) => /Fixtures?$/.test(d.name)),
         describe("runner", "SessionFixtures"),
+        describe("sdk", "Users"),
+        describe("sdk", "UserSession"),
       ].map(entryOf),
     },
     ...fixed.slice(1),

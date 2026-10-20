@@ -20,8 +20,8 @@ export interface UserOptions {
 /**
  * Other people's browsers in this test, beside the test's own: `const bob = await
  * users.open("bob", { session: "bob-signed-in" })` gives Bob's `app`, `screen`, `expect` and
- * `agent`, working on a browser context of his own behind the same proxy. His steps, calls and
- * video are recorded under his name, and his browser closes when the test ends. Web only.
+ * `agent`, working on a browser context of their own behind the same proxy. Their steps, calls
+ * and video are recorded under their name, and the browser closes when the test ends. Web only.
  */
 export interface Users {
   open(name: string, options?: UserOptions): Promise<UserSession>

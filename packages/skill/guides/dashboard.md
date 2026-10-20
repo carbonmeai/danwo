@@ -87,3 +87,8 @@ and fault as an offset into it. Which videos are kept:
 A short test's video is tens of kilobytes. Video shows the screen as it was: fields holding a
 secret show as dots, but a secret the app prints as text is on screen, and so is anything else the
 page shows. Turn video off (`video: "off"`) for suites that show secrets.
+
+When a test opened another person's browser (`users.open`), each person has their own video, named
+`bob · tab 1` beside `you · tab 1` in the player. A person's video marks their own steps and calls
+plus the app server's; the transcript tags each step with its person, draws a line where the test
+moves to another person's browser, and its "Go to" switches to that person's video.
