@@ -1,0 +1,132 @@
+---
+description: The model APIs your app calls, OpenAI, Anthropic, the Vercel AI Gateway, Gemini, Perplexity and Bedrock, answered from scripts, with token counts and cost a test can check.
+---
+
+danwo's model API emulator answers the hosts your app's AI features call: `api.openai.com`,
+`api.anthropic.com`, `ai-gateway.vercel.sh`, `generativelanguage.googleapis.com`,
+`api.perplexity.ai` and `bedrock-runtime.<region>.amazonaws.com`. The `openai` and
+`@anthropic-ai/sdk` packages and the AI SDK work against it unchanged, streaming or not.
+
+Each call is answered from a **script** you write, so a test knows exactly what the model will
+say. That makes AI features testable like any other: same input, same answer, every run.
+
+This page covers setting it up and reading the calls back. Writing replies is on
+[Scripting replies](/docs/providers/model-scripts), and Gemini, Perplexity and Bedrock on
+[More model APIs](/docs/providers/model-providers).
+
+## Set up
+
+Add `llmService` with a script and the prices you want cost reported at. Any key is accepted, so
+your app keeps its own:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, llmService } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  environment: () =>
+    appEnvironment({
+      app: { command: "npm run dev", url: "http://localhost:3000" },
+      services: [
+        llmService({
+          seed: {
+            scripts: [
+              {
+                name: "summary",
+                match: { user: /summari[sz]e/ },
+                reply: { text: "Three orders shipped late this week." },
+              },
+            ],
+            prices: { "gpt-5": { input: 1.25, output: 10 } },
+          },
+        }),
+      ],
+    }),
+})
+```
+
+## Seed it
+
+| Field | What it seeds |
+| --- | --- |
+| `scripts` | Replies, and the calls each one answers; the first that matches wins. See [Scripting replies](/docs/providers/model-scripts). |
+| `unscripted` | What a call no script answers gets: its own words back, marked `[danwo: unscripted]` (`echo`, the default), or a 500 (`fail`). |
+| `prices` | Dollars per million input and output tokens, by model, for cost. |
+| `models` | The models `GET /v1/models` lists. |
+| `knownModelsOnly` | Answer a model not in `models` with a 404, as the gateway does. |
+| `record` | Record unscripted calls from the real provider with your own key, then replay them. |
+
+## Use it in a test
+
+Ask for a summary, then check the call the app made and what it cost:
+
+```ts title="tests/summary.danwo.ts"
+import { type LlmFixtures, llmCalls, test as base } from "@danwo/sdk"
+
+const test = base.extend<LlmFixtures>()
+
+test("summarises the week in one call", async ({ app, screen, expect, llm }) => {
+  await app.open("/reports")
+  await screen.getByRole("button", { name: "Summarise this week" }).click()
+  await expect(screen.getByText("Three orders shipped late this week.")).toBeVisible()
+
+  const calls = llmCalls(llm)
+
+  expect(calls.all()).toHaveLength(1)
+  expect(calls.last()?.model).toBe("gpt-5")
+  expect(calls.cost()).toBeLessThan(0.01)
+})
+```
+
+Each call has its `provider`, `api`, `model`, `system` prompt, `messages`, the `tools` it
+offered, whether it streamed, the `reply`, the `script` that answered, its `usage` in tokens and
+its `cost`.
+
+## Cost
+
+Token counts are an estimate, about four characters a token, and the same for the same text
+every time, so a test of your app's usage tracking can check exact numbers. With `prices` seeded,
+each call's `cost` is in dollars, and the AI Gateway's answers carry that cost in their provider
+metadata, as the real gateway's do.
+
+## What's covered
+
+| API | Covered |
+| --- | --- |
+| OpenAI | Chat Completions and Responses, streaming, tools, structured output, embeddings, models |
+| Anthropic | Messages, streaming, tools, `count_tokens` |
+| AI Gateway | the AI SDK's language model and embedding model calls, cost metadata, unknown models |
+| Gemini, Perplexity, Bedrock | see [More model APIs](/docs/providers/model-providers) |
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| A model call, such as `POST /v1/chat/completions` | 429, 500, 503 (529 on Anthropic), a 400 for a context that's too long, a delay, connection reset, answer lost after the model answered |
+| The same, shaped by the emulator | a refusal, an empty completion, a truncated answer, a content filter, a malformed tool call, a stream cut off halfway |
+
+The last row is what only an emulator can do: the real API won't refuse on cue.
+
+## Fidelity
+
+**Live for the AI Gateway.** `danwo fidelity gateway` runs 6 scenarios against the real
+gateway: text, a tool call, structured output, a stream, embeddings and errors. All 6 match.
+Gemini, Perplexity and Bedrock are checked offline, against their published descriptions.
+OpenAI and Anthropic have no suite of their own yet.
+
+## Not covered yet
+
+- Images, audio and video
+- OpenAI's Assistants, Realtime and batch APIs
+- Fine-tuning and file uploads
+
+## Next
+
+<Cards>
+  <Card title="Scripting replies" href="/docs/providers/model-scripts">
+    Match calls, give tool calls and structured answers, change replies mid-test.
+  </Card>
+  <Card title="More model APIs" href="/docs/providers/model-providers">
+    Gemini, Perplexity and Bedrock.
+  </Card>
+</Cards>

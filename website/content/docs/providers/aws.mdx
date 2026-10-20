@@ -1,0 +1,102 @@
+---
+description: The rest of AWS, from SQS to DynamoDB, answered by MiniStack behind danwo's proxy, so an unmodified app keeps calling amazonaws.com.
+---
+
+For AWS beyond S3, danwo sends AWS's hosts to [MiniStack](https://ministack.org), an AWS
+emulator. Your app keeps calling `sqs.us-east-1.amazonaws.com` or `dynamodb.…amazonaws.com`
+with the AWS SDK, and the proxy forwards each call to MiniStack with its original `Host`.
+
+## Set up
+
+Add `awsService`. Either let danwo start a MiniStack container for each worker, or point it at
+one you run:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, awsService, defineConfig } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  environment: () =>
+    appEnvironment({
+      app: {
+        command: "npm run dev",
+        url: "http://localhost:3000",
+        env: { AWS_ACCESS_KEY_ID: "test", AWS_SECRET_ACCESS_KEY: "test", AWS_REGION: "us-east-1" },
+      },
+      services: [awsService({ docker: true })],
+    }),
+})
+```
+
+| Option | What it does |
+| --- | --- |
+| `docker` | Starts a MiniStack container per worker and removes it on close, so workers never share state. `true` uses the pinned image; `{ image }` picks another. |
+| `endpoint` | A MiniStack (or LocalStack) you already run, such as `http://127.0.0.1:4566`. Ignored with `docker`. |
+| `hosts` | The hosts sent to MiniStack; every `*.amazonaws.com` by default. |
+| `reset` | Wipe MiniStack between matrix runs (default `true`). The wipe is global, so a shared endpoint is wiped for every worker. |
+
+To use danwo's own S3 emulator beside MiniStack, list `s3Service()` first: it answers the S3
+hosts, and MiniStack takes the rest.
+
+## Seed it
+
+MiniStack has no seed of its own. Create queues, tables and buckets in your app's startup, or
+from a test with any AWS SDK client pointed at `aws.endpoint`.
+
+## Use it in a test
+
+Check the app sent its job to SQS through the proxy:
+
+```ts title="tests/export.danwo.ts"
+import { type AwsFixtures, test as base } from "@danwo/sdk"
+
+const test = base.extend<AwsFixtures>()
+
+test("queues the export job", async ({ app, screen, expect, proxy }) => {
+  await app.open("/reports")
+  await screen.getByRole("button", { name: "Export" }).click()
+  await expect(screen.getByText("Export queued")).toBeVisible()
+
+  const sqs = proxy.exchanges().filter((call) => call.host === "sqs.us-east-1.amazonaws.com")
+
+  expect(sqs.map((call) => call.disposition)).toEqual(["routed"])
+})
+```
+
+The `aws` fixture gives `aws.endpoint`, MiniStack's own address, for reading state with an AWS
+SDK client.
+
+## What's covered
+
+Whatever MiniStack emulates: SQS, SNS, DynamoDB, Lambda, S3, Secrets Manager and more. See
+MiniStack's own list. danwo adds the routing, the per-worker container, resets, the clock and the
+fault matrix.
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| Any call to an AWS host | 500, connection reset, answer lost after MiniStack acted |
+
+These are the plain faults the matrix gives any routed host. Calls to S3, when `s3Service`
+answers them, get [S3's faults](/docs/providers/s3#faults).
+
+## Fidelity
+
+**Not checked by danwo.** MiniStack's fidelity is MiniStack's: there's no danwo suite for it.
+
+## Not covered yet
+
+- AWS-shaped faults, such as SQS throttling and DynamoDB's `ProvisionedThroughputExceededException`
+- Seeding from the config
+
+## Next
+
+<Cards>
+  <Card title="S3 and Tigris" href="/docs/providers/s3">
+    danwo's own S3 emulator, with signatures and presigned URLs.
+  </Card>
+  <Card title="Real stacks" href="/docs/real-stacks">
+    Run your app, its database and AWS together.
+  </Card>
+</Cards>

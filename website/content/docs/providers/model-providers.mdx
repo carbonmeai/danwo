@@ -1,0 +1,107 @@
+---
+description: Gemini, Perplexity and Amazon Bedrock, answered from the same scripts as OpenAI and Anthropic, each in its own wire format.
+---
+
+The model API emulator answers three more APIs from the same
+[scripts](/docs/providers/model-scripts), each in its own shape: Google's Gemini API, Perplexity,
+and Amazon Bedrock's runtime. One script can serve all of them, or you can match on `provider`.
+
+## Set up
+
+All three come with `llmService`; there's nothing to add. Each takes its key the way the real
+API does, and any key is accepted:
+
+| API | Host | Key |
+| --- | --- | --- |
+| Gemini | `generativelanguage.googleapis.com` | `x-goog-api-key` or `?key=` |
+| Perplexity | `api.perplexity.ai` | a bearer token |
+| Bedrock | `bedrock-runtime.<region>.amazonaws.com` | a well-formed SigV4 signature, or a Bedrock API key as a bearer token |
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, llmService } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  environment: () =>
+    appEnvironment({
+      app: { command: "npm run dev", url: "http://localhost:3000" },
+      services: [
+        llmService({
+          seed: {
+            scripts: [
+              {
+                match: { provider: "perplexity" },
+                reply: {
+                  text: "Rates rose by a quarter point.",
+                  sources: [{ url: "https://example.org/rates", title: "Rates" }],
+                },
+              },
+              { match: { provider: "google" }, reply: { text: "Here's your plan for Monday." } },
+            ],
+          },
+        }),
+      ],
+    }),
+})
+```
+
+## Seed it
+
+The same seed as every model API; see [Model APIs](/docs/providers/model-apis#seed-it). Give a
+reply `sources` to have Perplexity cite them.
+
+## Use it in a test
+
+Check the app shows Perplexity's citations:
+
+```ts title="tests/citations.danwo.ts"
+import { type LlmFixtures, llmCalls, test as base } from "@danwo/sdk"
+
+const test = base.extend<LlmFixtures>()
+
+test("cites its sources", async ({ app, screen, expect, llm }) => {
+  await app.open("/research")
+  await screen.getByLabel("Question").fill("What happened to rates?")
+  await screen.getByRole("button", { name: "Research" }).click()
+
+  await expect(screen.getByRole("link", { name: "Rates" })).toBeVisible()
+  expect(llmCalls(llm).last()?.provider).toBe("perplexity")
+})
+```
+
+## What's covered
+
+| API | Covered |
+| --- | --- |
+| Gemini | `generateContent` and `streamGenerateContent` (text, function calls, structured output), `countTokens`, `embedContent`, `batchEmbedContents`, models; `v1beta` and `v1` |
+| Perplexity | the Agent API (`/v1/agent`, which the AI SDK uses), the Sonar API (`/v1/sonar` and `/chat/completions`) with citations and cost |
+| Bedrock | Converse and ConverseStream; InvokeModel and its stream in each family's own body: Anthropic's Messages for Claude, Nova, Titan text and embeddings, Cohere embeddings |
+
+## Faults
+
+The same as every model API: 429, 500, 503, a long-context 400, a delay, a reset, an answer lost
+after the model answered, and the shaped answers: a refusal, an empty completion, a truncated
+answer, a content filter, a malformed tool call and a cut-off stream.
+
+## Fidelity
+
+**Offline.** `danwo fidelity` checks Gemini (4 scenarios), Perplexity (3) and Bedrock (3)
+against the APIs' published descriptions, not live accounts.
+
+## Not covered yet
+
+- Gemini's Live API, file uploads and caching
+- Vertex AI's hosts
+- Bedrock Agents and knowledge bases
+- Recording Bedrock calls
+
+## Next
+
+<Cards>
+  <Card title="Scripting replies" href="/docs/providers/model-scripts">
+    Every way to match a call and shape a reply.
+  </Card>
+  <Card title="Model APIs" href="/docs/providers/model-apis">
+    OpenAI, Anthropic and the AI Gateway, with cost.
+  </Card>
+</Cards>

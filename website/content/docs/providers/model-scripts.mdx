@@ -1,0 +1,152 @@
+---
+description: Script what the model answers your app, text, tool calls, structured output or a refusal, matched by prompt, model, provider or tool, and change it mid-test.
+---
+
+A script is a reply and the calls it answers. The first script that matches a call answers it,
+whichever provider's API the call came through, so one script serves OpenAI, Anthropic and the
+AI Gateway alike.
+
+## Set up
+
+Scripts go in `llmService`'s seed:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, llmService } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  environment: () =>
+    appEnvironment({
+      app: { command: "npm run dev", url: "http://localhost:3000" },
+      services: [
+        llmService({
+          seed: {
+            unscripted: "fail",
+            scripts: [
+              {
+                name: "look up the order",
+                match: { tool: "getOrder", toolResult: false },
+                reply: { toolCalls: [{ name: "getOrder", arguments: { id: "o_1" } }] },
+              },
+              {
+                name: "answer from the order",
+                match: { tool: "getOrder", toolResult: true },
+                reply: { text: "Order o_1 ships tomorrow." },
+              },
+            ],
+          },
+        }),
+      ],
+    }),
+})
+```
+
+With `unscripted: "fail"`, a call no script answers gets a 500 that names the call, so a missing
+script shows up at once.
+
+## Seed it
+
+### Match a call
+
+Every field given must match. Leave `match` out to answer every call.
+
+| Field | Matches |
+| --- | --- |
+| `user` | The last user message: a string (case-insensitive) or a regular expression. |
+| `system` | The system prompt, the same way. |
+| `model` | The model name, the same way. |
+| `provider` | `openai`, `anthropic`, `gateway`, `google`, `perplexity` or `bedrock`. |
+| `tool` | A tool the call offers, by name. |
+| `toolResult` | `true` for the turn after a tool call, `false` for the others. |
+| `fingerprint` | The exact request, as a recording identifies it. |
+
+### Write the reply
+
+| Field | The model answers with |
+| --- | --- |
+| `text` | Text, streamed in pieces when the call streams. |
+| `toolCalls` | Tool calls, each a `name` and its `arguments`. |
+| `json` | A structured object, for a `response_format` or a JSON schema. |
+| `refusal` | A refusal, in the provider's own shape. |
+| `stop` | An early end: `length`, as when out of tokens, or `content_filter`. |
+| `sources` | The pages a search-backed answer cites, as Perplexity lists them. |
+
+Give `reply` a list to answer in turn: the first call gets the first reply, the next the second,
+and the last one repeats.
+
+## Use it in a test
+
+Add a script from the test, for one case only:
+
+```ts title="tests/refusal.danwo.ts"
+import { type LlmFixtures, llmScripts, test as base } from "@danwo/sdk"
+
+const test = base.extend<LlmFixtures>()
+
+test("shows a friendly message when the model refuses", async ({ app, screen, expect, llm }) => {
+  llmScripts(llm).add({
+    match: { user: /cancel everything/ },
+    reply: { refusal: "I can't help with that." },
+  })
+
+  await app.open("/assistant")
+  await screen.getByLabel("Ask").fill("Cancel everything on my account")
+  await screen.getByRole("button", { name: "Send" }).click()
+
+  await expect(screen.getByText("The assistant couldn't help with that")).toBeVisible()
+})
+```
+
+Scripts a test adds come after the seed's, so a seeded script that matches still answers first:
+match narrowly in the seed. A reset puts the seed's scripts back and drops the rest, so they never
+answer the next test. `llmScripts(llm).clear()` removes every script, the seed's too.
+
+## Record real answers
+
+Point `record` at a file and give your own keys. A call no script answers goes to the real
+provider once, its answer is saved as a script, and every later run replays it:
+
+```ts title="danwo.config.ts · recording"
+llmService({
+  seed: {
+    record: {
+      file: "tests/model-replies.json",
+      keys: { openai: process.env.OPENAI_API_KEY ?? "" },
+    },
+  },
+})
+```
+
+Bedrock calls aren't recorded: they're signed with your AWS secret, which a recording would have
+to keep.
+
+## What's covered
+
+Scripts answer every API the emulator serves: OpenAI's Chat Completions and Responses,
+Anthropic's Messages, the AI Gateway, Gemini, Perplexity and Bedrock, streamed or not.
+
+## Faults
+
+Scripts decide the answer; the [fault matrix](/docs/fault-matrix) can still spoil it. Beside
+HTTP errors, it tries a refusal, an empty completion, a truncated answer, a content filter, a
+malformed tool call and a stream cut off halfway, whatever the script said.
+
+## Fidelity
+
+The shapes scripts are sent in are the ones checked on [Model APIs](/docs/providers/model-apis#fidelity).
+
+## Not covered yet
+
+- Matching on an image or file in the prompt
+- Replies computed from the request: use `record`, or add a script from the test
+
+## Next
+
+<Cards>
+  <Card title="Model APIs" href="/docs/providers/model-apis">
+    Read the calls back, with tokens and cost.
+  </Card>
+  <Card title="Composio" href="/docs/providers/composio">
+    The tools your agent calls, emulated too.
+  </Card>
+</Cards>

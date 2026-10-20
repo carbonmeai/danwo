@@ -34,6 +34,12 @@ export default defineConfig({
 `appEnvironment` starts your app with the proxy's settings in its environment. When your app
 calls `api.stripe.com`, the Stripe emulator answers.
 
+### When emulators apply
+
+Emulators answer only calls that go through danwo's proxy: from the browser danwo drives and
+the apps danwo starts. A staging site or a remote API that danwo didn't start calls the real
+providers. [Where danwo runs](/docs/where-danwo-runs) shows what each setup can emulate.
+
 ## Seed it
 
 Most apps expect some data to exist already: a product, a webhook endpoint, a signed-up user.
