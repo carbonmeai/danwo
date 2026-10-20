@@ -209,6 +209,20 @@ body {
   color: var(--color-fd-primary-foreground);
 }
 
+/*
+ * Inline code reads as text, not as buttons: no border or shadow, a faint tint, a size that sits
+ * with the words around it. Code blocks (`pre > code`) keep their own look.
+ */
+.prose :not(pre) > code {
+  padding: 0.08em 0.3em;
+  border: 0;
+  border-radius: 4px;
+  box-shadow: none;
+  font-size: 0.86em;
+  background: color-mix(in oklab, var(--color-fd-muted) 70%, transparent);
+  color: var(--color-fd-foreground);
+}
+
 /* Reference tables: signatures in code wrap rather than widen the page. */
 .prose td code {
   white-space: pre-wrap;
