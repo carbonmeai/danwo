@@ -165,6 +165,43 @@ describe("Twilio messages", () => {
   })
 })
 
+describe("Twilio accounts", () => {
+  const TRIAL = "REDACTED-TEST-VALUE"
+  const TRIAL_TOKEN = "trial-token"
+  const VERIFIED = "+14155550142"
+
+  beforeEach(() =>
+    seedTwilio(emulator.store, {
+      accounts: [{ sid: TRIAL, authToken: TRIAL_TOKEN, type: "Trial", verified: [VERIFIED] }],
+      numbers: [{ number: "+15005550010", account: TRIAL }],
+    }),
+  )
+
+  it("reads the account and the numbers it owns", async () => {
+    const client = twilioClient(emulator)
+    const account = await client.api.v2010.accounts(ACCOUNT).fetch()
+    const numbers = await client.incomingPhoneNumbers.list()
+
+    expect([account.sid, account.status, account.type]).toEqual([ACCOUNT, "active", "Full"])
+    expect(account.subresourceUris["messages"]).toBe(
+      `/2010-04-01/Accounts/${ACCOUNT}/Messages.json`,
+    )
+    expect(numbers.map((number) => number.phoneNumber)).toEqual([APP_NUMBER])
+    expect(await errorOf(client.api.v2010.accounts(TRIAL).fetch())).toBe(20003)
+  })
+
+  it("refuses a trial account's sends the way Twilio does, and sends to a verified number", async () => {
+    const client = twilioClient(emulator, TRIAL, TRIAL_TOKEN, TRIAL)
+    const from = "+15005550010"
+
+    expect(await errorOf(client.messages.create({ from, to: "555", body: "x" }))).toBe(0)
+    expect(await errorOf(client.messages.create({ from, to: PERSON, body: "x" }))).toBe(572002)
+    expect(await errorOf(client.messages.create({ from, to: PERSON, body: "" }))).toBe(0)
+    expect((await client.messages.create({ from, to: VERIFIED, body: "hi" })).status).toBe("queued")
+    expect((await client.api.v2010.accounts(TRIAL).fetch()).type).toBe("Trial")
+  })
+})
+
 describe("incoming messages", () => {
   it("posts a text to the number's SMS URL, signed, and sends the TwiML reply back", async () => {
     reply = "<?xml version='1.0'?><Response><Message>You are subscribed</Message></Response>"

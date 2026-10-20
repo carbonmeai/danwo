@@ -73,9 +73,14 @@ interface Answer<TData> {
 }
 
 /** The official Twilio client, talking to `emulator` as the given account (or API key). */
-export function twilioClient(emulator: Pick<Emulator, "fetch">, user = ACCOUNT, password = TOKEN) {
+export function twilioClient(
+  emulator: Pick<Emulator, "fetch">,
+  user = ACCOUNT,
+  password = TOKEN,
+  accountSid = ACCOUNT,
+) {
   return twilioSdk(user, password, {
-    accountSid: ACCOUNT,
+    accountSid,
     httpClient: new EmulatorClient(emulator),
   })
 }

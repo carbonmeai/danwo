@@ -2,6 +2,7 @@ import { createHash } from "node:crypto"
 
 import type { Store } from "../store.ts"
 import { serviceObject } from "./formatters.ts"
+import { rfc2822 } from "./helpers.ts"
 import { type TwilioStore, twilioStore } from "./store.ts"
 
 /** An account the API answers for. */
@@ -10,6 +11,10 @@ export interface TwilioSeedAccount {
   readonly sid: string
   readonly authToken: string
   readonly friendlyName?: string
+  /** `Full` by default; a `Trial` account only messages its `verified` numbers. */
+  readonly type?: "Trial" | "Full"
+  /** The recipients a trial account has verified. */
+  readonly verified?: readonly string[]
 }
 
 /** An API key (`SK…`) with its secret, authenticating as an account (the first one by default). */
@@ -77,9 +82,11 @@ function seedService(seeding: Seeding, service: TwilioSeedService): void {
 
 /** Each kind of seed data, loaded in order: accounts first, since the rest belong to one. */
 const SEEDERS: readonly ((seeding: Seeding, config: TwilioSeedConfig) => void)[] = [
-  ({ twilio }, { accounts = [] }) => {
-    for (const { sid, authToken, friendlyName = "danwo" } of accounts)
-      twilio.accounts.add({ id: sid, authToken, friendlyName }, null)
+  ({ twilio, store }, { accounts = [] }) => {
+    const createdAt = rfc2822(store.clock())
+
+    for (const { sid, authToken, friendlyName = "danwo", type = "Full", verified = [] } of accounts)
+      twilio.accounts.add({ id: sid, authToken, friendlyName, type, verified, createdAt }, null)
   },
   ({ twilio, owner }, { apiKeys = [] }) => {
     for (const { sid, secret, account } of apiKeys)

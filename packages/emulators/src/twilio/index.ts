@@ -4,6 +4,7 @@ import { twilioAuth } from "./auth.ts"
 import type { TwilioRouteContext } from "./context.ts"
 import { deliveryEndpoints, TwilioMessaging } from "./events.ts"
 import { twilioError } from "./helpers.ts"
+import { accountRoutes } from "./routes/accounts.ts"
 import { messageRoutes } from "./routes/messages.ts"
 import { verifyRoutes } from "./routes/verify.ts"
 import { TWILIO_DELIVERY, twilioSigner } from "./signature.ts"
@@ -48,6 +49,7 @@ export const twilio = defineEmulator({
       ),
     )
     emulator.app.use(twilioAuth(context.twilio))
+    accountRoutes(context)
     messageRoutes(context, messaging)
     verifyRoutes(context, messaging)
   },

@@ -12,8 +12,8 @@ const MAX_BODY = 1600
 /** The sid a `/Messages/{sid}.json` path names. */
 const sidOf = (c: Context) => c.req.param("file").replace(/\.json$/, "")
 
-/** A refusal: Twilio's error code and message. */
-type Problem = readonly [number, string]
+/** A refusal: Twilio's error code and message, and its HTTP status when it is not 400. */
+type Problem = readonly [number, string, number?]
 
 /**
  * Twilio's magic recipients: numbers its test credentials refuse with a fixed error, so an app can
@@ -72,6 +72,29 @@ function contentProblem(draft: Omit<Draft, "account">): Problem | undefined {
   return undefined
 }
 
+/**
+ * What a trial account refuses before anything else: a malformed parameter or a missing body, with
+ * Twilio's code 0, then a recipient the account has not verified (422, code 572002).
+ */
+function trialProblem(account: Account, draft: Omit<Draft, "account">): Problem | undefined {
+  if (account.type !== "Trial" || draft.to === "") return undefined
+  if (!isE164(draft.to))
+    return [
+      0,
+      "Invalid or disallowed parameters provided - trial accounts have limited parameter access, upgrade your account to unlock full functionality",
+    ]
+  if (draft.body === "" && draft.media.length === 0)
+    return [0, "Required parameter is missing or empty"]
+  if (!account.verified.includes(draft.to))
+    return [
+      572002,
+      "No Twilio trial phone number is assigned for messaging to this destination number. Please add the 'to' number as a verified recipient.",
+      422,
+    ]
+
+  return undefined
+}
+
 /** Why a send cannot be made; undefined when it can. */
 function problemWith(
   context: TwilioRouteContext,
@@ -79,7 +102,10 @@ function problemWith(
   draft: Omit<Draft, "account">,
 ): Problem | undefined {
   return (
-    recipientProblem(draft.to) ?? senderProblem(context, account, draft) ?? contentProblem(draft)
+    trialProblem(account, draft) ??
+    recipientProblem(draft.to) ??
+    senderProblem(context, account, draft) ??
+    contentProblem(draft)
   )
 }
 
@@ -102,7 +128,7 @@ async function create(c: Context, context: TwilioRouteContext, messaging: Twilio
   }
   const problem = problemWith(context, account, draft)
 
-  if (problem) return twilioError(c, 400, problem[0], problem[1])
+  if (problem) return twilioError(c, problem[2] ?? 400, problem[0], problem[1])
 
   const from = draft.from || serviceSender(context, account)
 

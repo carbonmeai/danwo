@@ -1,3 +1,5 @@
+import type { AccountInstance } from "twilio/lib/rest/api/v2010/account.js"
+import type { IncomingPhoneNumberInstance } from "twilio/lib/rest/api/v2010/account/incomingPhoneNumber.js"
 import type { MessageInstance } from "twilio/lib/rest/api/v2010/account/message.js"
 import type { ServiceInstance } from "twilio/lib/rest/verify/v2/service.js"
 import type { VerificationInstance } from "twilio/lib/rest/verify/v2/service/verification.js"
@@ -22,6 +24,20 @@ type Nullable<T, K extends keyof T> = Omit<T, K> & { [P in K]: T[P] | null }
 export type Message = Nullable<
   Wire<Payload<typeof MessageInstance>>,
   "error_code" | "error_message" | "messaging_service_sid" | "date_sent" | "price"
+>
+/** An account as `GET /2010-04-01/Accounts/{sid}.json` answers it. */
+export type AccountResource = Wire<Payload<typeof AccountInstance>>
+/** A number the account owns, as the IncomingPhoneNumbers list answers it. */
+export type IncomingNumber = Nullable<
+  Wire<Payload<typeof IncomingPhoneNumberInstance>>,
+  | "address_sid"
+  | "identity_sid"
+  | "sms_application_sid"
+  | "status_callback"
+  | "trunk_sid"
+  | "voice_application_sid"
+  | "emergency_address_sid"
+  | "bundle_sid"
 >
 /** A Verify service. */
 export type VerifyService = Wire<Payload<typeof ServiceInstance>>
@@ -55,6 +71,15 @@ export interface Account {
   readonly id: string
   readonly authToken: string
   readonly friendlyName: string
+  /**
+   * `Trial` accounts may only message the numbers in `verified`, and refuse parameters a trial
+   * cannot use, as Twilio's trial accounts do; `Full` accounts have neither limit.
+   */
+  readonly type: "Trial" | "Full"
+  /** The recipients a trial account has verified. */
+  readonly verified: readonly string[]
+  /** When the account was made, in RFC 2822 as the 2010 API writes dates. */
+  readonly createdAt: string
 }
 
 /** An API key: another way to authenticate as an account. */
