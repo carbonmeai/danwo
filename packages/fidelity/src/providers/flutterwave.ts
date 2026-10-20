@@ -46,9 +46,27 @@ const paymentLink: Scenario = {
   },
 }
 
+/**
+ * Whether live Flutterwave is failing its banks list in test mode: it has answered every country
+ * with its generic 400 ("An error occurred") while other reads with the same key work, so a
+ * mismatch would be Flutterwave's outage, not the emulator's.
+ */
+async function banksDown(context: ScenarioContext): Promise<boolean> {
+  if (context.target.kind !== "live") return false
+
+  const response = await context.target.send(call(context, "GET", "/v3/banks/NG"))
+  const text = await response.text()
+
+  return response.status === 400 && text.includes("An error occurred")
+}
+
 const banks: Scenario = {
   name: "banks: list",
   async run(context) {
+    if (await banksDown(context))
+      context.skip(
+        "provider error in test mode: Flutterwave answers its generic 400 to every banks list; the emulator is still checked offline against the golden",
+      )
     await context.step("list Nigerian banks", call(context, "GET", "/v3/banks/NG"), {
       literals: ["status"],
       doc: {
