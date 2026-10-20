@@ -308,6 +308,68 @@ describe("hosted auth", () => {
     expect(me.data.email).toBe("linus@kernel.test")
   })
 
+  it("takes the PKCE challenge Nylas's SDKs make: the hex digest in base64", async () => {
+    const verifier = randomBytes(32).toString("base64url")
+    const hex = createHash("sha256").update(verifier).digest("hex")
+    const challenge = Buffer.from(hex).toString("base64").replace(/=+$/, "")
+    const decided = await fetch(`${baseUrl}/v3/connect/auth/decide`, {
+      method: "POST",
+      redirect: "manual",
+      body: new URLSearchParams({
+        client_id: "app",
+        redirect_uri: "https://app.test/cb",
+        provider: "microsoft",
+        state: "s2",
+        code_challenge: challenge,
+        code_challenge_method: "S256",
+        email: "grace@navy.test",
+        decision: "allow",
+      }),
+    })
+    const code = new URL(decided.headers.get("location") ?? "").searchParams.get("code")
+    const tokens = await fetch(`${baseUrl}/v3/connect/token`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        client_id: "app",
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: "https://app.test/cb",
+        code_verifier: verifier,
+      }),
+    })
+
+    expect(tokens.status).toBe(200)
+
+    const body = await tokens.json()
+
+    expect(body).toMatchObject({ email: "grace@navy.test", provider: "microsoft" })
+
+    /* The id token is a JWT whose claims name the grant, as `@nylas/connect` reads them. */
+    const [, claims = ""] = String(body.id_token).split(".")
+
+    expect(JSON.parse(Buffer.from(claims, "base64url").toString())).toMatchObject({
+      sub: body.grant_id,
+      email: "grace@navy.test",
+      provider: "microsoft",
+    })
+  })
+
+  it("answers the browser's preflight for the token exchange, as an app's page sends it", async () => {
+    const preflight = await fetch(`${baseUrl}/v3/connect/token`, {
+      method: "OPTIONS",
+      headers: {
+        origin: "http://localhost:3050",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type",
+      },
+    })
+
+    expect(preflight.status).toBe(204)
+    expect(preflight.headers.get("access-control-allow-origin")).toBe("http://localhost:3050")
+    expect(preflight.headers.get("access-control-allow-headers")).toBe("content-type")
+  })
+
   it("refuses a code twice and a wrong verifier, as OAuth errors", async () => {
     const error = await client()
       .auth.exchangeCodeForToken({

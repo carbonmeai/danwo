@@ -1,3 +1,4 @@
+import { browserCors } from "../cors.ts"
 import { defineEmulator } from "../define.ts"
 import { HttpError } from "../errors.ts"
 import type { Store } from "../store.ts"
@@ -73,6 +74,8 @@ export const nylas = defineEmulator({
 
     const objects = nylasStore(store)
 
+    /* `@nylas/connect` exchanges the code for a token from the app's page, across origins. */
+    app.use(browserCors((path) => path.startsWith("/v3/connect/")))
     routes({
       app,
       store,

@@ -3,7 +3,7 @@
  * code, and the token endpoint that turns the code into a grant's tokens, for a backend with the
  * API key as the client secret or for a browser with a PKCE verifier (as `@nylas/connect` does).
  */
-import { createHash, randomBytes } from "node:crypto"
+import { createHash, createHmac, randomBytes } from "node:crypto"
 
 import { escapeHtml, htmlPage } from "../../html.ts"
 import type { Context } from "../../http.ts"
@@ -132,22 +132,60 @@ function decide(
   return backTo(c, redirectUri, { code: issueCode(context, grant, form), state: form["state"] })
 }
 
+/** One JWT segment: `value` as JSON in base64url. */
+const part = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url")
+
+/**
+ * An id token for `grant`: a JWT whose claims name the grant (`sub`), its account and provider,
+ * signed with HS256 under the application id.
+ */
+function idToken(
+  context: NylasRouteContext,
+  grant: NylasGrant,
+  clientId: string,
+  now: number,
+): string {
+  const header = part({ alg: "HS256", typ: "JWT" })
+  const claims = part({
+    iss: "https://nylas.com",
+    aud: clientId,
+    sub: grant.id,
+    email: grant.email,
+    email_verified: true,
+    ...(grant.name !== null && { name: grant.name }),
+    provider: grant.provider,
+    iat: now,
+    exp: now + ACCESS_SECONDS,
+  })
+  const signature = createHmac("sha256", context.objects.applicationId())
+    .update(`${header}.${claims}`)
+    .digest("base64url")
+
+  return `${header}.${claims}.${signature}`
+}
+
 /** Tokens for `grant`: a short-lived access token, a refresh token and an id token. */
 function tokensFor(context: NylasRouteContext, grant: NylasGrant, clientId: string) {
   const now = seconds(context.clock)
 
-  const make = (kind: "access" | "refresh" | "id", lifetime: number) => {
-    const id = `${kind === "access" ? "nyat" : kind === "refresh" ? "nyrt" : "nyid"}_${randomBytes(24).toString("base64url")}`
-
+  const keep = (id: string, kind: "access" | "refresh" | "id", lifetime: number) => {
     context.objects.tokens.add({ id, grant_id: grant.id, kind, expires_at: now + lifetime }, null)
 
     return id
   }
 
+  const make = (kind: "access" | "refresh", lifetime: number) =>
+    keep(
+      `${kind === "access" ? "nyat" : "nyrt"}_${randomBytes(24).toString("base64url")}`,
+      kind,
+      lifetime,
+    )
+
   return {
     access_token: make("access", ACCESS_SECONDS),
     refresh_token: make("refresh", 365 * 86_400),
-    id_token: make("id", ACCESS_SECONDS),
+    /* A JWT, as Nylas sends: `@nylas/connect` reads the grant's details from its claims. */
+    id_token: keep(idToken(context, grant, clientId, now), "id", ACCESS_SECONDS),
     token_type: "Bearer",
     expires_in: ACCESS_SECONDS,
     scope: grant.scope.join(" "),
@@ -176,12 +214,20 @@ function proves(
   if (code.challenge === null || typeof verifier !== "string")
     return code.challenge === null && secret !== undefined
 
-  const hashed =
-    code.challenge_method === "plain"
-      ? verifier
-      : createHash("sha256").update(verifier).digest("base64url")
+  if (code.challenge_method === "plain") return verifier === code.challenge
 
-  return hashed === code.challenge
+  return s256Challenges(verifier).includes(code.challenge)
+}
+
+/**
+ * The S256 challenges Nylas accepts for `verifier`: the standard one (the SHA-256 digest in
+ * base64url), and the one Nylas's own SDKs send, the hex digest in base64 without padding.
+ */
+function s256Challenges(verifier: string): readonly string[] {
+  const digest = createHash("sha256").update(verifier)
+  const hex = createHash("sha256").update(verifier).digest("hex")
+
+  return [digest.digest("base64url"), Buffer.from(hex).toString("base64").replace(/=+$/, "")]
 }
 
 async function formOrJson(c: Context): Promise<Record<string, unknown>> {
