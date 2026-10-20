@@ -601,7 +601,7 @@ export async function runMatrix(
   const file = resolve(cwd, options.file)
   const test = await theTest(loaded, file, options)
   const cache = await trialCache(loaded)
-  const recording = openRecording(loaded, options.record, options.video)
+  const recording = openRecording(loaded, options.record, options.video, options.keepRuns)
   const workers = matrixWorkers(options, loaded.config)
   const id = recording === undefined ? newRunId() : basename(recording.runDir)
   const feed = await openLiveFeed(loaded.root, { id, kind: "matrix", title: test.id, planned: 1 })

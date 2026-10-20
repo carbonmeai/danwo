@@ -8,8 +8,11 @@ import { basename, join, relative } from "node:path"
 import type { FlightRecord } from "./record.ts"
 import { type Loaded, renderReport } from "./report-html.ts"
 
-/** Runs kept under `.danwo/runs`; older ones are deleted when a run finishes. */
-const KEEP_RUNS = 20
+/**
+ * Runs kept under `.danwo/runs` unless the config's `record.keepRuns` says otherwise; older ones
+ * are deleted when a run finishes.
+ */
+export const DEFAULT_KEEP_RUNS = 50
 
 async function children(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true }).catch(() => [])
@@ -54,7 +57,10 @@ export async function loadRecords(runDir: string): Promise<Loaded[]> {
  * Finishes a run's recording: writes `report.html` over its records and resolves to its path, or
  * removes the run directory when nothing was kept. Prunes all but the newest runs. Never throws.
  */
-export async function finishRun(runDir: string): Promise<string | undefined> {
+export async function finishRun(
+  runDir: string,
+  keepRuns = DEFAULT_KEEP_RUNS,
+): Promise<string | undefined> {
   try {
     const records = await loadRecords(runDir)
 
@@ -67,7 +73,7 @@ export async function finishRun(runDir: string): Promise<string | undefined> {
     const path = join(runDir, "report.html")
 
     await writeFile(path, renderReport(basename(runDir), records))
-    await pruneRuns(join(runDir, ".."))
+    await pruneRuns(join(runDir, ".."), keepRuns)
 
     return path
   } catch {
@@ -75,10 +81,13 @@ export async function finishRun(runDir: string): Promise<string | undefined> {
   }
 }
 
-async function pruneRuns(runsDir: string): Promise<void> {
+/** Deletes all but the newest `keep` runs under `runsDir`; at least one, the run just finished, stays. */
+export async function pruneRuns(runsDir: string, keep: number): Promise<void> {
   const runs = (await children(runsDir)).toSorted().toReversed()
 
-  await Promise.all(runs.slice(KEEP_RUNS).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(
+    runs.slice(Math.max(1, keep)).map((dir) => rm(dir, { recursive: true, force: true })),
+  )
 }
 
 /** Says a command found no run to read (the named one, or any); resolves to its exit code, 1. */

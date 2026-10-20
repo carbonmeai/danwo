@@ -82,6 +82,12 @@ const videoOption = () =>
     "video in kept records: retain-on-failure keeps failed runs' (default: config, else on)",
   ).choices(["retain-on-failure", "on", "off"])
 
+const keepRunsOption = () =>
+  new Option(
+    "--keep-runs <n>",
+    "how many of the newest runs keep their recordings (default: config, else 50)",
+  ).argParser(integerAtLeast(1))
+
 const updateOption = () =>
   new Option("-u, --update-snapshots", "rewrite every toHaveScreenshot baseline")
 
@@ -129,6 +135,7 @@ withReporterOptions(withLintOptions(program.command("test")))
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .addOption(recordOption())
   .addOption(videoOption())
+  .addOption(keepRunsOption())
   .addOption(updateOption())
   .action(
     async (
@@ -152,6 +159,7 @@ withReporterOptions(withLintOptions(program.command("test")))
         config?: string
         record?: RecordMode
         video?: VideoMode
+        keepRuns?: number
         updateSnapshots?: boolean
         reporter?: string[]
         prComment?: boolean
@@ -201,6 +209,7 @@ withReporterOptions(withLintOptions(program.command("matrix")))
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .addOption(recordOption())
   .addOption(videoOption())
+  .addOption(keepRunsOption())
   .addOption(updateOption())
   .action(
     async (
@@ -225,6 +234,7 @@ withReporterOptions(withLintOptions(program.command("matrix")))
         config?: string
         record?: RecordMode
         video?: VideoMode
+        keepRuns?: number
         updateSnapshots?: boolean
         reporter?: string[]
         prComment?: boolean

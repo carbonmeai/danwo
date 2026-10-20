@@ -84,6 +84,8 @@ export interface RunCommandOptions {
   readonly record?: RecordMode
   /** When a kept record keeps video; overrides the config's `video`. */
   readonly video?: VideoMode
+  /** How many of the newest runs keep their recordings; overrides the config's `record.keepRuns`. */
+  readonly keepRuns?: number
   /** Rewrite every `toHaveScreenshot` baseline (`--update-snapshots`). */
   readonly updateScreenshots?: boolean
   /** Reporters besides the config's, e.g. from `--reporter`. */

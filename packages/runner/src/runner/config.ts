@@ -19,7 +19,7 @@ import type { VisionSetting } from "../vision/desk.ts"
 import type { EnvironmentContext, WorkerEnvironment } from "./environment.ts"
 import type { ImpactConfig } from "./impact.ts"
 import type { Isolation } from "./isolation.ts"
-import type { RecordMode } from "./record.ts"
+import type { RecordMode, RecordOptions } from "./record.ts"
 import type { Reporter } from "./reporting.ts"
 
 /** What `danwo.config.ts` default-exports; every key is optional. */
@@ -113,9 +113,10 @@ export interface DanwoConfig {
   readonly isolation?: Isolation
   /**
    * The flight recorder: `always` (default) keeps what every run did under `.danwo/runs/<run>/`
-   * with an HTML report; `on-failure` keeps failed runs only; `off` records nothing.
+   * with an HTML report; `on-failure` keeps failed runs only; `off` records nothing. As an object,
+   * `{ mode, keepRuns }` also says how many of the newest runs keep their recordings (default 50).
    */
-  readonly record?: RecordMode
+  readonly record?: RecordMode | RecordOptions
   /**
    * Video in the flight record, one per tab or the device's screen, with every step, call and
    * webhook on its clock: `on` (default) keeps it with every record kept; `retain-on-failure` films

@@ -271,7 +271,12 @@ function findingsOf(reports: readonly TestReport[]): LintFinding[] {
 
 /** Runs the picked tests with a live feed of them; resolves to the exit code. */
 async function executeRun(input: RunInput): Promise<number> {
-  const recording = openRecording(input.loaded, input.options.record, input.options.video)
+  const recording = openRecording(
+    input.loaded,
+    input.options.record,
+    input.options.video,
+    input.options.keepRuns,
+  )
   const id = recording === undefined ? newRunId() : basename(recording.runDir)
   const count = input.entries.length
   const feed = await openLiveFeed(input.loaded.root, {

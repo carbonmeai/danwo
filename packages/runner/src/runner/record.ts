@@ -25,12 +25,24 @@ import { type FailureVerdict, failureVerdict } from "./verdict.ts"
 /** `always` keeps every run (the default); `on-failure` keeps failed runs only; `off` records nothing. */
 export type RecordMode = "on-failure" | "always" | "off"
 
+/** The config's `record` as an object: the mode, and how many runs keep their recordings. */
+export interface RecordOptions {
+  readonly mode?: RecordMode
+  /**
+   * How many of the newest runs keep their recordings under `.danwo/runs` (default 50); older
+   * runs' records and videos are deleted when a run finishes. The run history keeps its 200.
+   */
+  readonly keepRuns?: number
+}
+
 /** Where one `danwo test` or `danwo matrix` invocation records, and what it keeps. */
 export interface RecordSettings {
   readonly runDir: string
   readonly mode: RecordMode
   /** When a kept record keeps its video too; absent records none. */
   readonly video?: VideoMode
+  /** How many of the newest runs keep their recordings; absent keeps the default. */
+  readonly keepRuns?: number
 }
 
 export type RecordedStep = StepRecord & {

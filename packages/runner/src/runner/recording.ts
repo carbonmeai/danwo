@@ -6,19 +6,30 @@ import { relative } from "node:path"
 
 import type { VideoMode } from "../record/video.ts"
 import type { LoadedConfig } from "./config.ts"
-import { newRunDir, type RecordMode, type RecordSettings } from "./record.ts"
-import { finishRun } from "./report.ts"
+import { newRunDir, type RecordMode, type RecordOptions, type RecordSettings } from "./record.ts"
+import { DEFAULT_KEEP_RUNS, finishRun } from "./report.ts"
+
+/** The config's `record`, whichever form it takes, as an object. */
+export function recordOptions(record: RecordMode | RecordOptions | undefined): RecordOptions {
+  return typeof record === "string" ? { mode: record } : (record ?? {})
+}
+
+/** How many of the newest runs keep their recordings: the option, else the config, else 50. */
+export function keepRunsOf(loaded: LoadedConfig, keepRuns?: number): number {
+  return keepRuns ?? recordOptions(loaded.config.record).keepRuns ?? DEFAULT_KEEP_RUNS
+}
 
 /**
  * The run's recording settings: the option, else the config, else `always`; none when off.
- * Video follows the same order and defaults to `on`.
+ * Video follows the same order and defaults to `on`; so do the runs kept, defaulting to 50.
  */
 export function openRecording(
   loaded: LoadedConfig,
   mode: RecordMode | undefined,
   video?: VideoMode,
+  keepRuns?: number,
 ): RecordSettings | undefined {
-  const chosen = mode ?? loaded.config.record ?? "always"
+  const chosen = mode ?? recordOptions(loaded.config.record).mode ?? "always"
 
   return chosen === "off"
     ? undefined
@@ -26,6 +37,7 @@ export function openRecording(
         runDir: newRunDir(loaded.root),
         mode: chosen,
         video: video ?? loaded.config.video ?? "on",
+        keepRuns: keepRunsOf(loaded, keepRuns),
       }
 }
 
@@ -38,7 +50,7 @@ export async function closeRecording(
   cwd: string,
   write: (line: string) => void,
 ): Promise<string | undefined> {
-  const report = recording && (await finishRun(recording.runDir))
+  const report = recording && (await finishRun(recording.runDir, recording.keepRuns))
 
   if (report === undefined) return undefined
 
