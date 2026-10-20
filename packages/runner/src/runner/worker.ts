@@ -50,6 +50,7 @@ import {
   type FlightRecord,
   markEvidence,
   recordEvidence,
+  runVerdict,
   type RecordExtras,
   type RecordInput,
   type RecordSettings,
@@ -334,11 +335,13 @@ async function reportAttempt(attempt: FinishedAttempt): Promise<AttemptReport> {
     env,
     mark: attempt.mark,
     video: videoKept(result.status === "passed"),
+    appsDown: down,
   }
   const inspected = inspect(input)
   const record = await keepRecord(attempt.recordDir, result.status !== "passed", () =>
     buildRecord(input, inspected),
   )
+  const verdict = runVerdict(input)
 
   return {
     status: result.status,
@@ -347,6 +350,7 @@ async function reportAttempt(attempt: FinishedAttempt): Promise<AttemptReport> {
     record,
     usage: usageOf(result.flight.session.steps()),
     ...lintOf(inspected),
+    ...(verdict !== undefined && { verdict }),
   }
 }
 

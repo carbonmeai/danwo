@@ -135,6 +135,18 @@ export {
   type RuleLevel,
 } from "../lint/index.ts"
 export type { TrialFindings } from "./reporting.ts"
+export {
+  type FailureVerdict,
+  failureVerdict,
+  fixAdvice,
+  trialVerdict,
+  type Verdict,
+  type VerdictConfidence,
+  type VerdictEvidence,
+  VERDICT_LABELS,
+  verdictCounts,
+  verdictSummary,
+} from "./verdict.ts"
 export { type CacheAction, type CacheCommandOptions, runCache } from "./cache-command.ts"
 export { type ErrorCodeRow, errorCodeTable, exitCodeForError } from "../support/codes.ts"
 export { CACHE_OUTCOMES, type CacheOutcome } from "../record/steps.ts"

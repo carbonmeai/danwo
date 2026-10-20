@@ -17,6 +17,7 @@ import type { AttemptStatus, ResultStatus } from "../tests/retry.ts"
 import type { WorkerLiveEvent } from "./live.ts"
 import type { RecordSettings } from "./record.ts"
 import type { TrialTimings } from "./timings.ts"
+import type { FailureVerdict } from "./verdict.ts"
 
 /** What a worker needs before its first task: where the project is and how to record. */
 export interface WorkerStart {
@@ -70,6 +71,8 @@ export interface AttemptReport {
   readonly usage?: Usage
   /** What the integration lint found in the attempt. */
   readonly lint?: readonly LintFinding[]
+  /** Whose failure it was, for an attempt that did not pass. */
+  readonly verdict?: FailureVerdict
 }
 
 /**

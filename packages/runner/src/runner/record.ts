@@ -20,6 +20,7 @@ import type { TestError } from "../support/errors.ts"
 import type { AttemptFlight } from "./attempt.ts"
 import type { WorkerEnvironment } from "./environment.ts"
 import { createRedactor, type Redactor } from "./redact.ts"
+import { type FailureVerdict, failureVerdict } from "./verdict.ts"
 
 /** `always` keeps every run (the default); `on-failure` keeps failed runs only; `off` records nothing. */
 export type RecordMode = "on-failure" | "always" | "off"
@@ -82,6 +83,8 @@ export interface FlightRecord {
   readonly lint?: readonly LintFinding[]
   /** Video of the run, one per tab (or the device's screen), each with the run on its clock. */
   readonly videos?: readonly RecordedVideo[]
+  /** Whose failure a run that did not pass was: the app's, the test's, the environment's, danwo's. */
+  readonly verdict?: FailureVerdict
 }
 
 /** The parts of a record the integration lint reads, redacted as the record keeps them. */
@@ -181,6 +184,8 @@ export interface RecordInput {
   readonly mark: EvidenceMark
   /** Keep the run's video in its record; without it the record has none. */
   readonly video?: boolean
+  /** Apps of the environment that stopped during the run, for its verdict. */
+  readonly appsDown?: readonly string[]
 }
 
 function redactorOf(input: Pick<RecordInput, "flight">): Redactor {
@@ -259,7 +264,27 @@ export function buildRecord(input: RecordInput, extras: RecordExtras = {}): Flig
     state: environmentState(input.env, redactor),
     ...(extras.lint !== undefined && extras.lint.length > 0 && { lint: extras.lint }),
     ...videosOf(input, evidence),
+    ...verdictOf(input),
   }
+}
+
+/** A run's verdict, for one that did not pass; nothing for a run that passed or was skipped. */
+export function runVerdict(input: RecordInput): FailureVerdict | undefined {
+  if (input.status === "passed" || input.status === "skipped") return undefined
+
+  return failureVerdict({
+    error: input.error,
+    ...(input.run.kind === "matrix" && { fault: input.run.fault?.label ?? null }),
+    calls: (input.env?.proxy?.exchanges() ?? []).slice(input.mark.exchanges),
+    appLog: input.flight.session.appLog(),
+    ...(input.appsDown !== undefined && { appsDown: input.appsDown }),
+  })
+}
+
+function verdictOf(input: RecordInput): Pick<FlightRecord, "verdict"> {
+  const found = runVerdict(input)
+
+  return found === undefined ? {} : { verdict: found }
 }
 
 /** The run's videos with its steps, calls and webhooks on their clocks, when the record keeps them. */

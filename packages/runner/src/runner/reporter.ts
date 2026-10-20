@@ -8,6 +8,7 @@ import { addUsage, cacheLine, dollars, modelLine, type Usage } from "../record/u
 import { type ErrorClass, exitCodeOf } from "../support/codes.ts"
 import type { ResultStatus } from "../tests/retry.ts"
 import type { TestReport } from "./tasks.ts"
+import { type FailureVerdict, VERDICT_LABELS, verdictSummary } from "./verdict.ts"
 
 const SYMBOL: Readonly<Record<ResultStatus, string>> = {
   passed: pc.green("✓"),
@@ -31,27 +32,44 @@ export function testLine(report: TestReport): string {
   return `  ${SYMBOL[report.status]} ${report.id}${attempts} ${pc.dim(`${ms} ms, worker ${report.workerIndex}`)}`
 }
 
-/** A failed test in full: its id, its last attempt's error, and where its flight record is. */
+/** A verdict as a failure's header shows it: "App bug (likely)". */
+export function verdictTag(verdict: FailureVerdict): string {
+  const label = VERDICT_LABELS[verdict.verdict]
+
+  return verdict.confidence === "likely" ? `${label} (likely)` : label
+}
+
+/** A failed test in full: its id and verdict, its last attempt's error, and its flight record. */
 function failureLines(report: TestReport): string[] {
   const last = report.attempts.at(-1)
+  const tag = last?.verdict ? pc.dim(`  [${verdictTag(last.verdict)}]`) : ""
 
   return [
     "",
-    pc.red(pc.bold(`✗ ${report.id}`)),
+    pc.red(pc.bold(`✗ ${report.id}`)) + tag,
     ...(last?.error ? [`  ${last.error.code}: ${last.error.message}`] : []),
+    ...(last?.verdict ? [pc.dim(`  why: ${last.verdict.reason}`)] : []),
     ...(last?.record ? [pc.dim(`  record: ${last.record}`)] : []),
   ]
+}
+
+/** The verdicts of the run's failed tests, by their last attempt. */
+export function failedVerdicts(reports: readonly TestReport[]): (FailureVerdict | undefined)[] {
+  return reports
+    .filter((report) => isFailure(report.status))
+    .map((report) => report.attempts.at(-1)?.verdict)
 }
 
 function summaryLine(reports: readonly TestReport[]): string {
   const tally = (status: ResultStatus) =>
     reports.filter((report) => report.status === status).length
   const failed = reports.filter((report) => isFailure(report.status)).length
+  const split = verdictSummary(failedVerdicts(reports))
 
   return [
     `${tally("passed")} passed`,
     tally("flaky") > 0 ? `${tally("flaky")} flaky` : "",
-    failed > 0 ? pc.red(`${failed} failed`) : "",
+    failed > 0 ? pc.red(`${failed} failed`) + (split === "" ? "" : ` (${split})`) : "",
     tally("skipped") > 0 ? `${tally("skipped")} skipped` : "",
   ]
     .filter((part) => part !== "")

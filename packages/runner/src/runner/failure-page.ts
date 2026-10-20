@@ -9,6 +9,7 @@ import { findingPlace } from "../lint/index.ts"
 import { effectNotes, effectsOf } from "../record/effect-notes.ts"
 import { dollars, stepCost } from "../record/usage.ts"
 import type { FlightRecord, RecordedExchange, RecordedStep } from "./record.ts"
+import { fixAdvice, VERDICT_LABELS } from "./verdict.ts"
 
 /** Caps that keep a page readable in an agent's context. */
 const LIMITS = {
@@ -50,6 +51,7 @@ function headerLines(record: FlightRecord): string[] {
     "",
     `${runLabel(record)} · ${record.status}${kind} · ${(record.durationMs / 1000).toFixed(1)} s`,
     "",
+    ...verdictLines(record),
     ...(error
       ? [`**Error${where}:**`, "", "```text", clip(error.message, LIMITS.message), "```", ""]
       : []),
@@ -63,6 +65,18 @@ function headerLines(record: FlightRecord): string[] {
     ...record.notes.map((note) => `- ${note}`),
     ...(record.notes.length > 0 ? [""] : []),
   ]
+}
+
+/** Whose failure it is, why, and what to fix: the first thing a coding agent should read. */
+function verdictLines(record: FlightRecord): string[] {
+  const { verdict } = record
+
+  if (verdict === undefined) return []
+
+  const label = VERDICT_LABELS[verdict.verdict]
+  const sure = verdict.confidence === "likely" ? " (likely)" : ""
+
+  return [`**Verdict: ${label}${sure}.** ${verdict.reason}`, "", fixAdvice(verdict), ""]
 }
 
 /** A step's cache outcome, with what made a recording stale or why it stopped matching. */

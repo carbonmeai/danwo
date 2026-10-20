@@ -16,6 +16,7 @@ import { redactCredentials } from "../secrets/index.ts"
 import { headCommit } from "./git-changes.ts"
 import type { MatrixRunReport, Reporter, RunContext, TestRunReport } from "./reporting.ts"
 import type { AttemptReport, TestReport } from "./tasks.ts"
+import { type FailureVerdict, trialVerdict } from "./verdict.ts"
 
 /** History summaries kept; older ones are deleted when a run is added. */
 const KEEP = 200
@@ -44,6 +45,8 @@ export interface HistoryAttempt {
   readonly usage?: Usage
   /** What the integration lint found, counted by rule; absent when it found nothing. */
   readonly lint?: readonly HistoryLint[]
+  /** Whose failure it was, for an attempt that did not pass. */
+  readonly verdict?: FailureVerdict
 }
 
 export interface HistoryTest {
@@ -64,6 +67,8 @@ export interface HistoryTrial {
   readonly source?: { readonly file: string; readonly line: number }
   readonly calls: number
   readonly deliveries: number
+  /** Whose failure a trial that did not pass was. */
+  readonly verdict?: FailureVerdict
 }
 
 interface HistoryBase {
@@ -150,7 +155,13 @@ function attemptOf(context: RunContext, attempt: AttemptReport): HistoryAttempt 
     ...(record !== undefined && { record }),
     ...(attempt.usage && { usage: attempt.usage }),
     ...(attempt.lint?.length && { lint: lintCounts(attempt.lint) }),
+    ...(attempt.verdict && { verdict: redactedVerdict(attempt.verdict) }),
   }
+}
+
+/** A verdict with its reason redacted, as everything a summary keeps is. */
+function redactedVerdict(verdict: FailureVerdict): FailureVerdict {
+  return { ...verdict, reason: line(verdict.reason) }
 }
 
 function testOf(context: RunContext, report: TestReport): HistoryTest {
@@ -174,7 +185,15 @@ function trialOf(context: RunContext, outcome: RunOutcome): HistoryTrial {
     ...(outcome.source && { source: outcome.source }),
     calls: outcome.exchanges.length,
     deliveries: outcome.deliveries.length,
+    ...trialVerdictOf(outcome),
   }
+}
+
+/** A trial's verdict from its outcome: whose failure a trial that did not pass was. */
+function trialVerdictOf(outcome: RunOutcome): Pick<HistoryTrial, "verdict"> {
+  const found = trialVerdict(outcome.status, outcome.fault?.label ?? null, outcome.error)
+
+  return found === undefined ? {} : { verdict: redactedVerdict(found) }
 }
 
 /** The run's id and when it began, from its record folder when it has one. */
