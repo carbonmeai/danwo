@@ -2,11 +2,9 @@
 import type { Context } from "../http.ts"
 import type { NovuEnvironment, NovuMessage, NovuSubscriber, NovuTopic } from "./entities.ts"
 
-/** A subscriber, as `subscribers.create`, `retrieve` and `patch` return one. */
-export function subscriberObject(env: NovuEnvironment, subscriber: NovuSubscriber) {
-  return {
-    _id: subscriber.id,
-    subscriberId: subscriber.subscriber_id,
+/** The details a subscriber was given; Novu leaves out the ones nobody set. */
+function setDetails(subscriber: NovuSubscriber) {
+  const details = {
     firstName: subscriber.first_name,
     lastName: subscriber.last_name,
     email: subscriber.email,
@@ -15,6 +13,17 @@ export function subscriberObject(env: NovuEnvironment, subscriber: NovuSubscribe
     locale: subscriber.locale,
     timezone: subscriber.timezone,
     data: subscriber.data,
+  }
+
+  return Object.fromEntries(Object.entries(details).filter(([, value]) => value !== null))
+}
+
+/** A subscriber, as `subscribers.create`, `retrieve` and `patch` return one. */
+export function subscriberObject(env: NovuEnvironment, subscriber: NovuSubscriber) {
+  return {
+    _id: subscriber.id,
+    subscriberId: subscriber.subscriber_id,
+    ...setDetails(subscriber),
     channels: subscriber.channels.map((channel) => ({
       providerId: channel.providerId,
       ...(channel.integrationIdentifier && {
@@ -30,7 +39,6 @@ export function subscriberObject(env: NovuEnvironment, subscriber: NovuSubscribe
     deleted: false,
     createdAt: subscriber.created,
     updatedAt: subscriber.updated,
-    __v: 0,
   }
 }
 

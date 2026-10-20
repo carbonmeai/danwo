@@ -182,7 +182,10 @@ function subscriberRoutes(ctx: NovuRouteContext): void {
   app.post("/v2/subscribers", async (c) => {
     const env = environmentOf(ctx, c)
 
-    return c.json(subscriberObject(env, upsertSubscriber(ctx, await jsonObjectOf(c))), 201)
+    return c.json(
+      { data: subscriberObject(env, upsertSubscriber(ctx, await jsonObjectOf(c))) },
+      201,
+    )
   })
 
   app.get("/v2/subscribers", (c) => {
@@ -206,9 +209,12 @@ function subscriberRoutes(ctx: NovuRouteContext): void {
   })
 
   app.get("/v2/subscribers/:subscriberId", (c) =>
-    c.json(
-      subscriberObject(environmentOf(ctx, c), subscriberById(ctx, c.req.param("subscriberId"))),
-    ),
+    c.json({
+      data: subscriberObject(
+        environmentOf(ctx, c),
+        subscriberById(ctx, c.req.param("subscriberId")),
+      ),
+    }),
   )
 
   app.patch("/v2/subscribers/:subscriberId", async (c) => {
@@ -216,22 +222,22 @@ function subscriberRoutes(ctx: NovuRouteContext): void {
 
     subscriberById(ctx, c.req.param("subscriberId"))
 
-    return c.json(
-      subscriberObject(
+    return c.json({
+      data: subscriberObject(
         env,
         upsertSubscriber(ctx, {
           ...(await jsonObjectOf(c)),
           subscriberId: c.req.param("subscriberId"),
         }),
       ),
-    )
+    })
   })
 
   app.delete("/v2/subscribers/:subscriberId", (c) => {
     environmentOf(ctx, c)
     ctx.objects.subscribers.remove(subscriberById(ctx, c.req.param("subscriberId")).id)
 
-    return c.json({ acknowledged: true, status: "deleted" })
+    return c.json({ data: { acknowledged: true, status: "deleted" } })
   })
 
   app.put("/v1/subscribers/:subscriberId/credentials", async (c) => {
