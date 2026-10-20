@@ -12,6 +12,8 @@ import {
   ReplayFlow,
   Setup,
 } from "./diagrams.tsx"
+import { HowItWorks, MatrixFlow } from "./diagrams.tsx"
+import { StackFlow } from "./stack-diagram.tsx"
 
 /**
  * The components MDX pages can use: the docs defaults (cards, callouts, code blocks), steps,
@@ -31,6 +33,7 @@ export function useMdxComponents(components?: MDXComponents) {
     ReplayFlow,
     EmulatorFlow,
     IsolationSlots,
+    StackFlow,
     ...components,
   } satisfies MDXComponents
 }

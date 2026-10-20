@@ -25,7 +25,11 @@
   },
   "devDependencies": {
     "@danwo/cli": "workspace:*",
+    "@danwo/device": "workspace:*",
+    "@danwo/expo": "workspace:*",
+    "@danwo/playwright": "workspace:*",
     "@danwo/sdk": "workspace:*",
+    "@playwright/test": "1.64.0",
     "@tailwindcss/vite": "4.3.3",
     "@types/mdx": "2.0.14",
     "@types/react": "19.2.18",

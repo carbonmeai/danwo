@@ -5,16 +5,17 @@
  */
 import type { ReactNode } from "react"
 
+export const TEXT = "var(--color-fd-foreground)"
+export const MUTED = "var(--color-fd-muted-foreground)"
+
 const BORDER = "var(--color-fd-border)"
 const CARD = "var(--color-fd-card)"
-const TEXT = "var(--color-fd-foreground)"
-const MUTED = "var(--color-fd-muted-foreground)"
 const LINE = "var(--color-fd-muted-foreground)"
 const PASS = "var(--color-fd-success)"
 const FAIL = "var(--color-fd-error)"
 
 /** A labelled box, with an optional second line in a lighter colour. */
-function Box(props: {
+export function Box(props: {
   readonly x: number
   readonly y: number
   readonly width: number
@@ -57,7 +58,7 @@ function Box(props: {
 }
 
 /** A line from one point to another, ending in an arrowhead. */
-function Arrow(props: {
+export function Arrow(props: {
   readonly from: readonly [number, number]
   readonly to: readonly [number, number]
 }): ReactNode {
@@ -77,7 +78,7 @@ function Arrow(props: {
 }
 
 /** The figure around a diagram: a scalable SVG with an arrowhead marker and a caption. */
-function Figure(props: {
+export function Figure(props: {
   readonly width: number
   readonly height: number
   readonly label: string
