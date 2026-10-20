@@ -122,7 +122,7 @@ describe("Clerk webhooks", () => {
         {
           endpoint: receiver.url,
           secret: SECRET,
-          headers: { "primus-token": "shared-token", "svix-id": "not-used" },
+          headers: { "x-app-token": "shared-token", "svix-id": "not-used" },
         },
       ],
     })
@@ -130,7 +130,7 @@ describe("Clerk webhooks", () => {
     await bed.client.users.createUser({ emailAddress: ["ada@danwo.test"] })
 
     await vi.waitFor(() => expect(receiver.received).toHaveLength(1))
-    expect(receiver.received[0]?.headers.get("primus-token")).toBe("shared-token")
+    expect(receiver.received[0]?.headers.get("x-app-token")).toBe("shared-token")
     expect(receiver.received[0]?.headers.get("svix-id")).toMatch(/^msg_/)
   })
 

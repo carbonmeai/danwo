@@ -8,8 +8,8 @@ describe("expect on plain values", () => {
   })
 
   it("prints the message given with the value when the check fails", () => {
-    vitestExpect(() => expect(503, "primus /health: database down").toBeLessThan(500)).toThrow(
-      /primus \/health: database down/,
+    vitestExpect(() => expect(503, "api /health: database down").toBeLessThan(500)).toThrow(
+      /api \/health: database down/,
     )
   })
 
