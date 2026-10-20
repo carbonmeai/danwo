@@ -413,7 +413,9 @@ function NowWords({
         <Span fontWeight="500" color={segment.bad ? "verdict.failed.fg" : "ink.strong"}>
           {segment.phase === "settle" ? "Waiting for background work" : "Checking what the app did"}
         </Span>
-        {playback.speeding ? <Span color="ink.muted">playing at {TAIL_RATE}×</Span> : null}
+        {playback.playing && playback.speeding ? (
+          <Span color="ink.muted">playing at {TAIL_RATE}×</Span>
+        ) : null}
       </>
     )
 
