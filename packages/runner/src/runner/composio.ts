@@ -15,7 +15,6 @@ import {
   oauthService,
   type Seed,
 } from "./oauth.ts"
-import { servicesLifecycle, startServices } from "./services.ts"
 
 /** Options of `composioService()` and `composioEnvironment()`. */
 export interface ComposioOptions {
@@ -76,24 +75,5 @@ export function composioService(options: ComposioOptions = {}): OAuthService {
 export async function composioEnvironment(
   options: ComposioOptions & { readonly unmatched?: "passthrough" | "block" } = {},
 ): Promise<ComposioEnvironment> {
-  const service = composioService(options)
-  const backends = options.backends ?? []
-
-  if (backends.length === 0) return oauthEnvironment("composio", service, options)
-
-  const services = await startServices([...backends, service], options)
-  const lifecycle = servicesLifecycle(services)
-
-  return {
-    emulator: service.emulator,
-    proxy: services.proxy,
-    webhooks: services.webhooks,
-    ...lifecycle,
-    fixtures: {
-      ...services.fixtures,
-      composio: service.emulator,
-      proxy: services.proxy,
-      settle: lifecycle.settle,
-    },
-  }
+  return oauthEnvironment("composio", composioService(options), options, options.backends ?? [])
 }

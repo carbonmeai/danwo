@@ -28,7 +28,6 @@ import {
   type Provider,
   type Seed,
 } from "./oauth.ts"
-import { servicesLifecycle, startServices } from "./services.ts"
 
 /** Options of `nylasService()` and `nylasEnvironment()`. */
 export interface NylasOptions {
@@ -145,24 +144,5 @@ export function unipileEnvironment(
 export async function nangoEnvironment(
   options: NangoOptions & Unrouted = {},
 ): Promise<NangoEnvironment> {
-  const service = nangoService(options)
-  const backends = options.backends ?? []
-
-  if (backends.length === 0) return oauthEnvironment("nango", service, options)
-
-  const services = await startServices([...backends, service], options)
-  const lifecycle = servicesLifecycle(services)
-
-  return {
-    emulator: service.emulator,
-    proxy: services.proxy,
-    webhooks: services.webhooks,
-    ...lifecycle,
-    fixtures: {
-      ...services.fixtures,
-      nango: service.emulator,
-      proxy: services.proxy,
-      settle: lifecycle.settle,
-    },
-  }
+  return oauthEnvironment("nango", nangoService(options), options, options.backends ?? [])
 }

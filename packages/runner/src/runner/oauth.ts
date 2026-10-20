@@ -251,18 +251,29 @@ export function oauthService<Config>(
   }
 }
 
-/** A provider's service started on its own proxy, with its emulator under `name` in the fixtures. */
+/**
+ * A provider's service started on its own proxy, with its emulator under `name` in the fixtures.
+ * `backends` are the services it acts on (Google, Slack and the like), started behind the same
+ * proxy with their own fixtures alongside.
+ */
 export async function oauthEnvironment<Name extends string>(
   name: Name,
   service: OAuthService,
   options: { readonly unmatched?: "passthrough" | "block" },
+  backends: readonly Service[] = [],
 ): Promise<OAuthEnvironment<Name>> {
-  const services = await startServices([service], options)
+  const services = await startServices([...backends, service], options)
   const { proxy } = services
   const lifecycle = servicesLifecycle(services)
   const { settle } = lifecycle
+  const own = backends.length === 0 ? {} : services.fixtures
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the mapped key is `name` itself, which TypeScript can't see through a computed property
-  const fixtures = { [name]: service.emulator, proxy, settle } as OAuthEnvironment<Name>["fixtures"]
+  const fixtures = {
+    ...own,
+    [name]: service.emulator,
+    proxy,
+    settle,
+  } as OAuthEnvironment<Name>["fixtures"]
 
   return {
     emulator: service.emulator,
