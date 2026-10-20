@@ -30,7 +30,7 @@ import {
 import { routeOf } from "../replay/route.ts"
 import type { ReplayStore, StepKey } from "../replay/store.ts"
 import { describe } from "../replay/target.ts"
-import type { Trace } from "../replay/trace.ts"
+import type { RecordedAction, Trace } from "../replay/trace.ts"
 import type { SecretVault } from "../secrets/index.ts"
 import { type VisionChoice, VisionDesk, visionFor, type VisionMode } from "../vision/desk.ts"
 import { SecretSpots } from "../vision/screen.ts"
@@ -46,9 +46,11 @@ import { JUDGE_PROMPT, WAIT_PROMPT } from "./prompts.ts"
 import {
   compareEffects,
   keepRecording,
+  type LiveRun,
   pollOf,
   requireModel,
   passed,
+  ranBefore,
   stepEvents,
   stepSpends,
 } from "./recording.ts"
@@ -141,10 +143,18 @@ interface ActCall {
   readonly time: boolean
 }
 
-/** How replaying a step's recording went: how many actions, or why it did not replay. */
+/**
+ * How replaying a step's recording went: how many actions, or why it did not replay and the
+ * actions it carried out before it stopped.
+ */
 type Replayed =
   | { readonly ok: true; readonly actions: number; readonly relocated: boolean }
-  | { readonly ok: false; readonly reason: string | undefined; readonly effect?: boolean }
+  | {
+      readonly ok: false
+      readonly reason: string | undefined
+      readonly effect?: boolean
+      readonly ran?: readonly RecordedAction[]
+    }
 
 class SessionAgent implements Agent {
   private readonly options: AgentOptions
@@ -412,7 +422,7 @@ class SessionAgent implements Agent {
     })
 
     this.checkApp(mark)
-    await this.keep(key, call, result, { miss, watch })
+    await this.keep(key, call, result, { miss, watch, replayed: replayed.ran ?? [] })
 
     return {
       summary: result.summary,
@@ -475,11 +485,13 @@ class SessionAgent implements Agent {
 
     const outcome = await this.tryReplay(trace, params, files)
 
-    if (typeof outcome === "string") return { ok: false, reason: outcome }
+    if (outcome instanceof ReplayMismatch)
+      return { ok: false, reason: outcome.message, ran: ranBefore(trace, outcome) }
 
     const effect = await this.checkEffects(trace, watch)
 
-    if (effect !== undefined) return { ok: false, reason: `effect: ${effect}`, effect: true }
+    if (effect !== undefined)
+      return { ok: false, reason: `effect: ${effect}`, effect: true, ran: outcome.trace.actions }
 
     this.noteMoves(key, outcome)
 
@@ -508,12 +520,12 @@ class SessionAgent implements Agent {
     if (moves.length > 0) store?.stage(key, steps.next - 1, outcome.trace)
   }
 
-  /** How the replay went; otherwise why it did not. */
+  /** How the replay went; otherwise where and why it stopped matching. */
   private async tryReplay(
     trace: Trace,
     params: Params,
     files: Files,
-  ): Promise<ReplayOutcome | string> {
+  ): Promise<ReplayOutcome | ReplayMismatch> {
     try {
       return await replay(trace, {
         ...this.finder(),
@@ -531,7 +543,7 @@ class SessionAgent implements Agent {
           this.options.steps.event({ kind: "action", at: new Date().toISOString(), label }),
       })
     } catch (error) {
-      if (error instanceof ReplayMismatch) return error.message
+      if (error instanceof ReplayMismatch) return error
 
       throw error
     }
@@ -595,7 +607,7 @@ class SessionAgent implements Agent {
     key: StepKey | undefined,
     call: ActCall,
     result: LiveResult,
-    seen: { readonly miss: CacheNote; readonly watch: EffectWatch | undefined },
+    seen: Pick<LiveRun, "miss" | "watch" | "replayed">,
   ): Promise<void> {
     const { store, steps, mail, tabs, appUrl } = this.options
 

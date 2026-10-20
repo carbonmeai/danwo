@@ -19,9 +19,11 @@ import { divergedNote, handedOff, missError, missOf } from "../../agent/miss.ts"
 import {
   compareEffects,
   keepRecording,
+  type LiveRun,
   pollOf,
   requireModel,
   passed,
+  ranBefore,
   stepEvents,
   stepSpends,
 } from "../../agent/recording.ts"
@@ -39,7 +41,7 @@ import { embedsValue, type Params } from "../../replay/params.ts"
 import { relocates } from "../../replay/policy.ts"
 import { ReplayMismatch } from "../../replay/replayer.ts"
 import type { StepKey } from "../../replay/store.ts"
-import type { Trace } from "../../replay/trace.ts"
+import type { RecordedAction, Trace } from "../../replay/trace.ts"
 import { DanwoError } from "../../support/codes.ts"
 import { visionFor, type VisionChoice, type VisionMode } from "../../vision/desk.ts"
 import type { DeviceTarget } from "../types.ts"
@@ -201,7 +203,7 @@ class DeviceAgent implements Agent {
 
     const result = await this.runModel(call)
 
-    await this.keep(key, call, result, { miss, watch })
+    await this.keep(key, call, result, { miss, watch, replayed: replayed.ran ?? [] })
 
     return {
       summary: result.summary,
@@ -236,7 +238,12 @@ class DeviceAgent implements Agent {
     watch: EffectWatch | undefined,
   ): Promise<
     | { readonly ok: true; readonly actions: number; readonly relocated: boolean }
-    | { readonly ok: false; readonly reason: string | undefined; readonly effect?: boolean }
+    | {
+        readonly ok: false
+        readonly reason: string | undefined
+        readonly effect?: boolean
+        readonly ran?: readonly RecordedAction[]
+      }
   > {
     const { steps, store } = this.options
     const trace = key === undefined ? undefined : await store?.read(key.key)
@@ -245,11 +252,13 @@ class DeviceAgent implements Agent {
 
     const outcome = await this.tryReplay(trace, params)
 
-    if (typeof outcome === "string") return { ok: false, reason: outcome }
+    if (outcome instanceof ReplayMismatch)
+      return { ok: false, reason: outcome.message, ran: ranBefore(trace, outcome) }
 
     const effect = await compareEffects(steps, trace, watch)
 
-    if (effect !== undefined) return { ok: false, reason: `effect: ${effect}`, effect: true }
+    if (effect !== undefined)
+      return { ok: false, reason: `effect: ${effect}`, effect: true, ran: outcome.trace.actions }
 
     for (const move of outcome.moved) steps.event({ kind: "relocated", at: now(), ...move })
     if (outcome.moved.length > 0) store?.stage(key, steps.next - 1, outcome.trace)
@@ -257,8 +266,11 @@ class DeviceAgent implements Agent {
     return { ok: true, actions: trace.actions.length, relocated: outcome.moved.length > 0 }
   }
 
-  /** How the replay went; otherwise why it did not. */
-  private async tryReplay(trace: Trace, params: Params): Promise<DeviceReplayOutcome | string> {
+  /** How the replay went; otherwise where and why it stopped matching. */
+  private async tryReplay(
+    trace: Trace,
+    params: Params,
+  ): Promise<DeviceReplayOutcome | ReplayMismatch> {
     const { steps, strict } = this.options
 
     try {
@@ -274,7 +286,7 @@ class DeviceAgent implements Agent {
         onAction: (label) => steps.event({ kind: "action", at: now(), label }),
       })
     } catch (error) {
-      if (error instanceof ReplayMismatch) return error.message
+      if (error instanceof ReplayMismatch) return error
 
       throw error
     }
@@ -311,7 +323,7 @@ class DeviceAgent implements Agent {
     key: StepKey | undefined,
     call: ActCall,
     result: LoopResult,
-    seen: { readonly miss: CacheNote; readonly watch: EffectWatch | undefined },
+    seen: Pick<LiveRun, "miss" | "watch" | "replayed">,
   ): Promise<void> {
     const { store, steps, mail, target } = this.options
 

@@ -10,6 +10,7 @@ import { type CallCost, resolveModel } from "../model/resolve.ts"
 import type { StepRecorder } from "../record/index.ts"
 import type { CacheNote } from "../record/steps.ts"
 import { type Params, paramText } from "../replay/params.ts"
+import type { ReplayMismatch } from "../replay/replayer.ts"
 import type { ReplayStore, StepKey } from "../replay/store.ts"
 import type { RecordedAction, Trace } from "../replay/trace.ts"
 import { DanwoError } from "../support/codes.ts"
@@ -92,6 +93,14 @@ export async function compareEffects(
   return check.result === "diverged" ? check.reason : undefined
 }
 
+/**
+ * The recorded actions a replay carried out before it stopped matching: every one before the
+ * action that failed, or all of them when only the end route differed.
+ */
+export function ranBefore(trace: Trace, mismatch: ReplayMismatch): readonly RecordedAction[] {
+  return trace.actions.slice(0, mismatch.action)
+}
+
 /** Values that differ from run to run, which an effect may not hold: params and mail values. */
 function runValues(params: Params, mail: MailDesk): string[] {
   const named = Object.keys(params).flatMap((name) => paramText(params, name) ?? [])
@@ -109,6 +118,11 @@ export interface LiveRun {
   readonly mail: MailDesk
   /** The run's actions; null when one cannot be replayed. */
   readonly recorded: readonly RecordedAction[] | null
+  /**
+   * What a replay that stopped matching had already done before the model took over: the model
+   * went on from there, so the recording begins with them.
+   */
+  readonly replayed?: readonly RecordedAction[]
   readonly miss: CacheNote
   readonly watch: EffectWatch | undefined
   /** Where the step left the app, as the recording keeps it. */
@@ -135,7 +149,7 @@ export async function keepRecording(run: LiveRun): Promise<void> {
     version: 1,
     instruction: run.instruction,
     recordedAt: now(),
-    actions: [...recorded],
+    actions: [...(run.replayed ?? []), ...recorded],
     endRoute: await run.endRoute(),
     ...(effects !== undefined && { effects }),
   })

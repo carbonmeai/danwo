@@ -74,7 +74,10 @@ function create(view: string, done: readonly string[]): LanguageModelV4GenerateR
 
 /** Opens the task's members and picks the Babbage among them, waiting for the options to load. */
 function assign(view: string, done: readonly string[]): LanguageModelV4GenerateResult {
-  if (done.filter((tool) => tool === "click").length >= 2)
+  if (
+    done.filter((tool) => tool === "click").length >= 2 ||
+    /Assigned: [A-Za-z]+ Babbage/.test(view)
+  )
     return call("done", {
       status: "passed",
       summary: `assigned ${TITLE} to Bob`,
@@ -172,6 +175,7 @@ function outcomes(steps: readonly StepRecord[]): Record<string, string | undefin
 async function run<T>(
   model: MockLanguageModelV4,
   steps: (session: WebSession) => Promise<T>,
+  options: { readonly relocation?: "exact" } = {},
 ): Promise<{ result: T; steps: readonly StepRecord[] }> {
   const cache = {
     dir,
@@ -184,6 +188,7 @@ async function run<T>(
     model,
     cache,
     assertionTimeout: 2_000,
+    ...options,
   })
 
   try {
@@ -289,6 +294,34 @@ describe("a replay of a page that really changed", () => {
     })
     expect(second.doGenerateCalls.length).toBeGreaterThan(0)
   }, 120_000)
+
+  it("keeps what the replay did before the model took over in the new recording", async () => {
+    const exact = { relocation: "exact" } as const
+
+    await run(boardModel(), journey, exact)
+    board.reset()
+    board.look({ members: ["Ada Lovelace", "Robert Babbage"] })
+
+    const second = await run(boardModel(), journey, exact)
+
+    expect(notes(second.steps)[`assign ${TITLE} to Bob`]).toMatchObject({
+      mode: "handed-off",
+      reason: expect.stringMatching(
+        /^action 3 \(click\): getByRole\("option", name: "Bob Babbage"\)/,
+      ),
+    })
+    expect(board.tasks()[0]?.assignee).toBe("Robert Babbage")
+    board.reset()
+    board.look({ members: ["Ada Lovelace", "Robert Babbage"] })
+
+    const third = boardModel()
+    const { result, steps } = await run(third, journey, exact)
+
+    expect(result).toBe(1)
+    expect(board.tasks()[0]?.assignee).toBe("Robert Babbage")
+    expect(outcomes(steps)[`assign ${TITLE} to Bob`]).toBe("replayed")
+    expect(third.doGenerateCalls.length).toBe(0)
+  }, 180_000)
 
   it("reads a value again through the model when the element it was read from is gone", async () => {
     board.add(TITLE)
