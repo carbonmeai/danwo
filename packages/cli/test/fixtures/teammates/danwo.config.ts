@@ -12,7 +12,6 @@ import { freePort } from "../app-process.ts"
 export default defineConfig({
   testDir: "tests",
   timeout: 30_000,
-  assertionTimeout: 4_000,
   readiness: "page",
   async environment() {
     const port = await freePort()
