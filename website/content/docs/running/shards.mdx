@@ -9,7 +9,8 @@ the test files, and one job joins the results.
 
 ## Split the suite
 
-`--shard i/n` gives machine `i` of `n` its share: every `n`th test file.
+`--shard 2/4` runs the second of four shares. Each share is every fourth test file, so the four
+machines together run them all.
 
 ```yaml title=".github/workflows/danwo.yml · the shards"
 strategy:

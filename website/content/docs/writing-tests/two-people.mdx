@@ -25,9 +25,16 @@ test("a teammate sees a post the moment it is made", async ({ app, screen, expec
 })
 ```
 
-`bob` has their own `app`, `screen`, `expect`, `agent`, `mail` and `secret`, all scoped to that
-browser. Pass `{ session }` to start it from a [saved session](/docs/sessions). Leave it out to
-start signed out.
+`bob` has the same fixtures a test does, each scoped to that browser:
+
+| On `bob`          | Works like                          |
+| ----------------- | ----------------------------------- |
+| `app`, `screen`   | the test's own, in Bob's browser    |
+| `expect`, `agent` | checks and agent steps on his pages |
+| `mail`, `secret`  | his mail and the run's secrets      |
+
+Pass `{ session }` to start Bob from a [saved session](/docs/sessions). Leave it out to start
+signed out.
 
 ## What both browsers share
 
@@ -37,8 +44,8 @@ start signed out.
 | the clock: `time.travel` moves both | their video and steps in the record |
 | your app and its database           | the session each one starts from    |
 
-Names are letters, digits, `.`, `_` or `-`, and each name opens once per test. Call `bob.close()`
-to close that browser early. Every browser closes when the test ends.
+A name is up to 40 letters, digits, dots, underscores or dashes, and each name opens once per
+test. Call `bob.close()` to close that browser early. Every browser closes when the test ends.
 
 ## In the record
 

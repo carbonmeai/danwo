@@ -39,8 +39,8 @@ export default defineConfig({
 
 ## This machine always passes
 
-Calls to `localhost`, `127.0.0.1` and `::1` always go through, even under `block`. That's where
-your other apps, the Inngest dev server and your databases answer.
+Calls to this machine (`localhost`, `127.0.0.1`, `::1`) always go through, even when other hosts
+are blocked. That's where your other apps, the Inngest dev server and your databases answer.
 
 If nothing listens on the port, the call gets a 502 that says so:
 

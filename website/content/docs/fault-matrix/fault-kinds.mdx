@@ -24,9 +24,17 @@ as it would in production.
 
 ## Model APIs
 
-Calls to OpenAI, Anthropic and the other model APIs can also get `refusal`, `empty-completion`,
-`truncated`, `content-filter`, `malformed-tool-call` and `stream-cut`. These check what your app
-does when the model answers badly.
+Calls to OpenAI, Anthropic and the other model APIs can also get answers that go wrong. These
+check what your app does when the model answers badly.
+
+| Fault                 | What the model sends                       |
+| --------------------- | ------------------------------------------ |
+| `refusal`             | a refusal instead of an answer             |
+| `empty-completion`    | an answer with no text                     |
+| `truncated`           | an answer cut off at the token limit       |
+| `content-filter`      | an answer stopped by the provider's filter |
+| `malformed-tool-call` | a tool call whose arguments don't parse    |
+| `stream-cut`          | a stream that stops halfway                |
 
 ## Webhooks
 

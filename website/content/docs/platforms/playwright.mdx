@@ -24,8 +24,8 @@ proxy, and `baseURL` comes from it.
 
 ## Write the test
 
-Use `testWith` from `@danwo/playwright` instead of Playwright's `test`. Everything Playwright gives
-you still works, plus a `danwo` fixture:
+Import `testWith` from `@danwo/playwright` and use it in place of Playwright's test function.
+Everything Playwright gives you still works, plus a fixture named `danwo`:
 
 ```ts title="tests/checkout.spec.ts"
 import { expect, testWith } from "@danwo/playwright"

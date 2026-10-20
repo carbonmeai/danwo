@@ -63,6 +63,9 @@ a platform page, a feature page, a reference page and an examples page):
   consistency issue".
 - **Say what the reader sees.** Show real command output in `text` blocks, trimmed to the lines
   that matter.
+- **Never more than three inline code items in one sentence; use a table.** A run of names
+  (finders, helpers, flags) becomes a table of name and what it does, or a short code block. The
+  docs test fails on a paragraph with more than three.
 
 ## Code
 

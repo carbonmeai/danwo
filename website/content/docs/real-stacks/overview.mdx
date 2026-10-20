@@ -68,8 +68,8 @@ export default defineConfig({
 })
 ```
 
-danwo starts `api` first, waits until `/health` answers, then starts `web` with the API's address
-in `VITE_API_URL`. The browser opens the first app, `web`.
+danwo starts the API first and waits until `/health` answers. Then it starts the web app, with the
+API's address in `VITE_API_URL`. The browser opens the first app in the list, the web app.
 
 <Callout type="info">
   Tests stay the same. A test opens pages and clicks buttons as before; the stack runs underneath.

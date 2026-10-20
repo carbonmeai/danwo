@@ -11,7 +11,7 @@ every outgoing HTTP call through danwo's proxy and trusts its certificate.
 ## How it gets in
 
 danwo adds the preload to `NODE_OPTIONS` in each app's environment, together with the proxy's
-address and the run's CA certificate. Calls made with `fetch`, `http`, `https`, axios and most SDKs
+address and the run's CA certificate. Calls made with Node's own HTTP clients, axios and most SDKs
 then go through the proxy. That includes clients that build their own agent:
 
 | Client                                     | Routed                                                     |

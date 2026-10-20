@@ -59,9 +59,32 @@ test("signs in", async ({ app, screen }) => {
 A string matches part of the name, ignoring case. Pass `{ exact: true }` for an exact match, or a
 regular expression.
 
+## Act on it
+
+Once a finder has one element, call an action on it. Each action waits for the element to be ready
+first.
+
+| Action                | What it does                     |
+| --------------------- | -------------------------------- |
+| `click()`             | clicks the element               |
+| `fill(text)`          | types into a field, replacing it |
+| `press(key)`          | presses a key, like `"Enter"`    |
+| `check()`             | ticks a checkbox or radio        |
+| `selectOption(value)` | picks an option in a select      |
+| `hover()`             | moves the pointer over it        |
+| `setInputFiles(path)` | attaches a file to a file input  |
+| `dragTo(target)`      | drags it onto another element    |
+
 ## Narrow it to one element
 
 An action needs exactly one match. When a finder matches several, narrow it:
+
+| Narrow with            | Keeps                                   |
+| ---------------------- | --------------------------------------- |
+| `.first()`             | the first match                         |
+| `.nth(i)`              | the match at index `i`, counting from 0 |
+| `.filter({ hasText })` | the matches that contain this text      |
+| another `getBy…` call  | elements inside the matches             |
 
 ```ts title="tests/basket.danwo.ts · narrowing"
 await screen.getByRole("listitem").filter({ hasText: "Socks" }).getByRole("button").click()
@@ -77,7 +100,7 @@ await screen.getByRole("row").nth(2).click()
 
 <Cards>
   <Card title="Agent steps" href="/docs/agent-steps">
-    `act`, `assert`, `extract` and `waitFor`, with examples.
+    The agent's four steps, with an example of each.
   </Card>
   <Card title="Replay cache" href="/docs/replay-cache">
     Why agent steps cost nothing after the first run.

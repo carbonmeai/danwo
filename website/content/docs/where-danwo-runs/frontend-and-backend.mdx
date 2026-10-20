@@ -43,8 +43,10 @@ export default defineConfig({
 })
 ```
 
-danwo starts `api`, waits for `/health` to answer, then starts `web` with `VITE_API_URL` pointing
-at it. `baseUrl` names the app the browser opens; without it, tests open the first app listed.
+danwo starts the API and waits for `/health` to answer. Then it starts the web app, with
+`VITE_API_URL` pointing at the API.
+
+`baseUrl` names the app the browser opens. Without it, tests open the first app listed.
 
 ## What you get
 
