@@ -2,7 +2,7 @@ import { styled } from "@danwo/ui/jsx"
 
 import { BRAND, BRAND_NAME } from "../brand.ts"
 
-/** Which brand image: the horizontal lockup, the mark on its tile, or the bare glyph. */
+/** Which brand image: the horizontal lockup, the mark on its tile, the bare glyph, or the wordmark. */
 type Kind = keyof typeof BRAND
 
 /**

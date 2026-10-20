@@ -10,6 +10,8 @@ import lockupOnDark from "../../../../../brand/svg/danwo-lockup-horizontal-on-da
 import lockupOnLight from "../../../../../brand/svg/danwo-lockup-horizontal-on-light.svg?url"
 import markOnDark from "../../../../../brand/svg/danwo-mark-on-dark.svg?url"
 import markOnLight from "../../../../../brand/svg/danwo-mark-on-light.svg?url"
+import wordmarkBlack from "../../../../../brand/svg/danwo-wordmark-black.svg?url"
+import wordmarkWhite from "../../../../../brand/svg/danwo-wordmark-white.svg?url"
 import faviconSvg from "../../../../../brand/svg/favicon.svg?raw"
 import faviconSvgUrl from "../../../../../brand/svg/favicon.svg?url"
 
@@ -21,6 +23,7 @@ export const BRAND = {
   lockup: { onLight: lockupOnLight, onDark: lockupOnDark },
   mark: { onLight: markOnLight, onDark: markOnDark },
   glyph: { onLight: glyphBlack, onDark: glyphWhite },
+  wordmark: { onLight: wordmarkBlack, onDark: wordmarkWhite },
 } as const
 
 /** The links a page's head carries for the browser's and the home screen's icons. */

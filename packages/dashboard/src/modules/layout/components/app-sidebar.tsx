@@ -1,5 +1,6 @@
+import { css } from "@danwo/ui/css"
 import { Icons } from "@danwo/ui/icons/base"
-import { Box, HStack, Stack } from "@danwo/ui/jsx"
+import { Box, HStack } from "@danwo/ui/jsx"
 import {
   Sidebar,
   SidebarContent,
@@ -62,32 +63,41 @@ function LiveBadge() {
   )
 }
 
+/** The heading link: one row the height of a small button, rounded and tinted on hover. */
+const projectLink = css({
+  display: "flex",
+  alignItems: "center",
+  gap: "2",
+  minW: "0",
+  flex: "1",
+  h: "8",
+  px: "1",
+  rounded: "md",
+  _hover: { bg: "surface.hover" },
+  _focusVisible: { outline: "none", boxShadow: "0 0 0 3px {colors.ring}" },
+  "[data-collapsible=icon] &": { flex: "none", px: "0" },
+})
+
 /**
- * The sidebar's heading: the brand's horizontal lockup and the project's folder beneath it; only
- * the mark when the sidebar is the icon rail.
+ * The sidebar's heading, in one row: the brand's mark on its tile and the project's name beside it,
+ * as a workspace sits at the top of an app's sidebar; only the tile when the sidebar is the icon
+ * rail.
  */
 function ProjectName({ name }: { readonly name: string }) {
   return (
-    <Link to="/" aria-label={`dánwò, the tests of ${name}`}>
-      <Stack gap="1" minW="0" px="1" pt="1.5" pb="1">
-        <Box display="flex" css={{ "[data-collapsible=icon] &": { display: "none" } }}>
-          <BrandImage kind="lockup" height={22} />
-        </Box>
-        <Box display="none" css={{ "[data-collapsible=icon] &": { display: "flex" } }}>
-          <BrandImage kind="mark" height={24} />
-        </Box>
-        <Span
-          fontSize="1"
-          color="ink.muted"
-          overflow="hidden"
-          textOverflow="ellipsis"
-          whiteSpace="nowrap"
-          title={name}
-          css={{ "[data-collapsible=icon] &": { display: "none" } }}
-        >
-          {name}
-        </Span>
-      </Stack>
+    <Link to="/" aria-label={`The tests of ${name}`} title={name} className={projectLink}>
+      <BrandImage kind="mark" height={24} decorative />
+      <Span
+        fontSize="2"
+        fontWeight="600"
+        minW="0"
+        overflow="hidden"
+        textOverflow="ellipsis"
+        whiteSpace="nowrap"
+        css={{ "[data-collapsible=icon] &": { display: "none" } }}
+      >
+        {name}
+      </Span>
     </Link>
   )
 }
@@ -169,13 +179,9 @@ export function AppSidebar({ project }: { readonly project: string }) {
           px="1"
           css={{ "[data-collapsible=icon] &": { justifyContent: "center", px: "0" } }}
         >
-          <Span
-            color="ink.muted"
-            fontSize="1"
-            css={{ "[data-collapsible=icon] &": { display: "none" } }}
-          >
-            Theme
-          </Span>
+          <Box opacity="0.55" css={{ "[data-collapsible=icon] &": { display: "none" } }}>
+            <BrandImage kind="wordmark" height={13} />
+          </Box>
           <ThemeSwitch />
         </HStack>
       </SidebarFooter>
