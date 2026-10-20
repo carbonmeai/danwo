@@ -170,6 +170,12 @@ export interface DanwoConfig {
      * the test's own `concurrent` option.
      */
     readonly races?: false | RaceSettings
+    /**
+     * Most faulted trials a matrix runs (default 40). Past it the plan folds repeated routes and
+     * statements into their first, keeps each target's most telling faults, then keeps races,
+     * webhooks and writes ahead of reads. `--budget` and `--all` override it.
+     */
+    readonly budget?: number
   }
 }
 

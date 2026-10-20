@@ -80,6 +80,11 @@ export interface AttemptSetup {
   readonly skipInvariant?: boolean
   /** Hears every step as it starts and as it ends, for the run's live feed. */
   readonly onStep?: (step: StepRecord) => void
+  /**
+   * Called once the test's setup is done (its session, fixtures and `beforeEach` hooks) and just
+   * before its body starts: where a matrix trial arms its fault and marks what was setup.
+   */
+  readonly onBodyStart?: () => void
 }
 
 /** What the session saw, for the flight recorder; it stays in the worker. */
@@ -174,6 +179,7 @@ export async function runAttempt(
         if (start?.error !== undefined) throw start.error
         await fixtures.prepare(wantedByAll(everyUser(file, test)))
         for (const hook of hooksAround(file, test, "beforeEach")) await call(hook.fn)()
+        setup.onBodyStart?.()
         await call(test.body)()
       },
       deadline,

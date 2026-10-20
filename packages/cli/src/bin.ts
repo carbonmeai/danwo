@@ -179,6 +179,25 @@ withReporterOptions(withLintOptions(program.command("matrix")))
   )
   .option("--max-failures <n>", "start no new run once this many failed", integerAtLeast(1))
   .option("--shuffle <seed>", "run the faulted runs in a shuffled order", integerAtLeast(0))
+  .option(
+    "--plan",
+    "run the clean run, print the planned faults and how long they would take, and stop",
+  )
+  .option(
+    "--budget <n>",
+    "at most this many faulted runs (default: config, else 40)",
+    integerAtLeast(1),
+  )
+  .option("--all", "every fault on the test's body, background work included, with no budget")
+  .option("--thorough", "every fault kind on each call, not only the most telling ones")
+  .option(
+    "--every-occurrence",
+    "faults on every repeat of a route or statement, not only its first",
+  )
+  .option(
+    "--include-setup",
+    "fault the test's setup too: its saved session signing in, fixtures and beforeEach",
+  )
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .addOption(recordOption())
   .addOption(videoOption())
@@ -197,6 +216,12 @@ withReporterOptions(withLintOptions(program.command("matrix")))
         workers?: number
         maxFailures?: number
         shuffle?: number
+        plan?: boolean
+        budget?: number
+        all?: boolean
+        thorough?: boolean
+        everyOccurrence?: boolean
+        includeSetup?: boolean
         config?: string
         record?: RecordMode
         video?: VideoMode

@@ -13,6 +13,7 @@ import {
   deliveriesOf,
   faultFired,
   type RunOutcome,
+  type SetupSpan,
 } from "@danwo/matrix"
 import type { Proxy } from "@danwo/proxy"
 import type { Browser } from "playwright-core"
@@ -125,7 +126,7 @@ function findDeclared(declarations: FileDeclarations, file: string, id: string):
 
 /** What a trial adds to one of its attempts: a race in its browser, or its place among several users. */
 type AttemptExtras = Partial<
-  Pick<AttemptSetup, "onContext" | "beforeInvariant" | "skipInvariant">
+  Pick<AttemptSetup, "onContext" | "beforeInvariant" | "skipInvariant" | "onBodyStart">
 > & {
   /** Keeps no flight record: another attempt of the same trial keeps the trial's. */
   readonly unrecorded?: boolean
@@ -140,12 +141,13 @@ async function attemptOnce(
   recordAs: string,
   checkPace?: CheckPace,
   extras: AttemptExtras = {},
-): Promise<{ result: AttemptResult; recordDir: string | undefined; mark: EvidenceMark }> {
+): Promise<AttemptRun> {
   const { loaded, env, recording, updateScreenshots, sessions } = benchOrFail()
-  const { unrecorded, ...race } = extras
+  const { unrecorded, onBodyStart, ...race } = extras
   const recordDir =
     unrecorded === true ? undefined : recording && attemptDir(recording, id, recordAs)
   const mark = markEvidence(env)
+  let body: EvidenceMark | undefined
   const test = findDeclared(declarations, file, id)
   // Another user's attempt in a race trial runs alongside the one the feed follows.
   const tap =
@@ -171,11 +173,24 @@ async function attemptOnce(
     ...(checkPace && { checkPace }),
     ...(tap && { onStep: (step: StepRecord) => tap.step(step) }),
     ...race,
+    onBodyStart: () => {
+      body = markEvidence(env)
+      onBodyStart?.()
+    },
   }).finally(() => tap?.stop())
 
   tap?.end(result.status, result.durationMs)
 
-  return { result, recordDir, mark }
+  return { result, recordDir, mark, body }
+}
+
+/** One attempt as it ran: its result, record directory, and the evidence marks at its start and body. */
+interface AttemptRun {
+  readonly result: AttemptResult
+  readonly recordDir: string | undefined
+  readonly mark: EvidenceMark
+  /** Where the evidence stood when the body began; undefined when setup never finished. */
+  readonly body: EvidenceMark | undefined
 }
 
 /** A test's baselines: `__screenshots__/<file>/<test>/` next to its file. */
@@ -467,11 +482,13 @@ function verdictOf(result: AttemptResult) {
 function trialReport(
   result: AttemptResult,
   env: TrialEnvironment,
-  mark: EvidenceMark,
+  marks: { readonly mark: EvidenceMark; readonly body: EvidenceMark | undefined },
 ): TrialReport {
+  const { mark } = marks
   const stop = stopNote(result)
 
   return {
+    setup: setupSpan(env, mark, marks.body ?? markEvidence(env)),
     ...verdictOf(result),
     // Bodies stay in the worker: the flight record has them; the run plans by route alone.
     exchanges: env.proxy
@@ -483,6 +500,24 @@ function trialReport(
     sockets: env.proxy.sockets().slice(mark.sockets ?? 0),
     divergence: result.divergence,
     notes: [...(stop === undefined ? [] : [stop]), ...(env.notes?.() ?? [])],
+  }
+}
+
+/**
+ * What came between the attempt's start and its body: the setup the matrix plans no faults on.
+ * Without a body mark (setup never finished) everything the attempt did was setup.
+ */
+function setupSpan(env: TrialEnvironment, mark: EvidenceMark, body: EvidenceMark): SetupSpan {
+  const data: Record<string, number> = {}
+
+  for (const [at, proxy] of (env.data ?? []).entries())
+    data[proxy.service] = (body.data?.[at] ?? 0) - (mark.data?.[at] ?? 0)
+
+  return {
+    exchanges: body.exchanges - mark.exchanges,
+    deliveries: body.deliveries - mark.deliveries,
+    sockets: (body.sockets ?? 0) - (mark.sockets ?? 0),
+    data,
   }
 }
 
@@ -504,10 +539,7 @@ function cleanPace(task: TrialTask, result: AttemptResult): Pick<TrialReport, "p
 type RaceFacts = Pick<TrialReport, "races" | "fired"> & { readonly notes: readonly string[] }
 
 /** One trial attempt with what its race reported. */
-interface TrialRun {
-  readonly result: AttemptResult
-  readonly recordDir: string | undefined
-  readonly mark: EvidenceMark
+interface TrialRun extends AttemptRun {
   readonly race: RaceFacts | undefined
 }
 
@@ -560,6 +592,7 @@ async function trialRun(
   env: TrialEnvironment,
   declarations: FileDeclarations,
   replay: ReplayUse,
+  arm: (() => void) | undefined,
 ): Promise<TrialRun> {
   const { fault } = task
 
@@ -567,7 +600,10 @@ async function trialRun(
 
   const baseUrl = env.baseUrl ?? benchOrFail().loaded.config.baseUrl
   const race = trialRace(fault, baseUrl, env)
-  const extras = race === undefined ? {} : { onContext: race.onContext }
+  const extras = {
+    ...(race !== undefined && { onContext: race.onContext }),
+    ...(arm !== undefined && { onBodyStart: arm }),
+  }
   const label = fault?.label ?? "clean"
   const run = await attemptOnce(
     declarations,
@@ -596,13 +632,20 @@ async function runTrial(
   task: TrialTask,
   env: TrialEnvironment,
   timings: Record<TrialPhase, number>,
+  arm: (() => void) | undefined,
 ): Promise<TrialReport> {
   const replay: ReplayUse = {
     kind: task.fault === null ? "learn" : "replay-only",
     dir: task.cacheDir,
   }
   const declarations = await loadTestFile(task.file)
-  const { result, recordDir, mark, race } = await trialRun(task, env, declarations, replay)
+  const { result, recordDir, mark, body, race } = await trialRun(
+    task,
+    env,
+    declarations,
+    replay,
+    arm,
+  )
 
   for (const phase of TRIAL_PHASES) timings[phase] += result.timings[phase]
   await timed(timings, "settle", async () => {
@@ -610,7 +653,7 @@ async function runTrial(
     await env.proxy.settled().catch(() => undefined)
   })
 
-  const reported = withRace(trialReport(result, env, mark), race)
+  const reported = withRace(trialReport(result, env, { mark, body }), race)
   const verdict = { ...reported, timings, ...cleanPace(task, result) }
   const input: RecordInput = {
     test: task.testId,
@@ -646,16 +689,33 @@ async function runTrial(
 async function trial(task: TrialTask): Promise<TrialReport> {
   const env = trialEnvironment()
   const timings = noTimings()
+  const { start, sessions } = benchOrFail()
 
-  await timed(timings, "prepare", async () => benchOrFail().start?.clean())
+  await timed(timings, "prepare", async () => start?.clean())
   untouched = false
-  // The app was reset with it: sign-ins saved before belong to the app as it was.
-  benchOrFail().sessions.invalidate()
-  applyFault(env, task.fault)
+
+  /*
+   * The plan counts a fault's occurrences from where the trial arms it: the body, unless the
+   * plan includes setup. A fault armed at the body leaves setup unfaulted, so a sign-in it makes
+   * can be kept in the starting point and the next trial restores it instead of signing in again.
+   * A fault armed before setup may land on the sign-in, so none is kept then.
+   */
+  const atBody = task.includeSetup !== true
+  const keep = atBody && start?.keeps === true
+
+  if (!keep) sessions.invalidate()
+  keepSignIns = keep
+  if (!atBody) applyFault(env, task.fault)
 
   try {
-    return await runTrial(task, env, timings)
+    return await runTrial(
+      task,
+      env,
+      timings,
+      atBody ? () => applyFault(env, task.fault) : undefined,
+    )
   } finally {
+    keepSignIns = false
     env.proxy.setFault(undefined)
     clearWebhookFaults(env.webhooks)
     clearDataFaults(env.data)

@@ -9,14 +9,21 @@ import { availableParallelism, tmpdir } from "node:os"
 import { basename, join, relative, resolve } from "node:path"
 
 import {
+  bodyOf,
   checkFaultFired,
   type FaultMatrixResult,
+  type FocusedPlan,
+  focusLines,
+  type FocusOptions,
+  focusPlan,
   formatMatrix,
   type PlannedFault,
+  type PlanSummary,
   planFaults,
   planRaceFaults,
   type RaceEvidence,
   type RunOutcome,
+  setupSize,
 } from "@danwo/matrix"
 
 import type { CheckPace } from "../assert/pace.ts"
@@ -49,6 +56,18 @@ interface MatrixSelection {
   readonly grep?: string
   /** A regular expression over planned fault labels: only the faults it matches run. */
   readonly faults?: string
+  /** Plans faults on setup too: the saved session signing in, fixtures, `beforeEach`. */
+  readonly includeSetup?: boolean
+  /** Most faulted trials (default: the config's `matrix.budget`, else 40). */
+  readonly budget?: number
+  /** Every fault on the body, background work included, with no budget. */
+  readonly all?: boolean
+  /** Every fault kind on each target, not only the most telling ones. */
+  readonly thorough?: boolean
+  /** Faults on every occurrence of a route or statement, not only its first. */
+  readonly everyOccurrence?: boolean
+  /** Runs the clean trial, prints the plan and the time it would take, and runs no faults. */
+  readonly plan?: boolean
 }
 
 /** How the faulted trials are handed out. */
@@ -127,6 +146,7 @@ function trialRunner(crew: Crew, run: MatrixRun) {
         fault,
         cacheDir: run.cacheDir,
         ...(pace && { pace }),
+        ...(run.focus.includeSetup && { includeSetup: true }),
       })
 
       keepTrialFacts(run, fault, report)
@@ -227,10 +247,10 @@ function selectFaults(plan: readonly PlannedFault[], filter: string | undefined)
 }
 
 /** The line announcing the plan, naming the filter when one narrowed it. */
-function planLine(planned: number, kept: number, filter: string | undefined): string {
+function planLine(kept: number, of: number, filter: string | undefined): string {
   return filter === undefined
-    ? `clean run passed; ${planned} faults planned`
-    : `clean run passed; ${kept} of ${planned} planned faults match /${filter}/`
+    ? `clean run passed; ${kept} faults planned`
+    : `clean run passed; ${kept} of ${of} planned faults match /${filter}/`
 }
 
 /** How the faulted trials are handed out. */
@@ -273,6 +293,7 @@ interface TrialsSetup {
   readonly write: (line: string) => void
   /** Narrows the planned faults by label. */
   readonly filter: string | undefined
+  readonly focus: PlanFocus
   readonly dispatch: Dispatch
   /** What the clean trial showed from the browser's side, once it ran. */
   readonly races: () => RaceEvidence | undefined
@@ -280,18 +301,77 @@ interface TrialsSetup {
   readonly planned?: (count: number) => void
 }
 
-/** Every fault the clean run allows: one per call and webhook, then the races. */
-function planAll(clean: RunOutcome, setup: TrialsSetup): PlannedFault[] {
+/** How the plan is focused, and whether the run stops once it is printed. */
+interface PlanFocus extends FocusOptions {
+  readonly includeSetup: boolean
+  readonly preview: boolean
+}
+
+/** Every fault `outcome` allows: one per call, delivery, statement and socket, then the races. */
+function planOn(outcome: RunOutcome, setup: TrialsSetup): PlannedFault[] {
   const { matrix } = setup
 
   return [
     ...planFaults(
-      clean,
+      outcome,
       matrix?.outboundFaults ?? defaultOutboundFaults,
       matrix?.webhookFaults ?? DEFAULT_WEBHOOK_FAULTS,
       matrix?.dataFaults ?? defaultDataFaults,
     ),
-    ...planRaceFaults(clean, racePlan(matrix, setup.test, setup.races())),
+    ...planRaceFaults(outcome, racePlan(matrix, setup.test, setup.races())),
+  ]
+}
+
+/**
+ * The faults to run: those on the test's body (all of the run with `includeSetup`), narrowed by
+ * the label filter, then focused under the budget.
+ */
+function planAll(clean: RunOutcome, setup: TrialsSetup): { focused: FocusedPlan; of: number } {
+  const { focus } = setup
+  const body = focus.includeSetup ? clean : bodyOf(clean)
+  const unfiltered = planOn(body, setup)
+  const planned = selectFaults(unfiltered, setup.filter)
+  const onSetup =
+    focus.includeSetup || setupSize(clean.setup) === 0
+      ? 0
+      : Math.max(0, selectFaults(planOn(clean, setup), setup.filter).length - planned.length)
+
+  return { focused: focusPlan(planned, onSetup, focus), of: unfiltered.length }
+}
+
+/** The counts the matrix result keeps of how its plan was focused. */
+function summaryOf(focused: FocusedPlan): PlanSummary {
+  const { skipped } = focused
+
+  return {
+    total: focused.total,
+    planned: focused.trials.length,
+    skipped: {
+      setup: skipped.setup,
+      background: skipped.background,
+      repeats: skipped.repeats,
+      kinds: skipped.kinds,
+      budget: skipped.budget.length,
+    },
+  }
+}
+
+/**
+ * The plan as `--plan` prints it: each trial, what was left out, and about how long the trials
+ * would take on the crew, from the clean trial's time.
+ */
+function previewLines(focused: FocusedPlan, cleanMs: number, workers: number): string[] {
+  const minutes = Math.ceil((cleanMs * focused.trials.length) / Math.max(1, workers) / 60_000)
+
+  return [
+    ...focused.trials.map((fault) => `  ${fault.label}`),
+    ...focusLines(focused),
+    ...(focused.skipped.budget.length > 0
+      ? [
+          `over the budget: ${focused.skipped.budget.slice(0, 10).join("; ")}${focused.skipped.budget.length > 10 ? "; …" : ""}`,
+        ]
+      : []),
+    `about ${minutes} min for ${focused.trials.length} trials on ${workers} workers`,
   ]
 }
 
@@ -312,21 +392,45 @@ async function runTrials(
     return { result, code: matrixExitCode([clean]) || 1 }
   }
 
-  const planned = planAll(clean, setup)
-  const plan = selectFaults(planned, setup.filter)
+  const cleanMs = Date.now() - began
+  const { focused, of } = planAll(clean, setup)
+  const plan = focused.trials
+  const summary = focused.total === plan.length ? {} : { plan: summaryOf(focused) }
 
   setup.planned?.(plan.length)
-  write(planLine(planned.length, plan.length, setup.filter))
+  write(planLine(plan.length, of, setup.filter))
+  for (const line of focusLines(focused)) write(line)
+
+  if (setup.focus.preview) {
+    for (const line of previewLines(focused, cleanMs, setup.dispatch.workers)) write(line)
+
+    return { result: { clean, runs: [], ...summary }, code: 0 }
+  }
+
   write(judgingLine(setup.test))
 
   const ran = await runPlan(plan, run, setup.dispatch, write)
   const runs = await retryInvalid(ran, matrix?.rerunInvalid ?? 0, run)
-  const result = { clean, runs }
+  const result = { clean, runs, ...summary }
 
   write(formatMatrix(result))
   write(`${runs.length + 1} runs in ${Math.round((Date.now() - began) / 1000)} s`)
 
   return { result, code: matrixExitCode(runs) }
+}
+
+/** How the run focuses its plan: the flags, then the config's `matrix.budget`. */
+function focusOf(options: RunMatrixOptions, config: DanwoConfig): PlanFocus {
+  const budget = options.budget ?? config.matrix?.budget
+
+  return {
+    includeSetup: options.includeSetup === true,
+    preview: options.plan === true,
+    ...(budget !== undefined && { budget }),
+    ...(options.all === true && { all: true }),
+    ...(options.thorough === true && { thorough: true }),
+    ...(options.everyOccurrence === true && { everyOccurrence: true }),
+  }
 }
 
 /** At most this many workers unless asked for more: each runs its own app, browser and emulators. */
@@ -376,6 +480,8 @@ interface MatrixRun {
   readonly write: (line: string) => void
   /** Narrows the planned faults by label. */
   readonly faults: string | undefined
+  /** How the plan is focused, and whether the run stops at the plan. */
+  readonly focus: PlanFocus
   readonly dispatch: Dispatch
   /** Each finished trial's use of the cache and the model. */
   readonly usages: Usage[]
@@ -399,6 +505,7 @@ async function trialsOrAbort(run: MatrixRun): Promise<{ result: FaultMatrixResul
       matrix: run.loaded.config.matrix,
       write: run.write,
       filter: run.faults,
+      focus: run.focus,
       dispatch: run.dispatch,
       races: () => run.races.current,
       planned: (count) =>
@@ -503,6 +610,7 @@ export async function runMatrix(
     began: Date.now(),
     write,
     faults: options.faults,
+    focus: focusOf(options, loaded.config),
     dispatch: { workers, maxFailures: options.maxFailures, shuffle: options.shuffle },
     usages: [],
     timings: [],

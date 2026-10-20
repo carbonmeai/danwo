@@ -4,7 +4,7 @@
  * for `danwo test`. A trial runs one test once, clean or with one planned fault, for `danwo matrix`.
  */
 import type { DataCall } from "@danwo/infra"
-import type { PlannedFault, RaceEvidence, ServiceDelivery } from "@danwo/matrix"
+import type { PlannedFault, RaceEvidence, ServiceDelivery, SetupSpan } from "@danwo/matrix"
 import type { Exchange, SocketExchange } from "@danwo/proxy"
 
 import type { CheckPace } from "../assert/pace.ts"
@@ -52,6 +52,11 @@ export interface TrialTask {
   readonly cacheDir: string
   /** For a faulted trial: how long the clean trial's checks took, so its own wait only so long. */
   readonly pace?: CheckPace
+  /**
+   * Arms the fault before the test's setup rather than at its body, and signs its saved session
+   * in again under it: for plans that include setup (`--include-setup`).
+   */
+  readonly includeSetup?: boolean
 }
 
 /** One attempt of a test, as the parent reports it. */
@@ -119,6 +124,8 @@ export interface TrialReport {
   readonly races?: RaceEvidence
   /** For a race trial (page, users, redirect): whether its race was set up. */
   readonly fired?: boolean
+  /** How much of what the trial reports came before the test's body began. */
+  readonly setup?: SetupSpan
 }
 
 /** What a worker answers, by the name the parent calls it with. */
