@@ -180,6 +180,26 @@ function matches(endpoint: WebhookEndpoint, topic: string): boolean {
   return endpoint.enabled && (endpoint.events.includes("*") || endpoint.events.includes(topic))
 }
 
+/** A letter or digit turned into another of its kind (`a`↔`z`, `A`↔`Z`, `0`↔`9`). */
+function flipped(char: string): string {
+  const code = char.charCodeAt(0)
+  const [first, last] = code <= 57 ? [48, 57] : code <= 90 ? [65, 90] : [97, 122]
+
+  return String.fromCharCode(first + last - code)
+}
+
+/**
+ * A wrong secret of the same shape: every letter and digit after the secret's prefix (`whsec_`)
+ * turned into another, so the key differs however a provider reads it, as text, base64 or hex,
+ * then `_forged`, which marks the copy. Appending alone is not enough: a base64 decoder stops at
+ * the padding, so `whsec_…XQ=_forged` decodes to the real key.
+ */
+export function forgedSecret(secret: string): string {
+  const prefix = /^(?:[a-z]+_)*/.exec(secret)?.[0] ?? ""
+
+  return `${prefix}${secret.slice(prefix.length).replace(/[0-9A-Za-z]/g, flipped)}_forged`
+}
+
 /**
  * Delivers every outbox message to each matching endpoint, after the request that produced it has
  * returned. A non-2xx response, a network error or a timeout is retried after the next delay in
@@ -336,7 +356,7 @@ export class WebhookDispatcher {
 
     if (mode.signing === "forged")
       return sign({
-        endpoint: { ...endpoint, secret: `${endpoint.secret}_forged` },
+        endpoint: { ...endpoint, secret: forgedSecret(endpoint.secret) },
         body,
         timestamp: now,
       })
