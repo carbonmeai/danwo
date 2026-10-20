@@ -33,10 +33,7 @@ function danwo(args: readonly string[], env: NodeJS.ProcessEnv = {}): Promise<vo
   })
 }
 
-/**
- * The shop example as a project of its own, with one failing test, after a test run that kept
- * every recording and a matrix run.
- */
+/** The shop example as a project of its own, with one failing test, after a test run and a matrix run. */
 async function project(): Promise<void> {
   await rm(WORK, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   await mkdir(join(WORK, "tests"), { recursive: true })
@@ -46,7 +43,7 @@ async function project(): Promise<void> {
   await cp(join(SHOP, "package.json"), join(WORK, "package.json"))
   await symlink(join(SHOP, "node_modules"), join(WORK, "node_modules"))
   await writeFile(join(WORK, "tests", "broken.danwo.ts"), BROKEN)
-  await danwo(["test", "--record", "always"])
+  await danwo(["test"])
   await danwo(
     ["matrix", "tests/buy-credits.danwo.ts", "--faults", "duplicate|status 500 on POST"],
     {
