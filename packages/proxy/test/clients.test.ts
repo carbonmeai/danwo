@@ -37,6 +37,23 @@ describe("dropped clients", () => {
     expect(isDroppedClientLine(["Response error:", "write EPIPE"])).toBe(true)
     expect(isDroppedClientLine(["Response error:", "Unexpected token in JSON"])).toBe(false)
     expect(isDroppedClientLine(["read ECONNRESET"])).toBe(false)
+    expect(isDroppedClientLine(["Failed to handle request:", "socket hang up"])).toBe(true)
+    expect(isDroppedClientLine(["Failed to handle request:", "No rule matched"])).toBe(false)
+  })
+
+  it("keeps passed-through streams dropped mid-answer out of console.error too", () => {
+    const seen: unknown[][] = []
+    const write = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      seen.push(args)
+    })
+    const stop = quietDroppedClients()
+
+    console.error("Failed to handle request:", "socket hang up")
+    console.error("Failed to handle request:", "No rule matched")
+    stop()
+
+    expect(seen).toEqual([["Failed to handle request:", "No rule matched"]])
+    expect(console.error).toBe(write)
   })
 
   it("keeps those lines out while a proxy runs, and puts console.log back after the last", () => {
