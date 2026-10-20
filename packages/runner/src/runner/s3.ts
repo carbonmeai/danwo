@@ -26,12 +26,44 @@ export interface S3Options {
 
 export interface S3Service extends Service {
   readonly emulator: Emulator
+  /**
+   * The environment an app on AWS S3 or Tigris reads to reach the emulator through the proxy:
+   * `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_ENDPOINT_URL_S3` (and
+   * `AWS_ENDPOINT_URL`), and the Tigris SDK's `TIGRIS_STORAGE_ACCESS_KEY_ID`,
+   * `TIGRIS_STORAGE_SECRET_ACCESS_KEY`, `TIGRIS_STORAGE_ENDPOINT` and `TIGRIS_STORAGE_BUCKET`.
+   * The key is the first seeded in `credentials`, or a stand-in the emulator accepts; the bucket
+   * is the first seeded; the endpoint is Tigris's unless `endpoint` names another the service answers.
+   */
+  env(options?: { readonly endpoint?: string }): Record<string, string>
+}
+
+/** The key an app is handed when the seed names none: any well-formed key is accepted then. */
+const STAND_IN_KEY = { accessKeyId: "tid_danwo_emulated", secretAccessKey: "tsec_danwo_emulated" }
+
+/** The variables an S3 or Tigris app reads, pointed at `endpoint` with `seed`'s key and bucket. */
+function s3Env(seed: S3SeedConfig | undefined, endpoint: string): Record<string, string> {
+  const key = seed?.credentials?.[0] ?? STAND_IN_KEY
+  const bucket = seed?.buckets?.[0]?.name
+
+  return {
+    AWS_ACCESS_KEY_ID: key.accessKeyId,
+    AWS_SECRET_ACCESS_KEY: key.secretAccessKey,
+    AWS_REGION: "auto",
+    AWS_ENDPOINT_URL_S3: endpoint,
+    AWS_ENDPOINT_URL: endpoint,
+    TIGRIS_STORAGE_ACCESS_KEY_ID: key.accessKeyId,
+    TIGRIS_STORAGE_SECRET_ACCESS_KEY: key.secretAccessKey,
+    TIGRIS_STORAGE_ENDPOINT: endpoint,
+    ...(bucket !== undefined && { TIGRIS_STORAGE_BUCKET: bucket }),
+  }
 }
 
 /** What `s3Environment()` starts: the S3 emulator behind its own proxy. */
 export interface S3Environment {
   readonly emulator: Emulator
   readonly proxy: Proxy
+  /** The S3 and Tigris variables for the app; see `S3Service.env`. */
+  env(options?: { readonly endpoint?: string }): Record<string, string>
   /** Moves the app's clock and the emulator's time forward by `ms`; see `time.travel`. */
   readonly travel: (ms: number) => Promise<void>
   /** Emulator back to its seed, proxy log and fault rules cleared. */
@@ -63,6 +95,7 @@ export function s3Service(options: S3Options = {}): S3Service {
   return {
     name: "s3",
     emulator,
+    env: (env = {}) => s3Env(options.seed, env.endpoint ?? `https://${TIGRIS_ENDPOINTS[0]}`),
     routes: [
       {
         hosts: endpoints.flatMap((endpoint) => [endpoint, `*.${endpoint}`]),
@@ -95,6 +128,7 @@ export async function s3Environment(
   return {
     emulator: service.emulator,
     proxy,
+    env: (env) => service.env(env),
     travel: (ms: number) => services.travel(ms),
     reset: () => services.reset(),
     snapshot: () => services.snapshot(),
