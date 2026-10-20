@@ -15,6 +15,7 @@ export type TextProps = Props<HTMLParagraphElement> & {
 export type SpanProps = Props<HTMLSpanElement> & React.ComponentProps<"span">
 export type PreProps = Props<HTMLPreElement> & React.ComponentProps<"pre">
 export type CodeProps = Props<HTMLElement> & React.ComponentProps<"code">
+export type KbdProps = Props<HTMLElement> & React.ComponentProps<"kbd">
 export type ParagraphProps = Props<HTMLParagraphElement> & React.ComponentProps<"p">
 export type HeadingProps = Props<HTMLHeadingElement> & {
   as: "h1" | "h2" | "h3" | "h4" | "h5" | "h6"
@@ -74,6 +75,12 @@ export const Paragraph = ({ asChild, ...props }: ParagraphProps) => {
 
 export const Anchor = ({ asChild, ...props }: AnchorProps) => {
   const Comp = asChild ? Slot.Root : styled.a
+
+  return <Comp {...props} />
+}
+
+export const Kbd = ({ asChild, ...props }: KbdProps) => {
+  const Comp = asChild ? Slot.Root : styled.kbd
 
   return <Comp {...props} />
 }
