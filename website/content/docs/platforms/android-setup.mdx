@@ -1,0 +1,91 @@
+---
+title: Android setup
+description: Get this machine ready to test a React Native or Expo app on an Android emulator with danwo.
+icon: Smartphone
+---
+
+danwo runs the same tests, invariants and fault matrix against a React Native or Expo app on an
+Android emulator. The app's calls go through danwo's proxy, so Stripe and the rest are emulated
+there too. This page gets the machine ready.
+
+## What you need
+
+| Need                           | Why                                                                          |
+| ------------------------------ | ---------------------------------------------------------------------------- |
+| Android Studio                 | it brings the Android SDK (`adb`, the emulator) and a JDK                    |
+| a **Google APIs** system image | danwo needs root to trust its certificate; Play Store images can't be rooted |
+| an AVD                         | the virtual device danwo boots                                               |
+
+## Create the emulator
+
+<Steps>
+<Step>
+
+### Install Android Studio
+
+Install it, open it once, and let it download the SDK.
+
+</Step>
+<Step>
+
+### Add a Google APIs image
+
+In **Device Manager**, create a device and pick a system image whose target says **Google APIs**,
+not Google Play. On Apple silicon use `arm64-v8a`; on Intel and Linux, `x86_64`:
+
+```text
+system-images;android-34;google_apis;arm64-v8a
+```
+
+</Step>
+<Step>
+
+### Name the AVD
+
+Give it a short name, such as `danwo_spike`. Your config refers to it by that name.
+
+</Step>
+</Steps>
+
+## Check the machine
+
+```sh
+npx danwo device doctor
+```
+
+```text
+ok    Android SDK: ~/Library/Android/sdk
+ok    adb: ~/Library/Android/sdk/platform-tools/adb
+ok    emulator: ~/Library/Android/sdk/emulator/emulator
+ok    system images: rootable: system-images/android-34/google_apis/arm64-v8a
+ok    AVD danwo_spike: system-images/android-34/google_apis/arm64-v8a
+ok    JDK: /Applications/Android Studio.app/Contents/jbr/Contents/Home
+```
+
+Each line is `ok`, `warn` or a failure with what to do. It also warns about an emulator left with a
+proxy setting from an earlier run, and about images missing their files.
+
+<Callout type="warn">
+  Apps that pin their TLS certificates ignore danwo's certificate, so their calls can't be emulated.
+  Turn pinning off in the build you test.
+</Callout>
+
+## What works on Android today
+
+| Works                                        | Not yet                                                  |
+| -------------------------------------------- | -------------------------------------------------------- |
+| locators, `expect`, screenshots, the agent   | `hover`, `setInputFiles`, `dragTo`                       |
+| Custom Tabs (a web checkout inside the app)  | reading mail from a test, saved sessions                 |
+| the fault matrix, on one emulator or several | iOS, and Flutter apps (their accessibility tree is thin) |
+| time travel for your services and backend    | moving the device's own clock                            |
+
+## Next
+
+<Cards>
+  <Card title="Android builds" href="/docs/android-build">
+    Build your Expo app so it trusts danwo's proxy.
+  </Card>
+  <Card title="Android tests" href="/docs/android-tests">
+    The config and what a test can do on a device.
+  </Card>
+</Cards>

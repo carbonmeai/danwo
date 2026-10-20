@@ -1,0 +1,58 @@
+---
+title: Android builds
+description: Build an Expo app as a release APK that trusts danwo's proxy, and reuse it until its sources change.
+icon: Hammer
+---
+
+An Android app trusts only the system's certificates unless its build says otherwise. danwo's
+proxy has its own certificate, created for each run. `danwo build-android` builds your Expo app so
+it trusts it.
+
+## Build it
+
+```sh
+npx danwo build-android app
+```
+
+`app` is the folder of your Expo project. danwo:
+
+1. runs `expo prebuild`;
+2. adds a network security config that also trusts user-installed certificates, where danwo puts
+   each run's;
+3. runs `gradlew assembleRelease` with `DANWO=1`, using Android Studio's JDK when `JAVA_HOME` is
+   unset.
+
+The JavaScript is bundled into the APK, so no Metro server runs during tests.
+
+## Reuse it
+
+The APK is kept under `<project>/.danwo/builds/`, keyed by a hash of the app's sources. An
+unchanged app isn't built again. Force a rebuild with `--force`.
+
+## Build it from the config
+
+`buildAndroid` from `@danwo/expo` does the same inside your environment, so a test run always has
+a current build:
+
+```ts title="build.ts"
+import { buildAndroid } from "@danwo/expo"
+
+export async function currentApk(): Promise<string> {
+  const build = await buildAndroid({ project: "app" })
+
+  return build.apk
+}
+```
+
+<Callout type="warn">
+  This build trusts user-installed certificates. Use it only for testing; ship your store builds
+  without it.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Android tests" href="/docs/android-tests">
+    Install the build on the emulator and test it.
+  </Card>
+</Cards>

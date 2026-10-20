@@ -1,0 +1,112 @@
+---
+title: Android tests
+description: Bind an emulator to the run, then write the same locators, checks, agent steps and invariants as on the web.
+icon: TabletSmartphone
+---
+
+An Android test reads like a web test. `screen` finds elements on the device's screen,
+`expect` waits for checks, and an invariant compares your backend with Stripe. danwo boots the
+emulator, routes its traffic through the proxy, and installs your build.
+
+## A test on a device
+
+```ts title="tests/buy-credits.danwo.ts"
+import type { DeviceFixtures } from "@danwo/device"
+import { type StripeFixtures, test as base } from "@danwo/sdk"
+
+const test = base.extend<StripeFixtures & DeviceFixtures>()
+
+test("buys 500 credits", async ({ screen, expect, device }) => {
+  await screen.getByTestId("buy").tap()
+
+  /* Checkout opens in a Custom Tab; the same locators read the web page. */
+  expect((await device.foreground()).browser).toBe(true)
+  await screen.getByLabel("Email").fill("buyer@example.com")
+  await screen.getByRole("button", { name: "Pay $5.00" }).tap()
+
+  await expect(screen.getByTestId("credits")).toHaveText("Credits: 500")
+})
+```
+
+`getByTestId` matches React Native's `testID`. A Custom Tab, the in-app browser a checkout often
+opens, is part of the screen.
+
+## Bind the emulator in the config
+
+`withAndroidDevice` wraps your environment and binds an emulator to it:
+
+```ts title="danwo.config.ts · the device"
+return withAndroidDevice(environment, {
+  avd: "danwo_spike",
+  worker: workerIndex,
+  snapshot: "danwo_clean",
+  app: { package: "com.danwo.shopmobile", apk: build.apk, scheme: "danwoshop" },
+})
+```
+
+The full file, with the backend and Stripe behind the proxy, is in
+[`examples/shop-mobile`](/docs/examples/shop-mobile). For each worker, danwo:
+
+1. boots the AVD headless, or uses one that already runs;
+2. runs `adb root` and puts the run's certificate in the trust store;
+3. turns off animations, Chrome's first-run screens and the captive-portal probe;
+4. routes the device's traffic through the proxy;
+5. installs the APK.
+
+| Option        | What it does                                                        |
+| ------------- | ------------------------------------------------------------------- |
+| `avd`         | the AVD to boot                                                     |
+| `worker`      | gives each worker its own emulator (console port 5554 + 2 × worker) |
+| `snapshot`    | boots from a saved AVD snapshot: seconds instead of a minute        |
+| `serial`      | uses a device that already runs, as it is                           |
+| `permissions` | runtime permissions to grant before each launch                     |
+| `app.scheme`  | the link scheme `app.open(path)` uses, as `<scheme>://<path>`       |
+
+Pass `blocked: ANDROID_BACKGROUND_HOSTS` from `@danwo/device` to your services. It blocks the
+emulator's own background traffic (Chrome sync, Play services), so the matrix never faults it.
+
+## What a test can do
+
+| Fixture    | On Android                                                                                             |
+| ---------- | ------------------------------------------------------------------------------------------------------ |
+| `screen`   | `getByTestId`, `getByRole`, `getByLabel`, `getByText`; `tap`, `fill`, `check`, `press`, `selectOption` |
+| `expect`   | the same checks as the web, including `toHaveScreenshot`                                               |
+| `app.open` | opens a deep link; with no path, restarts the app                                                      |
+| `device`   | `foreground()`, `back()`, `openLink(url)`, `logs()`                                                    |
+| `agent`    | `act`, `assert`, `extract`, `waitFor`, with device tools                                               |
+
+Every attempt starts the app afresh: its data cleared, its permissions granted.
+
+## The agent on a device
+
+Plain-English steps work too. The agent reads the screen as a list of elements and acts with
+taps, typing and scrolls:
+
+```ts title="tests/agent-buy.danwo.ts"
+import { test, z } from "@danwo/sdk"
+
+test("buys 500 credits when asked in plain words", async ({ agent, screen, expect }) => {
+  const { credits } = await agent.extract("the credits balance", z.object({ credits: z.number() }))
+
+  await agent.act("Start buying 500 credits")
+  await agent.act("Pay for the credits with the email {email}", {
+    params: { email: "buyer@example.com" },
+  })
+  await expect(screen.getByTestId("credits")).toHaveText(`Credits: ${credits + 500}`)
+})
+```
+
+The first run records each step. Later runs, and every matrix trial, replay them with no model
+call. In the example shop, the recorded run made 6 model calls in about 17 seconds; the replay
+made none, in about 6.
+
+## Next
+
+<Cards>
+  <Card title="Parallel emulators" href="/docs/parallel-emulators">
+    Run the matrix on two or three emulators at once.
+  </Card>
+  <Card title="Agent and locators" href="/docs/agent-and-locators">
+    When to use plain-English steps.
+  </Card>
+</Cards>

@@ -1,0 +1,80 @@
+---
+title: Web
+description: danwo drives your web app in a real Chromium browser, behind its proxy, with locators, an agent and a recording of every test.
+icon: Globe
+---
+
+On the web, danwo opens your app in Chromium and clicks through it like a user. The browser runs
+behind danwo's proxy, so every request the page makes, and every call your server makes, is
+recorded and can be faulted.
+
+## A web test
+
+```ts title="tests/storefront.danwo.ts"
+import { test } from "@danwo/sdk"
+
+test("shows the credits offer", async ({ app, screen, expect }) => {
+  await app.open("/")
+  await expect(screen.getByRole("button", { name: "Buy 500 credits" })).toBeVisible()
+})
+```
+
+`app.open("/")` loads your app's address plus the path. `screen` finds elements the way a person
+names them, and `expect` waits until a check holds.
+
+## What a test gets
+
+| Fixture  | What it is                                                             |
+| -------- | ---------------------------------------------------------------------- |
+| `app`    | your app: `open(path)` and `baseUrl`                                   |
+| `screen` | finds elements: `getByRole`, `getByLabel`, `getByText`, `getByTestId`… |
+| `expect` | checks that wait: `toBeVisible`, `toHaveText`, `toHaveScreenshot`…     |
+| `agent`  | plain-English steps: `act`, `assert`, `extract`, `waitFor`             |
+| `users`  | another person's browser in the same test                              |
+| `time`   | moves the app's clock forward                                          |
+| `mail`   | reads the emails and codes your app sent                               |
+
+[Agent and locators](/docs/agent-and-locators) explains when to use each style.
+
+## Each test gets a fresh browser
+
+Every test, and every retry, opens a new browser context: no cookies, no storage, nothing left from
+the test before. To start signed in, use a [saved session](/docs/sessions), which signs in once
+per worker and reuses the browser state.
+
+## The page waits for your backend
+
+After each action danwo waits for the page to settle. With an environment, it also waits until
+nothing your app started is still in flight at the proxy:
+
+| `readiness`    | Waits for                                                 |
+| -------------- | --------------------------------------------------------- |
+| `page+backend` | the page, then the backend's calls (default with a proxy) |
+| `page`         | the page alone                                            |
+| `off`          | nothing                                                   |
+
+Add `settle: true` to also wait for webhooks to be delivered and background jobs to finish:
+
+```ts title="danwo.config.ts · readiness"
+readiness: { mode: "page+backend", settle: true },
+```
+
+## What's recorded
+
+Every test keeps a flight record: a video of the tab, each step with a screenshot, the page's
+console and network, and every provider call and webhook behind it. Open it with
+`npx danwo serve --open`. See [Recordings](/docs/recordings).
+
+## Next
+
+<Cards>
+  <Card title="Agent and locators" href="/docs/agent-and-locators">
+    Exact steps, plain-English steps, or both.
+  </Card>
+  <Card title="Playwright Test" href="/docs/playwright">
+    Already have Playwright tests? Add danwo to them.
+  </Card>
+  <Card title="Android" href="/docs/mobile">
+    The same tests on a mobile app.
+  </Card>
+</Cards>

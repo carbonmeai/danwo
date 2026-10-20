@@ -1,0 +1,100 @@
+---
+title: Playwright Test
+description: Keep your Playwright tests and add danwo's emulators, invariants and fault matrix to them.
+icon: FlaskConical
+---
+
+Already have a Playwright suite? You don't have to rewrite it. `@danwo/playwright` runs your
+Playwright tests behind danwo's proxy and emulators, adds invariants, and runs the fault matrix
+over a Playwright test.
+
+## Point Playwright at your danwo config
+
+```ts title="playwright.config.ts"
+import type { DanwoWorkerFixtures } from "@danwo/playwright"
+import { defineConfig } from "@playwright/test"
+
+export default defineConfig<object, Pick<DanwoWorkerFixtures, "danwoConfig">>({
+  use: { danwoConfig: "./danwo.config.ts" },
+})
+```
+
+Each Playwright worker starts the danwo config's `environment()` once. The browser runs behind its
+proxy, and `baseURL` comes from it.
+
+## Write the test
+
+Use `testWith` from `@danwo/playwright` instead of Playwright's `test`. Everything Playwright gives
+you still works, plus a `danwo` fixture:
+
+```ts title="tests/checkout.spec.ts"
+import { expect, testWith } from "@danwo/playwright"
+import type { StripeFixtures } from "@danwo/sdk"
+
+const test = testWith<StripeFixtures>()
+
+test("buys credits", async ({ page, danwo }) => {
+  await page.goto("/")
+  await page.getByRole("button", { name: "Buy 500 credits" }).click()
+  await page.getByTestId("checkout-pay").click()
+  await danwo.settle()
+  await expect(page.getByText("Credits: 500")).toBeVisible()
+})
+```
+
+`danwo.settle()` waits until Stripe's webhook has reached your app.
+
+## Add an invariant
+
+`test.invariant` runs after every test in the file (or the describe block):
+
+```ts title="tests/checkout.spec.ts · invariant"
+test.invariant(async ({ danwo, baseURL }) => {
+  const paid = await danwo.stripe.fetch(
+    new Request("https://api.stripe.com/v1/checkout/sessions?payment_status=paid"),
+  )
+  const { data } = await paid.json()
+  const granted = await (await fetch(`${baseURL}/api/credits`)).json()
+
+  expect(granted.credits).toBe(data.length * 500)
+})
+```
+
+## What `danwo` holds
+
+| Member          | What it does                                       |
+| --------------- | -------------------------------------------------- |
+| `danwo.stripe`… | the environment's fixtures, by name                |
+| `settle()`      | waits for webhooks and the backend                 |
+| `exchanges()`   | the calls recorded so far                          |
+| `deliveries()`  | the webhooks delivered so far                      |
+| `inject(label)` | faults the next call or webhook matching the label |
+| `clearFaults()` | removes injected faults                            |
+
+A failed test gets a **danwo flight record** attachment next to Playwright's trace.
+
+## Run the matrix
+
+```sh
+npx danwo-playwright matrix tests/checkout.spec.ts
+```
+
+```text
+clean run passed; 15 of 15 planned faults to run
+PASS  duplicate on webhook checkout.session.completed
+PASS  reset-after on POST api.stripe.com/v1/checkout/sessions
+faults: 15 passed
+```
+
+Narrow it with `--grep` (the test) and `--faults` (the fault labels).
+
+## Next
+
+<Cards>
+  <Card title="Fault matrix" href="/docs/fault-matrix">
+    What the matrix does and how to read it.
+  </Card>
+  <Card title="Playwright example" href="/docs/examples/shop-playwright">
+    A complete project to run.
+  </Card>
+</Cards>

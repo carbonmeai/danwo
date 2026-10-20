@@ -1,0 +1,67 @@
+---
+title: Parallel emulators
+description: Give each worker its own Android emulator, sized to what this machine can run.
+icon: Layers
+---
+
+A matrix runs your test many times. On Android each run needs an emulator, so more emulators means
+a faster matrix, up to what the machine can hold.
+
+## Size the workers
+
+`androidWorkers` picks a worker count from the machine:
+
+```ts title="danwo.config.ts"
+import { androidWorkers } from "@danwo/device"
+import { defineConfig } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  workers: androidWorkers({ avd: "danwo_spike" }),
+})
+```
+
+An emulator takes its AVD's memory plus about a gigabyte, and two cores. `androidWorkers` allows as
+many as half the memory and half the cores fit, at most three by default (`max`). On a machine
+already busy past its cores, it allows one.
+
+Give each worker its own emulator with `worker: workerIndex` in `withAndroidDevice`. Every boot is
+read-only, so several emulators share one AVD and its snapshots.
+
+## How much faster
+
+The example shop's matrix of 29 runs, on a 12-core, 32 GB Apple silicon machine:
+
+| Emulators | Wall time | Median trial |
+| --------- | --------- | ------------ |
+| 1         | 160 s     | 4.6 s        |
+| 2         | 103 s     | 5.6 s        |
+| 3         | 95 s      | 7.1 s        |
+
+Two emulators are the sweet spot there. A third mostly slows each trial down.
+
+## Override it
+
+```sh
+npx danwo matrix tests/buy-credits.danwo.ts --workers 2
+```
+
+## In CI
+
+| Runner | Needs                                              |
+| ------ | -------------------------------------------------- |
+| Linux  | KVM (`/dev/kvm`) and an `x86_64` Google APIs image |
+| macOS  | Apple silicon runs `arm64-v8a` images              |
+
+Create the AVD with `avdmanager`, and save a snapshot so each worker boots in seconds.
+
+## Next
+
+<Cards>
+  <Card title="CI and GitHub" href="/docs/ci">
+    Run tests and the matrix on every pull request.
+  </Card>
+  <Card title="Planning and budget" href="/docs/matrix-planning">
+    Keep a matrix to the trials that matter.
+  </Card>
+</Cards>
