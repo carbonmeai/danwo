@@ -1,0 +1,144 @@
+---
+description: Auth0's Universal Login with sign-up, MFA and social connections, the authentication API's grants, and the Management API v2, on your tenant's own domain.
+---
+
+danwo's Auth0 emulator answers your tenant's domain, such as `my-app.us.auth0.com`. The browser
+logs in, signs up and passes MFA on Universal Login, and your server uses the authentication API
+and the Management API, through `@auth0/nextjs-auth0`, `express-openid-connect`, `auth0` or plain
+OpenID Connect.
+
+## Set up
+
+Add `auth0Service` with a tenant, your application and a user:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, auth0Service, defineConfig } from "@danwo/sdk"
+
+const url = "http://localhost:3000"
+const domain = "my-app.us.auth0.com"
+const client = { client_id: "danwo-client", client_secret: "danwo-client-secret" }
+
+export default defineConfig({
+  testDir: "tests",
+  environment: () =>
+    appEnvironment({
+      app: {
+        command: "npm run dev",
+        url,
+        env: {
+          AUTH0_DOMAIN: domain,
+          AUTH0_CLIENT_ID: client.client_id,
+          AUTH0_CLIENT_SECRET: client.client_secret,
+        },
+      },
+      services: [
+        auth0Service({
+          seed: {
+            tenants: [
+              {
+                domain,
+                clients: [
+                  {
+                    ...client,
+                    name: "My app",
+                    app_type: "regular_web",
+                    callbacks: [`${url}/auth/callback`],
+                    allowed_logout_urls: [url],
+                  },
+                ],
+                users: [{ email: "ada@example.com", password: "correct-horse-battery" }],
+              },
+            ],
+          },
+        }),
+      ],
+    }),
+})
+```
+
+## Seed it
+
+Each tenant takes:
+
+| Field | What it seeds |
+| --- | --- |
+| `domain`, `custom_domains` | Where the tenant answers. |
+| `clients` | Applications: type, callbacks, logout URLs, grant types, refresh-token rotation. |
+| `apis` | APIs by identifier, with scopes, RBAC, permissions in the token and token lifetime. |
+| `roles` | Roles and their permissions. |
+| `organizations` | Organizations users can belong to. |
+| `users` | Users with a password, metadata, roles, organizations, an MFA secret or `blocked`. |
+| `connections` | Social logins on the login page: `google-oauth2`, `github` or `windowslive`. |
+| `post_login_claims`, `roles_claim` | Claims added to tokens, as an Action would add them. |
+
+## Use it in a test
+
+Log in on Universal Login, then check the tenant recorded it:
+
+```ts title="tests/login.danwo.ts"
+import { type Auth0Fixtures, auth0Tenant, test as base } from "@danwo/sdk"
+
+const test = base.extend<Auth0Fixtures>()
+
+test("logs in with a password", async ({ app, screen, expect, auth0 }) => {
+  await app.open("/")
+  await screen.getByRole("link", { name: "Log in" }).click()
+  await screen.getByLabel("Email address").fill("ada@example.com")
+  await screen.getByLabel("Password").fill("correct-horse-battery")
+  await screen.getByRole("button", { name: "Continue" }).click()
+
+  await expect(screen.getByText("Signed in as ada@example.com")).toBeVisible()
+
+  const [login] = auth0Tenant(auth0).logins("ada@example.com")
+
+  expect(login?.mfa).toBe(false)
+})
+```
+
+`auth0Tenant(auth0)` reads `users()`, `user(email)`, `logins(email)`, `liveRefreshTokens()` and
+the verification `emails(to)` the tenant sent, and `block(email)` blocks a user mid-test. For a
+user seeded with an `mfa_secret`, type `auth0OtpAt(secret, new Date())` into "Enter your
+one-time code".
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Universal Login | log in, sign up, MFA with a one-time code, email verification, social connections |
+| Authentication API | `/authorize`, `/oauth/token` (authorization code with PKCE, refresh, client credentials, password), `/oauth/revoke`, `/userinfo`, logout |
+| OpenID Connect | discovery, JWKS, ID and access tokens with your claims |
+| Management API v2 | users, users by email, roles and permissions, organizations and members, user blocks, verification-email jobs |
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| `POST /oauth/token` | 429, 500, 503, a 10-second delay, connection reset, answer lost after Auth0 issued the token, a 403 `invalid_grant` refresh |
+| `GET /.well-known/jwks.json` | 5xx and a connection reset, so you can show your app fails closed |
+| `GET /userinfo` | 429, 500, connection reset |
+| The Management API | 429 with `x-ratelimit-reset`, 5xx, a delay, connection reset, and an answer lost after a write |
+
+The Universal Login pages themselves are left alone, so the browser always reaches them.
+
+## Fidelity
+
+**Not checked live yet.** There's no Auth0 suite; the emulator follows Auth0's documented
+answers.
+
+## Not covered yet
+
+- Actions, Rules and Hooks: use `post_login_claims` for claims
+- Passwordless email and SMS
+- Enterprise connections (SAML, Active Directory)
+- Webhooks: Auth0 sends none, and log streams aren't emulated
+
+## Next
+
+<Cards>
+  <Card title="Clerk" href="/docs/providers/clerk">
+    Another hosted sign-in, with webhooks and a Frontend API.
+  </Card>
+  <Card title="Sessions" href="/docs/sessions">
+    Log in once and reuse the session across tests.
+  </Card>
+</Cards>

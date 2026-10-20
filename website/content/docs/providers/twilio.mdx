@@ -1,0 +1,155 @@
+---
+description: Text messages with status callbacks, texts to your app's numbers, Verify codes and the limits of a trial account.
+---
+
+danwo's Twilio emulator answers `api.twilio.com` and `verify.twilio.com`. Messages your app sends
+land on phones your test reads; texts your test sends reach your app's SMS URL, signed as Twilio
+signs them.
+
+## Set up
+
+Add `twilioService` and seed the account your app authenticates as. Hand the same credentials to
+the app:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, twilioService } from "@danwo/sdk"
+
+const url = "http://localhost:3000"
+const account = { sid: "REDACTED-TEST-VALUE", authToken: "danwo-auth-token" }
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  environment: () =>
+    appEnvironment({
+      app: {
+        command: "npm run dev",
+        url,
+        env: {
+          TWILIO_ACCOUNT_SID: account.sid,
+          TWILIO_AUTH_TOKEN: account.authToken,
+          TWILIO_PHONE_NUMBER: "+15005550006",
+        },
+      },
+      services: [
+        twilioService({
+          seed: {
+            accounts: [account],
+            numbers: [{ number: "+15005550006", smsUrl: `${url}/api/twilio/sms` }],
+            verifyServices: [{ friendlyName: "Sign in" }],
+          },
+        }),
+      ],
+    }),
+})
+```
+
+Wrong credentials get Twilio's 401 with error `20003`.
+
+## Seed it
+
+| Field | What it seeds |
+| --- | --- |
+| `accounts` | Accounts by `sid` and auth token; `type: "Trial"` with its `verified` numbers. |
+| `apiKeys` | `SK…` API keys and their secrets. |
+| `numbers` | Numbers the account owns, and the URL texts to each are POSTed to. |
+| `verifyServices` | Verify services, with the code length. |
+| `unreachable` | Phones that never get a text: the message ends `undelivered` with error 30003. |
+
+## Use it in a test
+
+Sign in with a code sent by Verify, read from the phone:
+
+```ts title="tests/sms-code.danwo.ts"
+import { type TwilioFixtures, test as base, twilioInbox } from "@danwo/sdk"
+
+const test = base.extend<TwilioFixtures>()
+
+test("signs in with a texted code", async ({ app, screen, expect, twilio }) => {
+  await app.open("/sign-in")
+  await screen.getByLabel("Phone").fill("+15551234567")
+  await screen.getByRole("button", { name: "Text me a code" }).click()
+
+  const text = await twilioInbox(twilio).waitFor("+15551234567")
+  await screen.getByLabel("Code").fill(text.code() ?? "")
+  await screen.getByRole("button", { name: "Sign in" }).click()
+
+  await expect(screen.getByText("Welcome back")).toBeVisible()
+})
+```
+
+To text your app as a person would, call `twilioPhone(twilio).send(from, to, body)`: the emulator
+POSTs it to the number's `smsUrl` and sends any `<Message>` in your TwiML reply back to the phone.
+`twilioSms(twilio)` gives the texts to the `mail` fixture, addressed by phone number.
+
+## Trial accounts
+
+Seed `type: "Trial"` to test what a trial account refuses, with Twilio's own codes:
+
+```ts title="danwo.config.ts · a trial account"
+twilioService({
+  seed: {
+    accounts: [
+      {
+        sid: "REDACTED-TEST-VALUE",
+        authToken: "danwo-auth-token",
+        type: "Trial",
+        verified: ["+15551234567"],
+      },
+    ],
+  },
+})
+```
+
+| A trial account sending… | Gets |
+| --- | --- |
+| to a number not in `verified` | 422, error `572002` |
+| a body that isn't one of Twilio's trial templates, such as `sms_2fa` | error `572006` |
+| a parameter only upgraded accounts may use | error `0` or `20003` |
+
+A template id in the body is sent as the template's text, as on Twilio.
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Messages | send, fetch, list, update, delete; media; Twilio's magic test numbers |
+| Statuses | `queued` to `sent` to `delivered` or `undelivered`, on the emulator's clock, with status callbacks |
+| Incoming | texts to the account's numbers POSTed to their SMS URL, TwiML replies sent |
+| Verify v2 | services, verifications that text a code, verification checks |
+| Accounts | fetch, incoming phone numbers, API keys |
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| `POST …/Messages.json` and Verify's POSTs | 429, 500, 503, a 10-second delay, connection reset, answer lost after Twilio acted |
+| Every status callback and incoming text | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+
+## Webhooks
+
+Status callbacks and incoming texts are form POSTs signed with `X-Twilio-Signature` under the
+account's auth token, so `twilio.validateRequest` accepts them.
+
+## Fidelity
+
+**Live, in safe mode.** `danwo fidelity twilio` reads the account and checks error answers and
+trial refusals against a real account, without sending texts. A real send on a trial account
+runs only when `DANWO_FIDELITY_TWILIO_SEND_ON_TRIAL` is set.
+
+## Not covered yet
+
+- Voice calls and TwiML for voice
+- WhatsApp and Conversations
+- Lookup
+
+## Next
+
+<Cards>
+  <Card title="Email and OTP" href="/docs/email-and-otp">
+    Read codes from texts and email the same way.
+  </Card>
+  <Card title="Resend" href="/docs/providers/resend">
+    Codes sent by email.
+  </Card>
+</Cards>

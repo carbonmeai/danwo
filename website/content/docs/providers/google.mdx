@@ -1,0 +1,125 @@
+---
+description: Sign in with Google on accounts.google.com, with seeded accounts, OAuth clients, tokens that refresh and access a user can revoke mid-test.
+---
+
+danwo's Google emulator answers Google's real hosts: the sign-in page on `accounts.google.com`,
+tokens on `oauth2.googleapis.com`, OpenID Connect discovery and keys, and the Gmail, Calendar and
+Drive APIs. `googleapis`, `google-auth-library` and any OpenID Connect library work against it
+unchanged.
+
+This page covers signing in. Gmail, Calendar and Drive have their own page,
+[Gmail, Calendar, Drive](/docs/providers/google-workspace).
+
+## Set up
+
+Add `googleService` with your OAuth client and the accounts that may sign in. Hand the app the
+same client:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, googleService } from "@danwo/sdk"
+
+const url = "http://localhost:3000"
+const client = {
+  client_id: "danwo-client.apps.googleusercontent.com",
+  client_secret: "danwo-client-secret",
+  name: "My app",
+  redirect_uris: [`${url}/auth/google/callback`],
+}
+
+export default defineConfig({
+  testDir: "tests",
+  environment: () =>
+    appEnvironment({
+      app: {
+        command: "npm run dev",
+        url,
+        env: { GOOGLE_CLIENT_ID: client.client_id, GOOGLE_CLIENT_SECRET: client.client_secret },
+      },
+      services: [
+        googleService({
+          seed: {
+            oauth_clients: [client],
+            users: [{ email: "ada@example.com", name: "Ada Lovelace" }],
+          },
+        }),
+      ],
+    }),
+})
+```
+
+An unknown client gets `invalid_client`, and a redirect URI that isn't listed gets
+`redirect_uri_mismatch`, as on Google.
+
+## Seed it
+
+| Field | What it seeds |
+| --- | --- |
+| `users` | Google accounts by email, with name, picture, locale, `email_verified` and the Workspace domain `hd`. |
+| `oauth_clients` | Your OAuth clients, with their redirect URIs. |
+| `gmail`, `calendar`, `drive`, `pubsub` | Each account's mail, events and files; see [Gmail, Calendar, Drive](/docs/providers/google-workspace). |
+
+## Use it in a test
+
+The sign-in page lists the seeded accounts as "Continue as <name>" buttons:
+
+```ts title="tests/sign-in.danwo.ts"
+import { type GoogleFixtures, googleSignIns, test as base } from "@danwo/sdk"
+
+const test = base.extend<GoogleFixtures>()
+
+test("signs in with Google", async ({ app, screen, expect, google }) => {
+  await app.open("/")
+  await screen.getByRole("button", { name: "Sign in with Google" }).click()
+  await screen.getByRole("button", { name: "Continue as Ada Lovelace" }).click()
+
+  await expect(screen.getByText("Hello, Ada")).toBeVisible()
+
+  const signIn = googleSignIns(google).latest()
+
+  expect(signIn?.email).toBe("ada@example.com")
+  expect(signIn?.redeemed).toBe(true)
+})
+```
+
+`googleSignIns(google)` lists who signed in to which client, with the scope granted, whether the
+app exchanged the code and how many access tokens it was given. To test what happens when a
+user removes your app from their Google Account, call `revokeGoogleAccess(google, email)`: their
+tokens stop working and refreshes fail with `invalid_grant`.
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Sign-in | the account chooser, consent, Cancel, `access_type=offline`, `include_granted_scopes` |
+| Tokens | code exchange, refresh, revoke, ID tokens signed with the published keys |
+| OpenID Connect | discovery document, `certs`, `userinfo` |
+| Scopes | every Gmail, Calendar and Drive call checks the token's scopes, as Google documents them |
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| `POST oauth2.googleapis.com/token` | 500, 503, 400, a 10-second delay, connection reset, answer lost after Google issued the token |
+| Gmail, Calendar and Drive calls | see [Gmail, Calendar, Drive](/docs/providers/google-workspace#faults) |
+
+## Fidelity
+
+**Public endpoints only.** `danwo fidelity google` compares the discovery document and the
+signing keys with Google's. Both match. Calls that need a signed-in account aren't checked live.
+
+## Not covered yet
+
+- One Tap and the Google Identity Services script
+- Service accounts and domain-wide delegation
+- Google's people, contacts and admin APIs
+
+## Next
+
+<Cards>
+  <Card title="Gmail, Calendar, Drive" href="/docs/providers/google-workspace">
+    Read and change a user's mail, events and files.
+  </Card>
+  <Card title="Microsoft" href="/docs/providers/microsoft">
+    The same sign-in flow for Microsoft accounts.
+  </Card>
+</Cards>

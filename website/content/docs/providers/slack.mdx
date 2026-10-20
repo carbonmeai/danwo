@@ -1,0 +1,138 @@
+---
+description: Slack app installs through OAuth, the Web API with its scope checks, incoming webhooks, and signed events, slash commands and interactions sent to your app.
+---
+
+danwo's Slack emulator answers `slack.com`, `hooks.slack.com` and `files.slack.com`. Your app
+installs through OAuth, calls the Web API with `@slack/web-api` or Bolt, and receives events,
+slash commands and button clicks signed with its signing secret.
+
+## Set up
+
+Add `slackService` with your app as its configuration page has it, and install it in advance so
+the test needn't go through the consent page. Hand the app its token and signing secret:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, slackService } from "@danwo/sdk"
+
+const url = "http://localhost:3000"
+const signingSecret = "danwo-signing-secret"
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  environment: () =>
+    appEnvironment({
+      app: {
+        command: "npm run dev",
+        url,
+        env: { SLACK_BOT_TOKEN: "xoxb-danwo", SLACK_SIGNING_SECRET: signingSecret },
+      },
+      services: [
+        slackService({
+          seed: {
+            users: [{ name: "ada", email: "ada@example.com" }],
+            channels: [{ name: "deploys", members: ["ada"] }],
+            apps: [
+              {
+                name: "Deploy bot",
+                client_id: "1.1",
+                client_secret: "danwo-client-secret",
+                signing_secret: signingSecret,
+                bot_scopes: ["chat:write", "commands"],
+                events: { url: `${url}/api/slack/events`, bot_events: ["app_mention"] },
+                commands: [{ command: "/deploy", url: `${url}/api/slack/commands` }],
+              },
+            ],
+            installations: [{ app: "Deploy bot", bot_token: "xoxb-danwo", channels: ["deploys"] }],
+          },
+        }),
+      ],
+    }),
+})
+```
+
+## Seed it
+
+| Field | What it seeds |
+| --- | --- |
+| `team` | The workspace's name, id and domain. |
+| `users` | Members by handle, with email, real name and admin. |
+| `channels` | Channels, private or public, with members; `#general` always exists. |
+| `apps` | Your app: credentials, scopes, event subscriptions, slash commands, interactivity URL, token rotation. |
+| `installations` | Apps already installed, with fixed bot and user tokens and the channels the bot is in. |
+
+## Use it in a test
+
+Run a slash command as a member, then read what the bot posted:
+
+```ts title="tests/deploy.danwo.ts"
+import { type SlackFixtures, slackWorkspace, test as base } from "@danwo/sdk"
+
+const test = base.extend<SlackFixtures>()
+
+test("announces a deploy in the channel", async ({ expect, settle, slack }) => {
+  const workspace = slackWorkspace(slack)
+
+  workspace.command("ada", "#deploys", "/deploy", "production")
+  await settle()
+
+  const [message] = workspace.messages("#deploys")
+
+  expect(message?.text).toContain("Deploying production")
+})
+```
+
+`slackWorkspace` acts as members, with `post`, `react`, `join`, `command`, `click` on a button and
+`submit` on a modal, and reads back `messages`, `thread`, `ephemeral`, `views` and uploaded
+`file`s. `verifyEventsUrl()` sends Slack's `url_verification` challenge to your events URL.
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| OAuth v2 | the consent page, `oauth.v2.access`, token rotation, `auth.test`, `auth.revoke` |
+| Chat | `postMessage`, `postEphemeral`, `update`, `delete`, `scheduleMessage`, threads, blocks |
+| Conversations | `create`, `list`, `info`, `history`, `replies`, `join`, `invite`, `members`, `open` |
+| Users | `list`, `info`, `lookupByEmail` |
+| Reactions, views, files | `reactions.add` and `.remove`; `views.open`, `.update`, `.publish`; external uploads |
+| Incoming | incoming webhooks and `response_url`s |
+| Sent to your app | Events API callbacks, slash commands, interactive payloads |
+
+Every method checks the token's scopes and answers `{ ok: false, error }` as Slack does, such as
+`missing_scope` or `channel_not_found`.
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| A Web API write, such as `chat.postMessage` | 429, 500, 503, a 200 with `ok: false`, a 10-second delay, connection reset, answer lost after Slack acted |
+| A Web API read | the same, without the lost answer |
+| Every event, command and interaction | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+
+## Webhooks
+
+What Slack sends your app carries `X-Slack-Signature` and `X-Slack-Request-Timestamp`, made with
+the app's `signing_secret`, so Bolt's request verification accepts it. A stale timestamp is one
+your app should refuse.
+
+## Fidelity
+
+**Public endpoints only.** `danwo fidelity slack` checks what Slack answers without a
+workspace: `api.test`, and the errors for a missing or unknown token. Both match.
+
+## Not covered yet
+
+- Socket Mode
+- Enterprise Grid, Slack Connect and workflow steps
+- Search, pins, bookmarks and reminders
+
+## Next
+
+<Cards>
+  <Card title="GitHub" href="/docs/providers/github">
+    Another app platform with signed webhooks.
+  </Card>
+  <Card title="Fault matrix" href="/docs/fault-matrix">
+    What a 200 with `ok: false` does to your bot.
+  </Card>
+</Cards>

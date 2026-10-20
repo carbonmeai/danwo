@@ -1,0 +1,146 @@
+---
+description: Sign in with Microsoft, then Microsoft Graph's Outlook mail, calendars, OneDrive and change notifications for each seeded user.
+---
+
+danwo's Microsoft emulator answers `login.microsoftonline.com` for sign-in and tokens, and
+`graph.microsoft.com` for Outlook mail, calendars, OneDrive and subscriptions. MSAL and the
+Graph client work against it unchanged.
+
+## Set up
+
+Add `microsoftService` with your app registration and the users who may sign in:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, microsoftService } from "@danwo/sdk"
+
+const url = "http://localhost:3000"
+const app = {
+  client_id: "00000000-0000-0000-0000-00000000a001",
+  client_secret: "danwo-client-secret",
+  name: "My app",
+  redirect_uris: [`${url}/auth/microsoft/callback`],
+}
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  environment: () =>
+    appEnvironment({
+      app: {
+        command: "npm run dev",
+        url,
+        env: { AZURE_AD_CLIENT_ID: app.client_id, AZURE_AD_CLIENT_SECRET: app.client_secret },
+      },
+      services: [
+        microsoftService({
+          seed: {
+            oauth_clients: [app],
+            users: [{ email: "ada@contoso.com", name: "Ada Lovelace" }],
+            mail: [{ user: "ada@contoso.com", from: "boss@contoso.com", subject: "Quarterly plan" }],
+            events: [
+              {
+                user: "ada@contoso.com",
+                subject: "Planning",
+                start: "2026-11-02T10:00:00",
+                end: "2026-11-02T11:00:00",
+              },
+            ],
+            files: [{ user: "ada@contoso.com", path: "/Documents/plan.txt", content: "Draft" }],
+          },
+        }),
+      ],
+    }),
+})
+```
+
+## Seed it
+
+| Field | What it seeds |
+| --- | --- |
+| `users` | Work or school accounts by email, with names and a tenant. |
+| `oauth_clients` | App registrations, with redirect URIs and an optional single tenant. |
+| `mail` | Messages in a user's folders, Inbox by default. |
+| `events` | Calendar events, with time zones, attendees, all-day and free/busy. |
+| `files` | OneDrive files and folders, by path. |
+
+## Use it in a test
+
+Sign in, then check the app sent mail from the user's mailbox:
+
+```ts title="tests/outlook.danwo.ts"
+import { type MicrosoftFixtures, outlookMailbox, test as base } from "@danwo/sdk"
+
+const test = base.extend<MicrosoftFixtures>()
+
+test("sends the weekly summary from Outlook", async ({ app, screen, expect, microsoft }) => {
+  await app.open("/")
+  await screen.getByRole("button", { name: "Sign in with Microsoft" }).click()
+  await screen.getByRole("button", { name: "Continue as Ada Lovelace" }).click()
+  await screen.getByRole("button", { name: "Send summary" }).click()
+
+  await expect(screen.getByText("Summary sent")).toBeVisible()
+
+  const sent = outlookMailbox(microsoft, "ada@contoso.com").latest("Sent Items")
+
+  expect(sent?.subject).toBe("Your weekly summary")
+})
+```
+
+| Helper | What it does |
+| --- | --- |
+| `outlookMailbox(microsoft, email)` | `messages(folder)`, `latest(folder)`, and `receive(message)` to deliver new mail |
+| `outlookCalendar(microsoft, email)` | `between(from, to)` and `add(event)` |
+| `oneDrive(microsoft, email)` | `list()`, `read(path)`, `put(file)`, `remove(path)` |
+| `graphSubscriptions(microsoft)` | the change subscriptions apps made, live or expired |
+| `microsoftSignIns(microsoft)` | who signed in to which app |
+| `revokeMicrosoftSessions(microsoft, email)` | signs the user out everywhere: refreshes fail with `invalid_grant` |
+
+`outlookMail(microsoft)` gives the mail to the `mail` fixture.
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Sign-in | authorize with the account chooser, tokens, refresh, logout, OpenID discovery and keys, `userinfo` |
+| Mail | messages, mail folders, `sendMail`, drafts, replies and forwards, delta; `$filter` (comparisons joined by `and`), `$orderby`, `$top`, `$skip`, `$select` |
+| Calendar | events, `calendarView`, recurrence, time zones, delta sync |
+| OneDrive | items by id and path, uploads and upload sessions, downloads, delta |
+| Subscriptions | create, renew, delete; change notifications with `clientState` and validation |
+| Users | `/me`, `revokeSignInSessions` |
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| `POST …/oauth2/v2.0/token` | 500, 503, 400, a 10-second delay, connection reset, answer lost after Microsoft issued the token |
+| A Graph write, such as `POST /me/sendMail` | 429, 503, 504, a 10-second delay, connection reset, answer lost after Graph acted |
+| A Graph read | 429, 503, 504, a 10-second delay, connection reset |
+| Every change notification | arrives twice, arrives 10 minutes late, forged, 1 hour stale |
+
+## Webhooks
+
+Change notifications go to each subscription's `notificationUrl`, after Graph's validation
+handshake, and carry the `clientState` the app chose, so your app can refuse a forged one.
+
+## Fidelity
+
+**Public endpoints only.** `danwo fidelity microsoft` compares the discovery document and the
+signing keys with Microsoft's. Both match. Graph calls need a signed-in account, so they aren't
+checked live.
+
+## Not covered yet
+
+- Teams, SharePoint sites and Planner
+- Personal Microsoft accounts' consumer-only features
+- Batch requests (`$batch`) and `$filter` beyond plain comparisons
+
+## Next
+
+<Cards>
+  <Card title="Google" href="/docs/providers/google">
+    The same sign-in flow for Google accounts.
+  </Card>
+  <Card title="Email and OTP" href="/docs/email-and-otp">
+    Read the mail your app sends through Outlook.
+  </Card>
+</Cards>

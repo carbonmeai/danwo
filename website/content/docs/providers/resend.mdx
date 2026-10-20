@@ -1,0 +1,125 @@
+---
+description: Sending email, batches and scheduled sends, domains, API keys and signed webhooks on api.resend.com, with every message readable from a test.
+---
+
+danwo's Resend emulator answers `api.resend.com`. The `resend` package works against it
+unchanged. Nothing is delivered anywhere: each email lands in an inbox your test reads.
+
+## Set up
+
+Add `resendService`. Any well-formed `re_…` key is accepted, so your app keeps its own:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, resendService } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  environment: () =>
+    appEnvironment({
+      app: { command: "npm run dev", url: "http://localhost:3000" },
+      services: [resendService()],
+    }),
+})
+```
+
+`resendService` also hands its mail to the `mail` fixture, so a test or an agent step can read a
+sign-in code with `mail.code(address)`.
+
+## Seed it
+
+```ts title="danwo.config.ts · the seed"
+resendService({
+  seed: {
+    domains: [{ name: "example.com" }],
+    keys: [{ name: "sending", token: "re_sending_only", permission: "sending_access" }],
+    webhooks: [
+      {
+        endpoint: "http://localhost:3000/api/webhooks/resend",
+        events: ["email.sent", "email.delivered"],
+        secret: "whsec_danwo",
+      },
+    ],
+  },
+})
+```
+
+| Field | What it seeds |
+| --- | --- |
+| `domains` | Verified sending domains, with a region. |
+| `keys` | Known API keys; a `sending_access` key may only send, as on Resend. |
+| `webhooks` | Where events go, which ones, and the signing secret. |
+| `allowlist` | When set, only these addresses may receive mail, as on a sandboxed account. |
+
+## Use it in a test
+
+Sign up, then read the code from the email the app sent:
+
+```ts title="tests/verify-email.danwo.ts"
+import { type ResendFixtures, resendInbox, test as base } from "@danwo/sdk"
+
+const test = base.extend<ResendFixtures>()
+
+test("verifies the email address", async ({ app, screen, expect, resend }) => {
+  await app.open("/signup")
+  await screen.getByLabel("Email").fill("ada@example.com")
+  await screen.getByRole("button", { name: "Sign up" }).click()
+
+  const email = await resendInbox(resend).waitFor("ada@example.com")
+  await screen.getByLabel("Code").fill(email.code() ?? "")
+  await screen.getByRole("button", { name: "Verify" }).click()
+
+  await expect(screen.getByText("Email verified")).toBeVisible()
+  expect(email.subject).toBe("Your code")
+})
+```
+
+Each email has `subject`, `text`, `html`, `from` and `to`, plus `code()` for a one-time code and
+`links()` for the links in it. `resendInbox(resend).list(to)` gives every email sent to an
+address, oldest first.
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Emails | send, batch send, retrieve, list, scheduled sends and cancelling them, tags, idempotency keys |
+| Domains | create, retrieve, list, verify, delete |
+| API keys | create, list, delete; `sending_access` and `full_access` |
+| Webhooks | create, retrieve, update, list, delete; signed deliveries |
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| `POST /emails` | 429, 500, a 10-second delay, connection reset, answer lost after Resend sent it |
+| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+
+The error bodies are Resend's, so the SDK hands your code `{ data: null, error }` as it would for
+real.
+
+## Webhooks
+
+Deliveries are signed the Svix way, with `webhook-id`, `webhook-timestamp` and
+`webhook-signature`, so Resend's `webhooks.verify` accepts them. The emulator sends
+`email.sent`, `email.scheduled`, `email.delivered`, `domain.created` and `domain.deleted`.
+
+## Fidelity
+
+**Live.** `danwo fidelity resend` runs 5 scenarios against a real Resend account, sending only to
+Resend's test address `delivered@resend.dev`. All 5 match.
+
+## Not covered yet
+
+- Bounces, complaints, opens and clicks: the emulator never sends those events
+- Audiences, contacts and broadcasts
+- Receiving email
+
+## Next
+
+<Cards>
+  <Card title="Email and OTP" href="/docs/email-and-otp">
+    Read codes and magic links from any provider's mail.
+  </Card>
+  <Card title="Twilio" href="/docs/providers/twilio">
+    The same, for codes sent by text message.
+  </Card>
+</Cards>
