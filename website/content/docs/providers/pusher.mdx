@@ -1,0 +1,144 @@
+---
+description: Pusher Channels, the API your server triggers events on and the socket pusher-js keeps open, with private and presence channels, subscription counting, signed webhooks and Beams.
+---
+
+danwo's Pusher emulator answers the Channels API on `api-<cluster>.pusher.com`, the socket
+`pusher-js` connects to on `ws-<cluster>.pusher.com`, and Beams on
+`<instance>.pushnotifications.pusher.com`. Your server's `pusher` package and the browser's
+`pusher-js` work against it unchanged, and an event your server triggers reaches the page danwo
+drives.
+
+## Set up
+
+Add `pusherService`. With no seed it serves one app, `PUSHER_DEFAULTS.app`; hand its
+credentials to your app:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, PUSHER_DEFAULTS, pusherService } from "@danwo/sdk"
+
+const { app } = PUSHER_DEFAULTS
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  environment: () =>
+    appEnvironment({
+      app: {
+        command: "npm run dev",
+        url: "http://localhost:3000",
+        env: {
+          PUSHER_APP_ID: app.id,
+          PUSHER_KEY: app.key,
+          PUSHER_SECRET: app.secret,
+          PUSHER_CLUSTER: app.cluster,
+          NEXT_PUBLIC_PUSHER_KEY: app.key,
+          NEXT_PUBLIC_PUSHER_CLUSTER: app.cluster,
+        },
+      },
+      services: [pusherService()],
+    }),
+})
+```
+
+## Seed it
+
+```ts title="danwo.config.ts · the seed"
+pusherService({
+  seed: {
+    apps: [
+      {
+        id: "1000001",
+        key: "my-key",
+        secret: "my-secret",
+        cluster: "eu",
+        subscriptionCounting: true,
+        webhooks: [
+          { url: "http://localhost:3000/api/pusher", events: ["channel_occupied", "member_added"] },
+        ],
+      },
+    ],
+    beams: [{ instanceId: "my-instance", secretKey: "my-beams-secret" }],
+  },
+})
+```
+
+| Field | What it seeds |
+| --- | --- |
+| `apps` | Channels apps: id, key, secret, cluster, and their webhooks. |
+| `apps[].subscriptionCounting` | Turns on subscription counting, so channel info carries `subscription_count` and the `subscription_count` webhook fires. Off by default, as on a new app. |
+| `beams` | Beams instances and their secret keys. |
+
+## Use it in a test
+
+Place an order, then check the page heard of it live, and that the server published it once:
+
+```ts title="tests/live-orders.danwo.ts"
+import { type PusherFixtures, pusherChannels, test as base } from "@danwo/sdk"
+
+const test = base.extend<PusherFixtures>()
+
+test("shows a new order without a reload", async ({ app, screen, expect, pusher }) => {
+  await app.open("/orders")
+  await screen.getByRole("button", { name: "Place order" }).click()
+
+  await expect(screen.getByRole("status")).toHaveText("Order o_1 placed")
+
+  const event = await pusherChannels(pusher).waitFor("orders", "order.placed")
+
+  expect(event.delivered_to).toHaveLength(1)
+  expect(pusherChannels(pusher).events({ channel: "orders" })).toHaveLength(1)
+})
+```
+
+`pusherChannels(pusher)` reads `events(filter)`, waits with `waitFor(channel, name)`, lists live
+`connections()`, and publishes from the test with `trigger(channel, name, data)`. Each event says
+which sockets it was `delivered_to`. `pusherBeams(pusher)` reads Beams `publishes()` and
+registered `devices()`.
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Channels API | `events`, `batch_events`, channel info, occupied channels, presence users, terminating a user's connections |
+| Socket | public, private and presence channels with your auth endpoint's signatures, client events, user sign-in, pings |
+| Subscription counting | `subscription_count` in channel info and webhooks, when turned on |
+| Webhooks | `channel_occupied`, `channel_vacated`, `member_added`, `member_removed`, `client_event`, `subscription_count` |
+| Beams | publish to interests and users, devices and their interests, deleting users |
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| `POST /apps/:id/events` | 429, 500, connection reset, answer lost after Pusher published it |
+| The socket | the upgrade refused, and the connection dropped for one person |
+| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+
+A dropped connection is the test that matters most: does the page reconnect, and does it catch
+up on what it missed?
+
+## Webhooks
+
+Webhooks carry `X-Pusher-Key` and `X-Pusher-Signature`, an HMAC of the body under the app's
+secret, so `pusher.webhook(request).isValid()` accepts them.
+
+## Fidelity
+
+**Live.** `danwo fidelity pusher` runs 5 scenarios against a real app. 4 match; the
+subscription-counting scenario with counting on needs the feature enabled on the real app first.
+
+## Not covered yet
+
+- Encrypted channels (`private-encrypted-…`)
+- Cache channels
+- Watchlist events
+
+## Next
+
+<Cards>
+  <Card title="Novu" href="/docs/providers/novu">
+    In-app notifications, also live in the browser.
+  </Card>
+  <Card title="Tiptap" href="/docs/providers/tiptap">
+    Collaborative documents over a socket.
+  </Card>
+</Cards>

@@ -1,0 +1,130 @@
+---
+description: Nango integrations, connect sessions with the hosted Connect UI, connections whose tokens refresh, the proxy, actions and records, routed to danwo's other emulators.
+---
+
+danwo's Nango emulator answers `api.nango.dev` and the hosted Connect UI on `connect.nango.dev`.
+`@nangohq/node` and `@nangohq/frontend` work against it unchanged.
+
+Like [Composio](/docs/providers/composio), it can route to danwo's other emulators: give it the
+Google, Microsoft, Slack or GitHub service as a backend, and a connection's proxied calls reach
+that emulator with the connection's token.
+
+## Set up
+
+List the backends before Nango, and pass them in `backends`:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, githubService, nangoService } from "@danwo/sdk"
+
+const url = "http://localhost:3000"
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  environment: () => {
+    const github = githubService({
+      seed: {
+        users: [{ login: "ada" }],
+        repos: [{ repo: "ada/notes" }],
+        tokens: [{ token: "gho_danwo", login: "ada", scopes: ["repo"] }],
+      },
+    })
+
+    return appEnvironment({
+      app: { command: "npm run dev", url, env: { NANGO_SECRET_KEY: "danwo-nango-key" } },
+      services: [
+        github,
+        nangoService({
+          backends: [github],
+          seed: {
+            secretKeys: ["danwo-nango-key"],
+            integrations: [{ key: "github", provider: "github" }],
+            connections: [{ integration: "github", connectionId: "ada", accessToken: "gho_danwo" }],
+            webhook: { url: `${url}/api/webhooks/nango` },
+          },
+        }),
+      ],
+    })
+  },
+})
+```
+
+## Seed it
+
+| Field | What it seeds |
+| --- | --- |
+| `secretKeys` | The environment's secret keys; without any, any non-empty key works. |
+| `integrations` | Integrations by unique key, and the provider each connects to. |
+| `connections` | Connections already made, with an end user, metadata and a token a backend issued. |
+| `webhook` | The environment's webhook URL and the secret that signs it. |
+| `proxy` | Answers for proxied calls to integrations without a backend. |
+| `actions` | What each action returns. |
+| `records` | Synced records by connection and model. |
+
+## Use it in a test
+
+Revoke the connection mid-test, as when the user removes your app on GitHub. Once the token is
+due to refresh, the refresh fails and Nango sends its `auth` webhook:
+
+```ts title="tests/reconnect.danwo.ts"
+import { type NangoFixtures, nangoProject, test as base } from "@danwo/sdk"
+
+const test = base.extend<NangoFixtures>()
+
+test("asks to reconnect when access is revoked", async ({ app, screen, expect, time, nango }) => {
+  nangoProject(nango).revoke("github", "ada")
+  await time.travel({ hours: 2 })
+
+  await app.open("/repos")
+  await expect(screen.getByRole("button", { name: "Reconnect GitHub" })).toBeVisible()
+  expect(nangoProject(nango).connections()).toHaveLength(1)
+})
+```
+
+`nangoProject(nango)` reads `connections()`, `connection(integration, id)` and every proxied or
+action `calls()`, with its status, and `revoke` makes a connection's next token refresh fail.
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Integrations | list, get |
+| Connect | connect sessions, reconnect sessions, the hosted Connect UI |
+| Connections | list, get, metadata; tokens that expire and refresh on the emulator's clock |
+| Proxy | calls forwarded to a backend emulator, or answered from the seed |
+| Actions and records | triggering actions; reading synced records |
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| A proxied write | 429, 424 when the token refresh failed, a 30-second delay, 500, connection reset, answer lost after the call |
+| A read | 424, 500, connection reset |
+| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+
+## Webhooks
+
+`auth` webhooks, sent when a connection is made or fails, carry `X-Nango-Signature`, signed with
+the webhook's secret or else the first secret key, as Nango signs them.
+
+## Fidelity
+
+**Live, reads only.** `danwo fidelity nango` runs 2 scenarios against a real environment: errors,
+and listing integrations and connections. Both match.
+
+## Not covered yet
+
+- Running your own syncs and actions' code: their output comes from the seed
+- `sync` and `forward` webhooks
+- Nango's self-hosted admin API
+
+## Next
+
+<Cards>
+  <Card title="Composio" href="/docs/providers/composio">
+    Tools for agents, routed to the same emulators.
+  </Card>
+  <Card title="GitHub" href="/docs/providers/github">
+    The emulator behind this page's example.
+  </Card>
+</Cards>

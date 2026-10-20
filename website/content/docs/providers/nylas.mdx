@@ -1,0 +1,130 @@
+---
+description: Nylas v3 hosted auth and grants, email, calendars and events, contacts and the scheduler, with signed webhooks and mail a test can deliver.
+---
+
+danwo's Nylas emulator answers `api.us.nylas.com` and `api.eu.nylas.com`. The `nylas` package
+works against it unchanged: your app connects a user's mailbox with hosted auth, then reads and
+sends mail and events through the grant.
+
+## Set up
+
+Add `nylasService` with your API key and a connected grant:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, nylasService } from "@danwo/sdk"
+
+const url = "http://localhost:3000"
+const apiKey = "nyk_danwo"
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  environment: () =>
+    appEnvironment({
+      app: { command: "npm run dev", url, env: { NYLAS_API_KEY: apiKey } },
+      services: [
+        nylasService({
+          seed: {
+            apiKeys: [apiKey],
+            grants: [
+              {
+                email: "ada@example.com",
+                provider: "google",
+                messages: [{ from: "bob@example.com", subject: "Lunch on Friday?" }],
+              },
+            ],
+            webhooks: [{ url: `${url}/api/webhooks/nylas`, triggers: ["message.created"] }],
+          },
+        }),
+      ],
+    }),
+})
+```
+
+Without `apiKeys`, any `nyk_` key is accepted.
+
+## Seed it
+
+| Field | What it seeds |
+| --- | --- |
+| `applicationId` | The application id tokens and notifications carry. |
+| `apiKeys` | The keys the application accepts. |
+| `grants` | Connected accounts by email, with their provider, scopes, messages, events and contacts. |
+| `webhooks` | Webhook subscriptions, their triggers, and the secret that signs them. |
+
+## Use it in a test
+
+Deliver an email to the user, as if someone wrote in, then check the app's reply went out:
+
+```ts title="tests/auto-reply.danwo.ts"
+import { type NylasFixtures, nylasApplication, test as base } from "@danwo/sdk"
+
+const test = base.extend<NylasFixtures>()
+
+test("replies to a new booking request", async ({ expect, settle, nylas }) => {
+  const application = nylasApplication(nylas)
+
+  application.receive("ada@example.com", {
+    from: "bob@example.com",
+    subject: "Can we book a call?",
+  })
+  await settle()
+
+  const [reply] = application.sent("ada@example.com")
+
+  expect(reply?.subject).toBe("Re: Can we book a call?")
+})
+```
+
+`nylasApplication(nylas)` reads `grants()`, `grant(email)`, `messages(email, folder)`,
+`sent(email)` and `events(email)`, delivers mail with `receive`, and expires a grant with
+`expire(email)`, as when the user's provider token is revoked. Mail sent between two seeded
+grants lands in the other's inbox.
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Auth | hosted auth, the consent step, token exchange, `tokeninfo`, revoke; grants listed and read |
+| Email | messages, send, threads, drafts, folders, attachments |
+| Calendar | calendars, events, free/busy |
+| Contacts | create, list, update, delete |
+| Scheduler | configurations, availability, bookings: create, confirm, reschedule, cancel |
+| Webhooks | create, update, delete, rotate the secret |
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| `POST …/messages/send` | 429, 401, 504, a 30-second delay, 500, connection reset, answer lost after Nylas sent it |
+| A read | 429, 500, connection reset |
+| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+
+## Webhooks
+
+Notifications carry `X-Nylas-Signature`, an HMAC of the body with the subscription's secret.
+Triggers include `message.created`, `message.updated`, `thread.replied`, `event.created`,
+`event.updated`, `event.deleted`, `grant.created`, `grant.expired`, `contact.updated` and
+`booking.created`.
+
+## Fidelity
+
+**Live, reads only.** `danwo fidelity nylas` runs 2 scenarios against a real application:
+errors, and listing and reading grants. Both match.
+
+## Not covered yet
+
+- Notetaker
+- The Scheduler's hosted booking pages
+- Smart Compose and other AI features
+
+## Next
+
+<Cards>
+  <Card title="Nango" href="/docs/providers/nango">
+    Connections to your users' accounts, proxied.
+  </Card>
+  <Card title="Google" href="/docs/providers/google-workspace">
+    Gmail and Calendar directly.
+  </Card>
+</Cards>

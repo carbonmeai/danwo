@@ -1,0 +1,133 @@
+---
+description: Novu's server API, workflows run through your app's bridge or from seeded templates, the Inbox API and socket the browser uses, and emails sent through the Resend emulator.
+---
+
+danwo's Novu emulator answers `api.novu.co` and the Inbox's socket on `socket.novu.co`, and their
+EU hosts. Your server triggers workflows with `@novu/api`, code-first workflows run through your
+app's `@novu/framework` bridge, and the browser's `@novu/react` Inbox shows each message live.
+
+## Set up
+
+Add `novuService` with your API key and, for code-first workflows, the bridge URL. To send the
+workflows' emails somewhere a test can read them, give it a Resend service:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, NOVU_DEFAULTS, novuService, resendService } from "@danwo/sdk"
+
+const url = "http://localhost:3000"
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  environment: () => {
+    const resend = resendService()
+
+    return appEnvironment({
+      app: {
+        command: "npm run dev",
+        url,
+        env: {
+          NOVU_SECRET_KEY: NOVU_DEFAULTS.apiKey,
+          NEXT_PUBLIC_NOVU_APPLICATION_IDENTIFIER: NOVU_DEFAULTS.applicationIdentifier,
+        },
+      },
+      services: [
+        resend,
+        novuService({
+          email: resend,
+          seed: {
+            bridgeUrl: `${url}/api/novu`,
+            subscribers: [{ subscriberId: "ada", email: "ada@example.com" }],
+          },
+        }),
+      ],
+    })
+  },
+})
+```
+
+With no seed, the API key and application identifier are `NOVU_DEFAULTS`'.
+
+## Seed it
+
+| Field | What it seeds |
+| --- | --- |
+| `apiKey`, `applicationIdentifier` | The environment's keys. |
+| `bridgeUrl` | Your app's `@novu/framework` endpoint: workflows are discovered and run through it. |
+| `hmac` | Require the Inbox's subscriber hash, as with HMAC encryption turned on. |
+| `subscribers` | Subscribers with names, email, phone and data. |
+| `workflows` | Dashboard-style workflows, with `in_app`, `email`, `sms`, `push`, `chat`, `delay`, `digest` and `custom` steps. |
+
+## Use it in a test
+
+Trigger a notification from the app, then check the Inbox showed it and the email went out:
+
+```ts title="tests/notify.danwo.ts"
+import { type NovuFixtures, novuProject, type ResendFixtures, test as base } from "@danwo/sdk"
+
+const test = base.extend<NovuFixtures & ResendFixtures>()
+
+test("tells Ada her order shipped", async ({ app, screen, expect, settle, novu }) => {
+  await app.open("/orders/o_1")
+  await screen.getByRole("button", { name: "Mark shipped" }).click()
+  await settle()
+
+  await expect(screen.getByText("Order o_1 is on its way")).toBeVisible()
+
+  const message = await novuProject(novu).waitForMessage("ada", { channel: "in_app" })
+
+  expect(message.content).toBe("Order o_1 is on its way")
+  expect(novuProject(novu).messages({ channel: "email", subscriberId: "ada" })).toHaveLength(1)
+})
+```
+
+`novuProject(novu)` reads `subscribers()`, workflow `executions()`, every step's `messages()`, a
+subscriber's `inbox()` and the `openInboxes()` sockets, waits with `waitForMessage`, and
+`idle()` waits until every run has finished. `settle` waits for the runs too.
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Events | trigger, bulk, broadcast, cancel |
+| Subscribers | create, list, get, update, delete, credentials, their notifications |
+| Topics | create, get, subscriptions |
+| Workflows | code-first through the bridge's discover and execute; seeded templates; delays and digests run straight through |
+| Inbox | session, notifications, counts, read, seen, archive, delete, preferences; the realtime socket |
+| Email | email steps sent through a Resend service, so they land in `resendInbox(resend)` |
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| `POST /v1/events/trigger` | 429, 500, connection reset, answer lost after Novu started the run |
+| A read | 500, connection reset |
+| The Inbox socket | the upgrade refused, and the connection dropped for one person |
+
+## Webhooks
+
+Novu sends your app no webhooks here. Its calls to your bridge are signed with
+`novu-signature`, an HMAC of the timestamp and body under the API key, so `@novu/framework`
+accepts them.
+
+## Fidelity
+
+**Live.** `danwo fidelity novu` runs 2 scenarios against a real environment: an unknown key, and
+creating, reading, patching and deleting a subscriber. Both match.
+
+## Not covered yet
+
+- Delays and digests that wait: they run straight through
+- SMS, push and chat providers: those steps are recorded, not sent anywhere
+- Layouts, translations and the dashboard's workflow editor
+
+## Next
+
+<Cards>
+  <Card title="Resend" href="/docs/providers/resend">
+    Read the emails Novu sent.
+  </Card>
+  <Card title="Pusher" href="/docs/providers/pusher">
+    Live events without a notification service.
+  </Card>
+</Cards>

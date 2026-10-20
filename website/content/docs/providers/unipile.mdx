@@ -1,0 +1,118 @@
+---
+description: Unipile's hosted auth links, connected LinkedIn, WhatsApp and mail accounts, chats, messages and email, with webhooks when the other side writes back.
+---
+
+danwo's Unipile emulator answers every `*.unipile.com` DSN your app is given, and the hosted auth
+pages on `account.unipile.com`. `unipile-node-sdk` works against it unchanged: your app links a
+user's LinkedIn or WhatsApp, then reads and sends messages through it.
+
+## Set up
+
+Add `unipileService` with your access token and a connected account. Point the app at any DSN:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, unipileService } from "@danwo/sdk"
+
+const url = "http://localhost:3000"
+const token = "danwo-unipile-token"
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  environment: () =>
+    appEnvironment({
+      app: {
+        command: "npm run dev",
+        url,
+        env: { UNIPILE_ACCESS_TOKEN: token, UNIPILE_DSN: "api1.unipile.com:13111" },
+      },
+      services: [
+        unipileService({
+          seed: {
+            tokens: [token],
+            accounts: [{ id: "acc_ada", type: "LINKEDIN", name: "Ada Lovelace", username: "ada" }],
+            webhooks: [{ source: "messaging", url: `${url}/api/webhooks/unipile` }],
+          },
+        }),
+      ],
+    }),
+})
+```
+
+Every call needs the token in `X-API-KEY`, as on Unipile.
+
+## Seed it
+
+| Field | What it seeds |
+| --- | --- |
+| `tokens` | Access tokens the API accepts. |
+| `accounts` | Connected accounts: `LINKEDIN`, `WHATSAPP`, `GOOGLE_OAUTH` or `MAIL`. |
+| `webhooks` | Where `messaging`, `email` and `account_status` events go, with your own auth headers. |
+
+## Use it in a test
+
+Have a contact write to the user on LinkedIn, then check the app shows it:
+
+```ts title="tests/linkedin-inbox.danwo.ts"
+import { type UnipileFixtures, test as base, unipileWorkspace } from "@danwo/sdk"
+
+const test = base.extend<UnipileFixtures>()
+
+test("shows a new LinkedIn message", async ({ app, screen, expect, settle, unipile }) => {
+  unipileWorkspace(unipile).receive("acc_ada", { providerId: "bob", name: "Bob" }, "Free for a call?")
+  await settle()
+
+  await app.open("/inbox")
+  await expect(screen.getByText("Free for a call?")).toBeVisible()
+})
+```
+
+`unipileWorkspace(unipile)` reads `accounts()`, `messages(accountId)` and `emails(accountId)`,
+writes as the other side with `receive` and `receiveEmail`, and `disconnect(accountId)` drops an
+account, as when its credentials expire.
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Accounts | hosted auth links and pages, list, get, delete |
+| Messaging | chats, attendees, messages: list, read, start a chat, send |
+| Email | list, read, send |
+| Users | profiles and posts, `users/me` |
+| Webhooks | create, list, delete |
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| A send, such as `POST …/chats/:id/messages` | 429, 401 for a disconnected account, a 30-second delay, 500, connection reset, answer lost after Unipile sent it |
+| A read | 401, 500, connection reset |
+| Every webhook delivery | arrives twice, arrives 10 minutes late, forged, 1 hour stale |
+
+## Webhooks
+
+Events go to each subscription's URL with the headers you gave it, as Unipile sends them:
+`message_received` for messaging, `mail_received` for email, and `account_status` when an
+account connects or disconnects.
+
+## Fidelity
+
+**Live, reads only.** `danwo fidelity unipile` runs 2 scenarios against a real workspace: an
+unknown token, and listing accounts. Both match.
+
+## Not covered yet
+
+- Instagram, Telegram and X accounts
+- LinkedIn invitations, searches and Sales Navigator
+- Attachments and voice notes
+
+## Next
+
+<Cards>
+  <Card title="Nylas" href="/docs/providers/nylas">
+    Email and calendars through grants.
+  </Card>
+  <Card title="Twilio" href="/docs/providers/twilio">
+    Text messages.
+  </Card>
+</Cards>

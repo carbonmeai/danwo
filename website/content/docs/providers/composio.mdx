@@ -1,0 +1,150 @@
+---
+description: Composio's toolkits, tool execution, connected accounts with hosted connect links, and triggers, with tools that act on danwo's Google, Slack, GitHub and Microsoft emulators.
+---
+
+danwo's Composio emulator answers `backend.composio.dev` and its hosted connect pages on
+`connect.composio.dev`. `@composio/core` works against it unchanged: your agent lists tools,
+connects a user's accounts and executes tools.
+
+What makes it more than a stub is **routing to other emulators**. Give it danwo's Google, Slack,
+GitHub or Microsoft service as a backend, and a user connects Gmail on the Google emulator's
+consent page, and `GMAIL_SEND_EMAIL` lands in the Google emulator's mailbox, where a test can read
+it.
+
+## Set up
+
+List the backends before Composio, and pass them in `backends`:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, composioService, defineConfig, googleService } from "@danwo/sdk"
+
+const url = "http://localhost:3000"
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  environment: () => {
+    const google = googleService({
+      seed: { users: [{ email: "ada@example.com", name: "Ada Lovelace" }] },
+    })
+
+    return appEnvironment({
+      app: { command: "npm run dev", url, env: { COMPOSIO_API_KEY: "danwo-composio-key" } },
+      services: [
+        google,
+        composioService({
+          backends: [google],
+          seed: {
+            apiKeys: ["danwo-composio-key"],
+            authConfigs: [{ toolkit: "gmail", id: "ac_gmail" }],
+          },
+        }),
+      ],
+    })
+  },
+})
+```
+
+Toolkits without a backend connect on Composio's own page and answer from seeded results or
+sample data.
+
+## Seed it
+
+| Field | What it seeds |
+| --- | --- |
+| `apiKeys` | The project's API keys. |
+| `toolkits`, `tools` | Extra toolkits and tools beside the built-in catalogue, with input schemas. |
+| `authConfigs` | Auth configs by toolkit: Composio-managed or your own credentials and scopes. |
+| `connectedAccounts` | Accounts already connected for a user, `ACTIVE` or `EXPIRED`. |
+| `triggers` | Trigger instances on a connected account. |
+| `webhook` | The project's webhook subscription: URL, secret and events. |
+| `results` | Canned results for a tool, optionally only for matching arguments, or an error. |
+
+## Use it in a test
+
+Connect Gmail as the user, ask the agent to send an email, then read the Google emulator's mailbox:
+
+```ts title="tests/agent-email.danwo.ts"
+import {
+  type ComposioFixtures,
+  composioProject,
+  type GoogleFixtures,
+  gmailMailbox,
+  test as base,
+} from "@danwo/sdk"
+
+const test = base.extend<ComposioFixtures & GoogleFixtures>()
+
+test("the agent emails the customer", async ({ app, screen, expect, composio, google }) => {
+  await app.open("/integrations")
+  await screen.getByRole("button", { name: "Connect Gmail" }).click()
+  await screen.getByRole("button", { name: "Continue as Ada Lovelace" }).click()
+
+  await app.open("/agent")
+  await screen.getByLabel("Ask").fill("Email bob@example.com that the order shipped")
+  await screen.getByRole("button", { name: "Send" }).click()
+  await expect(screen.getByText("Email sent")).toBeVisible()
+
+  const [execution] = composioProject(composio).executions()
+  const [sent] = gmailMailbox(google, "ada@example.com").sent()
+
+  expect(execution?.tool).toBe("GMAIL_SEND_EMAIL")
+  expect(execution?.source).toBe("backend")
+  expect(sent?.to).toBe("bob@example.com")
+})
+```
+
+`composioProject(composio)` reads `accounts()` and `executions()`, each run saying whether a
+seed, a backend or sample data answered it; fires a trigger with
+`fire(trigger, data)` and expires an account with `expire(id)`. `composioTools(composio)`
+answers a tool from the test with `handle(tool, handler)`, before any seeded result or backend.
+
+Pair it with the [model API emulator](/docs/providers/model-apis) to script the tool calls the
+model makes.
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Catalogue | toolkits, tools, tool enums, trigger types |
+| Execution | `tools/execute/:slug`, the proxy execute call |
+| Accounts | auth configs; connected accounts, connect links and the hosted page, refresh, status |
+| Triggers | trigger instances: upsert, list, enable, disable, delete; firing them |
+| Webhooks | webhook subscriptions, event types, secret rotation |
+| Backed tools | `GMAIL_SEND_EMAIL`, `GMAIL_FETCH_EMAILS`, `GMAIL_CREATE_EMAIL_DRAFT`, `GOOGLECALENDAR_CREATE_EVENT`, `GOOGLECALENDAR_EVENTS_LIST`, `GOOGLEDRIVE_FIND_FILE`, `SLACK_SEND_MESSAGE`, `SLACK_LIST_ALL_CHANNELS`, `GITHUB_CREATE_AN_ISSUE`, `GITHUB_GET_A_REPOSITORY`, `OUTLOOK_SEND_EMAIL`, `OUTLOOK_LIST_MESSAGES` |
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| `POST /tools/execute/:slug` | 429, 503, 408, 422 for an expired account, a 200 with `successful: false`, a 30-second delay, 500, connection reset, answer lost after the tool ran |
+| A connect link | 429, 500, connection reset |
+| A read | 500, connection reset |
+| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+
+## Webhooks
+
+Trigger events and account expiries go to the webhook subscription, signed with `webhook-id`,
+`webhook-timestamp` and `webhook-signature`.
+
+## Fidelity
+
+**Live, reads only.** `danwo fidelity composio` runs 3 scenarios against a real project: errors,
+the catalogue, and auth configs and connected accounts. All 3 match.
+
+## Not covered yet
+
+- Most toolkits' tools act on sample data: only the tools above reach a backend
+- MCP servers hosted by Composio
+- Custom tools defined in code on Composio's side
+
+## Next
+
+<Cards>
+  <Card title="Scripting replies" href="/docs/providers/model-scripts">
+    Make the model call the tool on cue.
+  </Card>
+  <Card title="Nango" href="/docs/providers/nango">
+    Another way to reach your users' accounts.
+  </Card>
+</Cards>

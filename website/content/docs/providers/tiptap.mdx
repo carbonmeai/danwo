@@ -1,0 +1,124 @@
+---
+description: Tiptap Cloud collaboration, the socket editors sync documents over and the documents REST API, with a test that reads what a document says and makes the server misbehave.
+---
+
+danwo's Tiptap emulator answers every collaboration app on `<appId>.collab.tiptap.cloud`: the
+WebSocket server `TiptapCollabProvider` and `@hocuspocus/provider` sync documents with, and the
+documents REST API on `/api`. Several editors of one document see each other's changes, and a
+test reads what the document says.
+
+## Set up
+
+Add `tiptapService` with your app id and the secret your server signs collaboration tokens with:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, tiptapService } from "@danwo/sdk"
+
+const app = { id: "notes", secret: "danwo-collab-secret", apiKey: "danwo-tiptap-key" }
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  environment: () =>
+    appEnvironment({
+      app: {
+        command: "npm run dev",
+        url: "http://localhost:3000",
+        env: {
+          TIPTAP_APP_ID: app.id,
+          TIPTAP_COLLAB_SECRET: app.secret,
+          TIPTAP_API_KEY: app.apiKey,
+        },
+      },
+      services: [
+        tiptapService({
+          seed: {
+            apps: [app],
+            documents: {
+              "note-1": {
+                type: "doc",
+                content: [{ type: "paragraph", content: [{ type: "text", text: "Agenda" }] }],
+              },
+            },
+          },
+        }),
+      ],
+    }),
+})
+```
+
+## Seed it
+
+| Field | What it seeds |
+| --- | --- |
+| `apps` | Collaboration apps: the `secret` that verifies clients' JWTs, and the REST API's `apiKey`. Without them, any token or key is accepted. |
+| `documents` | Documents by name, written as ProseMirror JSON. |
+
+## Use it in a test
+
+Type into the editor, then check the server kept it:
+
+```ts title="tests/collab.danwo.ts"
+import { type TiptapFixtures, test as base, tiptapCollab } from "@danwo/sdk"
+
+const test = base.extend<TiptapFixtures>()
+
+test("saves what was typed", async ({ app, screen, expect, tiptap }) => {
+  await app.open("/notes/note-1")
+  await expect(screen.getByText("Agenda")).toBeVisible()
+  await screen.getByRole("textbox").press("End")
+  await screen.getByRole("textbox").press("Enter")
+  await screen.getByRole("textbox").fill("Ship on Friday")
+
+  const collab = tiptapCollab(tiptap)
+
+  expect(await collab.waitForText("note-1", "Ship on Friday")).toContain("Ship on Friday")
+  expect(collab.editors("note-1")).toBe(1)
+})
+```
+
+`tiptapCollab(tiptap)` lists document `names()`, reads one as `json(name)` or `text(name)`, waits
+with `waitForText`, writes a document as another editor would with `write(name, doc)`, and counts
+the `editors(name)` connected. `trouble({ permissionDenied: true })` refuses tokens and
+`trouble({ syncDelayMs })` answers syncs late, so you can test how your editor shows it.
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Socket | the Yjs sync protocol, awareness, Tiptap's stateless messages, tokens checked against the app's secret |
+| REST API | documents: list, get, create, update, delete |
+| Documents | ProseMirror JSON in and out, fragments |
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| A REST write, such as `POST /api/documents/:name` | 429, 500, connection reset, answer lost after the document was saved |
+| The socket | the upgrade refused, and the connection dropped for one person |
+
+## Webhooks
+
+Tiptap Cloud's document webhooks aren't sent yet.
+
+## Fidelity
+
+**Live.** `danwo fidelity tiptap` runs 1 scenario against a real collaboration app: creating a
+document, reading it as JSON and deleting it. It matches.
+
+## Not covered yet
+
+- Webhooks
+- Comments, versions and AI features
+- Document conversion (import and export)
+
+## Next
+
+<Cards>
+  <Card title="Pusher" href="/docs/providers/pusher">
+    Live events over a socket.
+  </Card>
+  <Card title="Fault matrix" href="/docs/fault-matrix">
+    What a dropped socket does to your editor.
+  </Card>
+</Cards>
