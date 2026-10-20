@@ -4,7 +4,7 @@ import { randomBytes, randomUUID } from "node:crypto"
 import type { Context } from "../../http.ts"
 import { asRecord } from "../../json.ts"
 import { callerOf, grantOf, requireApplication } from "../auth.ts"
-import type { NylasContact, NylasWebhook } from "../entities.ts"
+import type { NylasContact, NylasGrant, NylasWebhook } from "../entities.ts"
 import { NYLAS_TRIGGERS } from "../events.ts"
 import { removeGrant } from "../grants.ts"
 import {
@@ -129,6 +129,17 @@ function contactRoutes(context: NylasRouteContext): void {
   })
 }
 
+/** The grant a request names, for calls only the application may make; not found otherwise. */
+function applicationGrant(context: NylasRouteContext, c: Context): NylasGrant {
+  requireApplication(context, c)
+
+  const grant = context.objects.grants.get(c.req.param("grant"))
+
+  if (!grant) throw notFound(`grant ${c.req.param("grant")}`)
+
+  return grant
+}
+
 function grantRoutes(context: NylasRouteContext): void {
   const { app, objects, events } = context
 
@@ -160,12 +171,7 @@ function grantRoutes(context: NylasRouteContext): void {
     return one(c, grant)
   })
   app.patch(GRANT, async (c) => {
-    requireApplication(context, c)
-
-    const grant = objects.grants.get(c.req.param("grant"))
-
-    if (!grant) throw notFound(`grant ${c.req.param("grant")}`)
-
+    const grant = applicationGrant(context, c)
     const body = await bodyOf(c)
     const settings = asRecord(body["settings"])
     const changed =
@@ -182,11 +188,8 @@ function grantRoutes(context: NylasRouteContext): void {
     return one(c, changed)
   })
   app.delete(GRANT, (c) => {
-    requireApplication(context, c)
+    const grant = applicationGrant(context, c)
 
-    const grant = objects.grants.get(c.req.param("grant"))
-
-    if (!grant) throw notFound(`grant ${c.req.param("grant")}`)
     removeGrant(context, grant)
     events.grant("grant.deleted", grant)
 

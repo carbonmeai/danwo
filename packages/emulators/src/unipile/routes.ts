@@ -63,6 +63,18 @@ function accountOf(context: UnipileRouteContext, id: string | undefined): Unipil
   return account
 }
 
+/** A write made for one of the workspace's accounts: its fields and the account they name. */
+async function accountRequest(
+  context: UnipileRouteContext,
+  c: Context,
+): Promise<{ body: Record<string, string>; account: UnipileAccountRecord }> {
+  requireToken(context, c)
+
+  const body = await fields(c)
+
+  return { body, account: accountOf(context, body["account_id"]) }
+}
+
 function chatOf(context: UnipileRouteContext, id: string): UnipileChatRecord {
   const chat = context.objects.chats.get(id)
 
@@ -221,10 +233,7 @@ function messagingRoutes(context: UnipileRouteContext): void {
     )
   })
   app.post(`${API}/chats`, async (c) => {
-    requireToken(context, c)
-
-    const body = await fields(c)
-    const account = accountOf(context, body["account_id"])
+    const { body, account } = await accountRequest(context, c)
     const ids =
       body["attendees_ids"] === undefined
         ? []
@@ -319,10 +328,7 @@ function emailRoutes(context: UnipileRouteContext): void {
     return c.json(emailObject(email, objects.accounts.get(email.account_id)?.type ?? "MAIL"))
   })
   app.post(`${API}/emails`, async (c) => {
-    requireToken(context, c)
-
-    const body = await fields(c)
-    const account = accountOf(context, body["account_id"])
+    const { body, account } = await accountRequest(context, c)
     const to = listIn(body["to"] ?? "[]").flatMap((item) => {
       const record = asRecord(item)
       const identifier = record?.["identifier"]
