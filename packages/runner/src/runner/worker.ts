@@ -55,6 +55,7 @@ import {
   type RecordSettings,
 } from "./record.ts"
 import { SessionKeeper } from "./sessions.ts"
+import { type MessageMarks, messageMarks, type RunLists, setupCaused } from "./setup-causes.ts"
 import type {
   AttemptReport,
   TestFileTask,
@@ -149,6 +150,7 @@ async function attemptOnce(
     unrecorded === true ? undefined : recording && attemptDir(recording, id, recordAs)
   const mark = markEvidence(env)
   let body: EvidenceMark | undefined
+  let messages: MessageMarks = {}
   const test = findDeclared(declarations, file, id)
   // Another user's attempt in a race trial runs alongside the one the feed follows.
   const tap =
@@ -176,13 +178,14 @@ async function attemptOnce(
     ...race,
     onBodyStart: () => {
       body = markEvidence(env)
+      messages = messageMarks(env?.webhooks)
       onBodyStart?.()
     },
   }).finally(() => tap?.stop())
 
   tap?.end(result.status, result.durationMs)
 
-  return { result, recordDir, mark, body }
+  return { result, recordDir, mark, body, messages }
 }
 
 /** One attempt as it ran: its result, record directory, and the evidence marks at its start and body. */
@@ -192,6 +195,8 @@ interface AttemptRun {
   readonly mark: EvidenceMark
   /** Where the evidence stood when the body began; undefined when setup never finished. */
   readonly body: EvidenceMark | undefined
+  /** Each webhook service's newest message when the body began: what setup had set off. */
+  readonly messages: MessageMarks
 }
 
 /** A test's baselines: `__screenshots__/<file>/<test>/` next to its file. */
@@ -467,21 +472,25 @@ function verdictOf(result: AttemptResult) {
 function trialReport(
   result: AttemptResult,
   env: TrialEnvironment,
-  marks: { readonly mark: EvidenceMark; readonly body: EvidenceMark | undefined },
+  marks: Pick<AttemptRun, "mark" | "body" | "messages">,
 ): TrialReport {
   const { mark } = marks
   const stop = stopNote(result)
+  // Bodies stay in the worker: the flight record has them; the run plans by route alone.
+  const exchanges = env.proxy
+    .exchanges()
+    .slice(mark.exchanges)
+    .map(({ request: _q, response: _r, ...call }) => call)
+  const deliveries = deliveriesOf(env.webhooks).slice(mark.deliveries)
+  const dataCalls = env.data === undefined ? undefined : dataCallsOf(env.data, mark.data)
+  const lists = { exchanges, deliveries, dataCalls: dataCalls ?? [] }
 
   return {
-    setup: setupSpan(env, mark, marks.body ?? markEvidence(env)),
+    setup: setupSpan(env, lists, { ...marks, body: marks.body ?? markEvidence(env) }),
     ...verdictOf(result),
-    // Bodies stay in the worker: the flight record has them; the run plans by route alone.
-    exchanges: env.proxy
-      .exchanges()
-      .slice(mark.exchanges)
-      .map(({ request: _q, response: _r, ...call }) => call),
-    deliveries: deliveriesOf(env.webhooks).slice(mark.deliveries),
-    ...(env.data !== undefined && { dataCalls: dataCallsOf(env.data, mark.data) }),
+    exchanges,
+    deliveries,
+    ...(dataCalls !== undefined && { dataCalls }),
     sockets: env.proxy.sockets().slice(mark.sockets ?? 0),
     divergence: result.divergence,
     notes: [...(stop === undefined ? [] : [stop]), ...(env.notes?.() ?? [])],
@@ -489,21 +498,29 @@ function trialReport(
 }
 
 /**
- * What came between the attempt's start and its body: the setup the matrix plans no faults on.
- * Without a body mark (setup never finished) everything the attempt did was setup.
+ * What came between the attempt's start and its body, and what that setup set off after the body
+ * began: the setup the matrix plans no faults on. Without a body mark (setup never finished)
+ * everything the attempt did was setup.
  */
-function setupSpan(env: TrialEnvironment, mark: EvidenceMark, body: EvidenceMark): SetupSpan {
+function setupSpan(
+  env: TrialEnvironment,
+  lists: RunLists,
+  marks: Pick<AttemptRun, "mark" | "messages"> & { readonly body: EvidenceMark },
+): SetupSpan {
+  const { mark, body } = marks
   const data: Record<string, number> = {}
 
   for (const [at, proxy] of (env.data ?? []).entries())
     data[proxy.service] = (body.data?.[at] ?? 0) - (mark.data?.[at] ?? 0)
 
-  return {
+  const span = {
     exchanges: body.exchanges - mark.exchanges,
     deliveries: body.deliveries - mark.deliveries,
     sockets: (body.sockets ?? 0) - (mark.sockets ?? 0),
     data,
   }
+
+  return { ...span, caused: setupCaused(lists, span, marks.messages) }
 }
 
 /** A trial's record is kept when it failed, and when its fault never fired (it shows why). */
@@ -624,7 +641,7 @@ async function runTrial(
     kind: task.fault === null ? "learn" : "replay-only",
     dir: task.cacheDir,
   }
-  const { result, recordDir, mark, body, race } = await trialRun(
+  const { result, recordDir, mark, body, messages, race } = await trialRun(
     task,
     env,
     declarations,
@@ -638,7 +655,7 @@ async function runTrial(
     await env.proxy.settled().catch(() => undefined)
   })
 
-  const reported = withRace(trialReport(result, env, { mark, body }), race)
+  const reported = withRace(trialReport(result, env, { mark, body, messages }), race)
   const verdict = { ...reported, timings, ...cleanPace(task, result) }
   const input: RecordInput = {
     test: task.testId,
