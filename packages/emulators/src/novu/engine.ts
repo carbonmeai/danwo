@@ -47,6 +47,52 @@ function channelOf(type: string): NovuChannel | undefined {
     : undefined
 }
 
+const UNIT_MS: Readonly<Record<string, number>> = {
+  seconds: 1000,
+  minutes: 60_000,
+  hours: 3_600_000,
+  days: 86_400_000,
+  weeks: 604_800_000,
+  months: 2_592_000_000,
+}
+
+type StepResult = Record<string, unknown>
+
+/** A delay step's duration in milliseconds, from the amount and unit it returned. */
+function delayResult(outputs: StepResult): StepResult {
+  const amount = typeof outputs["amount"] === "number" ? outputs["amount"] : 0
+  const unit = typeof outputs["unit"] === "string" ? (UNIT_MS[outputs["unit"]] ?? 0) : 0
+
+  return { duration: amount * unit }
+}
+
+/** Results of the steps that do not deliver, by type; a custom step passes its outputs on. */
+const ACTION_RESULTS: Readonly<
+  Record<string, (outputs: StepResult, execution: NovuExecution) => StepResult>
+> = {
+  delay: delayResult,
+  digest: (_outputs, execution) => ({
+    eventCount: 1,
+    events: [{ id: execution.transaction_id, time: execution.created, payload: execution.payload }],
+  }),
+  throttle: () => ({ throttled: false }),
+}
+
+/**
+ * What a finished step hands the steps after it, in the shape the bridge checks a step's
+ * result against: a message step's delivery status rather than the content it sent, a delay's
+ * duration, a digest's events. A custom step's result is what it returned.
+ */
+function resultOf(type: string, outputs: StepResult, execution: NovuExecution): StepResult {
+  const channel = channelOf(type)
+
+  if (channel === "in_app")
+    return { seen: false, read: false, lastSeenDate: null, lastReadDate: null }
+  if (channel !== undefined) return {}
+
+  return ACTION_RESULTS[type]?.(outputs, execution) ?? outputs
+}
+
 /** `{{payload.a.b}}` and `{{subscriber.firstName}}` in a template, filled from the trigger. */
 function fill(template: string | undefined, values: Record<string, unknown>): string {
   return (template ?? "").replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, path: string) => {
@@ -286,7 +332,11 @@ export class NovuEngine {
 
       if (!skipped) await this.deliver(execution, subscriber, step.stepId, step.type, outputs, tags)
       this.record(execution, { stepId: step.stepId, type: step.type, status, outputs })
-      state.push({ stepId: step.stepId, outputs, state: { status } })
+      state.push({
+        stepId: step.stepId,
+        outputs: resultOf(step.type, outputs, execution),
+        state: { status },
+      })
     }
   }
 

@@ -71,8 +71,27 @@ async function bridge(): Promise<string> {
       } as const,
     },
   )
+  const assigned = workflow(
+    "assigned",
+    async ({ step, payload }) => {
+      await step.inApp("bell", async () => ({ subject: "Assigned", body: payload.title }))
+      await step.push("phone", async () => ({ subject: "Assigned", body: payload.title }))
+      await step.email("mail", async () => ({
+        subject: "Assigned",
+        body: `<p>${payload.title}</p>`,
+      }))
+    },
+    {
+      payloadSchema: {
+        type: "object",
+        properties: { title: { type: "string" } },
+        required: ["title"],
+        additionalProperties: false,
+      } as const,
+    },
+  )
   const handler = serveBridge({
-    workflows: [welcome],
+    workflows: [welcome, assigned],
     client: new Client({ secretKey: KEY, strictAuthentication: true }),
   })
   const server = serve({ port: 0, fetch: (request) => handler({ request }) })
@@ -256,6 +275,27 @@ describe("novu framework bridge", () => {
     expect(novuProject(emulator).messages({ channel: "email" })[0]?.subject).toBe("Welcome Lin")
     expect(resendInbox(mail).latest("u3@example.com")?.subject).toBe("Welcome Lin")
     expect(novuProject(emulator).inbox("u3")).toEqual([])
+  })
+
+  it("passes each delivered step's result to the steps after it, as the bridge checks them", async () => {
+    seedNovu(emulator.store, { bridgeUrl: await bridge() })
+    await sdk().trigger({ workflowId: "assigned", to: "u6", payload: { title: "Review Q3 plan" } })
+    await novuProject(emulator).idle()
+
+    const [run] = novuProject(emulator).executions({ workflowId: "assigned" })
+
+    expect(run?.error).toBeNull()
+    expect(run?.status).toBe("completed")
+    expect(run?.steps.map((step) => `${step.stepId}:${step.status}`)).toEqual([
+      "bell:completed",
+      "phone:completed",
+      "mail:completed",
+    ])
+    expect(
+      novuProject(emulator)
+        .inbox("u6")
+        .map((message) => message.subject),
+    ).toEqual(["Assigned"])
   })
 
   it("fails the run when the bridge refuses a bad payload", async () => {
