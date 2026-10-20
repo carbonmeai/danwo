@@ -225,7 +225,11 @@ export const nangoFidelity: FidelityProvider = {
         secretKeys: ["danwo-fidelity-secret"],
         integrations: [{ key: "hubspot", provider: "hubspot", name: "HubSpot" }],
         connections: [
-          { integration: "hubspot", connectionId: "fidelity-1", endUser: { id: "u1" } },
+          {
+            integration: "hubspot",
+            connectionId: "fidelity-1",
+            endUser: { id: "u1", email: "ada@example.com", display_name: "Ada" },
+          },
         ],
       }),
     ),

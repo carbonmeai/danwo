@@ -110,10 +110,15 @@ function sessionRoutes(context: NangoRouteContext): void {
 
 function integrationRoutes(context: NangoRouteContext): void {
   const { app, objects } = context
+  /** An integration as Nango lists one: webhooks forwarded, and no settings left to fill in. */
   const shown = ({
     id: _id,
     ...integration
-  }: ReturnType<typeof objects.integrations.all>[number]) => integration
+  }: ReturnType<typeof objects.integrations.all>[number]) => ({
+    ...integration,
+    forward_webhooks: true,
+    missing_fields: [],
+  })
 
   app.get("/integrations", (c) => {
     requireSecret(context, c)

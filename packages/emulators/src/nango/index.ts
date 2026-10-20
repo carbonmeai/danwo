@@ -37,7 +37,11 @@ export interface NangoSeedIntegration {
 export interface NangoSeedConnection {
   readonly integration: string
   readonly connectionId: string
-  readonly endUser?: { readonly id: string; readonly email?: string }
+  readonly endUser?: {
+    readonly id: string
+    readonly email?: string
+    readonly display_name?: string
+  }
   readonly accessToken?: string
   readonly metadata?: Readonly<Record<string, unknown>>
 }

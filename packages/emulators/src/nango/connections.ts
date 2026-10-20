@@ -172,6 +172,19 @@ function touched(context: NangoRouteContext, connection: NangoConnection): Nango
   )
 }
 
+/** Who a connection belongs to, with every field Nango answers, unset ones as `null`. */
+function endUserObject(endUser: NangoEndUser | null) {
+  if (endUser === null) return null
+
+  return {
+    id: endUser.id,
+    display_name: endUser.display_name ?? null,
+    email: endUser.email ?? null,
+    tags: endUser.tags ?? null,
+    organization: null,
+  }
+}
+
 /** A connection as `GET /connections/{id}` shows it; the refresh token only when asked for. */
 export function connectionObject(connection: NangoConnection, withRefreshToken: boolean) {
   const { refresh_token: refreshToken, ...credentials } = connection.credentials
@@ -182,7 +195,7 @@ export function connectionObject(connection: NangoConnection, withRefreshToken: 
     provider_config_key: connection.provider_config_key,
     provider: connection.provider,
     errors: connection.broken ? [{ type: "auth", log_id: "danwo" }] : [],
-    end_user: connection.end_user,
+    end_user: endUserObject(connection.end_user),
     metadata: connection.metadata,
     connection_config: connection.connection_config,
     created_at: connection.created_at,
@@ -202,7 +215,7 @@ export function listedConnection(connection: NangoConnection) {
     created: connection.created_at,
     metadata: connection.metadata,
     errors: connection.broken ? [{ type: "auth", log_id: "danwo" }] : [],
-    end_user: connection.end_user,
+    end_user: endUserObject(connection.end_user),
     tags: connection.tags,
   }
 }
