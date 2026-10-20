@@ -103,16 +103,32 @@ export function sendLive(request: Request): Promise<Response> {
   return fetch(request)
 }
 
+/**
+ * One line of an env file as dotenv reads it, or undefined for blanks and comments: `export ` is
+ * allowed before the name; a quoted value keeps everything inside its quotes, `#` included; an
+ * unquoted value ends at ` #`, so a comment pasted after it is not part of it.
+ */
+export function parseEnvLine(line: string): readonly [string, string] | undefined {
+  const match = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line)
+
+  if (match?.[1] === undefined || match[2] === undefined) return undefined
+
+  const quoted = /^(["'])(.*?)\1/.exec(match[2])
+
+  if (quoted?.[2] !== undefined) return [match[1], quoted[2]]
+
+  return [match[1], match[2].replace(/(^|\s)#.*$/, "").trim()]
+}
+
 /** The `NAME=value` lines of an env file in `cwd`, or nothing when there is no such file. */
 function envFile(cwd: string, name: string): Record<string, string> {
   const values: Record<string, string> = {}
 
   try {
     for (const line of readFileSync(join(cwd, name), "utf8").split("\n")) {
-      const match = /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line)
+      const entry = parseEnvLine(line)
 
-      if (match?.[1] !== undefined && match[2] !== undefined)
-        values[match[1]] = match[2].replace(/^["']|["']$/g, "")
+      if (entry) values[entry[0]] = entry[1]
     }
   } catch {
     /* No file: nothing from it. */
