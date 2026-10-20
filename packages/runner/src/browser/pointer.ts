@@ -48,9 +48,9 @@ function installPointer(settings: { host: string; moveMs: number }): void {
     .cursor { position:absolute; left:0; top:0; width:18px; height:18px; transition: transform ${settings.moveMs}ms ease-out; }
     .cursor svg { filter: drop-shadow(0 1px 2px rgba(0,0,0,.45)); }
     .box { position:absolute; border:2px solid #2563eb; border-radius:6px; background:rgba(37,99,235,.08); opacity:0; transition: opacity 120ms; }
-    .ripple { position:absolute; width:36px; height:36px; margin:-18px 0 0 -18px; border-radius:50%; border:3px solid #2563eb; animation: ripple 450ms ease-out forwards; }
+    .ripple { position:absolute; width:44px; height:44px; margin:-22px 0 0 -22px; border-radius:50%; border:3px solid #2563eb; background:rgba(37,99,235,.28); animation: ripple 600ms ease-out forwards; }
     .badge { position:absolute; padding:2px 6px; border-radius:6px; background:#111827; color:#fff; font:600 11px/15px system-ui,sans-serif; }
-    @keyframes ripple { from { transform: scale(.3); opacity: .9 } to { transform: scale(1.4); opacity: 0 } }
+    @keyframes ripple { from { transform: scale(.25); opacity: 1 } 60% { opacity: .8 } to { transform: scale(1.3); opacity: 0 } }
   `
   root.append(style)
 
