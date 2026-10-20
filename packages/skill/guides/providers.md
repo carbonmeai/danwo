@@ -208,6 +208,23 @@ milliseconds, so this costs next to nothing. A file's `beforeAll` work and
 saved sessions' sign-ins are kept on top, so tests start signed in and set up without paying for it
 again.
 
+The worker keeps one snapshot per starting point, each in a named slot: the seeded state, the
+file's `beforeAll` state, and one per saved session on top of either. A test that uses no session
+starts from the seeded (or file's) state, never from another test's sign-in; a test using a
+session restores that session's snapshot, kept the first time the session signed in. An
+environment opts in with `snapshotSlots: true` and a `snapshot(slot)` and `restore(slot)` that keep
+each slot apart. `startServices`, the emulators and `@danwo/data`'s snapshots all do; pass the slot
+through:
+
+```ts
+snapshot: async (slot) => { await services.snapshot(slot); await db.snapshot(slot) },
+restore: async (slot) => { await services.restore(slot); await db.restore(slot) },
+snapshotSlots: services.snapshotSlots,
+```
+
+An environment without `snapshotSlots` keeps a single snapshot, of the seeded or file's state, and
+each test that uses a session signs in again on top of it.
+
 Change it with `isolation` in the config, or per file or describe block with `test.use({ isolation
 })`: `"test"` (default), `"file"` (reset once per file; its tests build on one another) or `"none"`
 (never reset; state carries from file to file in a worker). Each worker has its own environment, so

@@ -61,6 +61,15 @@ the body began (the saved session signing in, fixtures, `beforeEach` hooks) is s
 no faults. A trial arms its fault when the body starts, and counts occurrences from there, so a
 route the session also called is still the body's first. `--include-setup` faults setup too.
 
+Setup's work is found by what caused it, not only by when it came. A webhook for a message the
+provider emitted before the body began, the calls and statements the app made while answering
+it, and the rest of a transaction setup opened all belong to setup, although they arrive once the
+body is running. They get no faults, yet still count toward occurrences, so the body's own call
+keeps the number a trial sees. Before keeping a session's sign-in, the worker also waits for the
+environment to settle, so the sign-in's late webhooks land in setup and not in the trials that
+restore it. A plan therefore holds no fault that only setup's leftovers could fire, and the
+trials `--plan` prints are the trials the run makes.
+
 A plan within its budget (40 trials by default: `--budget n`, or `matrix.budget`) runs whole.
 Over it, the plan is narrowed step by step, the same way every time, until it fits:
 

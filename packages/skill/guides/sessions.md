@@ -32,8 +32,11 @@ one with `test.session(name, setup)`.
   again.
 - With an environment that has `snapshot()` and `restore()`, the backend side of a sign-in (the
   user and session in the emulators and the app's database) is kept in the state every test starts
-  from, so later tests reuse it although each starts isolated. A full reset drops the kept state,
-  and each `danwo matrix` trial signs in afresh.
+  from, so later tests reuse it although each starts isolated. Each session gets a snapshot slot
+  of its own (when the environment has `snapshotSlots`), so a test that uses no session still
+  starts signed out. Without slots, a test using a session signs in again on top of the seeded
+  state. A full reset drops the kept state, and with `--include-setup` each `danwo matrix` trial
+  signs in afresh.
 - Agent steps in a setup record and replay like any others.
 - A failing setup fails the tests that use it with `SESSION_SETUP_FAILED`, once.
 - The browser state is never written to flight records.
