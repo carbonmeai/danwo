@@ -60,7 +60,7 @@ describe.skipIf(!dockerAvailable())("danwo matrix faults the app's own Postgres"
     server = await startPostgres()
   }, 180_000)
 
-  afterAll(() => server?.stop())
+  afterAll(() => server?.stop(), 60_000)
 
   /**
    * One matrix run of the checkout app with `bug` switched in, on a base database of its own:

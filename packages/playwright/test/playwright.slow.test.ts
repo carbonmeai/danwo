@@ -9,6 +9,9 @@ import { afterAll, describe, expect, it } from "vitest"
 
 import { removeWorkCopies, workCopy } from "../../cli/test/work-copy.ts"
 
+/** Each matrix replays the shop once per planned fault (15 trials); a busy machine needs longer than the default. */
+const MATRIX_TIMEOUT = 600_000
+
 const run = promisify(execFile)
 const EXAMPLE = workCopy(
   fileURLToPath(new URL("../../../examples/shop-playwright/", import.meta.url)),
@@ -85,32 +88,40 @@ describe("@danwo/playwright on the shop", () => {
     expect(result?.attachments.map((a) => a.name)).toContain("danwo flight record")
   })
 
-  it("passes the matrix with the correct shop", async () => {
-    const { code, out } = await inExample([BIN, "matrix", "tests/buy-credits.spec.ts"])
+  it(
+    "passes the matrix with the correct shop",
+    async () => {
+      const { code, out } = await inExample([BIN, "matrix", "tests/buy-credits.spec.ts"])
 
-    expect(out).toContain("clean run passed; 15 of 15 planned faults to run")
-    expect(out).toMatch(/^PASS {2}duplicate on webhook checkout\.session\.completed$/m)
-    expect(out).toMatch(/^PASS {2}reset-after on POST api\.stripe\.com\/v1\/checkout\/sessions$/m)
-    expect(out).toContain("faults: 15 passed")
-    expect(code).toBe(0)
-  })
+      expect(out).toContain("clean run passed; 15 of 15 planned faults to run")
+      expect(out).toMatch(/^PASS {2}duplicate on webhook checkout\.session\.completed$/m)
+      expect(out).toMatch(/^PASS {2}reset-after on POST api\.stripe\.com\/v1\/checkout\/sessions$/m)
+      expect(out).toContain("faults: 15 passed")
+      expect(code).toBe(0)
+    },
+    MATRIX_TIMEOUT,
+  )
 
-  it("fails the matrix only on the duplicate webhook when the shop does not dedupe", async () => {
-    const { code, out } = await inExample([BIN, "matrix", "tests/buy-credits.spec.ts"], {
-      SHOP_BUG: "no-dedupe",
-    })
+  it(
+    "fails the matrix only on the duplicate webhook when the shop does not dedupe",
+    async () => {
+      const { code, out } = await inExample([BIN, "matrix", "tests/buy-credits.spec.ts"], {
+        SHOP_BUG: "no-dedupe",
+      })
 
-    expect(out).toMatch(/^FAIL {2}duplicate on webhook checkout\.session\.completed$/m)
-    expect(out).toContain(
-      "invariant: expect(received).toBe(expected) // Object.is equality · Expected: 500 · Received: 1000",
-    )
-    expect(out).toMatch(
-      /record: test-results\/danwo-matrix\/\d+-duplicate-on-webhook[^\n]*danwo-flight-record\.json/,
-    )
-    expect(out.match(/^FAIL /gm)).toHaveLength(1)
-    expect(out).toContain("faults: 14 passed, 1 failed")
-    expect(code).toBe(1)
-  })
+      expect(out).toMatch(/^FAIL {2}duplicate on webhook checkout\.session\.completed$/m)
+      expect(out).toContain(
+        "invariant: expect(received).toBe(expected) // Object.is equality · Expected: 500 · Received: 1000",
+      )
+      expect(out).toMatch(
+        /record: test-results\/danwo-matrix\/\d+-duplicate-on-webhook[^\n]*danwo-flight-record\.json/,
+      )
+      expect(out.match(/^FAIL /gm)).toHaveLength(1)
+      expect(out).toContain("faults: 14 passed, 1 failed")
+      expect(code).toBe(1)
+    },
+    MATRIX_TIMEOUT,
+  )
 
   it("runs only the faults --faults selects", async () => {
     const { code, out } = await inExample([
