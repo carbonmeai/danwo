@@ -1,0 +1,130 @@
+---
+title: Fidelity test accounts
+description: Sign a test account in once, so the Gmail, Calendar, Drive and Microsoft Graph fidelity suites can run against the real APIs.
+icon: UserCheck
+---
+
+The Google and Microsoft suites act as a person's account: they send mail, make events and upload
+files. To run them live, you sign a test account in once with `danwo fidelity login`, and danwo
+keeps its refresh token in `.env.fidelity`.
+
+Offline, nothing is needed. The emulator plays the account, and the goldens come from what Google
+and Microsoft publish: the Discovery documents for Gmail, Calendar and Drive, and Microsoft Graph's
+OpenAPI description.
+
+```sh
+npx danwo fidelity login google
+npx danwo fidelity google
+```
+
+## What the login does
+
+It listens for the redirect on this machine, opens the provider's consent page, and exchanges the
+code with PKCE. It shows the scopes it asks for before the browser opens:
+
+```text
+Signing a Google test account in for the fidelity suites. It is asked for:
+  openid
+  email
+  https://www.googleapis.com/auth/gmail.modify
+  https://www.googleapis.com/auth/calendar.events
+  https://www.googleapis.com/auth/calendar.calendarlist.readonly
+  https://www.googleapis.com/auth/drive.file
+The consent page sends the browser back to http://127.0.0.1:8765/callback; the client must register it.
+Sign in with a test account, not your own. If the browser does not open, go to:
+  https://accounts.google.com/o/oauth2/v2/auth?...
+Saved DANWO_FIDELITY_GOOGLE_REFRESH_TOKEN in .env.fidelity for tester@gmail.com.
+Granted: openid email https://www.googleapis.com/auth/gmail.modify ...
+Run the live suite with: danwo fidelity google
+```
+
+The token itself is never printed. Only its line in `.env.fidelity` changes; the other lines,
+comments and the file's `600` mode stay as they were.
+
+| Option                 | Does                                        | Default                          |
+| ---------------------- | ------------------------------------------- | -------------------------------- |
+| `--port <port>`        | the port of the default redirect URI        | `8765`                           |
+| `--redirect-uri <uri>` | a redirect URI the client already registers | `http://127.0.0.1:8765/callback` |
+
+## Make a Google client
+
+1. In the Google Cloud Console, pick a project and enable the Gmail, Calendar and Drive APIs.
+2. Under **Google Auth Platform → Audience**, keep the app in **Testing** and add your test
+   account as a test user.
+3. Under **Clients**, create a **Web application** client and register the redirect URI.
+4. Put the client in `.env.fidelity`.
+
+```sh title=".env.fidelity"
+DANWO_FIDELITY_GOOGLE_CLIENT_ID=....apps.googleusercontent.com
+DANWO_FIDELITY_GOOGLE_CLIENT_SECRET=...
+```
+
+<Callout type="info">
+  Google expires the refresh tokens of an app in Testing after seven days. When a live run says the
+  token was refused, run the login again.
+</Callout>
+
+## Make a Microsoft client
+
+1. In the Azure portal, open **Microsoft Entra ID → App registrations** and register a new app.
+   For a personal test account, allow personal Microsoft accounts.
+2. Add a **Web** platform redirect URI, the one the login uses.
+3. Under **Certificates & secrets**, create a client secret and copy its value.
+4. Add the delegated Graph permissions for mail, calendars and files.
+
+```sh title=".env.fidelity"
+DANWO_FIDELITY_MICROSOFT_CLIENT_ID=...
+DANWO_FIDELITY_MICROSOFT_CLIENT_SECRET=...
+DANWO_FIDELITY_MICROSOFT_TENANT_ID=common
+```
+
+## Reuse your app's OAuth client
+
+If your app already signs people in to Google or Microsoft, its client works too. Give danwo one
+of the redirect URIs it registers, and danwo listens on that URI's host, port and path.
+
+```sh title=".env.fidelity"
+DANWO_FIDELITY_GOOGLE_REDIRECT_URI=http://localhost:3050/settings/integrations/google-verify
+DANWO_FIDELITY_MICROSOFT_REDIRECT_URI=http://localhost:3050/settings/integrations/microsoft-verify
+```
+
+Stop your app's dev server first, since the login needs its port. If the port is busy it says so:
+
+```text
+danwo fidelity login: port 3050 on localhost is in use: stop the app on :3050 first (its dev server, most likely), then run the sign-in again
+```
+
+The URI must use `http` on `localhost` or `127.0.0.1`. The client must also allow the scopes the
+login asks for.
+
+## When it fails
+
+| Message                                     | What to do                                                        |
+| ------------------------------------------- | ----------------------------------------------------------------- |
+| set the client id and secret                | add the client to `.env.fidelity`                                 |
+| the token endpoint refused the redirect URI | register exactly the URI it names, or pass the registered one     |
+| no answer from the consent page             | the browser never came back; check the redirect URI is registered |
+| the sign-in was cancelled                   | you chose Cancel; run it again                                    |
+| gave no refresh token                       | remove the app's access from the account, then sign in again      |
+
+## Live runs stay in their lane
+
+- Everything a run makes is tagged `danwo-fidelity-<run>`, and removed after each scenario.
+- Mail goes only to the account's own address.
+- Untagged mail, events and files are never touched. `--sweep` lists tagged leftovers.
+
+<Callout type="warn">
+  A live run refuses an account that doesn't look personal, such as a work address. To run as one on
+  purpose, name it in `DANWO_FIDELITY_GOOGLE_ACCOUNT` or `DANWO_FIDELITY_MICROSOFT_ACCOUNT`.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Fidelity" href="/docs/fidelity">
+    How the suites compare the emulator with the real provider.
+  </Card>
+  <Card title="Cleaning up sandboxes" href="/docs/fidelity-cleanup">
+    What a live run makes, and how it's removed.
+  </Card>
+</Cards>

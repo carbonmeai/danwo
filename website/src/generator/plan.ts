@@ -281,6 +281,12 @@ export const PLAN: readonly PlannedTab[] = [
           file("impact", "Changed tests", "GitCompare", "running/impact.mdx"),
           file("fidelity", "Fidelity", "Scale", "running/fidelity.mdx"),
           file(
+            "fidelity-accounts",
+            "Fidelity test accounts",
+            "UserCheck",
+            "running/fidelity-accounts.mdx",
+          ),
+          file(
             "fidelity-cleanup",
             "Cleaning up sandboxes",
             "Eraser",

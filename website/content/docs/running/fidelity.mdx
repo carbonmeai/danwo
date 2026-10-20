@@ -79,23 +79,24 @@ tokens. Use `--offline` to stay off the network.
 
 ## Providers
 
-| Provider                         | Key                                                                                           |
-| -------------------------------- | --------------------------------------------------------------------------------------------- |
-| Stripe                           | `DANWO_FIDELITY_STRIPE_KEY` (`sk_test_` or `rk_test_`)                                        |
-| Resend                           | `DANWO_FIDELITY_RESEND_KEY`; sends only to `delivered@resend.dev`                             |
-| S3 (Tigris)                      | `DANWO_FIDELITY_TIGRIS_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY`, `_BUCKET` (an empty test bucket) |
-| Twilio                           | `DANWO_FIDELITY_TWILIO_ACCOUNT_SID` plus an API key or auth token                             |
-| Paystack                         | `DANWO_FIDELITY_PAYSTACK_KEY` (`sk_test_`)                                                    |
-| Flutterwave                      | `DANWO_FIDELITY_FLUTTERWAVE_KEY` (`FLWSECK_TEST-`)                                            |
-| Bachs                            | `DANWO_FIDELITY_BACHS_KEY` (`sk_sandbox_`)                                                    |
-| Clerk                            | `DANWO_FIDELITY_CLERK_SECRET_KEY` and `_PUBLISHABLE_KEY` of a development instance            |
-| Pusher                           | `DANWO_FIDELITY_PUSHER_APP_ID`, `_KEY`, `_SECRET`, `_CLUSTER` (a test app)                    |
-| Tiptap                           | `DANWO_FIDELITY_TIPTAP_APP_ID`, `_API_SECRET`                                                 |
-| Slack, GitHub, Google, Microsoft | `DANWO_FIDELITY_PUBLIC=1` (public calls only)                                                 |
-| Composio, Novu, Nylas, Nango     | `DANWO_FIDELITY_PUBLIC=1`, plus an optional key                                               |
-| Unipile                          | `DANWO_FIDELITY_UNIPILE_DSN`, `_KEY`                                                          |
-| AI Gateway, Gemini, Perplexity   | `DANWO_FIDELITY_AI_GATEWAY_KEY`, `_GEMINI_KEY`, `_PERPLEXITY_KEY`                             |
-| Bedrock                          | `DANWO_FIDELITY_BEDROCK_API_KEY`                                                              |
+| Provider                       | Key                                                                                           |
+| ------------------------------ | --------------------------------------------------------------------------------------------- |
+| Stripe                         | `DANWO_FIDELITY_STRIPE_KEY` (`sk_test_` or `rk_test_`)                                        |
+| Resend                         | `DANWO_FIDELITY_RESEND_KEY`; sends only to `delivered@resend.dev`                             |
+| S3 (Tigris)                    | `DANWO_FIDELITY_TIGRIS_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY`, `_BUCKET` (an empty test bucket) |
+| Twilio                         | `DANWO_FIDELITY_TWILIO_ACCOUNT_SID` plus an API key or auth token                             |
+| Paystack                       | `DANWO_FIDELITY_PAYSTACK_KEY` (`sk_test_`)                                                    |
+| Flutterwave                    | `DANWO_FIDELITY_FLUTTERWAVE_KEY` (`FLWSECK_TEST-`)                                            |
+| Bachs                          | `DANWO_FIDELITY_BACHS_KEY` (`sk_sandbox_`)                                                    |
+| Clerk                          | `DANWO_FIDELITY_CLERK_SECRET_KEY` and `_PUBLISHABLE_KEY` of a development instance            |
+| Pusher                         | `DANWO_FIDELITY_PUSHER_APP_ID`, `_KEY`, `_SECRET`, `_CLUSTER` (a test app)                    |
+| Tiptap                         | `DANWO_FIDELITY_TIPTAP_APP_ID`, `_API_SECRET`                                                 |
+| Slack, GitHub                  | `DANWO_FIDELITY_PUBLIC=1` (public calls only)                                                 |
+| Google, Microsoft              | a signed-in test account, from `danwo fidelity login`                                         |
+| Composio, Novu, Nylas, Nango   | `DANWO_FIDELITY_PUBLIC=1`, plus an optional key                                               |
+| Unipile                        | `DANWO_FIDELITY_UNIPILE_DSN`, `_KEY`                                                          |
+| AI Gateway, Gemini, Perplexity | `DANWO_FIDELITY_AI_GATEWAY_KEY`, `_GEMINI_KEY`, `_PERPLEXITY_KEY`                             |
+| Bedrock                        | `DANWO_FIDELITY_BEDROCK_API_KEY`                                                              |
 
 `npx danwo guide fidelity` lists each suite's scenarios and the optional keys.
 
@@ -107,6 +108,9 @@ tokens. Use `--offline` to stay off the network.
 ## Next
 
 <Cards>
+  <Card title="Fidelity test accounts" href="/docs/fidelity-accounts">
+    Sign a test account in for the Gmail, Calendar, Drive and Graph suites.
+  </Card>
   <Card title="Cleaning up sandboxes" href="/docs/fidelity-cleanup">
     What a live run makes, and how it's removed.
   </Card>
