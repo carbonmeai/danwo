@@ -92,6 +92,14 @@ const MODULE_QUERY =
 const ASSET =
   /(?:\.(?:css|js|mjs|map|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf)|\/favicon[^/]*)$/i
 
+/** Hosts that only serve a provider's browser script (Stripe.js): loading it is the page loading. */
+const SCRIPT_HOSTS = new Set(["js.stripe.com"])
+
+/** True for a provider's browser-script host, whose requests are the page loading, not app calls. */
+export function isScriptHost(host: string): boolean {
+  return SCRIPT_HOSTS.has(host)
+}
+
 /**
  * True when a request is the page loading (a static file, a dev server's module or hot reload)
  * rather than a call the app makes: readiness, effects and the matrix leave these out.

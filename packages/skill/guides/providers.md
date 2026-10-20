@@ -172,6 +172,9 @@ Calls to hosts no service emulates pass through to the real host by default
 
 - **This machine always passes**: `localhost`, `127.0.0.1` and `::1`, where the apps a run starts
   and local servers such as Inngest dev answer. A `blocked` entry naming one of them still blocks it.
+  A port of this machine nothing listens on gets 502 with "nothing is listening on
+  127.0.0.1:8108; start that service or route the host", so a service the app needs but the run
+  did not start (a search server, a cache) is named plainly.
 - **`allow`** lists hosts that always pass, even under `block`.
 - **`blocked`** lists hosts that get 502 even when others pass through.
 - **Telemetry** (PostHog, Sentry, Segment, Amplitude, Datadog, hosted trace backends, Google
@@ -182,6 +185,22 @@ The page loading itself (static files, and a dev server's modules and hot reload
 `/@vite/client` or `/src/main.ts?v=…`) is in the flight record but left out of readiness, effects
 and the matrix. A response that streams for as long as the client listens (server-sent events,
 NDJSON) is recorded once its headers arrive and never holds readiness up.
+
+### Stripe.js
+
+`stripeService` also answers `js.stripe.com`, with a stand-in for Stripe.js: the real script
+talks to Stripe's own iframes and cannot run against an emulator. A page that loads it (directly,
+or through `loadStripe` and `@stripe/react-stripe-js`) gets `Stripe(key)` with `elements()`, and
+card, card number, expiry, CVC, payment, address and link elements mounted as plain inputs a test
+fills by label ("Card number", "Expiration date", "Security code"; the address element's "Full
+name", "Address line 1" and so on). Stripe's test numbers decide the outcome: `4242 4242 4242 4242`
+succeeds, `4000 0000 0000 0002` is declined, `4000 0025 0000 3155` needs authentication.
+`createPaymentMethod`, `confirmCardPayment`, `confirmCardSetup`, `confirmPayment`, `confirmSetup`,
+`retrievePaymentIntent` and `retrieveSetupIntent` call the emulator with the publishable key and
+the intent's client secret, as Stripe.js does; `redirectToCheckout({ sessionId })` opens the hosted
+page, and `paymentRequest()` reports no wallet. The emulator accepts a `pk_test_` key only on those
+calls, and on an intent only with its own client secret. Loading the script counts as the page
+loading, so it stays out of effects and the matrix.
 
 ### WebSockets
 

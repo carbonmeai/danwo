@@ -46,7 +46,7 @@ export interface StripeEnvironment {
 }
 
 /**
- * A Stripe emulator for `startServices`: answers `api.stripe.com` and `checkout.stripe.com`,
+ * A Stripe emulator for `startServices`: answers `api.stripe.com`, `checkout.stripe.com` and `js.stripe.com`,
  * delivers webhooks on a manual clock, and gives tests the `stripe` fixture.
  */
 export function stripeService(options: StripeOptions = {}): StripeService {
@@ -72,7 +72,12 @@ export function stripeService(options: StripeOptions = {}): StripeService {
     name: "stripe",
     emulator,
     clock,
-    routes: [{ hosts: ["api.stripe.com", "checkout.stripe.com"], handler: emulator.fetch }],
+    routes: [
+      {
+        hosts: ["api.stripe.com", "checkout.stripe.com", "js.stripe.com"],
+        handler: emulator.fetch,
+      },
+    ],
     fixtures: { stripe: emulator },
     webhooks: emulator.webhooks,
     ...emulatorLifecycle(emulator, clock, seed),

@@ -13,7 +13,14 @@ import {
 
 import { type AppClock, createAppClock } from "./app-clock.ts"
 import { type CapturedMessage, captureMessage } from "./capture.ts"
-import { hostMatches, isLoopback, isPageAsset, isStreaming, TELEMETRY_HOSTS } from "./hosts.ts"
+import {
+  hostMatches,
+  isLoopback,
+  isPageAsset,
+  isScriptHost,
+  isStreaming,
+  TELEMETRY_HOSTS,
+} from "./hosts.ts"
 import { isListening, nothingListening } from "./listening.ts"
 import { type EnvOptions, preloadedPids, proxyEnvironment, writeNodeShim } from "./node-env.ts"
 import { forwardTo } from "./upstream.ts"
@@ -587,7 +594,7 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
       method: req.method,
       path: req.path,
       disposition: hosts.dispositionOf(host),
-      ...(isPageAsset(req.path) && { asset: true }),
+      ...((isPageAsset(req.path) || isScriptHost(host)) && { asset: true }),
       startedAt: new Date(req.timingEvents.startTime).toISOString(),
       client: clientOf(req.headers["user-agent"]),
       status: null,

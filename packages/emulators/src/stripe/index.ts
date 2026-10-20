@@ -35,6 +35,7 @@ import { subscriptionRoutes } from "./routes/subscriptions.ts"
 import { webhookEndpointRoutes } from "./routes/webhook-endpoints.ts"
 import { STRIPE_SANDBOX_DELIVERY, stripeWebhookHeaders } from "./signature.ts"
 import { stripeStore } from "./store.ts"
+import { STRIPE_JS } from "./stripe-js.ts"
 import { runDue } from "./subscribing.ts"
 
 export type * from "./entities.ts"
@@ -208,8 +209,27 @@ function seedDefaults({ store }: EmulatorContext): void {
   )
 }
 
+/** The headers the API answers a page with, so Stripe.js can call it from the app's origin. */
+const CORS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-headers": "authorization, content-type, stripe-version, idempotency-key",
+  "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
+}
+
+/** Stripe.js, at `js.stripe.com/v3` and at the versioned `/<version>/stripe.js` paths. */
+function stripeJsRoutes({ app }: StripeRouteContext): void {
+  const headers = {
+    "content-type": "application/javascript; charset=utf-8",
+    "cache-control": "no-store",
+  }
+
+  for (const path of ["/v3", "/v3/", "/:version/stripe.js"])
+    app.get(path, (c) => c.body(STRIPE_JS, 200, headers))
+}
+
 function routes(context: StripeRouteContext): void {
   for (const register of [
+    stripeJsRoutes,
     customerRoutes,
     productRoutes,
     priceRoutes,
@@ -258,6 +278,15 @@ export const stripe = defineEmulator({
     app.onError(
       providerErrors((c, status, message) => stripeError(c, status, "api_error", message)),
     )
+    /* Stripe.js calls the API from the app's page, across origins, as the real API allows. */
+    app.use((c, next) => {
+      if (!c.req.path.startsWith("/v1/")) return next()
+      if (c.req.method === "OPTIONS") return c.body(null, 204, CORS)
+
+      for (const [name, value] of Object.entries(CORS)) c.header(name, value)
+
+      return next()
+    })
     app.use(stripeRequests())
     app.use(stripeApiKey())
     app.use(stripeIdempotency(context.store, context.clock))
