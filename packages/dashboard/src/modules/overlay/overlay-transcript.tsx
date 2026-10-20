@@ -30,7 +30,7 @@ import {
   afterBody,
   checkWords,
   fixPrompt,
-  tabMovesBefore,
+  tabMovesOf,
   transcriptOf,
   warningsOf,
 } from "./overlay-values.ts"
@@ -389,6 +389,7 @@ export function Transcript({
   const steps = transcriptOf(view, view.replay)
   const body = steps.filter((step) => !afterBody(step))
   const checks = steps.filter(afterBody)
+  const moves = tabMovesOf(body, view.replay.tabMarks)
   const warnings = warningsOf(record)
   const playing = playback ? stepAt(playback.marks, playback.ms) : undefined
 
@@ -432,7 +433,7 @@ export function Transcript({
               step={step}
               current={step.index === playing}
               switched={switchedTo(body, at)}
-              moves={tabMovesBefore(body, at, view.replay.tabMarks)}
+              moves={moves[at]}
               playback={playback}
             />
           ))}

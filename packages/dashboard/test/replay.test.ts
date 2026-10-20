@@ -4,7 +4,7 @@ import { join } from "node:path"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
-import { tabMovesBefore, transcriptOf } from "../src/modules/overlay/overlay-values.ts"
+import { tabMovesOf, transcriptOf } from "../src/modules/overlay/overlay-values.ts"
 import { byteRange, serveMedia } from "../src/modules/record/record-media.ts"
 import {
   clock,
@@ -219,7 +219,7 @@ function popupReplay() {
     tabStep(0, "Connect", "0.300", 400, 1),
     tabStep(1, "Email", "1.000", 300, 2),
     tabStep(2, "Allow", "1.500", 500, 2),
-    tabStep(3, "Connected", "2.500", 300, 1),
+    tabStep(3, "Connected", "2.100", 300, 1),
   ]
   const app = "2026-10-19T10:00:00.200Z"
   const popup = "2026-10-19T10:00:00.800Z"
@@ -277,10 +277,18 @@ describe("the player following the action across tabs", () => {
     expect(followedVideo(played, 0, 900)).toBe(0)
     expect(followedVideo(played, 0, 1_100)).toBe(1)
     expect(followedVideo(played, 1, 1_600)).toBe(1)
-    /* Allow is still running when the popup closes: its video has ended, so back to the app. */
-    expect(followedVideo(played, 1, 2_200)).toBe(0)
-    expect(followedVideo(played, 1, 2_600)).toBe(0)
+    /* Allow is done and the popup is still closing: the player stays until a step moves on. */
+    expect(followedVideo(played, 1, 2_050)).toBe(1)
+    expect(followedVideo(played, 1, 2_150)).toBe(0)
     expect(followedVideo(played, 0, 2_600)).toBe(0)
+  })
+
+  it("goes back to the opener when the popup's video ends with no step in another tab", () => {
+    const { replay: played } = popupReplay()
+    const unmoved = { ...played, stepVideos: { ...played.stepVideos, 3: 1 } }
+
+    expect(followedVideo(unmoved, 1, 2_150)).toBe(1)
+    expect(followedVideo(unmoved, 1, 2_200)).toBe(0)
   })
 
   it("jumps to a step in its tab's video, badges the popup's steps, and lists the moves between", () => {
@@ -294,12 +302,11 @@ describe("the player following the action across tabs", () => {
       ["Connect", 0, 300, undefined],
       ["Email", 1, 1_000, true],
       ["Allow", 1, 1_500, true],
-      ["Connected", 0, 2_500, undefined],
+      ["Connected", 0, 2_100, undefined],
     ])
+    /* The check of the app started while the popup was closing; the move still goes above it. */
     expect(
-      transcript.map((_, at) =>
-        tabMovesBefore(transcript, at, played.tabMarks).map((mark) => mark.label),
-      ),
+      tabMovesOf(transcript, played.tabMarks).map((moves) => moves.map((mark) => mark.label)),
     ).toEqual([[], ["Popup opened: accounts.provider.test"], [], ["Back to the app"]])
   })
 

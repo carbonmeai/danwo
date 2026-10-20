@@ -68,22 +68,37 @@ export function transcriptOf(view: Pick<RecordView, "steps">, replay: Replay): T
   })
 }
 
+type MovedStep = Pick<TranscriptStep, "atMs" | "durationMs" | "video">
+
 /**
- * Where the run moved between tabs just before step `at`: a popup that opened, or the run coming
- * back from one, since the step before it started.
+ * The step a move between tabs is shown above: the first step in the tab the run moved to, coming
+ * from another tab, that had not ended when it moved (a check can start while a popup is closing
+ * and finish in the app). Else the first step that started after the move; else none.
  */
-export function tabMovesBefore(
-  steps: readonly Pick<TranscriptStep, "atMs">[],
-  at: number,
+function stepAfterMove(steps: readonly MovedStep[], mark: ReplayTabMark): number {
+  const moved = steps.findIndex(
+    (step, at) =>
+      step.video === mark.video &&
+      steps[at - 1]?.video !== mark.video &&
+      step.atMs !== undefined &&
+      step.atMs + step.durationMs >= mark.atMs,
+  )
+
+  return moved >= 0
+    ? moved
+    : steps.findIndex((step) => step.atMs !== undefined && step.atMs >= mark.atMs)
+}
+
+/** The moves between tabs shown above each step: a popup opening, the run coming back from one. */
+export function tabMovesOf(
+  steps: readonly MovedStep[],
   marks: readonly ReplayTabMark[],
-): ReplayTabMark[] {
-  const startMs = steps[at]?.atMs
+): ReplayTabMark[][] {
+  const moves = steps.map((): ReplayTabMark[] => [])
 
-  if (startMs === undefined) return []
+  for (const mark of marks) moves[stepAfterMove(steps, mark)]?.push(mark)
 
-  const after = at === 0 ? Number.NEGATIVE_INFINITY : (steps[at - 1]?.atMs ?? startMs)
-
-  return marks.filter((mark) => mark.atMs > after && mark.atMs <= startMs)
+  return moves
 }
 
 /** Whether a step ran after the body: the wait for background work, or the invariant's checks. */
