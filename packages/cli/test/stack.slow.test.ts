@@ -48,13 +48,14 @@ const Record = z.object({
   ),
   sockets: z.array(z.object({ host: z.string(), path: z.string(), status: z.number().nullable() })),
   processLogs: z.record(z.string(), z.array(z.string())),
+  notes: z.array(z.string()),
   state: z.object({
     inngest: z.object({ runs: z.array(z.object({ functionId: z.string(), status: z.string() })) }),
   }),
 })
 
-/** The newest record of the test whose slug includes `slug`. */
-async function newestRecord(slug: string): Promise<z.infer<typeof Record>> {
+/** The newest record of the test whose slug includes `slug`, as it was written. */
+async function newestRecordJson(slug: string): Promise<unknown> {
   const paths: string[] = []
 
   for await (const path of glob(`.danwo/runs/*/*${slug}*/attempt-1/record.json`, { cwd: STACK }))
@@ -64,7 +65,12 @@ async function newestRecord(slug: string): Promise<z.infer<typeof Record>> {
 
   if (newest === undefined) throw new Error(`no record for ${slug}`)
 
-  return Record.parse(JSON.parse(await readFile(`${STACK}/${newest}`, "utf8")))
+  return JSON.parse(await readFile(`${STACK}/${newest}`, "utf8"))
+}
+
+/** The newest record of the test whose slug includes `slug`. */
+async function newestRecord(slug: string): Promise<z.infer<typeof Record>> {
+  return Record.parse(await newestRecordJson(slug))
 }
 
 describe("a stack of apps behind one proxy", () => {
@@ -98,6 +104,26 @@ describe("a stack of apps behind one proxy", () => {
     expect(out).toMatch(/danwo: api: process \d+ \(.*node.*\) runs without danwo's preload/)
     expect(out).toContain("1 passed")
     expect(code).toBe(0)
+  }, 180_000)
+
+  it("passes an outside image under block, refuses the page's fetch() and says so", async () => {
+    const { code, out } = await danwo(["test", "tests/media.danwo.ts"])
+    const warning =
+      "Blocked hosts the pages tried to load: images.unrouted.test (1 request). Add the ones the app needs to `allow`"
+
+    expect(out).toContain("1 passed")
+    expect(out.split(warning)).toHaveLength(2)
+    expect(code).toBe(0)
+
+    const record = Record.pick({ exchanges: true, notes: true }).parse(
+      await newestRecordJson("outside-image"),
+    )
+    const calls = record.exchanges
+      .filter((e) => e.host === "images.unrouted.test")
+      .map((e) => `${e.disposition} ${e.method} ${e.path} ${e.asset === true}`)
+
+    expect(calls).toEqual(["passthrough GET /logo.png true", "blocked GET /data.json false"])
+    expect(record.notes.join("\n")).toContain(warning)
   }, 180_000)
 
   it("plans socket and event faults from the clean run", async () => {
