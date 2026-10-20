@@ -102,18 +102,43 @@ function eventOf(body: Record<string, unknown>): {
   }
 }
 
-/** The `info` attributes a channel's answer asks for, for those Pusher can report. */
+/** Pusher's answer to `subscription_count` from an app with subscription counting off. */
+const COUNTING_OFF =
+  "Cannot retrieve the subscription count because subscription counting is not enabled\n"
+/** Pusher's answer to `user_count` on one channel that is not a presence channel. */
+const USERS_ON_PRESENCE_ONLY =
+  "Cannot retrieve the user count unless the channel is a presence channel\n"
+/** Pusher's answer to `user_count` on a channel list not limited to presence channels. */
+const USERS_NEED_PRESENCE_PREFIX =
+  "user_count may only be requested for presence channels - please supply filter_by_prefix begining with presence-\n"
+
+/** The `info` attributes a request names. */
+function infoOf(info: string | null): Set<string> {
+  return new Set((info ?? "").split(",").filter((part) => part !== ""))
+}
+
+/** Refuses `subscription_count` when the app has subscription counting off, as Pusher does. */
+function requireCounting(app: PusherApp, info: string | null): void {
+  if (infoOf(info).has("subscription_count") && !app.subscription_counting)
+    throw new HttpError(400, COUNTING_OFF)
+}
+
+/**
+ * The `info` attributes a channel's answer asks for, for those Pusher can report; a count the
+ * app does not keep is left out.
+ */
 function channelInfo(
   ctx: PusherRouteContext,
   app: PusherApp,
   channel: string,
   info: string | null,
 ) {
-  const wanted = new Set((info ?? "").split(",").filter((part) => part !== ""))
+  const wanted = infoOf(info)
   const connections = ctx.hub.on(app, channel).length
 
   return {
-    ...(wanted.has("subscription_count") && { subscription_count: connections }),
+    ...(wanted.has("subscription_count") &&
+      app.subscription_counting && { subscription_count: connections }),
     ...(wanted.has("user_count") &&
       channel.startsWith("presence-") && { user_count: ctx.hub.members(app, channel).length }),
   }
@@ -143,6 +168,7 @@ export function channelRoutes(ctx: PusherRouteContext): void {
     const app = await signedApp(c, ctx)
     const event = eventOf(await jsonObjectOf(c))
 
+    requireCounting(app, event.info)
     publish(ctx, app, event)
 
     return c.json(
@@ -169,6 +195,7 @@ export function channelRoutes(ctx: PusherRouteContext): void {
 
     const events = batch.map((item) => eventOf(asRecord(item) ?? {}))
 
+    for (const event of events) requireCounting(app, event.info)
     for (const event of events) publish(ctx, app, event)
 
     const withInfo = events.some((event) => event.info !== null)
@@ -189,11 +216,8 @@ export function channelRoutes(ctx: PusherRouteContext): void {
     const prefix = c.req.query("filter_by_prefix") ?? ""
     const info = c.req.query("info") ?? null
 
-    if (info?.includes("user_count") && !prefix.startsWith("presence-"))
-      throw new HttpError(
-        400,
-        "user_count may only be requested for presence channels (filter_by_prefix=presence-)",
-      )
+    if (infoOf(info).has("user_count") && !prefix.startsWith("presence-"))
+      throw new HttpError(400, USERS_NEED_PRESENCE_PREFIX)
 
     const channels = [...ctx.hub.occupied(app).keys()].filter((channel) =>
       channel.startsWith(prefix),
@@ -209,9 +233,14 @@ export function channelRoutes(ctx: PusherRouteContext): void {
   router.get("/apps/:appId/channels/:channel", async (c) => {
     const app = await signedApp(c, ctx)
     const channel = c.req.param("channel")
+    const info = c.req.query("info") ?? null
     const occupied = ctx.hub.on(app, channel).length > 0
 
-    return c.json({ occupied, ...channelInfo(ctx, app, channel, c.req.query("info") ?? null) })
+    requireCounting(app, info)
+    if (infoOf(info).has("user_count") && !channel.startsWith("presence-"))
+      throw new HttpError(400, USERS_ON_PRESENCE_ONLY)
+
+    return c.json({ occupied, ...channelInfo(ctx, app, channel, info) })
   })
 
   router.get("/apps/:appId/channels/:channel/users", async (c) => {

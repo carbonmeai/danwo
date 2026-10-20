@@ -173,6 +173,8 @@ describe("pusher channels", () => {
   })
 
   it("authorises private and presence channels and lists presence members", async () => {
+    seedPusher(emulator.store, { apps: [{ ...APP, subscriptionCounting: true }] })
+
     const alice = client("alice")
     const bob = client("bob")
 
@@ -189,6 +191,69 @@ describe("pusher channels", () => {
 
     expect(await users.json()).toEqual({ users: [{ id: "alice" }, { id: "bob" }] })
     expect(await info.json()).toEqual({ occupied: true, user_count: 2, subscription_count: 2 })
+  })
+
+  it("refuses subscription counts while the app has subscription counting off", async () => {
+    const refused = {
+      status: 400,
+      body: "Cannot retrieve the subscription count because subscription counting is not enabled\n",
+    }
+
+    await expect(
+      server().get({ path: "/channels/feed", params: { info: "subscription_count" } }),
+    ).rejects.toMatchObject(refused)
+    await expect(
+      server().trigger("feed", "posted", "{}", { info: "subscription_count" }),
+    ).rejects.toMatchObject(refused)
+    await expect(
+      server().triggerBatch([
+        { channel: "feed", name: "a", data: "1", info: "subscription_count" },
+      ]),
+    ).rejects.toMatchObject(refused)
+    expect(pusherChannels(emulator).events({ channel: "feed" })).toEqual([])
+
+    const listed = await server().get({ path: "/channels", params: { info: "subscription_count" } })
+
+    expect(await listed.json()).toEqual({ channels: {} })
+  })
+
+  it("reports subscription counts once the app turns counting on", async () => {
+    seedPusher(emulator.store, { apps: [{ ...APP, subscriptionCounting: true }] })
+
+    const listener = client()
+
+    await connected(listener)
+    await subscribed(listener, "feed")
+
+    const triggered = await server().trigger("feed", "posted", "{}", {
+      info: "subscription_count",
+    })
+    const read = await server().get({
+      path: "/channels/feed",
+      params: { info: "subscription_count" },
+    })
+
+    expect(await triggered.json()).toEqual({ channels: { feed: { subscription_count: 1 } } })
+    expect(await read.json()).toEqual({ occupied: true, subscription_count: 1 })
+  })
+
+  it("refuses a user count on a channel that is not a presence channel", async () => {
+    await expect(
+      server().get({ path: "/channels/feed", params: { info: "user_count" } }),
+    ).rejects.toMatchObject({
+      status: 400,
+      body: "Cannot retrieve the user count unless the channel is a presence channel\n",
+    })
+    await expect(
+      server().get({ path: "/channels", params: { info: "user_count" } }),
+    ).rejects.toMatchObject({
+      status: 400,
+      body: "user_count may only be requested for presence channels - please supply filter_by_prefix begining with presence-\n",
+    })
+
+    const ignored = await server().trigger("feed", "posted", "{}", { info: "user_count" })
+
+    expect(await ignored.json()).toEqual({ channels: { feed: {} } })
   })
 
   it("refuses a private channel with a bad signature", async () => {

@@ -9,6 +9,11 @@ export type PusherSeedApp = {
   readonly secret: string
 } & Partial<{
   readonly cluster: string
+  /**
+   * Turns on subscription counting, so channel info can carry `subscription_count`; off by
+   * default, as on a new app.
+   */
+  readonly subscriptionCounting: boolean
   /** Where the app's webhooks go; each endpoint gets every kind unless it lists `events`. */
   readonly webhooks: readonly {
     readonly url: string
@@ -46,6 +51,7 @@ export function seedPusher(store: Store, config: PusherSeedConfig): void {
         key: app.key,
         secret: app.secret,
         cluster: app.cluster ?? "mt1",
+        subscription_counting: app.subscriptionCounting ?? false,
         webhooks: (app.webhooks ?? []).map((hook) => ({
           url: hook.url,
           events: hook.events ? [...hook.events] : null,

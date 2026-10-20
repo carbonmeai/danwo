@@ -9,6 +9,11 @@ export interface PusherApp {
   /** Signs API requests, channel authorisations and webhooks. */
   secret: string
   cluster: string
+  /**
+   * Whether the app reports `subscription_count`: an app setting, off unless turned on in the
+   * app's settings. Asking for the count while it is off is refused.
+   */
+  subscription_counting: boolean
   /** Where the app's webhooks go, and which kinds each gets (all, without `events`). */
   webhooks: { url: string; events: PusherWebhookKind[] | null }[]
 }
