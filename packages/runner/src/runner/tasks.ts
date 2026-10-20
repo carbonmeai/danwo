@@ -5,7 +5,7 @@
  */
 import type { DataCall } from "@danwo/infra"
 import type { PlannedFault, RaceEvidence, ServiceDelivery, SetupSpan } from "@danwo/matrix"
-import type { Exchange, SocketExchange } from "@danwo/proxy"
+import type { BlockedLoad, Exchange, SocketExchange } from "@danwo/proxy"
 
 import type { CheckPace } from "../assert/pace.ts"
 import type { LintFinding } from "../lint/index.ts"
@@ -73,6 +73,8 @@ export interface AttemptReport {
   readonly lint?: readonly LintFinding[]
   /** Whose failure it was, for an attempt that did not pass. */
   readonly verdict?: FailureVerdict
+  /** Hosts the attempt's pages were refused, by what they asked for: what the page lost. */
+  readonly blocked?: readonly BlockedLoad[]
 }
 
 /**

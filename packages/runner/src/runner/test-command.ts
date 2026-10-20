@@ -1,6 +1,8 @@
 /** `danwo test`: run the project's tests across worker processes and report them. */
 import { basename, relative, resolve } from "node:path"
 
+import { blockedLoadsLine, mergeBlockedLoads } from "@danwo/proxy"
+
 import { type LintFinding, lintReport, withLint } from "../lint/index.ts"
 import { catalogOf, testFilesOf, type CatalogEntry } from "./catalog.ts"
 import { ciDefaults, inCi, parseShard, type Shard, shardFiles, shardLabel } from "./ci.ts"
@@ -269,6 +271,15 @@ function findingsOf(reports: readonly TestReport[]): LintFinding[] {
   return reports.flatMap((report) => report.attempts.flatMap((attempt) => attempt.lint ?? []))
 }
 
+/** The run's one warning about hosts its pages were refused, every attempt's added up; none when nothing was. */
+function blockedReport(reports: readonly TestReport[]): string[] {
+  const line = blockedLoadsLine(
+    mergeBlockedLoads(reports.flatMap((report) => report.attempts.map((a) => a.blocked ?? []))),
+  )
+
+  return line === undefined ? [] : [line]
+}
+
 /** Runs the picked tests with a live feed of them; resolves to the exit code. */
 async function executeRun(input: RunInput): Promise<number> {
   const recording = openRecording(
@@ -358,6 +369,7 @@ async function runAndReport(input: RunInput, frame: RunFrame): Promise<number> {
 
   for (const line of closingLines(results.reports)) write(line)
   for (const line of lintReport(findings)) write(line)
+  for (const line of blockedReport(results.reports)) write(line)
   if (ran.notRun > 0)
     write(`stopped after ${options.maxFailures} failed: ${ran.notRun} test files not run`)
 

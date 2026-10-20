@@ -60,6 +60,12 @@ export interface UnroutedHosts {
   readonly allow?: readonly string[]
   /** Analytics and telemetry hosts: blocked by default; `passthrough` lets them go. */
   readonly telemetry?: "block" | "passthrough"
+  /**
+   * A page's images, fonts, stylesheets and media from unrouted hosts while `unmatched` is
+   * `block`: `passthrough` (default) lets them load, so the page looks right; `block` refuses them.
+   * Scripts and the page's `fetch()` calls stay blocked either way.
+   */
+  readonly assets?: "passthrough" | "block"
 }
 
 /** Just the `UnroutedHosts` options from a larger options object. */
@@ -69,6 +75,7 @@ export function unroutedOf(options: UnroutedHosts): UnroutedHosts {
     ...(options.blocked && { blocked: options.blocked }),
     ...(options.allow && { allow: options.allow }),
     ...(options.telemetry && { telemetry: options.telemetry }),
+    ...(options.assets && { assets: options.assets }),
   }
 }
 

@@ -15,7 +15,7 @@ import {
   type RunOutcome,
   type SetupSpan,
 } from "@danwo/matrix"
-import type { Proxy } from "@danwo/proxy"
+import { blockedLoads, blockedLoadsLine, type Proxy } from "@danwo/proxy"
 import type { Browser } from "playwright-core"
 
 import { type CheckPace, paceOf } from "../assert/pace.ts"
@@ -322,6 +322,7 @@ async function reportAttempt(attempt: FinishedAttempt): Promise<AttemptReport> {
   const { env } = benchOrFail()
   const { result, down } = attempt
   const error = withAppsDown(result.error, down)
+  const blocked = blockedLoads((env?.proxy?.exchanges() ?? []).slice(attempt.mark.exchanges))
   const input: RecordInput = {
     test: attempt.id,
     run: { kind: "test", attempt: attempt.n },
@@ -329,7 +330,7 @@ async function reportAttempt(attempt: FinishedAttempt): Promise<AttemptReport> {
     error,
     stopped: result.stopped,
     divergence: result.divergence,
-    notes: [...result.notes, ...appsDownNotes(down)],
+    notes: [...result.notes, ...appsDownNotes(down), ...[blockedLoadsLine(blocked) ?? []].flat()],
     durationMs: result.durationMs,
     flight: result.flight,
     env,
@@ -351,6 +352,7 @@ async function reportAttempt(attempt: FinishedAttempt): Promise<AttemptReport> {
     usage: usageOf(result.flight.session.steps()),
     ...lintOf(inspected),
     ...(verdict !== undefined && { verdict }),
+    ...(blocked.length > 0 && { blocked }),
   }
 }
 
