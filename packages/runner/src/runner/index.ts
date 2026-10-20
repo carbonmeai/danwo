@@ -147,7 +147,7 @@ export {
 } from "./verdict-words.ts"
 export { type CacheAction, type CacheCommandOptions, runCache } from "./cache-command.ts"
 export { type ErrorCodeRow, errorCodeTable, exitCodeForError } from "../support/codes.ts"
-export { CACHE_OUTCOMES, type CacheOutcome } from "../record/steps.ts"
+export { CACHE_OUTCOMES, type CacheOutcome, recordingText } from "../record/steps.ts"
 export type { RelocationPolicy } from "../replay/policy.ts"
 export type { VisionChoice, VisionMode, VisionSetting } from "../vision/desk.ts"
 export type { SessionTime, Span } from "../time/index.ts"

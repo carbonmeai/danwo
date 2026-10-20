@@ -117,7 +117,8 @@ export interface LiveRun {
 
 /**
  * Stages the step's actions as its recording, written once a later check confirms them, with the
- * effects the step had when it was watched; notes on the step whether it will be saved.
+ * effects the step had when it was watched; notes on the step that it is staged, and the session
+ * notes whether it was kept when it closes.
  */
 export async function keepRecording(run: LiveRun): Promise<void> {
   const { store, steps, key, miss, watch, recorded } = run
@@ -138,5 +139,5 @@ export async function keepRecording(run: LiveRun): Promise<void> {
     endRoute: await run.endRoute(),
     ...(effects !== undefined && { effects }),
   })
-  steps.cache(miss.mode, { ...miss, saved: true })
+  steps.cache(miss.mode, { ...miss, saved: false, recording: "staged" })
 }

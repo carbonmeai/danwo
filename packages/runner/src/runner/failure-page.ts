@@ -7,6 +7,7 @@
  */
 import { findingPlace } from "../lint/index.ts"
 import { effectNotes, effectsOf } from "../record/effect-notes.ts"
+import { recordingText } from "../record/steps.ts"
 import { dollars, stepCost } from "../record/usage.ts"
 import { afterBody, checkLine } from "./checks-text.ts"
 import type { FlightRecord, RecordedExchange, RecordedStep } from "./record.ts"
@@ -85,7 +86,9 @@ function cacheText(cache: RecordedStep["cache"]): string {
   if (cache === undefined) return ""
   if (cache.changed) return `${cache.mode} (${cache.changed.join(", ")} changed)`
 
-  const mode = cache.because === undefined ? cache.mode : `${cache.mode} (${cache.because})`
+  const because = cache.because === undefined ? cache.mode : `${cache.mode} (${cache.because})`
+  const recorded = recordingText(cache)
+  const mode = recorded === undefined ? because : `${because}, ${recorded}`
 
   return cache.reason === undefined ? mode : `${mode}: ${cache.reason}`
 }

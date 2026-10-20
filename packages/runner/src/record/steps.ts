@@ -115,11 +115,35 @@ export const CACHE_OUTCOMES: readonly CacheOutcome[] = [
   "off",
 ]
 
+/**
+ * What became of a step's new recording: `staged` while the attempt runs, then `kept` once a later
+ * check confirmed it, or not kept because the test failed after it (`test-failed`) or no check
+ * passed after it (`unchecked`).
+ */
+export type RecordingFate = "staged" | "kept" | "test-failed" | "unchecked"
+
+/** How each fate reads in a report, after the step's cache outcome. */
+const RECORDING_WORDS: Readonly<Record<RecordingFate, string>> = {
+  staged: "recorded, kept only if the test passes",
+  kept: "recorded",
+  "test-failed": "not kept: the test failed",
+  unchecked: "not kept: no check after it passed",
+}
+
+/** What became of a step's new recording, in words; undefined when it made none. */
+export function recordingText(note: Pick<CacheNote, "saved" | "recording">): string | undefined {
+  if (note.recording !== undefined) return RECORDING_WORDS[note.recording]
+
+  return note.saved === true ? RECORDING_WORDS.kept : undefined
+}
+
 /** What a step's cache use came to: its outcome, whether a new recording was kept, and why stale. */
 export interface CacheNote {
   readonly mode: CacheOutcome
-  /** A new recording of the step was staged (written once a later check confirms it). */
+  /** A new recording of the step was written to the cache. */
   readonly saved?: boolean
+  /** For a recording that waits for a later check: what became of it. */
+  readonly recording?: RecordingFate
   /** For `stale`: which parts of the step's key differ from the recording's. */
   readonly changed?: readonly string[]
   /**
@@ -387,6 +411,32 @@ export class StepRecorder implements StepLog {
   /** Whether a check that verifies passed after step `index`, confirming what it did. */
   verifiedAfter(index: number): boolean {
     return this.verified.some((verified) => verified > index)
+  }
+
+  /**
+   * Notes what became of each staged recording once the attempt ended: kept when `confirmed`,
+   * otherwise dropped because a later step failed, or because no check after it passed.
+   */
+  settleRecordings(confirmed: (index: number) => boolean): void {
+    for (const running of this.steps) {
+      const { cache, index } = running.record
+
+      if (cache?.recording !== "staged") continue
+
+      const failedLater = this.steps.some(
+        (later) => later.record.index > index && later.record.status !== "passed",
+      )
+      const recording: RecordingFate = confirmed(index)
+        ? "kept"
+        : failedLater
+          ? "test-failed"
+          : "unchecked"
+
+      running.record = {
+        ...running.record,
+        cache: { ...cache, saved: recording === "kept", recording },
+      }
+    }
   }
 
   /** Every step so far, with its events. */

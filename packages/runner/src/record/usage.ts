@@ -3,10 +3,22 @@
  * records: the counts behind the run summary's `cache:` and `model:` lines and the per-step cost
  * table of the flight report.
  */
-import { CACHE_OUTCOMES, type CacheOutcome, type StepRecord } from "./steps.ts"
+import {
+  CACHE_OUTCOMES,
+  type CacheOutcome,
+  type RecordingFate,
+  recordingText,
+  type StepRecord,
+} from "./steps.ts"
 
 /** How many steps came to each cache outcome. */
 export type CacheCounts = Readonly<Partial<Record<CacheOutcome, number>>>
+
+/** How many new recordings came to each fate. */
+export type RecordingCounts = Readonly<Partial<Record<RecordingFate, number>>>
+
+/** Every fate, in the order the `cache:` line lists them. */
+const FATES: readonly RecordingFate[] = ["kept", "staged", "test-failed", "unchecked"]
 
 /** Model calls and what they took: tokens each way, and dollars as the gateway billed them. */
 export interface Spent {
@@ -38,6 +50,8 @@ export interface StepCost {
 /** An attempt's use of the cache and the model. */
 export interface Usage {
   readonly cache: CacheCounts
+  /** What became of the new recordings the steps made; absent in older reports. */
+  readonly recordings?: RecordingCounts
   readonly spent: Spent
   /** The agent steps that called the model, in order. */
   readonly steps: readonly StepCost[]
@@ -69,18 +83,28 @@ export function stepCost(step: StepRecord): StepCost {
   }
 }
 
-/** Counts added up by outcome. */
-function countsOf(all: readonly CacheCounts[]): CacheCounts {
-  const counts: Partial<Record<CacheOutcome, number>> = {}
+/** Counts added up by key. */
+function countsOf<Key extends string>(
+  all: readonly Readonly<Partial<Record<Key, number>>>[],
+  keys: readonly Key[],
+): Partial<Record<Key, number>> {
+  const counts: Partial<Record<Key, number>> = {}
 
   for (const one of all)
-    for (const mode of CACHE_OUTCOMES) {
-      const n = one[mode]
+    for (const key of keys) {
+      const n = one[key]
 
-      if (n !== undefined) counts[mode] = (counts[mode] ?? 0) + n
+      if (n !== undefined) counts[key] = (counts[key] ?? 0) + n
     }
 
   return counts
+}
+
+/** A step's new recording by its fate; a recording written at once counts as kept. */
+function fateOf(step: StepRecord): RecordingFate | undefined {
+  if (step.cache === undefined) return undefined
+
+  return step.cache.recording ?? (step.cache.saved === true ? "kept" : undefined)
 }
 
 /** The usage of an attempt's steps. */
@@ -90,6 +114,15 @@ export function usageOf(steps: readonly StepRecord[]): Usage {
   return {
     cache: countsOf(
       steps.flatMap((step) => (step.cache === undefined ? [] : [{ [step.cache.mode]: 1 }])),
+      CACHE_OUTCOMES,
+    ),
+    recordings: countsOf(
+      steps.flatMap((step) => {
+        const fate = fateOf(step)
+
+        return fate === undefined ? [] : [{ [fate]: 1 }]
+      }),
+      FATES,
     ),
     spent: costs.reduce((sum, cost) => plus(sum, cost.spent), NOTHING),
     steps: costs,
@@ -99,7 +132,14 @@ export function usageOf(steps: readonly StepRecord[]): Usage {
 /** Several attempts' usage added up; their per-step lists are joined. */
 export function addUsage(all: readonly Usage[]): Usage {
   return {
-    cache: countsOf(all.map((usage) => usage.cache)),
+    cache: countsOf(
+      all.map((usage) => usage.cache),
+      CACHE_OUTCOMES,
+    ),
+    recordings: countsOf(
+      all.map((usage) => usage.recordings ?? {}),
+      FATES,
+    ),
     spent: all.reduce((sum, usage) => plus(sum, usage.spent), NOTHING),
     steps: all.flatMap((usage) => usage.steps),
   }
@@ -118,8 +158,14 @@ const WORDS: Readonly<Record<CacheOutcome, string>> = {
 /** The outcomes always listed, even at 0; the rest only when they happened. */
 const ALWAYS: readonly CacheOutcome[] = ["replayed", "relocated", "handed-off", "missed"]
 
-/** `cache: 12 replayed · 1 relocated · 1 handed off · 0 missed`, or undefined with no agent steps. */
-export function cacheLine(counts: CacheCounts): string | undefined {
+/**
+ * `cache: 12 replayed · 1 relocated · 1 handed off · 2 missed · 2 recorded`, or undefined with no
+ * agent steps. New recordings are listed by what became of them: `recorded`, or `not kept` and why.
+ */
+export function cacheLine(
+  counts: CacheCounts,
+  recordings: RecordingCounts = {},
+): string | undefined {
   const total = Object.values(counts).reduce((sum, n) => sum + (n ?? 0), 0)
 
   if (total === 0) return undefined
@@ -127,8 +173,11 @@ export function cacheLine(counts: CacheCounts): string | undefined {
   const parts = CACHE_OUTCOMES.filter(
     (mode) => mode !== "off" && (ALWAYS.includes(mode) || (counts[mode] ?? 0) > 0),
   ).map((mode) => `${counts[mode] ?? 0} ${WORDS[mode]}`)
+  const fates = FATES.filter((fate) => (recordings[fate] ?? 0) > 0).map(
+    (fate) => `${recordings[fate]} ${recordingText({ recording: fate })}`,
+  )
 
-  return `cache: ${parts.join(" · ")}`
+  return `cache: ${[...parts, ...fates].join(" · ")}`
 }
 
 /** Thousands as `k`, for token counts. */

@@ -148,7 +148,7 @@ function attemptUsages(reports: readonly TestReport[]): Usage[] {
 /** The run's `cache:` and `model:` lines, then its costliest model steps, as a small table. */
 function usageLines(reports: readonly TestReport[]): string[] {
   const usage = addUsage(attemptUsages(reports))
-  const cache = cacheLine(usage.cache)
+  const cache = cacheLine(usage.cache, usage.recordings)
   const model = modelLine(usage)
   const costliest = usage.steps
     .toSorted((a, b) => b.spent.usd - a.spent.usd || b.spent.calls - a.spent.calls)

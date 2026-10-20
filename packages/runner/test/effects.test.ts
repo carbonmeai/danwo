@@ -237,7 +237,8 @@ describe("replayed effects", () => {
       mode: "handed-off",
       because: "effect",
       reason: "effect: expected listitem: Groceries on the page, saw none",
-      saved: true,
+      saved: false,
+      recording: "staged",
     })
     expect(actor.doGenerateCalls.length).toBeGreaterThan(0)
 

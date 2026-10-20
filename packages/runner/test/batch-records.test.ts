@@ -74,7 +74,7 @@ const RECORD: FlightRecord = {
   durationMs: 4300,
   steps: [
     step({
-      cache: { mode: "missed", saved: true },
+      cache: { mode: "missed", saved: false, recording: "test-failed" },
       events: [
         {
           kind: "model",
@@ -183,7 +183,7 @@ describe("the failure page", () => {
     expect(page).toContain("attempt 1 · failed · EXPECTATION_FAILED (test) · 4.3 s")
     expect(page).toContain("**Error at tests/pay.danwo.ts:12:**")
     expect(page).toContain(
-      "| 0 | pay for the order | passed | missed | 2 ($0.0070) | 1200 | tests/pay.danwo.ts:9 |",
+      "| 0 | pay for the order | passed | missed, not kept: the test failed | 2 ($0.0070) | 1200 | tests/pay.danwo.ts:9 |",
     )
     expect(page).toContain(
       '| 1 | expect(getByText("Paid")).toBeVisible() | failed: EXPECTATION_FAILED |',

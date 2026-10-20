@@ -81,11 +81,16 @@ async function saveStep(session: WebSession, instruction = "save the desk") {
   return session.flight.steps().find((step) => step.api === "agent.act")?.cache
 }
 
+/** The cache note of the session's `agent.act` step. */
+function actStep(session: WebSession) {
+  return session.flight.steps().find((step) => step.api === "agent.act")?.cache
+}
+
 describe("cache outcomes", () => {
   it("misses, records, replays, and names what changed when a recording is stale", async () => {
     const first = await withSession({ model: scripted([SAVE]) }, saveStep)
 
-    expect(first).toEqual({ mode: "missed", saved: true })
+    expect(first).toEqual({ mode: "missed", saved: false, recording: "staged" })
 
     const replayed = await withSession({ model: scripted([]) }, async (session) => {
       const cache = await saveStep(session)
@@ -112,7 +117,42 @@ describe("cache outcomes", () => {
       saveStep(session, "save the desk now"),
     )
 
-    expect(relearned).toEqual({ mode: "stale", changed: ["instruction"], saved: true })
+    expect(relearned).toEqual({
+      mode: "stale",
+      changed: ["instruction"],
+      saved: false,
+      recording: "staged",
+    })
+  }, 90_000)
+
+  it("says once the session closes whether a recording was kept, and why not", async () => {
+    const failed = await withSession({ model: scripted([SAVE]) }, async (session) => {
+      await session.agent.act("save the desk")
+      await session
+        .expect(session.screen.getByTestId("status"))
+        .toHaveText("Paid")
+        .catch(() => undefined)
+
+      return session
+    })
+    const unchecked = await withSession({ model: scripted([SAVE]) }, async (session) => {
+      await session.agent.act("save the desk")
+
+      return session
+    })
+    const kept = await withSession({ model: scripted([SAVE]) }, async (session) => {
+      await saveStep(session)
+
+      return session
+    })
+    const usage = usageOf(failed.flight.steps())
+
+    expect(actStep(failed)).toEqual({ mode: "missed", saved: false, recording: "test-failed" })
+    expect(actStep(unchecked)).toEqual({ mode: "missed", saved: false, recording: "unchecked" })
+    expect(actStep(kept)).toEqual({ mode: "missed", saved: true, recording: "kept" })
+    expect(cacheLine(usage.cache, usage.recordings)).toBe(
+      "cache: 0 replayed · 0 relocated · 0 handed off · 1 missed · 1 not kept: the test failed",
+    )
   }, 90_000)
 
   it("hands a step to the model when its recording no longer replays", async () => {
@@ -125,7 +165,7 @@ describe("cache outcomes", () => {
       return saveStep(session)
     })
 
-    expect(cache).toEqual({ mode: "stale", changed: ["policy"], saved: true })
+    expect(cache).toEqual({ mode: "stale", changed: ["policy"], saved: false, recording: "staged" })
 
     const handed = scripted([(view) => ["click", { ref: ref(view, "button", "Keep") }]])
     const handedCache = await withSession({ model: handed }, async (session) => {
@@ -137,7 +177,8 @@ describe("cache outcomes", () => {
     expect(handedCache).toEqual({
       mode: "handed-off",
       reason: 'action 1 (click): getByRole("button", name: "Save") is no longer on the page',
-      saved: true,
+      saved: false,
+      recording: "staged",
     })
     expect(actor.doGenerateCalls.length).toBeGreaterThan(0)
   }, 90_000)

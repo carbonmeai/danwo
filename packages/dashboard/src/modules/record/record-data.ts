@@ -12,6 +12,7 @@ import {
   failurePage,
   type FlightRecord,
   type RecordedStep,
+  recordingText,
   redactCredentials,
 } from "@danwo/runner/runner"
 
@@ -77,9 +78,8 @@ function cacheDetail(step: RecordedStep): string | undefined {
   if (note === undefined) return undefined
   if (note.changed?.length) return `changed: ${note.changed.join(", ")}`
   if (note.because === "effect") return "the recorded effect did not happen"
-  if (note.saved) return "new recording saved"
 
-  return undefined
+  return recordingText(note)
 }
 
 /** The step's phase, a check's sides and what settling waited for, where the record kept them. */

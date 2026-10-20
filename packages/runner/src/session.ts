@@ -605,6 +605,7 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
       closed = true
       // A recording is written only once a later check confirmed what its step did.
       await store?.settle((step) => steps.verifiedAfter(step))
+      steps.settleRecordings((step) => steps.verifiedAfter(step))
       await flight.settle()
       stopped.abort()
 

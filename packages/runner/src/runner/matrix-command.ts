@@ -508,7 +508,9 @@ function matrixExitCode(runs: readonly RunOutcome[]): number {
 function usageLines(usages: readonly Usage[]): string[] {
   const usage = addUsage(usages)
 
-  return [cacheLine(usage.cache), modelLine(usage)].filter((line) => line !== undefined)
+  return [cacheLine(usage.cache, usage.recordings), modelLine(usage)].filter(
+    (line) => line !== undefined,
+  )
 }
 
 /** Everything a matrix run holds while its trials run. */
