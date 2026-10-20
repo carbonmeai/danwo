@@ -14,7 +14,7 @@ import {
   readKnownDifferences,
   writeGolden,
 } from "./golden.ts"
-import { cleanUpOnInterrupt, type LeftBehind, leftBehindLines } from "./ledger.ts"
+import { cleanUpOnInterrupt, type LeftBehind, leftBehindLines, UNREMOVABLE } from "./ledger.ts"
 import { type ApiDescription, documentedShape } from "./openapi.ts"
 import type { FidelityProvider } from "./provider.ts"
 import { runScenario, type Scenario, type ScenarioRun, type Target } from "./scenario.ts"
@@ -307,13 +307,22 @@ function scenarioLines(report: ScenarioReport): string[] {
   return lines
 }
 
-/** Everything a provider's live scenarios left in its sandbox, split into kept and stuck. */
-function leftovers(report: ProviderReport): { kept: LeftBehind[]; stuck: LeftBehind[] } {
+/**
+ * Everything a provider's live scenarios left in its sandbox: kept on request, kept because the
+ * provider cannot remove it, and stuck (an undo that went wrong).
+ */
+function leftovers(report: ProviderReport): {
+  kept: LeftBehind[]
+  unremovable: LeftBehind[]
+  stuck: LeftBehind[]
+} {
   const all = report.scenarios.flatMap((scenario) => scenario.leftBehind ?? [])
+  const isUnremovable = (item: LeftBehind) => item.reason.startsWith(UNREMOVABLE)
 
   return {
     kept: all.filter((item) => item.reason === "kept"),
-    stuck: all.filter((item) => item.reason !== "kept"),
+    unremovable: all.filter(isUnremovable),
+    stuck: all.filter((item) => item.reason !== "kept" && !isUnremovable(item)),
   }
 }
 
@@ -321,13 +330,14 @@ function providerLines(report: ProviderReport): string[] {
   const failing = report.scenarios.filter((s) => s.counted.length > 0).length
   const skipped = report.scenarios.filter((s) => s.skipped !== undefined).length
   const header = `${report.provider} (${report.mode}): ${report.scenarios.length - failing - skipped} of ${report.scenarios.length} scenarios match${skipped > 0 ? `, ${skipped} skipped` : ""}`
-  const { kept, stuck } = leftovers(report)
+  const { kept, unremovable, stuck } = leftovers(report)
 
   return [
     header,
     ...report.scenarios.flatMap(scenarioLines),
     ...leftBehindLines("could not be undone", stuck),
     ...leftBehindLines("kept, as --keep asked", kept),
+    ...leftBehindLines("kept, the provider cannot remove it", unremovable),
     ...(report.wrote === undefined ? [] : [`  wrote ${report.wrote}`]),
     "",
   ]
@@ -340,7 +350,11 @@ function cleanupSummary(reports: readonly ProviderReport[]): string[] {
   if (live.length === 0) return []
 
   const stuck = live.flatMap((report) => leftovers(report).stuck)
-  const kept = live.flatMap((report) => leftovers(report).kept)
+  const kept = live.flatMap((report) => {
+    const { kept: asked, unremovable } = leftovers(report)
+
+    return [...asked, ...unremovable]
+  })
   const undone = live
     .flatMap((report) => report.scenarios)
     .reduce((sum, scenario) => sum + (scenario.undone ?? 0), 0)
@@ -351,7 +365,7 @@ function cleanupSummary(reports: readonly ProviderReport[]): string[] {
     ]
   if (kept.length > 0)
     return [
-      `kept: ${kept.length} object(s) in the sandboxes; \`danwo fidelity --sweep\` removes them`,
+      `kept: ${kept.length} object(s) in the sandboxes, listed above with why; \`danwo fidelity --sweep\` removes the tagged ones a provider lets it`,
     ]
 
   return undone === 0 ? [] : [`cleaned up: ${undone} object(s) undone, nothing left behind`]

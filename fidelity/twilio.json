@@ -43,7 +43,7 @@
         {
           "step": "list the messages",
           "status": 200,
-          "shape": "6d4528149d1c"
+          "shape": "525f4588b1c7"
         }
       ],
       "facts": []
@@ -117,12 +117,48 @@
         }
       ],
       "facts": []
+    },
+    "messages: a trial account sends a template": {
+      "steps": [
+        {
+          "step": "send one message",
+          "status": 201,
+          "shape": "ebc8b8591ef7"
+        },
+        {
+          "step": "read the message",
+          "status": 200,
+          "shape": "499ef179c06d"
+        },
+        {
+          "step": "list it by recipient",
+          "status": 200,
+          "shape": "525f4588b1c7"
+        },
+        {
+          "step": "try to delete it",
+          "status": 401,
+          "shape": "5d8734afc863"
+        }
+      ],
+      "facts": [
+        {
+          "name": "settled status",
+          "value": "delivered"
+        },
+        {
+          "name": "kept in the account's log",
+          "value": "a trial account cannot delete or redact messages"
+        }
+      ]
     }
   },
   "shapes": {
     "0b7afb152b24": {"t":"object","keys":{"code":{"t":"literal","v":20404},"message":{"t":"string"},"more_info":{"t":"string"},"status":{"t":"literal","v":404}}},
     "2a78cac0073c": {"t":"object","keys":{"end":{"t":"number"},"first_page_uri":{"t":"string"},"next_page_uri":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"page":{"t":"number"},"page_size":{"t":"number"},"previous_page_uri":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"start":{"t":"number"},"uri":{"t":"string"},"messages":{"t":"array","of":{"t":"object","keys":{"body":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"num_segments":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"direction":{"t":"string"},"from":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"to":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"date_updated":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"price":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"error_message":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"uri":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"account_sid":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"num_media":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"status":{"t":"string"},"messaging_service_sid":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"sid":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"date_sent":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"date_created":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"error_code":{"t":"union","of":[{"t":"number"},{"t":"null"}]},"price_unit":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"api_version":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"subresource_uris":{"t":"union","of":[{"t":"object","keys":{},"open":true},{"t":"null"}]}},"optional":["body","num_segments","direction","from","to","date_updated","price","error_message","uri","account_sid","num_media","status","messaging_service_sid","sid","date_sent","date_created","error_code","price_unit","api_version","subresource_uris"]}}},"optional":["end","first_page_uri","next_page_uri","page","page_size","previous_page_uri","start","uri","messages"]},
     "38bdf9025373": {"t":"object","keys":{"code":{"t":"literal","v":21606},"message":{"t":"string"},"more_info":{"t":"string"},"status":{"t":"literal","v":400},"details":{"t":"union","of":[{"t":"any"},{"t":"null"}]}},"optional":["details"]},
+    "499ef179c06d": {"t":"object","keys":{"account_sid":{"t":"string"},"api_version":{"t":"string"},"body":{"t":"string"},"date_created":{"t":"string"},"date_sent":{"t":"string"},"date_updated":{"t":"string"},"direction":{"t":"literal","v":"outbound-api"},"error_code":{"t":"null"},"error_message":{"t":"null"},"from":{"t":"string"},"messaging_service_sid":{"t":"null"},"num_media":{"t":"string"},"num_segments":{"t":"string"},"price":{"t":"null"},"price_unit":{"t":"null"},"sid":{"t":"string"},"status":{"t":"string"},"subresource_uris":{"t":"object","keys":{"feedback":{"t":"string"},"media":{"t":"string"}}},"to":{"t":"string"},"uri":{"t":"string"}}},
+    "525f4588b1c7": {"t":"object","keys":{"end":{"t":"number"},"first_page_uri":{"t":"string"},"messages":{"t":"array","of":{"t":"object","keys":{"account_sid":{"t":"string"},"api_version":{"t":"string"},"body":{"t":"string"},"date_created":{"t":"string"},"date_sent":{"t":"string"},"date_updated":{"t":"string"},"direction":{"t":"string"},"error_code":{"t":"null"},"error_message":{"t":"null"},"from":{"t":"string"},"messaging_service_sid":{"t":"null"},"num_media":{"t":"string"},"num_segments":{"t":"string"},"price":{"t":"null"},"price_unit":{"t":"null"},"sid":{"t":"string"},"status":{"t":"string"},"subresource_uris":{"t":"object","keys":{"feedback":{"t":"string"},"media":{"t":"string"}}},"to":{"t":"string"},"uri":{"t":"string"}}}},"next_page_uri":{"t":"null"},"page":{"t":"number"},"page_size":{"t":"number"},"previous_page_uri":{"t":"null"},"start":{"t":"number"},"uri":{"t":"string"}}},
     "5d8734afc863": {"t":"object","keys":{"code":{"t":"literal","v":20003},"message":{"t":"string"},"more_info":{"t":"string"},"status":{"t":"literal","v":401}}},
     "67bcbb560844": {"t":"object","keys":{"auth_token":{"t":"string"},"date_created":{"t":"string"},"date_updated":{"t":"string"},"friendly_name":{"t":"string"},"owner_account_sid":{"t":"string"},"sid":{"t":"string"},"status":{"t":"literal","v":"active"},"subresource_uris":{"t":"object","keys":{"addresses":{"t":"string"},"applications":{"t":"string"},"authorized_connect_apps":{"t":"string"},"available_phone_numbers":{"t":"string"},"balance":{"t":"string"},"calls":{"t":"string"},"conferences":{"t":"string"},"connect_apps":{"t":"string"},"incoming_phone_numbers":{"t":"string"},"keys":{"t":"string"},"messages":{"t":"string"},"notifications":{"t":"string"},"outgoing_caller_ids":{"t":"string"},"queues":{"t":"string"},"recordings":{"t":"string"},"short_codes":{"t":"string"},"signing_keys":{"t":"string"},"sip":{"t":"string"},"transcriptions":{"t":"string"},"usage":{"t":"string"}}},"type":{"t":"string"},"uri":{"t":"string"}}},
     "6d4528149d1c": {"t":"object","keys":{"end":{"t":"number"},"first_page_uri":{"t":"string"},"messages":{"t":"array","of":null},"next_page_uri":{"t":"null"},"page":{"t":"number"},"page_size":{"t":"number"},"previous_page_uri":{"t":"null"},"start":{"t":"number"},"uri":{"t":"string"}}},
@@ -131,6 +167,7 @@
     "dd2c1c417c47": {"t":"object","keys":{"code":{"t":"literal","v":0},"message":{"t":"string"},"more_info":{"t":"string"},"status":{"t":"literal","v":400}}},
     "dfc19d9d6f7c": {"t":"object","keys":{"body":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"num_segments":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"direction":{"t":"string"},"from":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"to":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"date_updated":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"price":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"error_message":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"uri":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"account_sid":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"num_media":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"status":{"t":"literal","v":"queued"},"messaging_service_sid":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"sid":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"date_sent":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"date_created":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"error_code":{"t":"union","of":[{"t":"number"},{"t":"null"}]},"price_unit":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"api_version":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"subresource_uris":{"t":"union","of":[{"t":"object","keys":{},"open":true},{"t":"null"}]}},"optional":["body","num_segments","direction","from","to","date_updated","price","error_message","uri","account_sid","num_media","status","messaging_service_sid","sid","date_sent","date_created","error_code","price_unit","api_version","subresource_uris"]},
     "e89312be02aa": {"t":"object","keys":{"code":{"t":"literal","v":21604},"message":{"t":"string"},"more_info":{"t":"string"},"status":{"t":"literal","v":400}}},
+    "ebc8b8591ef7": {"t":"object","keys":{"account_sid":{"t":"string"},"api_version":{"t":"string"},"body":{"t":"string"},"date_created":{"t":"string"},"date_sent":{"t":"null"},"date_updated":{"t":"string"},"direction":{"t":"literal","v":"outbound-api"},"error_code":{"t":"null"},"error_message":{"t":"null"},"from":{"t":"string"},"messaging_service_sid":{"t":"null"},"num_media":{"t":"string"},"num_segments":{"t":"string"},"price":{"t":"null"},"price_unit":{"t":"null"},"sid":{"t":"string"},"status":{"t":"literal","v":"queued"},"subresource_uris":{"t":"object","keys":{"media":{"t":"string"}}},"to":{"t":"string"},"uri":{"t":"string"}}},
     "f78b1a25632d": {"t":"object","keys":{"end":{"t":"number"},"first_page_uri":{"t":"string"},"incoming_phone_numbers":{"t":"array","of":null},"next_page_uri":{"t":"null"},"page":{"t":"number"},"page_size":{"t":"number"},"previous_page_uri":{"t":"null"},"start":{"t":"number"},"uri":{"t":"string"}}}
   }
 }

@@ -4,20 +4,23 @@
  * - Test credentials (Twilio answers 403 to reading the account): the magic numbers, a message from
  *   the always-valid test sender and the refusals for an invalid recipient and an unowned sender.
  *   Test credentials send nothing and bill nothing.
- * - Live credentials, an Auth Token or an API key: nothing is ever sent. The suite reads the account,
- *   its numbers and its messages, and makes only requests Twilio refuses before a message exists:
- *   bad credentials, a message that isn't there, no recipient, and the refusals a trial or a full
- *   account gives for a malformed recipient, an unverified recipient or a sender it doesn't own.
- *   Every refused send names a `From` the account is first checked not to own, and never a
- *   Messaging Service, so none can go out; afterwards the account's messages to that recipient are
- *   counted, and must be none. A successful send's shape is checked against the published API
- *   reference only.
+ * - Live credentials, an Auth Token or an API key: the suite reads the account, its numbers and its
+ *   messages, and makes requests Twilio refuses before a message exists: bad credentials, a message
+ *   that isn't there, no recipient, and the refusals a trial or a full account gives for a
+ *   malformed recipient, an unverified recipient or a sender it doesn't own. Every refused send
+ *   names a `From` the account is first checked not to own, and never a Messaging Service, so none
+ *   can go out; afterwards the account's messages to that recipient are counted, and must be none.
+ * - One real send, only when the account's own number and a recipient are configured: a full
+ *   account sends a message, follows it until it settles, reads and lists it, then deletes it. A
+ *   trial account can send only a predefined template and can neither delete nor redact what it
+ *   sent, so it sends only with an explicit opt-in, and the message it keeps is reported.
  */
 import { seedTwilio, twilio } from "@danwo/emulators"
 
 import { type FidelityProvider, requiredCredentials } from "../provider.ts"
 import type { Answer, Scenario, ScenarioContext, StepDoc } from "../scenario.ts"
 import { nullable, num, object, str } from "../schema.ts"
+import { asJsonObject } from "../shape.ts"
 import { credential, emulatorTarget, liveTarget } from "../target.ts"
 
 const API = "https://api.twilio.com/2010-04-01"
@@ -25,6 +28,11 @@ const SID = "DANWO_FIDELITY_TWILIO_ACCOUNT_SID"
 const TOKEN = "DANWO_FIDELITY_TWILIO_AUTH_TOKEN"
 const KEY_SID = "DANWO_FIDELITY_TWILIO_API_KEY_SID"
 const KEY_SECRET = "DANWO_FIDELITY_TWILIO_API_KEY_SECRET"
+/** The account's own number and a recipient (a verified one on a trial account), for a real send. */
+const FROM = "DANWO_FIDELITY_TWILIO_FROM"
+const TO = "DANWO_FIDELITY_TWILIO_TO"
+/** `1` lets a trial account send, though the message then stays in its log. */
+const SEND_ON_TRIAL = "DANWO_FIDELITY_TWILIO_SEND_ON_TRIAL"
 const MESSAGES = "post /2010-04-01/Accounts/{AccountSid}/Messages.json"
 
 /** Twilio's magic numbers for test credentials. */
@@ -304,14 +312,159 @@ const fullRefusals: Scenario = {
   },
 }
 
+/** The emulator's sender and recipient for a real send, owned and verified by each account. */
+const EMULATOR_NUMBERS = {
+  trial: { from: "+14155550140", to: "+14155550141" },
+  full: { from: "+14155550150", to: "+14155550151" },
+} as const
+
+/** The template a trial account sends, since it cannot write its own text. */
+const TRIAL_TEMPLATE = "sms_internal_alerts"
+
+const SETTLED = new Set(["delivered", "undelivered", "failed"])
+
+/**
+ * The account's own number and a recipient for one real send: live, the configured
+ * `DANWO_FIDELITY_TWILIO_FROM` and `_TO` (skipping without them); on the emulator, numbers it
+ * seeds for the account.
+ */
+function sendNumbers(context: ScenarioContext, kind: "trial" | "full") {
+  if (context.target.kind === "emulator") return EMULATOR_NUMBERS[kind]
+
+  const { from, to } = context.target.credentials
+
+  if (from === undefined || to === undefined)
+    context.skip(`a real send needs ${FROM} and ${TO}: the account's number and a recipient`)
+
+  return { from, to }
+}
+
+/** The message `sid` once its status has settled, or as it stands after about a minute. */
+async function settledMessage(context: ScenarioContext, caller: Caller, sid: string) {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const response = await context.target.send(read(caller, `/Messages/${sid}.json`))
+    const message: unknown = await response.json()
+    const status =
+      typeof message === "object" && message !== null && "status" in message
+        ? message.status
+        : undefined
+
+    if (typeof status === "string" && SETTLED.has(status)) return status
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+  }
+
+  return "unsettled"
+}
+
+/** The sid of a created message, from its answer. */
+function sidOf(answer: Answer): string {
+  const sid = asJsonObject(answer.body)?.["sid"]
+
+  return typeof sid === "string" ? sid : ""
+}
+
+/**
+ * Sends one message, follows it until it settles, reads and lists it, then deletes it. A trial
+ * account can neither delete nor redact a message, so what it sends stays in its log: it sends
+ * only when {@link SEND_ON_TRIAL} says so, and the kept message is reported as a fact.
+ */
+async function sendOne(context: ScenarioContext, kind: "trial" | "full", body: string) {
+  const caller = callerFor(context, kind)
+  const { from, to } = sendNumbers(context, kind)
+  const answer = await context.step(
+    "send one message",
+    send(caller, { From: from, To: to, Body: body }),
+    {
+      literals: ["status", "direction"],
+      doc: { operation: MESSAGES, status: 201, literals: { status: "queued" } },
+    },
+  )
+  const sid = sidOf(answer)
+
+  if (sid === "") return
+  context.created({
+    kind: "message",
+    id: sid,
+    undo: async () => {
+      /* Twilio deletes a message only once it is no longer in flight. */
+      await settledMessage(context, caller, sid)
+
+      return context.target.send(deleteRequest(caller, sid))
+    },
+    ...(kind === "trial" && {
+      unremovable: "a Twilio trial account can neither delete nor redact the messages it sends",
+    }),
+  })
+  context.fact("settled status", await settledMessage(context, caller, sid))
+  await context.step("read the message", read(caller, `/Messages/${sid}.json`), {
+    literals: ["direction"],
+    doc: { operation: "get /2010-04-01/Accounts/{AccountSid}/Messages/{Sid}.json", status: 200 },
+  })
+  await context.step(
+    "list it by recipient",
+    read(caller, `/Messages.json?To=${encodeURIComponent(to)}&PageSize=5`),
+    { doc: { operation: "get /2010-04-01/Accounts/{AccountSid}/Messages.json", status: 200 } },
+  )
+
+  if (kind === "trial") {
+    await context.step("try to delete it", deleteRequest(caller, sid), {
+      ...errorLiterals,
+      doc: errorDoc(401, 20003),
+    })
+    context.fact("kept in the account's log", "a trial account cannot delete or redact messages")
+  }
+}
+
+function deleteRequest(caller: Caller, sid: string): Request {
+  return new Request(`${API}/Accounts/${caller.sid}/Messages/${sid}.json`, {
+    method: "DELETE",
+    headers: { authorization: basic(caller.user, caller.password) },
+  })
+}
+
+const trialSend: Scenario = {
+  name: "messages: a trial account sends a template",
+  async run(context) {
+    await onlyFor(context, ["trial"], "the account is not a trial one")
+    if (context.target.kind === "live" && context.target.credentials["sendOnTrial"] !== "1")
+      context.skip(
+        `a trial account keeps every message it sends (it cannot delete or redact them); set ${SEND_ON_TRIAL}=1 to send one anyway`,
+      )
+    await sendOne(context, "trial", TRIAL_TEMPLATE)
+  },
+}
+
+const fullSend: Scenario = {
+  name: "messages: a full account sends, then deletes",
+  async run(context) {
+    await onlyFor(context, ["full"], "the account is not a full one")
+    await sendOne(context, "full", `danwo fidelity ${context.unique}`)
+  },
+}
+
 export const twilioFidelity: FidelityProvider = {
   name: "twilio",
   leaves:
-    "nothing: test credentials never send, and live ones only read and make sends Twilio refuses",
+    "nothing, unless a real send is set up: a full account deletes the one message it sends; a trial account keeps it, and sends only with DANWO_FIDELITY_TWILIO_SEND_ON_TRIAL=1",
   openapi:
     "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/json/twilio_api_v2010.json",
   credentials: [
     { name: SID, description: "the Account SID (test or live)" },
+    {
+      name: FROM,
+      description: "the account's own number, for one real send per run",
+      optional: true,
+    },
+    {
+      name: TO,
+      description: "the recipient of that send; a trial account's must be verified",
+      optional: true,
+    },
+    {
+      name: SEND_ON_TRIAL,
+      description: "1 to let a trial account send, though it keeps the message",
+      optional: true,
+    },
     {
       name: KEY_SID,
       description: "an API key's SID (SK…), preferred over the Auth Token",
@@ -324,29 +477,50 @@ export const twilioFidelity: FidelityProvider = {
       optional: true,
     },
   ],
-  scenarios: [sendMessage, refusals, accountReads, errors, trialRefusals, fullRefusals],
+  scenarios: [
+    sendMessage,
+    refusals,
+    accountReads,
+    errors,
+    trialRefusals,
+    fullRefusals,
+    trialSend,
+    fullSend,
+  ],
   emulator: () =>
     emulatorTarget(twilio, {}, (emulator) =>
       seedTwilio(emulator.store, {
         accounts: [
           { sid: ACCOUNTS.test.sid, authToken: ACCOUNTS.test.token },
-          { sid: ACCOUNTS.trial.sid, authToken: ACCOUNTS.trial.token, type: "Trial" },
+          {
+            sid: ACCOUNTS.trial.sid,
+            authToken: ACCOUNTS.trial.token,
+            type: "Trial",
+            verified: [EMULATOR_NUMBERS.trial.to],
+          },
           { sid: ACCOUNTS.full.sid, authToken: ACCOUNTS.full.token },
         ],
-        numbers: [{ number: VALID_FROM, account: ACCOUNTS.test.sid }],
+        numbers: [
+          { number: VALID_FROM, account: ACCOUNTS.test.sid },
+          { number: EMULATOR_NUMBERS.trial.from, account: ACCOUNTS.trial.sid },
+          { number: EMULATOR_NUMBERS.full.from, account: ACCOUNTS.full.sid },
+        ],
       }),
     ),
   live(env) {
     const found = requiredCredentials(this, env)
     const sid = found?.[SID]
-    const keySid = found?.[KEY_SID]
-    const keySecret = found?.[KEY_SECRET]
-    const token = found?.[TOKEN]
+    const byKey = found?.[KEY_SID] !== undefined && found[KEY_SECRET] !== undefined
+    const user = byKey ? found?.[KEY_SID] : sid
+    const password = byKey ? found?.[KEY_SECRET] : found?.[TOKEN]
+    const sends = {
+      ...(found?.[FROM] !== undefined && { from: found[FROM] }),
+      ...(found?.[TO] !== undefined && { to: found[TO] }),
+      ...(found?.[SEND_ON_TRIAL] !== undefined && { sendOnTrial: found[SEND_ON_TRIAL] }),
+    }
 
-    if (sid === undefined) return undefined
-    if (keySid !== undefined && keySecret !== undefined)
-      return liveTarget({ sid, user: keySid, password: keySecret })
+    if (sid === undefined || user === undefined || password === undefined) return undefined
 
-    return token === undefined ? undefined : liveTarget({ sid, user: sid, password: token })
+    return liveTarget({ sid, user, password, ...sends })
   },
 }

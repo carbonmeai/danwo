@@ -21,7 +21,16 @@ export interface Created {
    * already-canceled subscription, a setup intent that already succeeded.
    */
   readonly settled?: (status: number, body: string) => boolean
+  /**
+   * Why the provider gives no way to remove it, such as a trial account's sent message. Nothing is
+   * tried: it is reported as kept by the provider, which does not fail the run the way an undo
+   * that went wrong does.
+   */
+  readonly unremovable?: string
 }
+
+/** The reason a {@link LeftBehind} carries when its provider cannot remove it. */
+export const UNREMOVABLE = "cannot be removed: "
 
 /** An object the ledger could not undo, or was told to keep. */
 export interface LeftBehind {
@@ -94,6 +103,11 @@ export class CleanupLedger {
     this.#entries = []
 
     for (const created of entries) {
+      if (created.unremovable !== undefined) {
+        left.push({ kind: created.kind, id: created.id, reason: UNREMOVABLE + created.unremovable })
+        continue
+      }
+
       const reason = await withTimeout(attempt(created))
       const retried = reason === undefined ? undefined : await withTimeout(attempt(created))
 
