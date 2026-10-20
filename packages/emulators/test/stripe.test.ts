@@ -539,4 +539,20 @@ describe("refunds and deleted customers", () => {
       deleted: true,
     })
   })
+
+  it("attaches a new payment method for a test token, as Stripe does", async () => {
+    const s = client()
+    const customer = await s.customers.create({ email: "token@example.com" })
+    const attached = await s.paymentMethods.attach("pm_card_chargeCustomerFail", {
+      customer: customer.id,
+    })
+
+    expect(attached.id).toMatch(/^pm_/)
+    expect(attached.id).not.toBe("pm_card_chargeCustomerFail")
+    expect(attached).toMatchObject({ customer: customer.id, card: { last4: "0341" } })
+
+    const saved = await s.customers.listPaymentMethods(customer.id, { type: "card" })
+
+    expect(saved.data.map((pm) => pm.id)).toEqual([attached.id])
+  })
 })

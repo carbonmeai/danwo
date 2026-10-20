@@ -1,4 +1,4 @@
-import { addCard, defaultCard, testCard } from "../cards.ts"
+import { addCard, defaultCard, paymentMethodFor, testCard } from "../cards.ts"
 import type { StripeRouteContext } from "../context.ts"
 import {
   asRecord,
@@ -65,11 +65,15 @@ export function paymentMethodRoutes({ app, objects, events, clock }: StripeRoute
     const id = c.req.param("id")
     const customer = text((await readParams(c)).customer)
 
-    if (!methods.get(id)) return noSuch(c, "PaymentMethod", id)
     if (!customer || !objects.customers.get(customer))
       return noSuch(c, "customer", customer ?? "", "customer")
 
-    const attached = methods.change(id, { customer })
+    // A test token such as `pm_card_visa` attaches a new payment method of that card, as Stripe does.
+    const method = paymentMethodFor(objects, id, clock())
+
+    if (!method) return noSuch(c, "PaymentMethod", id)
+
+    const attached = methods.change(method.id, { customer })
 
     if (attached) events.emit("payment_method.attached", attached)
 
