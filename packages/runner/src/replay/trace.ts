@@ -110,7 +110,7 @@ const identity = z.object({
   projectId: z.string(),
   journey: z.string(),
   appIdentity: z.string(),
-  kind: z.enum(["act", "extract", "wait"]),
+  kind: z.enum(["act", "extract", "wait", "assert"]),
   /** Zero-based position among the journey's agent steps; not part of the key. */
   step: z.number().int().nonnegative(),
   instruction: z.string(),
@@ -154,7 +154,9 @@ export const extractTraceSchema = z.object({
   instruction: z.string(),
   recordedAt: z.string(),
   fields: z
-    .array(z.object({ path: z.string(), target, as: z.enum(["text", "number", "boolean"]) }))
+    .array(
+      z.object({ path: z.string(), target, as: z.enum(["text", "number", "boolean", "count"]) }),
+    )
     .min(1),
   identity: identity.optional(),
 })
@@ -162,12 +164,12 @@ export const extractTraceSchema = z.object({
 export type ExtractTrace = z.infer<typeof extractTraceSchema>
 
 /**
- * A recording of one `agent.waitFor` step: the text whose presence showed the condition held, so a
- * replay waits for that text to appear and needs no model.
+ * A recording of one `agent.waitFor` or `agent.assert` step: the text whose presence showed the
+ * condition held, so a replay waits for that text to appear and needs no model.
  */
 export const waitTraceSchema = z.object({
   version: z.literal(1),
-  kind: z.literal("wait"),
+  kind: z.enum(["wait", "assert"]),
   instruction: z.string(),
   recordedAt: z.string(),
   evidence: z.object({ text: z.string().min(1) }),

@@ -12,7 +12,7 @@ import {
   ExtractFailed,
   type FieldSource,
   numberIn,
-  type ReadAs,
+  type PageReadAs,
   readInput,
 } from "../../agent/extract.ts"
 import { toolCallsOf } from "../../agent/loop.ts"
@@ -41,9 +41,10 @@ const tools = {
 const MAX_TURNS = 4
 const TRUE_WORDS = /^(?:yes|true|on|enabled|active|checked)$/i
 
-/** Reads one element as `as`; a password field is never read. */
-function readNode(nodes: readonly DeviceNode[], node: DeviceNode, as: ReadAs): unknown {
+/** Reads one element as `as`; a password field is never read, and a screen's elements not counted. */
+function readNode(nodes: readonly DeviceNode[], node: DeviceNode, as: PageReadAs): unknown {
   if (node.password) throw new Error("a password field is never read")
+  if (as === "count") throw new Error("elements are counted only on a web page")
   if (as === "boolean") return node.checked ?? TRUE_WORDS.test(textOf(nodes, node))
 
   const text = node.editable ? (node.value ?? "") : textOf(nodes, node)

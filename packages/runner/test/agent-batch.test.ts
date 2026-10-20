@@ -134,7 +134,11 @@ describe("cache outcomes", () => {
       return saveStep(session)
     })
 
-    expect(handedCache).toEqual({ mode: "handed-off", saved: true })
+    expect(handedCache).toEqual({
+      mode: "handed-off",
+      reason: 'action 1 (click): getByRole("button", name: "Save") is no longer on the page',
+      saved: true,
+    })
     expect(actor.doGenerateCalls.length).toBeGreaterThan(0)
   }, 90_000)
 })

@@ -15,7 +15,7 @@ import { type BackendMark, EffectWatch, markOf } from "../../agent/effect-watch.
 import { ExtractFailed } from "../../agent/extract.ts"
 import { type JudgeInput, judgeScreen, judgeScreenUntil, type Poll } from "../../agent/judge.ts"
 import type { LoopResult } from "../../agent/loop.ts"
-import { missError, missOf } from "../../agent/miss.ts"
+import { divergedNote, handedOff, missError, missOf } from "../../agent/miss.ts"
 import {
   compareEffects,
   keepRecording,
@@ -137,7 +137,7 @@ class DeviceAgent implements Agent {
       throw missError(index, instruction, miss)
     }
 
-    steps.cache("diverged", miss.because === undefined ? {} : { because: miss.because })
+    steps.cache("diverged", divergedNote(miss))
 
     return this.diverge(index, instruction, reason)
   }
@@ -191,7 +191,7 @@ class DeviceAgent implements Agent {
     const miss: CacheNote =
       replayed.reason === undefined
         ? await missOf(store, key)
-        : { mode: "handed-off", ...(replayed.effect === true && { because: "effect" }) }
+        : handedOff({ ...replayed, reason: replayed.reason }, this.options.vault.redact)
 
     if (strict) {
       const reason = this.stopStrict(call.index, call.instruction, replayed.reason, miss)
@@ -378,7 +378,9 @@ class DeviceAgent implements Agent {
 
   /** Why a step had no recording to replay, or that it had one that stopped replaying. */
   private async missFor(key: StepKey | undefined, reason: string | undefined): Promise<CacheNote> {
-    return reason === undefined ? missOf(this.options.store, key) : { mode: "handed-off" }
+    return reason === undefined
+      ? missOf(this.options.store, key)
+      : handedOff({ reason }, this.options.vault.redact)
   }
 
   /** The recorded sources read again; undefined when there is no recording. */

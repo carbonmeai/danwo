@@ -39,8 +39,14 @@ Pick one verdict:
   wall, a blank or still-loading page, a dialog covering everything.
 - "inconclusive": the page is the right one, but it does not show enough to tell either way.
 
+When it holds, also give evidence: a short piece of text copied exactly from the page (a few words
+at most) whose presence alone shows the claim is true, so that a later run can check for it. Pick
+text that would be there whenever the claim holds and not otherwise, not text that changes from run
+to run (no dates, ids or amounts that differ each time). Leave evidence out when no such text
+exists, as for a claim that something is absent.
+
 Answer with JSON only, no other text:
-{"verdict": "holds" | "fails" | "blocked" | "inconclusive", "reason": "<one sentence citing what the page shows>"}`
+{"verdict": "holds" | "fails" | "blocked" | "inconclusive", "reason": "<one sentence citing what the page shows>", "evidence": "<text from the page>"}`
 
 export const WAIT_PROMPT = `You watch a web page for a test that is waiting for a condition to hold.
 
@@ -74,7 +80,9 @@ Call read with one entry per value in the result:
 - ref: the element that shows the value. Pick the element that holds just that value when there
   is one, not a whole section.
 - as: "text" for words, "number" to take the number in the text ("$1,234.50" reads as 1234.5),
-  "boolean" for a checkbox or switch, or text such as yes/no or on/off.
+  "boolean" for a checkbox or switch, or text such as yes/no or on/off, or "count" for how many
+  of something the page lists when no text says the number: point at any one of them (a card, a
+  row, a list item) and the browser counts the elements like it.
 
 If the result does not fit the schema you are told why and shown the page again; fix the fields.
 If the page does not show what was asked for, call fail and say what you saw.`

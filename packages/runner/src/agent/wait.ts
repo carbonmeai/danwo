@@ -1,32 +1,46 @@
-import type { Tabs } from "../browser/tabs.ts"
 /**
- * One `agent.waitFor` step: wait until a condition in plain words holds. The first time, the
- * judge looks at the page every so often until it says the condition holds, and names a short
- * text on the page that shows it. That text is the recording: a replay waits for it to appear and
- * asks no model. Under strict replay there is no model: evidence that does not appear in time is a
- * divergence, and a step with no recording fails.
+ * `agent.waitFor` and `agent.assert` steps: a condition or a claim in plain words, which the judge
+ * decides. The first time, the judge looks at the page (every so often, for a wait) until it says
+ * the condition holds, and names a short text on the page that shows it. That text is the
+ * recording: a replay waits for it to appear and asks no model. When it does not appear, the page
+ * changed: the judge is asked afresh, and the step is handed off. Under strict replay there is no
+ * model: evidence that does not appear in time is a divergence, and a step with no recording fails.
  */
+import type { Tabs } from "../browser/tabs.ts"
 import type { CacheNote, CacheOutcome } from "../record/steps.ts"
 import { embedsValue, type Params } from "../replay/params.ts"
 import type { ReplayStore, StepKey } from "../replay/store.ts"
 import type { WaitTrace } from "../replay/trace.ts"
 import { DanwoError } from "../support/codes.ts"
-import { type JudgeContext, judgeUntil, type Poll, type Verdict } from "./judge.ts"
+import { type JudgeContext, judgeUntil, type Poll, type Unheld } from "./judge.ts"
 import { missError, missOf } from "./miss.ts"
 
 export interface WaitStepContext {
   readonly tabs: Tabs
   readonly store: ReplayStore | undefined
   readonly strict: boolean
-  readonly poll: Poll
-  /** The judge, set up to watch for a condition; throws when the session has no model. */
+  /** How the judge keeps asking; undefined asks it once. */
+  readonly poll: Poll | undefined
+  /** How long a replay waits for the recorded evidence to be shown. */
+  readonly within: number
+  /** The judge, set up for the step; throws when the session has no model. */
   readonly judge: () => JudgeContext
+  /** The error a verdict other than `holds` ends the step with, given the judge's reason. */
+  readonly fail: (verdict: Unheld, reason: string) => Error
   readonly redact: (text: string) => string
   /** Values a recording must not contain (read from emulators, for instance). */
   readonly volatile: () => readonly string[]
   readonly cache: (outcome: CacheOutcome, detail?: Omit<CacheNote, "mode">) => void
   /** Ends the session's replay here; later steps do nothing. */
   readonly diverge: (reason: string) => string
+}
+
+/** One judged step: which kind, its place in the journey, and what it says. */
+export interface JudgedStep {
+  readonly kind: "wait" | "assert"
+  readonly index: number
+  readonly condition: string
+  readonly params: Params
 }
 
 export interface WaitResult {
@@ -60,12 +74,12 @@ function usable(
 }
 
 /** The error a wait that never saw its condition ends with. */
-function notHeld(condition: string, verdict: Verdict, timeout: number): DanwoError {
-  const code = verdict.verdict === "blocked" ? "CLAIM_BLOCKED" : "WAIT_TIMED_OUT"
+export function notHeld(condition: string, verdict: Unheld, reason: string, timeout: number) {
+  const code = verdict === "blocked" ? "CLAIM_BLOCKED" : "WAIT_TIMED_OUT"
 
   return new DanwoError(
     code,
-    `agent.waitFor(${JSON.stringify(condition)}) did not hold within ${timeout} ms: ${verdict.reason}`,
+    `agent.waitFor(${JSON.stringify(condition)}) did not hold within ${timeout} ms: ${reason}`,
   )
 }
 
@@ -76,24 +90,19 @@ async function fromRecording(
   const trace = key === undefined ? undefined : await context.store?.readWait(key.key)
 
   if (trace === undefined) return { reason: undefined }
-  if (await shown(context.tabs, trace.evidence.text, context.poll.timeout))
-    return { replayed: true }
+  if (await shown(context.tabs, trace.evidence.text, context.within)) return { replayed: true }
 
   return {
-    reason: context.redact(
-      `"${trace.evidence.text}" was not shown within ${context.poll.timeout} ms`,
-    ),
+    reason: context.redact(`"${trace.evidence.text}" was not shown within ${context.within} ms`),
   }
 }
 
-/** Runs one waitFor step. */
-export async function waitStep(
-  step: { readonly index: number; readonly condition: string; readonly params: Params },
-  context: WaitStepContext,
-): Promise<WaitResult> {
+/** Runs one waitFor or assert step. */
+export async function waitStep(step: JudgedStep, context: WaitStepContext): Promise<WaitResult> {
   const { condition, params } = step
   const { store } = context
-  const key = store?.key({ kind: "wait", step: step.index, instruction: condition, params })
+  const { kind, index } = step
+  const key = store?.key({ kind, step: index, instruction: condition, params })
   const recorded = await fromRecording(key, context)
 
   if ("replayed" in recorded) {
@@ -103,7 +112,9 @@ export async function waitStep(
   }
 
   const miss: CacheNote =
-    recorded.reason === undefined ? await missOf(store, key) : { mode: "handed-off" }
+    recorded.reason === undefined
+      ? await missOf(store, key)
+      : { mode: "handed-off", reason: recorded.reason }
 
   if (context.strict) {
     if (recorded.reason === undefined) {
@@ -111,7 +122,7 @@ export async function waitStep(
       throw missError(step.index, condition, miss)
     }
 
-    context.cache("diverged")
+    context.cache("diverged", { reason: recorded.reason })
     context.diverge(recorded.reason)
 
     return { replayed: false }
@@ -119,9 +130,12 @@ export async function waitStep(
 
   const { verdict, page } = await judgeUntil(condition, context.judge(), context.poll)
 
-  if (verdict.verdict !== "holds") throw notHeld(condition, verdict, context.poll.timeout)
+  if (verdict.verdict !== "holds") {
+    context.cache(miss.mode, miss)
+    throw context.fail(verdict.verdict, context.redact(verdict.reason))
+  }
 
-  const saved = await keep(key, condition, verdict.evidence, page, params, context)
+  const saved = await keep(key, step, verdict.evidence, page, context)
 
   context.cache(miss.mode, { ...miss, saved })
 
@@ -131,21 +145,20 @@ export async function waitStep(
 /** Writes the judge's evidence as the step's recording when it can be one. */
 async function keep(
   key: StepKey | undefined,
-  condition: string,
+  step: JudgedStep,
   evidence: string | undefined,
   page: string,
-  params: Params,
   context: WaitStepContext,
 ): Promise<boolean> {
   const { store } = context
 
   if (key === undefined || store === undefined || !store.writes) return false
-  if (!usable(evidence, page, params, context.volatile())) return false
+  if (!usable(evidence, page, step.params, context.volatile())) return false
 
   const trace: WaitTrace = {
     version: 1,
-    kind: "wait",
-    instruction: condition,
+    kind: step.kind,
+    instruction: step.condition,
     recordedAt: new Date().toISOString(),
     evidence: { text: evidence },
   }

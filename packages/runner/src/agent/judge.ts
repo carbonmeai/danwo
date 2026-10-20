@@ -21,11 +21,14 @@ import { JUDGE_PROMPT } from "./prompts.ts"
 const verdictSchema = z.object({
   verdict: z.enum(["holds", "fails", "blocked", "inconclusive"]),
   reason: z.string(),
-  /** For a wait that holds: text on the page whose presence shows it (see WAIT_PROMPT). */
+  /** For a wait or claim that holds: text on the page whose presence shows it (see WAIT_PROMPT). */
   evidence: z.string().optional(),
 })
 
 export type Verdict = z.infer<typeof verdictSchema>
+
+/** A verdict that did not let the step pass. */
+export type Unheld = Exclude<Verdict["verdict"], "holds">
 
 /** Everything the judge sees. */
 export interface JudgeInput {
@@ -43,10 +46,10 @@ const CODES = {
 } as const
 
 /** The claim did not hold, could not be judged, or could not be decided, in the judge's words. */
-class ClaimFailed extends Error {
+export class ClaimFailed extends Error {
   readonly code: (typeof CODES)[keyof typeof CODES]
 
-  constructor(claim: string, verdict: Exclude<Verdict["verdict"], "holds">, reason: string) {
+  constructor(claim: string, verdict: Unheld, reason: string) {
     const word = verdict === "fails" ? "failed" : verdict
 
     super(`agent.assert(${JSON.stringify(claim)}) ${word}: ${reason}`)
@@ -221,14 +224,6 @@ async function untilHolds(
 
     await sleep(Math.min(poll.interval, left), signal)
   }
-}
-
-/** Asks the judge about `claim`; resolves when it holds, throws ClaimFailed otherwise. */
-export async function judge(claim: string, context: JudgeContext, poll?: Poll): Promise<void> {
-  const { verdict } = await judgeUntil(claim, context, poll)
-
-  if (verdict.verdict !== "holds")
-    throw new ClaimFailed(claim, verdict.verdict, context.redact(verdict.reason))
 }
 
 /** A judge of a screen that is not a page, such as a device's: it is shown what `see` gives. */

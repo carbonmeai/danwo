@@ -127,6 +127,8 @@ export interface CacheNote {
    * its recorded effect on the page or the backend (see replay/effects.ts).
    */
   readonly because?: "effect"
+  /** For `diverged` and `handed-off`: what stopped matching, in a line, with secrets redacted. */
+  readonly reason?: string
 }
 
 export interface StepRecord {

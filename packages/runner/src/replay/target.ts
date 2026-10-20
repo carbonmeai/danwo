@@ -170,15 +170,66 @@ export async function describeTarget(
   ref: string,
 ): Promise<Target | undefined> {
   const element = page.getByRef(ref)
-  const testId = await element.getAttribute("data-testid", { timeout: 1_000 }).catch(() => null)
-  const handle = await element.elementHandle({ timeout: 1_000 }).catch(() => null)
-  const frames = handle === null ? [] : await framesOf(handle)
+  const { testId, frames } = await factsOf(element)
 
   if (frames === undefined) return undefined
 
   const base = baseTarget(refLine(tree, ref), testId, refSection(tree, ref))
 
-  return singleOut(page, frames.length > 0 ? { ...base, frame: frames } : base, element)
+  return singleOut(page, framed(base, frames), element)
+}
+
+/** The element's test id, and the frames it sits in (undefined when one cannot be singled out). */
+async function factsOf(element: Locator) {
+  const testId = await element.getAttribute("data-testid", { timeout: 1_000 }).catch(() => null)
+  const handle = await element.elementHandle({ timeout: 1_000 }).catch(() => null)
+  const frames = handle === null ? [] : await framesOf(handle)
+
+  return { testId, frames }
+}
+
+function framed(target: Target, frames: readonly string[]): Target {
+  return frames.length > 0 ? { ...target, frame: [...frames] } : target
+}
+
+/**
+ * The elements like the one behind `ref`, to count them: those with its test id, or else every
+ * element of its role. Undefined when neither describes them (an element with no test id and a
+ * plain role, such as a `div`).
+ */
+export async function describeKind(
+  page: Page,
+  tree: string,
+  ref: string,
+): Promise<Target | undefined> {
+  const { testId, frames } = await factsOf(page.getByRef(ref))
+  const role = refLine(tree, ref)?.role
+
+  if (frames === undefined) return undefined
+  if (testId !== null) return framed({ testId }, frames)
+
+  return role !== undefined && isRoleName(role) ? framed({ role }, frames) : undefined
+}
+
+/**
+ * Every shown element `target` describes, once at least one is, waiting up to `timeout`; throws
+ * TargetMissing when none comes. A count of none is not read: the elements may have been renamed.
+ */
+export async function findAll(page: Page, target: Target, timeout: number): Promise<Locator> {
+  const matches = candidates(page, target)?.filter({ visible: true })
+
+  if (matches === undefined) throw new TargetMissing(`${describe(target)} describes nothing`)
+
+  const deadline = Date.now() + timeout
+
+  while ((await matches.count()) === 0) {
+    if (Date.now() >= deadline)
+      throw new TargetMissing(`${describe(target)} is no longer on the page`)
+
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS))
+  }
+
+  return matches
 }
 
 /** Why a target could not be found again. */

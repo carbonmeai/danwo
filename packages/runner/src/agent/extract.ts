@@ -18,7 +18,7 @@ import { z } from "zod"
 
 import type { Tabs } from "../browser/tabs.ts"
 import { callCost, type CallCost } from "../model/resolve.ts"
-import { describe, describeTarget, type Target } from "../replay/target.ts"
+import { describe, describeKind, describeTarget, findAll, type Target } from "../replay/target.ts"
 import { viewTabs, viewText } from "../snapshot/view.ts"
 import { DanwoError } from "../support/codes.ts"
 import type { VisionDesk } from "../vision/desk.ts"
@@ -29,28 +29,37 @@ import { EXTRACT_PROMPT } from "./prompts.ts"
 /** How a field's element is read: its text, a number in its text, or whether it is on. */
 const readAs = z.enum(["text", "number", "boolean"])
 
-export type ReadAs = z.infer<typeof readAs>
+/** On a page a field may also be a count: how many elements like the one pointed at there are. */
+const pageReadAs = z.enum([...readAs.options, "count"])
+
+export type PageReadAs = z.infer<typeof pageReadAs>
 
 /** One field of the result, the element it comes from, and how to read it. */
 export interface FieldSource {
   /** Where the value goes in the result: `balance`, `owner.name`, `items[0].price`. */
   readonly path: string
   readonly target: Target
-  readonly as: ReadAs
+  readonly as: PageReadAs
 }
 
 /** What a `read` call takes: each field, the element that shows it, and how to read it. */
-export const readInput = z.object({
-  fields: z
-    .array(
-      z.object({
-        path: z.string().describe("Where the value goes, e.g. `balance` or `items[0].name`."),
-        ref: z.string().describe('The ref of the element that shows the value, e.g. "e12".'),
-        as: readAs,
-      }),
-    )
-    .min(1),
-})
+function readInputOf<A extends z.ZodType>(as: A) {
+  return z.object({
+    fields: z
+      .array(
+        z.object({
+          path: z.string().describe("Where the value goes, e.g. `balance` or `items[0].name`."),
+          ref: z.string().describe('The ref of the element that shows the value, e.g. "e12".'),
+          as,
+        }),
+      )
+      .min(1),
+  })
+}
+
+export const readInput = readInputOf(readAs)
+
+const pageReadInput = readInputOf(pageReadAs)
 
 const failInput = z.object({ reason: z.string() })
 
@@ -71,7 +80,7 @@ const extractTools = {
   read: tool({
     description:
       "Read the result off the page: for every field, the element that shows its value and how to read it.",
-    inputSchema: readInput,
+    inputSchema: pageReadInput,
     outputSchema: z.string(),
   }),
   fail: tool({
@@ -134,8 +143,9 @@ async function booleanOf(element: Locator): Promise<boolean> {
   return checkable ? element.isChecked() : TRUE_WORDS.test(await textOf(element))
 }
 
-/** Reads one element as `as`. */
-async function readElement(element: Locator, as: ReadAs): Promise<unknown> {
+/** Reads one element as `as`; for a count, `element` is every element counted. */
+async function readElement(element: Locator, as: PageReadAs): Promise<unknown> {
+  if (as === "count") return element.count()
   if (as === "boolean") return booleanOf(element)
 
   const text = await textOf(element)
@@ -184,7 +194,7 @@ function withPath(node: unknown, keys: readonly (string | number)[], value: unkn
 
 /** Reads every field from its element and checks the result against `schema`. */
 export async function readFields<T>(
-  fields: readonly { readonly path: string; readonly as: ReadAs; readonly element: Locator }[],
+  fields: readonly { readonly path: string; readonly as: PageReadAs; readonly element: Locator }[],
   schema: z.ZodType<T>,
 ): Promise<T> {
   const values: { readonly path: string; readonly value: unknown }[] = []
@@ -241,19 +251,51 @@ function firstMessage(instruction: string, schema: z.ZodType, view: string): str
   ].join("\n\n")
 }
 
-interface ReadCall {
-  readonly fields: readonly { readonly path: string; readonly ref: string; readonly as: ReadAs }[]
+type ReadCall = z.infer<typeof pageReadInput>
+
+/** Where one field of a read call is read, and the element (or, for a count, elements) it reads. */
+interface Located {
+  readonly path: string
+  readonly as: PageReadAs
+  readonly element: Locator
+  /** How a replay finds it again; undefined when nothing durable does. */
+  readonly target: Target | undefined
 }
 
-/** Describes every field's element, while its ref still belongs to the latest view. */
-async function sourcesOf(page: Page, tree: string, call: ReadCall): Promise<FieldSource[] | null> {
-  const sources: FieldSource[] = []
+/**
+ * Finds every field's element, while its ref still belongs to the latest view. A count reads every
+ * element like the one pointed at, so it needs a description of them; throws when there is none.
+ */
+async function locate(page: Page, tree: string, call: ReadCall): Promise<Located[]> {
+  const located: Located[] = []
 
   for (const field of call.fields) {
-    const target = await describeTarget(page, tree, field.ref)
+    if (field.as !== "count") {
+      const target = await describeTarget(page, tree, field.ref)
 
+      located.push({ ...field, element: page.getByRef(field.ref), target })
+      continue
+    }
+
+    const kind = await describeKind(page, tree, field.ref)
+
+    if (kind === undefined)
+      throw new Error(
+        `${field.path}: the elements like [ref=${field.ref}] have no test id or role to count them by; point at one that has`,
+      )
+    located.push({ ...field, element: await findAll(page, kind, 0), target: kind })
+  }
+
+  return located
+}
+
+/** Where every field was read, to record; null when one has no durable target. */
+function sourcesOf(located: readonly Located[]): FieldSource[] | null {
+  const sources: FieldSource[] = []
+
+  for (const { path, target, as } of located) {
     if (target === undefined) return null
-    sources.push({ path: field.path, target, as: field.as })
+    sources.push({ path, target, as })
   }
 
   return sources
@@ -363,11 +405,10 @@ class ExtractLoop<T> {
     const page = this.context.tabs.page
 
     try {
-      const sources = await sourcesOf(page, tree, input)
-      const fields = input.fields.map((field) => ({ ...field, element: page.getByRef(field.ref) }))
-      const value = await readFields(fields, this.schema)
+      const located = await locate(page, tree, input)
+      const value = await readFields(located, this.schema)
 
-      return { value, sources }
+      return { value, sources: sourcesOf(located) }
     } catch (error) {
       return {
         problem: this.context.redact(error instanceof Error ? error.message : String(error)),
@@ -420,7 +461,7 @@ class ExtractLoop<T> {
         : undefined
     }
 
-    const read = readInput.safeParse(call.toolName === "read" ? call.input : undefined)
+    const read = pageReadInput.safeParse(call.toolName === "read" ? call.input : undefined)
 
     return read.success ? { id: call.toolCallId, kind: "read", input: read.data } : undefined
   }

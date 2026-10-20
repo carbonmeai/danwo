@@ -12,7 +12,7 @@ import type { CacheNote, CacheOutcome } from "../record/steps.ts"
 import type { Params } from "../replay/params.ts"
 import type { TargetFinder } from "../replay/replayer.ts"
 import type { ReplayStore, StepKey } from "../replay/store.ts"
-import { findTarget, type Target } from "../replay/target.ts"
+import { describe, findAll, findTarget, type Target } from "../replay/target.ts"
 import type { ExtractTrace } from "../replay/trace.ts"
 import {
   type ExtractContext,
@@ -22,7 +22,7 @@ import {
   readFields,
   sourceLabels,
 } from "./extract.ts"
-import { missError, missOf } from "./miss.ts"
+import { divergedNote, handedOff, missError, missOf } from "./miss.ts"
 
 /** A recorded element that is not back within this long is gone: the page changed. */
 const FIND_MS = 5_000
@@ -66,8 +66,18 @@ async function replayExtract<T>(
   const found: ExtractTrace["fields"] = []
 
   for (const field of trace.fields) {
+    if (field.as === "count") {
+      const element = await findAll(context.tabs.page, field.target, timeout)
+
+      fields.push({ path: field.path, as: field.as, element })
+      found.push(field)
+      continue
+    }
+
     const located = await find(field.target, timeout)
 
+    if (!(await located.element.isVisible()))
+      throw new Error(`${describe(located.target)} is no longer shown`)
     if (located.target !== field.target) context.onRelocated(field.target, located.target)
     fields.push({ path: field.path, as: field.as, element: located.element })
     found.push({ ...field, target: located.target })
@@ -120,7 +130,9 @@ export async function extractStep<T>(
   }
 
   const miss: CacheNote =
-    recorded.reason === undefined ? await missOf(store, key) : { mode: "handed-off" }
+    recorded.reason === undefined
+      ? await missOf(store, key)
+      : handedOff({ reason: recorded.reason }, context.redact)
 
   if (context.strict) return stopStrict(step, recorded.reason, miss, context)
 
@@ -151,7 +163,7 @@ function stopStrict(
     throw missError(step.index, step.instruction, miss)
   }
 
-  context.cache("diverged")
+  context.cache("diverged", divergedNote(miss))
   throw new ExtractFailed(step.instruction, `diverged: ${context.diverge(reason)}`)
 }
 

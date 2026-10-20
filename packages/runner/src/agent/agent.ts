@@ -39,9 +39,9 @@ import { type BackendMark, EffectWatch, markOf } from "./effect-watch.ts"
 import { extractStep } from "./extract-step.ts"
 import { ExtractFailed } from "./extract.ts"
 import type { Files } from "./files.ts"
-import { judge, type JudgeContext, type Poll } from "./judge.ts"
+import { ClaimFailed, type JudgeContext, type Poll, type Unheld } from "./judge.ts"
 import { type LiveResult, runLive } from "./live.ts"
-import { missError, missOf } from "./miss.ts"
+import { divergedNote, handedOff, missError, missOf } from "./miss.ts"
 import { JUDGE_PROMPT, WAIT_PROMPT } from "./prompts.ts"
 import {
   compareEffects,
@@ -60,7 +60,7 @@ import type {
   ExtractOptions,
   WaitForOptions,
 } from "./types.ts"
-import { waitStep } from "./wait.ts"
+import { type JudgedStep, notHeld, type WaitStepContext, waitStep } from "./wait.ts"
 
 /** The current time, as step and log lines record it. */
 function now(): string {
@@ -259,55 +259,73 @@ class SessionAgent implements Agent {
   }
 
   assert(claim: string, options: AssertOptions = {}): Promise<void> {
-    const { steps } = this.options
     const poll = pollOf(options.poll, {
       timeout: this.options.assertionTimeout,
       interval: DEFAULT_INTERVAL_MS,
     })
+    /*
+     * A claim is checked even under strict replay: with no evidence recorded, or evidence that is
+     * no longer shown, the judge decides it as it always did.
+     */
+    const judged = {
+      strict: false,
+      poll,
+      within: this.options.assertionTimeout,
+      judge: () => this.judgeContext(JUDGE_PROMPT, options.vision),
+      fail: (verdict: Unheld, reason: string) => new ClaimFailed(claim, verdict, reason),
+    }
 
-    return steps.run(
-      "agent",
-      "agent.assert",
-      this.options.vault.redact(claim),
-      () => {
-        this.spent.check()
-
-        return judge(claim, this.judgeContext(JUDGE_PROMPT, options.vision), poll)
-      },
-      { verifies: true },
-    )
+    return this.judged({ kind: "assert", condition: claim, params: {} }, judged, "agent.assert")
   }
 
   waitFor(condition: string, options: WaitForOptions = {}): Promise<void> {
-    const index = this.actCount++
-    const { steps, vault } = this.options
     const poll: Poll = {
       timeout: options.timeout ?? DEFAULT_WAIT_MS,
       interval: options.interval ?? DEFAULT_INTERVAL_MS,
     }
+    const judged = {
+      strict: this.options.strict,
+      poll,
+      within: poll.timeout,
+      judge: () => this.judgeContext(WAIT_PROMPT),
+      fail: (verdict: Unheld, reason: string) => notHeld(condition, verdict, reason, poll.timeout),
+    }
+    const step = { kind: "wait" as const, condition, params: options.params ?? {} }
+
+    return this.judged(step, judged, "agent.waitFor")
+  }
+
+  /** Runs a step the judge decides, replaying the evidence it named when one was recorded. */
+  private judged(
+    step: Omit<JudgedStep, "index">,
+    how: Pick<WaitStepContext, "strict" | "poll" | "within" | "judge" | "fail">,
+    api: string,
+  ): Promise<void> {
+    const index = this.actCount++
+    const { steps, vault } = this.options
 
     const body = async () => {
       this.spent.check()
 
-      if (this.divergence !== undefined) {
+      if (how.strict && this.divergence !== undefined) {
         steps.cache("diverged")
 
         return
       }
 
       await waitStep(
-        { index, condition, params: options.params ?? {} },
+        { ...step, index },
         {
+          ...how,
           tabs: this.options.tabs,
           store: this.options.store,
-          strict: this.options.strict,
-          poll,
-          judge: () => this.judgeContext(WAIT_PROMPT),
           redact: vault.redact,
           volatile: () => this.options.mail.values(),
           cache: (outcome, detail) => steps.cache(outcome, detail),
           diverge: (reason) => {
-            this.divergence = { step: index, instruction: condition, reason: vault.redact(reason) }
+            const instruction = step.condition
+
+            this.divergence = { step: index, instruction, reason: vault.redact(reason) }
 
             return this.divergence.reason
           },
@@ -315,7 +333,7 @@ class SessionAgent implements Agent {
       )
     }
 
-    return steps.run("agent", "agent.waitFor", vault.redact(condition), body, { verifies: true })
+    return steps.run("agent", api, vault.redact(step.condition), body, { verifies: true })
   }
 
   /** The judge as a step calls it, told its job by `system`, seeing a screenshot as `vision` says. */
@@ -441,7 +459,7 @@ class SessionAgent implements Agent {
   private async missFor(key: StepKey | undefined, replayed: Replayed): Promise<CacheNote> {
     if (replayed.ok || replayed.reason === undefined) return missOf(this.options.store, key)
 
-    return { mode: "handed-off", ...(replayed.effect === true && { because: "effect" }) }
+    return handedOff({ ...replayed, reason: replayed.reason }, this.options.vault.redact)
   }
 
   /** Replays the recording under `key`; `reason` is undefined when there is none. */
@@ -540,10 +558,7 @@ class SessionAgent implements Agent {
     }
 
     this.divergence = { step: index, instruction, reason: this.options.vault.redact(reason) }
-    this.options.steps.cache(
-      "diverged",
-      miss.because === undefined ? {} : { because: miss.because },
-    )
+    this.options.steps.cache("diverged", divergedNote(miss))
 
     return { summary: `diverged: ${this.divergence.reason}`, modelCalls: 0, actions: 0 }
   }

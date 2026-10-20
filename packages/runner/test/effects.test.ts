@@ -190,7 +190,11 @@ describe("replayed effects", () => {
     expect(replayed.divergence?.reason).toBe(
       "effect: expected listitem: Groceries on the page, saw none",
     )
-    expect(replayed.cache).toEqual({ mode: "diverged", because: "effect" })
+    expect(replayed.cache).toEqual({
+      mode: "diverged",
+      because: "effect",
+      reason: "effect: expected listitem: Groceries on the page, saw none",
+    })
     expect(replayed.effects).toMatchObject({ result: "diverged" })
   }, 60_000)
 
@@ -229,7 +233,12 @@ describe("replayed effects", () => {
       return session.flight.steps().find((s) => s.api === "agent.act")?.cache
     })
 
-    expect(healed).toEqual({ mode: "handed-off", because: "effect", saved: true })
+    expect(healed).toEqual({
+      mode: "handed-off",
+      because: "effect",
+      reason: "effect: expected listitem: Groceries on the page, saw none",
+      saved: true,
+    })
     expect(actor.doGenerateCalls.length).toBeGreaterThan(0)
 
     const replayed = await strictReplay()
