@@ -1,3 +1,4 @@
+import { browserCors } from "../cors.ts"
 import type { Emulator } from "../define.ts"
 import { defineEmulator } from "../define.ts"
 import { HttpError } from "../errors.ts"
@@ -77,6 +78,8 @@ export const novu = defineEmulator({
 
       return novuError(c, status, error instanceof Error ? error.message : "Internal server error")
     })
+    /* `@novu/react` calls the Inbox API from the app's page, across origins. */
+    app.use(browserCors((path) => path.startsWith("/v1/inbox")))
     inboxRoutes({ app, objects, clock, engine, realtime })
     apiRoutes({ app, objects, clock, engine, realtime }, store)
   },

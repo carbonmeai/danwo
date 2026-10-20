@@ -1,3 +1,4 @@
+import { browserCors } from "../cors.ts"
 import { defineEmulator, type EmulatorContext } from "../define.ts"
 import { HttpError } from "../errors.ts"
 import { App, type Context, type ErrorHandler, type Middleware } from "../http.ts"
@@ -12,7 +13,7 @@ import { BAPI_HOST, ClerkFailure, clerkErrorBody } from "./helpers.ts"
 import { accountsRoutes } from "./routes/accounts.ts"
 import { attemptRoutes } from "./routes/attempts.ts"
 import { clientApiRoutes } from "./routes/client.ts"
-import { frontendCors, frontendRoutes, methodOverride } from "./routes/frontend.ts"
+import { frontendRoutes, methodOverride } from "./routes/frontend.ts"
 import { instanceRoutes } from "./routes/instance.ts"
 import { organizationRoutes } from "./routes/organizations.ts"
 import { sessionRoutes } from "./routes/sessions.ts"
@@ -144,7 +145,7 @@ export const clerk = defineEmulator({
     sessionRoutes(apps.backend, context)
     organizationRoutes(apps.backend, context)
     instanceRoutes(apps.backend, context)
-    apps.frontend.use(frontendCors())
+    apps.frontend.use(browserCors())
     apps.frontend.use(methodOverride(apps.frontend))
     apps.frontend.use(clerkScripts())
     frontendRoutes(apps.frontend, context)

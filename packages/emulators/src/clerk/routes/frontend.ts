@@ -37,33 +37,6 @@ function handshake(c: Context, context: ClerkContext): Response {
 }
 
 /**
- * ClerkJS calls the Frontend API from the app's own origin with credentials, so every answer names
- * that origin and preflights are answered here.
- */
-export function frontendCors(): Middleware {
-  return async (c, next) => {
-    const origin = c.req.header("origin")
-
-    if (origin === undefined) return next()
-
-    const headers = {
-      "access-control-allow-origin": origin,
-      "access-control-allow-credentials": "true",
-      "access-control-allow-headers":
-        c.req.header("access-control-request-headers") ?? "content-type",
-      "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS",
-      vary: "Origin",
-    }
-
-    if (c.req.method === "OPTIONS") return new Response(null, { status: 204, headers })
-
-    for (const [name, value] of Object.entries(headers)) c.header(name, value)
-
-    return next()
-  }
-}
-
-/**
  * ClerkJS sends `PATCH` and `DELETE` as a `POST` with `_method` in the query, so they pass
  * through anything that only allows simple requests; the request is replayed with its real method.
  */

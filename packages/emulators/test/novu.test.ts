@@ -187,6 +187,34 @@ function send(body: unknown): Promise<Response> {
   })
 }
 
+describe("novu Inbox from the app's page", () => {
+  it("answers a preflight and names the calling origin, so the browser's Inbox can start", async () => {
+    const page = "http://localhost:3050"
+    const preflight = await emulator.fetch(
+      new Request("https://api.novu.co/v1/inbox/session", {
+        method: "OPTIONS",
+        headers: {
+          origin: page,
+          "access-control-request-headers": "content-type, novu-api-version",
+        },
+      }),
+    )
+    const server = await emulator.fetch(
+      new Request("https://api.novu.co/v2/subscribers", {
+        method: "OPTIONS",
+        headers: { origin: page },
+      }),
+    )
+
+    expect(preflight.status).toBe(204)
+    expect(preflight.headers.get("access-control-allow-origin")).toBe(page)
+    expect(preflight.headers.get("access-control-allow-headers")).toBe(
+      "content-type, novu-api-version",
+    )
+    expect(server.headers.get("access-control-allow-origin")).toBeNull()
+  })
+})
+
 describe("novu idempotency", () => {
   it("answers a retried trigger with the first answer, and runs the workflow once", async () => {
     seedNovu(emulator.store, {
