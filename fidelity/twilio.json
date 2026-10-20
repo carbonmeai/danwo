@@ -1,7 +1,7 @@
 {
   "provider": "twilio",
-  "source": "openapi",
-  "recorded": "2026-10-18",
+  "source": "live",
+  "recorded": "2026-10-20",
   "scenarios": {
     "messages: send from the test number": {
       "steps": [
@@ -27,11 +27,110 @@
         }
       ],
       "facts": []
+    },
+    "account: the account, its numbers and its messages": {
+      "steps": [
+        {
+          "step": "read the account",
+          "status": 200,
+          "shape": "67bcbb560844"
+        },
+        {
+          "step": "list the numbers",
+          "status": 200,
+          "shape": "f78b1a25632d"
+        },
+        {
+          "step": "list the messages",
+          "status": 200,
+          "shape": "6d4528149d1c"
+        }
+      ],
+      "facts": []
+    },
+    "errors: bad credentials, a missing message, no recipient": {
+      "steps": [
+        {
+          "step": "read with a wrong secret",
+          "status": 401,
+          "shape": "5d8734afc863"
+        },
+        {
+          "step": "read a message that isn't there",
+          "status": 404,
+          "shape": "0b7afb152b24"
+        },
+        {
+          "step": "send with no recipient",
+          "status": 400,
+          "shape": "e89312be02aa"
+        }
+      ],
+      "facts": []
+    },
+    "messages: a trial account's refusals": {
+      "steps": [
+        {
+          "step": "send to a malformed number",
+          "status": 400,
+          "shape": "dd2c1c417c47"
+        },
+        {
+          "step": "send to an unverified number",
+          "status": 422,
+          "shape": "b3485915fede"
+        },
+        {
+          "step": "send with no body",
+          "status": 400,
+          "shape": "dd2c1c417c47"
+        },
+        {
+          "step": "the account's messages to the recipient",
+          "status": 200,
+          "shape": "6d4528149d1c"
+        }
+      ],
+      "facts": [
+        {
+          "name": "messages created",
+          "value": 0
+        }
+      ]
+    },
+    "messages: a full account's refusals": {
+      "steps": [
+        {
+          "step": "send to a malformed number",
+          "status": 400,
+          "shape": "9ddbd9cab392"
+        },
+        {
+          "step": "send from a number not owned",
+          "status": 400,
+          "shape": "38bdf9025373"
+        },
+        {
+          "step": "the account's messages to the recipient",
+          "status": 200,
+          "shape": "2a78cac0073c"
+        }
+      ],
+      "facts": []
     }
   },
   "shapes": {
+    "0b7afb152b24": {"t":"object","keys":{"code":{"t":"literal","v":20404},"message":{"t":"string"},"more_info":{"t":"string"},"status":{"t":"literal","v":404}}},
+    "2a78cac0073c": {"t":"object","keys":{"end":{"t":"number"},"first_page_uri":{"t":"string"},"next_page_uri":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"page":{"t":"number"},"page_size":{"t":"number"},"previous_page_uri":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"start":{"t":"number"},"uri":{"t":"string"},"messages":{"t":"array","of":{"t":"object","keys":{"body":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"num_segments":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"direction":{"t":"string"},"from":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"to":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"date_updated":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"price":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"error_message":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"uri":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"account_sid":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"num_media":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"status":{"t":"string"},"messaging_service_sid":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"sid":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"date_sent":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"date_created":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"error_code":{"t":"union","of":[{"t":"number"},{"t":"null"}]},"price_unit":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"api_version":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"subresource_uris":{"t":"union","of":[{"t":"object","keys":{},"open":true},{"t":"null"}]}},"optional":["body","num_segments","direction","from","to","date_updated","price","error_message","uri","account_sid","num_media","status","messaging_service_sid","sid","date_sent","date_created","error_code","price_unit","api_version","subresource_uris"]}}},"optional":["end","first_page_uri","next_page_uri","page","page_size","previous_page_uri","start","uri","messages"]},
     "38bdf9025373": {"t":"object","keys":{"code":{"t":"literal","v":21606},"message":{"t":"string"},"more_info":{"t":"string"},"status":{"t":"literal","v":400},"details":{"t":"union","of":[{"t":"any"},{"t":"null"}]}},"optional":["details"]},
+    "5d8734afc863": {"t":"object","keys":{"code":{"t":"literal","v":20003},"message":{"t":"string"},"more_info":{"t":"string"},"status":{"t":"literal","v":401}}},
+    "67bcbb560844": {"t":"object","keys":{"auth_token":{"t":"string"},"date_created":{"t":"string"},"date_updated":{"t":"string"},"friendly_name":{"t":"string"},"owner_account_sid":{"t":"string"},"sid":{"t":"string"},"status":{"t":"literal","v":"active"},"subresource_uris":{"t":"object","keys":{"addresses":{"t":"string"},"applications":{"t":"string"},"authorized_connect_apps":{"t":"string"},"available_phone_numbers":{"t":"string"},"balance":{"t":"string"},"calls":{"t":"string"},"conferences":{"t":"string"},"connect_apps":{"t":"string"},"incoming_phone_numbers":{"t":"string"},"keys":{"t":"string"},"messages":{"t":"string"},"notifications":{"t":"string"},"outgoing_caller_ids":{"t":"string"},"queues":{"t":"string"},"recordings":{"t":"string"},"short_codes":{"t":"string"},"signing_keys":{"t":"string"},"sip":{"t":"string"},"transcriptions":{"t":"string"},"usage":{"t":"string"}}},"type":{"t":"string"},"uri":{"t":"string"}}},
+    "6d4528149d1c": {"t":"object","keys":{"end":{"t":"number"},"first_page_uri":{"t":"string"},"messages":{"t":"array","of":null},"next_page_uri":{"t":"null"},"page":{"t":"number"},"page_size":{"t":"number"},"previous_page_uri":{"t":"null"},"start":{"t":"number"},"uri":{"t":"string"}}},
     "9ddbd9cab392": {"t":"object","keys":{"code":{"t":"literal","v":21211},"message":{"t":"string"},"more_info":{"t":"string"},"status":{"t":"literal","v":400},"details":{"t":"union","of":[{"t":"any"},{"t":"null"}]}},"optional":["details"]},
-    "dfc19d9d6f7c": {"t":"object","keys":{"body":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"num_segments":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"direction":{"t":"string"},"from":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"to":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"date_updated":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"price":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"error_message":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"uri":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"account_sid":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"num_media":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"status":{"t":"literal","v":"queued"},"messaging_service_sid":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"sid":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"date_sent":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"date_created":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"error_code":{"t":"union","of":[{"t":"number"},{"t":"null"}]},"price_unit":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"api_version":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"subresource_uris":{"t":"union","of":[{"t":"object","keys":{},"open":true},{"t":"null"}]}},"optional":["body","num_segments","direction","from","to","date_updated","price","error_message","uri","account_sid","num_media","status","messaging_service_sid","sid","date_sent","date_created","error_code","price_unit","api_version","subresource_uris"]}
+    "b3485915fede": {"t":"object","keys":{"code":{"t":"literal","v":572002},"message":{"t":"string"},"more_info":{"t":"string"},"status":{"t":"literal","v":422}}},
+    "dd2c1c417c47": {"t":"object","keys":{"code":{"t":"literal","v":0},"message":{"t":"string"},"more_info":{"t":"string"},"status":{"t":"literal","v":400}}},
+    "dfc19d9d6f7c": {"t":"object","keys":{"body":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"num_segments":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"direction":{"t":"string"},"from":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"to":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"date_updated":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"price":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"error_message":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"uri":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"account_sid":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"num_media":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"status":{"t":"literal","v":"queued"},"messaging_service_sid":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"sid":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"date_sent":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"date_created":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"error_code":{"t":"union","of":[{"t":"number"},{"t":"null"}]},"price_unit":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"api_version":{"t":"union","of":[{"t":"string"},{"t":"null"}]},"subresource_uris":{"t":"union","of":[{"t":"object","keys":{},"open":true},{"t":"null"}]}},"optional":["body","num_segments","direction","from","to","date_updated","price","error_message","uri","account_sid","num_media","status","messaging_service_sid","sid","date_sent","date_created","error_code","price_unit","api_version","subresource_uris"]},
+    "e89312be02aa": {"t":"object","keys":{"code":{"t":"literal","v":21604},"message":{"t":"string"},"more_info":{"t":"string"},"status":{"t":"literal","v":400}}},
+    "f78b1a25632d": {"t":"object","keys":{"end":{"t":"number"},"first_page_uri":{"t":"string"},"incoming_phone_numbers":{"t":"array","of":null},"next_page_uri":{"t":"null"},"page":{"t":"number"},"page_size":{"t":"number"},"previous_page_uri":{"t":"null"},"start":{"t":"number"},"uri":{"t":"string"}}}
   }
 }
