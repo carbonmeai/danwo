@@ -122,4 +122,20 @@ describe("a stack of apps behind one proxy", () => {
     expect(out).toMatch(/about \d+ min for \d+ trials on \d+ workers/)
     expect(out).not.toContain("faulted runs stop")
   }, 300_000)
+
+  it("runs the trials it planned, each landing on the body's own work", async () => {
+    const preview = await danwo(["matrix", "tests/session.danwo.ts", "--plan"])
+    const planned = preview.out
+      .split("\n")
+      .filter((line) => line.startsWith("  "))
+      .map((line) => line.trim())
+    const { out } = await danwo(["matrix", "tests/session.danwo.ts"])
+    const runs = [...out.matchAll(/^(PASS|FAIL|INVALID|NOT JUDGED|ENV) {1,2}(.+)$/gm)]
+      .map(([, status, label]) => ({ status, label }))
+      .filter(({ label }) => label !== "clean run")
+
+    expect(runs.map(({ label }) => label).toSorted()).toEqual(planned.toSorted())
+    /* A fault the setup's leftovers would have drawn never fires in a trial: none was planned. */
+    expect(runs.filter(({ status }) => status === "INVALID")).toEqual([])
+  }, 600_000)
 })
