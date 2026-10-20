@@ -30,9 +30,11 @@ import { Upload } from "@aws-sdk/lib-storage"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { s3, seedS3, signRequest, type SigningKey } from "@danwo/emulators"
 
+import { FIDELITY_TAG } from "../ledger.ts"
 import { type FidelityProvider, requiredCredentials } from "../provider.ts"
 import type { Scenario, ScenarioContext, StepOptions, Target } from "../scenario.ts"
 import { asJsonObject, type Json } from "../shape.ts"
+import { isTagged, type Leftover } from "../sweep.ts"
 import { credential, emulatorTarget, liveTarget } from "../target.ts"
 import {
   envelopeTarget,
@@ -105,8 +107,9 @@ function clientOf(target: Target, handler: RecordingHandler, key: SigningKey): S
 }
 
 /**
- * The scenario's bucket view, with cleanup registered: every key under the run's prefix is
- * deleted and every multipart upload under it aborted once the scenario ends.
+ * The scenario's bucket view. Its prefix, `danwo-fidelity/<tag>/`, goes in the cleanup ledger
+ * first: once the scenario ends, finished or not, every multipart upload under it is aborted and
+ * every object under it deleted.
  */
 function bucketOf(context: ScenarioContext): Bucket {
   const handler = recordingHandler(context, rawTargetOf(context.target))
@@ -115,19 +118,22 @@ function bucketOf(context: ScenarioContext): Bucket {
     client: clientOf(context.target, handler, key),
     handler,
     bucket: credential(context.target, "bucket"),
-    prefix: `danwo-fidelity/${context.unique}/`,
+    prefix: `${FIDELITY_TAG}/${context.tag}/`,
     key,
     region: credential(context.target, "region"),
     endpoint: new URL(credential(context.target, "endpoint")),
   }
 
-  context.cleanup(() => emptyPrefix(view))
+  context.created({ kind: "prefix", id: view.prefix, undo: () => emptyPrefix(view) })
 
   return view
 }
 
-/** Aborts the uploads and deletes the objects under the run's prefix; unrecorded. */
-async function emptyPrefix(view: Bucket): Promise<void> {
+/**
+ * Aborts the uploads and deletes the objects under the run's prefix, unrecorded, and answers
+ * 204 when nothing is left under it, 409 when something is, for the ledger to report.
+ */
+async function emptyPrefix(view: Bucket): Promise<Response> {
   const { client, bucket, prefix } = view
   const uploads = await client.send(
     new ListMultipartUploadsCommand({ Bucket: bucket, Prefix: prefix }),
@@ -152,7 +158,74 @@ async function emptyPrefix(view: Bucket): Promise<void> {
       new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: keys, Quiet: true } }),
     )
 
+  const left = await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix }))
+
   client.destroy()
+
+  return new Response(null, { status: (left.KeyCount ?? 0) === 0 ? 204 : 409 })
+}
+
+/** A request signed with the target's key, sent to its own target, unrecorded. */
+async function sendSigned(target: Target, request: Request): Promise<Response> {
+  return rawTargetOf(target).send(
+    await signRequest(request, signingKey(target), { region: credential(target, "region") }),
+  )
+}
+
+/** Every `<tag>` text in an S3 listing, decoded. */
+function texts(xml: string, tag: string): string[] {
+  return [...xml.matchAll(new RegExp(`<${tag}>([^<]*)</${tag}>`, "g"))].map((match) =>
+    (match[1] ?? "").replaceAll("&amp;", "&"),
+  )
+}
+
+/** A key as a URL path, each segment encoded. */
+function keyPath(key: string): string {
+  return key
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/")
+}
+
+/**
+ * What earlier runs left under `danwo-fidelity/`: objects, removed one by one, and multipart
+ * uploads, aborted. Everything under that prefix carries the tag, and nothing else is touched.
+ */
+async function sweepBucket(target: Target): Promise<Leftover[]> {
+  const base = `https://${credential(target, "bucket")}.${new URL(credential(target, "endpoint")).host}`
+  const prefix = encodeURIComponent(`${FIDELITY_TAG}/`)
+  const objects = await (
+    await sendSigned(target, new Request(`${base}/?list-type=2&prefix=${prefix}`))
+  ).text()
+  const uploads = await (
+    await sendSigned(target, new Request(`${base}/?uploads&prefix=${prefix}`))
+  ).text()
+  const uploadKeys = texts(uploads, "Key")
+
+  return [
+    ...texts(objects, "Key").map((key) => ({
+      kind: "object",
+      id: key,
+      label: key,
+      tagged: isTagged(key),
+      remove: () =>
+        sendSigned(target, new Request(`${base}/${keyPath(key)}`, { method: "DELETE" })),
+    })),
+    ...texts(uploads, "UploadId").map((uploadId, index) => ({
+      kind: "multipart upload",
+      id: uploadId,
+      label: uploadKeys[index] ?? "",
+      tagged: isTagged(uploadKeys[index]),
+      remove: () =>
+        sendSigned(
+          target,
+          new Request(
+            `${base}/${keyPath(uploadKeys[index] ?? "")}?uploadId=${encodeURIComponent(uploadId)}`,
+            { method: "DELETE" },
+          ),
+        ),
+    })),
+  ]
 }
 
 /** A virtual-hosted URL for `key` in the bucket, or for the bucket itself. */
@@ -704,6 +777,7 @@ export const s3Fidelity: FidelityProvider = {
     { name: REGION, description: "the signing region (default auto)", optional: true },
   ],
   scenarios: [objects, listing, multipart, presigned, conditional, errors, tigrisCalls],
+  sweep: sweepBucket,
   async emulator() {
     return envelopeTarget(
       await emulatorTarget(s3, EMULATED, (emulator) =>
