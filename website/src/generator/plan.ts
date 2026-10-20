@@ -153,15 +153,12 @@ const REAL_STACK_SECTIONS = [
   "Hosts no service answers",
 ]
 
-/** The providers guide's section on starting every test from the seed, a page of its own. */
-const ISOLATION_SECTIONS = ["Isolation"]
-
 /**
  * Every guide section that is shown on a page of its own rather than its guide's page, by guide:
  * the guide's page drops them, and the docs test checks each has exactly one home.
  */
 export const MOVED_SECTIONS = {
-  providers: [...PROVIDER_GUIDE_SECTIONS, ...REAL_STACK_SECTIONS, ...ISOLATION_SECTIONS],
+  providers: [...PROVIDER_GUIDE_SECTIONS, ...REAL_STACK_SECTIONS],
 }
 
 /** The entries of the spec's test API that are about fixtures rather than declaring tests. */
@@ -181,17 +178,20 @@ export const PLAN: readonly PlannedTab[] = [
           file("why-danwo", "Why danwo", "Sparkles"),
           file("quickstart", "Quickstart", "Rocket"),
           file("test-a-provider", "Test a provider", "CreditCard"),
-          {
-            slug: "coding-agents",
-            title: "Coding agents",
-            icon: "Bot",
-            source: {
-              kind: "readme",
-              heading: "Coding agents (MCP)",
-              description:
-                "danwo's MCP server, skill, spec and guides let Claude Code, Cursor and Codex run, explain and write danwo tests.",
-            },
-          },
+        ],
+      },
+      {
+        title: "Coding agents",
+        pages: [
+          file("coding-agents", "Overview", "Bot", "coding-agents/overview.mdx"),
+          file("agent-setup", "Set up your agent", "Settings2", "coding-agents/setup.mdx"),
+          file("mcp-tools", "MCP tools", "Wrench", "coding-agents/mcp-tools.mdx"),
+          file(
+            "fix-with-an-agent",
+            "Fix a failure",
+            "Stethoscope",
+            "coding-agents/fix-a-failure.mdx",
+          ),
         ],
       },
       {
@@ -229,21 +229,18 @@ export const PLAN: readonly PlannedTab[] = [
       {
         title: "Core concepts",
         pages: [
-          guide(
+          file(
             "agent-and-locators",
             "Agent and locators",
             "MousePointerClick",
-            "locators-vs-agent",
+            "concepts/agent-and-locators.mdx",
           ),
+          file("agent-steps", "Agent steps", "Sparkle", "concepts/agent-steps.mdx"),
           file("replay-cache", "Replay cache", "RotateCcwClock", "concepts/replay-cache.mdx"),
-          guide("emulators", "Emulators", "Server", "providers", MOVED_SECTIONS.providers),
-          sections("isolation", "Isolation", "Layers", {
-            topic: "providers",
-            keep: ISOLATION_SECTIONS,
-            description:
-              "Every test, and every retry, starts from the environment's seeded state; change it per config, file or describe block.",
-          }),
-          guide("flight-records", "Flight records", "FileSearch", "debugging"),
+          file("emulators", "Emulators", "Server", "concepts/emulators.mdx"),
+          file("emulator-state", "Seeding and state", "Sprout", "concepts/emulator-state.mdx"),
+          file("isolation", "Isolation", "Layers", "concepts/isolation.mdx"),
+          file("flight-records", "Flight records", "FileSearch", "concepts/flight-records.mdx"),
         ],
       },
       {
@@ -272,12 +269,19 @@ export const PLAN: readonly PlannedTab[] = [
       {
         title: "Writing tests",
         pages: [
-          guide("secrets", "Secrets", "KeyRound"),
-          guide("email-and-otp", "Email and 2FA codes", "Mail"),
-          guide("sessions", "Saved sessions", "UserCheck"),
-          guide("time-travel", "Time travel", "Clock", "time"),
-          guide("data-faults", "Database and cache", "Database", "infrastructure"),
-          guide("integration-lint", "Integration lint", "ShieldCheck", "lint"),
+          file("secrets", "Secrets", "KeyRound", "writing-tests/secrets.mdx"),
+          file("email-and-otp", "Email and 2FA codes", "Mail", "writing-tests/email-and-otp.mdx"),
+          file("sessions", "Saved sessions", "UserCheck", "writing-tests/sessions.mdx"),
+          file("two-people", "A second person", "Users", "writing-tests/two-people.mdx"),
+          file("time-travel", "Time travel", "Clock", "writing-tests/time-travel.mdx"),
+          file("data-faults", "Database and cache", "Database", "writing-tests/data-faults.mdx"),
+          file(
+            "integration-lint",
+            "Integration lint",
+            "ShieldCheck",
+            "writing-tests/integration-lint.mdx",
+          ),
+          file("debugging", "Debugging a failure", "ScanSearch", "writing-tests/debugging.mdx"),
         ],
       },
       {
@@ -304,6 +308,21 @@ export const PLAN: readonly PlannedTab[] = [
         pages: [
           guide("agents-first-test", "First test guide", "Bot", "first-test"),
           guide("agents-matrix", "Matrix guide", "Bot", "matrix"),
+          guide("agents-locators", "Locators guide", "Bot", "locators-vs-agent"),
+          guide(
+            "agents-providers",
+            "Providers guide",
+            "Bot",
+            "providers",
+            MOVED_SECTIONS.providers,
+          ),
+          guide("agents-debugging", "Debugging guide", "Bot", "debugging"),
+          guide("agents-secrets", "Secrets guide", "Bot", "secrets"),
+          guide("agents-email-and-otp", "Email and OTP guide", "Bot", "email-and-otp"),
+          guide("agents-sessions", "Sessions guide", "Bot", "sessions"),
+          guide("agents-time", "Time guide", "Bot", "time"),
+          guide("agents-infrastructure", "Infrastructure guide", "Bot", "infrastructure"),
+          guide("agents-lint", "Lint guide", "Bot", "lint"),
         ],
       },
     ],
