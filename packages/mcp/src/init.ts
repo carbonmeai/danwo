@@ -1,6 +1,7 @@
 /**
  * `danwo init`: registers danwo's MCP server with the coding agents a project uses (Claude Code's
- * `.mcp.json`, Cursor's `.cursor/mcp.json`, Codex's `.codex/config.toml`), merging into files that
+ * `.mcp.json`, Cursor's `.cursor/mcp.json`, Codex's `.codex/config.toml`, and when asked VS Code's
+ * `.vscode/mcp.json` for GitHub Copilot), merging into files that
  * exist and leaving their other servers alone, and installs danwo's skill for those agents, keeping
  * any copy the user edited. Optionally writes a starter `danwo.config.ts`. It asks nothing and
  * reports each file it created, updated or left as it was.
@@ -23,7 +24,7 @@ export interface InitOptions {
   readonly skill?: boolean
   /**
    * The client configs to register the server in: `.mcp.json`, `.cursor/mcp.json`,
-   * `.codex/config.toml`. Default all three.
+   * `.codex/config.toml` and `.vscode/mcp.json`. Default the first three.
    */
   readonly clients?: readonly string[]
 }
@@ -36,8 +37,28 @@ export interface InitChange {
 }
 
 const SERVER = "danwo"
-const JSON_FILES = [".mcp.json", ".cursor/mcp.json"]
 const CODEX_FILE = ".codex/config.toml"
+
+/** A JSON client config: the key its servers sit under, and the entry it expects for one. */
+interface JsonClient {
+  readonly file: string
+  readonly key: string
+  readonly entry: (command: string | undefined, args: readonly string[]) => unknown
+}
+
+/** Claude Code and Cursor list servers under `mcpServers`; VS Code lists typed ones under `servers`. */
+const JSON_CLIENTS: readonly JsonClient[] = [
+  { file: ".mcp.json", key: "mcpServers", entry: (command, args) => ({ command, args }) },
+  { file: ".cursor/mcp.json", key: "mcpServers", entry: (command, args) => ({ command, args }) },
+  {
+    file: ".vscode/mcp.json",
+    key: "servers",
+    entry: (command, args) => ({ type: "stdio", command, args }),
+  },
+]
+
+/** The configs written when none are named: every client but VS Code's, which is asked for. */
+const DEFAULT_CLIENTS = [".mcp.json", ".cursor/mcp.json", CODEX_FILE]
 const CONFIG_FILE = "danwo.config.ts"
 
 const STARTER_CONFIG = `import { defineConfig } from "@danwo/sdk"
@@ -49,7 +70,8 @@ export default defineConfig({
 })
 `
 
-const McpJson = z.looseObject({ mcpServers: z.record(z.string(), z.unknown()).optional() })
+const McpJson = z.looseObject({})
+const Servers = z.record(z.string(), z.unknown()).optional()
 
 async function read(path: string): Promise<string | undefined> {
   return existsSync(path) ? readFile(path, "utf8") : undefined
@@ -66,24 +88,23 @@ function outcomeOf(before: string | undefined, after: string): InitChange["outco
   return before === after ? "unchanged" : "updated"
 }
 
-/** A JSON client config with danwo's server entry set, the rest as it was. */
-function mergedJson(before: string | undefined, file: string, server: unknown): string {
+/** A JSON client config with danwo's server entry set under the client's key, the rest as it was. */
+function mergedJson(before: string | undefined, client: JsonClient, server: unknown): string {
   let parsed: z.infer<typeof McpJson>
+  let servers: z.infer<typeof Servers>
 
   try {
     parsed = McpJson.parse(before === undefined ? {} : JSON.parse(before))
+    servers = Servers.parse(parsed[client.key])
   } catch {
-    throw new Error(`${file} is not a JSON object; fix it, then run danwo init again`)
+    throw new Error(`${client.file} is not a JSON object; fix it, then run danwo init again`)
   }
 
   /* Already registered as asked: leave the file exactly as it is. */
-  if (
-    before !== undefined &&
-    JSON.stringify(parsed.mcpServers?.[SERVER]) === JSON.stringify(server)
-  )
+  if (before !== undefined && JSON.stringify(servers?.[SERVER]) === JSON.stringify(server))
     return before
 
-  const merged = { ...parsed, mcpServers: { ...parsed.mcpServers, [SERVER]: server } }
+  const merged = { ...parsed, [client.key]: { ...servers, [SERVER]: server } }
 
   return `${JSON.stringify(merged, null, 2)}\n`
 }
@@ -133,12 +154,12 @@ export async function initProject(options: InitOptions): Promise<InitChange[]> {
   const command = options.command ?? ["npx", "danwo", "mcp"]
   const [program, ...args] = command
   const changes: InitChange[] = []
-  const clients = new Set(options.clients ?? [...JSON_FILES, CODEX_FILE])
+  const clients = new Set(options.clients ?? DEFAULT_CLIENTS)
 
-  for (const file of JSON_FILES.filter((name) => clients.has(name)))
+  for (const client of JSON_CLIENTS.filter(({ file }) => clients.has(file)))
     changes.push(
-      await apply(options.cwd, file, (before) =>
-        mergedJson(before, file, { command: program, args }),
+      await apply(options.cwd, client.file, (before) =>
+        mergedJson(before, client, client.entry(program, args)),
       ),
     )
   if (clients.has(CODEX_FILE))

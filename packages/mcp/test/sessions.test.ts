@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -181,6 +182,27 @@ describe("danwo init", () => {
       "kept      .claude/skills/danwo/SKILL.md (edited here",
     )
     expect(await readFile(join(dir, ".claude/skills/danwo/SKILL.md"), "utf8")).toBe("mine\n")
+  })
+
+  it("registers the server in VS Code's config when asked, under its typed servers key", async () => {
+    await mkdir(join(dir, ".vscode"))
+    await writeFile(
+      join(dir, ".vscode/mcp.json"),
+      JSON.stringify({ servers: { other: { type: "http", url: "http://x.test" } } }),
+    )
+
+    const changes = await initProject({ cwd: dir, clients: [".vscode/mcp.json"], skill: false })
+
+    expect(changes.map((change) => `${change.outcome} ${change.file}`)).toEqual([
+      "updated .vscode/mcp.json",
+    ])
+    expect(JSON.parse(await readFile(join(dir, ".vscode/mcp.json"), "utf8"))).toEqual({
+      servers: {
+        other: { type: "http", url: "http://x.test" },
+        danwo: { type: "stdio", command: "npx", args: ["danwo", "mcp"] },
+      },
+    })
+    expect(existsSync(join(dir, ".mcp.json"))).toBe(false)
   })
 
   it("refuses to rewrite a config that is not JSON", async () => {

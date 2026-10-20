@@ -101,7 +101,7 @@ describe("danwo init without prompts", () => {
     const run = recordingRunner()
     const { summary, answers } = await runInit({
       cwd: root,
-      flags: { yes: true, modelSource: "anthropic", skills: "claude,codex" },
+      flags: { yes: true, modelSource: "anthropic", skills: "claude,codex,copilot" },
       env: {},
       run,
       checkDevice: noDevice,
@@ -110,8 +110,9 @@ describe("danwo init without prompts", () => {
     expect(answers).toMatchObject({
       engine: "web",
       providers: ["stripe"],
-      agents: ["claude", "codex"],
+      agents: ["claude", "codex", "copilot"],
     })
+    expect(await read(root, ".vscode/mcp.json")).toContain('"type": "stdio"')
     expect(run.calls).toEqual([
       ["pnpm", "add", "-D", "@danwo/cli", "@danwo/sdk", "@ai-sdk/anthropic@4.0.82"],
     ])

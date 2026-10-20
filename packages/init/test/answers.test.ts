@@ -105,7 +105,7 @@ describe("parseList", () => {
     expect(parseList("--skills", "none", AGENTS)).toEqual([])
     expect(parseList("--skills", "claude,claude, codex", AGENTS)).toEqual(["claude", "codex"])
     expect(() => parseList("--skills", "vim", AGENTS)).toThrow(
-      "--skills: unknown vim; choose from claude, cursor, codex, agents, or none",
+      "--skills: unknown vim; choose from claude, cursor, codex, copilot, agents, or none",
     )
   })
 })

@@ -274,7 +274,7 @@ export function providerList(ids: readonly ProviderId[]): string {
 }
 
 /** Coding agents danwo installs its skill for and registers its MCP server with. */
-export const AGENTS = ["claude", "cursor", "codex", "agents"] as const
+export const AGENTS = ["claude", "cursor", "codex", "copilot", "agents"] as const
 export type AgentId = (typeof AGENTS)[number]
 
 export interface AgentInfo {
@@ -283,7 +283,7 @@ export interface AgentInfo {
   readonly skillDir: string
   /** Its MCP client config, when it has one. */
   readonly mcpFile?: string
-  /** A folder whose presence shows the project already uses it. */
+  /** A folder or file whose presence shows the project already uses it. */
   readonly marker: string
 }
 
@@ -305,6 +305,13 @@ export const AGENT_INFO: Readonly<Record<AgentId, AgentInfo>> = {
     skillDir: ".agents/skills/danwo",
     mcpFile: ".codex/config.toml",
     marker: ".codex",
+  },
+  copilot: {
+    label: "GitHub Copilot (VS Code)",
+    skillDir: ".agents/skills/danwo",
+    mcpFile: ".vscode/mcp.json",
+    /* A `.vscode` folder alone is common; VS Code's MCP file shows Copilot's agent mode is in use. */
+    marker: ".vscode/mcp.json",
   },
   agents: {
     label: "Other agents (.agents/skills)",
