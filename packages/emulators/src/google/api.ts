@@ -22,14 +22,32 @@ const STATUS_NAMES: Readonly<Record<number, string>> = {
   503: "UNAVAILABLE",
 }
 
+/** What some of Google's errors say beyond their reason: where the problem is, and why in detail. */
+export interface ErrorExtras {
+  /** The `errors[]` entry's own message, when it differs from the top-level one. */
+  readonly entryMessage?: string
+  /** The request part at fault, such as the `Authorization` header. */
+  readonly location?: { readonly location: string; readonly locationType: string }
+  /** `google.rpc` details, such as an `ErrorInfo`. */
+  readonly details?: readonly Record<string, unknown>[]
+}
+
 /** Google's API error body: `{ error: { code, message, errors: [{ domain, reason, message }], status } }`. */
-export function apiErrorBody(code: number, reason: string, message: string) {
+export function apiErrorBody(
+  code: number,
+  reason: string,
+  message: string,
+  extras: ErrorExtras = {},
+) {
   return {
     error: {
       code,
       message,
-      errors: [{ message, domain: "global", reason }],
+      errors: [
+        { message: extras.entryMessage ?? message, domain: "global", reason, ...extras.location },
+      ],
       status: STATUS_NAMES[code] ?? "UNKNOWN",
+      ...(extras.details && { details: extras.details }),
     },
   }
 }
@@ -40,10 +58,12 @@ export function apiErrorBody(code: number, reason: string, message: string) {
  */
 export class GoogleApiError extends HttpError {
   readonly reason: string
+  readonly extras: ErrorExtras
 
-  constructor(status: number, reason: string, message: string) {
+  constructor(status: number, reason: string, message: string, extras: ErrorExtras = {}) {
     super(status, message)
     this.reason = reason
+    this.extras = extras
   }
 }
 
@@ -66,7 +86,10 @@ const API_PATH = /^\/(gmail|calendar|drive|upload)\//
 export function googleErrors(): ErrorHandler {
   return (error, c) => {
     if (error instanceof GoogleApiError)
-      return c.json(apiErrorBody(error.status, error.reason, error.message), error.status)
+      return c.json(
+        apiErrorBody(error.status, error.reason, error.message, error.extras),
+        error.status,
+      )
 
     const message = error instanceof Error ? error.message : "Internal error"
 
@@ -84,8 +107,31 @@ export interface Caller {
   readonly scope: readonly string[]
 }
 
-const INVALID_CREDENTIALS =
-  "Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential."
+const SEE_CONSOLE = "See https://developers.google.com/identity/sign-in/web/devconsole-project."
+
+const EXPECTED =
+  "Expected OAuth 2 access token, login cookie or other valid authentication credential."
+
+/** Where a credential goes, as Google's 401s point at it. */
+const AUTHORIZATION_HEADER = { location: "Authorization", locationType: "header" }
+
+/** The service an API path belongs to, as Google's `ErrorInfo` names it. */
+function serviceOf(path: string): string {
+  if (path.startsWith("/gmail/")) return "gmail.googleapis.com"
+  if (path.startsWith("/calendar/")) return "calendar-json.googleapis.com"
+
+  return "drive.googleapis.com"
+}
+
+/** A `google.rpc.ErrorInfo` detail for the call `c` answers. */
+function errorInfo(c: Context, reason: string): Record<string, unknown> {
+  return {
+    "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+    reason,
+    domain: "googleapis.com",
+    metadata: { service: serviceOf(c.req.path), method: `${c.req.method} ${c.req.path}` },
+  }
+}
 
 /**
  * The caller behind the request's bearer token, if it was granted one of `accepted`. A missing,
@@ -103,7 +149,24 @@ export function requireAccess(
   if (!token || !user) {
     c.header("www-authenticate", 'Bearer realm="https://accounts.google.com/"')
 
-    throw new GoogleApiError(401, "authError", INVALID_CREDENTIALS)
+    if (bearerToken(c) === undefined)
+      throw new GoogleApiError(
+        401,
+        "required",
+        `Request is missing required authentication credential. ${EXPECTED} ${SEE_CONSOLE}`,
+        {
+          entryMessage: "Login Required.",
+          location: AUTHORIZATION_HEADER,
+          details: [errorInfo(c, "CREDENTIALS_MISSING")],
+        },
+      )
+
+    throw new GoogleApiError(
+      401,
+      "authError",
+      `Request had invalid authentication credentials. ${EXPECTED} ${SEE_CONSOLE}`,
+      { entryMessage: "Invalid Credentials", location: AUTHORIZATION_HEADER },
+    )
   }
 
   const scope = token.scope.split(/\s+/).filter(Boolean)
@@ -113,6 +176,10 @@ export function requireAccess(
       403,
       "insufficientPermissions",
       "Request had insufficient authentication scopes.",
+      {
+        entryMessage: "Insufficient Permission",
+        details: [errorInfo(c, "ACCESS_TOKEN_SCOPE_INSUFFICIENT")],
+      },
     )
 
   return { user, clientId: token.clientId, scope }
