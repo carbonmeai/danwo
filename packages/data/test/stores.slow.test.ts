@@ -78,6 +78,38 @@ describe.skipIf(!dockerAvailable())("Postgres snapshots", () => {
     }, 120_000)
   }
 
+  for (const [at, strategy] of (["recreate", "swap", "rows"] as const).entries()) {
+    it(`keeps a state per slot with ${strategy}, and restores whichever is asked for`, async () => {
+      const appUrl = await postgresWorkerDatabase(withDatabase(url, "orders_base"), 20 + at)
+      const app = new Pool({ connectionString: appUrl, max: 1 })
+
+      app.on("error", () => {})
+
+      const db = postgresSnapshot({ url: appUrl, strategy })
+
+      try {
+        await db.snapshot("pristine")
+        await app.query("INSERT INTO orders (payment_intent) VALUES ('pi_signed_in')")
+        await db.snapshot("pristine+ada")
+        await app.query("INSERT INTO orders (payment_intent) VALUES ('pi_test')")
+
+        // Back and forth, so a swap's spare is of the other slot each time.
+        for (const [slot, rows] of [
+          ["pristine", 0],
+          ["pristine+ada", 1],
+          ["pristine+ada", 1],
+          ["pristine", 0],
+        ] as const) {
+          await db.restore(slot)
+          expect(await countOrders(app), slot).toBe(rows)
+        }
+      } finally {
+        await app.end()
+        await db.close()
+      }
+    }, 120_000)
+  }
+
   it("restores rows without closing the app's connections, foreign keys and sequences included", async () => {
     const appUrl = await postgresWorkerDatabase(withDatabase(url, "orders_base"), 8)
     const app = new Pool({ connectionString: appUrl, max: 1 })
@@ -186,6 +218,14 @@ describe.skipIf(!dockerAvailable())("Redis snapshots", () => {
           Buffer.from("b"),
         ])
         expect(await app.call("GET", "bytes")).toEqual(Buffer.from([0, 255, 13, 10]))
+
+        // A second slot beside the first: each restore brings back its own keys.
+        await app.call("SET", "member", "ada")
+        await cache.snapshot("pristine+ada")
+        await cache.restore()
+        expect(await app.call("GET", "member")).toBeNull()
+        await cache.restore("pristine+ada")
+        expect(String(await app.call("GET", "member"))).toBe("ada")
       } finally {
         app.close()
         await cache.close()

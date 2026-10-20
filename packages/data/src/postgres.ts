@@ -14,6 +14,7 @@ import { setTimeout as sleep } from "node:timers/promises"
 import type { Client } from "pg"
 
 import { rowsSnapshot } from "./postgres-rows.ts"
+import { SnapshotSlots } from "./slots.ts"
 
 /** How a restore brings the database back. */
 export type PostgresRestoreStrategy = "recreate" | "swap" | "rows"
@@ -41,14 +42,23 @@ export interface PostgresSnapshotOptions {
   readonly onRestore?: () => Promise<void> | void
 }
 
-/** What an environment's `snapshot()` and `restore()` call, plus `close()` for its own connection. */
+/**
+ * What an environment's `snapshot()` and `restore()` call, plus `close()` for its own connection.
+ * Each keeps a state per slot, so an environment with `snapshotSlots` passes its slot straight on:
+ * `snapshot: (slot) => db.snapshot(slot)`.
+ */
 export interface DatabaseSnapshot {
-  /** Keeps the database as it is now. Connections to it are closed while it is copied. */
-  snapshot(): Promise<void>
-  /** Brings back what `snapshot()` kept; connections to the database are closed. */
-  restore(): Promise<void>
+  /**
+   * Keeps the database as it is now, under `slot` (one slot when none is named). Connections to
+   * it are closed while it is copied, except with the `rows` strategy.
+   */
+  snapshot(slot?: string): Promise<void>
+  /** Brings back what `snapshot(slot)` kept; connections to the database are closed. */
+  restore(slot?: string): Promise<void>
   /** Closes the helper's own connections and drops the databases it made. */
   close(): Promise<void>
+  /** Always true: every slot keeps a state of its own. */
+  readonly snapshotSlots: true
 }
 
 /** A Postgres identifier, quoted. */
@@ -173,18 +183,30 @@ async function keep(admin: AdminConnection, database: string, template: string):
 /** Database names a snapshot works with. */
 interface Names {
   readonly database: string
-  readonly template: string
+  /** The template a slot is kept in: slot 0's is the plain template name. */
+  readonly template: (slot: number) => string
   readonly spare: string
   /** A name for a database a restore moved aside, unique per restore. */
   readonly retired: (n: number) => string
 }
 
+/** Postgres truncates identifiers longer than this, so two slots' templates could collide. */
+const MAX_IDENTIFIER = 63
+
 function namesOf(options: PostgresSnapshotOptions): Names {
   const database = options.database ?? databaseOf(options.url)
+  const template = options.template ?? `${database}_danwo_snapshot`
 
   return {
     database,
-    template: options.template ?? `${database}_danwo_snapshot`,
+    template: (slot) => {
+      const name = slot === 0 ? template : `${template}_${slot}`
+
+      if (name.length > MAX_IDENTIFIER)
+        throw new Error(`snapshot template ${name} is longer than Postgres's 63 characters`)
+
+      return name
+    },
     spare: `${database}_danwo_spare`,
     retired: (n) => `${database}_danwo_retired_${n}`,
   }
@@ -246,34 +268,44 @@ class Retirer {
   }
 }
 
-/** How a strategy readies itself after a snapshot and brings the database back. */
+/** How a strategy readies itself after a snapshot and brings the database back, by slot number. */
 interface Strategy {
-  prepare(): Promise<void>
-  restore(): Promise<void>
+  prepare(slot: number): Promise<void>
+  restore(slot: number): Promise<void>
   cleanUp(): Promise<void>
+}
+
+/** Moves the app's database aside and copies slot `slot`'s template into its place. */
+async function recreate(
+  admin: AdminConnection,
+  names: Names,
+  retirer: Retirer,
+  slot: number,
+): Promise<void> {
+  await shutOut(admin, names.database)
+
+  const retired = await retirer.retire(admin)
+
+  await admin.query(
+    `CREATE DATABASE ${ident(names.database)} TEMPLATE ${ident(names.template(slot))}`,
+  )
+  retirer.drop(retired)
 }
 
 /** Restores by moving the app's database aside and copying the template into its place. */
 function recreating(admin: AdminConnection, names: Names, retirer: Retirer): Strategy {
   return {
     prepare: async () => {},
-    restore: async () => {
-      await shutOut(admin, names.database)
-
-      const retired = await retirer.retire(admin)
-
-      await admin.query(
-        `CREATE DATABASE ${ident(names.database)} TEMPLATE ${ident(names.template)}`,
-      )
-      retirer.drop(retired)
-    },
+    restore: (slot) => recreate(admin, names, retirer, slot),
     cleanUp: async () => {},
   }
 }
 
 /**
  * Restores by renaming a spare copy into place: the next spare is copied in the background while
- * the trial runs, so a restore is two renames unless the trial was shorter than that copy.
+ * the trial runs, so a restore is two renames unless the trial was shorter than that copy. The
+ * spare is a copy of one slot; a restore of another slot copies its template, and readies the
+ * next spare from that slot.
  */
 function swapping(
   admin: AdminConnection,
@@ -282,25 +314,35 @@ function swapping(
   background: Background,
 ): Strategy {
   let ready: Promise<void> = Promise.resolve()
+  let spareOf: number | undefined
 
-  const nextSpare = () => {
-    ready = background.run((other) => copyOf(other, names.spare, names.template))
+  const nextSpare = (slot: number) => {
+    spareOf = slot
+    ready = background.run((other) => copyOf(other, names.spare, names.template(slot)))
   }
 
   return {
-    prepare: async () => {
-      nextSpare()
+    prepare: async (slot) => {
+      nextSpare(slot)
       await ready
     },
-    restore: async () => {
+    restore: async (slot) => {
       await ready
+
+      if (spareOf !== slot) {
+        await recreate(admin, names, retirer, slot)
+        nextSpare(slot)
+
+        return
+      }
+
       await shutOut(admin, names.database)
 
       const retired = await retirer.retire(admin)
 
       await admin.query(`ALTER DATABASE ${ident(names.spare)} RENAME TO ${ident(names.database)}`)
       // The next spare first, so the next restore never waits behind a drop.
-      nextSpare()
+      nextSpare(slot)
       retirer.drop(retired)
     },
     cleanUp: async () => {
@@ -316,7 +358,7 @@ function swapping(
  *
  * ```ts
  * const db = postgresSnapshot({ url: process.env.DATABASE_URL })
- * return { ..., snapshot: () => db.snapshot(), restore: () => db.restore(), close: () => db.close() }
+ * return { ..., snapshot: (slot) => db.snapshot(slot), restore: (slot) => db.restore(slot), snapshotSlots: true, close: () => db.close() }
  * ```
  */
 export function postgresSnapshot(options: PostgresSnapshotOptions): DatabaseSnapshot {
@@ -331,22 +373,27 @@ export function postgresSnapshot(options: PostgresSnapshotOptions): DatabaseSnap
     options.strategy === "swap"
       ? swapping(admin, names, retirer, background)
       : recreating(admin, names, retirer)
+  const slots = new SnapshotSlots()
 
   return {
-    async snapshot() {
-      await keep(admin, names.database, names.template)
-      await strategy.prepare()
+    async snapshot(slot) {
+      const n = slots.number(slot)
+
+      await keep(admin, names.database, names.template(n))
+      await strategy.prepare(n)
     },
-    async restore() {
-      await strategy.restore()
+    async restore(slot) {
+      await strategy.restore(slots.kept(slot))
       await options.onRestore?.()
     },
     async close() {
       await strategy.cleanUp()
       await background.close()
-      await admin.query(`DROP DATABASE IF EXISTS ${ident(names.template)}`)
+      for (const n of slots.all())
+        await admin.query(`DROP DATABASE IF EXISTS ${ident(names.template(n))}`)
       await admin.close()
     },
+    snapshotSlots: true,
   }
 }
 
@@ -363,12 +410,13 @@ function keptRows(options: PostgresSnapshotOptions): DatabaseSnapshot {
   })
 
   return {
-    snapshot: () => rows.snapshot(),
-    async restore() {
-      await rows.restore()
+    snapshot: (slot) => rows.snapshot(slot),
+    async restore(slot) {
+      await rows.restore(slot)
       await options.onRestore?.()
     },
     close: () => rows.close(),
+    snapshotSlots: true,
   }
 }
 

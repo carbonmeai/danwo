@@ -12,6 +12,7 @@ import { rm } from "node:fs/promises"
 import { backup, DatabaseSync } from "node:sqlite"
 
 import type { DatabaseSnapshot } from "./postgres.ts"
+import { SnapshotSlots } from "./slots.ts"
 
 /** Which SQLite file `sqliteSnapshot` keeps and brings back, and where it keeps the copy. */
 export interface SqliteSnapshotOptions {
@@ -41,25 +42,31 @@ async function backUp(from: string, to: string, busyTimeoutMs: number): Promise<
  *
  * ```ts
  * const db = sqliteSnapshot({ file: "data/app.db" })
- * return { ..., snapshot: () => db.snapshot(), restore: () => db.restore(), close: () => db.close() }
+ * return { ..., snapshot: (slot) => db.snapshot(slot), restore: (slot) => db.restore(slot), snapshotSlots: true, close: () => db.close() }
  * ```
  */
 export function sqliteSnapshot(options: SqliteSnapshotOptions): DatabaseSnapshot {
-  const kept = options.snapshotFile ?? `${options.file}.danwo-snapshot`
+  const base = options.snapshotFile ?? `${options.file}.danwo-snapshot`
   const wait = options.busyTimeoutMs ?? 5000
+  const slots = new SnapshotSlots()
+  /** Where slot `n` keeps its copy: slot 0 in the snapshot file itself. */
+  const keptIn = (n: number) => (n === 0 ? base : `${base}.${n}`)
 
   return {
-    async snapshot() {
+    async snapshot(slot) {
+      const kept = keptIn(slots.number(slot))
+
       await rm(kept, { force: true })
       await backUp(options.file, kept, wait)
     },
-    async restore() {
-      await backUp(kept, options.file, wait)
+    async restore(slot) {
+      await backUp(keptIn(slots.kept(slot)), options.file, wait)
       await options.onRestore?.()
     },
     async close() {
-      await rm(kept, { force: true })
+      for (const n of slots.all()) await rm(keptIn(n), { force: true })
     },
+    snapshotSlots: true,
   }
 }
 

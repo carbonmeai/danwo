@@ -6,6 +6,7 @@
  */
 import type { DatabaseSnapshot } from "./postgres.ts"
 import { type Reply, RespClient } from "./resp.ts"
+import { SnapshotSlots } from "./slots.ts"
 
 /** Which Redis or Valkey database `redisSnapshot` keeps and brings back. */
 export interface RedisSnapshotOptions {
@@ -78,7 +79,8 @@ function dbOf(options: RedisSnapshotOptions): number {
  */
 export function redisSnapshot(options: RedisSnapshotOptions): DatabaseSnapshot {
   let client: Promise<RespClient> | undefined
-  let kept: readonly KeptKey[] = []
+  const slots = new SnapshotSlots()
+  const kept = new Map<number, readonly KeptKey[]>()
 
   const open = () => {
     client ??= RespClient.open(options.url).then(async (opened) => {
@@ -91,19 +93,23 @@ export function redisSnapshot(options: RedisSnapshotOptions): DatabaseSnapshot {
   }
 
   return {
-    async snapshot() {
+    async snapshot(slot) {
       const redis = await open()
       const keys = await allKeys(redis)
       const entries = await Promise.all(keys.map((key) => keepKey(redis, key)))
 
-      kept = entries.filter((entry) => entry !== undefined)
+      kept.set(
+        slots.number(slot),
+        entries.filter((entry) => entry !== undefined),
+      )
     },
-    async restore() {
+    async restore(slot) {
       const redis = await open()
+      const entries = kept.get(slots.kept(slot)) ?? []
 
       await redis.call("FLUSHDB")
       await Promise.all(
-        kept.map((entry) =>
+        entries.map((entry) =>
           redis.call("RESTORE", entry.key, String(entry.ttl), entry.payload, "REPLACE"),
         ),
       )
@@ -115,5 +121,6 @@ export function redisSnapshot(options: RedisSnapshotOptions): DatabaseSnapshot {
       client = undefined
       if (opened) opened.close()
     },
+    snapshotSlots: true,
   }
 }

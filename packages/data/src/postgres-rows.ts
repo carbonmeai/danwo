@@ -8,8 +8,18 @@
  */
 import type { Client } from "pg"
 
-/** Where the rows are kept, inside the app's database. */
+import { SnapshotSlots } from "./slots.ts"
+
+/** Where the rows are kept, inside the app's database: slot 0 here, slot n in `<SCHEMA>_<n>`. */
 const SCHEMA = "danwo_snapshot"
+
+/** The schema slot `n` keeps its rows in. */
+function schemaOf(n: number): string {
+  return n === 0 ? SCHEMA : `${SCHEMA}_${n}`
+}
+
+/** Leaves out the schemas the snapshot keeps its own copies in, by their shared prefix. */
+const NOT_KEPT = (column: string) => `left(${column}, ${SCHEMA.length}) <> '${SCHEMA}'`
 
 /** One table, the columns a copy may write (generated ones are left out), and its copy's name. */
 interface KeptTable {
@@ -30,8 +40,11 @@ function ident(name: string): string {
   return `"${name.replaceAll('"', '""')}"`
 }
 
-/** Every user table, schema-qualified and quoted, with the columns it can be written to. */
-async function tablesOf(client: Client): Promise<KeptTable[]> {
+/**
+ * Every user table, schema-qualified and quoted, with the columns it can be written to, and the
+ * name of its copy in `schema`.
+ */
+async function tablesOf(client: Client, schema: string): Promise<KeptTable[]> {
   const result = await client.query<{ schema: string; table: string; columns: string[] }>(
     `SELECT c.table_schema AS schema, c.table_name AS table,
             array_agg(c.column_name::text ORDER BY c.ordinal_position) AS columns
@@ -39,7 +52,8 @@ async function tablesOf(client: Client): Promise<KeptTable[]> {
        JOIN information_schema.tables t
          ON t.table_schema = c.table_schema AND t.table_name = c.table_name
       WHERE t.table_type = 'BASE TABLE'
-        AND c.table_schema NOT IN ('pg_catalog', 'information_schema', '${SCHEMA}')
+        AND c.table_schema NOT IN ('pg_catalog', 'information_schema')
+        AND ${NOT_KEPT("c.table_schema")}
         AND c.is_generated = 'NEVER'
       GROUP BY c.table_schema, c.table_name
       ORDER BY 1, 2`,
@@ -48,7 +62,7 @@ async function tablesOf(client: Client): Promise<KeptTable[]> {
   return result.rows.map((row, index) => ({
     name: `${ident(row.schema)}.${ident(row.table)}`,
     columns: row.columns.map(ident),
-    copy: `${ident(SCHEMA)}.${ident(`t${index}`)}`,
+    copy: `${ident(schema)}.${ident(`t${index}`)}`,
   }))
 }
 
@@ -56,7 +70,7 @@ async function tablesOf(client: Client): Promise<KeptTable[]> {
 async function sequencesOf(client: Client): Promise<KeptSequence[]> {
   const result = await client.query<{ schema: string; name: string; value: string | null }>(
     `SELECT schemaname AS schema, sequencename AS name, last_value::text AS value
-       FROM pg_sequences WHERE schemaname NOT IN ('pg_catalog', '${SCHEMA}')`,
+       FROM pg_sequences WHERE schemaname <> 'pg_catalog' AND ${NOT_KEPT("schemaname")}`,
   )
 
   return result.rows.map((row) => ({
@@ -94,18 +108,24 @@ async function putBack(
     ])
 }
 
-/** What a rows snapshot keeps between its `snapshot()` and `restore()`. */
+/** What a rows snapshot keeps between its `snapshot()` and `restore()`, one schema per slot. */
 export interface RowsSnapshot {
-  snapshot(): Promise<void>
-  restore(): Promise<void>
+  snapshot(slot?: string): Promise<void>
+  restore(slot?: string): Promise<void>
   close(): Promise<void>
+}
+
+/** One slot's kept tables and sequences. */
+interface KeptRows {
+  readonly tables: readonly KeptTable[]
+  readonly sequences: readonly KeptSequence[]
 }
 
 /** A rows snapshot of the database `connect` reaches, over a connection of its own. */
 export function rowsSnapshot(connect: () => Promise<Client>): RowsSnapshot {
   let client: Promise<Client> | undefined
-  let tables: KeptTable[] = []
-  let sequences: KeptSequence[] = []
+  const slots = new SnapshotSlots()
+  const kept = new Map<number, KeptRows>()
 
   const session = () => {
     client ??= connect()
@@ -114,25 +134,30 @@ export function rowsSnapshot(connect: () => Promise<Client>): RowsSnapshot {
   }
 
   return {
-    async snapshot() {
+    async snapshot(slot) {
       const db = await session()
+      const n = slots.number(slot)
+      const schema = schemaOf(n)
 
-      await db.query(`DROP SCHEMA IF EXISTS ${ident(SCHEMA)} CASCADE`)
-      await db.query(`CREATE SCHEMA ${ident(SCHEMA)}`)
-      tables = await tablesOf(db)
-      sequences = await sequencesOf(db)
+      await db.query(`DROP SCHEMA IF EXISTS ${ident(schema)} CASCADE`)
+      await db.query(`CREATE SCHEMA ${ident(schema)}`)
+
+      const tables = await tablesOf(db, schema)
+
+      kept.set(n, { tables, sequences: await sequencesOf(db) })
       for (const table of tables)
         await db.query(
           `CREATE TABLE ${table.copy} AS SELECT ${table.columns.join(", ")} FROM ${table.name}`,
         )
     },
-    async restore() {
+    async restore(slot) {
       const db = await session()
+      const rows = kept.get(slots.kept(slot)) ?? { tables: [], sequences: [] }
 
       await db.query("BEGIN")
 
       try {
-        await putBack(db, tables, sequences)
+        await putBack(db, rows.tables, rows.sequences)
         await db.query("COMMIT")
       } catch (error) {
         await db.query("ROLLBACK")
@@ -146,7 +171,8 @@ export function rowsSnapshot(connect: () => Promise<Client>): RowsSnapshot {
       client = undefined
       if (db === undefined) return
 
-      await db.query(`DROP SCHEMA IF EXISTS ${ident(SCHEMA)} CASCADE`).catch(() => {})
+      for (const n of slots.all())
+        await db.query(`DROP SCHEMA IF EXISTS ${ident(schemaOf(n))} CASCADE`).catch(() => {})
       await db.end()
     },
   }

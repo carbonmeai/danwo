@@ -61,6 +61,28 @@ describe("sqliteSnapshot", () => {
     }
   })
 
+  it("keeps a state per slot and brings back whichever is asked for", async () => {
+    const file = join(dir, "app.db")
+    const app = openApp(file)
+    const db = sqliteSnapshot({ file })
+
+    try {
+      await db.snapshot("pristine")
+      app.exec("INSERT INTO orders (item) VALUES ('signed in')")
+      await db.snapshot("pristine+ada")
+      app.exec("INSERT INTO orders (item) VALUES ('a test')")
+
+      await db.restore("pristine")
+      expect(countOrders(app)).toBe(0)
+      await db.restore("pristine+ada")
+      expect(countOrders(app)).toBe(1)
+      await expect(db.restore("never-kept")).rejects.toThrow(/before snapshot/)
+    } finally {
+      app.close()
+      await db.close()
+    }
+  })
+
   it("runs the restore hook after every restore", async () => {
     const file = join(dir, "app.db")
     const app = openApp(file)
