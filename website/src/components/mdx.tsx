@@ -12,7 +12,6 @@ import {
   ReplayFlow,
   Setup,
 } from "./diagrams.tsx"
-import { HowItWorks, MatrixFlow } from "./diagrams.tsx"
 import { StackFlow } from "./stack-diagram.tsx"
 
 /**
