@@ -1,39 +1,166 @@
 {
   "provider": "pusher",
-  "source": "openapi",
-  "recorded": "2026-10-19",
+  "source": "live",
+  "recorded": "2026-10-20",
   "scenarios": {
-    "events: trigger, with info, and a batch": {
+    "events: trigger, a batch, and presence user counts": {
       "steps": [
         {
           "step": "trigger an event",
           "status": 200,
-          "shape": "4836648e0c45"
+          "shape": "df4dd8d6e326"
         },
         {
-          "step": "trigger an event asking for its channel's subscriber count",
+          "step": "trigger an event asking for a user count on a channel that is not a presence channel",
+          "status": 200,
+          "shape": "15868d05fd58"
+        },
+        {
+          "step": "trigger an event asking for a presence channel's user count",
           "status": 200,
           "shape": "15868d05fd58"
         },
         {
           "step": "trigger a batch",
           "status": 200,
-          "shape": "4836648e0c45"
+          "shape": "df4dd8d6e326"
         }
       ],
       "facts": []
     },
-    "channels: one channel, and the occupied ones": {
+    "channels: one channel, the occupied ones, and user counts": {
       "steps": [
         {
           "step": "read an empty channel",
           "status": 200,
-          "shape": "669bc53f36d8"
+          "shape": "6299de29db07"
+        },
+        {
+          "step": "read a presence channel's user count",
+          "status": 200,
+          "shape": "dfd8922f8b9d"
+        },
+        {
+          "step": "ask for a user count on a channel that is not a presence channel",
+          "status": 400,
+          "shape": "6f7f0467b772"
         },
         {
           "step": "list occupied channels",
           "status": 200,
           "shape": "15868d05fd58"
+        },
+        {
+          "step": "ask for user counts on a list without the presence prefix",
+          "status": 400,
+          "shape": "6f7f0467b772"
+        }
+      ],
+      "facts": [
+        {
+          "name": "a user count on a channel that is not a presence channel",
+          "value": "Cannot retrieve the user count unless the channel is a presence channel\n"
+        },
+        {
+          "name": "a user count on a list without the presence prefix",
+          "value": "user_count may only be requested for presence channels - please supply filter_by_prefix begining with presence-\n"
+        }
+      ]
+    },
+    "subscription counts: with counting on": {
+      "steps": [
+        {
+          "step": "trigger an event asking for its channel's subscription count",
+          "status": 200,
+          "shape": "15868d05fd58"
+        },
+        {
+          "step": "trigger a batch asking for subscription counts",
+          "status": 200,
+          "shape": "d82a53ccb508"
+        },
+        {
+          "step": "read a channel's subscription count",
+          "status": 200,
+          "shape": "d7f2de9c3837"
+        },
+        {
+          "step": "list channels with their subscription counts",
+          "status": 200,
+          "shape": "15868d05fd58"
+        }
+      ],
+      "facts": []
+    },
+    "subscription counts: with counting off": {
+      "steps": [
+        {
+          "step": "trigger an event asking for a subscription count",
+          "status": 400,
+          "shape": "6f7f0467b772"
+        },
+        {
+          "step": "trigger a batch asking for subscription counts",
+          "status": 400,
+          "shape": "6f7f0467b772"
+        },
+        {
+          "step": "read a channel's subscription count",
+          "status": 400,
+          "shape": "6f7f0467b772"
+        },
+        {
+          "step": "list channels asking for subscription counts",
+          "status": 200,
+          "shape": "15868d05fd58"
+        }
+      ],
+      "facts": [
+        {
+          "name": "a subscription count on a trigger",
+          "value": "Cannot retrieve the subscription count because subscription counting is not enabled\n"
+        },
+        {
+          "name": "a subscription count on a batch",
+          "value": "Cannot retrieve the subscription count because subscription counting is not enabled\n"
+        },
+        {
+          "name": "a subscription count on a channel",
+          "value": "Cannot retrieve the subscription count because subscription counting is not enabled\n"
+        }
+      ]
+    },
+    "beams: publish to an interest and a user nobody registered, and refusals": {
+      "steps": [
+        {
+          "step": "publish to an interest no device has",
+          "status": 200,
+          "shape": "4d7ad81878a0"
+        },
+        {
+          "step": "publish to a user with no devices",
+          "status": 200,
+          "shape": "4d7ad81878a0"
+        },
+        {
+          "step": "publish to an interest whose name Beams refuses",
+          "status": 422,
+          "shape": "46df5fa464f6"
+        },
+        {
+          "step": "publish to no interests",
+          "status": 422,
+          "shape": "46df5fa464f6"
+        },
+        {
+          "step": "publish with the wrong secret key",
+          "status": 401,
+          "shape": "30f1f86f3212"
+        },
+        {
+          "step": "delete the user nobody registered",
+          "status": 200,
+          "shape": "d33e6a781203"
         }
       ],
       "facts": []
@@ -41,7 +168,15 @@
   },
   "shapes": {
     "15868d05fd58": {"t":"object","keys":{"channels":{"t":"object","keys":{},"open":true}}},
-    "4836648e0c45": {"t":"object","keys":{},"open":true},
-    "669bc53f36d8": {"t":"object","keys":{"occupied":{"t":"literal","v":false},"subscription_count":{"t":"number"}},"optional":["subscription_count"]}
+    "30f1f86f3212": {"t":"object","keys":{"error":{"t":"literal","v":"Unauthorized"},"description":{"t":"string"}}},
+    "46df5fa464f6": {"t":"object","keys":{"error":{"t":"literal","v":"Unprocessable Entity"},"description":{"t":"string"}}},
+    "4d7ad81878a0": {"t":"object","keys":{"publishId":{"t":"string"}}},
+    "6299de29db07": {"t":"object","keys":{"occupied":{"t":"literal","v":false}}},
+    "6f7f0467b772": {"t":"string"},
+    "d33e6a781203": {"t":"null"},
+    "d7f2de9c3837": {"t":"object","keys":{"occupied":{"t":"literal","v":false},"subscription_count":{"t":"number"}}},
+    "d82a53ccb508": {"t":"object","keys":{"batch":{"t":"array","of":{"t":"object","keys":{"subscription_count":{"t":"number"}}}}}},
+    "df4dd8d6e326": {"t":"object","keys":{}},
+    "dfd8922f8b9d": {"t":"object","keys":{"occupied":{"t":"literal","v":false},"user_count":{"t":"number"}}}
   }
 }
