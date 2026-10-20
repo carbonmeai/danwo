@@ -93,26 +93,26 @@ const subscribers: Scenario = {
       undo: () => context.target.send(call(context, "DELETE", `/v2/subscribers/${id}`)),
     })
     await context.step("create a subscriber", create, {
-      literals: ["subscriberId", "firstName"],
-      maps: ["data"],
-      doc: { schema: SUBSCRIBER, status: 201 },
+      literals: ["data.firstName"],
+      maps: ["data.data"],
+      doc: { schema: object({ data: SUBSCRIBER }), status: 201 },
     })
     await context.step("read it", call(context, "GET", `/v2/subscribers/${id}`), {
-      maps: ["data"],
-      doc: { schema: SUBSCRIBER, status: 200 },
+      maps: ["data.data"],
+      doc: { schema: object({ data: SUBSCRIBER }), status: 200 },
     })
     await context.step(
       "patch it",
       call(context, "PATCH", `/v2/subscribers/${id}`, { lastName: "Lovelace" }),
       {
-        literals: ["lastName"],
-        maps: ["data"],
-        doc: { schema: SUBSCRIBER, status: 200 },
+        literals: ["data.lastName"],
+        maps: ["data.data"],
+        doc: { schema: object({ data: SUBSCRIBER }), status: 200 },
       },
     )
     await context.step("delete it", call(context, "DELETE", `/v2/subscribers/${id}`), {
-      literals: ["acknowledged", "status"],
-      doc: { schema: object({ acknowledged: bool, status: str }), status: 200 },
+      literals: ["data.acknowledged", "data.status"],
+      doc: { schema: object({ data: object({ acknowledged: bool, status: str }) }), status: 200 },
     })
   },
 }
