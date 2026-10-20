@@ -8,6 +8,7 @@ import type { ScreenshotEvent } from "../assert/screenshot.ts"
 import { findingPlace } from "../lint/index.ts"
 import { effectNotes, effectsOf } from "../record/effect-notes.ts"
 import { dollars, type Spent, tokensText, usageOf } from "../record/usage.ts"
+import { afterBody, checkLine } from "./checks-text.ts"
 import type { FlightRecord, RecordedExchange, RecordedStep } from "./record.ts"
 import { FAVICON, LOCKUP_ON_DARK, LOCKUP_ON_LIGHT } from "./report-brand.ts"
 
@@ -135,10 +136,24 @@ function cacheFact(cache: NonNullable<RecordedStep["cache"]>): string {
 
 function stepsBlock(loaded: Loaded): string {
   const { steps } = loaded.record
+  const body = steps.filter((step) => !afterBody(step))
 
-  if (steps.length === 0) return ""
+  if (body.length === 0) return ""
 
-  return `<h4>Steps</h4><table><tbody>${steps.map((s) => stepRow(s, loaded)).join("")}</tbody></table>${costBlock(steps)}`
+  return `<h4>Steps</h4><table><tbody>${body.map((s) => stepRow(s, loaded)).join("")}</tbody></table>${costBlock(steps)}`
+}
+
+/** What ran after the body: the wait for background work, then the invariant's checks. */
+function checksBlock(loaded: Loaded): string {
+  const checks = loaded.record.steps.filter(afterBody)
+
+  if (checks.length === 0) return ""
+
+  const items = checks.map(
+    (step) => `<li class="${escape(step.status)}">${escape(checkLine(step))}</li>`,
+  )
+
+  return `<h4>Checks</h4><ul class="checks">${items.join("")}</ul>`
 }
 
 /** One row of the cost table: which step, what it was, what it spent, how it used the cache. */
@@ -277,7 +292,7 @@ function section(loaded: Loaded): string {
   const { record } = loaded
   const failed = record.status !== "passed"
 
-  return `<section id="${escape(loaded.dir)}" class="${failed ? "failed" : "passed"}"><h3><span class="badge">${escape(record.status)}</span> ${escape(record.test)} <span class="dim">— ${escape(runTitle(record))}</span></h3><p class="dim">${escape(record.startedAt)} · ${record.durationMs} ms · <code>${escape(loaded.dir)}</code></p>${errorBlock(record)}${lintBlock(record)}${failureBlock(loaded)}${videoBlock(loaded)}${stepsBlock(loaded)}${appLogBlock(loaded)}${exchangesBlock(loaded)}${deliveriesBlock(loaded)}${dataCallsBlock(loaded)}${stateBlock(record)}</section>`
+  return `<section id="${escape(loaded.dir)}" class="${failed ? "failed" : "passed"}"><h3><span class="badge">${escape(record.status)}</span> ${escape(record.test)} <span class="dim">— ${escape(runTitle(record))}</span></h3><p class="dim">${escape(record.startedAt)} · ${record.durationMs} ms · <code>${escape(loaded.dir)}</code></p>${errorBlock(record)}${lintBlock(record)}${failureBlock(loaded)}${videoBlock(loaded)}${stepsBlock(loaded)}${checksBlock(loaded)}${appLogBlock(loaded)}${exchangesBlock(loaded)}${deliveriesBlock(loaded)}${dataCallsBlock(loaded)}${stateBlock(record)}</section>`
 }
 
 const STYLE = `
@@ -291,6 +306,7 @@ section.failed{border-left:4px solid var(--bad)}section.passed{border-left:4px s
 .failed .badge{color:var(--bad)}.passed .badge{color:var(--ok)}
 .dim{color:var(--dim)}.error{color:var(--bad);white-space:pre-wrap}.fault{color:var(--warn)}
 table{border-collapse:collapse;width:100%}td{border-top:1px solid var(--line);padding:4px 6px;vertical-align:top}
+ul.checks{list-style:none;padding:0;margin:0}ul.checks li{border-top:1px solid var(--line);padding:4px 6px}ul.checks li.failed{color:var(--bad)}
 tr.failed td,tr.error td{color:var(--bad)}tr.blocked td,tr.inconclusive td{color:var(--warn)}
 pre{background:var(--code);padding:8px;border-radius:4px;overflow-x:auto;white-space:pre-wrap;word-break:break-word;margin:4px 0}
 code{background:var(--code);padding:0 3px;border-radius:3px}

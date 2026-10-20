@@ -15,6 +15,7 @@ import { ReplayStore } from "../src/replay/store.ts"
 import { runCache } from "../src/runner/cache-command.ts"
 import { failurePage } from "../src/runner/failure-page.ts"
 import type { FlightRecord, RecordedStep } from "../src/runner/record.ts"
+import { renderReport } from "../src/runner/report-html.ts"
 import { SecretVault } from "../src/secrets/index.ts"
 
 const SECRET = "Pa ss&w<rd>/2026"
@@ -148,6 +149,32 @@ const RECORD: FlightRecord = {
   state: { stripe: { customers: 1 } },
 }
 
+/** The record with the wait for background work and a failed invariant check after its body. */
+const CHECKED: FlightRecord = {
+  ...RECORD,
+  steps: [
+    ...RECORD.steps,
+    step({
+      index: 2,
+      kind: "settle",
+      api: "settle",
+      label: "waiting for background work",
+      phase: "settle",
+      durationMs: 2_100,
+      waitedOn: ["stripe · 2.1 s · 1 webhook delivery"],
+    }),
+    step({
+      index: 3,
+      kind: "check",
+      api: "expect.toBe",
+      label: "expect(credits granted).toBe(500)",
+      phase: "checks",
+      status: "failed",
+      check: { actual: "1000", expected: "500" },
+    }),
+  ],
+}
+
 describe("the failure page", () => {
   it("tells what failed, where, at what cost, and what the app sent", () => {
     const page = failurePage(RECORD, 'heading "Payment failed"')
@@ -167,6 +194,30 @@ describe("the failure page", () => {
     expect(page).toContain("`POST api.stripe.com/v1/checkout/sessions` → 500 · fault: status 500")
     expect(page).not.toContain("/v1/prices")
     expect(page).toContain("### stripe")
+  })
+
+  it("lists the wait for background work and the invariant's checks after the steps", () => {
+    const page = failurePage(CHECKED)
+    const checks = page.slice(page.indexOf("## Checks"))
+
+    expect(page.indexOf("## Checks")).toBeGreaterThan(page.indexOf("## Steps"))
+    expect(checks).toContain(
+      "- ✓ waited 2.1 s for background work: stripe · 2.1 s · 1 webhook delivery",
+    )
+    expect(checks).toContain("- ✗ expect(credits granted).toBe(500) — expected 500, got 1000")
+    expect(page).not.toContain("| 3 | expect(credits granted)")
+  })
+
+  it("lists them in the offline report too, a failed check marked failed", () => {
+    const html = renderReport("20261019-120000-ab12", [
+      { record: CHECKED, dir: "tests-pay/attempt-1", screen: undefined },
+    ])
+    const checks = html.slice(html.indexOf("<h4>Checks</h4>"))
+
+    expect(html.indexOf("<h4>Checks</h4>")).toBeGreaterThan(html.indexOf("<h4>Steps</h4>"))
+    expect(checks).toContain(
+      '<li class="failed">✗ expect(credits granted).toBe(500) — expected 500, got 1000</li>',
+    )
   })
 
   it("caps a long screen", () => {

@@ -8,6 +8,7 @@
 import { findingPlace } from "../lint/index.ts"
 import { effectNotes, effectsOf } from "../record/effect-notes.ts"
 import { dollars, stepCost } from "../record/usage.ts"
+import { afterBody, checkLine } from "./checks-text.ts"
 import type { FlightRecord, RecordedExchange, RecordedStep } from "./record.ts"
 import { fixAdvice, VERDICT_LABELS } from "./verdict-words.ts"
 
@@ -244,12 +245,20 @@ function lintSection(record: FlightRecord): string[] {
   ]
 }
 
+/** What ran after the body: the wait for background work, then the invariant's checks. */
+function checkSection(steps: readonly RecordedStep[]): string[] {
+  return steps.length === 0
+    ? []
+    : ["## Checks", "", ...steps.map((step) => `- ${cell(checkLine(step))}`), ""]
+}
+
 /** The Markdown failure page of one run's record; `screen` is its screen-at-failure text. */
 export function failurePage(record: FlightRecord, screen?: string): string {
   return [
     ...headerLines(record),
     ...lintSection(record),
-    ...stepLines(record.steps),
+    ...stepLines(record.steps.filter((step) => !afterBody(step))),
+    ...checkSection(record.steps.filter(afterBody)),
     ...effectSection(record.steps),
     ...screenLines(screen, record),
     ...logLines(record),
