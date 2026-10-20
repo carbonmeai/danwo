@@ -156,13 +156,22 @@ describe("the docs tree", () => {
     }
   })
 
-  it("gives every provider a page with its logo and what the spec says about it", () => {
+  it("gives every provider a page with its logo, written to the providers' template", () => {
     for (const provider of PROVIDERS) {
-      const page = files.get(join("providers", `${provider.slug}.md`)) ?? ""
+      const page = files.get(join("providers", `${provider.slug}.mdx`)) ?? ""
 
       expect(field(page, "icon"), provider.slug).toContain(`/icons/${provider.icon}`)
-      expect(page, provider.slug).toMatch(/## (Environment and seed|Test helpers)/)
+
+      for (const heading of ["Set up", "Use it in a test", "Faults", "Fidelity"])
+        expect(page, `${provider.slug}: ## ${heading}`).toContain(`\n## ${heading}`)
     }
+  })
+
+  it("fills the Providers overview with a card for every provider", () => {
+    const overview = files.get(join("providers", "index.mdx")) ?? ""
+
+    for (const provider of PROVIDERS)
+      expect(overview, provider.slug).toContain(`href="/docs/providers/${provider.slug}"`)
   })
 
   it("makes each tab a root folder with its sections as separators", () => {

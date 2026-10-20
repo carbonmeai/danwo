@@ -39,9 +39,9 @@ export type PageSource =
       readonly only?: (name: string) => boolean
       readonly example?: ReferenceExample
     }
-  /** The provider pages and their overview, built from the provider list and the spec. */
+  /** The Providers overview, `content/docs/providers/index.mdx` with the card grid filled in. */
   | { readonly kind: "providers" }
-  /** One provider's page. */
+  /** One provider's page, `content/docs/providers/<provider>.mdx`, titled from the provider list. */
   | { readonly kind: "provider"; readonly provider: string }
   /** The reference overview: a card per reference page. */
   | { readonly kind: "reference-index" }
@@ -128,6 +128,16 @@ function reference(
 /** A provider's page; its title and logo come from the provider list. */
 function provider(slug: string): PlannedPage {
   return { slug, title: "", icon: "", source: { kind: "provider", provider: slug } }
+}
+
+/**
+ * A further page about a provider, written for the website under `content/docs/providers`, with
+ * the provider's logo, and its mark for dark surfaces when it has one.
+ */
+function part(slug: string, title: string, logo: string, dark?: string): PlannedPage {
+  const icon = [logo, dark].flatMap((file) => (file ? [`/icons/${file}`] : [])).join("|")
+
+  return file(slug, title, icon, `providers/${slug}.mdx`)
 }
 
 /** Sections of the providers guide that are pages under Providers instead. */
@@ -377,16 +387,37 @@ export const PLAN: readonly PlannedTab[] = [
         title: "Overview",
         pages: [{ slug: "index", title: "Providers", icon: "Plug", source: { kind: "providers" } }],
       },
-      { title: "Payments", pages: ["stripe", "paystack", "flutterwave", "bachs"].map(provider) },
+      {
+        title: "Payments",
+        pages: [
+          provider("stripe"),
+          part("stripe-billing", "Stripe billing", "stripe.svg"),
+          part("stripe-js", "Stripe.js and cards", "stripe.svg"),
+          ...["paystack", "flutterwave", "bachs"].map(provider),
+        ],
+      },
       { title: "Email and messaging", pages: ["resend", "twilio", "slack"].map(provider) },
       {
-        title: "Identity and workspace",
-        pages: ["google", "microsoft", "github", "auth0", "clerk"].map(provider),
+        title: "Identity",
+        pages: [
+          provider("google"),
+          part("google-workspace", "Gmail, Calendar, Drive", "google.svg"),
+          ...["microsoft", "github", "auth0", "clerk"].map(provider),
+        ],
+      },
+      { title: "Storage", pages: [provider("s3")] },
+      {
+        title: "AI",
+        pages: [
+          provider("model-apis"),
+          part("model-scripts", "Scripting replies", "openai.svg", "openai-on-dark.svg"),
+          part("model-providers", "More model APIs", "openai.svg", "openai-on-dark.svg"),
+          provider("composio"),
+        ],
       },
       { title: "Connectors", pages: ["nylas", "nango", "unipile"].map(provider) },
       { title: "Realtime", pages: ["pusher", "novu", "tiptap"].map(provider) },
-      { title: "Storage and cloud", pages: ["s3", "aws"].map(provider) },
-      { title: "AI", pages: ["model-apis", "composio"].map(provider) },
+      { title: "Infrastructure", pages: [provider("aws")] },
     ],
   },
   {

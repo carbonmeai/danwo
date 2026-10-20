@@ -35,7 +35,7 @@ import {
   type ReferenceExample,
   urlDir,
 } from "./plan.ts"
-import { type ProviderGroup, providerIndex, providerPage } from "./provider-pages.ts"
+import { type ProviderGroup, providerIcon, withProviderCards } from "./provider-pages.ts"
 
 /** The website package's folder. */
 export const WEBSITE = join(import.meta.dirname, "..", "..")
@@ -211,14 +211,11 @@ const BUILDERS: {
   ],
   reference: (source, { place, inputs }) => ["md", referenceFile(place, source, inputs)],
   "reference-index": (_, { place, tab }) => ["mdx", referenceIndex(place, tab)],
-  providers: (_, { place, tab }) => ["mdx", providerIndex(place.section, providerKinds(tab))],
-  provider: (source, { place, inputs }) => {
-    const found = PROVIDERS.find((provider) => provider.slug === source.provider)
-
-    if (!found) throw new Error(`no provider "${source.provider}" for the docs`)
-
-    return ["md", providerPage(found, inputs.spec, place.section)]
-  },
+  providers: (_, { place, tab }) => [
+    "mdx",
+    withProviderCards(copied("providers/index.mdx", place), providerKinds(tab)),
+  ],
+  provider: (source, { place }) => ["mdx", copied(`providers/${source.provider}.mdx`, place)],
   examples: () => ["mdx", examplesIndex()],
   example: (source) => {
     const found = EXAMPLES.find((example) => example.slug === source.example)
@@ -253,7 +250,9 @@ function placement(page: PlannedPage, group: PlannedSection): Placement {
     const slug = page.source.provider
     const found = PROVIDERS.find((provider) => provider.slug === slug)
 
-    return { title: found?.name ?? slug, icon: "", section: group.title }
+    if (!found) throw new Error(`no provider "${slug}" for the docs`)
+
+    return { title: found.name, icon: providerIcon(found), section: group.title }
   }
 
   return { title: page.title, icon: page.icon, section: group.title }

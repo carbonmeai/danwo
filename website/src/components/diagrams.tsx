@@ -434,3 +434,33 @@ export function Setup(props: { readonly kind: keyof typeof SETUPS }): ReactNode 
     </Figure>
   )
 }
+
+/**
+ * One provider call: the app's own SDK calls the real hostname, the proxy sends it to the
+ * emulator, the emulator keeps the state a test reads, and its webhook comes back to the app.
+ */
+export function ProviderFlow(): ReactNode {
+  return (
+    <Figure
+      width={760}
+      height={230}
+      label="Your app's SDK calls api.stripe.com; danwo's proxy routes the call to the Stripe emulator, which keeps the state your test reads and sends its signed webhook back to your app."
+      caption="The app's code and keys stay as they are. The emulator answers, remembers and sends webhooks back."
+    >
+      <Box x={10} y={40} width={170} label="Your app" note="stripe.checkout…create()" />
+      <Arrow from={[180, 65]} to={[256, 65]} />
+      <text x={218} y={55} textAnchor="middle" style={{ fill: MUTED, fontSize: 11 }}>
+        api.stripe.com
+      </text>
+      <Box x={260} y={40} width={150} label="danwo proxy" note="routes by hostname" stroke={TEXT} />
+      <Arrow from={[410, 65]} to={[486, 65]} />
+      <Box x={490} y={40} width={170} label="Stripe emulator" note="customers, sessions…" />
+      <Arrow from={[575, 90]} to={[575, 146]} />
+      <Box x={490} y={150} width={170} label="Your test" note="reads its state" />
+      <Arrow from={[490, 90]} to={[180, 160]} />
+      <text x={330} y={150} textAnchor="middle" style={{ fill: MUTED, fontSize: 11 }}>
+        signed webhook back to your app
+      </text>
+    </Figure>
+  )
+}
