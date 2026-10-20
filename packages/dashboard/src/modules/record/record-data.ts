@@ -27,6 +27,8 @@ export interface StepView {
   readonly api: string
   readonly status: string
   readonly durationMs: number
+  /** The person whose browser the step ran in, when the test opened more than one person's. */
+  readonly user?: string
   readonly source?: string
   readonly error?: string
   readonly cache?: string
@@ -83,6 +85,7 @@ function stepView(step: RecordedStep): StepView {
     api: step.api,
     status: step.status,
     durationMs: step.durationMs,
+    ...(step.user !== undefined && { user: step.user }),
     ...(step.source && { source: `${step.source.file}:${step.source.line}` }),
     ...(step.error && { error: `${step.error.code}: ${step.error.message}` }),
     ...(step.cache && { cache: step.cache.mode }),

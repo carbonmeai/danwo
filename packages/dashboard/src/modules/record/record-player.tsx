@@ -6,7 +6,15 @@ import { Span } from "@danwo/ui/primitives/typography"
 import { type KeyboardEvent, type PointerEvent, useRef, useState } from "react"
 
 import { useCopied } from "../../components/copy-link.tsx"
-import { clock, frameAt, type Replay, type ReplayMark, stepAt } from "./record-replay.ts"
+import {
+  clock,
+  frameAt,
+  type Replay,
+  type ReplayMark,
+  type ReplayVideo,
+  stepAt,
+  videoName,
+} from "./record-replay.ts"
 import type { Playback } from "./use-playback.ts"
 import { useScreenshot } from "./use-screenshot.ts"
 
@@ -48,7 +56,10 @@ function FaultMark({ mark, playback }: { readonly mark: ReplayMark; readonly pla
       borderColor="surface.item"
       role="img"
       aria-label={`Fault: ${mark.fault ?? ""} on ${mark.label}`}
-      style={{ left: at(playback, mark.atMs), transform: "translate(-50%, -50%) rotate(45deg)" }}
+      style={{
+        left: at(playback, mark.atMs),
+        transform: "translate(-50%, -50%) rotate(45deg)",
+      }}
     />
   )
 }
@@ -141,7 +152,10 @@ function Scrubber({ playback }: { readonly playback: Playback }) {
         bg="surface.chip"
         boxShadow="chip"
         pointerEvents="none"
-        style={{ left: at(playback, playback.ms), transform: "translate(-50%, -50%)" }}
+        style={{
+          left: at(playback, playback.ms),
+          transform: "translate(-50%, -50%)",
+        }}
       />
     </Box>
   )
@@ -233,7 +247,13 @@ function Toggles<T extends number>({
 }
 
 /** Play or pause, the clock, the scrubber, the speed, and a link to the moment. */
-function Controls({ playback, tabs }: { readonly playback: Playback; readonly tabs: number }) {
+function Controls({
+  playback,
+  videos,
+}: {
+  readonly playback: Playback
+  readonly videos: readonly ReplayVideo[]
+}) {
   return (
     <HStack gap="2" flexWrap="wrap" mt="2.5">
       <Button
@@ -261,12 +281,12 @@ function Controls({ playback, tabs }: { readonly playback: Playback; readonly ta
         words={(rate) => `${rate}×`}
         onChoose={playback.setRate}
       />
-      {tabs > 1 ? (
+      {videos.length > 1 ? (
         <Toggles
-          label="Tab"
-          values={Array.from({ length: tabs }, (_, i) => i)}
+          label={videos.some((video) => video.user !== undefined) ? "Browser" : "Tab"}
+          values={videos.map((_, i) => i)}
           chosen={playback.tab}
-          words={(i) => `Tab ${i + 1}`}
+          words={(i) => videoName(videos, i)}
           onChoose={playback.pickTab}
         />
       ) : null}
@@ -327,7 +347,7 @@ export function RecordPlayer({
             preload="auto"
             playsInline
             muted
-            aria-label={`Video of the run${replay.videos.length > 1 ? `, tab ${playback.video.tab}` : ""}`}
+            aria-label={`Video of the run${replay.videos.length > 1 ? `, ${videoName(replay.videos, playback.tab).toLowerCase()}` : ""}`}
             w="full"
             h="full"
             objectFit="contain"
@@ -337,7 +357,7 @@ export function RecordPlayer({
           <Still dir={dir} replay={replay} playback={playback} />
         )}
       </Box>
-      <Controls playback={playback} tabs={replay.videos.length} />
+      <Controls playback={playback} videos={replay.videos} />
       <NowLine playback={playback} />
     </Stack>
   )

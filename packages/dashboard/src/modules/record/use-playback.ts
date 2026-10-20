@@ -26,6 +26,11 @@ export interface Playback {
   readonly toggle: () => void
   readonly setRate: (rate: number) => void
   readonly pickTab: (index: number) => void
+  /**
+   * Shows the moment `ms` of video `tab`: another person's step plays in their browser's video,
+   * so the player switches to it first.
+   */
+  readonly showAt: (tab: number, ms: number) => void
 }
 
 const clamp = (value: number, low: number, high: number) => Math.min(Math.max(value, low), high)
@@ -165,7 +170,11 @@ function useOpening(
 function shownSpan(replay: Replay, video: ReplayVideo | undefined, length: number) {
   if (video === undefined) return { startMs: 0, endMs: replay.spanMs, marks: replay.marks }
 
-  return { startMs: video.startMs, endMs: video.startMs + length, marks: video.marks }
+  return {
+    startMs: video.startMs,
+    endMs: video.startMs + length,
+    marks: video.marks,
+  }
 }
 
 /** Where the clock is next frame: the video's own time, else the timer's, up to the end. */
@@ -197,6 +206,40 @@ function useTicks(
   }, [videoRef, ms, span.endMs, setPlaying])
 }
 
+/** What seeking into another video needs: the video playing, its span, and how to switch. */
+interface Switching {
+  readonly tab: number
+  readonly startMs: number
+  readonly endMs: number
+  readonly seek: (ms: number) => void
+  readonly pickTab: (index: number) => void
+}
+
+/**
+ * Seeks the player to a moment of any of its videos: at once in the one playing, else once the
+ * other has loaded far enough to know its length (before that, a seek would stop at its start).
+ */
+function useSwitchedSeek({ tab, startMs, endMs, seek, pickTab }: Switching) {
+  const pending = useRef<number>(undefined)
+
+  useEffect(() => {
+    if (pending.current === undefined || endMs <= startMs) return
+
+    seek(pending.current)
+    pending.current = undefined
+  }, [tab, startMs, endMs, seek])
+
+  return useCallback(
+    (to: number, ms: number) => {
+      if (to === tab) return seek(ms)
+
+      pending.current = ms
+      pickTab(to)
+    },
+    [tab, seek, pickTab],
+  )
+}
+
 /** The player's clock for `replay`, starting where the page's link points when it names a moment. */
 export function usePlayback(replay: Replay): Playback {
   const [tab, setTab] = useState(0)
@@ -210,7 +253,15 @@ export function usePlayback(replay: Replay): Playback {
 
   useVideoEvent(videoRef, video, STATE_EVENTS, (element) => setPlaying(isPlaying(element)))
 
-  useTicks({ videoRef, span: { startMs, endMs }, ms, setMs, setPlaying, playing, rate })
+  useTicks({
+    videoRef,
+    span: { startMs, endMs },
+    ms,
+    setMs,
+    setPlaying,
+    playing,
+    rate,
+  })
 
   const { seek, toggle } = useControls({
     videoRef,
@@ -237,6 +288,8 @@ export function usePlayback(replay: Replay): Playback {
     [forgetLink],
   )
 
+  const showAt = useSwitchedSeek({ tab, startMs, endMs, seek, pickTab })
+
   return {
     ms,
     startMs,
@@ -251,5 +304,6 @@ export function usePlayback(replay: Replay): Playback {
     toggle,
     setRate,
     pickTab,
+    showAt,
   }
 }

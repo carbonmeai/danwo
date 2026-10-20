@@ -24,6 +24,8 @@ export interface ReplayVideo {
   /** Where the dashboard serves the file. */
   readonly src: string
   readonly tab: number
+  /** The person whose browser it shows, when the test opened more than one person's. */
+  readonly user?: string
   /** When the video's first frame was taken. */
   readonly startMs: number
   readonly durationMs: number
@@ -121,6 +123,7 @@ export function replayOf(
     return {
       src: mediaUrl(dir, video.file),
       tab: video.tab,
+      ...(video.user !== undefined && { user: video.user }),
       startMs,
       durationMs: video.durationMs,
       marks: video.marks.map((mark) => onRecordClock(mark, startMs)),
@@ -133,6 +136,23 @@ export function replayOf(
     marks: timelineMarks(timeline),
     spanMs: timeline.spanMs,
   }
+}
+
+/** Who the test's own browser is, beside the other people a test opened browsers for. */
+const OWN_BROWSER = "you"
+
+/**
+ * How the player names video `index` of `videos`: by tab alone, or with whose browser it shows
+ * once a test opened more than one person's (`bob · tab 1`, `you · tab 1`).
+ */
+export function videoName(videos: readonly ReplayVideo[], index: number): string {
+  const video = videos[index]
+
+  if (video === undefined) return `Tab ${index + 1}`
+
+  return videos.some((each) => each.user !== undefined)
+    ? `${video.user ?? OWN_BROWSER} · tab ${video.tab}`
+    : `Tab ${video.tab}`
 }
 
 /** The frame showing at `ms`: the last one whose step had ended, else the first. */

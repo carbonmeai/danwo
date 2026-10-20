@@ -21,7 +21,13 @@ import type { RecordView } from "../record/record-data.ts"
 import { clock, stepAt } from "../record/record-replay.ts"
 import type { Playback } from "../record/use-playback.ts"
 import { sendFeedback } from "./feedback-api.ts"
-import { type Warning, fixPrompt, transcriptOf, warningsOf } from "./overlay-values.ts"
+import {
+  type TranscriptStep,
+  type Warning,
+  fixPrompt,
+  transcriptOf,
+  warningsOf,
+} from "./overlay-values.ts"
 
 const WARNING_TONE: Readonly<Record<Warning["kind"], string>> = {
   error: "verdict.failed.fg",
@@ -88,7 +94,9 @@ function Feedback({ dir }: { readonly dir: string }) {
         >
           <Box
             display="inline-flex"
-            style={{ transform: each === "down" ? "rotate(180deg)" : undefined }}
+            style={{
+              transform: each === "down" ? "rotate(180deg)" : undefined,
+            }}
           >
             <Icons.thumbsUp size={14} />
           </Box>
@@ -98,21 +106,65 @@ function Feedback({ dir }: { readonly dir: string }) {
   )
 }
 
+/**
+ * Whose browser the transcript moves to at step `at`, when the test opened more than one person's
+ * and the step before ran in another's.
+ */
+function switchedTo(steps: readonly TranscriptStep[], at: number): string | undefined {
+  const step = steps[at]
+
+  if (step === undefined || !steps.some((each) => each.user !== undefined)) return undefined
+  if (at > 0 && steps[at - 1]?.user === step.user) return undefined
+
+  return step.user === undefined ? "Your browser" : `${step.user}'s browser`
+}
+
+/** The line above a step where the test moves to another person's browser. */
+function UserSwitch({ who }: { readonly who: string }) {
+  return (
+    <HStack gap="2" px="2" pt="2" pb="1" color="ink.muted" fontSize="1" fontWeight="600">
+      <Span>{who}</Span>
+      <Box flex="1" h="1px" bg="hairline" />
+    </HStack>
+  )
+}
+
 /** One step of the transcript: its number, what it did, and a jump to it in the replay. */
 function StepLine({
   step,
   current,
+  switched,
   playback,
 }: {
-  readonly step: ReturnType<typeof transcriptOf>[number]
+  readonly step: TranscriptStep
   readonly current: boolean
+  readonly switched: string | undefined
   readonly playback: Playback | undefined
 }) {
   const failed = toneOf(step.status) === "failed"
 
   return (
+    <Box role="listitem">
+      {switched === undefined ? null : <UserSwitch who={switched} />}
+      <StepBody step={step} current={current} failed={failed} playback={playback} />
+    </Box>
+  )
+}
+
+/** A step's number, label, jump button, person, API, cache and time, and its error. */
+function StepBody({
+  step,
+  current,
+  failed,
+  playback,
+}: {
+  readonly step: TranscriptStep
+  readonly current: boolean
+  readonly failed: boolean
+  readonly playback: Playback | undefined
+}) {
+  return (
     <Box
-      role="listitem"
       display="grid"
       gridTemplateColumns="1.75rem minmax(0, 1fr)"
       gap="2"
@@ -147,12 +199,13 @@ function StepLine({
               h="5"
               px="1.5"
               aria-label={`Go to step ${step.index + 1}, at ${clock(step.atMs - playback.startMs)}`}
-              onClick={() => playback.seek(step.atMs ?? 0)}
+              onClick={() => playback.showAt(step.video ?? playback.tab, step.atMs ?? 0)}
             >
               <Icons.play size={10} />
               {clock(step.atMs - playback.startMs)}
             </Button>
           ) : null}
+          {step.user === undefined ? null : <Span fontWeight="600">{step.user}</Span>}
           <Span>{step.api}</Span>
           {step.cache ? <Span>cache: {step.cache}</Span> : null}
           <Span>{duration(step.durationMs)}</Span>
@@ -214,11 +267,12 @@ export function Transcript({
       </Stack>
       <Box flex="1" minH="0" overflowY="auto" px="3" py="3">
         <Box role="list" display="grid" gap="0.5" aria-label="Steps">
-          {steps.map((step) => (
+          {steps.map((step, at) => (
             <StepLine
               key={step.index}
               step={step}
               current={step.index === playing}
+              switched={switchedTo(steps, at)}
               playback={playback}
             />
           ))}

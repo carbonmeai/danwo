@@ -18,21 +18,39 @@ export interface TranscriptStep {
   readonly durationMs: number
   /** Where the step starts on the player's clock, when the run can be replayed. */
   readonly atMs?: number
+  /** Which of the record's videos shows the step: its person's browser. */
+  readonly video?: number
+  /** The person whose browser the step ran in, when the test opened more than one person's. */
+  readonly user?: string
   readonly error?: string
   /** What the replay cache did for an agent step, as its tag words it. */
   readonly cache?: string
 }
 
+/** Where each step starts on the player's clock, and in which video, from the replay's marks. */
+function stepStarts(replay: Replay): Map<number, { atMs: number; video?: number }> {
+  const starts = new Map<number, { atMs: number; video?: number }>()
+  const marked = [
+    ...replay.videos.flatMap((video, at) => video.marks.map((mark) => ({ mark, video: at }))),
+    ...replay.marks.map((mark) => ({ mark, video: undefined })),
+  ]
+
+  for (const { mark, video } of marked)
+    if (mark.kind === "step" && mark.step !== undefined && !starts.has(mark.step))
+      starts.set(mark.step, {
+        atMs: mark.atMs,
+        ...(video !== undefined && { video }),
+      })
+
+  return starts
+}
+
 /** The steps in order, each with the moment the player jumps to for it. */
 export function transcriptOf(view: Pick<RecordView, "steps">, replay: Replay): TranscriptStep[] {
-  const starts = new Map<number, number>()
-
-  for (const mark of [...replay.marks, ...replay.videos.flatMap((video) => video.marks)])
-    if (mark.kind === "step" && mark.step !== undefined && !starts.has(mark.step))
-      starts.set(mark.step, mark.atMs)
+  const starts = stepStarts(replay)
 
   return view.steps.map((step) => {
-    const atMs = starts.get(step.index)
+    const start = starts.get(step.index)
 
     return {
       index: step.index,
@@ -40,9 +58,13 @@ export function transcriptOf(view: Pick<RecordView, "steps">, replay: Replay): T
       api: step.api,
       status: step.status,
       durationMs: step.durationMs,
-      ...(atMs !== undefined && { atMs }),
+      ...(start !== undefined && { atMs: start.atMs }),
+      ...(start?.video !== undefined && { video: start.video }),
+      ...(step.user !== undefined && { user: step.user }),
       ...(step.error !== undefined && { error: step.error }),
-      ...(step.cache !== undefined && { cache: CACHE_WORDS[step.cache] ?? step.cache }),
+      ...(step.cache !== undefined && {
+        cache: CACHE_WORDS[step.cache] ?? step.cache,
+      }),
     }
   })
 }
