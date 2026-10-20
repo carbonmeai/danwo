@@ -557,7 +557,10 @@ channel info, presence users, ending a user's connections) and checks each signa
 and timestamp. On the socket it speaks the protocol `pusher-js` does: public, private and
 presence channels (authorised as the app's auth endpoint would), user sign-in, client events and
 pings. Seeded apps' webhooks (`channel_occupied`, `member_added`, `client_event`, …) are signed
-with the app's secret. Beams publishes and the device API are kept for tests. Without a seed it
+with the app's secret. Channel info carries `subscription_count` only for an app seeded with
+`subscriptionCounting: true`; otherwise asking for it is refused with Pusher's 400, as on a real
+app with subscription counting off (the default). Beams publishes and the device API are kept for
+tests. Without a seed it
 answers for `PUSHER_DEFAULTS`. In tests, `pusherChannels(pusher)` lists what was published, on
 which channel and which connections it reached, lists open connections, and publishes from the
 test; `pusherBeams(pusher)` reads push publishes and registered devices.
