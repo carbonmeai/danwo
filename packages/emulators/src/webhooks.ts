@@ -240,6 +240,14 @@ export class WebhookDispatcher {
     return [...this.log]
   }
 
+  /**
+   * The id of the newest message the emulator has emitted, 0 for none. Every delivery of a message
+   * up to it, however late it is sent, was set off by what happened before this was read.
+   */
+  lastMessageId(): number {
+    return this.options.outbox.all().at(-1)?.id ?? 0
+  }
+
   /** Sends a message again to one endpoint now, outside the retry schedule. */
   redeliver(message: OutboxMessage, endpoint: WebhookEndpoint): Promise<void> {
     const mode = { ...NORMAL, retry: false }
