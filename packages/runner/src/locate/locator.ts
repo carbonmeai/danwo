@@ -34,12 +34,16 @@ export interface StepLog {
     body: () => Promise<T>,
     options?: { readonly verifies?: boolean },
   ): Promise<T>
+  /** Notes the tab the running step found its element in. */
+  ranIn?(tab: number): void
 }
 
 /** What every locator of one session shares. */
 export interface LocateContext {
   /** The page to resolve against, read at every use. */
   readonly page: () => Page
+  /** Which tab `page` is, as its video is numbered, so a step records where it ran. */
+  readonly tabOf?: (page: Page) => number | undefined
   readonly steps: StepLog
   readonly secrets: SecretResolver
   /** Files tests may upload, by name, as absolute paths. */
@@ -164,6 +168,22 @@ export class ElementLocator extends Finder implements Locator {
     return this.query(this.context.page())
   }
 
+  /** The Playwright locator on the current page, as a step uses it: the step notes that page's tab. */
+  resolveInStep(): PlaywrightLocator {
+    const page = this.context.page()
+
+    this.noteTab(page)
+
+    return this.query(page)
+  }
+
+  /** Notes on the running step the tab of `page`, the one its element is looked for in. */
+  private noteTab(page: Page): void {
+    const tab = this.context.tabOf?.(page)
+
+    if (tab !== undefined) this.context.steps.ranIn?.(tab)
+  }
+
   /** What `expect` needs to poll this locator and record the check. */
   get session(): LocateContext {
     return this.context
@@ -182,6 +202,8 @@ export class ElementLocator extends Finder implements Locator {
   ): Promise<T> {
     const page = this.context.page()
     const target = this.query(page)
+
+    this.noteTab(page)
 
     try {
       return await perform(target, timeout)

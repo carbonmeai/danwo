@@ -76,7 +76,7 @@ async function look(locator: ElementLocator, probe: Probe, deadline: number): Pr
   const budget = Math.max(50, Math.min(MAX_LOOK_MS, deadline - Date.now()))
 
   try {
-    return await probe(locator.resolve(), budget)
+    return await probe(locator.resolveInStep(), budget)
   } catch (cause) {
     const message = cause instanceof Error ? (cause.message.split("\n")[0] ?? "") : String(cause)
 

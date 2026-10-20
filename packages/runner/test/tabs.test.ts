@@ -92,6 +92,21 @@ describe("tab attribution", () => {
     expect(tabs.numberOf(asPage(new FakePage("http://elsewhere.test/")))).toBeUndefined()
   })
 
+  it("moves a step to the tab it found its element in, and leaves finished steps alone", async () => {
+    const { steps, act } = browser()
+
+    await steps.run("assertion", "expect.toBeVisible", "Connect your account", () => {
+      /* The popup became active while the check was looking. */
+      steps.ranIn(2)
+
+      return Promise.resolve()
+    })
+    steps.ranIn(3)
+    await act("Email")
+
+    expect(steps.all().map((step) => step.tab)).toEqual([2, 1])
+  })
+
   it("numbers the steps of another person's browser by their own tabs", async () => {
     const steps = new StepRecorder({ projectRoot: process.cwd(), redact: (text) => text })
     const bob = steps.forUser("bob")

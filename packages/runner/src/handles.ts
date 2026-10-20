@@ -321,6 +321,7 @@ export function handlesFor(shared: SharedDesk, browsing: Browsing): Handles {
   const agent = agentFor(shared, browsing, tabs, { ready, appErrors })
   const screen = createScreen({
     page: () => tabs.page,
+    tabOf: (page) => tabs.numberOf(page),
     steps,
     files: settings.files,
     secrets: { resolve: (secret) => vault.reveal(secret) },

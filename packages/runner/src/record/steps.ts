@@ -237,6 +237,17 @@ export class StepRecorder implements StepLog {
     this.tab = tab
   }
 
+  /**
+   * Sets the tab of this person's running step to where it found its element: a step that started
+   * as a popup was opening runs in the popup, though the app's tab was active when it began.
+   */
+  ranIn(tab: number): void {
+    const running = this.latest()
+
+    if (running?.record.status === "running" && running.record.tab !== tab)
+      running.record = { ...running.record, tab }
+  }
+
   /** Marks the part of the attempt that starts now; every person's later steps are stamped with it. */
   enter(phase: AttemptPhase): void {
     this.shared.phase = phase
