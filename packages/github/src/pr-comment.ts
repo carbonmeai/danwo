@@ -159,18 +159,31 @@ function detailLines(details: FailureDetails | undefined): string[] {
   ]
 }
 
+/** A failure's summary line: its mark, test, error code and whose failure it was. */
+function failureSummary(report: TestReport, error: TestReport["attempts"][0]["error"]): string {
+  const verdict = report.attempts.at(-1)?.verdict
+  const whose = verdict ? ` · ${verdictText(verdict)}` : ""
+
+  return `<details><summary>${STATUS_MARK[report.status] ?? ""} ${cell(report.id)}${error ? `: ${error.code}` : ""}${whose}</summary>`
+}
+
+/** The failure's "Whose" line: its verdict and the evidence behind it. */
+function whoseLines(report: TestReport): string[] {
+  const verdict = report.attempts.at(-1)?.verdict
+
+  return verdict ? [`- **Whose:** ${verdictText(verdict)}: ${cell(verdict.reason)}`] : []
+}
+
 async function failureBlock(report: TestReport, cwd: string, links: CommentLinks): Promise<string> {
   const failing = report.attempts.findLast((attempt) => attempt.error !== undefined)
   const error = failing?.error
   const record = report.attempts.findLast((attempt) => attempt.record)?.record
   const where = error?.source ? ` (${error.source.file}:${error.source.line})` : ""
-  const verdict = report.attempts.at(-1)?.verdict
-  const whose = verdict ? ` · ${verdictText(verdict)}` : ""
 
   return [
-    `<details><summary>${STATUS_MARK[report.status] ?? ""} ${cell(report.id)}${error ? `: ${error.code}` : ""}${whose}</summary>`,
+    failureSummary(report, error),
     "",
-    ...(verdict ? [`- **Whose:** ${verdictText(verdict)}: ${cell(verdict.reason)}`] : []),
+    ...whoseLines(report),
     ...(error
       ? [`- **Error:** \`${error.code}\` (${error.class}): ${cell(error.message)}${where}`]
       : []),

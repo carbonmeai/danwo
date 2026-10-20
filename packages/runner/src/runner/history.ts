@@ -16,7 +16,8 @@ import { redactCredentials } from "../secrets/index.ts"
 import { headCommit } from "./git-changes.ts"
 import type { MatrixRunReport, Reporter, RunContext, TestRunReport } from "./reporting.ts"
 import type { AttemptReport, TestReport } from "./tasks.ts"
-import { type FailureVerdict, trialVerdict } from "./verdict.ts"
+import type { FailureVerdict } from "./verdict-words.ts"
+import { trialVerdict } from "./verdict.ts"
 
 /** History summaries kept; older ones are deleted when a run is added. */
 const KEEP = 200
@@ -81,6 +82,8 @@ interface HistoryBase {
   readonly usage: Usage
   /** The commit checked out when the run ended; absent outside git. */
   readonly commit?: string
+  /** How many of the newest runs kept their recordings when this one finished. */
+  readonly keepRuns?: number
 }
 
 export interface TestHistory extends HistoryBase {
@@ -218,6 +221,7 @@ function testHistory(run: TestRunReport): TestHistory {
     ...identity(run.durationMs, run.id ?? run.run),
     durationMs: run.durationMs,
     ...(run.run !== undefined && { run: run.run }),
+    ...(run.keepRuns !== undefined && { keepRuns: run.keepRuns }),
     usage: usageOfTests(run.reports),
     tests: run.reports.map((report) => testOf(run, report)),
     brokenFiles: run.brokenFiles.map((broken) => ({
@@ -242,6 +246,7 @@ function matrixHistory(run: MatrixRunReport): MatrixHistory {
     ...identity(run.durationMs, run.id ?? folder),
     durationMs: run.durationMs,
     ...(folder !== undefined && { run: folder }),
+    ...(run.keepRuns !== undefined && { keepRuns: run.keepRuns }),
     usage: run.usage ?? addUsage([]),
     testId: run.testId,
     file: run.file,

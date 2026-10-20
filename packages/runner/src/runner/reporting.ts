@@ -23,6 +23,8 @@ export interface RunContext {
   readonly cwd: string
   /** The run's id, shared by its history summary, its record folder and its live feed. */
   readonly id?: string
+  /** How many of the newest runs keep their recordings, when the run recorded. */
+  readonly keepRuns?: number
 }
 
 /** `danwo test` once every test reported. */

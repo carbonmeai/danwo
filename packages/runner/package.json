@@ -12,6 +12,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./runner": "./src/runner/index.ts",
+    "./verdict": "./src/runner/verdict-words.ts",
     "./register": "./src/runner/register.ts",
     "./children": "./src/support/children.ts",
     "./strip-types": "./strip-types.mjs"

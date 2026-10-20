@@ -20,7 +20,8 @@ import type { TestError } from "../support/errors.ts"
 import type { AttemptFlight } from "./attempt.ts"
 import type { WorkerEnvironment } from "./environment.ts"
 import { createRedactor, type Redactor } from "./redact.ts"
-import { type FailureVerdict, failureVerdict } from "./verdict.ts"
+import type { FailureVerdict } from "./verdict-words.ts"
+import { failureVerdict } from "./verdict.ts"
 
 /** `always` keeps every run (the default); `on-failure` keeps failed runs only; `off` records nothing. */
 export type RecordMode = "on-failure" | "always" | "off"

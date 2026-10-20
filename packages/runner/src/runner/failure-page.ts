@@ -9,7 +9,7 @@ import { findingPlace } from "../lint/index.ts"
 import { effectNotes, effectsOf } from "../record/effect-notes.ts"
 import { dollars, stepCost } from "../record/usage.ts"
 import type { FlightRecord, RecordedExchange, RecordedStep } from "./record.ts"
-import { fixAdvice, VERDICT_LABELS } from "./verdict.ts"
+import { fixAdvice, VERDICT_LABELS } from "./verdict-words.ts"
 
 /** Caps that keep a page readable in an agent's context. */
 const LIMITS = {

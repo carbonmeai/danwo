@@ -88,7 +88,7 @@ export {
   redactExchange,
   runsDir,
 } from "./record.ts"
-export { findRun } from "./report.ts"
+export { DEFAULT_KEEP_RUNS, findRun } from "./report.ts"
 export { failurePage } from "./failure-page.ts"
 export { runMatrix, type RunMatrixOptions } from "./matrix-command.ts"
 export type { MatrixRunReport, Reporter, RunContext, RunKind, TestRunReport } from "./reporting.ts"
@@ -135,18 +135,16 @@ export {
   type RuleLevel,
 } from "../lint/index.ts"
 export type { TrialFindings } from "./reporting.ts"
+export { failureVerdict, trialVerdict, type VerdictEvidence } from "./verdict.ts"
 export {
   type FailureVerdict,
-  failureVerdict,
   fixAdvice,
-  trialVerdict,
   type Verdict,
   type VerdictConfidence,
-  type VerdictEvidence,
   VERDICT_LABELS,
   verdictCounts,
   verdictSummary,
-} from "./verdict.ts"
+} from "./verdict-words.ts"
 export { type CacheAction, type CacheCommandOptions, runCache } from "./cache-command.ts"
 export { type ErrorCodeRow, errorCodeTable, exitCodeForError } from "../support/codes.ts"
 export { CACHE_OUTCOMES, type CacheOutcome } from "../record/steps.ts"

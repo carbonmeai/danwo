@@ -8,7 +8,7 @@ import { addUsage, cacheLine, dollars, modelLine, type Usage } from "../record/u
 import { type ErrorClass, exitCodeOf } from "../support/codes.ts"
 import type { ResultStatus } from "../tests/retry.ts"
 import type { TestReport } from "./tasks.ts"
-import { type FailureVerdict, VERDICT_LABELS, verdictSummary } from "./verdict.ts"
+import { type FailureVerdict, VERDICT_LABELS, verdictSummary } from "./verdict-words.ts"
 
 const SYMBOL: Readonly<Record<ResultStatus, string>> = {
   passed: pc.green("✓"),
@@ -33,7 +33,7 @@ export function testLine(report: TestReport): string {
 }
 
 /** A verdict as a failure's header shows it: "App bug (likely)". */
-export function verdictTag(verdict: FailureVerdict): string {
+function verdictTag(verdict: FailureVerdict): string {
   const label = VERDICT_LABELS[verdict.verdict]
 
   return verdict.confidence === "likely" ? `${label} (likely)` : label
@@ -54,7 +54,7 @@ function failureLines(report: TestReport): string[] {
 }
 
 /** The verdicts of the run's failed tests, by their last attempt. */
-export function failedVerdicts(reports: readonly TestReport[]): (FailureVerdict | undefined)[] {
+function failedVerdicts(reports: readonly TestReport[]): (FailureVerdict | undefined)[] {
   return reports
     .filter((report) => isFailure(report.status))
     .map((report) => report.attempts.at(-1)?.verdict)

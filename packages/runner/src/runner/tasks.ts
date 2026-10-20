@@ -17,7 +17,7 @@ import type { AttemptStatus, ResultStatus } from "../tests/retry.ts"
 import type { WorkerLiveEvent } from "./live.ts"
 import type { RecordSettings } from "./record.ts"
 import type { TrialTimings } from "./timings.ts"
-import type { FailureVerdict } from "./verdict.ts"
+import type { FailureVerdict } from "./verdict-words.ts"
 
 /** What a worker needs before its first task: where the project is and how to record. */
 export interface WorkerStart {

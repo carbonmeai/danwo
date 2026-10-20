@@ -2,13 +2,12 @@ import { fileURLToPath } from "node:url"
 
 import { describe, expect, it } from "vitest"
 
+import { fixAdvice, verdictSummary } from "../src/runner/verdict-words.ts"
 import {
   failureVerdict,
-  fixAdvice,
   stackFiles,
   type VerdictCall,
   type VerdictEvidence,
-  verdictSummary,
 } from "../src/runner/verdict.ts"
 import { classOf, type ErrorCode } from "../src/support/codes.ts"
 import type { TestError } from "../src/support/errors.ts"

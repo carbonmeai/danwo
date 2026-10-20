@@ -11,7 +11,7 @@ import { historyReporter } from "./history.ts"
 import { chooseByChanges } from "./impact-command.ts"
 import { updateImpactIndex } from "./impact.ts"
 import { type LiveFeed, newRunId, openLiveFeed } from "./live.ts"
-import { closeRecording, openRecording } from "./recording.ts"
+import { closeRecording, openRecording, recordingContext } from "./recording.ts"
 import { closingLines, fileErrorLine, openingLine, runExitCode, testLine } from "./reporter.ts"
 import { type RunCommandOptions, tellReporters, type TestRunReport } from "./reporting.ts"
 import {
@@ -315,7 +315,13 @@ async function runAndReport(input: RunInput, frame: RunFrame): Promise<number> {
     ...(loaded.config.reporters ?? []),
     ...(options.reporters ?? []),
   ]
-  const context = { kind: "test", root: loaded.root, cwd, id: frame.id } as const
+  const context = {
+    kind: "test",
+    root: loaded.root,
+    cwd,
+    id: frame.id,
+    ...recordingContext(recording),
+  } as const
   const reports: TestReport[] = []
   const crew = testCrew(input, size, recording, feed, (report) => {
     reports.push(report)

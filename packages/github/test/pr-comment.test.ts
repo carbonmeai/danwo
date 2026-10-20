@@ -198,6 +198,15 @@ function matrixRun(over: Partial<MatrixRunReport> = {}): MatrixRunReport {
 
 const count = (text: string, part: string) => text.split(part).length - 1
 
+/** The report with every attempt given `verdict`. */
+const withVerdict = (
+  report: TestReport,
+  verdict: NonNullable<TestReport["attempts"][0]["verdict"]>,
+): TestReport => ({
+  ...report,
+  attempts: report.attempts.map((attempt) => ({ ...attempt, verdict })),
+})
+
 describe("the pull request comment's markdown", () => {
   it("heads the test section with counts, spend and commit, and lists failures first", async () => {
     const section = await testSection(
@@ -266,13 +275,6 @@ describe("the pull request comment's markdown", () => {
   it("splits the failures by whose they are, and says why in each failure", async () => {
     const appBug = failed("tests/checkout.danwo.ts › pays")
     const testIssue = failed("tests/sign-in.danwo.ts › signs in")
-    const withVerdict = (
-      report: TestReport,
-      verdict: NonNullable<TestReport["attempts"][0]["verdict"]>,
-    ): TestReport => ({
-      ...report,
-      attempts: report.attempts.map((attempt) => ({ ...attempt, verdict })),
-    })
     const body = commentBody(
       undefined,
       await testSection(

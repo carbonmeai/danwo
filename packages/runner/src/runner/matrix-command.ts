@@ -37,7 +37,7 @@ import { DEFAULT_WEBHOOK_FAULTS, defaultDataFaults, defaultOutboundFaults } from
 import { historyReporter } from "./history.ts"
 import { type LiveFeed, newRunId, openLiveFeed } from "./live.ts"
 import { racePlan } from "./races.ts"
-import { closeRecording, openRecording } from "./recording.ts"
+import { closeRecording, openRecording, recordingContext } from "./recording.ts"
 import {
   type Reporter,
   type RunCommandOptions,
@@ -617,7 +617,7 @@ export async function runMatrix(
       ...(loaded.config.reporters ?? []),
       ...(options.reporters ?? []),
     ],
-    context: { kind: "matrix", root: loaded.root, cwd, id },
+    context: { kind: "matrix", root: loaded.root, cwd, id, ...recordingContext(recording) },
     began: Date.now(),
     write,
     faults: options.faults,

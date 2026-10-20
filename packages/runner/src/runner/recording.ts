@@ -41,6 +41,13 @@ export function openRecording(
       }
 }
 
+/** What a run's reporters are told of its recording: how many runs keep theirs, when it records. */
+export function recordingContext(recording: RecordSettings | undefined): {
+  readonly keepRuns?: number
+} {
+  return recording?.keepRuns === undefined ? {} : { keepRuns: recording.keepRuns }
+}
+
 /**
  * Writes the run's report over whatever records were kept, says where it is, and resolves to its
  * path relative to `cwd` (undefined when nothing was kept).
