@@ -1,0 +1,16 @@
+# Generated, copied or scratch folders the editor has no need to index or search.
+.claude/worktrees/
+**/.work-*/
+**/.danwo/
+**/node_modules/
+**/dist/
+**/coverage/
+**/test-results/
+**/playwright-report/
+packages/ui/styled-system/
+website/generated/
+website/.snippets/
+website/.output/
+benchmarks/results/
+docs/research/
+.local/
