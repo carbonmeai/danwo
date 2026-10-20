@@ -8,6 +8,9 @@ import { z } from "zod"
 
 import { removeWorkCopies, workCopy } from "./work-copy.ts"
 
+/** Orders trial labels as text, so a plan and a run compare regardless of order. */
+const byText = (a: string | undefined, b: string | undefined) => (a ?? "").localeCompare(b ?? "")
+
 const BIN = fileURLToPath(new URL("../src/bin.ts", import.meta.url))
 const STACK = workCopy(fileURLToPath(new URL("./fixtures/stack", import.meta.url)))
 
@@ -134,7 +137,7 @@ describe("a stack of apps behind one proxy", () => {
       .map(([, status, label]) => ({ status, label }))
       .filter(({ label }) => label !== "clean run")
 
-    expect(runs.map(({ label }) => label).toSorted()).toEqual(planned.toSorted())
+    expect(runs.map(({ label }) => label).toSorted(byText)).toEqual(planned.toSorted(byText))
     /* A fault the setup's leftovers would have drawn never fires in a trial: none was planned. */
     expect(runs.filter(({ status }) => status === "INVALID")).toEqual([])
   }, 600_000)
