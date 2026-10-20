@@ -4,7 +4,7 @@ import type { Context } from "../../http.ts"
 import { GoogleApiError, isRecord, jsonBody } from "../api.ts"
 import type { GoogleRouteContext } from "../context.ts"
 import type { GmailLabelRecord } from "../entities.ts"
-import { labelResource } from "../gmail-format.ts"
+import { createdLabel, labelResource } from "../gmail-format.ts"
 import { changeLabels, labelOf, mailboxOwner } from "../gmail.ts"
 import { SCOPES } from "../scopes.ts"
 import { googleStore } from "../store.ts"
@@ -86,7 +86,7 @@ export function gmailLabelRoutes(context: GoogleRouteContext): void {
       color: fields.color ?? null,
     })
 
-    return c.json(labelResource(label))
+    return c.json(createdLabel(label))
   })
 
   const change = async (c: Context) => {

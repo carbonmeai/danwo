@@ -131,6 +131,13 @@ function countsOf(labelId: string, messages: readonly GmailMessageRecord[]) {
   }
 }
 
+/** A new label, as `labels.create` answers it: without the `type` the other calls report. */
+export function createdLabel(label: GmailLabelRecord): gmail_v1.Schema$Label {
+  const { type: _type, ...created } = labelResource(label)
+
+  return created
+}
+
 /** A label; with the mailbox's messages, also its counts, as `labels.get` answers. */
 export function labelResource(
   label: GmailLabelRecord,
