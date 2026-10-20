@@ -79,6 +79,13 @@ export function asJsonObject(value: Json | undefined): { readonly [k: string]: J
   return value !== undefined && isRecord(value) ? value : undefined
 }
 
+/** The string field `name` of a JSON object, or an empty string. */
+export function stringField(value: Json | undefined, name: string): string {
+  const field = asJsonObject(value)?.[name]
+
+  return typeof field === "string" ? field : ""
+}
+
 /** The structure of `value`, keeping the values of literal paths only. */
 export function shapeOf(value: Json, options: ShapeOptions = {}, path = ""): Shape {
   const literals = [...ALWAYS_LITERAL, ...(options.literals ?? [])]

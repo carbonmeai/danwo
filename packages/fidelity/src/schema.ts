@@ -12,6 +12,8 @@ export const num: Schema = { type: "number" }
 export const bool: Schema = { type: "boolean" }
 /** Any value: a field the documentation names without describing. */
 export const anything: Schema = {}
+/** An answer with no body, such as a 204. */
+export const noBody: Schema = { type: "null" }
 
 /** `schema`, or null. */
 export function nullable(schema: Schema): Schema {
