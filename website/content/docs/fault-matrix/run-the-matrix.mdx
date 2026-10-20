@@ -1,0 +1,92 @@
+---
+title: Running it
+description: Run the fault matrix on a test, a chosen set of faults, or a single fault.
+icon: Play
+---
+
+You run the fault matrix on one test file at a time. It takes the test, runs it cleanly, then
+replays it once per planned fault, in parallel.
+
+## Run every planned fault
+
+```sh
+npx danwo matrix tests/buy-credits.danwo.ts
+```
+
+Each line is one trial:
+
+```text
+clean run passed; 18 faults planned
+PASS  clean run
+PASS  status 500 on POST api.stripe.com/v1/checkout/sessions
+PASS  reset on POST api.stripe.com/v1/checkout/sessions
+FAIL  duplicate on webhook checkout.session.completed
+        body stopped at tests/buy-credits.danwo.ts:16: expect(getByText(/^Credits: /)).toHaveText("Credits: 500") failed after 1500 ms
+        invariant: expected 1000 to be 500
+        record: .danwo/runs/20261020-083010-21a4/…/duplicate-on-webhook-checkout-session-completed
+PASS  double-submit on POST /buy
+        POST /buy sent twice at once: 303 and 303
+faults: 17 passed, 1 failed
+19 runs in 47 s
+```
+
+A failed trial shows three lines: where the test stopped, what the invariant said, and where its
+recording is.
+
+## Run only some faults
+
+Each trial has a **label**, such as `duplicate on webhook checkout.session.completed`. Pick
+trials by label with `--faults`, which takes a regular expression:
+
+```sh
+npx danwo matrix tests/buy-credits.danwo.ts --faults "^duplicate"
+```
+
+This is how you rerun the one trial that failed while you fix it.
+
+## Pick a test in a file
+
+When a file has several tests, choose one with `--grep`:
+
+```sh
+npx danwo matrix tests/checkout.danwo.ts --grep "pays with a saved card"
+```
+
+## Options
+
+| Option               | What it does                                                         | Default                 |
+| -------------------- | -------------------------------------------------------------------- | ----------------------- |
+| `--faults <regexp>`  | Run only the faults whose labels match.                              | all planned             |
+| `--grep <regexp>`    | Choose the test when the file has several.                           | the only test           |
+| `--workers <n>`      | How many trials run at once.                                         | one per core, at most 8 |
+| `--max-failures <n>` | Stop starting trials after this many failed.                         | no limit                |
+| `--plan`             | Show what would run, and how long it would take, without running it. | off                     |
+| `--budget <n>`       | Run at most this many trials.                                        | 40                      |
+| `--video <mode>`     | Keep video: `on`, `retain-on-failure` or `off`.                      | `on`                    |
+
+The full list is in the [CLI reference](/docs/reference/cli).
+
+## In CI
+
+Add the GitHub reporter. Each matrix run becomes a check on the pull request, plus a section in
+danwo's pull request comment:
+
+```sh
+npx danwo matrix tests/buy-credits.danwo.ts --reporter github
+```
+
+<Callout type="info">
+  The matrix needs an environment that can reset between trials. `appEnvironment` and the provider
+  environments (`stripeEnvironment` and the rest) already can.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Reading results" href="/docs/matrix-results">
+    Open a failed trial and see what went wrong.
+  </Card>
+  <Card title="Planning and budget" href="/docs/matrix-planning">
+    How danwo chooses which faults to run.
+  </Card>
+</Cards>

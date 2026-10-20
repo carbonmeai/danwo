@@ -84,7 +84,7 @@ export function Footer() {
             title="Developers"
             links={[
               ["Docs", "/docs"],
-              ["Quickstart", "/docs/first-test"],
+              ["Quickstart", "/docs/quickstart"],
               ["MCP", "/docs/coding-agents"],
               ["Playwright", "/docs/playwright"],
             ]}

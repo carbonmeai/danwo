@@ -155,7 +155,7 @@ export const Hero = forwardRef<HTMLElement>(function Hero(_props, ref) {
               GitHub
             </a>
           ) : (
-            <Link className="btn btn-solid" to="/docs/$" params={{ _splat: "first-test" }}>
+            <Link className="btn btn-solid" to="/docs/$" params={{ _splat: "quickstart" }}>
               Quickstart
             </Link>
           )}

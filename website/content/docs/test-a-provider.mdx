@@ -1,0 +1,159 @@
+---
+title: Test a provider
+description: Pay through Stripe in a test, check the charge happened exactly once, then try to break it.
+icon: CreditCard
+---
+
+This page builds on the [Quickstart](/docs/quickstart). Your app sells credits through Stripe
+Checkout. You'll write a test that buys them, then check the result in two places: what your
+app shows, and what Stripe recorded.
+
+## Seed the webhook
+
+When a payment completes, Stripe sends your app a **webhook**: an HTTP request saying what
+happened. Your app grants the credits when it arrives.
+
+Tell danwo's Stripe emulator where to send it. Add a `seed` to `stripeService`:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, stripeService } from "@danwo/sdk"
+
+const url = "http://localhost:3000"
+
+export default defineConfig({
+  testDir: "tests",
+  workers: 1,
+  readiness: { mode: "page+backend", settle: true },
+  environment: () =>
+    appEnvironment({
+      app: { command: "npm run dev", url, env: { STRIPE_WEBHOOK_SECRET: "whsec_test" } },
+      services: [
+        stripeService({
+          seed: () => ({
+            webhookEndpoints: [
+              {
+                url: `${url}/api/webhooks/stripe`,
+                events: ["checkout.session.completed"],
+                secret: "whsec_test",
+              },
+            ],
+          }),
+        }),
+      ],
+    }),
+})
+```
+
+The emulator signs each webhook with `secret`, exactly as Stripe would. Your app checks the
+signature with the same secret, so the app's `env` gets it too.
+
+<Callout type="info">
+  Keep your app's own `sk_test_` key. The emulator accepts any test key, and your app's code doesn't
+  change.
+</Callout>
+
+## Write the test
+
+The test clicks **Buy**, pays on Stripe's Checkout page, and checks the credits:
+
+```ts title="tests/buy-credits.danwo.ts · the body"
+test("buys 500 credits", async ({ app, screen, expect }) => {
+  await app.open("/")
+  await screen.getByRole("button", { name: "Buy 500 credits" }).click()
+  await screen.getByTestId("checkout-pay").click()
+
+  await expect(screen.getByText("Credits: 500")).toBeVisible()
+})
+```
+
+`checkout-pay` is the **Pay** button on the emulator's Checkout page. After the click, danwo
+waits for Stripe's webhook to reach your app before the next check. That's what
+`readiness: { settle: true }` in the config does.
+
+## Check Stripe agrees
+
+The screen says 500 credits. But was the card charged once, or twice? Add an **invariant**: a
+check that runs after the test and compares your app with the provider.
+
+```ts title="tests/buy-credits.danwo.ts"
+import { type StripeFixtures, test as base } from "@danwo/sdk"
+
+const test = base.extend<StripeFixtures>()
+
+test("buys 500 credits", async ({ app, screen, expect }) => {
+  await app.open("/")
+  await screen.getByRole("button", { name: "Buy 500 credits" }).click()
+  await screen.getByTestId("checkout-pay").click()
+
+  await expect(screen.getByText("Credits: 500")).toBeVisible()
+}).invariant(async ({ app, stripe, expect }) => {
+  const paid = await stripe.fetch(
+    new Request("https://api.stripe.com/v1/checkout/sessions?payment_status=paid", {
+      headers: { authorization: "Bearer sk_test_any" },
+    }),
+  )
+  const { data } = await paid.json()
+  const granted = await fetch(new URL("/api/credits", app.baseUrl))
+  const { credits } = await granted.json()
+
+  expect(credits).toBe(data.length * 500)
+})
+```
+
+Three things are new here:
+
+- `base.extend<StripeFixtures>()` gives the test a `stripe` fixture: the Stripe emulator.
+- `stripe.fetch` asks the emulator what happened, using Stripe's own API.
+- The invariant reads your app's side too (`/api/credits`), and says the two must match.
+
+## Run it
+
+```sh
+npm run test:danwo
+```
+
+```text
+  ✓ tests/buy-credits.danwo.ts › buys 500 credits 6681 ms, worker 0
+
+1 passed
+```
+
+Open the recording with `npx danwo serve --open`. The **Providers** tab shows the Checkout
+calls, and the `checkout.session.completed` webhook your app received.
+
+## Try to break it
+
+A passing test only proves the happy path. Run the **fault matrix** on it:
+
+```sh
+npx danwo matrix tests/buy-credits.danwo.ts
+```
+
+danwo runs the test once cleanly, then once per fault it could meet, and checks your invariant
+after each one. This app handles almost everything, but not a webhook that arrives twice:
+
+```text
+PASS  status 500 on POST api.stripe.com/v1/checkout/sessions
+PASS  reset-after on POST checkout.stripe.com/checkout/:id/complete
+FAIL  duplicate on webhook checkout.session.completed
+        invariant: expected 1000 to be 500
+PASS  double-submit on POST /buy
+faults: 17 passed, 1 failed
+```
+
+Stripe really does deliver webhooks more than once. This app granted the credits twice. The fix
+is to remember each event's id and ignore one you've already handled.
+
+## Next
+
+<Cards>
+  <Card title="Fault matrix" href="/docs/fault-matrix">
+    How the matrix works, and how to read what it found.
+  </Card>
+  <Card title="Writing invariants" href="/docs/invariants">
+    What to compare, and how to read each side.
+  </Card>
+  <Card title="Stripe" href="/docs/providers/stripe">
+    Everything the Stripe emulator covers.
+  </Card>
+</Cards>

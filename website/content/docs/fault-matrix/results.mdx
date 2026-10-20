@@ -1,0 +1,73 @@
+---
+title: Reading results
+description: Find the failed trials in the dashboard, and see what each fault did to your app.
+icon: Table
+---
+
+The terminal tells you which trials failed. The dashboard shows you why: the fault, the moment
+it hit, and what your app did next.
+
+## Open the matrix run
+
+```sh
+npx danwo serve --open
+```
+
+Go to **Runs** and pick the `danwo matrix` run, or open **Matrix** to see every test's latest
+result.
+
+## The grid
+
+The run's page is a grid. Each **row** is something the clean run did: a call to Stripe, a
+webhook, a form post. Each **column** is a kind of fault. Each cell is one trial.
+
+| Colour | Meaning                                          |
+| ------ | ------------------------------------------------ |
+| Green  | The invariant held.                              |
+| Red    | The invariant broke. This is a bug.              |
+| Blue   | Not judged: the trial couldn't run to a verdict. |
+| Grey   | Invalid: the fault never happened in that trial. |
+| Empty  | No such fault for that call.                     |
+
+Prefer a list? Switch the view from **Grid** to **List**.
+
+## Open a failed trial
+
+Click a red cell. A card shows:
+
+- **The fault**, such as `duplicate on webhook checkout.session.completed`.
+- **What the invariant said**, such as `expected 1000 to be 500`.
+- **Where the test stopped**, with the file and line.
+
+Click **Open the flight record** to watch the trial.
+
+## Watch what happened
+
+The recording opens in two panes. On the left are the test's steps. On the right:
+
+| Tab                | What you see                                         |
+| ------------------ | ---------------------------------------------------- |
+| **Replay**         | The video, with a marker where the fault hit.        |
+| **Providers**      | Every call and webhook, with the faulted one marked. |
+| **Effects**        | What changed behind the app after each step.         |
+| **Emulator state** | What each provider held when the trial ended.        |
+| **Matrix**         | The other trials of the same run.                    |
+
+For the duplicate webhook above, **Providers** shows `checkout.session.completed` delivered
+twice, and **Effects** shows the credits going up twice.
+
+## Hand it to your coding agent
+
+**Copy prompt to fix** copies the failure, the fault and the relevant calls as a prompt. Paste
+it into Claude Code, Cursor or Codex.
+
+## Next
+
+<Cards>
+  <Card title="Common findings" href="/docs/common-findings">
+    The usual failures, and how to fix each.
+  </Card>
+  <Card title="Dashboard" href="/docs/dashboard">
+    The rest of the dashboard.
+  </Card>
+</Cards>

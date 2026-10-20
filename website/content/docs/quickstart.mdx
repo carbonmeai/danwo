@@ -1,0 +1,191 @@
+---
+title: Quickstart
+description: Set danwo up in your project, run your first test, and watch it in the dashboard.
+icon: Rocket
+---
+
+This page takes you from nothing to a passing test you can watch back. It takes about five
+minutes. You need Node.js 24 and an app you can start with a command, such as `npm run dev`.
+
+<Steps>
+<Step>
+
+### Run `danwo init`
+
+In your app's folder:
+
+<Tabs items={["npm", "pnpm", "bun"]}>
+  <Tab value="npm">
+
+```sh
+npx danwo init
+```
+
+  </Tab>
+  <Tab value="pnpm">
+
+```sh
+pnpm dlx danwo init
+```
+
+  </Tab>
+  <Tab value="bun">
+
+```sh
+bunx danwo init
+```
+
+  </Tab>
+</Tabs>
+
+It looks at your project first: the package manager, the framework, the command that starts
+your app, and the services your code uses. Then it asks four things:
+
+| Question                                | What it means                                                             |
+| --------------------------------------- | ------------------------------------------------------------------------- |
+| What should tests drive?                | A browser, an Android app, both, or only your app's API.                  |
+| Which model should agent steps use?     | The AI that runs plain-English steps. Pick **None** to use locators only. |
+| Which providers should danwo emulate?   | The services found in your code (Stripe, Resend…) are already ticked.     |
+| Which coding agents should learn danwo? | Claude Code, Cursor or Codex get danwo's skill and MCP server.            |
+
+When you've answered, it shows what it wrote:
+
+```text
+Files
+  created   danwo.config.ts
+  created   tests/example.danwo.ts
+  updated   package.json        (adds test:danwo)
+  created   .gitignore          (.danwo/)
+  created   .env.example
+```
+
+</Step>
+<Step>
+
+### Read the config
+
+`danwo.config.ts` says how to start your app and which services to emulate. Here it is in
+three parts.
+
+First, **where your app is**. danwo runs your dev command itself, so it can put the app behind
+its proxy:
+
+```ts title="danwo.config.ts · the app"
+const app = process.env.APP_URL ?? { command: "npm run dev", url: "http://localhost:3000" }
+```
+
+Second, **the model** for agent steps. Leave it out if you chose **None**:
+
+```ts title="danwo.config.ts · the model"
+model: "anthropic/claude-sonnet-5",
+```
+
+Third, **the environment**: your app, started behind one proxy with the services you picked.
+When your app calls `api.stripe.com`, the Stripe emulator answers:
+
+```ts title="danwo.config.ts · the environment"
+environment: () => appEnvironment({ app, services: [stripeService(), resendService()] }),
+```
+
+Put together, the whole file is short:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, resendService, stripeService } from "@danwo/sdk"
+
+const app = process.env.APP_URL ?? { command: "npm run dev", url: "http://localhost:3000" }
+
+export default defineConfig({
+  testDir: "tests",
+  workers: 1,
+  timeout: 60_000,
+  model: "anthropic/claude-sonnet-5",
+  readiness: { mode: "page+backend", settle: true },
+  environment: () => appEnvironment({ app, services: [stripeService(), resendService()] }),
+})
+```
+
+`readiness` tells danwo to wait after each click until the page has settled **and** the calls
+it caused have finished. You never write sleeps or waits by hand.
+
+</Step>
+<Step>
+
+### Read the example test
+
+`tests/example.danwo.ts` checks that your home page loads:
+
+```ts title="tests/example.danwo.ts"
+import { test } from "@danwo/sdk"
+
+test("the home page opens", async ({ app, expect }) => {
+  const response = await fetch(new URL("/", app.baseUrl))
+
+  expect(response.status).toBeLessThan(400)
+  await app.open("/")
+})
+```
+
+A test gets **fixtures**: ready-made objects passed in by name. `app` is your running app,
+`expect` makes assertions, and `screen` (used on the next page) finds things on the page.
+
+</Step>
+<Step>
+
+### Run it
+
+```sh
+npm run test:danwo
+```
+
+danwo starts your app, opens a browser and runs the test:
+
+```text
+Running 1 test with 1 worker
+
+  ✓ tests/example.danwo.ts › the home page opens 812 ms, worker 0
+
+1 passed
+report: .danwo/runs/20261020-091203-ab12/report.html
+```
+
+<Callout type="info">
+  The example makes no AI calls, so it needs no API key. You only need the key in `.env.example`
+  once you write agent steps.
+</Callout>
+
+</Step>
+<Step>
+
+### Watch it in the dashboard
+
+```sh
+npx danwo serve --open
+```
+
+The dashboard opens at `http://127.0.0.1:4310`. Click your test to open its recording:
+
+- **Replay:** a video of the run, with a jump to each step.
+- **Providers:** every call your app made to an emulated service.
+- **Console** and **Network:** what the page logged and requested.
+
+</Step>
+</Steps>
+
+<Callout type="warn">
+  Setting `APP_URL` tests an app that's already running. That app wasn't started behind danwo's
+  proxy, so its calls go to the **real** Stripe and Resend. Use it only with test keys.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Test a provider" href="/docs/test-a-provider">
+    Pay with Stripe in a test, and check the charge happened once.
+  </Card>
+  <Card title="Agent and locators" href="/docs/agent-and-locators">
+    Write steps in plain English, or with exact locators.
+  </Card>
+  <Card title="Dashboard" href="/docs/dashboard">
+    Everything the recording shows, tab by tab.
+  </Card>
+</Cards>

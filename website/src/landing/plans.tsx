@@ -61,12 +61,12 @@ export function Plans() {
                   Star on GitHub
                 </a>
               ) : (
-                <Link className="btn btn-solid" to="/docs/$" params={{ _splat: "installation" }}>
+                <Link className="btn btn-solid" to="/docs/$" params={{ _splat: "quickstart" }}>
                   Install danwo
                 </Link>
               )}
-              <Link className="btn btn-soft" to="/docs/$" params={{ _splat: "first-test" }}>
-                Quickstart
+              <Link className="btn btn-soft" to="/docs/$" params={{ _splat: "test-a-provider" }}>
+                Test a provider
               </Link>
             </div>
           </Reveal>

@@ -1,0 +1,84 @@
+---
+title: Overview
+description: Replay one test under every fault it could meet, and check your app coped with each one.
+icon: Grid3x3
+---
+
+The fault matrix replays a test once for each thing that could go wrong while it runs: a
+declined card, a 500 from Stripe, a webhook that arrives twice, a button clicked twice. After
+each replay, it checks a rule you wrote. You learn which failures your app survives before your
+users find the ones it doesn't.
+
+## Why you need it
+
+A UI test checks the happy path. Real providers fail in small, ordinary ways. A webhook comes
+twice. A response is lost after the payment went through. A user double-clicks **Pay**.
+
+Each of those can leave your app wrong while the screen looks fine. The matrix makes each one
+happen, on purpose, one at a time.
+
+## How it works
+
+<MatrixFlow />
+
+1. **A clean run.** danwo runs your test once with nothing broken, and records every call,
+   webhook and database statement it caused.
+2. **A plan.** For each of those, it lists the faults that could happen to it. Each fault becomes
+   a **trial**: one replay of the test with that one fault.
+3. **The trials.** Each trial starts from the same clean state, replays your test's steps, and
+   injects its fault at the right moment.
+4. **The verdict.** After each trial, danwo runs your test's **invariant**: a check that must
+   hold however the run went.
+
+## A first matrix
+
+Give a test an invariant. This one says the credits your app granted equal the credits Stripe
+was paid for:
+
+```ts title="tests/buy-credits.danwo.ts · the invariant"
+}).invariant(async ({ app, stripe, expect }) => {
+  expect(await creditsGranted(app)).toBe(await creditsPaid(stripe))
+})
+```
+
+Then run the matrix on that file:
+
+```sh
+npx danwo matrix tests/buy-credits.danwo.ts
+```
+
+```text
+clean run passed; 18 faults planned
+PASS  status 500 on POST api.stripe.com/v1/checkout/sessions
+FAIL  duplicate on webhook checkout.session.completed
+        invariant: expected 1000 to be 500
+faults: 17 passed, 1 failed
+```
+
+The failure is a real bug: a webhook delivered twice granted the credits twice.
+
+## What each result means
+
+| Result       | Meaning                                                                                  |
+| ------------ | ---------------------------------------------------------------------------------------- |
+| `PASS`       | The invariant held under the fault. The test itself may have stopped early; that's fine. |
+| `FAIL`       | The invariant broke. The record shows where the test stopped and why.                    |
+| `INVALID`    | The fault never happened, because the app took another path.                             |
+| `NOT JUDGED` | The trial was blocked, or something outside your app failed.                             |
+
+## Next
+
+<Cards>
+  <Card title="Writing invariants" href="/docs/invariants">
+    What to compare, and how to read each side.
+  </Card>
+  <Card title="Running it" href="/docs/run-the-matrix">
+    Run every fault, a few, or one; locally or in CI.
+  </Card>
+  <Card title="Reading results" href="/docs/matrix-results">
+    The grid, a failed trial, and its recording.
+  </Card>
+  <Card title="Fault kinds" href="/docs/fault-kinds">
+    Every kind of fault the matrix can inject.
+  </Card>
+</Cards>

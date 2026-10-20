@@ -1,0 +1,90 @@
+---
+title: Fault kinds
+description: Every kind of fault the matrix can inject, what it simulates, and what it catches.
+icon: Zap
+---
+
+Every trial injects one fault. A fault is named by a **label**: what happens, then where it
+happens. For example, `status 500 on POST api.stripe.com/v1/checkout/sessions`.
+
+## Provider calls
+
+Faults on a call your app makes to Stripe, Resend, Slack or another provider:
+
+| Fault                      | What happens                                           | What it catches                              |
+| -------------------------- | ------------------------------------------------------ | -------------------------------------------- |
+| `status 500`, `status 503` | The provider fails.                                    | Errors shown as success, missing retries.    |
+| `status 429`               | The provider rate-limits the call.                     | Retries that hammer the API, or none at all. |
+| `reset`                    | The connection drops before the provider answers.      | Calls with no timeout or error handling.     |
+| `reset-after`              | The provider **did** the work, but the answer is lost. | Retries that charge or send twice.           |
+| `delay <ms>ms`             | The answer is slow.                                    | Timeouts that are too short, or missing.     |
+
+Each provider's error bodies match what its own SDK expects, so your app's error handling runs
+as it would in production.
+
+## Model APIs
+
+Calls to OpenAI, Anthropic and the other model APIs can also get `refusal`, `empty-completion`,
+`truncated`, `content-filter`, `malformed-tool-call` and `stream-cut`. These check what your app
+does when the model answers badly.
+
+## Webhooks
+
+Faults on a webhook a provider sends your app:
+
+| Fault            | What happens                                 | What it catches                                 |
+| ---------------- | -------------------------------------------- | ----------------------------------------------- |
+| `duplicate`      | The same webhook arrives twice.              | Work done twice, such as credits granted twice. |
+| `delay 600000ms` | It arrives ten minutes late.                 | Pages that assume the webhook came first.       |
+| `forged`         | A webhook arrives with a bad signature.      | Handlers that skip the signature check.         |
+| `stale 3600s`    | A correctly signed webhook from an hour ago. | Handlers that accept replayed requests.         |
+
+## Races
+
+Faults on timing, planned only where they can happen:
+
+| Fault                        | What happens                                                                   |
+| ---------------------------- | ------------------------------------------------------------------------------ |
+| `double-submit on POST /buy` | A form or request is sent twice at once.                                       |
+| `webhooks before redirect`   | The provider's webhooks arrive before the browser returns to your app.         |
+| `reorder webhooks a, b`      | Two webhooks arrive the other way round.                                       |
+| `slow-then-retry`            | A payment call is slow; your app retries while the first one still succeeds.   |
+| `2 concurrent users`         | The whole test runs as two users at once. Ask for it with `{ concurrent: 2 }`. |
+
+## Database and cache
+
+With danwo's data proxies in front of your app's Postgres and Redis, the matrix also faults the
+statements your test caused:
+
+| Fault                               | What happens                                           |
+| ----------------------------------- | ------------------------------------------------------ |
+| `reset-after on COMMIT`             | The database committed, but your app never heard back. |
+| `serialization_failure`, `deadlock` | Postgres asks your app to retry the transaction.       |
+| `down 3000ms`                       | The database is unreachable for three seconds.         |
+| `OOM`, `READONLY`                   | Redis refuses a write.                                 |
+
+See [Database and cache](/docs/data-faults) to set this up.
+
+## Sockets and background jobs
+
+| Fault                                       | What happens                            |
+| ------------------------------------------- | --------------------------------------- |
+| `upgrade refused on WS …`                   | A WebSocket can't connect.              |
+| `connection dropped on WS …`                | A connected WebSocket drops.            |
+| `status 500 on POST inngest.danwo.test/e/…` | A background job's event can't be sent. |
+
+## Time
+
+Faults don't move the clock. To test a trial that ends tomorrow or a token that expires, jump
+time forward inside the test. See [Time travel](/docs/time-travel).
+
+## Next
+
+<Cards>
+  <Card title="Common findings" href="/docs/common-findings">
+    What these faults usually find, and the fixes.
+  </Card>
+  <Card title="Faults reference" href="/docs/reference/faults">
+    Every provider's fault list, generated from the code.
+  </Card>
+</Cards>

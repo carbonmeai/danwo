@@ -1,0 +1,89 @@
+---
+title: Planning and budget
+description: How danwo picks which faults to run, how to preview the plan, and how to run more or fewer.
+icon: ListFilter
+---
+
+A real app's test can make hundreds of calls and thousands of database statements. Faulting
+every one would take hours. So danwo **plans**: it picks the faults most likely to find a bug,
+and stops at a **budget** of 40 trials.
+
+## Preview the plan
+
+`--plan` runs the clean trial, prints what it would run, and stops:
+
+```sh
+npx danwo matrix tests/buy-credits.danwo.ts --plan
+```
+
+```text
+clean run passed; 18 faults planned
+  status 500 on POST api.stripe.com/v1/checkout/sessions
+  reset-after on POST api.stripe.com/v1/checkout/sessions
+  duplicate on webhook checkout.session.completed
+  forged on webhook checkout.session.completed
+  double-submit on POST /buy
+  …
+about 2 min for 18 trials on 2 workers
+```
+
+Use it before a long run, or to check a fault you expect is in the plan.
+
+## Only the test's body
+
+Faults land only in the test's **body**: the code inside `test(…)`. Everything before it is
+**setup** and gets no faults:
+
+- signing in with a saved session,
+- fixtures,
+- `beforeEach` hooks.
+
+Setup is still part of every trial. It just runs cleanly.
+
+## How a big plan is cut down
+
+A plan that fits the budget runs whole. When it doesn't, danwo narrows it in this order, the same
+way every time:
+
+| Step                  | What goes                                                                 |
+| --------------------- | ------------------------------------------------------------------------- |
+| 1. Background work    | Health checks, metrics, static files, token refreshes.                    |
+| 2. Repeats            | A call or statement repeated in the body is faulted only the first time.  |
+| 3. Lesser fault kinds | Each call keeps its most telling faults, such as a 5xx and a lost answer. |
+| 4. Over the budget    | Races and webhooks are kept first, then writes, then sockets, then reads. |
+
+The run tells you what it left out:
+
+```text
+1999 of 2039 faults left out: 1608 on setup, 278 on repeats of a route or statement,
+71 lesser fault kinds, 42 over the budget
+```
+
+## Run more, or fewer
+
+| Option               | What it does                                                                           |
+| -------------------- | -------------------------------------------------------------------------------------- |
+| `--budget <n>`       | A different budget, such as `--budget 100`. Set it for a project with `matrix.budget`. |
+| `--all`              | Every fault on the body, with no budget.                                               |
+| `--thorough`         | Every fault kind on each call, not only the most telling ones.                         |
+| `--every-occurrence` | Faults on every repeat of a call, not only the first.                                  |
+| `--include-setup`    | Faults on the setup too, such as signing in.                                           |
+
+```sh
+npx danwo matrix tests/checkout.danwo.ts --budget 100 --thorough
+```
+
+<Callout type="idea">
+  Run the default plan on every pull request. Save `--all` and `--thorough` for a nightly run.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Fault kinds" href="/docs/fault-kinds">
+    What each kind of fault does.
+  </Card>
+  <Card title="Running it" href="/docs/run-the-matrix">
+    Every option of `danwo matrix`.
+  </Card>
+</Cards>

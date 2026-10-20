@@ -1,0 +1,92 @@
+---
+title: Writing invariants
+description: An invariant is the rule the fault matrix checks after every trial. Write one by comparing your app with the provider.
+icon: Scale
+---
+
+An **invariant** is a check that must be true however a test went: whether the payment
+succeeded, failed or was retried. You attach it to a test with `.invariant()`. The fault matrix
+runs it after every trial.
+
+## The shape of an invariant
+
+`.invariant()` takes a function with the same fixtures as the test. It runs after the test's
+body, once background work like webhooks has finished:
+
+```ts title="tests/buy-credits.danwo.ts"
+import { type StripeFixtures, test as base } from "@danwo/sdk"
+
+const test = base.extend<StripeFixtures>()
+
+test("buys 500 credits", async ({ app, screen, expect }) => {
+  await app.open("/")
+  await screen.getByRole("button", { name: "Buy 500 credits" }).click()
+  await screen.getByTestId("checkout-pay").click()
+}).invariant(async ({ app, stripe, expect }) => {
+  const res = await stripe.fetch(
+    new Request("https://api.stripe.com/v1/checkout/sessions?payment_status=paid", {
+      headers: { authorization: "Bearer sk_test_any" },
+    }),
+  )
+  const { data } = await res.json()
+  const { credits } = await (await fetch(new URL("/api/credits", app.baseUrl))).json()
+
+  expect(credits).toBe(data.length * 500)
+})
+```
+
+## Compare two sides
+
+A good invariant reads the same fact from two places and checks they agree:
+
+| Your app says    | The provider says                   | Invariant             |
+| ---------------- | ----------------------------------- | --------------------- |
+| credits granted  | payments Stripe captured            | equal                 |
+| orders confirmed | confirmation emails Resend accepted | one email per order   |
+| replies posted   | messages in the Slack channel       | one reply per mention |
+
+Read **your app's side** through its own API or database. Read **the provider's side** through
+its emulator fixture.
+
+## Reading the provider's side
+
+Each emulator gives your test a fixture named after it. Ask it what your app did:
+
+```ts title="tests/order-email.danwo.ts"
+import { type ResendFixtures, resendInbox, test as base } from "@danwo/sdk"
+
+const test = base.extend<ResendFixtures>()
+
+test("confirms the order by email", async ({ app, screen }) => {
+  await app.open("/checkout")
+  await screen.getByRole("button", { name: "Place order" }).click()
+}).invariant(async ({ resend, expect }) => {
+  expect(resendInbox(resend).list("ada@example.com")).toHaveLength(1)
+})
+```
+
+Every provider's page lists its fixture and helpers. See [Providers](/docs/providers).
+
+## Rules of thumb
+
+- **Compare counts and totals, not the screen.** The screen may never load in a trial where a
+  call failed. The invariant still has to hold.
+- **Allow a clean failure.** If the payment failed, zero credits and zero charges is correct.
+  Write the rule so both outcomes pass.
+- **Never compare times or ids.** They change on every trial.
+
+<Callout type="info">
+  A test without an invariant can still go through the matrix. Then the test itself must pass under
+  every fault, which is a much stricter bar.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Running it" href="/docs/run-the-matrix">
+    Run the matrix on a test with an invariant.
+  </Card>
+  <Card title="Common findings" href="/docs/common-findings">
+    The bugs invariants catch most often, and the fixes.
+  </Card>
+</Cards>

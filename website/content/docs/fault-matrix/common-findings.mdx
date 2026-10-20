@@ -1,0 +1,96 @@
+---
+title: Common findings
+description: The bugs the fault matrix finds most often, what each looks like, and how to fix it.
+icon: Bug
+---
+
+Most matrix failures come from a handful of patterns. Each one below shows the failing trial,
+what went wrong, and the usual fix.
+
+## A webhook handled twice
+
+```text
+FAIL  duplicate on webhook checkout.session.completed
+        invariant: expected 1000 to be 500
+```
+
+**What happened.** Providers deliver webhooks **at least** once, so the same event can arrive
+twice. Your handler granted the credits both times.
+
+**The fix.** Store each event's id when you handle it, and skip an id you've seen:
+
+```ts title="src/webhooks.ts"
+const handled = new Set<string>()
+
+export function onCheckoutCompleted(event: { id: string }, grant: () => void): void {
+  if (handled.has(event.id)) return
+
+  handled.add(event.id)
+  grant()
+}
+```
+
+In production, keep the ids in your database, in the same transaction as the work.
+
+## A payment made twice
+
+```text
+FAIL  double-submit on POST /buy
+        invariant: expected 2 to be 1
+```
+
+**What happened.** The user clicked **Pay** twice, or the page sent the request twice. Your app
+created two payments.
+
+**The fix.** Send Stripe an **idempotency key** that's the same for both requests, such as the
+order id. Stripe returns the first payment instead of making a second one.
+
+## An answer lost after the work was done
+
+```text
+FAIL  reset-after on POST api.stripe.com/v1/payment_intents
+        invariant: expected 2 to be 1
+```
+
+**What happened.** Stripe took the payment, but the connection dropped before your app got the
+answer. Your app retried, and paid again.
+
+**The fix.** The same as a double submit: an idempotency key on every call that moves money, so
+a retry is safe.
+
+## A lost commit
+
+```text
+FAIL  reset-after on COMMIT (postgres)
+        invariant: expected 0 to be 1
+```
+
+**What happened.** Postgres committed the order, but your app never heard back. It showed an
+error, or tried again and created a second order.
+
+**The fix.** After a lost commit, check whether the row exists before writing it again. Or make
+the write idempotent with a unique key, such as an `ON CONFLICT` clause.
+
+## A failure shown as success
+
+```text
+FAIL  status 500 on POST api.resend.com/emails
+        invariant: expected 0 to be 1
+```
+
+**What happened.** Sending the confirmation email failed, but the page still said "Check your
+inbox".
+
+**The fix.** Treat the provider's error as an error: retry it in the background, or tell the
+user it didn't go out.
+
+## Next
+
+<Cards>
+  <Card title="Writing invariants" href="/docs/invariants">
+    Catch these with a rule about your backend.
+  </Card>
+  <Card title="Integration lint" href="/docs/integration-lint">
+    Some of these, such as a missing idempotency key, are flagged on every run.
+  </Card>
+</Cards>

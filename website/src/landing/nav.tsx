@@ -91,7 +91,7 @@ export function Nav({
             </a>
           )}
           <ThemeButton />
-          <Link className="btn btn-solid" to="/docs/$" params={{ _splat: "installation" }}>
+          <Link className="btn btn-solid" to="/docs/$" params={{ _splat: "quickstart" }}>
             Get started
           </Link>
           <button

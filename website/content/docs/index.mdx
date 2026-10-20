@@ -1,45 +1,74 @@
 ---
 title: Introduction
-description: danwo drives your app through its UI like a user, and judges what happened behind it.
+description: danwo tests your app through its UI, then checks what happened behind it.
 icon: House
 ---
 
-Coding agents made writing code cheap; checking it is now the slow part. danwo answers one question
-per change: **what did this break, and how sure are we?**
+danwo is an open-source testing framework for web and mobile apps. A test clicks through your
+app like a user. Then danwo checks what that click did behind the screen: the payment, the email,
+the database row.
 
-A danwo test clicks through your web or mobile app with locators, plain-English agent steps, or
-both. While it runs, the third-party services your app calls (Stripe, Resend, Slack, Google, the
-model APIs and more) are answered by emulators behind an egress proxy, so the app keeps calling
-the real hostnames and needs no code changes. Everything the test caused behind the page is
-recorded: provider calls, webhooks, the app's own database statements.
+```ts title="tests/buy-credits.danwo.ts"
+import { type StripeFixtures, test as base } from "@danwo/sdk"
 
-Then danwo breaks it on purpose. `danwo matrix` replays the clean run once per fault the run could
-meet (a declined card, a 500, a duplicate or forged webhook, a double-submitted form, a lost
-`COMMIT`, thirty days passing) and judges each trial by the test's **invariant**: a rule about the
-backend that must hold however the run went.
+const test = base.extend<StripeFixtures>()
+
+test("buys 500 credits", async ({ app, screen, expect }) => {
+  await app.open("/")
+  await screen.getByRole("button", { name: "Buy 500 credits" }).click()
+  await screen.getByRole("button", { name: "Pay" }).click()
+
+  await expect(screen.getByText("Credits: 500")).toBeVisible()
+})
+```
+
+## The problem
+
+Most end-to-end tests stop at the screen. The page says "Thank you", so the test passes.
+
+The bugs that cost money live behind that page. Did Stripe charge the card once or twice? Did the
+receipt email go out? Did the webhook that grants the credits arrive, and what happens if it
+arrives twice? A screen can't tell you.
+
+## How it works
+
+<HowItWorks />
+
+1. **Your test drives the app**, with locators like `getByRole`, or with plain-English steps that
+   an AI agent carries out.
+2. **Your app calls Stripe, Resend, Slack and the rest as usual.** danwo starts it behind an
+   **egress proxy**: a proxy that every outgoing request goes through. The proxy answers those
+   hostnames with **emulators**, local copies of each service's API. Your app needs no code
+   changes and no sandbox keys.
+3. **Everything is recorded.** Every call, webhook and database statement the test caused goes in
+   a **flight record**, with a video of the screen.
+4. **Then danwo breaks it on purpose.** The [fault matrix](/docs/fault-matrix) replays the test
+   once per thing that could go wrong: a declined card, a 500, a duplicate webhook, a
+   double-clicked button. A rule you write, the **invariant**, says whether your app coped.
+
+## What you get
+
+|                             |                                                                                   |
+| --------------------------- | --------------------------------------------------------------------------------- |
+| **Fast, cheap reruns**      | Agent steps are recorded once, then replayed with no AI calls.                    |
+| **Real provider behaviour** | About twenty emulators, checked against the real APIs.                            |
+| **Bugs before production**  | The fault matrix finds what only breaks when something fails.                     |
+| **Clear failures**          | A dashboard with video, every call, and a prompt to paste into your coding agent. |
+| **Where you work**          | A GitHub check, a pull request comment, and an MCP server for coding agents.      |
+
+## Get started
 
 <Cards>
-  <Card title="Install danwo" href="/docs/installation">
-    Add danwo to a project and set it up for your coding agents.
+  <Card title="Quickstart" href="/docs/quickstart">
+    Set danwo up in your project and run your first test.
   </Card>
-  <Card title="Write a first test" href="/docs/first-test">
-    A config, one `*.danwo.ts` file, and a run.
+  <Card title="Test a provider" href="/docs/test-a-provider">
+    Check that a Stripe payment happens exactly once.
   </Card>
-  <Card title="The fault matrix" href="/docs/fault-matrix">
-    Write an invariant, then let the matrix try to break it.
+  <Card title="Fault matrix" href="/docs/fault-matrix">
+    Replay a test under every fault it could meet.
   </Card>
   <Card title="Providers" href="/docs/providers">
-    The APIs danwo emulates, and what each emulator covers.
+    The services danwo emulates, and what each covers.
   </Card>
 </Cards>
-
-## What a run gives you
-
-- **Tests that replay without a model.** Verified agent steps are cached as locators; reruns make
-  no model calls and cost nothing.
-- **A flight record of every failure:** the steps with screenshots, the provider waterfall, webhook
-  deliveries, the effects each step had and the emulators' state at the end, with secrets redacted.
-- **An integration lint** over every run, with no invariant to write: unsigned webhooks accepted,
-  money moved without an idempotency key, secret keys in the browser.
-- **Reports where you work:** a dashboard (`danwo serve`), a GitHub check run and pull request
-  comment, and an MCP server so coding agents can run, explain and fix tests.

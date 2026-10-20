@@ -156,16 +156,12 @@ const REAL_STACK_SECTIONS = [
 /** The providers guide's section on starting every test from the seed, a page of its own. */
 const ISOLATION_SECTIONS = ["Isolation"]
 
-/** The matrix guide's section on how faults are chosen, a page of its own. */
-const PLANNING_SECTIONS = ["What gets planned"]
-
 /**
  * Every guide section that is shown on a page of its own rather than its guide's page, by guide:
  * the guide's page drops them, and the docs test checks each has exactly one home.
  */
 export const MOVED_SECTIONS = {
   providers: [...PROVIDER_GUIDE_SECTIONS, ...REAL_STACK_SECTIONS, ...ISOLATION_SECTIONS],
-  matrix: PLANNING_SECTIONS,
 }
 
 /** The entries of the spec's test API that are about fixtures rather than declaring tests. */
@@ -183,18 +179,8 @@ export const PLAN: readonly PlannedTab[] = [
         pages: [
           file("index", "Introduction", "House"),
           file("why-danwo", "Why danwo", "Sparkles"),
-          {
-            slug: "installation",
-            title: "Installation",
-            icon: "Download",
-            source: {
-              kind: "readme",
-              heading: "Quickstart",
-              description:
-                "danwo init sets danwo up in your project: the engine, the model for agent steps, the providers to emulate and the coding agents to teach.",
-            },
-          },
-          guide("first-test", "First test", "Rocket"),
+          file("quickstart", "Quickstart", "Rocket"),
+          file("test-a-provider", "Test a provider", "CreditCard"),
           {
             slug: "coding-agents",
             title: "Coding agents",
@@ -225,14 +211,19 @@ export const PLAN: readonly PlannedTab[] = [
             description:
               "Every test, and every retry, starts from the environment's seeded state; change it per config, file or describe block.",
           }),
-          guide("fault-matrix", "Fault matrix", "Grid3x3", "matrix", MOVED_SECTIONS.matrix),
-          sections("matrix-planning", "Matrix planning", "ListFilter", {
-            topic: "matrix",
-            keep: PLANNING_SECTIONS,
-            description:
-              "Which faults a matrix runs: the test's body only, repeats grouped, the most telling fault kinds, within a budget you set.",
-          }),
           guide("flight-records", "Flight records", "FileSearch", "debugging"),
+        ],
+      },
+      {
+        title: "Fault matrix",
+        pages: [
+          file("fault-matrix", "Overview", "Grid3x3", "fault-matrix/overview.mdx"),
+          file("invariants", "Writing invariants", "Scale", "fault-matrix/invariants.mdx"),
+          file("run-the-matrix", "Running it", "Play", "fault-matrix/run-the-matrix.mdx"),
+          file("matrix-results", "Reading results", "Table", "fault-matrix/results.mdx"),
+          file("matrix-planning", "Planning and budget", "ListFilter", "fault-matrix/planning.mdx"),
+          file("fault-kinds", "Fault kinds", "Zap", "fault-matrix/fault-kinds.mdx"),
+          file("common-findings", "Common findings", "Bug", "fault-matrix/common-findings.mdx"),
         ],
       },
       {
@@ -270,6 +261,17 @@ export const PLAN: readonly PlannedTab[] = [
           guide("ci", "CI and GitHub", "GitPullRequest"),
           guide("dashboard", "Dashboard", "LayoutDashboard"),
           guide("fidelity", "Fidelity", "Scale"),
+        ],
+      },
+      {
+        /*
+         * The guides danwo hands coding agents, kept whole where a page written for the website
+         * has taken their place above, so every guide still has a page.
+         */
+        title: "For coding agents",
+        pages: [
+          guide("agents-first-test", "First test guide", "Bot", "first-test"),
+          guide("agents-matrix", "Matrix guide", "Bot", "matrix"),
         ],
       },
     ],
