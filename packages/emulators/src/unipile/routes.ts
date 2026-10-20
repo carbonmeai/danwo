@@ -113,7 +113,19 @@ function accountRoutes(context: UnipileRouteContext): void {
   app.get(`${API}/accounts`, (c) => {
     requireToken(context, c)
 
-    return listOf(c, "AccountList", objects.accounts.all().map(accountObject))
+    const accounts = objects.accounts.all()
+    /* The account list also counts every account, and the accounts in each status it reports. */
+    const statusCounts = Object.fromEntries(
+      (["OK", "CONNECTING", "CREDENTIALS", "STOPPED"] as const).map((status) => [
+        status,
+        accounts.filter((account) => account.status === status).length,
+      ]),
+    )
+
+    return listOf(c, "AccountList", accounts.map(accountObject), {
+      total_count: accounts.length,
+      status_counts: statusCounts,
+    })
   })
   app.get(`${API}/accounts/:id`, (c) => {
     requireToken(context, c)
