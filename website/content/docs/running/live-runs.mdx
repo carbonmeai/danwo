@@ -1,0 +1,46 @@
+---
+title: Live runs and reruns
+description: Watch tests and matrix trials stream into the dashboard as they run, and start, rerun or cancel runs from the page.
+icon: Radio
+---
+
+While a run is going, the dashboard shows it live. You can also start runs from the page: rerun
+what failed, run one test, or run the matrix for a test.
+
+## Watch a run as it happens
+
+Start a run as usual:
+
+```sh
+npx danwo test
+```
+
+Open **Runs**. The run shows under **Running now**, and its page fills in as it goes: tests and
+trials as they start and finish, each step, the calls, webhooks and faults behind it, the elapsed
+time and the model spend. The browser tab's title and icon show whether it's passing.
+
+A run started from a terminal shows up too.
+
+## Start a run from the page
+
+| Where             | Button                        | Runs                                                 |
+| ----------------- | ----------------------------- | ---------------------------------------------------- |
+| a test run        | **Rerun failed**              | the run's failed tests                               |
+| a test's row      | **Rerun**                     | that test                                            |
+| Tests             | **Run selected**, **Run all** | the tests you picked, or all of them                 |
+| Matrix, or a test | **Run the matrix**            | its matrix, optionally only faults matching a filter |
+| a running run     | **Cancel**                    | stops it                                             |
+
+The dashboard runs danwo's CLI with fixed arguments, for tests your project lists. It runs one at
+a time; more requests wait in a queue.
+
+## Next
+
+<Cards>
+  <Card title="Recordings" href="/docs/recordings">
+    Open what a run recorded.
+  </Card>
+  <Card title="Dashboard" href="/docs/dashboard">
+    Every page of the dashboard.
+  </Card>
+</Cards>

@@ -1,0 +1,73 @@
+---
+title: Shards and JUnit
+description: Split a big suite across machines, join the results, and report to any CI with JUnit.
+icon: Split
+---
+
+A suite that takes too long on one machine can run across several. Each machine runs a share of
+the test files, and one job joins the results.
+
+## Split the suite
+
+`--shard i/n` gives machine `i` of `n` its share: every `n`th test file.
+
+```yaml title=".github/workflows/danwo.yml · the shards"
+strategy:
+  matrix:
+    shard: [1, 2, 3, 4]
+steps:
+  - run: npx danwo test --shard ${{ matrix.shard }}/4
+  - uses: actions/upload-artifact@v4
+    with: { name: "results-${{ matrix.shard }}", path: .danwo/results }
+```
+
+Each shard keeps its results in `.danwo/results/`. A shard posts no pull request comment.
+
+## Join the results
+
+In a later job, download every `results-*` artifact into `.danwo/results`, then merge:
+
+```yaml title=".github/workflows/danwo.yml · the merge"
+- uses: actions/download-artifact@v4
+  with: { pattern: "results-*", path: .danwo/results, merge-multiple: true }
+- run: npx danwo merge-reports --reporter github
+  env:
+    GITHUB_TOKEN: ${{ github.token }}
+```
+
+`merge-reports` posts one check and one comment for the whole run.
+
+## Rerun what failed
+
+`--last-failed` runs only what failed in the latest run, and merges into it:
+
+```sh
+npx danwo test --last-failed
+```
+
+A test that failed before and passes now is reported once, as **flaky**. A test that fails and
+then passes on a retry in the same run is flaky too: it passes the run, and the summary and the
+check say so.
+
+## JUnit for other CIs
+
+```sh
+npx danwo test --reporter junit
+```
+
+That writes `.danwo/junit.xml`, which GitLab, Jenkins, CircleCI and Buildkite read.
+
+## Stop early
+
+`--max-failures 5` starts no new test file once five tests have failed.
+
+## Next
+
+<Cards>
+  <Card title="Changed tests" href="/docs/impact">
+    Run only the tests a change can affect.
+  </Card>
+  <Card title="Dashboard" href="/docs/dashboard">
+    Browse every run on your machine.
+  </Card>
+</Cards>

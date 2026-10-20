@@ -1,0 +1,104 @@
+---
+title: CI and GitHub
+description: Run danwo in GitHub Actions and get a check on every pull request, with each failing line annotated.
+icon: GitPullRequest
+---
+
+Run your tests and a fault matrix on every pull request. danwo reports back as a **GitHub check**,
+with an annotation on each failing test line, and keeps one comment on the pull request up to date.
+
+## The workflow
+
+```yaml title=".github/workflows/danwo.yml"
+name: danwo
+on: [pull_request]
+
+permissions:
+  checks: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  danwo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx danwo test --reporter github
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - run: npx danwo matrix tests/checkout.danwo.ts --reporter github
+        if: ${{ !cancelled() }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: danwo-runs
+          path: .danwo/runs
+```
+
+`--reporter github` turns on the check, the [pull request comment](/docs/pr-comment) and the job
+summary. The last step uploads the flight records, so you can open a failure's recording.
+
+## What the check shows
+
+- pass and fail counts, and a row per failing test or fault;
+- an annotation on each failing test line, in the pull request's **Files changed** tab;
+- each failure's flight record, by its path in the uploaded artifact.
+
+The same summary goes to the job summary page.
+
+## Permissions
+
+| Permission             | Needed for                        | Without it                                       |
+| ---------------------- | --------------------------------- | ------------------------------------------------ |
+| `checks: write`        | the check run and its annotations | the reporter says so; the exit code is unchanged |
+| `pull-requests: write` | the pull request comment          | the reporter says so once; the check still runs  |
+| `contents: read`       | checking out the code             | the job can't start                              |
+
+## CI defaults
+
+With `CI` set (every hosted CI sets it), or with `--ci`, `danwo test`:
+
+- retries a failing test once;
+- reads the replay cache without writing to it;
+- refuses `.only`, with exit code 2 naming the file and line.
+
+Your config's `retries` and `--retries` still win.
+
+## Exit codes
+
+| Code  | Meaning                                                    |
+| ----- | ---------------------------------------------------------- |
+| `0`   | everything passed                                          |
+| `1`   | a test failed                                              |
+| `2`   | configuration problem                                      |
+| `3`   | infrastructure: the browser, environment or model provider |
+| `130` | interrupted                                                |
+
+## Keep CI cheap
+
+<Callout type="idea">
+  Commit the replay cache (`cache.dir`). CI then replays recorded agent steps with no model calls,
+  so it needs a model key only when a recording is missing.
+</Callout>
+
+Run a narrowed matrix on pull requests with `--faults`, and the full matrix on a schedule.
+
+## Next
+
+<Cards>
+  <Card title="Pull request comment" href="/docs/pr-comment">
+    One comment per pull request, kept up to date.
+  </Card>
+  <Card title="Shards and JUnit" href="/docs/shards">
+    Split a big suite across machines.
+  </Card>
+  <Card title="Changed tests" href="/docs/impact">
+    Run only the tests a change can affect.
+  </Card>
+</Cards>

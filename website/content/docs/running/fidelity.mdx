@@ -1,0 +1,116 @@
+---
+title: Fidelity
+description: Check that each emulator answers like the real provider, against the provider's own sandbox.
+icon: Scale
+---
+
+An emulator is only useful if it answers like the real thing. `danwo fidelity` runs the same
+scenarios against danwo's emulator and the provider's sandbox, and compares the answers.
+
+## What it compares
+
+The **shape** of each answer: status codes, error codes, and the JSON's keys, types, nesting and
+fixed values. Ids, times, amounts and secrets never take part, so two runs a day apart still match.
+
+## Run it
+
+Without keys, it checks each emulator against the answers recorded from the sandbox:
+
+```sh
+npx danwo fidelity stripe resend --offline
+```
+
+```text
+stripe (offline): 11 of 11 scenarios match
+  ✓ customers: create, retrieve, update, delete
+  ✓ customers: list pages, newest first
+  ✓ errors: missing object, missing parameter, bad key (1 known)
+  ✓ idempotency: replay and conflicting reuse
+  ✓ products and prices: one-off and recurring
+  ✓ payment intent: create, confirm, expand, refund
+  ✓ checkout session: create, retrieve, expire (9 known)
+  ✓ events: a created customer appears as customer.created
+  ✓ setup intent: create and confirm with a test card
+  ✓ subscriptions: trial, active, cancel at period end, cancel
+  ✓ invoices: a subscription's first invoice, paid, and its list
+
+resend (offline): 5 of 5 scenarios match
+  ✓ emails: send and read back (1 known)
+  ✓ emails: batch send
+  ✓ emails: idempotent send
+  ✓ errors: missing field, missing key
+  ✓ domains: list
+```
+
+A difference prints with its scenario and step, as a missing field, an extra field, a type, status
+or error-code mismatch, an ordering difference or a missing step. **known** counts differences
+accepted on purpose, each with its reason in `fidelity/known-differences.json`.
+
+## Against the sandbox
+
+With sandbox keys set, the same command calls the provider too:
+
+| Command                                 | Does                                                   |
+| --------------------------------------- | ------------------------------------------------------ |
+| `danwo fidelity`                        | every provider; live where keys are set                |
+| `danwo fidelity stripe resend`          | some providers                                         |
+| `danwo fidelity stripe --update-golden` | records the sandbox's answers as the new golden        |
+| `danwo fidelity --from-openapi`         | goldens from each provider's published API description |
+| `danwo fidelity --offline`              | never calls a sandbox, even with keys set              |
+
+## Keys
+
+Keys come from the environment, or from `.env.fidelity` and then `.env` at the repository root.
+Git ignores both.
+
+```sh title=".env.fidelity"
+DANWO_FIDELITY_STRIPE_KEY=sk_test_...
+DANWO_FIDELITY_RESEND_KEY=re_...
+```
+
+<Callout type="warn">
+  Only test and sandbox keys. A key that looks live, such as `sk_live_`, stops the run with
+  `CONFIG_INVALID`. Keys are never printed or written, and goldens hold structure only.
+</Callout>
+
+The model APIs (AI Gateway, Gemini, Perplexity, Bedrock) have no sandbox, so their keys are real.
+With one set, a plain `danwo fidelity` runs that suite live, using the cheapest model and 20 output
+tokens. Use `--offline` to stay off the network.
+
+## Providers
+
+| Provider                         | Key                                                                                           |
+| -------------------------------- | --------------------------------------------------------------------------------------------- |
+| Stripe                           | `DANWO_FIDELITY_STRIPE_KEY` (`sk_test_` or `rk_test_`)                                        |
+| Resend                           | `DANWO_FIDELITY_RESEND_KEY`; sends only to `delivered@resend.dev`                             |
+| S3 (Tigris)                      | `DANWO_FIDELITY_TIGRIS_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY`, `_BUCKET` (an empty test bucket) |
+| Twilio                           | `DANWO_FIDELITY_TWILIO_ACCOUNT_SID` plus an API key or auth token                             |
+| Paystack                         | `DANWO_FIDELITY_PAYSTACK_KEY` (`sk_test_`)                                                    |
+| Flutterwave                      | `DANWO_FIDELITY_FLUTTERWAVE_KEY` (`FLWSECK_TEST-`)                                            |
+| Bachs                            | `DANWO_FIDELITY_BACHS_KEY` (`sk_sandbox_`)                                                    |
+| Clerk                            | `DANWO_FIDELITY_CLERK_SECRET_KEY` and `_PUBLISHABLE_KEY` of a development instance            |
+| Pusher                           | `DANWO_FIDELITY_PUSHER_APP_ID`, `_KEY`, `_SECRET`, `_CLUSTER` (a test app)                    |
+| Tiptap                           | `DANWO_FIDELITY_TIPTAP_APP_ID`, `_API_SECRET`                                                 |
+| Slack, GitHub, Google, Microsoft | `DANWO_FIDELITY_PUBLIC=1` (public calls only)                                                 |
+| Composio, Novu, Nylas, Nango     | `DANWO_FIDELITY_PUBLIC=1`, plus an optional key                                               |
+| Unipile                          | `DANWO_FIDELITY_UNIPILE_DSN`, `_KEY`                                                          |
+| AI Gateway, Gemini, Perplexity   | `DANWO_FIDELITY_AI_GATEWAY_KEY`, `_GEMINI_KEY`, `_PERPLEXITY_KEY`                             |
+| Bedrock                          | `DANWO_FIDELITY_BEDROCK_API_KEY`                                                              |
+
+`npx danwo guide fidelity` lists each suite's scenarios and the optional keys.
+
+<Callout type="info">
+  The offline check runs in danwo's own test suite, so an emulator change that breaks fidelity fails
+  before it ships.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Cleaning up sandboxes" href="/docs/fidelity-cleanup">
+    What a live run makes, and how it's removed.
+  </Card>
+  <Card title="Providers" href="/docs/providers">
+    Every emulator danwo runs.
+  </Card>
+</Cards>

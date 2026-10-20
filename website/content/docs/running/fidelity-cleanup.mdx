@@ -1,0 +1,62 @@
+---
+title: Cleaning up sandboxes
+description: How a live fidelity run tags what it makes, undoes it after each scenario, and sweeps up anything left behind.
+icon: Eraser
+---
+
+A live fidelity run creates real objects in your sandboxes: customers, users, documents. danwo
+tags each one and removes it when the scenario ends, so your sandbox stays as it was.
+
+## Tagged
+
+Everything a run makes carries `danwo-fidelity-<run>`: in Stripe customer emails and product
+names, Clerk addresses and organization names, Novu subscriber ids, Tiptap document names, Pusher
+channels, Resend subjects and the payment references.
+
+## Undone after each scenario
+
+Each create registers its undo in the run's **cleanup ledger**. After every scenario, passed,
+failed or thrown, the ledger undoes in reverse order and retries each undo once. An answer that the
+object is already gone counts as undone.
+
+Ctrl-C undoes what the open scenarios made before danwo exits. Anything that couldn't be undone is
+listed under **left behind** by kind and id, and fails the run.
+
+`--keep` leaves everything in place so you can look at it, and lists it as kept.
+
+## Sweep leftovers
+
+```sh
+npx danwo fidelity --sweep stripe        # list what earlier runs left
+npx danwo fidelity --sweep stripe --yes  # remove it
+```
+
+A sweep only removes what carries the tag. Look-alikes without one are listed for you to judge and
+never touched.
+
+## By provider
+
+| Provider    | Undone after each scenario                                                     | Stays behind                                     | Sweep                          |
+| ----------- | ------------------------------------------------------------------------------ | ------------------------------------------------ | ------------------------------ |
+| Stripe      | customers deleted, subscriptions canceled, products archived, sessions expired | payment intents and refunds stay in test history | tagged customers and products  |
+| Clerk       | users and organizations deleted, invitations and sessions revoked              | nothing                                          | tagged users and organizations |
+| Novu        | subscribers deleted                                                            | nothing                                          | tagged subscribers             |
+| Tiptap      | documents deleted                                                              | nothing                                          | tagged documents               |
+| Paystack    | nothing to undo                                                                | one abandoned test transaction per run           | none                           |
+| Flutterwave | nothing to undo                                                                | one tagged test payment link per run             | none                           |
+| Bachs       | nothing to undo                                                                | one sandbox customer per run                     | none                           |
+| Resend      | nothing to undo                                                                | sent emails, all to `delivered@resend.dev`       | none                           |
+| Twilio      | a full account's one real send, deleted once it settles                        | a trial account's send                           | none                           |
+| S3 (Tigris) | every object under the run's prefix deleted, uploads aborted                   | nothing                                          | none                           |
+| Others      | they only read                                                                 | nothing                                          | none                           |
+
+## Next
+
+<Cards>
+  <Card title="Fidelity" href="/docs/fidelity">
+    Run the checks.
+  </Card>
+  <Card title="Configuration" href="/docs/configuration">
+    Every option in `danwo.config.ts`.
+  </Card>
+</Cards>

@@ -1,0 +1,108 @@
+---
+title: Configuration
+description: A tour of danwo.config.ts, grouped by what each option is for.
+icon: SlidersHorizontal
+---
+
+`danwo.config.ts` default-exports one object. Every key is optional; `defineConfig` only types it.
+
+```ts title="danwo.config.ts"
+import { defineConfig, stripeEnvironment } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  workers: 2,
+  retries: 1,
+  model: "anthropic/claude-sonnet-5",
+  readiness: { mode: "page+backend", settle: true },
+  video: "retain-on-failure",
+  environment: () => stripeEnvironment(),
+})
+```
+
+This page groups the options. [Reference: Config](/docs/reference/config) lists each one with its
+type.
+
+## Finding and running tests
+
+| Option      | Default             | What it does                                    |
+| ----------- | ------------------- | ----------------------------------------------- |
+| `testDir`   | the config's folder | where test files are found                      |
+| `testMatch` | every `*.danwo.ts`  | globs relative to `testDir`                     |
+| `workers`   | `1`                 | worker processes, each with its own environment |
+| `retries`   | `0`                 | extra attempts for a failing test               |
+| `timeout`   | `60_000`            | one attempt's deadline, in milliseconds         |
+| `baseUrl`   | none                | the app's URL when no environment gives one     |
+
+## What tests run against
+
+| Option        | Default  | What it does                                                                  |
+| ------------- | -------- | ----------------------------------------------------------------------------- |
+| `environment` | none     | starts the app, emulators and proxy, once per worker                          |
+| `isolation`   | `"test"` | reset to the seeds before every test, once per `"file"`, or `"none"`          |
+| `sessions`    | none     | sign-ins set up once per worker and reused ([Saved sessions](/docs/sessions)) |
+| `secrets`     | none     | values the model never sees ([Secrets](/docs/secrets))                        |
+| `files`       | none     | files tests may upload, by name                                               |
+
+## Waiting
+
+| Option      | Default                       | What it does                                             |
+| ----------- | ----------------------------- | -------------------------------------------------------- |
+| `readiness` | `"page+backend"` with a proxy | after each action, wait for the page and the app's calls |
+| `appErrors` | `{ console: false }`          | `console: true` also fails a step on console errors      |
+
+## The agent
+
+| Option            | Default         | What it does                                |
+| ----------------- | --------------- | ------------------------------------------- |
+| `model`           | none            | an AI SDK model, or a Vercel AI Gateway id  |
+| `judge`           | `model`         | the model `agent.assert` judges with        |
+| `judgeScreenshot` | `false`         | show the judge a screenshot too             |
+| `vision`          | `"auto"`        | when the agent may see the page as an image |
+| `budget`          | 25 turns a step | limits on turns, calls, dollars and time    |
+
+## Replays
+
+| Option       | Default        | What it does                                                  |
+| ------------ | -------------- | ------------------------------------------------------------- |
+| `cache`      | none: no cache | `{ dir }`, where the [replay cache](/docs/replay-cache) lives |
+| `relocation` | `"similar-v1"` | find an element that moved, or `"exact"` never does           |
+| `effects`    | `true`         | a replayed step must change what its recording changed        |
+
+## Records and reports
+
+| Option      | Default         | What it does                                                                       |
+| ----------- | --------------- | ---------------------------------------------------------------------------------- |
+| `record`    | `"always"`      | keep every run's [flight record](/docs/flight-records), `"on-failure"`, or `"off"` |
+| `video`     | `"on"`          | keep video with each record, `"retain-on-failure"`, or `"off"`                     |
+| `reporters` | none            | e.g. `github()` from `@danwo/github` ([CI](/docs/ci))                              |
+| `lint`      | on, never fails | [integration lint](/docs/integration-lint) levels and `failOn`                     |
+| `impact`    | none            | rules for [changed tests](/docs/impact)                                            |
+
+## The fault matrix
+
+`matrix` holds the matrix's own settings:
+
+| Option           | Default                                | What it does                                               |
+| ---------------- | -------------------------------------- | ---------------------------------------------------------- |
+| `budget`         | `40`                                   | most faulted trials a matrix runs                          |
+| `workers`        | `workers`, else one per core (up to 8) | matrix worker processes                                    |
+| `races`          | all on                                 | double submits, early and reordered webhooks, slow retries |
+| `outboundFaults` | each provider's own                    | the faults planned on each provider call                   |
+| `webhookFaults`  | the defaults                           | the faults planned on each webhook                         |
+| `dataFaults`     | the defaults                           | faults on the app's database and cache calls               |
+| `rerunInvalid`   | `0`                                    | reruns of a trial whose fault never fired                  |
+| `checkPace`      | 3× the clean run, at least 1 s         | how long a faulted run's checks wait                       |
+
+See [Planning and budget](/docs/matrix-planning) for how the budget is spent.
+
+## Next
+
+<Cards>
+  <Card title="Reference: Config" href="/docs/reference/config">
+    Every option, with its type.
+  </Card>
+  <Card title="Several apps" href="/docs/stack-environment">
+    An `environment` for a real stack.
+  </Card>
+</Cards>

@@ -1,0 +1,78 @@
+---
+title: Recordings
+description: Every test's flight record in the dashboard, its video, steps, console, network and every provider call, and a prompt to fix it.
+icon: Video
+---
+
+Every test keeps a **flight record**: a video, each step, the page's console and network, and every
+call and webhook behind it. In the dashboard it opens over the page you came from.
+
+## Open one
+
+Click a test, a run's row or a matrix cell. The recording opens on top, and Esc closes it.
+
+![A recording: the steps on the left, the video and its tabs on the right](/docs/dashboard-recording.png)
+
+On the left are the steps. Each has **Go to**, which moves the video to that step. Under them are
+the error, where the test stopped, the faults and any lint findings.
+
+## The tabs
+
+| Tab            | What it shows                                                                        |
+| -------------- | ------------------------------------------------------------------------------------ |
+| Replay         | the video, with step and fault markers on the scrubber                               |
+| Console        | the page's console, filtered by level                                                |
+| Network        | the page's own requests                                                              |
+| Providers      | a waterfall of steps, provider calls, webhooks and faults; then the calls as a table |
+| Emulator state | what each emulator held when the test ended                                          |
+| Effects        | what each step was expected to change, and what it did                               |
+| Matrix         | on a trial: the fault it ran under, and its verdict                                  |
+
+## Read the calls behind a step
+
+The **Providers** tab lines up every call with the step that caused it:
+
+![The Providers tab: a waterfall of the test's steps and calls, with Stripe answering 500](/docs/dashboard-providers.png)
+
+Click a call to see its request and response. Secrets are redacted before the record is written,
+so they never reach the page.
+
+## Copy a prompt to fix it
+
+**Copy prompt to fix** copies the failure as a prompt for a coding agent: what failed, where, the
+calls and faults around it. The menu next to it copies the same page as Markdown.
+
+## Link to a moment
+
+| Address part      | Opens                         |
+| ----------------- | ----------------------------- |
+| `?open=<record>`  | that recording                |
+| `&pane=providers` | that tab                      |
+| `&t=12.5`         | the video 12.5 seconds in     |
+| `#step-3`         | the video where step 3 starts |
+
+## What's kept
+
+| Setting                      | Kept                                                      |
+| ---------------------------- | --------------------------------------------------------- |
+| `record: "always"` (default) | every run's flight record; the latest 20 runs keep theirs |
+| `record: "on-failure"`       | only failed runs'                                         |
+| `video: "on"` (default)      | a video with every record                                 |
+| `video: "retain-on-failure"` | videos of runs that didn't pass                           |
+| `video: "off"`               | no video                                                  |
+
+<Callout type="warn">
+  Video shows the screen as it was. Fields holding a secret show as dots, but a secret your app
+  prints as text is on screen. Use `video: "off"` for suites that show one.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Live runs and reruns" href="/docs/live-runs">
+    Watch a run as it happens.
+  </Card>
+  <Card title="Reading results" href="/docs/matrix-results">
+    Make sense of a matrix trial.
+  </Card>
+</Cards>

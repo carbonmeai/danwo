@@ -1,0 +1,104 @@
+---
+title: Changed tests
+description: Run only the tests a change can affect, and see why each one was picked.
+icon: GitCompare
+---
+
+`danwo test --changed` runs only the tests your change can affect. It knows what each test touched
+in its last passing run, so a change to your webhook handler runs the tests that got that webhook,
+and a change to the README runs nothing.
+
+## Run it
+
+```sh
+npx danwo test --changed                    # uncommitted changes
+npx danwo test --changed --since origin/main # everything since main
+```
+
+## How a test gets picked
+
+A changed file picks a test when:
+
+- it's the test file, or a file the test imports;
+- a rule in your config maps it to a page, provider host, call or webhook the test touched.
+
+A change nothing explains picks **every** test, so a lockfile or config change never skips one.
+Markdown, plain text and `docs/` pick none.
+
+## Map your source to what tests touch
+
+Rules map globs to what a change there affects:
+
+```ts title="danwo.config.ts"
+import { defineConfig } from "@danwo/sdk"
+
+export default defineConfig({
+  impact: {
+    rules: {
+      "src/webhooks.ts": ["webhook checkout.session.completed"],
+      "src/billing/**": ["api.stripe.com"],
+      "src/pages/checkout/**": ["/checkout"],
+      "src/server.ts": ["/"],
+    },
+  },
+})
+```
+
+| Target                                     | Picks the tests that                   |
+| ------------------------------------------ | -------------------------------------- |
+| `/checkout`                                | visited `/checkout` or a page under it |
+| `/`                                        | visited any page                       |
+| `api.stripe.com`                           | called that host                       |
+| `POST api.stripe.com/v1/checkout/sessions` | made that call                         |
+| `webhook checkout.session.completed`       | received that webhook                  |
+
+A test with no data yet is picked by every rule that matches.
+
+## See why
+
+`danwo impact` prints what a change would pick, without running anything:
+
+```sh
+npx danwo impact src/webhooks.ts
+```
+
+```text
+selected: 1 of 2 tests
+  tests/buy-credits.danwo.ts › buys 500 credits through Stripe Checkout
+      src/webhooks.ts (src/webhooks.ts) → webhook checkout.session.completed
+matrix: danwo matrix tests/buy-credits.danwo.ts
+```
+
+The last line is the matrix for the picked tests, to run when the change touches payments.
+
+```sh
+npx danwo impact README.md
+```
+
+```text
+ignored: README.md (no test depends on it)
+selected: 0 of 2 tests
+```
+
+## Keep the index
+
+Each passing test writes what it touched to `.danwo/impact.json`. The file is sorted and has no
+timestamps, so commit it: CI then picks tests from the same data you do.
+
+| Option          | Default                                            |
+| --------------- | -------------------------------------------------- |
+| `impact.rules`  | none: only test files and their imports pick tests |
+| `impact.ignore` | `**/*.md`, `**/*.mdx`, `**/*.txt`, `docs/**`       |
+
+The **Impact** page in the [dashboard](/docs/dashboard) shows the same index.
+
+## Next
+
+<Cards>
+  <Card title="CI and GitHub" href="/docs/ci">
+    Run changed tests on every pull request.
+  </Card>
+  <Card title="Configuration" href="/docs/configuration">
+    Every option in `danwo.config.ts`.
+  </Card>
+</Cards>

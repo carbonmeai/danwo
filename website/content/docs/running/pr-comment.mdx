@@ -1,0 +1,61 @@
+---
+title: Pull request comment
+description: One comment on each pull request, edited by every run, with each test, each failure and what the matrix found.
+icon: MessageSquare
+---
+
+On a pull request, danwo's GitHub reporter posts **one** comment and edits it on every later run.
+The conversation never fills with copies, and the comment always shows the latest commit.
+
+## Turn it on
+
+It's on whenever the GitHub reporter runs on a `pull_request` event and the token may write to pull
+requests:
+
+```sh
+npx danwo test --reporter github
+```
+
+The workflow needs `pull-requests: write`. See [CI and GitHub](/docs/ci).
+
+## What it shows
+
+| Part             | What's in it                                                                                                         |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------- |
+| the headline     | passed, failed, flaky and not judged; duration, model spend and commit                                               |
+| a row per test   | its duration and retries, failures first                                                                             |
+| each failure     | folded: the failing step, the error and its class, the last provider calls and any faults in them, its flight record |
+| flaky tests      | folded away                                                                                                          |
+| each matrix test | whether its invariant held under every fault, and a row per fault that broke it                                      |
+
+Set `DANWO_REPORT_URL` to where you publish the report or dashboard, and each test name links
+there.
+
+## How runs share it
+
+- A run replaces its own section and keeps the others for the same commit. A `danwo test` run and a
+  `danwo matrix` run both show.
+- A section from an older commit is dropped.
+- A [shard](/docs/shards) leaves the comment alone; `danwo merge-reports` posts the whole run once.
+- The comment stays under GitHub's size limit. A long one is cut between entries, with a note.
+
+## Turn it off
+
+| Way                                           | Scope       |
+| --------------------------------------------- | ----------- |
+| `--no-pr-comment`                             | one command |
+| `DANWO_PR_COMMENT=off`                        | the job     |
+| `github({ prComment: false })` in `reporters` | the project |
+
+The check run stays either way.
+
+## Next
+
+<Cards>
+  <Card title="CI and GitHub" href="/docs/ci">
+    The workflow file and the check.
+  </Card>
+  <Card title="Shards and JUnit" href="/docs/shards">
+    Split a suite and post one combined result.
+  </Card>
+</Cards>
