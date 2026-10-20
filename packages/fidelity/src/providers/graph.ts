@@ -1,12 +1,12 @@
 /**
- * Microsoft Graph, as a signed-in test account uses it: a message sent to the account itself, an
+ * Microsoft Graph, as a signed-in test account uses it: its profile, a message sent to itself, an
  * event, a OneDrive file the suite uploads, the app's change subscriptions, and Graph's error
  * answers. Everything made is named with the run's tag and removed when the scenario ends; mail
  * is only ever sent to the account's own address and deleted for good, both copies.
  */
 import { accountJson, asAccount, requireAccount, untilFound } from "../account-target.ts"
 import { MICROSOFT_ACCOUNT } from "../accounts.ts"
-import type { Scenario, ScenarioContext, Target } from "../scenario.ts"
+import type { Answer, Scenario, ScenarioContext, Target } from "../scenario.ts"
 import { map, noBody, object, partialObject, str } from "../schema.ts"
 import { asJsonObject, isJsonArray, type Json, readJson, stringField } from "../shape.ts"
 
@@ -61,19 +61,56 @@ function signedIn(context: ScenarioContext): void {
   requireAccount(context, MICROSOFT_ACCOUNT)
 }
 
+/** What a work account without the needed licence is told, and how to get an account that works. */
+const SETUP_ERRORS = [
+  {
+    says: /AADSTS500014|service principal for resource 'https:\/\/outlook\.office/i,
+    reason: "account has no Exchange Online mailbox",
+  },
+  { says: /does not have a SPO license/i, reason: "no OneDrive (SharePoint) license" },
+] as const
+
+const SETUP_FIX =
+  "sign in with a personal Microsoft account through the common tenant, or give the account a Microsoft 365 licence with Exchange Online and OneDrive"
+
+/**
+ * Stops the scenario when Graph refused the call because the account's tenant lacks the service
+ * behind it, so a setup gap is reported as one instead of as every later call's mismatch.
+ */
+function skipWithoutService(context: ScenarioContext, answer: Answer): void {
+  if (answer.status < 400) return
+
+  const message = stringField(asJsonObject(answer.body)?.["error"], "message")
+  const gap = SETUP_ERRORS.find(({ says }) => says.test(message))
+
+  if (gap !== undefined) context.skip(`${gap.reason}: ${SETUP_FIX}`)
+}
+
+const account: Scenario = {
+  name: "account: the signed-in user",
+  async run(context) {
+    signedIn(context)
+
+    await context.step("read the account", accountJson("GET", `${GRAPH}/me`), {
+      doc: { operation: "GET /v1.0/me", status: 200 },
+    })
+  },
+}
+
 const mail: Scenario = {
   name: "mail: a message sent to the account itself",
   async run(context) {
     signedIn(context)
 
-    const me = await context.step("read the account", accountJson("GET", `${GRAPH}/me`), {
-      doc: { operation: "GET /v1.0/me", status: 200 },
-    })
-    const address = stringField(me.body, "mail") || stringField(me.body, "userPrincipalName")
+    const me = await readJson(await context.target.send(accountJson("GET", `${GRAPH}/me`)))
+    const address = stringField(me, "mail") || stringField(me, "userPrincipalName")
+    const folders = await context.step(
+      "list the mail folders",
+      accountJson("GET", `${GRAPH}/me/mailFolders`),
+      { doc: { operation: "GET /v1.0/me/mailFolders", status: 200 } },
+    )
 
-    await context.step("list the mail folders", accountJson("GET", `${GRAPH}/me/mailFolders`), {
-      doc: { operation: "GET /v1.0/me/mailFolders", status: 200 },
-    })
+    skipWithoutService(context, folders)
     context.created({
       kind: "message",
       id: context.tag,
@@ -145,6 +182,9 @@ const events: Scenario = {
       accountJson("POST", `${GRAPH}/me/events`, { subject: context.tag, ...nextHour() }),
       { doc: { operation: "POST /v1.0/me/events", status: 201 } },
     )
+
+    skipWithoutService(context, created)
+
     const id = stringField(created.body, "id")
 
     context.created({
@@ -189,6 +229,9 @@ const onedrive: Scenario = {
       }),
       { doc: { operation: `GET ${ITEM}`, status: 201 } },
     )
+
+    skipWithoutService(context, uploaded)
+
     const id = stringField(uploaded.body, "id")
 
     context.created({
@@ -224,13 +267,13 @@ const subscriptions: Scenario = {
 }
 
 const errors: Scenario = {
-  name: "errors: a missing file, no token",
+  name: "errors: a missing subscription, no token",
   async run(context) {
     signedIn(context)
 
     await context.step(
-      "read a file that does not exist",
-      accountJson("GET", `${GRAPH}/me/drive/items/01DANWOFIDELITYNOSUCHITEM000000000`),
+      "read a subscription that does not exist",
+      accountJson("GET", `${GRAPH}/subscriptions/7f1c2d3e-4b5a-4c6d-8e9f-0a1b2c3d4e5f`),
       { doc: { schema: GRAPH_ERROR, status: 404 } },
     )
     await context.step("call Graph without a token", new Request(`${GRAPH}/me`), {
@@ -240,4 +283,11 @@ const errors: Scenario = {
 }
 
 /** The account scenarios, in the order a run takes them. */
-export const GRAPH_SCENARIOS: readonly Scenario[] = [mail, events, onedrive, subscriptions, errors]
+export const GRAPH_SCENARIOS: readonly Scenario[] = [
+  account,
+  mail,
+  events,
+  onedrive,
+  subscriptions,
+  errors,
+]

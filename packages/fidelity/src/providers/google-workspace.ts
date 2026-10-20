@@ -1,14 +1,15 @@
-import { accountJson, asAccount, requireAccount, untilFound } from "../account-target.ts"
 /**
  * Gmail, Calendar and Drive, as a signed-in test account uses them: labels and a message sent to
  * the account itself, an event on its primary calendar, a file the suite uploads, and Google's
  * error answers. Everything made is named with the run's tag and removed when the scenario ends;
- * mail is only ever sent to the account's own address.
+ * mail is only ever sent to the account's own address. An API the OAuth client's project has not
+ * enabled skips its scenario with the console step that enables it.
  */
+import { accountJson, asAccount, requireAccount, untilFound } from "../account-target.ts"
 import { GOOGLE_ACCOUNT } from "../accounts.ts"
-import type { Scenario, ScenarioContext } from "../scenario.ts"
+import type { Answer, Scenario, ScenarioContext } from "../scenario.ts"
 import { arrayOf, noBody, num, object, partialObject, str } from "../schema.ts"
-import { stringField } from "../shape.ts"
+import { asJsonObject, isJsonArray, stringField } from "../shape.ts"
 
 const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me"
 const CALENDAR = "https://www.googleapis.com/calendar/v3"
@@ -33,6 +34,26 @@ function listed(body: unknown, items: string, field: string, value: string): boo
         typeof item === "object" && item !== null && Reflect.get(item, field) === value,
     )
   )
+}
+
+/** The `reason` of each entry of a Google error answer's `errors`. */
+function errorReasons(answer: Answer): string[] {
+  const errors = asJsonObject(asJsonObject(answer.body)?.["error"])?.["errors"]
+
+  return errors !== undefined && isJsonArray(errors)
+    ? errors.map((entry) => stringField(entry, "reason"))
+    : []
+}
+
+/**
+ * Stops the scenario when Google refused the call because the OAuth client's project has not
+ * enabled `api`, so a setup gap is reported as one instead of as every later call's mismatch.
+ */
+function skipWhenDisabled(context: ScenarioContext, answer: Answer, api: string): void {
+  if (answer.status === 403 && errorReasons(answer).includes("accessNotConfigured"))
+    context.skip(
+      `${api} not enabled for this OAuth client's project: in the Google Cloud console, open APIs & Services > Library for the project that owns the client, choose ${api}, press Enable, then wait a few minutes`,
+    )
 }
 
 /** Stops a scenario on a target without a signed-in account. */
@@ -67,6 +88,9 @@ const labels: Scenario = {
       }),
       { doc: { operation: "POST /gmail/v1/users/{userId}/labels", status: 200 } },
     )
+
+    skipWhenDisabled(context, created, "Gmail API")
+
     const id = stringField(created.body, "id")
 
     context.created({
@@ -95,6 +119,9 @@ async function sendToSelf(context: ScenarioContext): Promise<{ id: string; threa
       doc: { operation: "GET /gmail/v1/users/{userId}/profile", status: 200 },
     },
   )
+
+  skipWhenDisabled(context, profile, "Gmail API")
+
   const sent = await context.step(
     "send a message to the account itself",
     accountJson("POST", `${GMAIL}/messages/send`, {
@@ -180,13 +207,15 @@ const calendar: Scenario = {
 
     const events = `${CALENDAR}/calendars/primary/events`
 
-    await context.step(
+    const calendars = await context.step(
       "list the account's calendars",
       accountJson("GET", `${CALENDAR}/users/me/calendarList`),
       {
         doc: { operation: "GET /calendar/v3/users/me/calendarList", status: 200 },
       },
     )
+
+    skipWhenDisabled(context, calendars, "Google Calendar API")
 
     const created = await context.step(
       "create an event",
@@ -260,6 +289,9 @@ const drive: Scenario = {
     const uploaded = await context.step("upload a file", multipartUpload(name), {
       doc: { operation: "POST /drive/v3/files", status: 200 },
     })
+
+    skipWhenDisabled(context, uploaded, "Google Drive API")
+
     const id = stringField(uploaded.body, "id")
     const search = () =>
       accountJson(
@@ -296,17 +328,20 @@ const drive: Scenario = {
     await context.step("delete the file", accountJson("DELETE", `${DRIVE}/files/${id}`), {
       doc: { schema: noBody, status: 204 },
     })
+    await context.step("read it once it is gone", accountJson("GET", `${DRIVE}/files/${id}`), {
+      doc: { schema: GOOGLE_ERROR, status: 404 },
+    })
   },
 }
 
 const errors: Scenario = {
-  name: "errors: a missing file, no token",
+  name: "errors: a missing message, no token",
   async run(context) {
     signedIn(context)
 
     await context.step(
-      "read a file that does not exist",
-      accountJson("GET", `${DRIVE}/files/1danwoFidelityNoSuchFile0000000000`),
+      "read a message that does not exist",
+      accountJson("GET", `${GMAIL}/messages/18c0000000000000`),
       { doc: { schema: GOOGLE_ERROR, status: 404 } },
     )
     await context.step("call Gmail without a token", new Request(`${GMAIL}/labels`), {
