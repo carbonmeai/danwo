@@ -23,14 +23,19 @@ const SOCKET_FAULTS: readonly SocketFault[] = [{ kind: "refuse" }, { kind: "rese
 
 const GENERATED = /^(?:\d+|[0-9a-f-]{16,}|(?=.*\d)[A-Za-z0-9_-]{16,})$/i
 
-/** A socket's route: its host and path without query, generated ids folded to `:id`. */
-export function socketRoute(socket: Pick<SocketExchange, "host" | "path">): string {
+/**
+ * A socket's route: its host and path without query, generated ids folded to `:id`, and the person
+ * whose browser opened it (`for bob`) when the test opened more than one person's browser, so a
+ * fault can land on one person's socket and not another's.
+ */
+export function socketRoute(socket: Pick<SocketExchange, "host" | "path" | "user">): string {
   const path = (socket.path.split("?")[0] ?? "")
     .split("/")
     .map((segment) => (GENERATED.test(segment) ? ":id" : segment))
     .join("/")
+  const user = socket.user === undefined ? "" : ` for ${socket.user}`
 
-  return `WS ${socket.host}${path}`
+  return `WS ${socket.host}${path}${user}`
 }
 
 /** Each socket the clean run opened (and the proxy let through) × each socket fault. */

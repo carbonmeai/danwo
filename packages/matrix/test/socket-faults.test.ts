@@ -2,7 +2,7 @@ import type { Proxy, SocketExchange, SocketFaultRule } from "@danwo/proxy"
 import { describe, expect, it } from "vitest"
 
 import { applyFault, checkFaultFired, planFaults, type RunOutcome } from "../src/fault-matrix.ts"
-import { socketRoute } from "../src/socket-faults.ts"
+import { planSocketFaults, socketRoute } from "../src/socket-faults.ts"
 
 function socket(overrides: Partial<SocketExchange>): SocketExchange {
   return {
@@ -74,5 +74,20 @@ describe("socket faults", () => {
     expect(socketRoute({ host: "ws-eu.pusher.com", path: "/app/123456?client=js" })).toBe(
       "WS ws-eu.pusher.com/app/:id",
     )
+  })
+
+  it("plans one person's socket apart from another's, so a fault lands on theirs alone", () => {
+    const planned = planSocketFaults([
+      socket({ host: "app.test", path: "/live" }),
+      socket({ host: "app.test", path: "/live", user: "bob" }),
+    ])
+
+    expect(planned.map((fault) => fault.label)).toEqual([
+      "upgrade refused on WS app.test/live",
+      "connection dropped on WS app.test/live",
+      "upgrade refused on WS app.test/live for bob",
+      "connection dropped on WS app.test/live for bob",
+    ])
+    expect(planned[2]?.occurrence).toBe(0)
   })
 })
