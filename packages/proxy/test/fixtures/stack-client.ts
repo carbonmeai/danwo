@@ -1,6 +1,6 @@
 /**
  * A client run through the proxy (with its environment), the way an app's server would call:
- * `fetch <url>` prints the status, `stream <url>` prints the first event of a stream and leaves it
+ * `fetch <url>` prints the status, `text <url>` the status and body, `stream <url>` prints the first event of a stream and leaves it
  * open, `socket <url>` sends one frame and prints the echo, or the error when it is refused.
  * Node does not proxy WebSockets on its own, so the socket goes through a CONNECT tunnel, as a
  * browser's does.
@@ -57,6 +57,11 @@ async function socketOnce(): Promise<void> {
 
 const modes: Record<string, () => Promise<void>> = {
   fetch: fetchOnce,
+  text: async () => {
+    const response = await fetch(url)
+
+    console.log(`${response.status} ${await response.text()}`)
+  },
   stream: streamOnce,
   socket: socketOnce,
 }

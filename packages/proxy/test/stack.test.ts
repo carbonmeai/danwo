@@ -86,6 +86,30 @@ describe("hosts a run always reaches", () => {
     }
   })
 
+  it("says nothing is listening when a port of this machine is not served, in either mode", async () => {
+    const closed = createServer()
+
+    closed.listen(0, "127.0.0.1")
+    await once(closed, "listening")
+    const port = portOf(closed)
+
+    closed.close()
+    await once(closed, "close")
+
+    for (const unmatched of ["block", "passthrough"] as const) {
+      const proxy = await startProxy({ routes: [], unmatched })
+
+      try {
+        expect(await client(proxy, "text", `http://127.0.0.1:${port}/collections`)).toBe(
+          `502 danwo proxy: nothing is listening on 127.0.0.1:${port}; start that service or route the host`,
+        )
+        expect(await client(proxy, "fetch", `http://127.0.0.1:${app.port}/ok`)).toBe("200")
+      } finally {
+        await proxy.stop()
+      }
+    }
+  })
+
   it("blocks telemetry hosts by default, and lets them go when asked", async () => {
     const blocking = await startProxy({ routes: [] })
     const passing = await startProxy({ routes: [], telemetry: "passthrough" })

@@ -14,6 +14,7 @@ import {
 import { type AppClock, createAppClock } from "./app-clock.ts"
 import { type CapturedMessage, captureMessage } from "./capture.ts"
 import { hostMatches, isLoopback, isPageAsset, isStreaming, TELEMETRY_HOSTS } from "./hosts.ts"
+import { isListening, nothingListening } from "./listening.ts"
 import { type EnvOptions, preloadedPids, proxyEnvironment, writeNodeShim } from "./node-env.ts"
 import { forwardTo } from "./upstream.ts"
 import {
@@ -408,6 +409,20 @@ async function placeUnrouted(server: Mockttp, options: ProxyOptions, hosts: Host
     .matching((req) => unrouted(req) && hosts.isBlocked(req.destination.hostname))
     .always()
     .thenReply(502, "danwo proxy: host is blocked for this run")
+  /* A port of this machine nobody listens on: say so, rather than fail inside the passthrough. */
+  await server
+    .forAnyRequest()
+    .matching(
+      async (req) =>
+        unrouted(req) &&
+        isLoopback(req.destination.hostname) &&
+        !(await isListening(req.destination.hostname, req.destination.port)),
+    )
+    .always()
+    .thenCallback((req) => ({
+      statusCode: 502,
+      body: nothingListening(req.destination.hostname, req.destination.port),
+    }))
 
   if (options.unmatched !== "block") {
     await server.forUnmatchedRequest().thenPassThrough()
