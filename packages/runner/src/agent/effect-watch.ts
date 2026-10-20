@@ -26,6 +26,12 @@ import { viewPage } from "../snapshot/view.ts"
 
 /** How long a replay waits for a recorded effect that has not shown yet. */
 const SETTLE_MS = 3_000
+/**
+ * How long it waits for a recorded provider call that has not happened yet. A call made by
+ * background work (a queued job sending a notification) comes seconds after the step that caused
+ * it, and a replay's actions run much faster than the model that recorded them.
+ */
+const BACKEND_SETTLE_MS = 10_000
 const POLL_MS = 150
 
 /** Where a step's effects are read from, for the whole session. */
@@ -83,6 +89,13 @@ function signatures(activity: BackendActivity): string[] {
   return [...activity.calls, ...activity.deliveries].map((event) => event.signature)
 }
 
+/** Whether a recorded provider call has not happened (yet) in what `check` observed. */
+function lacksCalls(expected: Effects, check: EffectCheck): boolean {
+  const seen = new Set(check.observed?.backend ?? [])
+
+  return expected.backend.some((signature) => !seen.has(signature))
+}
+
 /** One step's watch: its start, and how its end compares. */
 export class EffectWatch {
   private readonly sources: EffectSources
@@ -133,7 +146,7 @@ export class EffectWatch {
 
   /**
    * How the step's effects compare with `expected`. A missing effect is waited for a little, as
-   * a webhook may land just after the page settled.
+   * a webhook may land just after the page settled, and a missing provider call a little longer.
    */
   async compare(expected: Effects): Promise<EffectCheck> {
     if (this.earlierFault !== undefined)
@@ -143,10 +156,13 @@ export class EffectWatch {
         note: `not compared: after the injected fault (${faultName(this.earlierFault)})`,
       }
 
-    const deadline = Date.now() + SETTLE_MS
+    const started = Date.now()
     let check = await this.once(expected)
 
-    while (check.result === "diverged" && check.note === undefined && Date.now() < deadline) {
+    while (check.result === "diverged" && check.note === undefined) {
+      const patience = lacksCalls(expected, check) ? BACKEND_SETTLE_MS : SETTLE_MS
+
+      if (Date.now() - started >= patience) break
       await sleep(POLL_MS)
       check = await this.once(expected)
     }

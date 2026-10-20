@@ -29,6 +29,8 @@ const app = {
   prefix: "",
   /** The fault the provider call gets, as the matrix would label it. */
   fault: null as string | null,
+  /** Make the provider call this long after the save, as a queued job would. */
+  lateMs: 0,
   calls: [] as BackendEvent[],
 }
 
@@ -48,7 +50,10 @@ document.getElementById("add").addEventListener("click", async () => {
 </script>`
 
 function added(text: string): string {
-  if (!app.skipCall) app.calls.push({ signature: CHECKOUT, fault: app.fault })
+  const call = { signature: CHECKOUT, fault: app.fault }
+
+  if (!app.skipCall && app.lateMs === 0) app.calls.push(call)
+  if (!app.skipCall && app.lateMs > 0) setTimeout(() => app.calls.push(call), app.lateMs)
   if (!app.silent) app.notes.push(app.prefix + text)
 
   return JSON.stringify(app.notes)
@@ -94,6 +99,7 @@ beforeEach(async () => {
     skipCall: false,
     prefix: "",
     fault: null,
+    lateMs: 0,
     calls: [],
   })
 })
@@ -195,6 +201,17 @@ describe("replayed effects", () => {
     const replayed = await strictReplay()
 
     expect(replayed.divergence?.reason).toBe(`effect: expected ${CHECKOUT}, saw none`)
+  }, 60_000)
+
+  it("waits for a provider call that background work makes seconds after the step", async () => {
+    await record()
+    app.lateMs = 5_000
+
+    const replayed = await strictReplay()
+
+    expect(replayed.divergence).toBeUndefined()
+    expect(replayed.cache).toEqual({ mode: "replayed" })
+    expect(replayed.effects).toMatchObject({ result: "matched" })
   }, 60_000)
 
   it("hands the step to the model outside strict replay, and its run is the new recording", async () => {
