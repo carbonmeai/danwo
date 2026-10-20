@@ -368,8 +368,7 @@ async function runAndReport(input: RunInput, frame: RunFrame): Promise<number> {
   const findings = findingsOf(results.reports)
 
   for (const line of closingLines(results.reports)) write(line)
-  for (const line of lintReport(findings)) write(line)
-  for (const line of blockedReport(results.reports)) write(line)
+  for (const line of [...lintReport(findings), ...blockedReport(results.reports)]) write(line)
   if (ran.notRun > 0)
     write(`stopped after ${options.maxFailures} failed: ${ran.notRun} test files not run`)
 
