@@ -12,7 +12,6 @@ import { twilioStore } from "./store.ts"
 
 export { twilioOutboundFaults } from "./faults.ts"
 export { TWILIO_HOSTS } from "./helpers.ts"
-export { TRIAL_TEMPLATES } from "./trial-templates.ts"
 export {
   type PhoneMessage,
   type TwilioInbox,

@@ -19,9 +19,6 @@ const TEXTS: Readonly<Record<string, string>> = {
   sms_internal_alerts: `Alert: System downtime detected. Engineers notified. ETA to resolution: 2 hours. Reply STATUS for updates. ${ENDING}`,
 }
 
-/** The template ids a trial account may send. */
-export const TRIAL_TEMPLATES: readonly string[] = Object.keys(TEXTS)
-
 /** The text a trial account's message carries for template `id`, or undefined for an unknown id. */
 export function trialTemplateText(id: string): string | undefined {
   return TEXTS[id]

@@ -509,18 +509,37 @@ export const twilioFidelity: FidelityProvider = {
     ),
   live(env) {
     const found = requiredCredentials(this, env)
-    const sid = found?.[SID]
-    const byKey = found?.[KEY_SID] !== undefined && found[KEY_SECRET] !== undefined
-    const user = byKey ? found?.[KEY_SID] : sid
-    const password = byKey ? found?.[KEY_SECRET] : found?.[TOKEN]
-    const sends = {
-      ...(found?.[FROM] !== undefined && { from: found[FROM] }),
-      ...(found?.[TO] !== undefined && { to: found[TO] }),
-      ...(found?.[SEND_ON_TRIAL] !== undefined && { sendOnTrial: found[SEND_ON_TRIAL] }),
-    }
+    const login = found === undefined ? undefined : loginOf(found)
 
-    if (sid === undefined || user === undefined || password === undefined) return undefined
-
-    return liveTarget({ sid, user, password, ...sends })
+    return login === undefined ? undefined : liveTarget({ ...login, ...sendsOf(found ?? {}) })
   },
+}
+
+/** Who to call as: an API key and its secret when both are set, else the Auth Token. */
+function loginOf(found: Readonly<Record<string, string>>) {
+  const sid = found[SID]
+  const byKey = found[KEY_SID] !== undefined && found[KEY_SECRET] !== undefined
+  const user = byKey ? found[KEY_SID] : sid
+  const password = byKey ? found[KEY_SECRET] : found[TOKEN]
+
+  return sid === undefined || user === undefined || password === undefined
+    ? undefined
+    : { sid, user, password }
+}
+
+/** The numbers and opt-in for a real send, as they are set. */
+function sendsOf(found: Readonly<Record<string, string>>): Record<string, string> {
+  const named: ReadonlyArray<readonly [string, string]> = [
+    ["from", FROM],
+    ["to", TO],
+    ["sendOnTrial", SEND_ON_TRIAL],
+  ]
+
+  return Object.fromEntries(
+    named.flatMap(([key, variable]) => {
+      const value = found[variable]
+
+      return value === undefined ? [] : [[key, value]]
+    }),
+  )
 }

@@ -307,6 +307,11 @@ function scenarioLines(report: ScenarioReport): string[] {
   return lines
 }
 
+/** Whether the provider gives no way to remove what was left. */
+function isUnremovable(item: LeftBehind): boolean {
+  return item.reason.startsWith(UNREMOVABLE)
+}
+
 /**
  * Everything a provider's live scenarios left in its sandbox: kept on request, kept because the
  * provider cannot remove it, and stuck (an undo that went wrong).
@@ -317,7 +322,6 @@ function leftovers(report: ProviderReport): {
   stuck: LeftBehind[]
 } {
   const all = report.scenarios.flatMap((scenario) => scenario.leftBehind ?? [])
-  const isUnremovable = (item: LeftBehind) => item.reason.startsWith(UNREMOVABLE)
 
   return {
     kept: all.filter((item) => item.reason === "kept"),
