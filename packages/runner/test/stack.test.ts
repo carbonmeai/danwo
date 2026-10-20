@@ -310,6 +310,27 @@ describe("Inngest", () => {
     }
   })
 
+  it("gives an event that starts no run its few seconds once, from when it was sent", async () => {
+    /* A run that never shows: the event has no function listening to it. */
+    const dev = await devServer(0, 60_000)
+    const inngest = await inngestService({ url: dev.url })
+    const services = await startServices([inngest])
+
+    try {
+      await sendThrough(services.proxy.url)
+
+      const [first = ""] = await services.settle()
+      const began = Date.now()
+
+      await services.settle()
+      expect(first).toMatch(/event evt_1 started no run$/)
+      expect(Date.now() - began).toBeLessThan(500)
+    } finally {
+      await services.close()
+      dev.server.close()
+    }
+  }, 20_000)
+
   it("faults event sends: down, accepted but unanswered, and slow", () => {
     const kinds = inngestOutboundFaults({
       host: INNGEST_HOST,

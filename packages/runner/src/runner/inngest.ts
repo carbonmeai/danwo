@@ -213,11 +213,15 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
   let proxy: Proxy | undefined
   let runs: InngestRun[] = []
 
-  /** Events sent through the proxy since the last reset, which clears the proxy's log. */
+  /**
+   * Events sent through the proxy since the last reset, which clears the proxy's log, each with
+   * when it was sent: an event's time to show runs counts from its send, so an earlier one that
+   * started none is not waited on again by every later settle.
+   */
   const sentEvents = () =>
     (proxy?.exchanges() ?? [])
       .filter((e) => e.host === INNGEST_HOST && e.method === "POST" && e.path.startsWith("/e/"))
-      .flatMap((e) => eventIds(e.response?.body))
+      .flatMap((e) => eventIds(e.response?.body).map((id) => ({ id, at: Date.parse(e.startedAt) })))
 
   /** When each run last checkpointed through the proxy (`/v1/checkpoint/<run id>/...`). */
   const lastCheckpoints = () => {
@@ -243,9 +247,10 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
     const firstSeen = new Map<string, number>()
 
     for (;;) {
-      const events = sentEvents()
+      const sent = sentEvents()
+      const events = sent.map(({ id }) => id)
 
-      markSeen(firstSeen, events)
+      for (const { id, at } of sent) if (!firstSeen.has(id)) firstSeen.set(id, at)
 
       const listed = (await Promise.all(events.map((event) => runsOf(url, event)))).flat()
 
