@@ -1,8 +1,10 @@
 /** How a test run's page sorts and sums its tests. */
 import type { HistoryTest, TestHistory, Usage } from "@danwo/runner/runner"
+import { verdictSummary } from "@danwo/runner/verdict"
 
 import { percent } from "../../lib/format.ts"
 import { type Share, toneOf } from "../../lib/verdicts.ts"
+import { runVerdicts } from "../../lib/whose.ts"
 import { cacheHitRate } from "../runs/run-trend.ts"
 
 /** Failures first, then flaky, then the rest, so what needs looking at is on top. */
@@ -36,17 +38,24 @@ function testShares(run: TestHistory): Share[] {
   ]
 }
 
+/** Under a run's failed count: whose failures they were, else how many flaked. */
+function failedNote(run: TestHistory, flaky: number): string {
+  return verdictSummary(runVerdicts(run)) || (flaky > 0 ? `${flaky} flaky` : "none flaky")
+}
+
 /** A test run's headline figures: its title, the verdict counts and what the model cost. */
 export function testFigures(run: TestHistory) {
   const shares = testShares(run)
   const { calls } = run.usage.spent
   const rate = cacheHitRate(run.usage)
+  const flaky = shares[1]?.count ?? 0
 
   return {
     shares,
+    failedNote: failedNote(run, flaky),
     title: `${run.tests.length} ${run.tests.length === 1 ? "test" : "tests"}`,
     passed: shares[0]?.count ?? 0,
-    flaky: shares[1]?.count ?? 0,
+    flaky,
     failed: shares[2]?.count ?? 0,
     spend:
       calls === 0 ? "no model calls" : `${calls} calls · ${percent(rate)} from the replay cache`,

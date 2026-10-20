@@ -1,3 +1,4 @@
+import type { Verdict } from "@danwo/runner/runner"
 import { Icons } from "@danwo/ui/icons/base"
 import { Box, Grid, HStack, Stack } from "@danwo/ui/jsx"
 import { Button } from "@danwo/ui/primitives/button"
@@ -11,17 +12,21 @@ import {
   TableRow,
 } from "@danwo/ui/primitives/table"
 import { Span } from "@danwo/ui/primitives/typography"
-import { Link } from "@tanstack/react-router"
+import { Link, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 
+import { ANY, Choice } from "../../components/choice.tsx"
 import { ListFilter } from "../../components/controls.tsx"
 import { Empty } from "../../components/empty-state.tsx"
 import { Page } from "../../components/page.tsx"
 import { Panel } from "../../components/panel.tsx"
+import { DeletedRecording } from "../../components/recordings.tsx"
 import { StatusBadge, VerdictBadge } from "../../components/status-badge.tsx"
 import { TimeAgo } from "../../components/time-ago.tsx"
+import { WhoseBadge } from "../../components/whose-badge.tsx"
 import { percent } from "../../lib/format.ts"
 import { useFilter } from "../../lib/list-keys.ts"
+import { VERDICT_CHOICES, verdictParam } from "../../lib/whose.ts"
 import { LiveRuns } from "../live/live-runs.tsx"
 import { RerunTest, RunTests } from "../live/run-actions.tsx"
 import type { MatrixVerdict } from "./matrix-verdict.ts"
@@ -54,8 +59,9 @@ function nameOf(row: TestRow): string {
   return row.id.split(" › ").slice(1).join(" › ") || row.id
 }
 
-/** Plays a test's latest recording over the page, when one was kept. */
-function Watch({ row }: { readonly row: TestRow }) {
+/** Plays a test's latest recording over the page, when one was kept and is still on disk. */
+function Watch({ row, keepRuns }: { readonly row: TestRow; readonly keepRuns: number }) {
+  if (row.recordingDeleted) return <DeletedRecording keepRuns={keepRuns} />
   if (row.thumb === undefined) return null
 
   return (
@@ -77,10 +83,12 @@ function TestRowLine({
   row,
   picked,
   onPick,
+  keepRuns,
 }: {
   readonly row: TestRow
   readonly picked: boolean
   readonly onPick: (picked: boolean) => void
+  readonly keepRuns: number
 }) {
   return (
     <TableRow data-row data-state={picked ? "selected" : undefined}>
@@ -101,8 +109,9 @@ function TestRowLine({
       </TableCell>
       <TableCell>
         {row.last ? (
-          <HStack gap="2">
+          <HStack gap="2" flexWrap="wrap">
             <StatusBadge status={row.last.status} />
+            {row.last.verdict ? <WhoseBadge verdict={row.last.verdict} /> : null}
             <Span color="ink.muted" fontSize="1">
               <TimeAgo at={row.last.at} />
             </Span>
@@ -123,11 +132,31 @@ function TestRowLine({
       </TableCell>
       <TableCell w="5.5rem">
         <HStack gap="0.5" justify="flex-end">
-          <Watch row={row} />
+          <Watch row={row} keepRuns={keepRuns} />
           <RerunTest testId={row.id} compact />
         </HStack>
       </TableCell>
     </TableRow>
+  )
+}
+
+/** Narrows the tests to those whose latest run failed with one verdict, kept in the address. */
+function VerdictChoice({ verdict }: { readonly verdict: Verdict | undefined }) {
+  const navigate = useNavigate()
+
+  return (
+    <Choice
+      label="Whose failure"
+      value={verdict ?? ANY}
+      options={[[ANY, "Any result"], ...VERDICT_CHOICES]}
+      onChange={(picked) =>
+        void navigate({
+          to: "/tests",
+          search: (prev) => ({ ...prev, verdict: verdictParam(picked) }),
+          replace: true,
+        })
+      }
+    />
   )
 }
 
@@ -203,10 +232,12 @@ function TestsTable({
   shown,
   picked,
   setPicked,
+  keepRuns,
 }: {
   readonly shown: readonly TestRow[]
   readonly picked: ReadonlySet<string>
   readonly setPicked: (next: ReadonlySet<string>) => void
+  readonly keepRuns: number
 }) {
   const pick = (id: string, on: boolean) => {
     const next = new Set(picked)
@@ -257,6 +288,7 @@ function TestsTable({
               row={row}
               picked={picked.has(row.id)}
               onPick={(on) => pick(row.id, on)}
+              keepRuns={keepRuns}
             />
           ))}
         </TableBody>
@@ -272,14 +304,27 @@ function TestsTable({
  */
 export function TestsPage({
   rows,
+  keepRuns,
   file,
+  verdict,
   query,
 }: {
   readonly rows: readonly TestRow[]
+  /** How many runs keep their recordings, for tests whose recordings were deleted. */
+  readonly keepRuns: number
   readonly file: string | undefined
-  readonly query?: { readonly query: string; readonly onChange: (query: string) => void }
+  /** Only tests whose latest run failed with this verdict. */
+  readonly verdict?: Verdict | undefined
+  readonly query?: {
+    readonly query: string
+    readonly onChange: (query: string) => void
+  }
 }) {
-  const inFile = file === undefined ? rows : rows.filter((row) => (row.file ?? "other") === file)
+  const inFile = rows.filter(
+    (row) =>
+      (file === undefined || (row.file ?? "other") === file) &&
+      (verdict === undefined || row.last?.verdict?.verdict === verdict),
+  )
   const found = useFilter(inFile, testText, query)
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
 
@@ -301,6 +346,7 @@ export function TestsPage({
       detail="Every test in this project. The play button opens its latest recording; the matrix column says what the fault matrix made of it."
       actions={
         <>
+          <VerdictChoice verdict={verdict} />
           <ListFilter label="Filter tests" placeholder="Filter tests" filter={found} />
           <RunTests testIds={[...picked]} />
         </>
@@ -316,9 +362,14 @@ export function TestsPage({
           <Groups rows={rows} file={file} />
         </Box>
         {found.shown.length === 0 ? (
-          <Empty title="No tests here" hint="No test in this file matches the filter." />
+          <Empty title="No tests here" hint="No test here matches the filters." />
         ) : (
-          <TestsTable shown={found.shown} picked={picked} setPicked={setPicked} />
+          <TestsTable
+            shown={found.shown}
+            picked={picked}
+            setPicked={setPicked}
+            keepRuns={keepRuns}
+          />
         )}
       </Grid>
     </Page>

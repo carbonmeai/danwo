@@ -5,9 +5,10 @@
  */
 import { join } from "node:path"
 
-import type { FlightRecord, MatrixHistory, RunHistory } from "@danwo/runner/runner"
+import type { FailureVerdict, FlightRecord, MatrixHistory, RunHistory } from "@danwo/runner/runner"
 
 import { insideArea, isVersioned, readJson } from "../../lib/project-files.ts"
+import { testVerdict } from "../../lib/whose.ts"
 import { type TestBreakdown, testBreakdown } from "../insights/test-breakdown.ts"
 import type { KnownTest } from "../live/launch-args.ts"
 import { mediaUrl } from "../record/record-replay.ts"
@@ -23,13 +24,23 @@ export interface Thumb {
 export interface TestRow {
   readonly id: string
   readonly file?: string
-  /** The latest run's verdict and when it started; absent for a test that never ran. */
-  readonly last?: { readonly status: string; readonly at: string; readonly runId: string }
+  /**
+   * The latest run's status, whose failure it was when it failed, and when it started; absent for
+   * a test that never ran.
+   */
+  readonly last?: {
+    readonly status: string
+    readonly at: string
+    readonly runId: string
+    readonly verdict?: FailureVerdict
+  }
   readonly runs: number
   readonly passRate: number | null
   readonly flakeRate: number | null
   readonly matrix: MatrixVerdict
   readonly thumb?: Thumb
+  /** It kept recordings once, but every one was deleted with its run. */
+  readonly recordingDeleted: boolean
 }
 
 /** The record folders a run kept for the test, newest attempt or failing trial first. */
@@ -90,15 +101,30 @@ async function latestThumb(
   return undefined
 }
 
+/** What the test did in `run`, with whose failure it was when it failed; undefined when absent. */
+function lastIn(run: RunHistory, testId: string): TestRow["last"] {
+  const at = { at: run.startedAt, runId: run.id }
+
+  if (run.kind === "matrix") {
+    if (run.testId !== testId) return undefined
+
+    const { status, verdict } = run.clean
+
+    return { status, ...at, ...(status !== "passed" && verdict && { verdict }) }
+  }
+
+  const test = run.tests.find((seen) => seen.id === testId)
+  const verdict = test && testVerdict(test)
+
+  return test && { status: test.status, ...at, ...(verdict && { verdict }) }
+}
+
 /** The newest run that ran the test, with the test's verdict in it. */
 function lastOf(runs: readonly RunHistory[], testId: string): TestRow["last"] {
   for (const run of runs) {
-    if (run.kind === "matrix" && run.testId === testId)
-      return { status: run.clean.status, at: run.startedAt, runId: run.id }
+    const last = lastIn(run, testId)
 
-    const test = run.kind === "test" ? run.tests.find((seen) => seen.id === testId) : undefined
-
-    if (test) return { status: test.status, at: run.startedAt, runId: run.id }
+    if (last) return last
   }
 
   return undefined
@@ -111,6 +137,8 @@ interface Known {
   readonly last: TestRow["last"]
   readonly matrix: MatrixVerdict
   readonly thumb: Thumb | undefined
+  /** Whether any run kept a recording of it, whether or not that is still on disk. */
+  readonly kept: boolean
 }
 
 /** How often the test ran, and how often it passed and flaked, from its breakdown. */
@@ -122,7 +150,7 @@ function ratesOf(
   return { runs: seen.runs + seen.matrixRuns, passRate: seen.passRate, flakeRate: seen.flakeRate }
 }
 
-function rowOf(id: string, { seen, file, last, matrix, thumb }: Known): TestRow {
+function rowOf(id: string, { seen, file, last, matrix, thumb, kept }: Known): TestRow {
   return {
     id,
     ...(file !== undefined && { file }),
@@ -130,6 +158,7 @@ function rowOf(id: string, { seen, file, last, matrix, thumb }: Known): TestRow 
     ...ratesOf(seen),
     matrix,
     ...(thumb !== undefined && { thumb }),
+    recordingDeleted: thumb === undefined && kept,
   }
 }
 
@@ -153,6 +182,7 @@ export async function listTests(
         last: lastOf(runs, id),
         matrix: matrixVerdict(ofTest(id)),
         thumb: await latestThumb(root, runs, id),
+        kept: runs.some((run) => recordsOf(run, id).length > 0),
       }),
     ),
   )

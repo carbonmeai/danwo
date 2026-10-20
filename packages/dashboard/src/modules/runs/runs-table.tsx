@@ -16,9 +16,11 @@ import { type RefObject, useRef, useState } from "react"
 import { Ident } from "../../components/code.tsx"
 import { useCopied } from "../../components/copy-link.tsx"
 import { Panel } from "../../components/panel.tsx"
+import { prunedWords } from "../../components/recordings.tsx"
 import { copyAddress, RowMenu } from "../../components/row-menu.tsx"
 import { StatusBadge, VerdictStrip } from "../../components/status-badge.tsx"
 import { TimeAgo } from "../../components/time-ago.tsx"
+import { WhoseBadge } from "../../components/whose-badge.tsx"
 import { dollars, duration } from "../../lib/format.ts"
 import { useListKeys } from "../../lib/list-keys.ts"
 import { MatrixIcon, TestIcon } from "./run-icons.tsx"
@@ -53,15 +55,22 @@ function RunLine({
   row,
   current,
   now,
+  keepRuns,
 }: {
   readonly row: RunRow
   readonly current: boolean
   readonly now: number
+  readonly keepRuns: number
 }) {
   return (
     <TableRow data-row data-state={current ? "selected" : undefined} position="relative">
       <TableCell w="7.5rem" px="3">
-        <StatusBadge status={verdictOf(row)} />
+        <Stack gap="1" alignItems="flex-start">
+          <StatusBadge status={verdictOf(row)} />
+          {row.topVerdict ? (
+            <WhoseBadge verdict={{ verdict: row.topVerdict }} detail={row.whose} />
+          ) : null}
+        </Stack>
       </TableCell>
       <TableCell minW="0" whiteSpace="normal">
         <Stack gap="1">
@@ -77,6 +86,11 @@ function RunLine({
           <HStack gap="2.5" color="ink.muted" fontSize="1">
             <VerdictStrip shares={sharesOf(row)} width="4rem" />
             <Span>{countLine(row)}</Span>
+            {row.pruned ? (
+              <Span color="ink.faint" title={prunedWords(keepRuns)} data-pruned>
+                recording deleted
+              </Span>
+            ) : null}
           </HStack>
         </Stack>
       </TableCell>
@@ -114,10 +128,13 @@ export function RunsTable({
   shown,
   deferred,
   box,
+  keepRuns,
 }: {
   readonly shown: readonly RunRow[]
   readonly deferred: string
   readonly box: RefObject<HTMLInputElement | null>
+  /** How many runs keep their recordings, for rows whose recordings were deleted. */
+  readonly keepRuns: number
 }) {
   const list = useRef<HTMLTableSectionElement>(null)
   const current = useListKeys(list, shown.length, box)
@@ -155,7 +172,7 @@ export function RunsTable({
         </TableHeader>
         <TableBody ref={list}>
           {shown.map((row, i) => (
-            <RunLine key={row.id} row={row} current={i === current} now={now} />
+            <RunLine key={row.id} row={row} current={i === current} now={now} keepRuns={keepRuns} />
           ))}
         </TableBody>
       </TableContainer>

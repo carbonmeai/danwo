@@ -5,9 +5,18 @@
  */
 import { join } from "node:path"
 
-import type { MatrixHistory, RunHistory, TestHistory, Usage } from "@danwo/runner/runner"
+import {
+  DEFAULT_KEEP_RUNS,
+  type MatrixHistory,
+  type RunHistory,
+  type TestHistory,
+  type Usage,
+  type Verdict,
+} from "@danwo/runner/runner"
+import { verdictCounts, verdictSummary } from "@danwo/runner/verdict"
 
 import { danwoDir, entries, isVersioned, readJson } from "../../lib/project-files.ts"
+import { hasVerdict, runVerdicts } from "../../lib/whose.ts"
 import { type Health, healthOf } from "./run-trend.ts"
 
 /** The statuses a row counts; tests and matrix trials share the words. */
@@ -32,6 +41,12 @@ export interface RunRow {
   readonly costUsd: number
   readonly modelCalls: number
   readonly recorded: boolean
+  /** It kept recordings, but they were deleted with the runs past `record.keepRuns`. */
+  readonly pruned: boolean
+  /** Its failures by verdict, such as "2 app bugs · 1 test issue"; empty when none failed. */
+  readonly whose: string
+  /** The verdict most of its failures share, app bugs first on a tie. */
+  readonly topVerdict?: Verdict
 }
 
 const NONE: RunCounts = { passed: 0, failed: 0, flaky: 0, skipped: 0, notJudged: 0, invalid: 0 }
@@ -80,40 +95,65 @@ export async function loadHistory(root: string): Promise<RunHistory[]> {
   return loaded.filter(isRunHistory).toSorted((a, b) => b.startedAt.localeCompare(a.startedAt))
 }
 
+/** The run folders still under `.danwo/runs`. */
+async function runsOnDisk(root: string): Promise<ReadonlySet<string>> {
+  return new Set(await entries(join(danwoDir(root), "runs")))
+}
+
+/** Whether the run kept recordings that have since been deleted. */
+function isPruned(run: RunHistory, onDisk: ReadonlySet<string>): boolean {
+  return run.run !== undefined && !onDisk.has(run.run)
+}
+
+/** How many runs keep their recordings: what the newest run that says was told, else 50. */
+export function keepRunsOf(history: readonly RunHistory[]): number {
+  return history.find((run) => run.keepRuns !== undefined)?.keepRuns ?? DEFAULT_KEEP_RUNS
+}
+
 function usageTotals(usage: Usage): Pick<RunRow, "costUsd" | "modelCalls"> {
   return { costUsd: usage.spent.usd, modelCalls: usage.spent.calls }
 }
 
-function testRow(run: TestHistory): RunRow {
+/** A run's failures by verdict, for its row. */
+function whoseOf(run: RunHistory): Pick<RunRow, "whose" | "topVerdict"> {
+  const verdicts = runVerdicts(run)
+  const top = verdictCounts(verdicts).toSorted((a, b) => b.count - a.count)[0]
+
+  return {
+    whose: verdictSummary(verdicts),
+    ...(top !== undefined && { topVerdict: top.verdict }),
+  }
+}
+
+function testRow(run: TestHistory): Pick<RunRow, "kind" | "title" | "counts"> {
   const count = run.tests.length
 
   return {
-    id: run.id,
     kind: "test",
-    startedAt: run.startedAt,
-    durationMs: run.durationMs,
     title: `${count} ${count === 1 ? "test" : "tests"}`,
     counts: countOf(run.tests.map((test) => test.status)),
-    ...usageTotals(run.usage),
-    recorded: run.run !== undefined,
   }
 }
 
-function matrixRow(run: MatrixHistory): RunRow {
+function matrixRow(run: MatrixHistory): Pick<RunRow, "kind" | "title" | "counts"> {
   return {
-    id: run.id,
     kind: "matrix",
-    startedAt: run.startedAt,
-    durationMs: run.durationMs,
     title: run.testId,
     counts: countOf(run.trials.map((trial) => trial.status)),
-    ...usageTotals(run.usage),
-    recorded: run.run !== undefined,
   }
 }
 
-function rowOf(run: RunHistory): RunRow {
-  return run.kind === "test" ? testRow(run) : matrixRow(run)
+function rowOf(run: RunHistory, onDisk: ReadonlySet<string> = new Set()): RunRow {
+  return {
+    id: run.id,
+    startedAt: run.startedAt,
+    durationMs: run.durationMs,
+    ...(run.kind === "test" ? testRow(run) : matrixRow(run)),
+    ...usageTotals(run.usage),
+    recorded: run.run !== undefined,
+    pruned: isPruned(run, onDisk),
+    ...whoseOf(run),
+  }
 }
 
 /** A page of the runs list, newest first. */
@@ -122,6 +162,8 @@ export interface RunPage {
   readonly total: number
   /** The recent runs' pass rate, flakiness, failures and spend, with their trend. */
   readonly health: Health
+  /** How many of the newest runs keep their recordings. */
+  readonly keepRuns: number
 }
 
 /** The two kinds of run: `danwo test` runs many tests once, `danwo matrix` one test per fault. */
@@ -135,6 +177,8 @@ export interface RunFilter {
   readonly days?: number | undefined
   /** Only runs started on this `YYYY-MM-DD` (UTC). */
   readonly day?: string | undefined
+  /** Only runs with a failure of this verdict. */
+  readonly verdict?: Verdict | undefined
 }
 
 function matches(run: RunHistory, filter: RunFilter, now: number): boolean {
@@ -144,7 +188,8 @@ function matches(run: RunHistory, filter: RunFilter, now: number): boolean {
     (filter.kind === undefined || run.kind === filter.kind) &&
     (filter.status === undefined || (filter.status === "failed") === failed) &&
     (filter.days === undefined || Date.parse(run.startedAt) >= now - filter.days * 86_400_000) &&
-    (filter.day === undefined || run.startedAt.startsWith(filter.day))
+    (filter.day === undefined || run.startedAt.startsWith(filter.day)) &&
+    hasVerdict(run, filter.verdict)
   )
 }
 
@@ -156,14 +201,15 @@ export async function listRuns(
   filter: RunFilter = {},
   now = Date.now(),
 ): Promise<RunPage & { readonly counts: Readonly<Record<RunKind, number>> }> {
-  const all = await loadHistory(root)
+  const [all, onDisk] = await Promise.all([loadHistory(root), runsOnDisk(root)])
   const runs = all.filter((run) => matches(run, filter, now))
   const matrix = all.filter((run) => run.kind === "matrix").length
 
   return {
-    rows: runs.slice(page * size, (page + 1) * size).map(rowOf),
+    rows: runs.slice(page * size, (page + 1) * size).map((run) => rowOf(run, onDisk)),
     total: runs.length,
     health: healthOf(all),
+    keepRuns: keepRunsOf(all),
     counts: { test: all.length - matrix, matrix },
   }
 }
@@ -173,4 +219,70 @@ export async function getRun(root: string, id: string): Promise<RunHistory | und
   const runs = await loadHistory(root)
 
   return runs.find((run) => run.id === id)
+}
+
+/** What a run's page needs of its recordings: whether they were deleted, and how many runs keep theirs. */
+export interface RunRecordings {
+  readonly pruned: boolean
+  readonly keepRuns: number
+}
+
+/** One run in full with whether its recordings are still on disk, or undefined when unknown. */
+export async function getRunWithRecordings(
+  root: string,
+  id: string,
+): Promise<{ readonly run: RunHistory; readonly recordings: RunRecordings } | undefined> {
+  const [runs, onDisk] = await Promise.all([loadHistory(root), runsOnDisk(root)])
+  const run = runs.find((each) => each.id === id)
+
+  return (
+    run && {
+      run,
+      recordings: { pruned: isPruned(run, onDisk), keepRuns: keepRunsOf(runs) },
+    }
+  )
+}
+
+/** Where a recording came from, for one whose run was deleted: its test, when, and which run. */
+export interface RecordingOrigin {
+  readonly testId: string
+  readonly startedAt: string
+  readonly runId: string
+  readonly keepRuns: number
+}
+
+/** The record folders a run's summary names, with the test each belongs to. */
+function recordsIn(run: RunHistory): (readonly [string, string])[] {
+  if (run.kind === "matrix")
+    return [run.clean, ...run.trials].flatMap((trial) =>
+      trial.record === undefined ? [] : [[trial.record, run.testId] as const],
+    )
+
+  return run.tests.flatMap((test) =>
+    test.attempts.flatMap((attempt) =>
+      attempt.record === undefined ? [] : [[attempt.record, test.id] as const],
+    ),
+  )
+}
+
+/** Which run and test a recording folder belonged to, from the history; undefined when unknown. */
+export async function recordingOrigin(
+  root: string,
+  dir: string,
+): Promise<RecordingOrigin | undefined> {
+  const runs = await loadHistory(root)
+
+  for (const run of runs) {
+    const found = recordsIn(run).find(([record]) => record === dir)
+
+    if (found !== undefined)
+      return {
+        testId: found[1],
+        startedAt: run.startedAt,
+        runId: run.id,
+        keepRuns: keepRunsOf(runs),
+      }
+  }
+
+  return undefined
 }

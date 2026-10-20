@@ -31,11 +31,15 @@ export function sharesOf(row: RunRow): Share[] {
   ]
 }
 
-/** The result in words, such as "12 passed, 1 failed". */
+/** The result in words, such as "12 passed, 3 failed: 2 app bugs · 1 test issue". */
 export function countLine(row: RunRow): string {
   return sharesOf(row)
     .filter((share) => share.count > 0)
-    .map((share) => `${share.count} ${share.label}`)
+    .map((share) =>
+      share.tone === "failed" && row.whose !== ""
+        ? `${share.count} ${share.label}: ${row.whose}`
+        : `${share.count} ${share.label}`,
+    )
     .join(", ")
 }
 

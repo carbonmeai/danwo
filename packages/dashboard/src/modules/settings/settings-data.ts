@@ -6,6 +6,7 @@ import { access } from "node:fs/promises"
 import { join } from "node:path"
 
 import { danwoDir, entries } from "../../lib/project-files.ts"
+import { keepRunsOf, loadHistory } from "../runs/runs-data.ts"
 
 const CONFIG_FILES = ["danwo.config.ts", "danwo.config.mts", "danwo.config.js", "danwo.config.mjs"]
 
@@ -13,6 +14,8 @@ export interface ProjectSettings {
   readonly root: string
   readonly config: string | null
   readonly runsKept: number
+  /** How many of the newest runs keep their recordings (`record.keepRuns`). */
+  readonly keepRuns: number
   readonly historyKept: number
 }
 
@@ -25,15 +28,17 @@ async function exists(path: string): Promise<boolean> {
 
 export async function settingsOf(root: string): Promise<ProjectSettings> {
   const found = await Promise.all(CONFIG_FILES.map((name) => exists(join(root, name))))
-  const [runs, history] = await Promise.all([
+  const [runs, history, summaries] = await Promise.all([
     entries(join(danwoDir(root), "runs")),
     entries(join(danwoDir(root), "history")),
+    loadHistory(root),
   ])
 
   return {
     root,
     config: CONFIG_FILES[found.indexOf(true)] ?? null,
     runsKept: runs.length,
+    keepRuns: keepRunsOf(summaries),
     historyKept: history.filter((name) => name.endsWith(".json")).length,
   }
 }

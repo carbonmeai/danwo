@@ -7,6 +7,7 @@ import { ListFilter } from "../../components/controls.tsx"
 import { Empty } from "../../components/empty-state.tsx"
 import { Page } from "../../components/page.tsx"
 import { useFilter } from "../../lib/list-keys.ts"
+import { VERDICT_CHOICES } from "../../lib/whose.ts"
 import { LiveRuns } from "../live/live-runs.tsx"
 import { StopAll } from "../live/run-actions.tsx"
 import type { RunFilter, RunKind, RunPage } from "./runs-data.ts"
@@ -20,7 +21,7 @@ function RunChoice({
   value,
   options,
 }: {
-  readonly name: "kind" | "status" | "days"
+  readonly name: "kind" | "status" | "days" | "verdict"
   readonly label: string
   readonly value: string | number | undefined
   readonly options: readonly (readonly [string, string])[]
@@ -67,6 +68,12 @@ function FilterBar({
           ["passed", "Passed"],
           ["failed", "Had a failure"],
         ]}
+      />
+      <RunChoice
+        name="verdict"
+        label="Whose failure"
+        value={filter.verdict}
+        options={[[ANY, "Any failure"], ...VERDICT_CHOICES]}
       />
       <RunChoice
         name="kind"
@@ -155,7 +162,12 @@ export function RunsPage({
         <Empty title="No runs match" hint="No run matches these filters." />
       ) : (
         <>
-          <RunsTable shown={found.shown} deferred={found.deferred} box={found.box} />
+          <RunsTable
+            shown={found.shown}
+            deferred={found.deferred}
+            box={found.box}
+            keepRuns={runs.keepRuns}
+          />
           <Pager page={page} pages={Math.ceil(total / PAGE_SIZE)} />
         </>
       )}

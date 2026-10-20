@@ -1,3 +1,4 @@
+import type { FailureVerdict } from "@danwo/runner/runner"
 import { Icons } from "@danwo/ui/icons/base"
 import { Box, HStack, Stack } from "@danwo/ui/jsx"
 import { Button } from "@danwo/ui/primitives/button"
@@ -14,6 +15,7 @@ import { useState } from "react"
 
 import { useCopied } from "../../components/copy-link.tsx"
 import { StatusBadge } from "../../components/status-badge.tsx"
+import { WhoseBadge } from "../../components/whose-badge.tsx"
 import { duration } from "../../lib/format.ts"
 import { toneOf } from "../../lib/verdicts.ts"
 import { RerunTest } from "../live/run-actions.tsx"
@@ -40,13 +42,21 @@ const WARNING_TONE: Readonly<Record<Warning["kind"], string>> = {
  * Copies the failure as a prompt for a coding agent, with a menu beside it to copy the failure
  * page itself as Markdown: the library's button group and dropdown menu.
  */
-function CopyFix({ test, page }: { readonly test: string; readonly page: string }) {
+function CopyFix({
+  test,
+  page,
+  verdict,
+}: {
+  readonly test: string
+  readonly page: string
+  readonly verdict: FailureVerdict | undefined
+}) {
   const [copied, copy] = useCopied("Prompt copied")
   const [, copyPage] = useCopied("Failure page copied")
 
   return (
     <ButtonGroup role="group" aria-label="Copy the failure">
-      <Button variant="solid" size="sm" onClick={() => copy(fixPrompt(test, page))}>
+      <Button variant="solid" size="sm" onClick={() => copy(fixPrompt(test, page, verdict))}>
         {copied ? <Icons.copyCheck size={14} /> : <Icons.aiStar size={14} />}
         <Span aria-live="polite">{copied ? "Copied" : "Copy prompt to fix"}</Span>
       </Button>
@@ -57,7 +67,7 @@ function CopyFix({ test, page }: { readonly test: string; readonly page: string 
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" side="top" minW="15rem">
-          <DropdownMenuItem gap="2" onSelect={() => copy(fixPrompt(test, page))}>
+          <DropdownMenuItem gap="2" onSelect={() => copy(fixPrompt(test, page, verdict))}>
             <Icons.aiStar size={14} />
             Copy prompt to fix
           </DropdownMenuItem>
@@ -250,7 +260,10 @@ export function Transcript({
           <DialogTitle fontSize="2" fontWeight="600" overflowWrap="anywhere">
             {record.test}
           </DialogTitle>
-          <StatusBadge status={record.status} />
+          <HStack gap="1.5" flexShrink="0">
+            {record.verdict ? <WhoseBadge verdict={record.verdict} /> : null}
+            <StatusBadge status={record.status} />
+          </HStack>
         </HStack>
         <HStack gap="3" color="ink.muted" fontSize="1" flexWrap="wrap">
           <Span>{new Date(record.startedAt).toLocaleString()}</Span>
@@ -292,7 +305,11 @@ export function Transcript({
           </Stack>
         ) : null}
         <HStack justify="space-between" gap="2" flexWrap="wrap">
-          {view.page ? <CopyFix test={record.test} page={view.page} /> : <Span />}
+          {view.page ? (
+            <CopyFix test={record.test} page={view.page} verdict={record.verdict} />
+          ) : (
+            <Span />
+          )}
           <Feedback dir={view.dir} />
         </HStack>
       </Stack>

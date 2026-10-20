@@ -30,6 +30,8 @@ function row(counts: Partial<RunRow["counts"]>): RunRow {
     costUsd: 0,
     modelCalls: 0,
     recorded: false,
+    pruned: false,
+    whose: "",
   }
 }
 
@@ -96,6 +98,12 @@ describe("the runs list", () => {
     expect(countLine(failing)).toBe("2 passed, 1 failed, 1 invalid or skipped")
     expect(runText(failing)).toContain("danwo test")
     expect(runText(failing)).toContain("failed")
+    expect(
+      countLine({
+        ...row({ passed: 1, failed: 3 }),
+        whose: "2 app bugs · 1 test issue",
+      }),
+    ).toBe("1 passed, 3 failed: 2 app bugs · 1 test issue")
   })
 
   it("takes the middle run time, or the mean of the middle two", () => {

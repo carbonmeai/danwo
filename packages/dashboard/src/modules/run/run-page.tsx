@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router"
 
 import { Empty } from "../../components/empty-state.tsx"
 import { Page } from "../../components/page.tsx"
+import { type Recordings, RecordingsProvider } from "../../components/recordings.tsx"
 import { LiveRunPage } from "../live/live-run-page.tsx"
 import type { LiveView } from "../live/live-values.ts"
 import { MatrixRun, type MatrixView } from "../matrix/matrix-run.tsx"
@@ -20,11 +21,14 @@ export interface RunFocus {
  */
 export function RunPage({
   run,
+  recordings,
   live,
   view,
   search,
 }: {
   readonly run: RunHistory | null
+  /** Whether the run's recordings are still on disk; absent when not known. */
+  readonly recordings?: Recordings | undefined
   readonly live: LiveView | null
   readonly view: MatrixView
   readonly search: RunFocus
@@ -52,9 +56,13 @@ export function RunPage({
       </Page>
     )
 
-  return run.kind === "test" ? (
-    <TestRun run={run} crumbs={runs} focus={search.test} />
-  ) : (
-    <MatrixRun run={run} view={view} crumbs={runs} focus={search.trial} />
+  return (
+    <RecordingsProvider value={recordings}>
+      {run.kind === "test" ? (
+        <TestRun run={run} crumbs={runs} focus={search.test} />
+      ) : (
+        <MatrixRun run={run} view={view} crumbs={runs} focus={search.trial} />
+      )}
+    </RecordingsProvider>
   )
 }

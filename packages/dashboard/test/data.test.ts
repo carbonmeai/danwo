@@ -8,7 +8,7 @@ import { insideArea } from "../src/lib/project-files.ts"
 import { getImpact } from "../src/modules/impact/impact-data.ts"
 import { getInsights } from "../src/modules/insights/insights-data.ts"
 import { getRecord, getScreenshot } from "../src/modules/record/record-data.ts"
-import { getRun, listRuns } from "../src/modules/runs/runs-data.ts"
+import { getRun, listRuns, recordingOrigin } from "../src/modules/runs/runs-data.ts"
 
 const NO_USAGE = { cache: {}, spent: { calls: 0, retries: 0, tokens: [0, 0], usd: 0 }, steps: [] }
 const SPENT = {
@@ -141,6 +141,69 @@ describe("runs", () => {
     })
     expect(rows[1]?.counts).toMatchObject({ passed: 1, failed: 1 })
     expect((await listRuns(root, 1, 2)).rows.map((row) => row.id)).toEqual(["20261018-090000-aaaa"])
+  })
+
+  it("splits failures by verdict, filters on it, and marks runs whose recordings were deleted", async () => {
+    const failed = testRun("20261018-100000-aaaa", "2026-10-18T10:00:00.000Z", "failed", RECORD_DIR)
+    const [checkout, home] = failed.tests
+    const judged = {
+      ...failed,
+      keepRuns: 7,
+      tests: [
+        {
+          ...checkout,
+          attempts: (checkout?.attempts ?? []).map((attempt) => ({
+            ...attempt,
+            verdict: {
+              verdict: "test",
+              confidence: "likely",
+              reason: "the locator may be stale",
+            },
+          })),
+        },
+        home,
+      ],
+    }
+
+    await write(".danwo/history/b.json", judged)
+    await write(".danwo/history/c.json", {
+      ...MATRIX,
+      trials: MATRIX.trials.map((trial) =>
+        trial.status === "failed"
+          ? {
+              ...trial,
+              verdict: {
+                verdict: "app",
+                confidence: "certain",
+                reason: "broke",
+              },
+            }
+          : trial,
+      ),
+    })
+
+    const { rows, keepRuns } = await listRuns(root)
+
+    expect(keepRuns).toBe(7)
+    expect(rows.map((row) => [row.topVerdict, row.whose, row.pruned])).toEqual([
+      ["app", "1 app bug", false],
+      ["test", "1 test issue", true],
+    ])
+    expect((await listRuns(root, 0, 50, { verdict: "test" })).rows.map((row) => row.id)).toEqual([
+      "20261018-100000-aaaa",
+    ])
+
+    await mkdir(join(root, ".danwo/runs/20261018-100000-aaaa"), {
+      recursive: true,
+    })
+    expect((await listRuns(root)).rows[1]?.pruned).toBe(false)
+    expect(await recordingOrigin(root, RECORD_DIR)).toEqual({
+      testId: "tests/checkout.danwo.ts › pays",
+      startedAt: "2026-10-18T10:00:00.000Z",
+      runId: "20261018-100000-aaaa",
+      keepRuns: 7,
+    })
+    expect(await recordingOrigin(root, ".danwo/runs/nope/x/attempt-1")).toBeUndefined()
   })
 
   it("finds one run, and none for an id it does not know", async () => {

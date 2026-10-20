@@ -3,6 +3,9 @@
  * moment each starts, the warnings worth pinning, the console by level, the network table, and the
  * prompt that hands a failure to a coding agent.
  */
+import type { FailureVerdict } from "@danwo/runner/runner"
+import { fixAdvice, VERDICT_LABELS } from "@danwo/runner/verdict"
+
 import type { RecordView } from "../record/record-data.ts"
 import type { Replay } from "../record/record-replay.ts"
 import { CACHE_WORDS, divergenceLine } from "../record/record-values.ts"
@@ -212,11 +215,27 @@ export function shownRows(
   )
 }
 
+/** When the run a record folder belongs to started, read from its `<date>-<time>` name. */
+export function runStartOf(dir: string): string | undefined {
+  const found = /(?:^|[\\/])(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})-[0-9a-f]+(?:[\\/]|$)/.exec(
+    dir,
+  )
+
+  if (found === null) return undefined
+
+  const [, year, month, day, hour, minute, second] = found
+
+  return `${year}-${month}-${day}T${hour}:${minute}:${second}Z`
+}
+
 /** The failure page wrapped as a request to a coding agent: what to fix, then the evidence. */
-export function fixPrompt(test: string, page: string): string {
+export function fixPrompt(test: string, page: string, verdict?: FailureVerdict): string {
   return [
     `The danwo test "${test}" failed. Its failure page follows: the error, the step it stopped at, the provider calls and webhooks behind it, and the faults injected.`,
-    "Find the cause. Change the app when the record shows a bug, and the test only when the app's behaviour changed on purpose. Then run the test again with `danwo test`.",
+    verdict === undefined
+      ? "Find the cause. Change the app when the record shows a bug, and the test only when the app's behaviour changed on purpose."
+      : `danwo's verdict: ${VERDICT_LABELS[verdict.verdict]} (${verdict.confidence}), because ${verdict.reason}. ${fixAdvice(verdict)}`,
+    "Then run the test again with `danwo test`.",
     "",
     page,
   ].join("\n")

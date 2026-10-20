@@ -18,18 +18,25 @@ import { Ident } from "../../components/code.tsx"
 import { KeyHint } from "../../components/controls.tsx"
 import { Page } from "../../components/page.tsx"
 import { Panel, StatCard, StatCards } from "../../components/panel.tsx"
+import { DeletedRecording, useRecordings } from "../../components/recordings.tsx"
 import { StatusBadge, VerdictStrip } from "../../components/status-badge.tsx"
 import { TimeAgo } from "../../components/time-ago.tsx"
+import { WhoseBadge } from "../../components/whose-badge.tsx"
 import { dollars, duration } from "../../lib/format.ts"
 import { useListKeys } from "../../lib/list-keys.ts"
+import { testVerdict } from "../../lib/whose.ts"
 import { RerunFailed, RerunTest } from "../live/run-actions.tsx"
 import { cacheLine, sortedTests, testFigures } from "./run-values.ts"
 
 /** Play buttons that open a test's kept recordings over the page, one per try that kept one. */
 function WatchButtons({ test }: { readonly test: HistoryTest }) {
+  const recordings = useRecordings()
   const kept = test.attempts.flatMap((attempt, i) =>
     attempt.record ? [{ i, dir: attempt.record }] : [],
   )
+
+  if (kept.length > 0 && recordings?.pruned)
+    return <DeletedRecording keepRuns={recordings.keepRuns} />
 
   if (kept.length === 0)
     return (
@@ -99,6 +106,7 @@ function TestLine({
   readonly picked: boolean
 }) {
   const error = test.attempts.find((a) => a.error)?.error
+  const verdict = testVerdict(test)
   const time = test.attempts.reduce((sum, a) => sum + a.durationMs, 0)
   const row = useRef<HTMLTableRowElement>(null)
 
@@ -109,7 +117,10 @@ function TestLine({
   return (
     <TableRow ref={row} data-row data-state={current || picked ? "selected" : undefined}>
       <TableCell px="3">
-        <StatusBadge status={test.status} />
+        <Stack gap="1" alignItems="flex-start">
+          <StatusBadge status={test.status} />
+          {verdict ? <WhoseBadge verdict={verdict} /> : null}
+        </Stack>
       </TableCell>
       <TableCell whiteSpace="normal">
         <Stack gap="1">
@@ -187,7 +198,7 @@ export function TestRun({
           label="Failed"
           icon={<Icons.closeCircle size={13} />}
           value={figures.failed}
-          sub={figures.flaky > 0 ? `${figures.flaky} flaky` : "none flaky"}
+          sub={figures.failedNote}
         />
         <StatCard
           label="Time"

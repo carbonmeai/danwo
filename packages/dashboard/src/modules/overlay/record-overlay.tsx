@@ -1,5 +1,6 @@
 import { useIsMobile } from "@danwo/ui/hooks/use-mobile"
-import { Box, Stack } from "@danwo/ui/jsx"
+import { Icons } from "@danwo/ui/icons/base"
+import { Box, HStack, Stack } from "@danwo/ui/jsx"
 import { Button } from "@danwo/ui/primitives/button"
 import { Dialog, DialogContent, DialogTitle } from "@danwo/ui/primitives/dialog"
 import {
@@ -12,9 +13,13 @@ import { Text } from "@danwo/ui/primitives/typography"
 import { useNavigate, useRouterState } from "@tanstack/react-router"
 import { type ReactNode, useEffect, useState } from "react"
 
+import { Empty } from "../../components/empty-state.tsx"
+import { prunedWords } from "../../components/recordings.tsx"
+import { RerunTest } from "../live/run-actions.tsx"
 import { fetchRecord } from "../record/record-api.ts"
 import type { RecordView } from "../record/record-data.ts"
 import { usePlayback } from "../record/use-playback.ts"
+import { fetchRecordingOrigin } from "../runs/runs-api.ts"
 import {
   ConsolePane,
   EffectsPane,
@@ -29,6 +34,7 @@ import {
   StatePane,
 } from "./overlay-panes.tsx"
 import { Transcript } from "./overlay-transcript.tsx"
+import { runStartOf } from "./overlay-values.ts"
 
 const PANE_BODY: Readonly<Record<Pane, (props: PaneProps) => ReactNode>> = {
   replay: ReplayPane,
@@ -60,29 +66,72 @@ function useTarget(): { readonly open?: string; readonly pane: Pane } {
   })
 }
 
-/** The record in `dir`, loaded once it is asked for; null when there is none. */
-function useRecord(dir: string | undefined): RecordView | null | undefined {
-  const [loaded, setLoaded] = useState<{ dir: string; view: RecordView | null }>()
+/**
+ * What `load` finds for `dir`, loaded once it is asked for: undefined while loading, null when
+ * there is nothing or the load failed.
+ */
+function useLoaded<T>(
+  dir: string | undefined,
+  load: (input: { readonly data: string }) => Promise<T | null>,
+): T | null | undefined {
+  const [loaded, setLoaded] = useState<{ dir: string; value: T | null }>()
 
   useEffect(() => {
     if (dir === undefined) return undefined
 
     let live = true
 
-    void fetchRecord({ data: dir })
+    void load({ data: dir })
       .catch(() => null)
-      .then((view) => {
-        if (live) setLoaded({ dir, view })
+      .then((value) => {
+        if (live) setLoaded({ dir, value })
       })
 
     return () => {
       live = false
     }
-  }, [dir])
+  }, [dir, load])
 
   if (loaded === undefined || loaded.dir !== dir) return undefined
 
-  return loaded.view
+  return loaded.value
+}
+
+/**
+ * A recording that is gone, inside the dialog: why (its run was deleted past `record.keepRuns`),
+ * when that run was, and a rerun of the test or a way back.
+ */
+function GoneRecording({ dir, onClose }: { readonly dir: string; readonly onClose: () => void }) {
+  const origin = useLoaded(dir, fetchRecordingOrigin)
+  const started = origin?.startedAt ?? runStartOf(dir)
+
+  return (
+    <Box flex="1" minH="0" display="grid" placeItems="center" p="6" overflowY="auto" data-gone>
+      <Box w="full" maxW="34rem">
+        <Empty
+          title="This recording was deleted"
+          hint={
+            <>
+              {started === undefined
+                ? "Its run is no longer on disk."
+                : `It was recorded on ${new Date(started).toLocaleString()}, and that run is no longer on disk.`}{" "}
+              {origin
+                ? prunedWords(origin.keepRuns)
+                : "Older runs' recordings are deleted as new runs finish; change record.keepRuns to keep more."}
+            </>
+          }
+          actions={
+            <>
+              {origin ? <RerunTest testId={origin.testId} label="Rerun this test" /> : null}
+              <Button variant="soft" size="sm" onClick={onClose}>
+                Close
+              </Button>
+            </>
+          }
+        />
+      </Box>
+    </Box>
+  )
 }
 
 /**
@@ -182,7 +231,7 @@ function Panes({ view, pane }: { readonly view: RecordView; readonly pane: Pane 
  */
 export function RecordOverlay() {
   const { open, pane } = useTarget()
-  const view = useRecord(open)
+  const view = useLoaded(open, fetchRecord)
   const navigate = useNavigate()
 
   const onClose = () =>
@@ -213,22 +262,16 @@ export function RecordOverlay() {
         {view === undefined ? (
           <>
             <DialogTitle srOnly>Loading the recording</DialogTitle>
-            <Box p="8" color="ink.muted">
-              Loading the recording…
-            </Box>
+            <HStack flex="1" justify="center" gap="2" color="ink.muted" data-loading>
+              <Icons.loading animation="loader" size={14} />
+              <Text>Loading the recording…</Text>
+            </HStack>
           </>
         ) : view === null ? (
-          <Stack p="8" gap="3">
-            <DialogTitle fontWeight="600">No such recording</DialogTitle>
-            <Text color="ink.muted">
-              Recordings are pruned with their run; the latest 20 runs keep theirs.
-            </Text>
-            <Box>
-              <Button variant="soft" size="sm" onClick={onClose}>
-                Close
-              </Button>
-            </Box>
-          </Stack>
+          <>
+            <DialogTitle srOnly>This recording was deleted</DialogTitle>
+            <GoneRecording dir={open ?? ""} onClose={onClose} />
+          </>
         ) : (
           <Box flex="1" minH="0">
             <Panes key={view.dir} view={view} pane={pane} />

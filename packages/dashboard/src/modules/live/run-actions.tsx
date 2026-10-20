@@ -124,9 +124,12 @@ export function RerunFailed({
 export function RerunTest({
   testId,
   compact = false,
+  label = "Rerun",
 }: {
   readonly testId: string
   readonly compact?: boolean
+  /** The labelled button's words. */
+  readonly label?: string
 }) {
   const { start, pending, outcome } = useStartRun()
 
@@ -141,7 +144,7 @@ export function RerunTest({
         onClick={() => void start({ action: "test", testId })}
       >
         <Icons.rotateCw size={14} />
-        {compact ? null : "Rerun"}
+        {compact ? null : label}
       </Button>
     </ActionRow>
   )

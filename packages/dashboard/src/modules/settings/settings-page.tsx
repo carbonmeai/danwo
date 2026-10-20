@@ -52,7 +52,8 @@ export function SettingsPage({ settings }: { readonly settings: ProjectSettings 
               )}
             </Fact>
             <Fact label="Recordings kept">
-              {settings.runsKept} runs in <Ident>.danwo/runs</Ident>; the latest 20 keep theirs
+              {settings.runsKept} runs in <Ident>.danwo/runs</Ident>; the latest {settings.keepRuns}{" "}
+              keep theirs (<Ident>record.keepRuns</Ident>)
             </Fact>
             <Fact label="History kept">
               {settings.historyKept} runs in <Ident>.danwo/history</Ident>; the latest 200 are kept

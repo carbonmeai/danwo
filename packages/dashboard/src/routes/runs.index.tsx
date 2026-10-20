@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
 
 import { useKeptQuery } from "../lib/kept-query.ts"
+import { verdictParam } from "../lib/whose.ts"
 import { fetchRuns } from "../modules/runs/runs-api.ts"
 import type { RunFilter } from "../modules/runs/runs-data.ts"
 import { RunsPage } from "../modules/runs/runs-page.tsx"
@@ -13,14 +14,16 @@ interface RunsSearch extends RunFilter {
 
 const DAYS = new Set([1, 7, 30])
 
-/** Which runs the address asks for: their kind, status and date. */
+/** Which runs the address asks for: their kind, status, date and whose failures they had. */
 function filterOf(search: Record<string, unknown>): RunFilter {
   const days = Number(search.days)
+  const verdict = verdictParam(search.verdict)
 
   return {
     ...((search.kind === "test" || search.kind === "matrix") && { kind: search.kind }),
     ...((search.status === "passed" || search.status === "failed") && { status: search.status }),
     ...(DAYS.has(days) && { days }),
+    ...(verdict !== undefined && { verdict }),
   }
 }
 
@@ -48,7 +51,13 @@ export const Route = createFileRoute("/runs/")({
   validateSearch: runsSearch,
   loaderDeps: ({ search }) => ({
     page: search.page ?? 0,
-    filter: { kind: search.kind, status: search.status, days: search.days, day: search.day },
+    filter: {
+      kind: search.kind,
+      status: search.status,
+      days: search.days,
+      day: search.day,
+      verdict: search.verdict,
+    },
   }),
   loader: ({ deps }) => fetchRuns({ data: deps }),
   component: RunsRoute,

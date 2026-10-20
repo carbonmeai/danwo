@@ -17,6 +17,7 @@ import {
   consoleLines,
   fixPrompt,
   networkRows,
+  runStartOf,
   shownRows,
   transcriptOf,
   warningsOf,
@@ -141,6 +142,22 @@ describe("the tests list", () => {
     expect(pays?.thumb).toMatchObject({ dir, screenshot: "step-0.png" })
     expect(pays?.thumb?.video).toMatch(/^\/media\/r1\/pays\/attempt-1\/video\/tab-1\.webm$/)
     expect(rows.find((row) => row.id.startsWith("tests/new"))?.last).toBeUndefined()
+    expect(pays?.recordingDeleted).toBe(false)
+  })
+
+  it("marks a test whose every recording was deleted with its run", async () => {
+    const rows = await listTests(
+      root,
+      [testRun("t2", "2026-10-19T10:00:00Z", "failed", ".danwo/runs/gone/pays/attempt-1")],
+      [],
+    )
+
+    expect(rows.find((row) => row.id === PAYS)).toMatchObject({
+      recordingDeleted: true,
+    })
+    expect(rows.find((row) => row.id === LOADS)).toMatchObject({
+      recordingDeleted: false,
+    })
   })
 })
 
@@ -328,6 +345,17 @@ describe("the run overlay", () => {
       /^The danwo test "tests\/checkout.danwo.ts › pays" failed/,
     )
     expect(fixPrompt(PAYS, "# Failure").endsWith("# Failure")).toBe(true)
+    expect(
+      fixPrompt(PAYS, "# Failure", {
+        verdict: "test",
+        confidence: "likely",
+        reason: "the locator may be stale",
+      }),
+    ).toContain("Test issue (likely), because the locator may be stale. Fix the test")
+    expect(runStartOf(".danwo/runs/20261018-100000-aaaa/pays/attempt-1")).toBe(
+      "2026-10-18T10:00:00Z",
+    )
+    expect(runStartOf("elsewhere")).toBeUndefined()
   })
 
   it("keeps a vote on a recording, and refuses one outside the run folders", async () => {
@@ -353,6 +381,7 @@ describe("the settings page", () => {
       root,
       config: "danwo.config.ts",
       runsKept: 1,
+      keepRuns: 50,
       historyKept: 1,
     })
   })

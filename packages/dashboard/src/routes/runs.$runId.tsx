@@ -26,18 +26,29 @@ function runSearch(search: Record<string, unknown>): RunSearch {
 }
 
 const RunRoute = () => {
-  const { run, live } = Route.useLoaderData()
+  const { found, live } = Route.useLoaderData()
   const search = Route.useSearch()
 
-  return <RunPage run={run} live={live} view={search.view ?? "grid"} search={search} />
+  return (
+    <RunPage
+      run={found?.run ?? null}
+      recordings={found?.recordings}
+      live={live}
+      view={search.view ?? "grid"}
+      search={search}
+    />
+  )
 }
 
 export const Route = createFileRoute("/runs/$runId")({
   validateSearch: runSearch,
   loader: async ({ params }) => {
-    const run = await fetchRun({ data: params.runId })
+    const found = await fetchRun({ data: params.runId })
 
-    return { run, live: run === null ? await fetchLiveRun({ data: params.runId }) : null }
+    return {
+      found,
+      live: found === null ? await fetchLiveRun({ data: params.runId }) : null,
+    }
   },
   component: RunRoute,
 })

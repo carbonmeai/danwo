@@ -1,4 +1,4 @@
-import { Box } from "@danwo/ui/jsx"
+import { Box, HStack } from "@danwo/ui/jsx"
 import { Card } from "@danwo/ui/primitives/card"
 import { Text } from "@danwo/ui/primitives/typography"
 import type { ReactNode } from "react"
@@ -6,15 +6,18 @@ import type { ReactNode } from "react"
 import { BrandImage } from "../modules/layout/components/brand.tsx"
 import { Command } from "./code.tsx"
 
-/** What a page shows when there is nothing to show yet, and the command that fills it. */
+/** What a page shows when there is nothing to show yet, and the command or buttons that fill it. */
 export function Empty({
   title,
   hint,
   command,
+  actions,
 }: {
   readonly title: string
   readonly hint: ReactNode
   readonly command?: string
+  /** Buttons under the hint, such as a rerun and a close. */
+  readonly actions?: ReactNode
 }) {
   return (
     <Card
@@ -51,6 +54,11 @@ export function Empty({
         <Box mt="1.5">
           <Command text={command} />
         </Box>
+      )}
+      {actions === undefined ? null : (
+        <HStack gap="2" mt="2" justify="center" flexWrap="wrap">
+          {actions}
+        </HStack>
       )}
     </Card>
   )
