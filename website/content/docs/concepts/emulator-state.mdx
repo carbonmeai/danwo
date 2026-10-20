@@ -1,0 +1,128 @@
+---
+title: Seeding and state
+description: Start an emulator with the data your test needs, and read back what your app did at it.
+icon: Sprout
+---
+
+An emulator starts empty. A **seed** gives it the data your test expects to find: a webhook
+endpoint, a bucket, a user. After each test, danwo puts it back to that seed.
+
+## Seed an emulator
+
+Pass `seed` to the service. Stripe's seed is a function, so it can use values known only once your
+app runs, like its webhook URL:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, s3Service, stripeService } from "@danwo/sdk"
+
+const url = "http://localhost:3000"
+
+export default defineConfig({
+  testDir: "tests",
+  environment: () =>
+    appEnvironment({
+      app: { command: "npm run dev", url },
+      services: [
+        stripeService({
+          seed: () => ({
+            webhookEndpoints: [
+              {
+                url: `${url}/api/webhooks/stripe`,
+                events: ["checkout.session.completed"],
+                secret: "whsec_test",
+              },
+            ],
+          }),
+        }),
+        s3Service({ seed: { buckets: [{ name: "uploads" }] } }),
+      ],
+    }),
+})
+```
+
+Each provider page lists what its seed takes. See [Providers](/docs/providers).
+
+## Read what your app did
+
+Each emulator has a helper that reads its state in plain terms. Call it with the emulator's
+fixture:
+
+```ts title="tests/upload.danwo.ts"
+import { type S3Fixtures, s3Objects, test as base } from "@danwo/sdk"
+
+const test = base.extend<S3Fixtures>()
+
+test("uploads a receipt", async ({ app, screen, s3, expect }) => {
+  await app.open("/receipts")
+  await screen.getByLabel("Receipt").setInputFiles("fixtures/receipt.pdf")
+  await screen.getByRole("button", { name: "Upload" }).click()
+
+  expect(s3Objects(s3).list("uploads", "receipts/")).toHaveLength(1)
+})
+```
+
+A few of the helpers:
+
+| Fixture  | Helper                           | Reads                                  |
+| -------- | -------------------------------- | -------------------------------------- |
+| `resend` | `resendInbox(resend)`            | emails your app sent                   |
+| `s3`     | `s3Objects(s3)`                  | buckets and objects                    |
+| `slack`  | `slackWorkspace(slack)`          | messages your app posted               |
+| `twilio` | `twilioInbox(twilio)`            | texts that reached phones              |
+| `github` | `githubRepo(github, "org/repo")` | issues, comments and check runs        |
+| `llm`    | `llmCalls(llm)`                  | your app's calls to OpenAI, Anthropic… |
+
+The [emulator helpers reference](/docs/reference/emulator-helpers) lists them all.
+
+## Ask the API directly
+
+Every emulator also takes requests through its fixture, the way your app would call the real API.
+Use it when there's no helper for what you need:
+
+```ts title="tests/charges.danwo.ts"
+import { type StripeFixtures, test as base } from "@danwo/sdk"
+
+const test = base.extend<StripeFixtures>()
+
+test("charges once", async ({ app, screen, stripe, expect }) => {
+  await app.open("/")
+  await screen.getByRole("button", { name: "Buy" }).click()
+
+  const res = await stripe.fetch(
+    new Request("https://api.stripe.com/v1/payment_intents", {
+      headers: { authorization: "Bearer sk_test_any" },
+    }),
+  )
+  const { data } = await res.json()
+
+  expect(data).toHaveLength(1)
+})
+```
+
+## Act as someone outside your app
+
+Some helpers act as a third party, so you can test what happens when something arrives from
+outside:
+
+```ts title="tests/inbound-sms.danwo.ts · a text arrives"
+await twilioPhone(twilio).send("+15555550100", "+15555550199", "STOP")
+```
+
+That's a phone texting your app's number. Other helpers post a Slack message as a user, pay into a
+virtual account, or revoke a sign-in.
+
+<Callout type="info">
+  State never leaks between tests. Every test starts from the seed, and so does every retry. See
+  [Isolation](/docs/isolation).
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Isolation" href="/docs/isolation">
+    How every test starts from the seed, and when to share state.
+  </Card>
+  <Card title="Writing invariants" href="/docs/invariants">
+    Compare your app's state with the provider's after every trial.
+  </Card>
+</Cards>

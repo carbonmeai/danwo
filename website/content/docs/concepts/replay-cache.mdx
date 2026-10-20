@@ -1,36 +1,86 @@
 ---
-title: The replay cache
+title: Replay cache
 description: Agent steps are recorded the first time they pass and replayed after that, with no model calls.
+icon: RotateCcwClock
 ---
 
-The first time an agent step passes, danwo records what the model did: which elements it acted on,
-found again by what they were (role, name, label, text), and what it checked. The next run replays
-that recording with no model call, so reruns are fast, free and give the same answer every time.
+The **replay cache** keeps a recording of every agent step that passed. The next run replays that
+recording instead of asking the model, so reruns are fast, free and give the same answer every
+time.
 
-## What a replay can come to
+<ReplayFlow />
 
-Each run prints a `cache:` line with what happened to every agent step:
+## How a step is recorded
 
-| Outcome      | What happened                                                                |
-| ------------ | ---------------------------------------------------------------------------- |
-| `replayed`   | The recording replayed as recorded, with no model.                           |
-| `relocated`  | The recording replayed, with an element found somewhere other than recorded. |
-| `handed-off` | The replay started, stopped matching, and the model took the step over.      |
-| `missed`     | There was no recording, so the model ran.                                    |
-| `stale`      | A recording of this step exists under another key, so it was not used.       |
-| `diverged`   | Under strict replay, the recording no longer replays.                        |
-| `off`        | The session has no cache.                                                    |
+The first time an `agent.act` passes, danwo keeps what the model did. It keeps each element it
+acted on, described by what it is (its role, name, label and text), not by its position. It also
+keeps what the step changed, on the page and behind it.
 
-The [cache outcomes reference](/docs/reference/cache) has the exact wording `danwo spec` prints.
+On the next run, danwo finds each element again by that description and repeats the actions.
 
-## In CI
+## Read the cache line
 
-Commit the cache directory (`cache.dir` in the config) so CI replays recorded steps without model
-calls. Under `--ci`, danwo reads the cache without writing to it, so a step that no longer replays
-fails the run instead of quietly asking the model. See [CI and GitHub](/docs/ci).
+Every run with agent steps prints a `cache:` line, counting what each step came to:
 
-## Managing recordings
+```text
+cache: 12 replayed · 1 relocated · 1 handed off · 0 missed
+```
 
-`danwo cache ls` lists recordings, `danwo cache stats` counts them, and
-`danwo cache clear` resets them. A step whose page changed is handed back to the model and
-recorded afresh.
+| Outcome      | What happened                                                         |
+| ------------ | --------------------------------------------------------------------- |
+| `replayed`   | The recording replayed as recorded, with no model.                    |
+| `relocated`  | It replayed, but an element was found somewhere other than recorded.  |
+| `handed-off` | The replay stopped matching, so the model took the step over.         |
+| `missed`     | There was no recording, so the model ran.                             |
+| `stale`      | A recording of this step exists under another key, so it wasn't used. |
+| `diverged`   | Under strict replay, the recording no longer replays.                 |
+| `off`        | The session has no cache.                                             |
+
+A `handed-off` step is recorded afresh once it passes, so the next run replays again.
+
+## When a recording goes stale
+
+A step's recording is keyed by its instruction and its options. Change the instruction, its
+`params` names, or the page it starts on, and the old recording no longer applies:
+
+```text
+cache: 3 replayed · 0 relocated · 0 handed off · 0 missed · 1 stale
+```
+
+Rerun the test to record the new version. The failure page names what changed.
+
+## Replay in CI
+
+Commit the cache folder, set by `cache.dir` in your config, so CI replays with no model calls:
+
+```ts title="danwo.config.ts · the cache"
+cache: { dir: ".danwo-cache" },
+```
+
+<Callout type="warn">
+  In CI the cache is read-only: steps replay from it, but nothing new is written, so CI leaves the
+  cache as you committed it. A step that misses there calls the model on every run. Rerun it
+  locally, check it, and commit the new recording.
+</Callout>
+
+## Manage recordings
+
+```sh
+npx danwo cache ls
+npx danwo cache stats
+npx danwo cache clear
+```
+
+`ls` lists the recordings, `stats` counts them by outcome, and `clear` deletes them so every step
+records afresh.
+
+## Next
+
+<Cards>
+  <Card title="Agent steps" href="/docs/agent-steps">
+    The four calls that are recorded and replayed.
+  </Card>
+  <Card title="CI and GitHub" href="/docs/ci">
+    Run tests on every pull request with the cache committed.
+  </Card>
+</Cards>

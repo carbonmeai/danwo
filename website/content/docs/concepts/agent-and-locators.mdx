@@ -1,0 +1,85 @@
+---
+title: Agent and locators
+description: Two ways to write a step. Locators name an element exactly; the agent takes a plain-English instruction. Use both in one test.
+icon: MousePointerClick
+---
+
+A danwo test drives your app in two ways. A **locator** finds one element the way a user names
+it, like "the button called Pay". The **agent** takes an instruction in plain English, like "pay
+with the saved card", and works out the clicks itself.
+
+```ts title="tests/checkout.danwo.ts"
+import { test } from "@danwo/sdk"
+
+test("pays for a basket", async ({ app, screen, agent, expect }) => {
+  await app.open("/basket")
+  await screen.getByRole("button", { name: "Checkout" }).click()
+  await agent.act("pay with the test card 4242 4242 4242 4242")
+  await expect(screen.getByRole("heading", { name: "Thank you" })).toBeVisible()
+})
+```
+
+The first and last steps use locators. The payment page in the middle belongs to another company
+and changes often, so the agent handles it.
+
+## When to use which
+
+| Use a locator when…                         | Use the agent when…                                                     |
+| ------------------------------------------- | ----------------------------------------------------------------------- |
+| you can name the element: a button, a field | the step is easier to say than to pin down                              |
+| the control is stable and yours             | the page is someone else's, like a provider's checkout                  |
+| you check an exact value: a total, a count  | you check what the page _means_: "the order is confirmed"               |
+| you want no model calls, ever               | a recording can do the replays (see [Replay cache](/docs/replay-cache)) |
+
+Locators never call a model. Agent steps call one the first time, then replay from a recording.
+
+## Find an element with a locator
+
+`screen` finds elements by what a user sees. Prefer these, in this order:
+
+```ts title="tests/sign-in.danwo.ts"
+import { test } from "@danwo/sdk"
+
+test("signs in", async ({ app, screen }) => {
+  await app.open("/login")
+  await screen.getByLabel("Email").fill("ada@shop.test")
+  await screen.getByRole("button", { name: "Sign in" }).click()
+  await screen.getByText("Welcome back").waitFor()
+})
+```
+
+| Finder                      | Finds                                        |
+| --------------------------- | -------------------------------------------- |
+| `getByRole(role, { name })` | a button, link, heading or field by its name |
+| `getByLabel(text)`          | a field by its label                         |
+| `getByText(text)`           | an element by the text it shows              |
+| `getByPlaceholder(text)`    | a field by its placeholder                   |
+| `getByTestId(id)`           | an element by its `data-testid`              |
+
+A string matches part of the name, ignoring case. Pass `{ exact: true }` for an exact match, or a
+regular expression.
+
+## Narrow it to one element
+
+An action needs exactly one match. When a finder matches several, narrow it:
+
+```ts title="tests/basket.danwo.ts · narrowing"
+await screen.getByRole("listitem").filter({ hasText: "Socks" }).getByRole("button").click()
+await screen.getByRole("row").nth(2).click()
+```
+
+<Callout type="info">
+  Not sure a locator matches one element? Your coding agent can check it against the running app
+  with the `check_locator` MCP tool, which answers with the exact line to paste.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Agent steps" href="/docs/agent-steps">
+    `act`, `assert`, `extract` and `waitFor`, with examples.
+  </Card>
+  <Card title="Replay cache" href="/docs/replay-cache">
+    Why agent steps cost nothing after the first run.
+  </Card>
+</Cards>

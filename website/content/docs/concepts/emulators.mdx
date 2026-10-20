@@ -1,0 +1,95 @@
+---
+title: Emulators
+description: Local stand-ins for the services your app calls, answering on the real hostnames behind danwo's proxy, with no change to your code.
+icon: Server
+---
+
+An **emulator** is a local copy of a service your app depends on, such as Stripe, Resend or Slack.
+It answers the same API, sends the same webhooks and returns the same errors. Your app keeps
+calling `api.stripe.com`; danwo's proxy makes sure the emulator answers.
+
+<EmulatorFlow />
+
+## Why emulate instead of using a sandbox
+
+A real test account is slow, shared and flaky, and it can't fail on demand. An emulator starts in
+milliseconds, holds only what your test put there, and resets between tests. It can also answer a
+500, drop a connection or send a webhook twice, which is how the
+[fault matrix](/docs/fault-matrix) tests your app's error handling.
+
+## Add one to your config
+
+List the emulators you need under `services`. danwo starts them behind one proxy, then starts your
+app through it:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, resendService, stripeService } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  environment: () =>
+    appEnvironment({
+      app: { command: "npm run dev", url: "http://localhost:3000" },
+      services: [stripeService(), resendService()],
+    }),
+})
+```
+
+Every provider page lists its service: see [Providers](/docs/providers).
+
+## How the proxy reaches your app
+
+danwo's **egress proxy** sits between your app and the internet. It starts your app with a few
+environment variables:
+
+| Variable              | What it does                                                    |
+| --------------------- | --------------------------------------------------------------- |
+| `HTTPS_PROXY`         | sends the app's outgoing calls through the proxy                |
+| `NODE_OPTIONS`        | loads danwo's preload, so Node's own HTTP clients use the proxy |
+| `NODE_EXTRA_CA_CERTS` | trusts the proxy's certificate for this run only                |
+
+The proxy answers emulated hosts itself, records every call, and blocks or passes through the rest.
+Your app's code and keys don't change.
+
+<Callout type="warn">
+  If you set `APP_URL` to test an app that's already running, that app wasn't started through the
+  proxy. Its calls go to the **real** services. Use it only with test keys.
+</Callout>
+
+## What an emulator gives your test
+
+Each emulator adds a **fixture** to your tests, named after it: `stripe`, `resend`, `slack`.
+Through it, a test or an invariant reads what your app did:
+
+```ts title="tests/welcome-email.danwo.ts"
+import { type ResendFixtures, resendInbox, test as base } from "@danwo/sdk"
+
+const test = base.extend<ResendFixtures>()
+
+test("sends a welcome email", async ({ app, screen, resend, expect }) => {
+  await app.open("/sign-up")
+  await screen.getByLabel("Email").fill("ada@shop.test")
+  await screen.getByRole("button", { name: "Create account" }).click()
+
+  expect(resendInbox(resend).latest("ada@shop.test")?.subject).toBe("Welcome to the shop")
+})
+```
+
+[Seeding and state](/docs/emulator-state) shows how to start an emulator with data, and every
+way to read it back.
+
+## Is it accurate?
+
+Every emulator is checked against the real API with **fidelity** suites: the same calls go to both,
+and danwo compares the answers field by field. See [Fidelity](/docs/fidelity).
+
+## Next
+
+<Cards>
+  <Card title="Seeding and state" href="/docs/emulator-state">
+    Start emulators with data, and read what your app did.
+  </Card>
+  <Card title="Providers" href="/docs/providers">
+    Every service danwo emulates.
+  </Card>
+</Cards>

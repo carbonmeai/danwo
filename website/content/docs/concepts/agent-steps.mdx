@@ -1,0 +1,121 @@
+---
+title: Agent steps
+description: The agent's four calls, act, assert, extract and waitFor, with examples, parameters and limits.
+icon: Sparkle
+---
+
+The `agent` fixture gives a test four calls. Each takes plain English. Each is checked, recorded
+the first time it passes, and replayed with no model call after that.
+
+```ts title="tests/upgrade.danwo.ts"
+import { test } from "@danwo/sdk"
+
+test("upgrades to Pro", async ({ app, agent }) => {
+  await app.open("/settings/billing")
+  await agent.act("upgrade the workspace to the Pro plan")
+  await agent.assert("the plan shows as Pro")
+})
+```
+
+## Pick a model
+
+Agent steps need a `model` in your config. A model id goes through the Vercel AI Gateway, which
+reads `AI_GATEWAY_API_KEY` from the environment:
+
+```ts title="danwo.config.ts · the model"
+model: "anthropic/claude-sonnet-5",
+```
+
+[`danwo init`](/docs/quickstart) can set up Anthropic, OpenAI, Google, OpenRouter or any
+OpenAI-compatible server instead.
+
+## `act`: do something
+
+`act` carries out an instruction on the page: clicks, typing, choosing, scrolling, across several
+pages if needed.
+
+```ts title="tests/sign-up.danwo.ts"
+import { test, unique } from "@danwo/sdk"
+
+test("signs up", async ({ app, agent, secret }) => {
+  await app.open("/")
+  await agent.act("sign up as {email} with the password {password}", {
+    params: { email: unique("ada@shop.test"), password: secret("password") },
+  })
+})
+```
+
+Values in braces come from `params`:
+
+- `unique(value)` gives a fresh value on every run, such as a new email address. A replay accepts
+  the new value.
+- `secret(name)` passes a configured [secret](/docs/secrets). The model only ever sees the name.
+
+## `assert`: check what the page means
+
+`assert` asks a judge whether a claim is true of the page right now. It throws when it isn't:
+
+```ts title="tests/order.danwo.ts · assert"
+await agent.assert("the order is confirmed and shows one item")
+await agent.assert("the status says paid", { poll: true })
+```
+
+With `{ poll: true }`, the judge looks again until the claim holds or time runs out. Use it when
+the page gets there on its own, like after a webhook.
+
+## `extract`: read typed values
+
+`extract` reads values off the page and checks them against a schema. Use it for numbers you then
+compare with the backend:
+
+```ts title="tests/balance.danwo.ts"
+import { test, z } from "@danwo/sdk"
+
+test("shows the balance", async ({ app, agent, expect }) => {
+  await app.open("/account")
+  const { balance } = await agent.extract("the account balance", z.object({ balance: z.number() }))
+
+  expect(balance).toBe(500)
+})
+```
+
+The values come from the elements the model points at, read by the runner, not typed by the model.
+
+## `waitFor`: wait for a state
+
+`waitFor` waits until a condition holds, then returns:
+
+```ts title="tests/order.danwo.ts · waitFor"
+await agent.waitFor("the order shows as paid", { timeout: 20_000 })
+```
+
+On replay, it waits for the text that proved the condition last time, with no model call.
+
+## Options
+
+| Option    | On                    | What it does                                                        | Default       |
+| --------- | --------------------- | ------------------------------------------------------------------- | ------------- |
+| `params`  | act, extract, waitFor | Values the instruction names in braces.                             | none          |
+| `files`   | act                   | Files the step may upload, by name.                                 | none          |
+| `budget`  | act                   | Limits for the step: turns, model calls, cost, time.                | the session's |
+| `vision`  | act, assert, extract  | Whether the step may see a screenshot: `true`, `"auto"` or `false`. | `"auto"`      |
+| `time`    | act                   | Lets the step move time forward, e.g. "wait until the trial ends".  | `false`       |
+| `poll`    | assert                | Ask again until the claim holds.                                    | off           |
+| `timeout` | waitFor               | How long to wait, in milliseconds.                                  | 30 000        |
+
+<Callout type="info">
+  With `vision: "auto"`, the agent is told when part of a page isn't in its text view, such as a
+  chart or an icon button with no name. It can then look at a screenshot. Those steps replay with no
+  model too.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Replay cache" href="/docs/replay-cache">
+    How a recorded step replays, and what each outcome means.
+  </Card>
+  <Card title="Secrets" href="/docs/secrets">
+    Keep passwords and keys away from the model.
+  </Card>
+</Cards>

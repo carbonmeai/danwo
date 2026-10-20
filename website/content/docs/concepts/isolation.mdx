@@ -1,0 +1,114 @@
+---
+title: Isolation
+description: Every test, and every retry, starts from the same seeded state, so no test depends on another one.
+icon: Layers
+---
+
+**Isolation** means each test starts from a clean slate: the emulators back at their seeds, no
+queued webhooks, the clock at now. A test never sees what the test before it left behind, so tests
+pass in any order and a retry runs exactly like the first attempt.
+
+## What's reset before each test
+
+| Part                   | Reset to                                                    |
+| ---------------------- | ----------------------------------------------------------- |
+| Every emulator         | its seed: customers, mail, sign-ins, connected accounts     |
+| Webhooks and the proxy | empty queues, an empty call log                             |
+| The clock              | now, after any time travel                                  |
+| Your data stores       | their snapshot, when you give one (Postgres, SQLite, Redis) |
+| The browser            | a fresh context: no cookies, no storage                     |
+
+It's fast: restoring four emulators takes about a tenth of a millisecond, and a test-sized
+Postgres database tens of milliseconds.
+
+## Saved sessions keep their sign-in
+
+A [saved session](/docs/sessions) signs a user in once per worker. danwo keeps a snapshot of the
+state right after that sign-in, next to the clean one:
+
+<IsolationSlots />
+
+A test that uses `ada` starts signed in as Ada, without signing in again. A test that uses no
+session starts signed out, even if it runs right after one that used Ada.
+
+## Share state when you mean to
+
+Some files are a story, where each test builds on the last. Set `isolation` for that file:
+
+```ts title="tests/onboarding.danwo.ts"
+import { test } from "@danwo/sdk"
+
+test.use({ isolation: "file" })
+
+test("creates a workspace", async ({ app, screen }) => {
+  await app.open("/onboarding")
+  await screen.getByLabel("Workspace name").fill("Acme")
+  await screen.getByRole("button", { name: "Create" }).click()
+})
+
+test("invites a teammate to it", async ({ app, screen }) => {
+  await app.open("/settings/members")
+  await screen.getByLabel("Email").fill("bob@acme.test")
+  await screen.getByRole("button", { name: "Invite" }).click()
+})
+```
+
+| Value    | What it does                                                 |
+| -------- | ------------------------------------------------------------ |
+| `"test"` | Default. Every test and retry starts from the seeded state.  |
+| `"file"` | Resets once per file. The file's tests build on one another. |
+| `"none"` | Never resets. State carries from file to file in a worker.   |
+
+Set it for the whole project with `isolation` in `danwo.config.ts`, or per file or describe
+block with `test.use({ isolation })`.
+
+## Reset your app's own memory
+
+danwo resets the emulators, the clock and the stores you give it. It can't reach into your app's
+memory. If your app caches things in memory, give it a test-only reset endpoint, and call it from
+the environment's `restore`:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, stripeService } from "@danwo/sdk"
+
+const url = "http://localhost:3000"
+
+export default defineConfig({
+  testDir: "tests",
+  async environment() {
+    const env = await appEnvironment({
+      app: { command: "npm run dev", url, env: { APP_TEST_RESET: "1" } },
+      services: [stripeService()],
+    })
+
+    return {
+      ...env,
+      async restore(slot) {
+        await env.restore?.(slot)
+        await fetch(new URL("/__test/reset", url), { method: "POST" })
+      },
+    }
+  },
+})
+```
+
+<Callout type="warn">
+  Only turn the reset endpoint on in tests. Here the app enables it when `APP_TEST_RESET` is set,
+  which danwo passes to the app it starts and nowhere else.
+</Callout>
+
+## Parallel workers never share
+
+Each worker has its own app, emulators and proxy. Two workers never see each other's state, so
+`workers: 4` is safe without any changes to your tests.
+
+## Next
+
+<Cards>
+  <Card title="Saved sessions" href="/docs/sessions">
+    Sign in once per worker, and start tests already signed in.
+  </Card>
+  <Card title="Database and cache" href="/docs/data-faults">
+    Snapshot your Postgres or Redis, and fault it in the matrix.
+  </Card>
+</Cards>

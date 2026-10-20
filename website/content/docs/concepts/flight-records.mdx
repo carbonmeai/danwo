@@ -1,0 +1,106 @@
+---
+title: Flight records
+description: Every run keeps a record of what happened, on the screen and behind it, so you can replay a test without running it again.
+icon: FileSearch
+---
+
+A **flight record** is what danwo keeps of one test run: a video, every step, every call your app
+made to a provider, every webhook, the database statements, and what each emulator held at the
+end. You can replay it in the dashboard, read it as a failure page, or hand it to a coding agent.
+
+## Where records live
+
+Every `danwo test` and `danwo matrix` run writes a folder under `.danwo/runs/`. Each test, and each
+matrix trial, gets a folder of its own:
+
+```text
+.danwo/runs/20261020-103017-e625/
+  report.html
+  tests-buy-credits-buys-500-credits-through-stripe-checkout/
+    clean/
+      record.json
+      timeline.jsonl
+      screenshots/
+      video/
+    duplicate-on-webhook-checkout-session-completed/
+      …
+```
+
+danwo keeps the latest 20 runs and deletes older ones.
+
+## What a record holds
+
+| Part             | What it shows                                                         |
+| ---------------- | --------------------------------------------------------------------- |
+| Steps            | each action and check, its time, its replay outcome and model calls   |
+| Video            | the screen, with every step, call and fault marked on its timeline    |
+| Screenshots      | the screen after each step, and at a failure                          |
+| Provider calls   | every request through the proxy, with redacted headers and bodies     |
+| Webhooks         | every delivery the emulators sent your app, and its answer            |
+| Database calls   | the statements and commands, when your stores go through a data proxy |
+| Emulator state   | what each emulated service held when the test ended                   |
+| Console          | what the page logged, errors first                                    |
+| Integration lint | risky provider usage danwo spotted in the calls                       |
+
+## Replay a record
+
+Open the dashboard and click a test:
+
+```sh
+npx danwo serve --open
+```
+
+The recording opens with the steps on the left and tabs on the right: **Replay**, **Console**,
+**Network**, **Providers**, **Emulator state** and **Effects**. In Replay, each step has a **Go to**
+button that jumps the video there, and a playhead moves along the provider calls as it plays.
+
+<Callout type="idea">
+  A link to the exact moment works: `?t=12.5` opens the video 12.5 seconds in, and `#step-3` where
+  step 3 starts. Copy one into a bug report.
+</Callout>
+
+## Read it as a failure page
+
+For a failed run, the terminal prints a page per failure:
+
+```sh
+npx danwo show --format md
+```
+
+It's the same page the dashboard's **Copy prompt to fix** copies. [Debugging a
+failure](/docs/debugging) walks through it part by part.
+
+## Choose what to keep
+
+By default danwo keeps every run, with video. Change it in the config, or for one run:
+
+| Option   | Values                           | Default  |
+| -------- | -------------------------------- | -------- |
+| `record` | `always`, `on-failure`, `off`    | `always` |
+| `video`  | `on`, `retain-on-failure`, `off` | `on`     |
+
+```sh
+npx danwo test --record on-failure --video retain-on-failure
+```
+
+## Secrets are redacted
+
+Records never hold a configured secret. Every value you list under `secrets` is removed from
+calls, logs and pages, in every encoding, as are provider keys and tokens. Screenshots mask fields
+that hold a secret.
+
+<Callout type="warn">
+  Video shows the screen as it was. A field holding a secret shows as dots, but a secret your app
+  prints as text is on screen. For suites that do that, set `video: "off"`.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Debugging a failure" href="/docs/debugging">
+    Read a failure page, top to bottom.
+  </Card>
+  <Card title="Dashboard" href="/docs/dashboard">
+    Every page and tab of `danwo serve`.
+  </Card>
+</Cards>
