@@ -28,12 +28,12 @@ export default defineConfig({
 })
 ```
 
-| Option | What it does |
-| --- | --- |
-| `docker` | Starts a MiniStack container per worker and removes it on close, so workers never share state. `true` uses the pinned image; `{ image }` picks another. |
-| `endpoint` | A MiniStack (or LocalStack) you already run, such as `http://127.0.0.1:4566`. Ignored with `docker`. |
-| `hosts` | The hosts sent to MiniStack; every `*.amazonaws.com` by default. |
-| `reset` | Wipe MiniStack between matrix runs (default `true`). The wipe is global, so a shared endpoint is wiped for every worker. |
+| Option     | What it does                                                                                                                                            |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docker`   | Starts a MiniStack container per worker and removes it on close, so workers never share state. `true` uses the pinned image; `{ image }` picks another. |
+| `endpoint` | A MiniStack (or LocalStack) you already run, such as `http://127.0.0.1:4566`. Ignored with `docker`.                                                    |
+| `hosts`    | The hosts sent to MiniStack; every `*.amazonaws.com` by default.                                                                                        |
+| `reset`    | Wipe MiniStack between matrix runs (default `true`). The wipe is global, so a shared endpoint is wiped for every worker.                                |
 
 To use danwo's own S3 emulator beside MiniStack, list `s3Service()` first: it answers the S3
 hosts, and MiniStack takes the rest.
@@ -74,8 +74,8 @@ fault matrix.
 
 ## Faults
 
-| Call | Faults the matrix tries |
-| --- | --- |
+| Call                    | Faults the matrix tries                                  |
+| ----------------------- | -------------------------------------------------------- |
 | Any call to an AWS host | 500, connection reset, answer lost after MiniStack acted |
 
 These are the plain faults the matrix gives any routed host. Calls to S3, when `s3Service`

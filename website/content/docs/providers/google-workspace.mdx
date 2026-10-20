@@ -35,7 +35,9 @@ export default defineConfig({
             ],
             users: [{ email: ada, name: "Ada Lovelace" }],
             gmail: {
-              [ada]: [{ from: "billing@example.org", to: ada, subject: "Invoice 42", text: "Due Friday" }],
+              [ada]: [
+                { from: "billing@example.org", to: ada, subject: "Invoice 42", text: "Due Friday" },
+              ],
             },
             calendar: {
               [ada]: [
@@ -63,12 +65,12 @@ export default defineConfig({
 
 ## Seed it
 
-| Field | What it seeds |
-| --- | --- |
-| `gmail` | Messages already in each mailbox, with labels and dates. |
-| `calendar` | Events on each primary calendar, in the Calendar API's own event shape. |
-| `drive` | Files in each drive, with content and folders. |
-| `pubsub` | Push subscriptions: what Gmail publishes to a topic after `users.watch` is POSTed to the endpoint. |
+| Field      | What it seeds                                                                                      |
+| ---------- | -------------------------------------------------------------------------------------------------- |
+| `gmail`    | Messages already in each mailbox, with labels and dates.                                           |
+| `calendar` | Events on each primary calendar, in the Calendar API's own event shape.                            |
+| `drive`    | Files in each drive, with content and folders.                                                     |
+| `pubsub`   | Push subscriptions: what Gmail publishes to a topic after `users.watch` is POSTed to the endpoint. |
 
 ## Use it in a test
 
@@ -93,11 +95,11 @@ test("files a new invoice email", async ({ app, screen, expect, settle, google }
 
 `deliver` sends the push notification too, so an app that watches the mailbox hears of it.
 
-| Helper | Reads | Changes |
-| --- | --- | --- |
-| `gmailMailbox(google, email)` | `messages(label)`, `inbox()`, `sent()` | `deliver(mail)`, `expireHistory()` |
-| `googleCalendar(google, email)` | `events()` | `add(event)`, `cancel(id)`, `expireSyncTokens()` |
-| `googleDrive(google, email)` | `files()`, `read(id)` | `add(file)`, `remove(id)` |
+| Helper                          | Reads                                  | Changes                                          |
+| ------------------------------- | -------------------------------------- | ------------------------------------------------ |
+| `gmailMailbox(google, email)`   | `messages(label)`, `inbox()`, `sent()` | `deliver(mail)`, `expireHistory()`               |
+| `googleCalendar(google, email)` | `events()`                             | `add(event)`, `cancel(id)`, `expireSyncTokens()` |
+| `googleDrive(google, email)`    | `files()`, `read(id)`                  | `add(file)`, `remove(id)`                        |
 
 `expireHistory()` and `expireSyncTokens()` make the next incremental sync fail, as Google does
 after a while, so you can test that your app falls back to a full sync. `gmailMail(google)`
@@ -105,19 +107,19 @@ gives the mail to the `mail` fixture.
 
 ## What's covered
 
-| Area | Covered |
-| --- | --- |
-| Gmail | messages: list with search queries, get, send, insert, import, modify, trash, delete, batch; threads; labels; drafts; attachments; history; `watch` with Pub/Sub push |
-| Calendar | calendar list, calendars, events with recurrence and instances, `quickAdd`, free/busy, sync tokens, `watch` |
-| Drive | files: list with queries, get, create, copy, update, delete; uploads; permissions; changes and `watch` |
+| Area     | Covered                                                                                                                                                               |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gmail    | messages: list with search queries, get, send, insert, import, modify, trash, delete, batch; threads; labels; drafts; attachments; history; `watch` with Pub/Sub push |
+| Calendar | calendar list, calendars, events with recurrence and instances, `quickAdd`, free/busy, sync tokens, `watch`                                                           |
+| Drive    | files: list with queries, get, create, copy, update, delete; uploads; permissions; changes and `watch`                                                                |
 
 ## Faults
 
-| Call | Faults the matrix tries |
-| --- | --- |
-| A Gmail send, such as `POST …/messages/send` | 429, 403, 500, 503, a 10-second delay, connection reset, answer lost after Gmail sent it |
+| Call                                                 | Faults the matrix tries                                                                                                              |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| A Gmail send, such as `POST …/messages/send`         | 429, 403, 500, 503, a 10-second delay, connection reset, answer lost after Gmail sent it                                             |
 | A read, such as `GET …/history` or Calendar's events | 429, 403, 500, 503, a 10-second delay, connection reset, and the expiry answer: 404 for Gmail history, 410 for a Calendar sync token |
-| Every push notification | arrives twice, arrives 10 minutes late, forged, 1 hour stale |
+| Every push notification                              | arrives twice, arrives 10 minutes late, forged, 1 hour stale                                                                         |
 
 ## Webhooks
 

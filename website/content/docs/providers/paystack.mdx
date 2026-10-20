@@ -55,12 +55,12 @@ paystackService({
 })
 ```
 
-| Field | What it seeds |
-| --- | --- |
+| Field          | What it seeds                                                                                            |
+| -------------- | -------------------------------------------------------------------------------------------------------- |
 | `integrations` | Secret keys, the webhook and callback URLs, the currency, the balance and whether transfers need an OTP. |
-| `customers` | Customers, attached to the first integration unless you name one. |
-| `plans` | Plans, `hourly` to `annually`, with an optional invoice limit. |
-| `accounts` | Bank accounts that resolve by number, and what a transfer to each does. |
+| `customers`    | Customers, attached to the first integration unless you name one.                                        |
+| `plans`        | Plans, `hourly` to `annually`, with an optional invoice limit.                                           |
+| `accounts`     | Bank accounts that resolve by number, and what a transfer to each does.                                  |
 
 Amounts are in the currency's subunit, kobo for naira, as on Paystack.
 
@@ -96,36 +96,36 @@ To pay into a dedicated account as the customer's bank would, call
 
 ## Test cards
 
-| Card number | What the hosted page does |
-| --- | --- |
-| `4084 0840 8408 4081` | Pays at once. |
-| `5060 6666 6666 6666 666` | Asks for PIN `1234`, then pays. |
-| `5078 5078 5078 5078 12` | Asks for PIN `1111`, then OTP `123456`. |
-| `4084 0800 0000 5408` | Declined. |
-| `5399 8383 8383 8381` | Declined for insufficient funds. |
+| Card number               | What the hosted page does               |
+| ------------------------- | --------------------------------------- |
+| `4084 0840 8408 4081`     | Pays at once.                           |
+| `5060 6666 6666 6666 666` | Asks for PIN `1234`, then pays.         |
+| `5078 5078 5078 5078 12`  | Asks for PIN `1111`, then OTP `123456`. |
+| `4084 0800 0000 5408`     | Declined.                               |
+| `5399 8383 8383 8381`     | Declined for insufficient funds.        |
 
 The page also offers bank transfer ("I've sent the money") and USSD, and "Cancel payment" goes
 back to your callback URL.
 
 ## What's covered
 
-| Area | Covered |
-| --- | --- |
-| Transactions | initialize, verify, fetch, list, totals, `charge_authorization` with a saved card |
-| Hosted page | card with PIN and OTP steps, bank transfer, USSD, cancel |
-| Customers | create, fetch, update, list |
-| Plans and subscriptions | create, fetch, list, enable, disable; renewals on the emulator's clock |
-| Transfers | recipients, transfers, `finalize_transfer` with an OTP, verify; they settle later |
-| Refunds | create, fetch, list; they settle later |
-| Banks | list, account resolution, balance, dedicated accounts |
+| Area                    | Covered                                                                           |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| Transactions            | initialize, verify, fetch, list, totals, `charge_authorization` with a saved card |
+| Hosted page             | card with PIN and OTP steps, bank transfer, USSD, cancel                          |
+| Customers               | create, fetch, update, list                                                       |
+| Plans and subscriptions | create, fetch, list, enable, disable; renewals on the emulator's clock            |
+| Transfers               | recipients, transfers, `finalize_transfer` with an OTP, verify; they settle later |
+| Refunds                 | create, fetch, list; they settle later                                            |
+| Banks                   | list, account resolution, balance, dedicated accounts                             |
 
 ## Faults
 
-| Call | Faults the matrix tries |
-| --- | --- |
+| Call                                            | Faults the matrix tries                                                              |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------ |
 | A write, such as `POST /transaction/initialize` | 429, 500, 503, a 10-second delay, connection reset, answer lost after Paystack acted |
-| `GET /transaction/verify/:reference` | 429, 500, connection reset, and a 200 whose body says the payment failed |
-| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+| `GET /transaction/verify/:reference`            | 429, 500, connection reset, and a 200 whose body says the payment failed             |
+| Every webhook delivery                          | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale               |
 
 ## Webhooks
 

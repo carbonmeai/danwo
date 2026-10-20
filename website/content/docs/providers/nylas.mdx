@@ -45,12 +45,12 @@ Without `apiKeys`, any `nyk_` key is accepted.
 
 ## Seed it
 
-| Field | What it seeds |
-| --- | --- |
-| `applicationId` | The application id tokens and notifications carry. |
-| `apiKeys` | The keys the application accepts. |
-| `grants` | Connected accounts by email, with their provider, scopes, messages, events and contacts. |
-| `webhooks` | Webhook subscriptions, their triggers, and the secret that signs them. |
+| Field           | What it seeds                                                                            |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| `applicationId` | The application id tokens and notifications carry.                                       |
+| `apiKeys`       | The keys the application accepts.                                                        |
+| `grants`        | Connected accounts by email, with their provider, scopes, messages, events and contacts. |
+| `webhooks`      | Webhook subscriptions, their triggers, and the secret that signs them.                   |
 
 ## Use it in a test
 
@@ -83,22 +83,22 @@ grants lands in the other's inbox.
 
 ## What's covered
 
-| Area | Covered |
-| --- | --- |
-| Auth | hosted auth, the consent step, token exchange, `tokeninfo`, revoke; grants listed and read |
-| Email | messages, send, threads, drafts, folders, attachments |
-| Calendar | calendars, events, free/busy |
-| Contacts | create, list, update, delete |
-| Scheduler | configurations, availability, bookings: create, confirm, reschedule, cancel |
-| Webhooks | create, update, delete, rotate the secret |
+| Area      | Covered                                                                                    |
+| --------- | ------------------------------------------------------------------------------------------ |
+| Auth      | hosted auth, the consent step, token exchange, `tokeninfo`, revoke; grants listed and read |
+| Email     | messages, send, threads, drafts, folders, attachments                                      |
+| Calendar  | calendars, events, free/busy                                                               |
+| Contacts  | create, list, update, delete                                                               |
+| Scheduler | configurations, availability, bookings: create, confirm, reschedule, cancel                |
+| Webhooks  | create, update, delete, rotate the secret                                                  |
 
 ## Faults
 
-| Call | Faults the matrix tries |
-| --- | --- |
+| Call                   | Faults the matrix tries                                                                  |
+| ---------------------- | ---------------------------------------------------------------------------------------- |
 | `POST …/messages/send` | 429, 401, 504, a 30-second delay, 500, connection reset, answer lost after Nylas sent it |
-| A read | 429, 500, connection reset |
-| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+| A read                 | 429, 500, connection reset                                                               |
+| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale                   |
 
 ## Webhooks
 

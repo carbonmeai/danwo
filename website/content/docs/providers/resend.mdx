@@ -43,11 +43,11 @@ resendService({
 })
 ```
 
-| Field | What it seeds |
-| --- | --- |
-| `domains` | Verified sending domains, with a region. |
-| `keys` | Known API keys; a `sending_access` key may only send, as on Resend. |
-| `webhooks` | Where events go, which ones, and the signing secret. |
+| Field       | What it seeds                                                               |
+| ----------- | --------------------------------------------------------------------------- |
+| `domains`   | Verified sending domains, with a region.                                    |
+| `keys`      | Known API keys; a `sending_access` key may only send, as on Resend.         |
+| `webhooks`  | Where events go, which ones, and the signing secret.                        |
 | `allowlist` | When set, only these addresses may receive mail, as on a sandboxed account. |
 
 ## Use it in a test
@@ -79,19 +79,19 @@ address, oldest first.
 
 ## What's covered
 
-| Area | Covered |
-| --- | --- |
-| Emails | send, batch send, retrieve, list, scheduled sends and cancelling them, tags, idempotency keys |
-| Domains | create, retrieve, list, verify, delete |
-| API keys | create, list, delete; `sending_access` and `full_access` |
-| Webhooks | create, retrieve, update, list, delete; signed deliveries |
+| Area     | Covered                                                                                       |
+| -------- | --------------------------------------------------------------------------------------------- |
+| Emails   | send, batch send, retrieve, list, scheduled sends and cancelling them, tags, idempotency keys |
+| Domains  | create, retrieve, list, verify, delete                                                        |
+| API keys | create, list, delete; `sending_access` and `full_access`                                      |
+| Webhooks | create, retrieve, update, list, delete; signed deliveries                                     |
 
 ## Faults
 
-| Call | Faults the matrix tries |
-| --- | --- |
-| `POST /emails` | 429, 500, a 10-second delay, connection reset, answer lost after Resend sent it |
-| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+| Call                   | Faults the matrix tries                                                         |
+| ---------------------- | ------------------------------------------------------------------------------- |
+| `POST /emails`         | 429, 500, a 10-second delay, connection reset, answer lost after Resend sent it |
+| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale          |
 
 The error bodies are Resend's, so the SDK hands your code `{ data: null, error }` as it would for
 real.

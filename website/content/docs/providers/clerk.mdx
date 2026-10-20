@@ -37,23 +37,23 @@ export default defineConfig({
 })
 ```
 
-| Variable | Holds |
-| --- | --- |
-| `CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_…`, `VITE_…` | The publishable key, derived from the slug. |
-| `CLERK_SECRET_KEY` | The secret key your server sends. |
-| `CLERK_JWT_KEY`, `CLERK_PEM_PUBLIC_KEY` | The public key, so tokens verify without a network call. |
-| `CLERK_WEBHOOK_SIGNING_SECRET` | The webhook secret, when there's one endpoint. |
+| Variable                                           | Holds                                                    |
+| -------------------------------------------------- | -------------------------------------------------------- |
+| `CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_…`, `VITE_…` | The publishable key, derived from the slug.              |
+| `CLERK_SECRET_KEY`                                 | The secret key your server sends.                        |
+| `CLERK_JWT_KEY`, `CLERK_PEM_PUBLIC_KEY`            | The public key, so tokens verify without a network call. |
+| `CLERK_WEBHOOK_SIGNING_SECRET`                     | The webhook secret, when there's one endpoint.           |
 
 ## Seed it
 
-| Field | What it seeds |
-| --- | --- |
-| `instance` | The slug, the secret key, the app's `origin`, a `signingKey` of your own, and `password: false` for emailed codes only. |
-| `users` | Users with a password, names, username, `externalId` and metadata. |
-| `organizations` | Organizations and their members' roles. |
-| `jwtTemplates` | JWT templates by name, with claims and lifetime. |
-| `webhooks` | Endpoints, events, secret and extra headers. |
-| `announce` | Send `user.created` and the like for the seeded records, so an app that builds its rows from webhooks has them. |
+| Field           | What it seeds                                                                                                           |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `instance`      | The slug, the secret key, the app's `origin`, a `signingKey` of your own, and `password: false` for emailed codes only. |
+| `users`         | Users with a password, names, username, `externalId` and metadata.                                                      |
+| `organizations` | Organizations and their members' roles.                                                                                 |
+| `jwtTemplates`  | JWT templates by name, with claims and lifetime.                                                                        |
+| `webhooks`      | Endpoints, events, secret and extra headers.                                                                            |
+| `announce`      | Send `user.created` and the like for the seeded records, so an app that builds its rows from webhooks has them.         |
 
 ### Stable ids
 
@@ -97,21 +97,21 @@ email, as on a development instance. `clerkMail(clerk)` gives the codes to the `
 
 ## What's covered
 
-| Area | Covered |
-| --- | --- |
-| Backend API | users (create, list, update, ban, delete, metadata), sessions and tokens, organizations, members and invitations, JWT templates, the instance's keys |
-| Frontend API | the dev browser, the client, sign-up and sign-in attempts by password or email code, session tokens and their refresh, the handshake |
-| ClerkJS | `clerk-js` and `@clerk/ui` served from the Frontend API, so `<ClerkProvider>`, `<SignIn/>` and `<UserButton/>` load |
-| Account Portal | sign-in with a password or a code, sign-up with a code |
-| Tokens | session tokens with `azp`, `sid`, `org_*` claims and your templates, signed with the instance's key |
+| Area           | Covered                                                                                                                                              |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend API    | users (create, list, update, ban, delete, metadata), sessions and tokens, organizations, members and invitations, JWT templates, the instance's keys |
+| Frontend API   | the dev browser, the client, sign-up and sign-in attempts by password or email code, session tokens and their refresh, the handshake                 |
+| ClerkJS        | `clerk-js` and `@clerk/ui` served from the Frontend API, so `<ClerkProvider>`, `<SignIn/>` and `<UserButton/>` load                                  |
+| Account Portal | sign-in with a password or a code, sign-up with a code                                                                                               |
+| Tokens         | session tokens with `azp`, `sid`, `org_*` claims and your templates, signed with the instance's key                                                  |
 
 ## Faults
 
-| Call | Faults the matrix tries |
-| --- | --- |
+| Call                                          | Faults the matrix tries                                                           |
+| --------------------------------------------- | --------------------------------------------------------------------------------- |
 | A Backend API write, such as `POST /v1/users` | 429, 500, 503, a 10-second delay, connection reset, answer lost after Clerk acted |
-| A Backend API read | 429, 500, 503, a 10-second delay, connection reset |
-| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+| A Backend API read                            | 429, 500, 503, a 10-second delay, connection reset                                |
+| Every webhook delivery                        | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale            |
 
 The Frontend API and the Account Portal are left alone, so the browser can always sign in.
 
@@ -120,12 +120,12 @@ The Frontend API and the Account Portal are left alone, so the browser can alway
 Deliveries are signed the Svix way, with `svix-id`, `svix-timestamp` and `svix-signature`, so
 `verifyWebhook` from `@clerk/nextjs/webhooks` and the `svix` package accept them.
 
-| Event family | Events |
-| --- | --- |
-| Users | `user.created`, `.updated`, `.deleted` |
-| Sessions | `session.created`, `.ended`, `.removed`, `.revoked` |
-| Organizations | `organization.created`, `.updated`, `.deleted` |
-| Memberships | `organizationMembership.created`, `.updated`, `.deleted` |
+| Event family  | Events                                                   |
+| ------------- | -------------------------------------------------------- |
+| Users         | `user.created`, `.updated`, `.deleted`                   |
+| Sessions      | `session.created`, `.ended`, `.removed`, `.revoked`      |
+| Organizations | `organization.created`, `.updated`, `.deleted`           |
+| Memberships   | `organizationMembership.created`, `.updated`, `.deleted` |
 
 ## Fidelity
 

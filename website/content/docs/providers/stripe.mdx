@@ -51,13 +51,13 @@ stripeService({
 })
 ```
 
-| Field | What it seeds |
-| --- | --- |
-| `customers` | Customers, with your own ids if you give them. |
-| `products` | Products, named so prices can refer to them. |
-| `prices` | One-off or recurring prices, by `product_name`, with an optional `lookup_key`. |
-| `webhookEndpoints` | Where webhooks go, which events, and the signing secret. |
-| `paymentMethodConfigurations` | Which payment methods Checkout offers. |
+| Field                         | What it seeds                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------------ |
+| `customers`                   | Customers, with your own ids if you give them.                                 |
+| `products`                    | Products, named so prices can refer to them.                                   |
+| `prices`                      | One-off or recurring prices, by `product_name`, with an optional `lookup_key`. |
+| `webhookEndpoints`            | Where webhooks go, which events, and the signing secret.                       |
+| `paymentMethodConfigurations` | Which payment methods Checkout offers.                                         |
 
 ## Use it in a test
 
@@ -91,24 +91,24 @@ On the emulator's Checkout page, `checkout-pay` pays and `checkout-cancel` goes 
 
 ## What's covered
 
-| Area | Covered |
-| --- | --- |
-| Customers | create, retrieve, update, delete, list, customer sessions |
-| Products and prices | create, retrieve, update, list, lookup keys |
-| Payment intents | create, update, confirm, cancel, retrieve, list |
-| Payment methods | create, attach, detach, list a customer's |
-| Charges and refunds | charges retrieved and listed; full and partial refunds |
-| Checkout Sessions | payment and subscription mode, the hosted page, `expire` |
-| Webhook endpoints | create, list, delete, signed deliveries with retries |
-| Requests | idempotency keys, `expand`, Stripe's error shapes |
+| Area                | Covered                                                   |
+| ------------------- | --------------------------------------------------------- |
+| Customers           | create, retrieve, update, delete, list, customer sessions |
+| Products and prices | create, retrieve, update, list, lookup keys               |
+| Payment intents     | create, update, confirm, cancel, retrieve, list           |
+| Payment methods     | create, attach, detach, list a customer's                 |
+| Charges and refunds | charges retrieved and listed; full and partial refunds    |
+| Checkout Sessions   | payment and subscription mode, the hosted page, `expire`  |
+| Webhook endpoints   | create, list, delete, signed deliveries with retries      |
+| Requests            | idempotency keys, `expand`, Stripe's error shapes         |
 
 ## Faults
 
-| Call | Faults the matrix tries |
-| --- | --- |
-| A write, such as `POST /v1/checkout/sessions` | 500, 429 rate limit, connection reset, answer lost after Stripe acted |
-| A read, such as `GET /v1/customers/:id` | 500, 429 rate limit, connection reset |
-| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+| Call                                          | Faults the matrix tries                                                |
+| --------------------------------------------- | ---------------------------------------------------------------------- |
+| A write, such as `POST /v1/checkout/sessions` | 500, 429 rate limit, connection reset, answer lost after Stripe acted  |
+| A read, such as `GET /v1/customers/:id`       | 500, 429 rate limit, connection reset                                  |
+| Every webhook delivery                        | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
 
 The error bodies are Stripe's, so the SDK raises `StripeAPIError` or `StripeRateLimitError` just
 as it would for real.

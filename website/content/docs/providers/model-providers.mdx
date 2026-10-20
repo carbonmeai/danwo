@@ -11,11 +11,11 @@ and Amazon Bedrock's runtime. One script can serve all of them, or you can match
 All three come with `llmService`; there's nothing to add. Each takes its key the way the real
 API does, and any key is accepted:
 
-| API | Host | Key |
-| --- | --- | --- |
-| Gemini | `generativelanguage.googleapis.com` | `x-goog-api-key` or `?key=` |
-| Perplexity | `api.perplexity.ai` | a bearer token |
-| Bedrock | `bedrock-runtime.<region>.amazonaws.com` | a well-formed SigV4 signature, or a Bedrock API key as a bearer token |
+| API        | Host                                     | Key                                                                   |
+| ---------- | ---------------------------------------- | --------------------------------------------------------------------- |
+| Gemini     | `generativelanguage.googleapis.com`      | `x-goog-api-key` or `?key=`                                           |
+| Perplexity | `api.perplexity.ai`                      | a bearer token                                                        |
+| Bedrock    | `bedrock-runtime.<region>.amazonaws.com` | a well-formed SigV4 signature, or a Bedrock API key as a bearer token |
 
 ```ts title="danwo.config.ts"
 import { appEnvironment, defineConfig, llmService } from "@danwo/sdk"
@@ -71,11 +71,11 @@ test("cites its sources", async ({ app, screen, expect, llm }) => {
 
 ## What's covered
 
-| API | Covered |
-| --- | --- |
-| Gemini | `generateContent` and `streamGenerateContent` (text, function calls, structured output), `countTokens`, `embedContent`, `batchEmbedContents`, models; `v1beta` and `v1` |
-| Perplexity | the Agent API (`/v1/agent`, which the AI SDK uses), the Sonar API (`/v1/sonar` and `/chat/completions`) with citations and cost |
-| Bedrock | Converse and ConverseStream; InvokeModel and its stream in each family's own body: Anthropic's Messages for Claude, Nova, Titan text and embeddings, Cohere embeddings |
+| API        | Covered                                                                                                                                                                 |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gemini     | `generateContent` and `streamGenerateContent` (text, function calls, structured output), `countTokens`, `embedContent`, `batchEmbedContents`, models; `v1beta` and `v1` |
+| Perplexity | the Agent API (`/v1/agent`, which the AI SDK uses), the Sonar API (`/v1/sonar` and `/chat/completions`) with citations and cost                                         |
+| Bedrock    | Converse and ConverseStream; InvokeModel and its stream in each family's own body: Anthropic's Messages for Claude, Nova, Titan text and embeddings, Cohere embeddings  |
 
 ## Faults
 

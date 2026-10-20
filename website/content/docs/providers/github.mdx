@@ -37,16 +37,16 @@ export default defineConfig({
 
 ## Seed it
 
-| Field | What it seeds |
-| --- | --- |
-| `users`, `orgs` | Accounts by login, with names, emails and members. |
-| `repos` | Repositories by `owner/name`, with files on the default branch, topics and privacy. |
-| `issues` | Issues already open. |
-| `tokens` | Personal access tokens, with their scopes. |
-| `oauthApps` | OAuth Apps, with their callback URLs. |
-| `apps` | GitHub Apps: slug, owner, private key, webhook URL and secret, permissions and events. |
-| `installations` | Where each app is installed, and on which repositories. |
-| `hooks` | Repository webhooks. |
+| Field           | What it seeds                                                                          |
+| --------------- | -------------------------------------------------------------------------------------- |
+| `users`, `orgs` | Accounts by login, with names, emails and members.                                     |
+| `repos`         | Repositories by `owner/name`, with files on the default branch, topics and privacy.    |
+| `issues`        | Issues already open.                                                                   |
+| `tokens`        | Personal access tokens, with their scopes.                                             |
+| `oauthApps`     | OAuth Apps, with their callback URLs.                                                  |
+| `apps`          | GitHub Apps: slug, owner, private key, webhook URL and secret, permissions and events. |
+| `installations` | Where each app is installed, and on which repositories.                                |
+| `hooks`         | Repository webhooks.                                                                   |
 
 ## Use it in a test
 
@@ -78,29 +78,29 @@ webhook, and `githubAppKey(github, slug)` gives an app's private key for signing
 
 ## What's covered
 
-| Area | Covered |
-| --- | --- |
-| Sign-in | OAuth Apps and GitHub Apps on `github.com/login/oauth`, expiring user tokens |
-| Apps | `/app`, installations, installation access tokens, `/installation/repositories` |
-| Repositories | get, create, list for a user or org, branches, commits, contents, refs |
-| Issues | create, update, list, comments, labels |
-| Pull requests | get, update, files, commits, reviews, merge |
-| Checks | check runs and their annotations |
-| Webhooks | repository hooks: create, update, delete, ping; App webhooks |
-| Users | `/user`, `/user/emails`, `/users/:username` |
+| Area          | Covered                                                                         |
+| ------------- | ------------------------------------------------------------------------------- |
+| Sign-in       | OAuth Apps and GitHub Apps on `github.com/login/oauth`, expiring user tokens    |
+| Apps          | `/app`, installations, installation access tokens, `/installation/repositories` |
+| Repositories  | get, create, list for a user or org, branches, commits, contents, refs          |
+| Issues        | create, update, list, comments, labels                                          |
+| Pull requests | get, update, files, commits, reviews, merge                                     |
+| Checks        | check runs and their annotations                                                |
+| Webhooks      | repository hooks: create, update, delete, ping; App webhooks                    |
+| Users         | `/user`, `/user/emails`, `/users/:username`                                     |
 
 Every call checks the token's scopes or the app's permissions and answers with GitHub's error
 shapes.
 
 ## Faults
 
-| Call | Faults the matrix tries |
-| --- | --- |
+| Call                                              | Faults the matrix tries                                                                      |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | A write, such as `POST …/issues/:number/comments` | 403, 429, 502, 503, a 10-second delay, connection reset, answer lost after GitHub acted, 422 |
-| A read | 403, 429, 502, 503, a 10-second delay, connection reset |
-| A contents write or a merge | adds a 409, as when the branch moved |
-| `POST github.com/login/oauth/access_token` | a 200 with `bad_verification_code`, 502, a delay, connection reset |
-| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+| A read                                            | 403, 429, 502, 503, a 10-second delay, connection reset                                      |
+| A contents write or a merge                       | adds a 409, as when the branch moved                                                         |
+| `POST github.com/login/oauth/access_token`        | a 200 with `bad_verification_code`, 502, a delay, connection reset                           |
+| Every webhook delivery                            | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale                       |
 
 The 403 and 429 are GitHub's secondary rate limit, with `Retry-After: 60`.
 

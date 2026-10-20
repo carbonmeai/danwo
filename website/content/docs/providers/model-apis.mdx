@@ -47,14 +47,14 @@ export default defineConfig({
 
 ## Seed it
 
-| Field | What it seeds |
-| --- | --- |
-| `scripts` | Replies, and the calls each one answers; the first that matches wins. See [Scripting replies](/docs/providers/model-scripts). |
-| `unscripted` | What a call no script answers gets: its own words back, marked `[danwo: unscripted]` (`echo`, the default), or a 500 (`fail`). |
-| `prices` | Dollars per million input and output tokens, by model, for cost. |
-| `models` | The models `GET /v1/models` lists. |
-| `knownModelsOnly` | Answer a model not in `models` with a 404, as the gateway does. |
-| `record` | Record unscripted calls from the real provider with your own key, then replay them. |
+| Field             | What it seeds                                                                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `scripts`         | Replies, and the calls each one answers; the first that matches wins. See [Scripting replies](/docs/providers/model-scripts).  |
+| `unscripted`      | What a call no script answers gets: its own words back, marked `[danwo: unscripted]` (`echo`, the default), or a 500 (`fail`). |
+| `prices`          | Dollars per million input and output tokens, by model, for cost.                                                               |
+| `models`          | The models `GET /v1/models` lists.                                                                                             |
+| `knownModelsOnly` | Answer a model not in `models` with a 404, as the gateway does.                                                                |
+| `record`          | Record unscripted calls from the real provider with your own key, then replay them.                                            |
 
 ## Use it in a test
 
@@ -91,19 +91,19 @@ metadata, as the real gateway's do.
 
 ## What's covered
 
-| API | Covered |
-| --- | --- |
-| OpenAI | Chat Completions and Responses, streaming, tools, structured output, embeddings, models |
-| Anthropic | Messages, streaming, tools, `count_tokens` |
-| AI Gateway | the AI SDK's language model and embedding model calls, cost metadata, unknown models |
-| Gemini, Perplexity, Bedrock | see [More model APIs](/docs/providers/model-providers) |
+| API                         | Covered                                                                                 |
+| --------------------------- | --------------------------------------------------------------------------------------- |
+| OpenAI                      | Chat Completions and Responses, streaming, tools, structured output, embeddings, models |
+| Anthropic                   | Messages, streaming, tools, `count_tokens`                                              |
+| AI Gateway                  | the AI SDK's language model and embedding model calls, cost metadata, unknown models    |
+| Gemini, Perplexity, Bedrock | see [More model APIs](/docs/providers/model-providers)                                  |
 
 ## Faults
 
-| Call | Faults the matrix tries |
-| --- | --- |
+| Call                                              | Faults the matrix tries                                                                                                                |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | A model call, such as `POST /v1/chat/completions` | 429, 500, 503 (529 on Anthropic), a 400 for a context that's too long, a delay, connection reset, answer lost after the model answered |
-| The same, shaped by the emulator | a refusal, an empty completion, a truncated answer, a content filter, a malformed tool call, a stream cut off halfway |
+| The same, shaped by the emulator                  | a refusal, an empty completion, a truncated answer, a content filter, a malformed tool call, a stream cut off halfway                  |
 
 The last row is what only an emulator can do: the real API won't refuse on cue.
 

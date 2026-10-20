@@ -62,11 +62,11 @@ pusherService({
 })
 ```
 
-| Field | What it seeds |
-| --- | --- |
-| `apps` | Channels apps: id, key, secret, cluster, and their webhooks. |
+| Field                         | What it seeds                                                                                                                                             |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps`                        | Channels apps: id, key, secret, cluster, and their webhooks.                                                                                              |
 | `apps[].subscriptionCounting` | Turns on subscription counting, so channel info carries `subscription_count` and the `subscription_count` webhook fires. Off by default, as on a new app. |
-| `beams` | Beams instances and their secret keys. |
+| `beams`                       | Beams instances and their secret keys.                                                                                                                    |
 
 ## Use it in a test
 
@@ -97,21 +97,21 @@ registered `devices()`.
 
 ## What's covered
 
-| Area | Covered |
-| --- | --- |
-| Channels API | `events`, `batch_events`, channel info, occupied channels, presence users, terminating a user's connections |
-| Socket | public, private and presence channels with your auth endpoint's signatures, client events, user sign-in, pings |
-| Subscription counting | `subscription_count` in channel info and webhooks, when turned on |
-| Webhooks | `channel_occupied`, `channel_vacated`, `member_added`, `member_removed`, `client_event`, `subscription_count` |
-| Beams | publish to interests and users, devices and their interests, deleting users |
+| Area                  | Covered                                                                                                        |
+| --------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Channels API          | `events`, `batch_events`, channel info, occupied channels, presence users, terminating a user's connections    |
+| Socket                | public, private and presence channels with your auth endpoint's signatures, client events, user sign-in, pings |
+| Subscription counting | `subscription_count` in channel info and webhooks, when turned on                                              |
+| Webhooks              | `channel_occupied`, `channel_vacated`, `member_added`, `member_removed`, `client_event`, `subscription_count`  |
+| Beams                 | publish to interests and users, devices and their interests, deleting users                                    |
 
 ## Faults
 
-| Call | Faults the matrix tries |
-| --- | --- |
-| `POST /apps/:id/events` | 429, 500, connection reset, answer lost after Pusher published it |
-| The socket | the upgrade refused, and the connection dropped for one person |
-| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+| Call                    | Faults the matrix tries                                                |
+| ----------------------- | ---------------------------------------------------------------------- |
+| `POST /apps/:id/events` | 429, 500, connection reset, answer lost after Pusher published it      |
+| The socket              | the upgrade refused, and the connection dropped for one person         |
+| Every webhook delivery  | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
 
 A dropped connection is the test that matters most: does the page reconnect, and does it catch
 up on what it missed?

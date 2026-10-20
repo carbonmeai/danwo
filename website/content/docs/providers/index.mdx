@@ -83,10 +83,10 @@ test("sends a welcome email", async ({ app, screen, expect, resend }) => {
 
 Two things come with every provider:
 
-| | What it is |
-| --- | --- |
-| **Faults** | The failures the [fault matrix](/docs/fault-matrix) tries on that provider's calls: rate limits, 500s, timeouts, a dropped answer after the provider acted, a webhook that arrives twice. |
-| **Fidelity** | A check that the emulator answers like the real API. `danwo fidelity` compares the two, field by field; see [Fidelity](/docs/fidelity). |
+|              | What it is                                                                                                                                                                                |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Faults**   | The failures the [fault matrix](/docs/fault-matrix) tries on that provider's calls: rate limits, 500s, timeouts, a dropped answer after the provider acted, a webhook that arrives twice. |
+| **Fidelity** | A check that the emulator answers like the real API. `danwo fidelity` compares the two, field by field; see [Fidelity](/docs/fidelity).                                                   |
 
 <Callout type="info">
   Calls to hosts no service answers pass through to the internet unless you set `unmatched:

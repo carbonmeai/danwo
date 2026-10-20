@@ -48,13 +48,13 @@ Wrong credentials get Twilio's 401 with error `20003`.
 
 ## Seed it
 
-| Field | What it seeds |
-| --- | --- |
-| `accounts` | Accounts by `sid` and auth token; `type: "Trial"` with its `verified` numbers. |
-| `apiKeys` | `SK…` API keys and their secrets. |
-| `numbers` | Numbers the account owns, and the URL texts to each are POSTed to. |
-| `verifyServices` | Verify services, with the code length. |
-| `unreachable` | Phones that never get a text: the message ends `undelivered` with error 30003. |
+| Field            | What it seeds                                                                  |
+| ---------------- | ------------------------------------------------------------------------------ |
+| `accounts`       | Accounts by `sid` and auth token; `type: "Trial"` with its `verified` numbers. |
+| `apiKeys`        | `SK…` API keys and their secrets.                                              |
+| `numbers`        | Numbers the account owns, and the URL texts to each are POSTed to.             |
+| `verifyServices` | Verify services, with the code length.                                         |
+| `unreachable`    | Phones that never get a text: the message ends `undelivered` with error 30003. |
 
 ## Use it in a test
 
@@ -101,30 +101,30 @@ twilioService({
 })
 ```
 
-| A trial account sending… | Gets |
-| --- | --- |
-| to a number not in `verified` | 422, error `572002` |
-| a body that isn't one of Twilio's trial templates, such as `sms_2fa` | error `572006` |
-| a parameter only upgraded accounts may use | error `0` or `20003` |
+| A trial account sending…                                             | Gets                 |
+| -------------------------------------------------------------------- | -------------------- |
+| to a number not in `verified`                                        | 422, error `572002`  |
+| a body that isn't one of Twilio's trial templates, such as `sms_2fa` | error `572006`       |
+| a parameter only upgraded accounts may use                           | error `0` or `20003` |
 
 A template id in the body is sent as the template's text, as on Twilio.
 
 ## What's covered
 
-| Area | Covered |
-| --- | --- |
-| Messages | send, fetch, list, update, delete; media; Twilio's magic test numbers |
-| Statuses | `queued` to `sent` to `delivered` or `undelivered`, on the emulator's clock, with status callbacks |
-| Incoming | texts to the account's numbers POSTed to their SMS URL, TwiML replies sent |
-| Verify v2 | services, verifications that text a code, verification checks |
-| Accounts | fetch, incoming phone numbers, API keys |
+| Area      | Covered                                                                                            |
+| --------- | -------------------------------------------------------------------------------------------------- |
+| Messages  | send, fetch, list, update, delete; media; Twilio's magic test numbers                              |
+| Statuses  | `queued` to `sent` to `delivered` or `undelivered`, on the emulator's clock, with status callbacks |
+| Incoming  | texts to the account's numbers POSTed to their SMS URL, TwiML replies sent                         |
+| Verify v2 | services, verifications that text a code, verification checks                                      |
+| Accounts  | fetch, incoming phone numbers, API keys                                                            |
 
 ## Faults
 
-| Call | Faults the matrix tries |
-| --- | --- |
+| Call                                      | Faults the matrix tries                                                            |
+| ----------------------------------------- | ---------------------------------------------------------------------------------- |
 | `POST …/Messages.json` and Verify's POSTs | 429, 500, 503, a 10-second delay, connection reset, answer lost after Twilio acted |
-| Every status callback and incoming text | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+| Every status callback and incoming text   | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale             |
 
 ## Webhooks
 

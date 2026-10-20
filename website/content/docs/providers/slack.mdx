@@ -53,13 +53,13 @@ export default defineConfig({
 
 ## Seed it
 
-| Field | What it seeds |
-| --- | --- |
-| `team` | The workspace's name, id and domain. |
-| `users` | Members by handle, with email, real name and admin. |
-| `channels` | Channels, private or public, with members; `#general` always exists. |
-| `apps` | Your app: credentials, scopes, event subscriptions, slash commands, interactivity URL, token rotation. |
-| `installations` | Apps already installed, with fixed bot and user tokens and the channels the bot is in. |
+| Field           | What it seeds                                                                                          |
+| --------------- | ------------------------------------------------------------------------------------------------------ |
+| `team`          | The workspace's name, id and domain.                                                                   |
+| `users`         | Members by handle, with email, real name and admin.                                                    |
+| `channels`      | Channels, private or public, with members; `#general` always exists.                                   |
+| `apps`          | Your app: credentials, scopes, event subscriptions, slash commands, interactivity URL, token rotation. |
+| `installations` | Apps already installed, with fixed bot and user tokens and the channels the bot is in.                 |
 
 ## Use it in a test
 
@@ -88,26 +88,26 @@ test("announces a deploy in the channel", async ({ expect, settle, slack }) => {
 
 ## What's covered
 
-| Area | Covered |
-| --- | --- |
-| OAuth v2 | the consent page, `oauth.v2.access`, token rotation, `auth.test`, `auth.revoke` |
-| Chat | `postMessage`, `postEphemeral`, `update`, `delete`, `scheduleMessage`, threads, blocks |
-| Conversations | `create`, `list`, `info`, `history`, `replies`, `join`, `invite`, `members`, `open` |
-| Users | `list`, `info`, `lookupByEmail` |
-| Reactions, views, files | `reactions.add` and `.remove`; `views.open`, `.update`, `.publish`; external uploads |
-| Incoming | incoming webhooks and `response_url`s |
-| Sent to your app | Events API callbacks, slash commands, interactive payloads |
+| Area                    | Covered                                                                                |
+| ----------------------- | -------------------------------------------------------------------------------------- |
+| OAuth v2                | the consent page, `oauth.v2.access`, token rotation, `auth.test`, `auth.revoke`        |
+| Chat                    | `postMessage`, `postEphemeral`, `update`, `delete`, `scheduleMessage`, threads, blocks |
+| Conversations           | `create`, `list`, `info`, `history`, `replies`, `join`, `invite`, `members`, `open`    |
+| Users                   | `list`, `info`, `lookupByEmail`                                                        |
+| Reactions, views, files | `reactions.add` and `.remove`; `views.open`, `.update`, `.publish`; external uploads   |
+| Incoming                | incoming webhooks and `response_url`s                                                  |
+| Sent to your app        | Events API callbacks, slash commands, interactive payloads                             |
 
 Every method checks the token's scopes and answers `{ ok: false, error }` as Slack does, such as
 `missing_scope` or `channel_not_found`.
 
 ## Faults
 
-| Call | Faults the matrix tries |
-| --- | --- |
+| Call                                        | Faults the matrix tries                                                                                   |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | A Web API write, such as `chat.postMessage` | 429, 500, 503, a 200 with `ok: false`, a 10-second delay, connection reset, answer lost after Slack acted |
-| A Web API read | the same, without the lost answer |
-| Every event, command and interaction | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+| A Web API read                              | the same, without the lost answer                                                                         |
+| Every event, command and interaction        | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale                                    |
 
 ## Webhooks
 

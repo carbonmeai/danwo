@@ -53,10 +53,10 @@ The address Element's fields are labelled the same way: "Full name", "Address li
 
 The card number decides what happens, as on Stripe:
 
-| Card number | Outcome |
-| --- | --- |
-| `4242 4242 4242 4242` | Succeeds |
-| `4000 0000 0000 0002` | Declined |
+| Card number           | Outcome                           |
+| --------------------- | --------------------------------- |
+| `4242 4242 4242 4242` | Succeeds                          |
+| `4000 0000 0000 0002` | Declined                          |
 | `4000 0025 0000 3155` | Needs authentication (3-D Secure) |
 
 On the server side, use Stripe's test payment methods instead; see
@@ -64,13 +64,13 @@ On the server side, use Stripe's test payment methods instead; see
 
 ## What's covered
 
-| Area | Covered |
-| --- | --- |
-| Elements | card, card number, expiry, CVC, payment, address, link authentication and express checkout, each a plain input |
-| Confirming | `confirmCardPayment`, `confirmCardSetup`, `confirmPayment`, `confirmSetup` |
-| Other calls | `createPaymentMethod`, `retrievePaymentIntent`, `retrieveSetupIntent` |
-| Checkout | `redirectToCheckout({ sessionId })` opens the emulator's hosted page |
-| Wallets | `paymentRequest()` reports that no wallet is available |
+| Area        | Covered                                                                                                        |
+| ----------- | -------------------------------------------------------------------------------------------------------------- |
+| Elements    | card, card number, expiry, CVC, payment, address, link authentication and express checkout, each a plain input |
+| Confirming  | `confirmCardPayment`, `confirmCardSetup`, `confirmPayment`, `confirmSetup`                                     |
+| Other calls | `createPaymentMethod`, `retrievePaymentIntent`, `retrieveSetupIntent`                                          |
+| Checkout    | `redirectToCheckout({ sessionId })` opens the emulator's hosted page                                           |
+| Wallets     | `paymentRequest()` reports that no wallet is available                                                         |
 
 The emulator accepts a `pk_test_` key only on these calls, and an intent only with its own client
 secret, as Stripe does.

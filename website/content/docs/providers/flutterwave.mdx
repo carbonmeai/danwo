@@ -46,11 +46,11 @@ flutterwaveService({
 })
 ```
 
-| Field | What it seeds |
-| --- | --- |
-| `webhook` | The dashboard's webhook URL and its secret hash. |
-| `balances` | Balances by currency, in major units; NGN 1,000,000 by default. |
-| `plans` | Payment plans, `hourly` to `yearly`, with an optional number of charges. |
+| Field      | What it seeds                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------ |
+| `webhook`  | The dashboard's webhook URL and its secret hash.                                                       |
+| `balances` | Balances by currency, in major units; NGN 1,000,000 by default.                                        |
+| `plans`    | Payment plans, `hourly` to `yearly`, with an optional number of charges.                               |
 | `accounts` | Accounts that resolve, beside Flutterwave's own test accounts; `blacklisted` refuses transfers to one. |
 
 ## Use it in a test
@@ -85,37 +85,37 @@ account, call `flutterwaveBank(flutterwave).transferIn({ accountNumber, amount }
 
 ## Test cards
 
-| Card number | What the hosted page does |
-| --- | --- |
-| `5377 2836 4507 7450` | Pays with no further step. |
-| `5531 8866 5214 2950` | Asks for a PIN, then an OTP. |
+| Card number           | What the hosted page does             |
+| --------------------- | ------------------------------------- |
+| `5377 2836 4507 7450` | Pays with no further step.            |
+| `5531 8866 5214 2950` | Asks for a PIN, then an OTP.          |
 | `4187 4274 1556 4246` | Asks for the bank's OTP (3-D Secure). |
-| `4556 0527 0417 2643` | Asks for a billing address. |
-| `5258 5859 2266 6506` | Refused for insufficient funds. |
-| `5143 0105 2233 9965` | Refused with "Do Not Honour". |
+| `4556 0527 0417 2643` | Asks for a billing address.           |
+| `5258 5859 2266 6506` | Refused for insufficient funds.       |
+| `5143 0105 2233 9965` | Refused with "Do Not Honour".         |
 
 OTP `5548` ends in "Wrong OTP". The page also offers bank transfer ("I've sent the money") and
 mobile money, and "Cancel payment" goes back to your `redirect_url`.
 
 ## What's covered
 
-| Area | Covered |
-| --- | --- |
-| Payments | Standard payment links, the hosted page, disabling a link |
-| Transactions | verify by id or `tx_ref`, list, events, fees, `resend-hook` |
-| Refunds | create, fetch, list |
+| Area                    | Covered                                                                                              |
+| ----------------------- | ---------------------------------------------------------------------------------------------------- |
+| Payments                | Standard payment links, the hosted page, disabling a link                                            |
+| Transactions            | verify by id or `tx_ref`, list, events, fees, `resend-hook`                                          |
+| Refunds                 | create, fetch, list                                                                                  |
 | Plans and subscriptions | create, update, cancel plans; list, activate, cancel subscriptions; renewals on the emulator's clock |
-| Transfers | create, fetch, list, fees, retries; they settle as the test-mode references say |
-| Money in | virtual account numbers, bank transfers into them |
-| Lookups | banks by country, account resolution, beneficiaries, balances |
+| Transfers               | create, fetch, list, fees, retries; they settle as the test-mode references say                      |
+| Money in                | virtual account numbers, bank transfers into them                                                    |
+| Lookups                 | banks by country, account resolution, beneficiaries, balances                                        |
 
 ## Faults
 
-| Call | Faults the matrix tries |
-| --- | --- |
+| Call                                 | Faults the matrix tries                                                                 |
+| ------------------------------------ | --------------------------------------------------------------------------------------- |
 | A write, such as `POST /v3/payments` | 429, 500, 503, a 10-second delay, connection reset, answer lost after Flutterwave acted |
-| `GET /v3/transactions/:id/verify` | 429, 500, connection reset, and a 200 whose body says the payment failed |
-| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+| `GET /v3/transactions/:id/verify`    | 429, 500, connection reset, and a 200 whose body says the payment failed                |
+| Every webhook delivery               | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale                  |
 
 ## Webhooks
 

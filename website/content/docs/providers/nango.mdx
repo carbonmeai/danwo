@@ -51,15 +51,15 @@ export default defineConfig({
 
 ## Seed it
 
-| Field | What it seeds |
-| --- | --- |
-| `secretKeys` | The environment's secret keys; without any, any non-empty key works. |
-| `integrations` | Integrations by unique key, and the provider each connects to. |
-| `connections` | Connections already made, with an end user, metadata and a token a backend issued. |
-| `webhook` | The environment's webhook URL and the secret that signs it. |
-| `proxy` | Answers for proxied calls to integrations without a backend. |
-| `actions` | What each action returns. |
-| `records` | Synced records by connection and model. |
+| Field          | What it seeds                                                                      |
+| -------------- | ---------------------------------------------------------------------------------- |
+| `secretKeys`   | The environment's secret keys; without any, any non-empty key works.               |
+| `integrations` | Integrations by unique key, and the provider each connects to.                     |
+| `connections`  | Connections already made, with an end user, metadata and a token a backend issued. |
+| `webhook`      | The environment's webhook URL and the secret that signs it.                        |
+| `proxy`        | Answers for proxied calls to integrations without a backend.                       |
+| `actions`      | What each action returns.                                                          |
+| `records`      | Synced records by connection and model.                                            |
 
 ## Use it in a test
 
@@ -86,21 +86,21 @@ action `calls()`, with its status, and `revoke` makes a connection's next token 
 
 ## What's covered
 
-| Area | Covered |
-| --- | --- |
-| Integrations | list, get |
-| Connect | connect sessions, reconnect sessions, the hosted Connect UI |
-| Connections | list, get, metadata; tokens that expire and refresh on the emulator's clock |
-| Proxy | calls forwarded to a backend emulator, or answered from the seed |
-| Actions and records | triggering actions; reading synced records |
+| Area                | Covered                                                                     |
+| ------------------- | --------------------------------------------------------------------------- |
+| Integrations        | list, get                                                                   |
+| Connect             | connect sessions, reconnect sessions, the hosted Connect UI                 |
+| Connections         | list, get, metadata; tokens that expire and refresh on the emulator's clock |
+| Proxy               | calls forwarded to a backend emulator, or answered from the seed            |
+| Actions and records | triggering actions; reading synced records                                  |
 
 ## Faults
 
-| Call | Faults the matrix tries |
-| --- | --- |
-| A proxied write | 429, 424 when the token refresh failed, a 30-second delay, 500, connection reset, answer lost after the call |
-| A read | 424, 500, connection reset |
-| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+| Call                   | Faults the matrix tries                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------ |
+| A proxied write        | 429, 424 when the token refresh failed, a 30-second delay, 500, connection reset, answer lost after the call |
+| A read                 | 424, 500, connection reset                                                                                   |
+| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale                                       |
 
 ## Webhooks
 

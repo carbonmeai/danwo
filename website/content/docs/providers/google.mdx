@@ -52,10 +52,10 @@ An unknown client gets `invalid_client`, and a redirect URI that isn't listed ge
 
 ## Seed it
 
-| Field | What it seeds |
-| --- | --- |
-| `users` | Google accounts by email, with name, picture, locale, `email_verified` and the Workspace domain `hd`. |
-| `oauth_clients` | Your OAuth clients, with their redirect URIs. |
+| Field                                  | What it seeds                                                                                          |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `users`                                | Google accounts by email, with name, picture, locale, `email_verified` and the Workspace domain `hd`.  |
+| `oauth_clients`                        | Your OAuth clients, with their redirect URIs.                                                          |
 | `gmail`, `calendar`, `drive`, `pubsub` | Each account's mail, events and files; see [Gmail, Calendar, Drive](/docs/providers/google-workspace). |
 
 ## Use it in a test
@@ -88,19 +88,19 @@ tokens stop working and refreshes fail with `invalid_grant`.
 
 ## What's covered
 
-| Area | Covered |
-| --- | --- |
-| Sign-in | the account chooser, consent, Cancel, `access_type=offline`, `include_granted_scopes` |
-| Tokens | code exchange, refresh, revoke, ID tokens signed with the published keys |
-| OpenID Connect | discovery document, `certs`, `userinfo` |
-| Scopes | every Gmail, Calendar and Drive call checks the token's scopes, as Google documents them |
+| Area           | Covered                                                                                  |
+| -------------- | ---------------------------------------------------------------------------------------- |
+| Sign-in        | the account chooser, consent, Cancel, `access_type=offline`, `include_granted_scopes`    |
+| Tokens         | code exchange, refresh, revoke, ID tokens signed with the published keys                 |
+| OpenID Connect | discovery document, `certs`, `userinfo`                                                  |
+| Scopes         | every Gmail, Calendar and Drive call checks the token's scopes, as Google documents them |
 
 ## Faults
 
-| Call | Faults the matrix tries |
-| --- | --- |
+| Call                               | Faults the matrix tries                                                                       |
+| ---------------------------------- | --------------------------------------------------------------------------------------------- |
 | `POST oauth2.googleapis.com/token` | 500, 503, 400, a 10-second delay, connection reset, answer lost after Google issued the token |
-| Gmail, Calendar and Drive calls | see [Gmail, Calendar, Drive](/docs/providers/google-workspace#faults) |
+| Gmail, Calendar and Drive calls    | see [Gmail, Calendar, Drive](/docs/providers/google-workspace#faults)                         |
 
 ## Fidelity
 

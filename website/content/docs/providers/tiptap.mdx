@@ -49,10 +49,10 @@ export default defineConfig({
 
 ## Seed it
 
-| Field | What it seeds |
-| --- | --- |
-| `apps` | Collaboration apps: the `secret` that verifies clients' JWTs, and the REST API's `apiKey`. Without them, any token or key is accepted. |
-| `documents` | Documents by name, written as ProseMirror JSON. |
+| Field       | What it seeds                                                                                                                          |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps`      | Collaboration apps: the `secret` that verifies clients' JWTs, and the REST API's `apiKey`. Without them, any token or key is accepted. |
+| `documents` | Documents by name, written as ProseMirror JSON.                                                                                        |
 
 ## Use it in a test
 
@@ -84,18 +84,18 @@ the `editors(name)` connected. `trouble({ permissionDenied: true })` refuses tok
 
 ## What's covered
 
-| Area | Covered |
-| --- | --- |
-| Socket | the Yjs sync protocol, awareness, Tiptap's stateless messages, tokens checked against the app's secret |
-| REST API | documents: list, get, create, update, delete |
-| Documents | ProseMirror JSON in and out, fragments |
+| Area      | Covered                                                                                                |
+| --------- | ------------------------------------------------------------------------------------------------------ |
+| Socket    | the Yjs sync protocol, awareness, Tiptap's stateless messages, tokens checked against the app's secret |
+| REST API  | documents: list, get, create, update, delete                                                           |
+| Documents | ProseMirror JSON in and out, fragments                                                                 |
 
 ## Faults
 
-| Call | Faults the matrix tries |
-| --- | --- |
+| Call                                              | Faults the matrix tries                                              |
+| ------------------------------------------------- | -------------------------------------------------------------------- |
 | A REST write, such as `POST /api/documents/:name` | 429, 500, connection reset, answer lost after the document was saved |
-| The socket | the upgrade refused, and the connection dropped for one person |
+| The socket                                        | the upgrade refused, and the connection dropped for one person       |
 
 ## Webhooks
 

@@ -50,14 +50,14 @@ export default defineConfig({
 
 ## Seed it
 
-| Field | What it seeds |
-| --- | --- |
-| `products` | One-off or recurring products, with a price per currency, a billing cycle and a trial. |
-| `customers` | Customers, with your own ids if you give them. |
-| `webhookEndpoints` | Where events go, which ones, and the signing secret. |
-| `balances` | Balances by currency, for payouts. |
-| `destinations` | Payout destinations; `fails: true` makes payouts to one fail. |
-| `recovery` | What the card recovery page does when a customer updates a card. |
+| Field              | What it seeds                                                                          |
+| ------------------ | -------------------------------------------------------------------------------------- |
+| `products`         | One-off or recurring products, with a price per currency, a billing cycle and a trial. |
+| `customers`        | Customers, with your own ids if you give them.                                         |
+| `webhookEndpoints` | Where events go, which ones, and the signing secret.                                   |
+| `balances`         | Balances by currency, for payouts.                                                     |
+| `destinations`     | Payout destinations; `fails: true` makes payouts to one fail.                          |
+| `recovery`         | What the card recovery page does when a customer updates a card.                       |
 
 ## Use it in a test
 
@@ -98,47 +98,47 @@ and `bachs-update-card` is the recovery page's button.
 
 The checkout's card field starts with `4242 4242 4242 4242`, which succeeds. These fail:
 
-| Card number | Fails with |
-| --- | --- |
-| `4000 0000 0000 0002` | Declined |
+| Card number           | Fails with         |
+| --------------------- | ------------------ |
+| `4000 0000 0000 0002` | Declined           |
 | `4000 0000 0000 9995` | Insufficient funds |
-| `4000 0000 0000 0069` | Expired card |
-| `4000 0000 0000 0119` | A provider error |
+| `4000 0000 0000 0069` | Expired card       |
+| `4000 0000 0000 0119` | A provider error   |
 
 ## What's covered
 
-| Area | Covered |
-| --- | --- |
-| Catalog | products: create, update, list, archive and unarchive |
-| Checkout | sessions, the hosted page, the overlay script `bachs.js` |
-| Customers | create, update, list, portal sessions |
-| Subscriptions | list, update, cancel; renewals, trials, failed cards and the recovery page |
-| Payments and refunds | payments listed; full and partial refunds, by charge |
-| Payouts | destinations, quotes, payouts, account resolution, banks |
-| Money in | virtual accounts and deposits |
-| Requests | idempotency keys, request ids, the sandbox's rate-limit headers |
+| Area                 | Covered                                                                    |
+| -------------------- | -------------------------------------------------------------------------- |
+| Catalog              | products: create, update, list, archive and unarchive                      |
+| Checkout             | sessions, the hosted page, the overlay script `bachs.js`                   |
+| Customers            | create, update, list, portal sessions                                      |
+| Subscriptions        | list, update, cancel; renewals, trials, failed cards and the recovery page |
+| Payments and refunds | payments listed; full and partial refunds, by charge                       |
+| Payouts              | destinations, quotes, payouts, account resolution, banks                   |
+| Money in             | virtual accounts and deposits                                              |
+| Requests             | idempotency keys, request ids, the sandbox's rate-limit headers            |
 
 ## Faults
 
-| Call | Faults the matrix tries |
-| --- | --- |
+| Call                                          | Faults the matrix tries                                                           |
+| --------------------------------------------- | --------------------------------------------------------------------------------- |
 | A write, such as `POST /v1/checkout-sessions` | 429, 500, 503, a 10-second delay, connection reset, answer lost after Bachs acted |
-| A read, such as `GET /v1/payments/:id` | 429, 500, connection reset |
-| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+| A read, such as `GET /v1/payments/:id`        | 429, 500, connection reset                                                        |
+| Every webhook delivery                        | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale            |
 
 ## Webhooks
 
 Deliveries carry `x-bachs-timestamp`, the signature, and `X-Bachs-Signature-V2` in the
 `t=…,v1=…` form, made with the endpoint's `secret`.
 
-| Event family | Events |
-| --- | --- |
-| Checkout | `checkout.opened`, `.completed`, `.closed`, `.expired` |
-| Collections | `collection.succeeded`, `.failed` |
-| Customers | `customer.created`, `.updated` |
-| Invoices | `invoice.created`, `.paid`, `.payment_failed` |
-| Payouts | `payout.created`, `.paid`, `.failed` |
-| Refunds | `refund.created`, `.paid`, `.failed` |
+| Event family | Events                                                 |
+| ------------ | ------------------------------------------------------ |
+| Checkout     | `checkout.opened`, `.completed`, `.closed`, `.expired` |
+| Collections  | `collection.succeeded`, `.failed`                      |
+| Customers    | `customer.created`, `.updated`                         |
+| Invoices     | `invoice.created`, `.paid`, `.payment_failed`          |
+| Payouts      | `payout.created`, `.paid`, `.failed`                   |
+| Refunds      | `refund.created`, `.paid`, `.failed`                   |
 
 ## Fidelity
 

@@ -60,16 +60,16 @@ export default defineConfig({
 
 Each tenant takes:
 
-| Field | What it seeds |
-| --- | --- |
-| `domain`, `custom_domains` | Where the tenant answers. |
-| `clients` | Applications: type, callbacks, logout URLs, grant types, refresh-token rotation. |
-| `apis` | APIs by identifier, with scopes, RBAC, permissions in the token and token lifetime. |
-| `roles` | Roles and their permissions. |
-| `organizations` | Organizations users can belong to. |
-| `users` | Users with a password, metadata, roles, organizations, an MFA secret or `blocked`. |
-| `connections` | Social logins on the login page: `google-oauth2`, `github` or `windowslive`. |
-| `post_login_claims`, `roles_claim` | Claims added to tokens, as an Action would add them. |
+| Field                              | What it seeds                                                                       |
+| ---------------------------------- | ----------------------------------------------------------------------------------- |
+| `domain`, `custom_domains`         | Where the tenant answers.                                                           |
+| `clients`                          | Applications: type, callbacks, logout URLs, grant types, refresh-token rotation.    |
+| `apis`                             | APIs by identifier, with scopes, RBAC, permissions in the token and token lifetime. |
+| `roles`                            | Roles and their permissions.                                                        |
+| `organizations`                    | Organizations users can belong to.                                                  |
+| `users`                            | Users with a password, metadata, roles, organizations, an MFA secret or `blocked`.  |
+| `connections`                      | Social logins on the login page: `google-oauth2`, `github` or `windowslive`.        |
+| `post_login_claims`, `roles_claim` | Claims added to tokens, as an Action would add them.                                |
 
 ## Use it in a test
 
@@ -102,21 +102,21 @@ one-time code".
 
 ## What's covered
 
-| Area | Covered |
-| --- | --- |
-| Universal Login | log in, sign up, MFA with a one-time code, email verification, social connections |
+| Area               | Covered                                                                                                                                  |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Universal Login    | log in, sign up, MFA with a one-time code, email verification, social connections                                                        |
 | Authentication API | `/authorize`, `/oauth/token` (authorization code with PKCE, refresh, client credentials, password), `/oauth/revoke`, `/userinfo`, logout |
-| OpenID Connect | discovery, JWKS, ID and access tokens with your claims |
-| Management API v2 | users, users by email, roles and permissions, organizations and members, user blocks, verification-email jobs |
+| OpenID Connect     | discovery, JWKS, ID and access tokens with your claims                                                                                   |
+| Management API v2  | users, users by email, roles and permissions, organizations and members, user blocks, verification-email jobs                            |
 
 ## Faults
 
-| Call | Faults the matrix tries |
-| --- | --- |
-| `POST /oauth/token` | 429, 500, 503, a 10-second delay, connection reset, answer lost after Auth0 issued the token, a 403 `invalid_grant` refresh |
-| `GET /.well-known/jwks.json` | 5xx and a connection reset, so you can show your app fails closed |
-| `GET /userinfo` | 429, 500, connection reset |
-| The Management API | 429 with `x-ratelimit-reset`, 5xx, a delay, connection reset, and an answer lost after a write |
+| Call                         | Faults the matrix tries                                                                                                     |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `POST /oauth/token`          | 429, 500, 503, a 10-second delay, connection reset, answer lost after Auth0 issued the token, a 403 `invalid_grant` refresh |
+| `GET /.well-known/jwks.json` | 5xx and a connection reset, so you can show your app fails closed                                                           |
+| `GET /userinfo`              | 429, 500, connection reset                                                                                                  |
+| The Management API           | 429 with `x-ratelimit-reset`, 5xx, a delay, connection reset, and an answer lost after a write                              |
 
 The Universal Login pages themselves are left alone, so the browser always reaches them.
 

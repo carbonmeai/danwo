@@ -50,26 +50,26 @@ script shows up at once.
 
 Every field given must match. Leave `match` out to answer every call.
 
-| Field | Matches |
-| --- | --- |
-| `user` | The last user message: a string (case-insensitive) or a regular expression. |
-| `system` | The system prompt, the same way. |
-| `model` | The model name, the same way. |
-| `provider` | `openai`, `anthropic`, `gateway`, `google`, `perplexity` or `bedrock`. |
-| `tool` | A tool the call offers, by name. |
-| `toolResult` | `true` for the turn after a tool call, `false` for the others. |
-| `fingerprint` | The exact request, as a recording identifies it. |
+| Field         | Matches                                                                     |
+| ------------- | --------------------------------------------------------------------------- |
+| `user`        | The last user message: a string (case-insensitive) or a regular expression. |
+| `system`      | The system prompt, the same way.                                            |
+| `model`       | The model name, the same way.                                               |
+| `provider`    | `openai`, `anthropic`, `gateway`, `google`, `perplexity` or `bedrock`.      |
+| `tool`        | A tool the call offers, by name.                                            |
+| `toolResult`  | `true` for the turn after a tool call, `false` for the others.              |
+| `fingerprint` | The exact request, as a recording identifies it.                            |
 
 ### Write the reply
 
-| Field | The model answers with |
-| --- | --- |
-| `text` | Text, streamed in pieces when the call streams. |
-| `toolCalls` | Tool calls, each a `name` and its `arguments`. |
-| `json` | A structured object, for a `response_format` or a JSON schema. |
-| `refusal` | A refusal, in the provider's own shape. |
-| `stop` | An early end: `length`, as when out of tokens, or `content_filter`. |
-| `sources` | The pages a search-backed answer cites, as Perplexity lists them. |
+| Field       | The model answers with                                              |
+| ----------- | ------------------------------------------------------------------- |
+| `text`      | Text, streamed in pieces when the call streams.                     |
+| `toolCalls` | Tool calls, each a `name` and its `arguments`.                      |
+| `json`      | A structured object, for a `response_format` or a JSON schema.      |
+| `refusal`   | A refusal, in the provider's own shape.                             |
+| `stop`      | An early end: `length`, as when out of tokens, or `content_filter`. |
+| `sources`   | The pages a search-backed answer cites, as Perplexity lists them.   |
 
 Give `reply` a list to answer in turn: the first call gets the first reply, the next the second,
 and the last one repeats.

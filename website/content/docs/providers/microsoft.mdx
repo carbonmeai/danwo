@@ -36,7 +36,9 @@ export default defineConfig({
           seed: {
             oauth_clients: [app],
             users: [{ email: "ada@contoso.com", name: "Ada Lovelace" }],
-            mail: [{ user: "ada@contoso.com", from: "boss@contoso.com", subject: "Quarterly plan" }],
+            mail: [
+              { user: "ada@contoso.com", from: "boss@contoso.com", subject: "Quarterly plan" },
+            ],
             events: [
               {
                 user: "ada@contoso.com",
@@ -55,13 +57,13 @@ export default defineConfig({
 
 ## Seed it
 
-| Field | What it seeds |
-| --- | --- |
-| `users` | Work or school accounts by email, with names and a tenant. |
+| Field           | What it seeds                                                        |
+| --------------- | -------------------------------------------------------------------- |
+| `users`         | Work or school accounts by email, with names and a tenant.           |
 | `oauth_clients` | App registrations, with redirect URIs and an optional single tenant. |
-| `mail` | Messages in a user's folders, Inbox by default. |
-| `events` | Calendar events, with time zones, attendees, all-day and free/busy. |
-| `files` | OneDrive files and folders, by path. |
+| `mail`          | Messages in a user's folders, Inbox by default.                      |
+| `events`        | Calendar events, with time zones, attendees, all-day and free/busy.  |
+| `files`         | OneDrive files and folders, by path.                                 |
 
 ## Use it in a test
 
@@ -86,36 +88,36 @@ test("sends the weekly summary from Outlook", async ({ app, screen, expect, micr
 })
 ```
 
-| Helper | What it does |
-| --- | --- |
-| `outlookMailbox(microsoft, email)` | `messages(folder)`, `latest(folder)`, and `receive(message)` to deliver new mail |
-| `outlookCalendar(microsoft, email)` | `between(from, to)` and `add(event)` |
-| `oneDrive(microsoft, email)` | `list()`, `read(path)`, `put(file)`, `remove(path)` |
-| `graphSubscriptions(microsoft)` | the change subscriptions apps made, live or expired |
-| `microsoftSignIns(microsoft)` | who signed in to which app |
-| `revokeMicrosoftSessions(microsoft, email)` | signs the user out everywhere: refreshes fail with `invalid_grant` |
+| Helper                                      | What it does                                                                     |
+| ------------------------------------------- | -------------------------------------------------------------------------------- |
+| `outlookMailbox(microsoft, email)`          | `messages(folder)`, `latest(folder)`, and `receive(message)` to deliver new mail |
+| `outlookCalendar(microsoft, email)`         | `between(from, to)` and `add(event)`                                             |
+| `oneDrive(microsoft, email)`                | `list()`, `read(path)`, `put(file)`, `remove(path)`                              |
+| `graphSubscriptions(microsoft)`             | the change subscriptions apps made, live or expired                              |
+| `microsoftSignIns(microsoft)`               | who signed in to which app                                                       |
+| `revokeMicrosoftSessions(microsoft, email)` | signs the user out everywhere: refreshes fail with `invalid_grant`               |
 
 `outlookMail(microsoft)` gives the mail to the `mail` fixture.
 
 ## What's covered
 
-| Area | Covered |
-| --- | --- |
-| Sign-in | authorize with the account chooser, tokens, refresh, logout, OpenID discovery and keys, `userinfo` |
-| Mail | messages, mail folders, `sendMail`, drafts, replies and forwards, delta; `$filter` (comparisons joined by `and`), `$orderby`, `$top`, `$skip`, `$select` |
-| Calendar | events, `calendarView`, recurrence, time zones, delta sync |
-| OneDrive | items by id and path, uploads and upload sessions, downloads, delta |
-| Subscriptions | create, renew, delete; change notifications with `clientState` and validation |
-| Users | `/me`, `revokeSignInSessions` |
+| Area          | Covered                                                                                                                                                  |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sign-in       | authorize with the account chooser, tokens, refresh, logout, OpenID discovery and keys, `userinfo`                                                       |
+| Mail          | messages, mail folders, `sendMail`, drafts, replies and forwards, delta; `$filter` (comparisons joined by `and`), `$orderby`, `$top`, `$skip`, `$select` |
+| Calendar      | events, `calendarView`, recurrence, time zones, delta sync                                                                                               |
+| OneDrive      | items by id and path, uploads and upload sessions, downloads, delta                                                                                      |
+| Subscriptions | create, renew, delete; change notifications with `clientState` and validation                                                                            |
+| Users         | `/me`, `revokeSignInSessions`                                                                                                                            |
 
 ## Faults
 
-| Call | Faults the matrix tries |
-| --- | --- |
-| `POST …/oauth2/v2.0/token` | 500, 503, 400, a 10-second delay, connection reset, answer lost after Microsoft issued the token |
-| A Graph write, such as `POST /me/sendMail` | 429, 503, 504, a 10-second delay, connection reset, answer lost after Graph acted |
-| A Graph read | 429, 503, 504, a 10-second delay, connection reset |
-| Every change notification | arrives twice, arrives 10 minutes late, forged, 1 hour stale |
+| Call                                       | Faults the matrix tries                                                                          |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `POST …/oauth2/v2.0/token`                 | 500, 503, 400, a 10-second delay, connection reset, answer lost after Microsoft issued the token |
+| A Graph write, such as `POST /me/sendMail` | 429, 503, 504, a 10-second delay, connection reset, answer lost after Graph acted                |
+| A Graph read                               | 429, 503, 504, a 10-second delay, connection reset                                               |
+| Every change notification                  | arrives twice, arrives 10 minutes late, forged, 1 hour stale                                     |
 
 ## Webhooks
 
