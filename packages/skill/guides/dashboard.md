@@ -57,7 +57,7 @@ this machine). On the right are tabs (`&pane=`):
 
 - **Replay**: the video (or the step screenshots when no video was kept) with play, speed and a
   scrubber marking steps and faults; `&t=12.5` opens it 12.5 seconds in, `#step-3` where step 3
-  starts. The scrubber shades "settling" and "checks", the idle tail after the last step, with a
+  starts. With a popup, it follows the run from tab to tab (see Video below). The scrubber shades "settling" and "checks", the idle tail after the last step, with a
   "Go to" for each; the tail plays at 4× unless "Idle at 4×" is turned off or the chosen speed is
   faster.
 - **Console** with level filters, and **Network** with the page's requests.
@@ -116,3 +116,27 @@ When a test opened another person's browser (`users.open`), each person has thei
 `bob · tab 1` beside `you · tab 1` in the player. A person's video marks their own steps and calls
 plus the app server's; the transcript tags each step with its person, draws a line where the test
 moves to another person's browser, and its "Go to" switches to that person's video.
+
+A popup or a new tab the app opens (an OAuth "Connect your account" page) is filmed as the next tab
+(`video/tab-2.webm`). Each step records the tab it ran in (`tab` in the record). A check that found
+its element in the popup counts as the popup's. Each video records the tab that opened it
+(`opener`), the host of its first page (`host`) and whether it closed before the browser did
+(`closed`).
+
+- While it plays, the player switches to the tab of the running step and keeps playing. When the
+  popup's video ends, it goes back to the tab that opened it.
+- The scrubber and the transcript mark "Popup opened: <host>" and "Back to the app".
+- The popup's steps carry a `popup` badge, and "Go to" shows the step's tab.
+- The clock and the step times read from the first video, so they don't change with the tab.
+- The Tab buttons still pick a tab by hand. That tab stays until the next step starts.
+
+Filmed pages draw a cursor that moves to each element before an action, the agent's included:
+
+- a box around the element;
+- a ripple on a click, check, select, upload or drag;
+- a "typing" badge on a fill or press.
+
+The cursor sits in a shadow root above the page, with `pointer-events: none`, and changes no
+layout. It is hidden from `toHaveScreenshot` pictures and from the model's screenshots, though not
+from the step screenshots. It is drawn only when video is on and costs about 0.2 s per action.
+Turn it off with `video: { mode: "on", cursor: false }`.

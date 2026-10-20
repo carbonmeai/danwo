@@ -74,7 +74,7 @@ type.
 | Option      | Default             | What it does                                                                            |
 | ----------- | ------------------- | --------------------------------------------------------------------------------------- |
 | `record`    | `"always"`, 50 runs | a [flight record](/docs/flight-records) mode, or `{ mode, keepRuns }` to keep more runs |
-| `video`     | `"on"`              | keep video with each record, `"retain-on-failure"`, or `"off"`                          |
+| `video`     | `"on"`              | keep video with each record, `"retain-on-failure"`, or `"off"`; `{ mode, cursor }` too  |
 | `reporters` | none                | e.g. `github()` from `@danwo/github` ([CI](/docs/ci))                                   |
 | `lint`      | on, never fails     | [integration lint](/docs/integration-lint) levels and `failOn`                          |
 | `impact`    | none                | rules for [changed tests](/docs/impact)                                                 |
