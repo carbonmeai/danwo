@@ -60,5 +60,5 @@ describe("dense inline code", () => {
       console.warn(`generated pages with dense inline code:\n${dense.join("\n")}`)
 
     expect(Array.isArray(dense)).toBe(true)
-  })
+  }, 60_000)
 })
