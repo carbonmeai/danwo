@@ -13,6 +13,7 @@ import {
 
 import { type AppClock, createAppClock } from "./app-clock.ts"
 import { type CapturedMessage, captureMessage } from "./capture.ts"
+import { clientOf, userField } from "./clients.ts"
 import {
   hostMatches,
   isLoopback,
@@ -23,6 +24,7 @@ import {
 } from "./hosts.ts"
 import { isListening, nothingListening } from "./listening.ts"
 import { type EnvOptions, preloadedPids, proxyEnvironment, writeNodeShim } from "./node-env.ts"
+import { quietDroppedClients } from "./quiet.ts"
 import { forwardTo } from "./upstream.ts"
 import {
   handleSockets,
@@ -163,6 +165,8 @@ export interface Exchange {
    * backend, or another program the run started). Always set by the proxy.
    */
   readonly client?: "browser" | "server"
+  /** The person whose browser sent it, in a test that opened more than one person's browser. */
+  readonly user?: string
   /** The fault injected into this exchange, if any. */
   fault: string | null
   /** Null until the response is sent, and for aborted requests. */
@@ -460,13 +464,6 @@ function socketUpstreams(routes: readonly Route[]): SocketUpstream[] {
   })
 }
 
-/** Whether a request's user agent is a browser's rather than a server-side HTTP client's. */
-function clientOf(userAgent: string | string[] | undefined): "browser" | "server" {
-  const agent = Array.isArray(userAgent) ? userAgent.join(" ") : (userAgent ?? "")
-
-  return agent.includes("Mozilla/") ? "browser" : "server"
-}
-
 /**
  * Starts an HTTPS-intercepting proxy. Requests for a routed host are answered in-process by its
  * handler or forwarded to its upstream; others pass through or are blocked. Faults apply to both
@@ -484,6 +481,7 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   const shimDir = await writeNodeShim(dir)
 
   const server = getLocal({ https: ca })
+  const loud = quietDroppedClients()
 
   await server.start()
 
@@ -597,6 +595,7 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
       ...((isPageAsset(req.path) || isScriptHost(host)) && { asset: true }),
       startedAt: new Date(req.timingEvents.startTime).toISOString(),
       client: clientOf(req.headers["user-agent"]),
+      ...userField(req.headers["user-agent"]),
       status: null,
       durationMs: null,
       aborted: false,
@@ -694,8 +693,12 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
       })
     },
     async stop() {
-      await server.stop()
-      await rm(dir, { recursive: true, force: true })
+      try {
+        await server.stop()
+        await rm(dir, { recursive: true, force: true })
+      } finally {
+        loud()
+      }
     },
   }
 }

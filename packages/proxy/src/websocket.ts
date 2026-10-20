@@ -6,6 +6,8 @@
  */
 import type { CompletedRequest, Mockttp } from "mockttp"
 
+import { clientOf, userField } from "./clients.ts"
+
 /** One WebSocket connection through the proxy, for the flight recorder. */
 export interface SocketExchange {
   readonly id: string
@@ -16,6 +18,8 @@ export interface SocketExchange {
   readonly path: string
   readonly startedAt: string
   readonly client: "browser" | "server"
+  /** The person whose browser opened it, in a test that opened more than one person's browser. */
+  readonly user?: string
   /** The fault injected into this connection, if any. */
   fault: string | null
   /** 101 once the upgrade is accepted, the refusal's status, or null while it is pending. */
@@ -36,6 +40,8 @@ export interface SocketCall {
   readonly host: string
   readonly path: string
   readonly index: number
+  /** The person whose browser opens it, when the test opened more than one person's browser. */
+  readonly user?: string
 }
 
 /**
@@ -78,12 +84,6 @@ export interface Sockets {
   sockets(): readonly SocketExchange[]
   setFault(rule: SocketFaultRule | undefined): void
   clear(): void
-}
-
-function clientOf(userAgent: string | string[] | undefined): "browser" | "server" {
-  const agent = Array.isArray(userAgent) ? userAgent.join(" ") : (userAgent ?? "")
-
-  return agent.includes("Mozilla/") ? "browser" : "server"
 }
 
 /** Where a socket to `host` goes when no fault applies. */
@@ -136,8 +136,8 @@ export async function handleSockets(
 
     const host = req.destination.hostname
     const placed = placement(hosts, host)
-    const fault =
-      placed.kind === "refuse" ? undefined : faultRule?.({ host, path: req.path, index: index++ })
+    const call = { host, path: req.path, ...userField(req.headers["user-agent"]) }
+    const fault = placed.kind === "refuse" ? undefined : faultRule?.({ ...call, index: index++ })
     const decision: Decision =
       fault === undefined
         ? placed
@@ -195,6 +195,7 @@ export async function handleSockets(
       path: req.path,
       startedAt: new Date(req.timingEvents.startTime).toISOString(),
       client: clientOf(req.headers["user-agent"]),
+      ...userField(req.headers["user-agent"]),
       fault:
         decision.kind === "reset"
           ? "ws reset"
