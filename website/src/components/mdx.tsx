@@ -1,9 +1,25 @@
+import { Step, Steps } from "fumadocs-ui/components/steps"
+import { Tab, Tabs } from "fumadocs-ui/components/tabs"
 import defaultMdxComponents from "fumadocs-ui/mdx"
 import type { MDXComponents } from "mdx/types"
 
-/** The components MDX pages can use: the docs defaults (cards, callouts, code blocks, tabs). */
+import { HowItWorks, MatrixFlow } from "./diagrams.tsx"
+
+/**
+ * The components MDX pages can use: the docs defaults (cards, callouts, code blocks), steps,
+ * tabs, and danwo's diagrams.
+ */
 export function useMdxComponents(components?: MDXComponents) {
-  return { ...defaultMdxComponents, ...components } satisfies MDXComponents
+  return {
+    ...defaultMdxComponents,
+    Step,
+    Steps,
+    Tab,
+    Tabs,
+    HowItWorks,
+    MatrixFlow,
+    ...components,
+  } satisfies MDXComponents
 }
 
 declare global {

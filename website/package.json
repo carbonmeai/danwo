@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@danwo/cli": "workspace:*",
+    "@danwo/sdk": "workspace:*",
     "@tailwindcss/vite": "4.3.3",
     "@types/mdx": "2.0.14",
     "@types/react": "19.2.18",
