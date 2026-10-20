@@ -5,5 +5,5 @@ import { fetchTests } from "../modules/tests/tests-api.ts"
 
 export const Route = createFileRoute("/matrix")({
   loader: () => fetchTests(),
-  component: () => <MatrixPage rows={Route.useLoaderData()} />,
+  component: () => <MatrixPage rows={Route.useLoaderData().rows} />,
 })

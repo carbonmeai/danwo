@@ -2,6 +2,7 @@ import type { HistoryTrial, MatrixHistory, TestHistory, Usage } from "@danwo/run
 import { describe, expect, it } from "vitest"
 
 import { toneOf, wordOf } from "../src/lib/verdicts.ts"
+import { hasVerdict, runVerdicts, testVerdict, verdictParam, WHOSE_TONE } from "../src/lib/whose.ts"
 import {
   invariantSummary,
   listedTrials,
@@ -220,5 +221,38 @@ describe("a flight record", () => {
     expect(statusColor({ outcome: "503", bad: true })).toBe("verdict.failed.fg")
     expect(statusColor({ outcome: "aborted", bad: true })).toBe("verdict.failed.fg")
     expect(statusColor({ outcome: "done", bad: false })).toBe("ink.muted")
+  })
+})
+
+describe("whose failure", () => {
+  const appBug = { verdict: "app", confidence: "certain", reason: "the app answered 500" } as const
+  const failing = (status: string): TestHistory["tests"][number] => ({
+    id: status,
+    status,
+    attempts: [{ status: "failed", durationMs: 1, verdict: appBug }],
+  })
+
+  it("reads a failing test's last verdict, and none for a test that passed", () => {
+    expect(testVerdict(failing("failed"))).toEqual(appBug)
+    expect(testVerdict(failing("flaky"))).toBeUndefined()
+    expect(testVerdict({ id: "t", status: "failed", attempts: [] })).toBeUndefined()
+  })
+
+  it("collects a run's failure verdicts and filters on them", () => {
+    const run = { ...testRun([]), tests: [failing("failed"), failing("passed")] }
+    const broke = { ...trial("dup", "failed"), verdict: appBug }
+
+    expect(runVerdicts(run)).toEqual([appBug])
+    expect(hasVerdict(run, "app")).toBe(true)
+    expect(hasVerdict(run, "test")).toBe(false)
+    expect(hasVerdict(run, undefined)).toBe(true)
+    expect(runVerdicts(matrixRun([broke, trial("x", "invalid")]))).toEqual([appBug])
+  })
+
+  it("reads a verdict from an address, and nothing else", () => {
+    expect(verdictParam("danwo")).toBe("danwo")
+    expect(verdictParam("someone")).toBeUndefined()
+    expect(WHOSE_TONE.app).toBe("failed")
+    expect(WHOSE_TONE.test).toBe("flaky")
   })
 })

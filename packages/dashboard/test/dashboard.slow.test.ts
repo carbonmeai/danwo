@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process"
-import { cp, mkdir, rm, symlink, writeFile } from "node:fs/promises"
+import { cp, mkdir, readdir, rm, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -230,5 +230,57 @@ describe("danwo serve", () => {
     ).toContainText(/held|broke under/)
     await open("/settings")
     await expect(screen.getByText("danwo.config.ts", { exact: true })).toBeVisible()
+    await expect(screen.getByText(/the latest 50 keep theirs/)).toBeVisible()
+  })
+
+  it("says whose failure a failed test was, on its row and over its recording", async () => {
+    const { screen, expect } = session
+
+    await open("/runs")
+    await expect(screen.getByRole("link", { name: "3 tests" })).toBeVisible()
+    await screen.getByRole("link", { name: "3 tests" }).click()
+
+    const row = screen.getByRole("row").filter({ hasText: "shows a heading" })
+
+    await expect(row.getByLabel(/^(App bug|Test issue)\./)).toBeVisible({ timeout: 30_000 })
+    await row.getByRole("link", { name: "Watch" }).click()
+
+    const dialog = screen.getByRole("dialog")
+
+    await expect(dialog.getByLabel(/^(App bug|Test issue)\./)).toBeVisible({ timeout: 30_000 })
+    await dialog.getByRole("list", { name: "Steps" }).press("Escape")
+    await open("/runs?verdict=environment")
+    await expect(screen.getByText("No runs match")).toBeVisible()
+  })
+
+  it("marks a run whose recordings were deleted, and explains it inside the overlay", async () => {
+    const { screen, expect } = session
+    const run = (await readdir(join(WORK, ".danwo", "runs"))).toSorted()[0] ?? ""
+    const test = (await readdir(join(WORK, ".danwo", "runs", run))).find((name) =>
+      name.includes("heading"),
+    )
+    const record = `.danwo/runs/${run}/${test ?? ""}/attempt-1`
+
+    await rm(join(WORK, ".danwo", "runs", run), { recursive: true, force: true })
+    await open(`/runs/${run}`)
+
+    const row = screen.getByRole("row").filter({ hasText: "shows a heading" })
+
+    await expect(row.getByText("recording deleted")).toBeVisible({ timeout: 30_000 })
+    await expect(row.getByRole("button", { name: "Watch (recording deleted)" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    )
+    await open(`/runs/${run}?open=${encodeURIComponent(record)}`)
+
+    const dialog = screen.getByRole("dialog")
+
+    await expect(dialog.getByText("This recording was deleted")).toBeVisible({ timeout: 30_000 })
+    await expect(dialog.getByText(/Only the latest 50 runs keep recordings/)).toBeVisible()
+    await expect(
+      dialog.getByRole("button", { name: /Rerun tests\/broken\.danwo\.ts/ }),
+    ).toBeVisible()
+    await dialog.getByRole("button", { name: "Close" }).first().click()
+    await expect(screen.getByRole("dialog")).toHaveCount(0)
   })
 })

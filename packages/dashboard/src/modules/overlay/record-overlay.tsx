@@ -269,7 +269,7 @@ export function RecordOverlay() {
           </>
         ) : view === null ? (
           <>
-            <DialogTitle srOnly>This recording was deleted</DialogTitle>
+            <DialogTitle srOnly>Recording deleted</DialogTitle>
             <GoneRecording dir={open ?? ""} onClose={onClose} />
           </>
         ) : (
