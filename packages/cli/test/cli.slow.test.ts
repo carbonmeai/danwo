@@ -136,7 +136,9 @@ describe("danwo test", () => {
       expect(fake.requests.map((r) => r.method)).toEqual(["POST", "PATCH"])
       expect(bodyOf(fake, 0)?.name).toBe("danwo")
       expect(bodyOf(fake, -1)?.conclusion).toBe("failure")
-      expect(bodyOf(fake, -1)?.output?.title).toBe("2 passed · 1 failed · 1 flaky · 0 skipped")
+      expect(bodyOf(fake, -1)?.output?.title).toBe(
+        "2 passed · 1 failed (1 app bug) · 1 flaky · 0 skipped",
+      )
       expect(bodyOf(fake, -1)?.output?.annotations.map((a) => [a.path, a.title])).toEqual(
         expect.arrayContaining([
           ["tests/fail.danwo.ts", "tests/fail.danwo.ts › fails its assertion"],
@@ -144,7 +146,7 @@ describe("danwo test", () => {
         ]),
       )
       expect(await readFile(join(state, "step-summary.md"), "utf8")).toContain(
-        "### danwo test: 2 passed · 1 failed · 1 flaky · 0 skipped",
+        "### danwo test: 2 passed · 1 failed (1 app bug) · 1 flaky · 0 skipped",
       )
     } finally {
       await fake.close()

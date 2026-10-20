@@ -182,11 +182,7 @@ function weighedVerdict(evidence: VerdictEvidence, error: TestError): FailureVer
       `${error.code} on a page that loaded with no app errors: the locator may be stale`,
     )
   if (error.code === "SESSION_SETUP_FAILED")
-    return judged(
-      "test",
-      "likely",
-      `the saved session's setup failed with no app errors: ${brief(error.message)}`,
-    )
+    return judged("test", "likely", "the saved session's setup failed on a page with no app errors")
   if (AGENT_CODES.has(error.code))
     return judged(
       "test",
