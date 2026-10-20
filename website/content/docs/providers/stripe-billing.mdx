@@ -1,0 +1,151 @@
+---
+description: Subscriptions, setup intents, invoices and the billing portal, renewing on the emulator's clock so a test can jump a month ahead.
+---
+
+The Stripe emulator runs billing as Stripe does: subscriptions start, trials end, invoices are
+paid or fail, and every step sends its webhook. It all runs on the emulator's clock, so a test can
+[travel in time](/docs/time-travel) and watch a renewal happen.
+
+## Set up
+
+Billing comes with `stripeService`. Seed a **recurring** price for each plan:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, stripeService } from "@danwo/sdk"
+
+const url = "http://localhost:3000"
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  environment: () =>
+    appEnvironment({
+      app: { command: "npm run dev", url },
+      services: [
+        stripeService({
+          seed: () => ({
+            products: [{ name: "Pro" }],
+            prices: [
+              {
+                product_name: "Pro",
+                unit_amount: 2000,
+                currency: "usd",
+                lookup_key: "pro_monthly",
+                nickname: "Pro monthly",
+                recurring: { interval: "month" },
+              },
+            ],
+            webhookEndpoints: [
+              {
+                url: `${url}/api/webhooks/stripe`,
+                events: ["customer.subscription.updated", "invoice.paid", "invoice.payment_failed"],
+                secret: "whsec_test",
+              },
+            ],
+          }),
+        }),
+      ],
+    }),
+})
+```
+
+`lookup_key` lets your app find the price by its own name, the way a `plans` table usually does.
+
+## Use it in a test
+
+Subscribe through Checkout, jump a month ahead, and check the second invoice was paid:
+
+```ts title="tests/renewal.danwo.ts"
+import { type StripeFixtures, test as base } from "@danwo/sdk"
+
+const test = base.extend<StripeFixtures>()
+
+test("renews the plan after a month", async ({ app, screen, expect, time, settle, stripe }) => {
+  await app.open("/pricing")
+  await screen.getByRole("button", { name: "Choose Pro" }).click()
+  await screen.getByTestId("checkout-pay").click()
+  await expect(screen.getByText("Plan: Pro")).toBeVisible()
+
+  await time.travel({ days: 32 })
+  await settle()
+
+  const answer = await stripe.fetch(
+    new Request("https://api.stripe.com/v1/invoices?status=paid", {
+      headers: { authorization: "Bearer sk_test_any" },
+    }),
+  )
+  const { data } = await answer.json()
+
+  expect(data).toHaveLength(2)
+})
+```
+
+`time.travel` moves your app's clock and the emulator's together. `settle` waits until every
+webhook the renewal sent has reached your app.
+
+## Choose the outcome with a card
+
+Stripe's test payment methods decide what happens to a payment:
+
+| Payment method | What happens |
+| --- | --- |
+| `pm_card_visa` | Succeeds, now and at every renewal. |
+| `pm_card_chargeDeclined` | Declined, even when only saving the card. |
+| `pm_card_chargeCustomerFail` | Saves, but every charge fails: the renewal goes `past_due`. |
+| `pm_card_authenticationRequired` | The intent stops at `requires_action` (3-D Secure). |
+
+A `past_due` subscription stays that way until `POST /v1/invoices/:id/pay` succeeds.
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Setup intents | create, confirm, retrieve, cancel, list |
+| Subscriptions | create, retrieve, update (price swaps), cancel, list; trials, `cancel_at_period_end`, `payment_behavior` |
+| Statuses | `incomplete`, `trialing`, `active`, `past_due`, `canceled`, `incomplete_expired` |
+| Invoices | retrieve, list by subscription, `pay`, `create_preview` |
+| Billing portal | sessions, and a hosted page that cancels at the period's end |
+| Checkout | subscription mode, with `subscription_data.trial_period_days` |
+
+## Faults
+
+The same faults as every Stripe call: 500, 429, a connection reset, and an answer lost after
+Stripe acted on a write. Each billing webhook can also arrive twice, late, forged or stale.
+
+<Callout type="idea">
+  To test a failed renewal, attach `pm_card_chargeCustomerFail` from the test before travelling.
+  See [Time travel](/docs/time-travel).
+</Callout>
+
+## Webhooks
+
+| Event family | Events |
+| --- | --- |
+| Subscriptions | `customer.subscription.created`, `.updated`, `.deleted`, `.trial_will_end` |
+| Invoices | `invoice.created`, `.finalized`, `.paid`, `.payment_succeeded`, `.payment_failed`, `.payment_action_required` |
+| Setup intents | `setup_intent.created`, `.succeeded`, `.setup_failed`, `.requires_action` |
+| Checkout | `checkout.session.completed` for subscription mode |
+
+Webhooks are signed on your app's clock, so a delivery after time travel isn't refused as stale.
+
+## Fidelity
+
+**Live.** The Stripe suite includes setup intents, subscriptions and invoices, checked against a
+test-mode account. They match.
+
+## Not covered yet
+
+- Coupons, promotion codes and tax rates
+- Usage-based billing and meters
+- Subscription schedules and pausing
+
+## Next
+
+<Cards>
+  <Card title="Stripe.js and cards" href="/docs/providers/stripe-js">
+    Collect a card in the browser and save it for renewals.
+  </Card>
+  <Card title="Time travel" href="/docs/time-travel">
+    How the app's, the emulator's and the page's clocks move together.
+  </Card>
+</Cards>

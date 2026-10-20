@@ -1,0 +1,146 @@
+---
+description: Flutterwave's v3 API with its hosted checkout, test cards, refunds, payment plans, transfers and virtual accounts.
+---
+
+danwo's Flutterwave emulator answers `api.flutterwave.com` in test mode and serves the hosted
+checkout on `checkout.flutterwave.com`. Your app creates a Standard payment link, the browser pays
+on the hosted page, and the emulator sends `charge.completed` to your webhook.
+
+## Set up
+
+Add `flutterwaveService`. Any test-mode key, `FLWSECK_TEST-…`, is accepted, so your app keeps its
+own. Seed the webhook with the secret hash your app checks:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, flutterwaveService } from "@danwo/sdk"
+
+const url = "http://localhost:3000"
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  environment: () =>
+    appEnvironment({
+      app: { command: "npm run dev", url, env: { FLW_SECRET_HASH: "danwo-hash" } },
+      services: [
+        flutterwaveService({
+          seed: { webhook: { url: `${url}/api/webhooks/flutterwave`, secretHash: "danwo-hash" } },
+        }),
+      ],
+    }),
+})
+```
+
+A key that isn't a test-mode key gets Flutterwave's 401, `Invalid authorization key`.
+
+## Seed it
+
+```ts title="danwo.config.ts · the seed"
+flutterwaveService({
+  seed: {
+    webhook: { url: "http://localhost:3000/api/webhooks/flutterwave", secretHash: "danwo-hash" },
+    balances: { NGN: 250_000, USD: 1_000 },
+    plans: [{ id: 101, name: "Pro", amount: 5_000, interval: "monthly", currency: "NGN" }],
+    accounts: [{ bankCode: "044", accountNumber: "0690000099", accountName: "Ada Obi" }],
+  },
+})
+```
+
+| Field | What it seeds |
+| --- | --- |
+| `webhook` | The dashboard's webhook URL and its secret hash. |
+| `balances` | Balances by currency, in major units; NGN 1,000,000 by default. |
+| `plans` | Payment plans, `hourly` to `yearly`, with an optional number of charges. |
+| `accounts` | Accounts that resolve, beside Flutterwave's own test accounts; `blacklisted` refuses transfers to one. |
+
+## Use it in a test
+
+Pay on the hosted page, then check the transaction was recorded once:
+
+```ts title="tests/pay.danwo.ts"
+import { type FlutterwaveFixtures, flutterwaveLedger, test as base } from "@danwo/sdk"
+
+const test = base.extend<FlutterwaveFixtures>()
+
+test("pays for an order once", async ({ app, screen, expect, flutterwave }) => {
+  await app.open("/checkout")
+  await screen.getByRole("button", { name: "Pay with Flutterwave" }).click()
+
+  await screen.getByLabel("Card number").fill("5377 2836 4507 7450")
+  await screen.getByLabel("Expiry date").fill("09/32")
+  await screen.getByLabel("CVV").fill("789")
+  await screen.getByRole("button", { name: /^Pay / }).click()
+  await expect(screen.getByText("Order paid")).toBeVisible()
+
+  const paid = flutterwaveLedger(flutterwave).paid("order-1")
+
+  expect(paid).toHaveLength(1)
+  expect(paid[0]?.status).toBe("successful")
+})
+```
+
+`flutterwaveLedger` also gives `refunds()`, `transfers()`, `subscriptions()`, `balance(currency)`
+and `renewDue()`, which charges every subscription that's due. For bank transfers into a virtual
+account, call `flutterwaveBank(flutterwave).transferIn({ accountNumber, amount })`.
+
+## Test cards
+
+| Card number | What the hosted page does |
+| --- | --- |
+| `5377 2836 4507 7450` | Pays with no further step. |
+| `5531 8866 5214 2950` | Asks for a PIN, then an OTP. |
+| `4187 4274 1556 4246` | Asks for the bank's OTP (3-D Secure). |
+| `4556 0527 0417 2643` | Asks for a billing address. |
+| `5258 5859 2266 6506` | Refused for insufficient funds. |
+| `5143 0105 2233 9965` | Refused with "Do Not Honour". |
+
+OTP `5548` ends in "Wrong OTP". The page also offers bank transfer ("I've sent the money") and
+mobile money, and "Cancel payment" goes back to your `redirect_url`.
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Payments | Standard payment links, the hosted page, disabling a link |
+| Transactions | verify by id or `tx_ref`, list, events, fees, `resend-hook` |
+| Refunds | create, fetch, list |
+| Plans and subscriptions | create, update, cancel plans; list, activate, cancel subscriptions; renewals on the emulator's clock |
+| Transfers | create, fetch, list, fees, retries; they settle as the test-mode references say |
+| Money in | virtual account numbers, bank transfers into them |
+| Lookups | banks by country, account resolution, beneficiaries, balances |
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| A write, such as `POST /v3/payments` | 429, 500, 503, a 10-second delay, connection reset, answer lost after Flutterwave acted |
+| `GET /v3/transactions/:id/verify` | 429, 500, connection reset, and a 200 whose body says the payment failed |
+| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+
+## Webhooks
+
+Each delivery carries the secret hash in `verif-hash` and an HMAC of the body in
+`flutterwave-signature`, as Flutterwave sends them. Events: `charge.completed`,
+`transfer.completed` and `subscription.cancelled`.
+
+## Fidelity
+
+**Live.** `danwo fidelity flutterwave` checks 3 scenarios against a test-mode account. 2 match;
+the bank list is skipped, since Flutterwave's test mode answers it with a provider error.
+
+## Not covered yet
+
+- Direct card charges (`/v3/charges`) and their encryption
+- Subaccounts and split payments
+- Bill payments, airtime and settlements reports
+
+## Next
+
+<Cards>
+  <Card title="Paystack" href="/docs/providers/paystack">
+    The same flow on Paystack's hosted page.
+  </Card>
+  <Card title="Fault matrix" href="/docs/fault-matrix">
+    What a verify call that says "failed" does to your order page.
+  </Card>
+</Cards>

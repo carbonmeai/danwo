@@ -1,0 +1,162 @@
+---
+description: Bachs checkout sessions, subscriptions, card recovery, refunds and payouts on its sandbox and live hosts, settling on the emulator's clock.
+---
+
+danwo's Bachs emulator answers the API on `sandbox-api.bachs.io` and `api.bachs.io`, the hosted
+checkout on `checkout.bachs.io`, its overlay script, the card recovery page and the customer
+portal on `portal.bachs.io`. Payments settle, subscriptions renew and payouts complete on the
+emulator's clock.
+
+## Set up
+
+Add `bachsService`. A well-formed key is accepted: `sk_sandbox_…` on the sandbox host and
+`sk_live_…` on the live one, as Bachs checks them, so your app keeps its own key.
+
+```ts title="danwo.config.ts"
+import { appEnvironment, bachsService, defineConfig } from "@danwo/sdk"
+
+const url = "http://localhost:3000"
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  environment: () =>
+    appEnvironment({
+      app: { command: "npm run dev", url },
+      services: [
+        bachsService({
+          seed: {
+            products: [
+              {
+                id: "prod_pro",
+                name: "Pro",
+                price: { currency: "USD", amount: "29.00" },
+                billing_cycle: { interval: "month", frequency: 1 },
+              },
+            ],
+            webhookEndpoints: [
+              {
+                url: `${url}/api/webhooks/bachs`,
+                events: ["checkout.completed", "invoice.paid", "invoice.payment_failed"],
+                secret: "whsec_danwo",
+              },
+            ],
+          },
+        }),
+      ],
+    }),
+})
+```
+
+## Seed it
+
+| Field | What it seeds |
+| --- | --- |
+| `products` | One-off or recurring products, with a price per currency, a billing cycle and a trial. |
+| `customers` | Customers, with your own ids if you give them. |
+| `webhookEndpoints` | Where events go, which ones, and the signing secret. |
+| `balances` | Balances by currency, for payouts. |
+| `destinations` | Payout destinations; `fails: true` makes payouts to one fail. |
+| `recovery` | What the card recovery page does when a customer updates a card. |
+
+## Use it in a test
+
+Subscribe on the hosted checkout, fail the next renewal, and check the app sent its customer to
+the recovery page:
+
+```ts title="tests/renewal.danwo.ts"
+import { type BachsFixtures, bachsLedger, test as base } from "@danwo/sdk"
+
+const test = base.extend<BachsFixtures>()
+
+test("asks for a new card when a renewal fails", async ({ app, screen, expect, time, bachs }) => {
+  await app.open("/pricing")
+  await screen.getByRole("button", { name: "Choose Pro" }).click()
+  await screen.getByTestId("bachs-pay").click()
+  await expect(screen.getByText("Plan: Pro")).toBeVisible()
+
+  const ledger = bachsLedger(bachs)
+  const [subscription] = ledger.subscriptions()
+
+  ledger.failCard(subscription?.id ?? "", "insufficient_funds")
+  await time.travel({ days: 31 })
+
+  await app.open("/billing")
+  await expect(screen.getByText("Update your card")).toBeVisible()
+  expect(ledger.recoveryEmails()).toHaveLength(1)
+})
+```
+
+`bachsLedger` reads `payments()`, `succeeded()`, `checkouts()`, `subscriptions()`, `refunds()`,
+`payouts()` and `balance(currency)`, and drives the account with `deposit`, `failCard`,
+`updateCard` and `catchUp`.
+
+On the hosted checkout, `bachs-pay` pays, `bachs-cancel` goes back, `bachs-total` shows the total
+and `bachs-update-card` is the recovery page's button.
+
+## Test cards
+
+The checkout's card field starts with `4242 4242 4242 4242`, which succeeds. These fail:
+
+| Card number | Fails with |
+| --- | --- |
+| `4000 0000 0000 0002` | Declined |
+| `4000 0000 0000 9995` | Insufficient funds |
+| `4000 0000 0000 0069` | Expired card |
+| `4000 0000 0000 0119` | A provider error |
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Catalog | products: create, update, list, archive and unarchive |
+| Checkout | sessions, the hosted page, the overlay script `bachs.js` |
+| Customers | create, update, list, portal sessions |
+| Subscriptions | list, update, cancel; renewals, trials, failed cards and the recovery page |
+| Payments and refunds | payments listed; full and partial refunds, by charge |
+| Payouts | destinations, quotes, payouts, account resolution, banks |
+| Money in | virtual accounts and deposits |
+| Requests | idempotency keys, request ids, the sandbox's rate-limit headers |
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| A write, such as `POST /v1/checkout-sessions` | 429, 500, 503, a 10-second delay, connection reset, answer lost after Bachs acted |
+| A read, such as `GET /v1/payments/:id` | 429, 500, connection reset |
+| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+
+## Webhooks
+
+Deliveries carry `x-bachs-timestamp`, the signature, and `X-Bachs-Signature-V2` in the
+`t=…,v1=…` form, made with the endpoint's `secret`.
+
+| Event family | Events |
+| --- | --- |
+| Checkout | `checkout.opened`, `.completed`, `.closed`, `.expired` |
+| Collections | `collection.succeeded`, `.failed` |
+| Customers | `customer.created`, `.updated` |
+| Invoices | `invoice.created`, `.paid`, `.payment_failed` |
+| Payouts | `payout.created`, `.paid`, `.failed` |
+| Refunds | `refund.created`, `.paid`, `.failed` |
+
+## Fidelity
+
+**Live.** `danwo fidelity bachs` runs 2 scenarios against the Bachs sandbox. Both match.
+
+## Not covered yet
+
+- Coupons and discounts
+- Usage-based prices
+- Disputes
+
+## Next
+
+<Cards>
+  <Card title="Time travel" href="/docs/time-travel">
+    Jump to the next renewal and watch it fail.
+  </Card>
+  <Card title="Stripe billing" href="/docs/providers/stripe-billing">
+    The same subscription flow on Stripe.
+  </Card>
+</Cards>

@@ -1,0 +1,104 @@
+---
+description: A stand-in for Stripe.js on js.stripe.com, with card fields a test can fill and Stripe's test cards deciding each outcome.
+---
+
+Pages that load Stripe.js get danwo's stand-in from `js.stripe.com`. It gives you `Stripe(key)`
+and its Elements as plain inputs, so a test can type a card number like a person would.
+
+## Why a stand-in
+
+The real Stripe.js runs inside Stripe's own iframes and talks to Stripe's servers. It can't run
+against an emulator. The stand-in keeps the same API, so your page's code doesn't change, and
+`loadStripe` and `@stripe/react-stripe-js` load it without knowing.
+
+## Set up
+
+Nothing extra: `stripeService` answers `js.stripe.com` as well as the API. Your page keeps its own
+`pk_test_` key.
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, stripeService } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  environment: () =>
+    appEnvironment({
+      app: { command: "npm run dev", url: "http://localhost:3000" },
+      services: [stripeService()],
+    }),
+})
+```
+
+## Use it in a test
+
+Each Element is a labelled input. Fill them by label, then submit your own form:
+
+```ts title="tests/card.danwo.ts"
+import { test } from "@danwo/sdk"
+
+test("saves a card", async ({ app, screen, expect }) => {
+  await app.open("/billing")
+  await screen.getByLabel("Card number").fill("4242 4242 4242 4242")
+  await screen.getByLabel("Expiration date").fill("12/34")
+  await screen.getByLabel("Security code").fill("123")
+  await screen.getByRole("button", { name: "Save card" }).click()
+
+  await expect(screen.getByText("Card saved")).toBeVisible()
+})
+```
+
+The address Element's fields are labelled the same way: "Full name", "Address line 1" and so on.
+
+## Test cards
+
+The card number decides what happens, as on Stripe:
+
+| Card number | Outcome |
+| --- | --- |
+| `4242 4242 4242 4242` | Succeeds |
+| `4000 0000 0000 0002` | Declined |
+| `4000 0025 0000 3155` | Needs authentication (3-D Secure) |
+
+On the server side, use Stripe's test payment methods instead; see
+[Stripe billing](/docs/providers/stripe-billing#choose-the-outcome-with-a-card).
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Elements | card, card number, expiry, CVC, payment, address, link authentication and express checkout, each a plain input |
+| Confirming | `confirmCardPayment`, `confirmCardSetup`, `confirmPayment`, `confirmSetup` |
+| Other calls | `createPaymentMethod`, `retrievePaymentIntent`, `retrieveSetupIntent` |
+| Checkout | `redirectToCheckout({ sessionId })` opens the emulator's hosted page |
+| Wallets | `paymentRequest()` reports that no wallet is available |
+
+The emulator accepts a `pk_test_` key only on these calls, and an intent only with its own client
+secret, as Stripe does.
+
+## Faults
+
+Loading Stripe.js counts as loading the page, so the fault matrix leaves the script alone. The
+calls it makes to `api.stripe.com` get the usual Stripe faults: 500, 429, a reset, and an answer
+lost after a write.
+
+## Fidelity
+
+**Not checked live.** The stand-in follows Stripe.js's documented API. The API calls behind it are
+the same ones the live Stripe suite checks.
+
+## Not covered yet
+
+- Apple Pay, Google Pay and Link wallets: express checkout shows no wallet
+- IBAN and other bank Elements
+- How the real Elements look: the stand-in's inputs are plain
+
+## Next
+
+<Cards>
+  <Card title="Stripe" href="/docs/providers/stripe">
+    Payments, Checkout and webhooks on the server side.
+  </Card>
+  <Card title="Stripe billing" href="/docs/providers/stripe-billing">
+    Use the saved card for subscriptions and renewals.
+  </Card>
+</Cards>

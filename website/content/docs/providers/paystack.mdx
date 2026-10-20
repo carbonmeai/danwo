@@ -1,0 +1,161 @@
+---
+description: Transactions paid on Paystack's hosted page with its test cards, bank transfer or USSD, plus plans, transfers, refunds and signed events.
+---
+
+danwo's Paystack emulator answers `api.paystack.co` and the hosted payment page on
+`checkout.paystack.com`. Your app initializes a transaction, the browser pays on the hosted page,
+and the emulator sends `charge.success` to your webhook URL.
+
+## Set up
+
+Add `paystackService` and seed an integration with the secret key your app uses. Hand the same key
+to the app:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, paystackService } from "@danwo/sdk"
+
+const url = "http://localhost:3000"
+const secretKey = "sk_test_danwo"
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  environment: () =>
+    appEnvironment({
+      app: { command: "npm run dev", url, env: { PAYSTACK_SECRET_KEY: secretKey } },
+      services: [
+        paystackService({
+          seed: {
+            integrations: [
+              {
+                secretKey,
+                webhookUrl: `${url}/api/webhooks/paystack`,
+                callbackUrl: `${url}/paid`,
+              },
+            ],
+          },
+        }),
+      ],
+    }),
+})
+```
+
+A key the emulator doesn't know gets Paystack's own 401, `Invalid key`.
+
+## Seed it
+
+```ts title="danwo.config.ts · the seed"
+paystackService({
+  seed: {
+    integrations: [{ secretKey: "sk_test_danwo", currency: "NGN", balance: { NGN: 5_000_000 } }],
+    customers: [{ email: "ada@example.com", firstName: "Ada" }],
+    plans: [{ planCode: "PLN_pro", name: "Pro", amount: 500_000, interval: "monthly" }],
+    accounts: [{ bankCode: "058", accountNumber: "0123456789", accountName: "Ada Obi" }],
+  },
+})
+```
+
+| Field | What it seeds |
+| --- | --- |
+| `integrations` | Secret keys, the webhook and callback URLs, the currency, the balance and whether transfers need an OTP. |
+| `customers` | Customers, attached to the first integration unless you name one. |
+| `plans` | Plans, `hourly` to `annually`, with an optional invoice limit. |
+| `accounts` | Bank accounts that resolve by number, and what a transfer to each does. |
+
+Amounts are in the currency's subunit, kobo for naira, as on Paystack.
+
+## Use it in a test
+
+Pay with a test card on the hosted page, then read the ledger:
+
+```ts title="tests/pay.danwo.ts"
+import { type PaystackFixtures, paystackLedger, test as base } from "@danwo/sdk"
+
+const test = base.extend<PaystackFixtures>()
+
+test("pays for an order once", async ({ app, screen, expect, paystack }) => {
+  await app.open("/checkout")
+  await screen.getByRole("button", { name: "Pay with Paystack" }).click()
+
+  await screen.getByLabel("Card number").fill("4084 0840 8408 4081")
+  await screen.getByLabel("Expiry (MM/YY)").fill("12/30")
+  await screen.getByLabel("CVV").fill("408")
+  await screen.getByRole("button", { name: /^Pay / }).click()
+  await expect(screen.getByText("Order paid")).toBeVisible()
+
+  const ledger = paystackLedger(paystack)
+
+  expect(ledger.successful("NGN")).toHaveLength(1)
+  expect(ledger.paidTotal("ada@example.com")).toBe(500_000)
+})
+```
+
+`paystackLedger` also lists `transfers()`, `refunds()`, `customers()` and `subscriptions()`.
+To pay into a dedicated account as the customer's bank would, call
+`paystackBank(paystack).transferTo(accountNumber, amount)`.
+
+## Test cards
+
+| Card number | What the hosted page does |
+| --- | --- |
+| `4084 0840 8408 4081` | Pays at once. |
+| `5060 6666 6666 6666 666` | Asks for PIN `1234`, then pays. |
+| `5078 5078 5078 5078 12` | Asks for PIN `1111`, then OTP `123456`. |
+| `4084 0800 0000 5408` | Declined. |
+| `5399 8383 8383 8381` | Declined for insufficient funds. |
+
+The page also offers bank transfer ("I've sent the money") and USSD, and "Cancel payment" goes
+back to your callback URL.
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Transactions | initialize, verify, fetch, list, totals, `charge_authorization` with a saved card |
+| Hosted page | card with PIN and OTP steps, bank transfer, USSD, cancel |
+| Customers | create, fetch, update, list |
+| Plans and subscriptions | create, fetch, list, enable, disable; renewals on the emulator's clock |
+| Transfers | recipients, transfers, `finalize_transfer` with an OTP, verify; they settle later |
+| Refunds | create, fetch, list; they settle later |
+| Banks | list, account resolution, balance, dedicated accounts |
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| A write, such as `POST /transaction/initialize` | 429, 500, 503, a 10-second delay, connection reset, answer lost after Paystack acted |
+| `GET /transaction/verify/:reference` | 429, 500, connection reset, and a 200 whose body says the payment failed |
+| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+
+## Webhooks
+
+Events go to the integration's `webhookUrl`, signed with `x-paystack-signature`: an HMAC-SHA512 of
+the body under the secret key. There is no timestamp, as on Paystack, so a stale event is only
+caught by your own checks.
+
+Events: `charge.success`, `transfer.success`, `transfer.failed`, `transfer.reversed`,
+`refund.processed`,
+`subscription.create`, `subscription.disable`, `invoice.create`, `invoice.update` and
+`invoice.payment_failed`.
+
+## Fidelity
+
+**Live.** `danwo fidelity paystack` runs 4 scenarios against a Paystack test-mode integration.
+All 4 match.
+
+## Not covered yet
+
+- Split payments and subaccounts
+- Payment pages, invoices you create yourself and the storefront
+- Disputes and settlements reports
+
+## Next
+
+<Cards>
+  <Card title="Flutterwave" href="/docs/providers/flutterwave">
+    Another African payments provider, with its own test cards.
+  </Card>
+  <Card title="Time travel" href="/docs/time-travel">
+    Renew a Paystack subscription a month from now.
+  </Card>
+</Cards>

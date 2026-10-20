@@ -1,0 +1,152 @@
+---
+description: Customers, products and prices, payment intents, refunds and Checkout with its hosted page, plus Stripe's signed webhooks.
+---
+
+danwo's Stripe emulator answers `api.stripe.com` and `checkout.stripe.com`. The official
+`stripe` package works against it unchanged, and your app keeps its own `sk_test_` key.
+
+This page covers payments and Checkout. Subscriptions and invoices have their own page,
+[Stripe billing](/docs/providers/stripe-billing), and so do the browser's
+[Stripe.js and test cards](/docs/providers/stripe-js).
+
+## Set up
+
+Add `stripeService` to your environment:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, stripeService } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  environment: () =>
+    appEnvironment({
+      app: { command: "npm run dev", url: "http://localhost:3000" },
+      services: [stripeService()],
+    }),
+})
+```
+
+Your app needs nothing new. Any `sk_test_` key is accepted, so keep the one in your `.env`.
+`settle: true` makes each step wait until Stripe's webhooks have reached your app.
+
+## Seed it
+
+The seed is a function: it runs at the start and before every test.
+
+```ts title="danwo.config.ts · the seed"
+stripeService({
+  seed: () => ({
+    customers: [{ id: "cus_ada", email: "ada@example.com", name: "Ada" }],
+    products: [{ name: "Credits" }],
+    prices: [{ product_name: "Credits", unit_amount: 500, currency: "usd", lookup_key: "credits" }],
+    webhookEndpoints: [
+      {
+        url: "http://localhost:3000/api/webhooks/stripe",
+        events: ["checkout.session.completed"],
+        secret: "whsec_test",
+      },
+    ],
+  }),
+})
+```
+
+| Field | What it seeds |
+| --- | --- |
+| `customers` | Customers, with your own ids if you give them. |
+| `products` | Products, named so prices can refer to them. |
+| `prices` | One-off or recurring prices, by `product_name`, with an optional `lookup_key`. |
+| `webhookEndpoints` | Where webhooks go, which events, and the signing secret. |
+| `paymentMethodConfigurations` | Which payment methods Checkout offers. |
+
+## Use it in a test
+
+The `stripe` fixture is the emulator. Ask it what happened with Stripe's own API, through
+`stripe.fetch`:
+
+```ts title="tests/buy.danwo.ts"
+import { type StripeFixtures, test as base } from "@danwo/sdk"
+
+const test = base.extend<StripeFixtures>()
+
+test("pays for credits once", async ({ app, screen, expect, stripe }) => {
+  await app.open("/")
+  await screen.getByRole("button", { name: "Buy 500 credits" }).click()
+  await screen.getByTestId("checkout-pay").click()
+  await expect(screen.getByText("Credits: 500")).toBeVisible()
+
+  const answer = await stripe.fetch(
+    new Request("https://api.stripe.com/v1/checkout/sessions?payment_status=paid", {
+      headers: { authorization: "Bearer sk_test_any" },
+    }),
+  )
+  const { data } = await answer.json()
+
+  expect(data).toHaveLength(1)
+})
+```
+
+On the emulator's Checkout page, `checkout-pay` pays and `checkout-cancel` goes back to your
+`cancel_url`.
+
+## What's covered
+
+| Area | Covered |
+| --- | --- |
+| Customers | create, retrieve, update, delete, list, customer sessions |
+| Products and prices | create, retrieve, update, list, lookup keys |
+| Payment intents | create, update, confirm, cancel, retrieve, list |
+| Payment methods | create, attach, detach, list a customer's |
+| Charges and refunds | charges retrieved and listed; full and partial refunds |
+| Checkout Sessions | payment and subscription mode, the hosted page, `expire` |
+| Webhook endpoints | create, list, delete, signed deliveries with retries |
+| Requests | idempotency keys, `expand`, Stripe's error shapes |
+
+## Faults
+
+| Call | Faults the matrix tries |
+| --- | --- |
+| A write, such as `POST /v1/checkout/sessions` | 500, 429 rate limit, connection reset, answer lost after Stripe acted |
+| A read, such as `GET /v1/customers/:id` | 500, 429 rate limit, connection reset |
+| Every webhook delivery | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
+
+The error bodies are Stripe's, so the SDK raises `StripeAPIError` or `StripeRateLimitError` just
+as it would for real.
+
+## Webhooks
+
+Deliveries carry a `Stripe-Signature` header made with the endpoint's `secret`, so
+`stripe.webhooks.constructEvent` accepts them. A failed delivery is retried after 5 minutes, 30
+minutes and 2 hours, on the emulator's clock.
+
+Events include `checkout.session.completed`, `checkout.session.expired`,
+`payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.succeeded`,
+`charge.refunded`, `customer.created` and the billing events on
+[Stripe billing](/docs/providers/stripe-billing).
+
+## Fidelity
+
+**Live.** `danwo fidelity stripe` runs 11 scenarios against a Stripe test-mode account and
+compares each answer's shape. All 11 match. Checkout differs where the account has Stripe Tax
+turned on, which is recorded as a known difference.
+
+## Not covered yet
+
+- Connect, Issuing, Terminal and Treasury
+- Payment Links, Quotes and coupons
+- Capturing a payment intent later, disputes and Radar rules
+- Deleting products and prices, and customer search
+
+## Next
+
+<Cards>
+  <Card title="Stripe billing" href="/docs/providers/stripe-billing">
+    Subscriptions, invoices and renewals on the emulator's clock.
+  </Card>
+  <Card title="Stripe.js and cards" href="/docs/providers/stripe-js">
+    The browser side, and the test cards that decline.
+  </Card>
+  <Card title="Test a provider" href="/docs/test-a-provider">
+    A full walkthrough with an invariant and the matrix.
+  </Card>
+</Cards>
