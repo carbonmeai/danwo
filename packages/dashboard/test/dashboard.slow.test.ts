@@ -35,7 +35,7 @@ function danwo(args: readonly string[], env: NodeJS.ProcessEnv = {}): Promise<vo
 
 /** The shop example as a project of its own, with one failing test, after a test run and a matrix run. */
 async function project(): Promise<void> {
-  await rm(WORK, { recursive: true, force: true })
+  await rm(WORK, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   await mkdir(join(WORK, "tests"), { recursive: true })
   await cp(join(SHOP, "src"), join(WORK, "src"), { recursive: true })
   await cp(join(SHOP, "tests"), join(WORK, "tests"), { recursive: true })
@@ -75,7 +75,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await session?.close()
   await dashboard?.close()
-  await rm(WORK, { recursive: true, force: true })
+  await rm(WORK, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 }, 120_000)
 
 describe("danwo serve", () => {
