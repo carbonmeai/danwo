@@ -14,6 +14,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { launchOf, requestOf } from "../src/modules/live/launch-args.ts"
 import { feedbackOf, keepFeedback } from "../src/modules/overlay/feedback-data.ts"
 import {
+  afterBody,
+  checkWords,
   consoleLines,
   fixPrompt,
   networkRows,
@@ -331,12 +333,33 @@ describe("the run overlay", () => {
     expect(shownRows(rows, "get", true).map((row) => row.id)).toEqual(["2"])
   })
 
+  it("puts settling and checks after the body, a check with what it got and wanted", () => {
+    const passed = { status: "passed", check: { actual: "1", expected: "1" } }
+    const failed = { status: "failed", check: { actual: "[1,2]", expected: "[1]" } }
+
+    expect(checkWords(passed)).toBe("got 1")
+    expect(checkWords(failed)).toBe("expected [1], got [1,2]")
+    expect(checkWords({ status: "passed" })).toBeUndefined()
+    expect([afterBody({ phase: "body" }), afterBody({ phase: "settle" })]).toEqual([false, true])
+    expect(afterBody({ phase: "checks" })).toBe(true)
+  })
+
   it("jumps each step to where it starts, and wraps the failure page as a prompt", () => {
-    const steps = [{ index: 0, label: "Buy", api: "click", status: "passed", durationMs: 9 }]
+    const steps = [
+      {
+        index: 0,
+        kind: "locator" as const,
+        label: "Buy",
+        api: "click",
+        status: "passed",
+        durationMs: 9,
+      },
+    ]
     const replay = {
       videos: [],
       frames: [],
       marks: [{ kind: "step" as const, label: "Buy", atMs: 120, endMs: 200, bad: false, step: 0 }],
+      segments: [],
       spanMs: 200,
     }
 

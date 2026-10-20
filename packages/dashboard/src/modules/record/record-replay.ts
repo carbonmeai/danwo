@@ -39,12 +39,27 @@ export interface ReplayFrame {
   readonly screenshot: string
 }
 
+/**
+ * A stretch of the run after its body, shaded on the scrubber: the wait for background work
+ * (`settle`), then the invariant's checks of what the app did. The browser sits idle through both.
+ */
+export interface ReplaySegment {
+  readonly phase: "settle" | "checks"
+  readonly label: string
+  readonly atMs: number
+  readonly endMs: number
+  /** A check in it failed, or the wait gave up. */
+  readonly bad: boolean
+}
+
 export interface Replay {
   readonly videos: readonly ReplayVideo[]
   /** Screenshots to step through when there is no video. */
   readonly frames: readonly ReplayFrame[]
   /** Steps, calls and webhooks from the timeline, for the screenshot player's scrubber. */
   readonly marks: readonly ReplayMark[]
+  /** The settle wait and the checks, in order; empty for records made before they were kept. */
+  readonly segments: readonly ReplaySegment[]
   /** The record's span, from its start to the last thing it timed. */
   readonly spanMs: number
 }
@@ -110,10 +125,69 @@ function framesOf(record: Pick<FlightRecord, "startedAt" | "steps">): ReplayFram
     .toSorted((a, b) => a.atMs - b.atMs)
 }
 
+type TimedStep = Pick<
+  FlightRecord["steps"][number],
+  "startedAt" | "durationMs" | "phase" | "status"
+>
+
+/**
+ * The settle wait and the checks on the record's clock. The checks run from where settling ended
+ * to the teardown (or the record's end), since the browser stays idle past the last check too.
+ */
+function segmentsOf(
+  record: Pick<FlightRecord, "startedAt" | "durationMs"> & { readonly steps: readonly TimedStep[] },
+): ReplaySegment[] {
+  const origin = millis(record.startedAt)
+  const startOf = (step: TimedStep) => millis(step.startedAt) - origin
+  const endOf = (step: TimedStep) => startOf(step) + step.durationMs
+  const wait = record.steps.find((step) => step.phase === "settle")
+  const checks = record.steps.filter((step) => step.phase === "checks")
+  const teardown = record.steps.find((step) => step.phase === "teardown")
+  const settled =
+    wait === undefined
+      ? []
+      : [
+          {
+            phase: "settle" as const,
+            label: "Settling",
+            atMs: startOf(wait),
+            endMs: endOf(wait),
+            bad: wait.status !== "passed",
+          },
+        ]
+  const [first] = checks
+
+  if (first === undefined) return settled
+
+  const atMs = wait === undefined ? startOf(first) : endOf(wait)
+  const endMs = Math.max(
+    teardown === undefined ? record.durationMs : startOf(teardown),
+    ...checks.map(endOf),
+  )
+
+  return [
+    ...settled,
+    {
+      phase: "checks",
+      label: "Checks",
+      atMs,
+      endMs,
+      bad: checks.some((step) => step.status !== "passed"),
+    },
+  ]
+}
+
+/** Whether `ms` is in the idle tail after the body, from the first segment on. */
+export function inTail(segments: readonly ReplaySegment[], ms: number): boolean {
+  const [first] = segments
+
+  return first !== undefined && ms >= first.atMs
+}
+
 /** What the player plays for the record in `dir`. */
 export function replayOf(
   dir: string,
-  record: Pick<FlightRecord, "startedAt" | "steps" | "videos">,
+  record: Pick<FlightRecord, "startedAt" | "durationMs" | "steps" | "videos">,
   timeline: Timeline,
 ): Replay {
   const origin = millis(record.startedAt)
@@ -134,6 +208,7 @@ export function replayOf(
     videos,
     frames: framesOf(record),
     marks: timelineMarks(timeline),
+    segments: segmentsOf(record),
     spanMs: timeline.spanMs,
   }
 }

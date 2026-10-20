@@ -23,6 +23,7 @@ import { type Timeline, timelineOf } from "./record-timeline.ts"
 /** A step with what the page needs beside the record's own fields. */
 export interface StepView {
   readonly index: number
+  readonly kind: RecordedStep["kind"]
   readonly label: string
   readonly api: string
   readonly status: string
@@ -30,6 +31,12 @@ export interface StepView {
   /** The person whose browser the step ran in, when the test opened more than one person's. */
   readonly user?: string
   readonly source?: string
+  /** The part of the attempt it ran in: setup, body, settle, checks or teardown. */
+  readonly phase?: RecordedStep["phase"]
+  /** A value check's two sides, what it got and what it wanted. */
+  readonly check?: RecordedStep["check"]
+  /** What the settle wait waited for, one line each. */
+  readonly waitedOn?: readonly string[]
   readonly error?: string
   readonly cache?: string
   readonly cacheDetail?: string
@@ -75,16 +82,27 @@ function cacheDetail(step: RecordedStep): string | undefined {
   return undefined
 }
 
+/** The step's phase, a check's sides and what settling waited for, where the record kept them. */
+function phaseFields(step: RecordedStep): Pick<StepView, "phase" | "check" | "waitedOn"> {
+  return {
+    ...(step.phase !== undefined && { phase: step.phase }),
+    ...(step.check !== undefined && { check: step.check }),
+    ...(step.waitedOn !== undefined && { waitedOn: step.waitedOn }),
+  }
+}
+
 function stepView(step: RecordedStep): StepView {
   const effects = effectsOf(step.events)
   const detail = cacheDetail(step)
 
   return {
     index: step.index,
+    kind: step.kind,
     label: step.label,
     api: step.api,
     status: step.status,
     durationMs: step.durationMs,
+    ...phaseFields(step),
     ...(step.user !== undefined && { user: step.user }),
     ...(step.source && { source: `${step.source.file}:${step.source.line}` }),
     ...(step.error && { error: `${step.error.code}: ${step.error.message}` }),

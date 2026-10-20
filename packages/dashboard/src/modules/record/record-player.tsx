@@ -11,20 +11,64 @@ import {
   frameAt,
   type Replay,
   type ReplayMark,
+  type ReplaySegment,
   type ReplayVideo,
   stepAt,
   videoName,
 } from "./record-replay.ts"
-import type { Playback } from "./use-playback.ts"
+import { type Playback, TAIL_RATE } from "./use-playback.ts"
 import { useScreenshot } from "./use-screenshot.ts"
 
 const RATES = [0.5, 1, 2, 4] as const
 
-/** A fraction of the scrubber's span, as a CSS percentage. */
-function at(playback: Playback, ms: number): string {
+/** Where `ms` falls along the scrubber's span, from 0 to 1. */
+function shareOf(playback: Playback, ms: number): number {
   const span = Math.max(playback.endMs - playback.startMs, 1)
 
-  return `${Math.min(Math.max((ms - playback.startMs) / span, 0), 1) * 100}%`
+  return Math.min(Math.max((ms - playback.startMs) / span, 0), 1)
+}
+
+/** A fraction of the scrubber's span, as a CSS percentage. */
+function at(playback: Playback, ms: number): string {
+  return `${shareOf(playback, ms) * 100}%`
+}
+
+/** The tint of a segment: settling as work still going, checks as how they went. */
+function segmentTint(segment: ReplaySegment): string {
+  if (segment.bad) return "verdict.failed.bg"
+
+  return segment.phase === "settle" ? "verdict.notJudged.bg" : "verdict.passed.bg"
+}
+
+/** A shaded, labelled stretch of the scrubber: the wait for background work, or the checks. */
+function SegmentShade({
+  segment,
+  playback,
+}: {
+  readonly segment: ReplaySegment
+  readonly playback: Playback
+}) {
+  const width = shareOf(playback, segment.endMs) - shareOf(playback, segment.atMs)
+
+  return (
+    <Box
+      position="absolute"
+      top="0"
+      bottom="0"
+      display="flex"
+      alignItems="center"
+      overflow="hidden"
+      rounded="4px"
+      bg={segmentTint(segment)}
+      pointerEvents="none"
+      aria-hidden
+      style={{ left: at(playback, segment.atMs), width: `${width * 100}%` }}
+    >
+      <Span px="1" fontSize="0.625" fontWeight="600" color="ink.muted" truncate>
+        {segment.label.toLowerCase()}
+      </Span>
+    </Box>
+  )
 }
 
 /** A step's tick on the scrubber, red when it did not pass. */
@@ -126,6 +170,9 @@ function Scrubber({ playback }: { readonly playback: Playback }) {
       onPointerUp={() => setDragging(false)}
       onKeyDown={(event) => scrubKeys(playback, event)}
     >
+      {playback.segments.map((segment) => (
+        <SegmentShade key={segment.phase} segment={segment} playback={playback} />
+      ))}
       <Box
         position="absolute"
         left="0"
@@ -281,6 +328,18 @@ function Controls({
         words={(rate) => `${rate}×`}
         onChoose={playback.setRate}
       />
+      {playback.segments.length > 0 ? (
+        <Button
+          variant={playback.fastTail ? "solid" : "soft"}
+          size="xs"
+          aria-pressed={playback.fastTail}
+          tooltipChildren={`Play settling and checks at ${TAIL_RATE}×, where the browser sits idle`}
+          onClick={() => playback.setFastTail(!playback.fastTail)}
+        >
+          <Icons.fastForward size={12} />
+          Idle at {TAIL_RATE}×
+        </Button>
+      ) : null}
       {videos.length > 1 ? (
         <Toggles
           label={videos.some((video) => video.user !== undefined) ? "Browser" : "Tab"}
@@ -295,13 +354,71 @@ function Controls({
   )
 }
 
-/** What is happening at the player's moment: the step running, and the run's problems near it. */
+/** A jump to where settling or the checks start. */
+function GoToSegment({
+  segment,
+  playback,
+}: {
+  readonly segment: ReplaySegment
+  readonly playback: Playback
+}) {
+  return (
+    <Button
+      variant="soft"
+      size="xs"
+      aria-label={`Go to ${segment.label.toLowerCase()}, at ${clock(segment.atMs - playback.startMs)}`}
+      onClick={() => playback.seek(segment.atMs)}
+    >
+      <Icons.play size={10} />
+      {segment.label}
+    </Button>
+  )
+}
+
+/** What is happening at the player's moment: the step running, or settling and the checks. */
 function NowLine({ playback }: { readonly playback: Playback }) {
   const index = stepAt(playback.marks, playback.ms)
   const step = playback.marks.find((mark) => mark.kind === "step" && mark.step === index)
+  const segment = playback.segments.findLast((each) => playback.ms >= each.atMs)
 
   return (
     <HStack gap="2" mt="2" fontSize="1" color="ink.soft" minH="5" aria-live="polite">
+      <NowWords playback={playback} step={step} index={index} segment={segment} />
+      {playback.segments.length > 0 ? (
+        <HStack gap="1" ml="auto" role="group" aria-label="After the body">
+          {playback.segments.map((each) => (
+            <GoToSegment key={each.phase} segment={each} playback={playback} />
+          ))}
+        </HStack>
+      ) : null}
+    </HStack>
+  )
+}
+
+/** The words for the player's moment: the stretch after the body, else the step running. */
+function NowWords({
+  playback,
+  step,
+  index,
+  segment,
+}: {
+  readonly playback: Playback
+  readonly step: ReplayMark | undefined
+  readonly index: number | undefined
+  readonly segment: ReplaySegment | undefined
+}) {
+  if (segment !== undefined)
+    return (
+      <>
+        <Span fontWeight="500" color={segment.bad ? "verdict.failed.fg" : "ink.strong"}>
+          {segment.phase === "settle" ? "Waiting for background work" : "Checking what the app did"}
+        </Span>
+        {playback.speeding ? <Span color="ink.muted">playing at {TAIL_RATE}×</Span> : null}
+      </>
+    )
+
+  return (
+    <>
       {step ? (
         <>
           <Span color="ink.muted">Step {index}</Span>
@@ -312,7 +429,7 @@ function NowLine({ playback }: { readonly playback: Playback }) {
       ) : (
         <Span color="ink.muted">Before the first step</Span>
       )}
-    </HStack>
+    </>
   )
 }
 

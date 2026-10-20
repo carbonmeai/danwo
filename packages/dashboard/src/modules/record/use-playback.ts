@@ -5,7 +5,14 @@
  */
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react"
 
-import { linkedMoment, type Replay, type ReplayMark, type ReplayVideo } from "./record-replay.ts"
+import {
+  inTail,
+  linkedMoment,
+  type Replay,
+  type ReplayMark,
+  type ReplaySegment,
+  type ReplayVideo,
+} from "./record-replay.ts"
 
 export interface Playback {
   /** Where the run is, in milliseconds on the record's clock. */
@@ -15,6 +22,12 @@ export interface Playback {
   readonly endMs: number
   readonly playing: boolean
   readonly rate: number
+  /** The settle wait and the checks, shaded on the scrubber. */
+  readonly segments: readonly ReplaySegment[]
+  /** Whether the idle tail (settling, checks) plays at `TAIL_RATE` or faster. */
+  readonly fastTail: boolean
+  /** Whether it is playing faster now, in the tail. */
+  readonly speeding: boolean
   /** The video playing, undefined when the screenshots stand in for one. */
   readonly video: ReplayVideo | undefined
   readonly videoRef: RefObject<HTMLVideoElement | null>
@@ -25,6 +38,7 @@ export interface Playback {
   readonly seek: (ms: number) => void
   readonly toggle: () => void
   readonly setRate: (rate: number) => void
+  readonly setFastTail: (fast: boolean) => void
   readonly pickTab: (index: number) => void
   /**
    * Shows the moment `ms` of video `tab`: another person's step plays in their browser's video,
@@ -32,6 +46,9 @@ export interface Playback {
    */
   readonly showAt: (tab: number, ms: number) => void
 }
+
+/** How fast the idle tail plays, unless the chosen speed is faster or fast tail is off. */
+export const TAIL_RATE = 4
 
 const clamp = (value: number, low: number, high: number) => Math.min(Math.max(value, low), high)
 
@@ -240,6 +257,34 @@ function useSwitchedSeek({ tab, startMs, endMs, seek, pickTab }: Switching) {
   )
 }
 
+/**
+ * How fast the player plays: the chosen speed, raised to `TAIL_RATE` through the idle tail while
+ * fast tail is on. The video element follows the speed shown.
+ */
+function useSpeed(
+  segments: readonly ReplaySegment[],
+  ms: number,
+  videoRef: RefObject<HTMLVideoElement | null>,
+  video: ReplayVideo | undefined,
+) {
+  const [rate, setRate] = useState(1)
+  const [fastTail, setFastTail] = useState(true)
+  const speeding = fastTail && rate < TAIL_RATE && inTail(segments, ms)
+  const shownRate = speeding ? TAIL_RATE : rate
+
+  /* A video that loads again starts at its default rate, so both follow the shown one. */
+  useEffect(() => {
+    const element = videoRef.current
+
+    if (element === null) return
+
+    element.defaultPlaybackRate = shownRate
+    element.playbackRate = shownRate
+  }, [videoRef, video, shownRate])
+
+  return { rate, setRate, fastTail, setFastTail, speeding, shownRate }
+}
+
 /** The player's clock for `replay`, starting where the page's link points when it names a moment. */
 export function usePlayback(replay: Replay): Playback {
   const [tab, setTab] = useState(0)
@@ -249,7 +294,8 @@ export function usePlayback(replay: Replay): Playback {
   const { startMs, endMs, marks } = shownSpan(replay, video, length)
   const [ms, setMs] = useState(startMs)
   const [playing, setPlaying] = useState(false)
-  const [rate, setRateState] = useState(1)
+  const speed = useSpeed(replay.segments, ms, videoRef, video)
+  const { rate, shownRate } = speed
 
   useVideoEvent(videoRef, video, STATE_EVENTS, (element) => setPlaying(isPlaying(element)))
 
@@ -260,7 +306,7 @@ export function usePlayback(replay: Replay): Playback {
     setMs,
     setPlaying,
     playing,
-    rate,
+    rate: shownRate,
   })
 
   const { seek, toggle } = useControls({
@@ -270,11 +316,6 @@ export function usePlayback(replay: Replay): Playback {
     setMs,
     setPlaying,
   })
-
-  const setRate = useCallback((next: number) => {
-    setRateState(next)
-    if (videoRef.current !== null) videoRef.current.playbackRate = next
-  }, [])
 
   /* Another tab's video starts from its own first frame. */
   const forgetLink = useOpening(marks, startMs, seek)
@@ -296,13 +337,17 @@ export function usePlayback(replay: Replay): Playback {
     endMs,
     playing,
     rate,
+    segments: replay.segments,
+    fastTail: speed.fastTail,
+    speeding: speed.speeding,
     video,
     videoRef,
     marks,
     tab,
     seek,
     toggle,
-    setRate,
+    setRate: speed.setRate,
+    setFastTail: speed.setFastTail,
     pickTab,
     showAt,
   }

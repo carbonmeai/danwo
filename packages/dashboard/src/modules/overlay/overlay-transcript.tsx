@@ -26,6 +26,8 @@ import { sendFeedback } from "./feedback-api.ts"
 import {
   type TranscriptStep,
   type Warning,
+  afterBody,
+  checkWords,
   fixPrompt,
   transcriptOf,
   warningsOf,
@@ -161,6 +163,110 @@ function StepLine({
   )
 }
 
+/** How a jump to a step names it. */
+function stepNoun(step: TranscriptStep): string {
+  if (step.kind === "check") return "the check"
+  if (step.kind === "settle") return "the wait for background work"
+
+  return `step ${step.index + 1}`
+}
+
+/** A step's mark: its number, a ✓ or ✗ for a value check, a clock for the settle wait. */
+function StepMarker({ step, failed }: { readonly step: TranscriptStep; readonly failed: boolean }) {
+  const passedCheck = step.kind === "check" && !failed
+
+  return (
+    <Span
+      display="grid"
+      placeItems="center"
+      h="6"
+      w="6"
+      rounded="full"
+      fontSize="1"
+      fontWeight="600"
+      bg={failed ? "verdict.failed.bg" : passedCheck ? "verdict.passed.bg" : "surface.hover"}
+      color={failed ? "verdict.failed.fg" : passedCheck ? "verdict.passed.fg" : "ink.soft"}
+    >
+      {step.kind === "check" ? (
+        <Span role="img" aria-label={failed ? "Failed" : "Passed"} display="inline-flex">
+          {failed ? <Icons.x size={12} /> : <Icons.check size={12} />}
+        </Span>
+      ) : step.kind === "settle" ? (
+        <Icons.clock size={12} />
+      ) : (
+        step.index + 1
+      )}
+    </Span>
+  )
+}
+
+/** What a check got and wanted, or what the settle wait waited for, one line each. */
+function StepDetail({ step, failed }: { readonly step: TranscriptStep; readonly failed: boolean }) {
+  const words = checkWords(step)
+
+  if (words !== undefined)
+    return (
+      <Span
+        color={failed ? "verdict.failed.fg" : "ink.muted"}
+        fontSize="1"
+        fontFamily="mono"
+        overflowWrap="anywhere"
+      >
+        {words}
+      </Span>
+    )
+
+  if (step.kind !== "settle") return null
+
+  return (
+    <Stack gap="0.5" color="ink.muted" fontSize="1" aria-label="Waited for">
+      {(step.waitedOn ?? []).length === 0 ? (
+        <Span>Nothing was running.</Span>
+      ) : (
+        step.waitedOn?.map((line) => (
+          <Span key={line} overflowWrap="anywhere">
+            {line}
+          </Span>
+        ))
+      )}
+    </Stack>
+  )
+}
+
+/**
+ * What ran after the body: the wait for background work, then the invariant's checks of what the
+ * app did, each a ✓ or ✗ with its values.
+ */
+function ChecksSection({
+  steps,
+  playing,
+  playback,
+}: {
+  readonly steps: readonly TranscriptStep[]
+  readonly playing: number | undefined
+  readonly playback: Playback | undefined
+}) {
+  return (
+    <Stack gap="1" mt="3" aria-labelledby="transcript-checks">
+      <HStack gap="2" px="2" color="ink.muted" fontSize="1" fontWeight="600">
+        <Span id="transcript-checks">Checks</Span>
+        <Box flex="1" h="1px" bg="hairline" />
+      </HStack>
+      <Box role="list" display="grid" gap="0.5" aria-label="Checks">
+        {steps.map((step) => (
+          <StepLine
+            key={step.index}
+            step={step}
+            current={step.index === playing}
+            switched={undefined}
+            playback={playback}
+          />
+        ))}
+      </Box>
+    </Stack>
+  )
+}
+
 /** A step's number, label, jump button, person, API, cache and time, and its error. */
 function StepBody({
   step,
@@ -184,23 +290,12 @@ function StepBody({
       bg={current ? "surface.active" : undefined}
       aria-current={current ? "step" : undefined}
     >
-      <Span
-        display="grid"
-        placeItems="center"
-        h="6"
-        w="6"
-        rounded="full"
-        fontSize="1"
-        fontWeight="600"
-        bg={failed ? "verdict.failed.bg" : "surface.hover"}
-        color={failed ? "verdict.failed.fg" : "ink.soft"}
-      >
-        {step.index + 1}
-      </Span>
+      <StepMarker step={step} failed={failed} />
       <Stack gap="1" minW="0">
         <Span fontWeight="500" overflowWrap="anywhere">
-          {step.label}
+          {step.kind === "settle" ? "Waiting for background work" : step.label}
         </Span>
+        <StepDetail step={step} failed={failed} />
         <HStack gap="2" color="ink.muted" fontSize="1" flexWrap="wrap">
           {playback && step.atMs !== undefined ? (
             <Button
@@ -208,7 +303,7 @@ function StepBody({
               size="xs"
               h="5"
               px="1.5"
-              aria-label={`Go to step ${step.index + 1}, at ${clock(step.atMs - playback.startMs)}`}
+              aria-label={`Go to ${stepNoun(step)}, at ${clock(step.atMs - playback.startMs)}`}
               onClick={() => playback.showAt(step.video ?? playback.tab, step.atMs ?? 0)}
             >
               <Icons.play size={10} />
@@ -243,6 +338,8 @@ export function Transcript({
 }) {
   const { record } = view
   const steps = transcriptOf(view, view.replay)
+  const body = steps.filter((step) => !afterBody(step))
+  const checks = steps.filter(afterBody)
   const warnings = warningsOf(record)
   const playing = playback ? stepAt(playback.marks, playback.ms) : undefined
 
@@ -280,16 +377,19 @@ export function Transcript({
       </Stack>
       <Box flex="1" minH="0" overflowY="auto" px="3" py="3">
         <Box role="list" display="grid" gap="0.5" aria-label="Steps">
-          {steps.map((step, at) => (
+          {body.map((step, at) => (
             <StepLine
               key={step.index}
               step={step}
               current={step.index === playing}
-              switched={switchedTo(steps, at)}
+              switched={switchedTo(body, at)}
               playback={playback}
             />
           ))}
         </Box>
+        {checks.length > 0 ? (
+          <ChecksSection steps={checks} playing={playing} playback={playback} />
+        ) : null}
       </Box>
       <Stack gap="3" px="5" py="4" boxShadow="inset 0 1px 0 {colors.hairline}">
         {warnings.length > 0 ? (

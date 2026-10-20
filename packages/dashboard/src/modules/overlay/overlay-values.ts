@@ -6,26 +6,18 @@
 import type { FailureVerdict } from "@danwo/runner/runner"
 import { fixAdvice, VERDICT_LABELS } from "@danwo/runner/verdict"
 
-import type { RecordView } from "../record/record-data.ts"
+import type { RecordView, StepView } from "../record/record-data.ts"
 import type { Replay } from "../record/record-replay.ts"
 import { CACHE_WORDS, divergenceLine } from "../record/record-values.ts"
 
 type Record_ = RecordView["record"]
 
-/** One step of the transcript. */
-export interface TranscriptStep {
-  readonly index: number
-  readonly label: string
-  readonly api: string
-  readonly status: string
-  readonly durationMs: number
+/** One step of the transcript: the step as the record page has it, and where the player shows it. */
+export interface TranscriptStep extends Omit<StepView, "cache"> {
   /** Where the step starts on the player's clock, when the run can be replayed. */
   readonly atMs?: number
   /** Which of the record's videos shows the step: its person's browser. */
   readonly video?: number
-  /** The person whose browser the step ran in, when the test opened more than one person's. */
-  readonly user?: string
-  readonly error?: string
   /** What the replay cache did for an agent step, as its tag words it. */
   readonly cache?: string
 }
@@ -56,20 +48,29 @@ export function transcriptOf(view: Pick<RecordView, "steps">, replay: Replay): T
     const start = starts.get(step.index)
 
     return {
-      index: step.index,
-      label: step.label,
-      api: step.api,
-      status: step.status,
-      durationMs: step.durationMs,
+      ...step,
       ...(start !== undefined && { atMs: start.atMs }),
       ...(start?.video !== undefined && { video: start.video }),
-      ...(step.user !== undefined && { user: step.user }),
-      ...(step.error !== undefined && { error: step.error }),
       ...(step.cache !== undefined && {
         cache: CACHE_WORDS[step.cache] ?? step.cache,
       }),
     }
   })
+}
+
+/** Whether a step ran after the body: the wait for background work, or the invariant's checks. */
+export function afterBody(step: Pick<TranscriptStep, "phase">): boolean {
+  return step.phase === "settle" || step.phase === "checks"
+}
+
+/** A value check's sides in words: what it got, and what it wanted when it failed. */
+export function checkWords(step: Pick<TranscriptStep, "check" | "status">): string | undefined {
+  const { actual, expected } = step.check ?? {}
+
+  if (actual === undefined) return undefined
+  if (step.status === "passed" || expected === undefined) return `got ${actual}`
+
+  return `expected ${expected}, got ${actual}`
 }
 
 /** A warning pinned under the transcript. */

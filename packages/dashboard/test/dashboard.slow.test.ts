@@ -33,7 +33,10 @@ function danwo(args: readonly string[], env: NodeJS.ProcessEnv = {}): Promise<vo
   })
 }
 
-/** The shop example as a project of its own, with one failing test, after a test run and a matrix run. */
+/**
+ * The shop example as a project of its own, with one failing test, after a test run that kept
+ * every recording and a matrix run.
+ */
 async function project(): Promise<void> {
   await rm(WORK, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   await mkdir(join(WORK, "tests"), { recursive: true })
@@ -43,7 +46,7 @@ async function project(): Promise<void> {
   await cp(join(SHOP, "package.json"), join(WORK, "package.json"))
   await symlink(join(SHOP, "node_modules"), join(WORK, "node_modules"))
   await writeFile(join(WORK, "tests", "broken.danwo.ts"), BROKEN)
-  await danwo(["test"])
+  await danwo(["test", "--record", "always"])
   await danwo(
     ["matrix", "tests/buy-credits.danwo.ts", "--faults", "duplicate|status 500 on POST"],
     {
@@ -130,6 +133,32 @@ describe("danwo serve", () => {
     await expect(dialog.getByRole("tablist", { name: "Log level" })).toBeVisible()
     await dialog.getByRole("tab", { name: "Console" }).press("Escape")
     await expect(screen.getByRole("dialog")).toHaveCount(0)
+  })
+
+  it("lists a passing test's checks after its steps, and shades settling on the scrubber", async () => {
+    const { screen, expect } = session
+
+    await open("/runs")
+    await screen.getByRole("link", { name: "3 tests" }).click()
+    await screen
+      .getByRole("row")
+      .filter({ hasText: "buys 500 credits" })
+      .getByRole("link", { name: "Watch" })
+      .click()
+
+    const checks = screen.getByRole("dialog").getByRole("list", { name: "Checks" })
+    const passed = checks.getByRole("listitem").filter({ hasText: /^expect\(.+\)\.toBe\(/ })
+
+    await expect(checks).toBeVisible({ timeout: 30_000 })
+    await expect(passed.getByRole("img", { name: "Passed" })).toBeVisible()
+    await expect(passed).toContainText("got ")
+    await expect(checks).toContainText("Waiting for background work")
+    await expect(screen.getByRole("button", { name: /^Go to settling, at / })).toBeVisible()
+    await expect(screen.getByRole("button", { name: /Idle at 4×/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    )
+    await screen.getByRole("dialog").press("Escape")
   })
 
   it("shows the matrix as a grid of faults, the duplicate webhook failed", async () => {

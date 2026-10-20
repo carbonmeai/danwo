@@ -8,6 +8,7 @@ import { byteRange, serveMedia } from "../src/modules/record/record-media.ts"
 import {
   clock,
   frameAt,
+  inTail,
   linkedMoment,
   mediaUrl,
   replayOf,
@@ -74,6 +75,18 @@ const RECORD = {
   ],
 }
 
+/** A passed step of `phase`, started `at` seconds in (`1.000`). */
+function phaseStep(index: number, phase: string, at: string, durationMs: number) {
+  return {
+    index,
+    label: phase,
+    status: "passed" as const,
+    phase,
+    startedAt: `2026-10-19T10:00:0${at}Z`,
+    durationMs,
+  }
+}
+
 function replay(withVideo = true) {
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a test double: the replay reads times, steps and videos
   const record = (withVideo ? RECORD : { ...RECORD, videos: undefined }) as unknown as Parameters<
@@ -131,6 +144,29 @@ describe("the replay player's data", () => {
     expect(linkedMoment({ search: "", hash: "#step-1" }, marks, startMs)).toBe(1_000)
     expect(linkedMoment({ search: "?t=-2", hash: "" }, marks, startMs)).toBeUndefined()
     expect(linkedMoment({ search: "", hash: "" }, marks, startMs)).toBeUndefined()
+  })
+
+  it("shades settling and the checks after the body, the checks up to the record's end", () => {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a test double: the segments read times, phases and statuses
+    const record = {
+      ...RECORD,
+      durationMs: 6_000,
+      videos: undefined,
+      steps: [
+        phaseStep(0, "body", "0.300", 200),
+        phaseStep(1, "settle", "1.000", 2_500),
+        phaseStep(2, "checks", "3.600", 5),
+      ],
+    } as unknown as Parameters<typeof replayOf>[1]
+    const { segments } = replayOf(DIR, record, timelineOf(RECORD))
+
+    expect(segments).toEqual([
+      { phase: "settle", label: "Settling", atMs: 1_000, endMs: 3_500, bad: false },
+      { phase: "checks", label: "Checks", atMs: 3_500, endMs: 6_000, bad: false },
+    ])
+    expect(inTail(segments, 900)).toBe(false)
+    expect(inTail(segments, 1_000)).toBe(true)
+    expect(replay().segments).toEqual([])
   })
 
   it("reads the clock as minutes, seconds and tenths", () => {
