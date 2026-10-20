@@ -1,7 +1,54 @@
 ---
 title: Unreleased
-description: What is on main and not yet in a release.
-date: 2026-10-19
+description: What is on main since the website's first build and not yet in a release.
+date: 2026-10-20
 ---
 
-This is a placeholder entry. Each release will list what it added, changed and fixed here.
+## Emulators
+
+- **New providers:** Nylas v3 (hosted auth, grants, mail, calendars, contacts, the scheduler), Nango (connect sessions and the Connect UI, refreshing connections, the proxy to other emulators, actions), Unipile (hosted auth links, LinkedIn, WhatsApp and mail accounts, chats and messages), Pusher (the Channels API, the `pusher-js` socket with private and presence channels, Beams), Novu (triggers, subscribers and topics, code-first workflows through the app's bridge, the Inbox and its socket) and Tiptap Cloud collaboration (the Hocuspocus protocol and the documents API).
+- **Model APIs:** Gemini, Perplexity and Bedrock alongside OpenAI, Anthropic and the AI Gateway.
+- **Stripe:** setup intents, subscriptions with trials and renewals on the emulator's clock, invoices, the billing portal, subscription-mode Checkout, Stripe's test payment methods for declines and authentication, and a Stripe.js stand-in on `js.stripe.com`.
+- **Clerk:** svix-signed webhooks, seeded ids that survive resets, the signing key as a PEM, and Frontend API answers matched to a live development instance.
+- **S3 and Tigris:** SigV4 checks for seeded keys, conditional requests, checksums, multipart listings, Tigris's own presign and rename calls, and the Tigris SDK's environment variables.
+- **Twilio:** account and number reads, and trial accounts' refusals.
+- **Pusher:** subscription counts follow the app's own setting, off by default.
+- Emulators can answer WebSockets, and every emulator restores and resets completely, which a conformance test checks.
+
+## Runner
+
+- **Isolation:** every test, and every retry, starts from the environment's seeded state (`isolation: "test" | "file" | "none"`).
+- **Real stacks:** `stackEnvironment` starts several apps in `dependsOn` order behind one proxy, with each app's readiness, wiring and logs; `inngestService` routes background jobs to the Inngest dev server and lets `settle()` wait for them.
+- **The proxy:** this machine always passes, WebSockets go through and are logged, streams and page assets no longer hold readiness up, telemetry is blocked by default, and a port nothing listens on is named.
+- **The preload:** a `node` shim keeps it when a start script replaces `NODE_OPTIONS`, undici's agent is routed, and a process that escaped it is reported.
+- **Live keys:** a run warns, or fails with `secrets: "fail"`, when an app holds live-looking keys for providers it does not emulate.
+- **Processes:** every child danwo starts is owned and stopped on exit, on a signal or when its owner dies; `spawnOwned()` does the same for an environment's own processes.
+- **Recording:** every run keeps its flight record and its video by default.
+- `expect(value, message)`, `environment-<worker>.json` with what a worker's environment did while it started, the stack app that went down named in a failure, and a rows restore for Postgres snapshots that closes no connection.
+
+## Matrix
+
+- **Planning:** faults go on the test's body only; repeated routes and statements are faulted once, each call keeps its most telling fault kinds, and the plan stays within a budget (40 by default). `--plan` previews it; `--budget`, `--all`, `--thorough`, `--every-occurrence` and `--include-setup` change it.
+- Trials restore the saved session's sign-in instead of signing in again.
+- Every WebSocket the clean run opened is tried with its upgrade refused and its connection dropped, and Inngest event sends get their own faults.
+
+## Dashboard
+
+- A collapsible sidebar, Overview, a test library, filtered runs, the matrix across the suite, and Settings.
+- Every recording opens in a two-pane overlay: the steps with "Copy prompt to fix" on the left, and Replay, Console, Network, Providers, Emulator state, Effects and Matrix on the right.
+- Runs stream in live; reruns, the matrix for one test and cancelling a run start from the page.
+- The dánwò brand throughout.
+
+## CI
+
+- The GitHub reporter posts one pull request comment beside the check run and edits it in place on later runs.
+
+## Fidelity
+
+- **Cleanup:** every live run undoes what it creates, even when a scenario fails, tags everything `danwo-fidelity`, and `--sweep` removes tagged leftovers; `--keep` keeps them for debugging.
+- **Live suites:** Clerk, S3 on Tigris, Novu, Tiptap, Nylas, Nango, Unipile and Pusher join Stripe, Resend, Paystack, Flutterwave, Bachs, Composio, the AI Gateway and the public Slack, GitHub, Google and Microsoft calls. Twilio runs live without sending anything.
+
+## Website
+
+- Docs in four tabs, provider pages with their logos and fidelity, pages for isolation, real stacks and matrix planning, and the dánwò brand.
+- The docs test now fails when an emulator, a guide section, a spec topic or a fidelity suite has no page.
