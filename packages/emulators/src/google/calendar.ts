@@ -140,6 +140,23 @@ function withResponses(event: Event): Event {
     : rest
 }
 
+/** An event boundary with a date-time, given the calendar's time zone when it names none. */
+function zoned(
+  time: calendar_v3.Schema$EventDateTime,
+  timeZone: string,
+): calendar_v3.Schema$EventDateTime {
+  return time.dateTime && !time.timeZone ? { ...time, timeZone } : time
+}
+
+/** The event with its start and end in the calendar's time zone when they name none. */
+function inTimeZone(event: Event, timeZone: string): Event {
+  return {
+    ...event,
+    ...(event.start && { start: zoned(event.start, timeZone) }),
+    ...(event.end && { end: zoned(event.end, timeZone) }),
+  }
+}
+
 /** Creates an event in `calendar` from client fields, as `events.insert` does. */
 export function insertEvent(
   push: PushContext,
@@ -170,7 +187,7 @@ export function insertEvent(
     updated: now,
     reminders: { useDefault: true },
     eventType: "default",
-    ...withResponses(fields),
+    ...withResponses(inTimeZone(fields, calendar.timeZone)),
     creator: { email: organizer.email, self: true },
     organizer: { email: calendar.calendarId, self: true },
     iCalUID: `${id}@google.com`,
@@ -208,7 +225,7 @@ export function changeEvent(
 
   const change = nextChange(push)
   const event: Event = {
-    ...withResponses(merged),
+    ...withResponses(inTimeZone(merged, calendar.timeZone)),
     status: merged.status ?? "confirmed",
     etag: etagOf(change),
     updated: push.clock().toISOString(),
@@ -309,5 +326,6 @@ export function calendarListEntry(calendar: CalendarRecord): calendar_v3.Schema$
     accessRole: "owner",
     defaultReminders: [],
     ...(calendar.primary && { primary: true }),
+    conferenceProperties: { allowedConferenceSolutionTypes: ["hangoutsMeet"] },
   }
 }

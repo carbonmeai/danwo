@@ -141,6 +141,7 @@ export function calendarEventRoutes(context: GoogleRouteContext): void {
       kind: "calendar#events",
       etag: `"${calendar.id}"`,
       summary: calendar.summary,
+      description: calendar.description ?? "",
       updated: context.clock().toISOString(),
       timeZone: calendar.timeZone,
       accessRole: "owner",

@@ -70,6 +70,7 @@ export function calendarListRoutes(context: GoogleRouteContext): void {
         .all()
         .filter((calendar) => calendar.owner === caller.user.uid)
         .map(calendarListEntry),
+      nextSyncToken: randomBytes(12).toString("base64url"),
     } satisfies calendar_v3.Schema$CalendarList)
   })
 
