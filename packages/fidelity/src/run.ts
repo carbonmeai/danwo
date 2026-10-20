@@ -195,15 +195,17 @@ function expectations(
   if (description !== undefined)
     return {
       mode: "openapi",
-      of: (scenario, emulated) =>
-        Promise.resolve({
-          golden: documentedGolden(
-            emulated,
-            scenario,
-            description,
-            provider.openapiLooseNulls === true,
-          ),
-        }),
+      of: (scenario, emulated) => {
+        const golden = documentedGolden(
+          emulated,
+          scenario,
+          description,
+          provider.openapiLooseNulls === true,
+        )
+
+        /* A scenario with no documented step (one recorded live) keeps its saved golden. */
+        return Promise.resolve(golden.steps.length === 0 ? {} : { golden })
+      },
     }
 
   return {

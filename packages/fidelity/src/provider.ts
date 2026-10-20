@@ -5,6 +5,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
+import type { ApiDescription } from "./openapi.ts"
 import type { OpenTarget, Scenario, Target } from "./scenario.ts"
 import type { Leftover } from "./sweep.ts"
 
@@ -36,6 +37,11 @@ export interface FidelityProvider {
   readonly scenarios: readonly Scenario[]
   /** The provider's published API description, for `danwo fidelity --from-openapi`. */
   readonly openapi?: string
+  /**
+   * Fetches and assembles the provider's published description where it is not one OpenAPI file
+   * (Google's Discovery documents), in place of {@link openapi}.
+   */
+  readonly describe?: () => Promise<ApiDescription>
   /** The description does not mark nullable fields, so any property may be null. */
   readonly openapiLooseNulls?: boolean
   /**

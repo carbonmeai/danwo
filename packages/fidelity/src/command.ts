@@ -52,6 +52,7 @@ export async function sweepCommand(options: SweepCommandOptions): Promise<number
  * publishes none has its documented answers written into its scenarios, which need no description.
  */
 async function published(provider: FidelityProvider, folder: string): Promise<ApiDescription> {
+  if (provider.describe !== undefined) return provider.describe()
   if (provider.openapi === undefined) return { paths: {} }
 
   const response = await fetch(provider.openapi)

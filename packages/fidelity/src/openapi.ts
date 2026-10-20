@@ -173,13 +173,47 @@ function typedShape(type: string, schema: Schema, walk: Walk): Shape {
   return enumShape(schema, walk) ?? primitiveShape(type)
 }
 
+/** A named schema's body, for `allOf` members, which extend a schema rather than nest it. */
+function named(member: Schema, description: ApiDescription): Schema | undefined {
+  const ref = member["$ref"]
+
+  if (typeof ref !== "string") return member
+
+  return description.components?.schemas?.[ref.split("/").at(-1) ?? ref]
+}
+
+/**
+ * One object schema from an `allOf` chain, properties and required names merged from every
+ * member, each base expanded in turn: an entity's own fields together with those it inherits.
+ */
+function mergedAllOf(schema: Schema, description: ApiDescription, depth = 0): Schema {
+  const members = asSchemas(schema["allOf"])
+  const merged: { properties: Record<string, unknown>; required: string[] } = {
+    properties: {},
+    required: [],
+  }
+  const parts = [{ ...schema, allOf: undefined }, ...members]
+
+  for (const part of parts) {
+    const body = named(part, description)
+    const flat =
+      body === undefined ? {} : depth < 8 ? mergedAllOf(body, description, depth + 1) : body
+
+    Object.assign(merged.properties, isSchema(flat["properties"]) ? flat["properties"] : {})
+    if (Array.isArray(flat["required"]))
+      merged.required.push(...flat["required"].filter((r): r is string => typeof r === "string"))
+  }
+
+  return members.length === 0 ? schema : { type: "object", ...merged }
+}
+
 /** The shape a schema describes, with named schemas expanded to {@link MAX_DEPTH}. */
 function schemaShape(node: Schema, walk: Walk): Shape {
   const resolved = resolve(node, walk)
 
   if (resolved === undefined) return { t: "any" }
 
-  const { schema } = resolved
+  const schema = mergedAllOf(resolved.schema, walk.description)
   const alternatives = [...asSchemas(schema["anyOf"]), ...asSchemas(schema["oneOf"])]
 
   if (alternatives.length > 0) {
