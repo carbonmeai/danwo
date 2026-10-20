@@ -144,9 +144,11 @@ export interface OAuthEnvironment<Name extends string> {
   /** Emulator back to its seed, proxy log and fault rules cleared. */
   reset(): Promise<void>
   /** Keeps the emulator's state now (right after a reset), for `restore`. */
-  snapshot(): Promise<void>
+  snapshot(slot?: string): Promise<void>
   /** Emulator back to the kept state, faster than a reset; proxy log and fault rules cleared. */
-  restore(): Promise<void>
+  restore(slot?: string): Promise<void>
+  /** Whether `snapshot` and `restore` keep a state per slot. */
+  readonly snapshotSlots: boolean
   /** Fixtures for tests: the emulator under `Name` (`google`, `microsoft`), `proxy`, `settle`. */
   readonly fixtures: { readonly proxy: Proxy; readonly settle: () => Promise<void> } & {
     readonly [K in Name]: Emulator

@@ -8,7 +8,13 @@ import type { ChildProcess } from "node:child_process"
 
 import { spawnOwned } from "../support/children.ts"
 import type { ProcessLog, WorkerEnvironment } from "./environment.ts"
-import { type Service, startServices, type UnroutedHosts, unroutedOf } from "./services.ts"
+import {
+  type Service,
+  servicesLifecycle,
+  startServices,
+  type UnroutedHosts,
+  unroutedOf,
+} from "./services.ts"
 
 /** How danwo starts the app. */
 export interface AppCommand {
@@ -225,8 +231,7 @@ export async function appEnvironment(
     proxy: services.proxy,
     webhooks: services.webhooks,
     fixtures: services.fixtures,
-    /* Where the services' mail lands (Clerk's codes, Resend's emails), for the `mail` fixture. */
-    ...(services.mail && { mail: services.mail }),
+    ...servicesLifecycle(services),
     logs: (): Readonly<Record<string, ProcessLog>> =>
       started === undefined ? {} : { app: started.logs() },
     stopped: () => {
@@ -235,11 +240,6 @@ export async function appEnvironment(
       return exit === undefined ? [] : [`the app ${exit}`]
     },
     state: () => services.state(),
-    settle: () => services.settle(),
-    travel: (ms) => services.travel(ms),
-    reset: () => services.reset(),
-    snapshot: () => services.snapshot(),
-    restore: () => services.restore(),
     async close() {
       await started?.stop()
       await services.close()

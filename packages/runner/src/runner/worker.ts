@@ -28,6 +28,7 @@ import {
   type DeclaredTest,
   type FileDeclarations,
   isolationOf,
+  sessionOf,
   suiteHooks,
 } from "../tests/registry.ts"
 import { resultOf, worthRetrying } from "../tests/retry.ts"
@@ -244,27 +245,17 @@ function keepRecord(
   return finishRecord(recordDir, recording.mode, failed, build)
 }
 
-/** Whether the environment is at its starting point: nothing ran since the last clean, keep or restore. */
-let untouched = false
-
-/** Back to the starting point before an attempt, unless the environment is still there. */
-async function fromStart(): Promise<void> {
+/**
+ * Readies the environment for an attempt: restored first when the test is isolated, to the kept
+ * sign-in of the session it names when there is one, else to the base without any. A sign-in the
+ * attempt makes is kept beside the base only when the attempt began from a starting point.
+ */
+async function beginAttempt(isolated: boolean, session: string | undefined): Promise<void> {
   const { start } = benchOrFail()
 
-  if (start === undefined || untouched) return
-
-  await start.again()
-  untouched = true
-}
-
-/**
- * Readies the environment for an attempt: restored first when the test is isolated. A sign-in
- * the attempt makes is kept in the starting point only when the attempt began from it.
- */
-async function beginAttempt(isolated: boolean): Promise<void> {
-  if (isolated) await fromStart()
-  keepSignIns = untouched
-  untouched = false
+  if (isolated) await start?.again(session)
+  keepSignIns = start?.untouched === true
+  start?.touch()
 }
 
 /** A test with its retries; every retry loads the file afresh. `isolated` restores before each. */
@@ -286,7 +277,7 @@ async function runTest(
   for (let n = 1; n <= tries; n++) {
     const declarations = n === 1 ? first : await loadTestFile(task.file)
 
-    await beginAttempt(isolated)
+    await beginAttempt(isolated, sessionOf(declarations, findDeclared(declarations, task.file, id)))
 
     const { result, recordDir, mark } = await attemptOnce(
       declarations,
@@ -384,22 +375,16 @@ async function startFile(
   const modeOf = (test: DeclaredTest) => isolationOf(declarations, test, fallback)
   const setup = suiteHooks(declarations, "beforeAll").length > 0
 
-  if (start !== undefined && tests.some((test) => modeOf(test) !== "none")) {
-    await start.clean()
-    untouched = true
-  }
+  if (start !== undefined && tests.some((test) => modeOf(test) !== "none")) await start.clean()
 
   await runSuiteHooks(declarations, "beforeAll")
   if (!setup) return (test) => modeOf(test) === "test"
 
-  untouched = false
+  start?.touch()
   if (start?.keeps !== true) return () => false
 
   // The tests start from what the file's setup left, so it is kept for every later restore.
-  if (tests.some((test) => modeOf(test) === "test")) {
-    await start.keep("file")
-    untouched = true
-  }
+  if (tests.some((test) => modeOf(test) === "test")) await start.keep("file")
 
   return (test) => modeOf(test) === "test"
 }
@@ -627,18 +612,18 @@ function withRace(report: TrialReport, race: RaceFacts | undefined): TrialReport
   return { ...report, ...facts, notes: [...report.notes, ...notes] }
 }
 
-/** Runs the trial's attempt in the reset, faulted environment and reports it. */
+/** Runs the trial's attempt, from the test file as loaded, in the reset, faulted environment and reports it. */
 async function runTrial(
   task: TrialTask,
   env: TrialEnvironment,
   timings: Record<TrialPhase, number>,
   arm: (() => void) | undefined,
+  declarations: FileDeclarations,
 ): Promise<TrialReport> {
   const replay: ReplayUse = {
     kind: task.fault === null ? "learn" : "replay-only",
     dir: task.cacheDir,
   }
-  const declarations = await loadTestFile(task.file)
   const { result, recordDir, mark, body, race } = await trialRun(
     task,
     env,
@@ -689,22 +674,22 @@ async function runTrial(
 async function trial(task: TrialTask): Promise<TrialReport> {
   const env = trialEnvironment()
   const timings = noTimings()
-  const { start, sessions } = benchOrFail()
-
-  await timed(timings, "prepare", async () => start?.clean())
-  untouched = false
+  const { start } = benchOrFail()
 
   /*
    * The plan counts a fault's occurrences from where the trial arms it: the body, unless the
    * plan includes setup. A fault armed at the body leaves setup unfaulted, so a sign-in it makes
-   * can be kept in the starting point and the next trial restores it instead of signing in again.
-   * A fault armed before setup may land on the sign-in, so none is kept then.
+   * is kept beside the seeded state and the next trial restores it instead of signing in again.
+   * A fault armed before setup may land on the sign-in, so the trial starts from the seeded state
+   * without it, and signs in under the fault.
    */
   const atBody = task.includeSetup !== true
-  const keep = atBody && start?.keeps === true
+  const declarations = await loadTestFile(task.file)
+  const session = sessionOf(declarations, findDeclared(declarations, task.file, task.testId))
 
-  if (!keep) sessions.invalidate()
-  keepSignIns = keep
+  await timed(timings, "prepare", async () => start?.clean(atBody ? session : undefined))
+  start?.touch()
+  keepSignIns = atBody && start?.keeps === true
   if (!atBody) applyFault(env, task.fault)
 
   try {
@@ -713,6 +698,7 @@ async function trial(task: TrialTask): Promise<TrialReport> {
       env,
       timings,
       atBody ? () => applyFault(env, task.fault) : undefined,
+      declarations,
     )
   } finally {
     keepSignIns = false
@@ -720,6 +706,25 @@ async function trial(task: TrialTask): Promise<TrialReport> {
     clearWebhookFaults(env.webhooks)
     clearDataFaults(env.data)
   }
+}
+
+/**
+ * A saved session signed in: the environment holds it now, and when the attempt began from a
+ * starting point its sign-in is kept beside it. Before it is kept, the app's background work from
+ * the sign-in (the webhooks it set off, the calls they make) is let finish, so the kept state is
+ * whole and a test or trial that restores it finds nothing of the sign-in still arriving.
+ */
+async function signedIn(name: string): Promise<void> {
+  const start = bench?.start
+
+  start?.signedIn(name)
+  if (!keepSignIns || start?.slots !== true) return
+
+  const env = bench?.env
+
+  await env?.settle?.()
+  await env?.proxy?.settled().catch(() => undefined)
+  await start.keep("session", name)
 }
 
 /** The lint settings a run uses: the flag wins, then the config; on by default. */
@@ -740,8 +745,9 @@ const calls: WorkerCalls = {
     const recording = start.record?.mode === "off" ? undefined : start.record
 
     if (env && recording) await writeEnvironmentRecord(recording.runDir, env, start.workerIndex)
-    const sessions = new SessionKeeper(async () => {
-      if (keepSignIns) await bench?.start?.keep("session")
+    const sessions = new SessionKeeper({
+      signedIn,
+      holds: (name) => bench?.start?.holds(name) ?? true,
     })
 
     bench = {

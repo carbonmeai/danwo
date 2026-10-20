@@ -31,10 +31,15 @@ export interface Service {
    */
   travel?(ms: number): Promise<void>
   reset?(): Promise<void>
-  /** Keeps the state it is in now (just reset), for `restore` to return to. */
-  snapshot?(): Promise<void>
+  /**
+   * Keeps the state it is in now (just reset), for `restore` to return to; with `snapshotSlots`,
+   * as `slot`, beside the states kept under other slots.
+   */
+  snapshot?(slot?: string): Promise<void>
   /** Back to the kept state, faster than a reset; services without one are reset instead. */
-  restore?(): Promise<void>
+  restore?(slot?: string): Promise<void>
+  /** Whether `snapshot` and `restore` keep a state per slot (see the environment's `snapshotSlots`). */
+  readonly snapshotSlots?: boolean
   close(): Promise<void>
 }
 
@@ -80,10 +85,12 @@ export interface Services {
   travel(ms: number): Promise<void>
   /** Every service back to its seed; proxy log, fault rules and the apps' clock offset cleared. */
   reset(): Promise<void>
-  /** Keeps every service's state now, for `restore`. */
-  snapshot(): Promise<void>
+  /** Keeps every service's state now, for `restore`, under `slot` when they keep slots. */
+  snapshot(slot?: string): Promise<void>
   /** Every service back to its kept state (or its seed, when it keeps none); log and faults cleared. */
-  restore(): Promise<void>
+  restore(slot?: string): Promise<void>
+  /** Whether every service that keeps a state keeps one per slot. */
+  readonly snapshotSlots: boolean
   close(): Promise<void>
 }
 
@@ -136,17 +143,18 @@ export async function startServices(
       for (const service of services) await service.reset?.()
       await clearRun()
     },
-    async snapshot() {
-      for (const service of services) await service.snapshot?.()
+    async snapshot(slot?: string) {
+      for (const service of services) await service.snapshot?.(slot)
     },
-    async restore() {
+    async restore(slot?: string) {
       for (const service of services) {
-        if (service.restore) await service.restore()
+        if (service.restore) await service.restore(slot)
         else await service.reset?.()
       }
 
       await clearRun()
     },
+    snapshotSlots: services.every((s) => s.snapshot === undefined || s.snapshotSlots === true),
     async close() {
       await proxy.stop()
       for (const service of services) await service.close()
@@ -162,27 +170,34 @@ function webhooksByService(
   return entries.length > 0 ? Object.fromEntries(entries) : undefined
 }
 
+/** The slot a `snapshot()` or `restore()` called without one keeps. */
+const DEFAULT_SLOT = "default"
+
 /**
  * `snapshot` and `restore` for a service backed by one emulator: the emulator's store is kept in
- * memory and put back, and webhook deliveries and anything else scheduled on its clock are dropped.
+ * memory, one copy per slot, and put back; webhook deliveries and anything else scheduled on its
+ * clock are dropped.
  */
 export function keptEmulator(
   emulator: Emulator,
   clock?: ManualClock,
-): Required<Pick<Service, "snapshot" | "restore">> {
-  let kept: StoreSnapshot | undefined
+): Required<Pick<Service, "snapshot" | "restore" | "snapshotSlots">> {
+  const kept = new Map<string, StoreSnapshot>()
 
   return {
-    async snapshot() {
-      kept = emulator.snapshot()
+    async snapshot(slot = DEFAULT_SLOT) {
+      kept.set(slot, emulator.snapshot())
     },
-    async restore() {
-      if (kept === undefined) throw new Error("restore() before snapshot()")
+    async restore(slot = DEFAULT_SLOT) {
+      const state = kept.get(slot)
+
+      if (state === undefined) throw new Error(`restore("${slot}") before snapshot("${slot}")`)
 
       emulator.webhooks?.reset()
       clock?.restart(new Date())
-      emulator.restore(kept)
+      emulator.restore(state)
     },
+    snapshotSlots: true,
   }
 }
 
@@ -214,8 +229,9 @@ export function servicesLifecycle(services: Services) {
     settle: () => services.settle(),
     travel: (ms: number) => services.travel(ms),
     reset: () => services.reset(),
-    snapshot: () => services.snapshot(),
-    restore: () => services.restore(),
+    snapshot: (slot?: string) => services.snapshot(slot),
+    restore: (slot?: string) => services.restore(slot),
+    snapshotSlots: services.snapshotSlots,
     close: () => services.close(),
   }
 }

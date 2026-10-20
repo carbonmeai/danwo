@@ -33,9 +33,11 @@ export interface StripeEnvironment {
   /** Emulator back to its seed, proxy log and fault rules cleared. */
   reset(): Promise<void>
   /** Keeps the emulator's state now (right after a reset), for `restore`. */
-  snapshot(): Promise<void>
+  snapshot(slot?: string): Promise<void>
   /** Emulator back to the kept state, faster than a reset; proxy log and fault rules cleared. */
-  restore(): Promise<void>
+  restore(slot?: string): Promise<void>
+  /** Whether `snapshot` and `restore` keep a state per slot. */
+  readonly snapshotSlots: boolean
   /** Fixtures for tests: `stripe` (the emulator), `proxy`, `settle`. */
   readonly fixtures: {
     readonly stripe: Emulator

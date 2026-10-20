@@ -8,7 +8,7 @@ import {
 } from "@danwo/emulators"
 import type { Proxy } from "@danwo/proxy"
 
-import { keptEmulator, type Service, startServices } from "./services.ts"
+import { keptEmulator, type Service, servicesLifecycle, startServices } from "./services.ts"
 
 const DEFAULT_ENDPOINTS = [...TIGRIS_ENDPOINTS, "s3.amazonaws.com", "s3.us-east-1.amazonaws.com"]
 
@@ -69,9 +69,11 @@ export interface S3Environment {
   /** Emulator back to its seed, proxy log and fault rules cleared. */
   reset(): Promise<void>
   /** Keeps the emulator's state now (right after a reset), for `restore`. */
-  snapshot(): Promise<void>
+  snapshot(slot?: string): Promise<void>
   /** Emulator back to the kept state, faster than a reset; proxy log and fault rules cleared. */
-  restore(): Promise<void>
+  restore(slot?: string): Promise<void>
+  /** Whether `snapshot` and `restore` keep a state per slot. */
+  readonly snapshotSlots: boolean
   /** Fixtures for tests: `s3` (the emulator), `proxy`, `settle`. */
   readonly fixtures: {
     readonly s3: Emulator
@@ -126,14 +128,10 @@ export async function s3Environment(
   const settle = () => services.settle()
 
   return {
+    ...servicesLifecycle(services),
     emulator: service.emulator,
     proxy,
     env: (env) => service.env(env),
-    travel: (ms: number) => services.travel(ms),
-    reset: () => services.reset(),
-    snapshot: () => services.snapshot(),
-    restore: () => services.restore(),
     fixtures: { s3: service.emulator, proxy, settle },
-    close: () => services.close(),
   }
 }

@@ -1,8 +1,10 @@
 /**
  * Saved sessions in a worker. A session's setup signs in once in a browser of its own; the
  * browser state it leaves (cookies, localStorage, IndexedDB) is kept, and every test that names
- * the session starts its own fresh browser from that state. Resetting the environment resets the
- * app, so the kept states are dropped then and each session is set up again on its next use.
+ * the session starts its own fresh browser from that state, as long as the app behind it still
+ * holds that sign-in. A test that names no session restores a state without it, so the kept
+ * browser state waits until the session's own kept state is restored again; resetting the
+ * environment drops every kept state, and each session is set up again on its next use.
  */
 import type { BrowserState, WebSession } from "../session.ts"
 import { DanwoError } from "../support/codes.ts"
@@ -11,25 +13,37 @@ import type { SessionArgs, SessionDefinition, SessionSetup } from "../tests/type
 
 type Definition = SessionDefinition<SessionArgs>
 
+/** What a session keeper asks of the worker around it. */
+export interface SessionKeeperHooks {
+  /** Told after `name`'s setup signs in, so the backend side of the sign-in can be kept too. */
+  readonly signedIn?: (name: string) => Promise<void>
+  /** Whether the app holds `name`'s sign-in now, so its kept browser state still works. */
+  readonly holds?: (name: string) => boolean
+}
+
 /** The kept states of one worker's saved sessions, by name. */
 export class SessionKeeper {
   readonly #states = new Map<string, BrowserState>()
   /** Setups that failed since the last reset; the next tests fail with the same reason at once. */
   readonly #failures = new Map<string, unknown>()
-  /** Told after a setup signs in, so the backend side of the sign-in can be kept too. */
-  readonly #onSignedIn: () => Promise<void>
+  readonly #hooks: SessionKeeperHooks
 
-  constructor(onSignedIn: () => Promise<void> = async () => {}) {
-    this.#onSignedIn = onSignedIn
+  constructor(hooks: SessionKeeperHooks = {}) {
+    this.#hooks = hooks
   }
 
-  /** A setup signed in and its browser state was kept; the backend's side is kept next. */
-  signedIn(): Promise<void> {
-    return this.#onSignedIn()
+  /** `name`'s setup signed in and its browser state was kept; the backend's side is kept next. */
+  async signedIn(name: string): Promise<void> {
+    await this.#hooks.signedIn?.(name)
   }
 
-  /** The state `name` left last time, unless the environment was reset since. */
+  /**
+   * The state `name` left last time, while the app still holds that sign-in: not after a reset,
+   * nor after a restore to a state the session was not signed in in.
+   */
   get(name: string): BrowserState | undefined {
+    if (this.#hooks.holds?.(name) === false) return undefined
+
     return this.#states.get(name)
   }
 
@@ -165,7 +179,7 @@ export async function startingState(
     const { state, steps } = await signIn(name, setup, context)
 
     context.keeper.keep(name, state)
-    await context.keeper.signedIn()
+    await context.keeper.signedIn(name)
 
     const note = `session ${name}: ${fresh ? "renewed" : "created"} (${steps} steps)`
 

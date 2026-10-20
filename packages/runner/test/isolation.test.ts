@@ -30,17 +30,22 @@ import { s3Service } from "../src/runner/s3.ts"
 import type { Service } from "../src/runner/services.ts"
 import { stripeService } from "../src/runner/stripe.ts"
 
-/** An environment that counts what the starting point asks of it. */
-function countingEnv(options: { readonly keeps?: boolean; readonly resets?: boolean } = {}) {
+/** An environment that counts what the starting point asks of it, with the slot it names. */
+function countingEnv(
+  options: { readonly keeps?: boolean; readonly resets?: boolean; readonly slots?: boolean } = {},
+) {
   const calls: string[] = []
 
-  const record = (name: string) => async () => {
-    calls.push(name)
-  }
+  const record =
+    (name: string) =>
+    async (slot?: string): Promise<void> => {
+      calls.push(slot === undefined ? name : `${name} ${slot}`)
+    }
 
   const env = {
     ...(options.resets !== false && { reset: record("reset") }),
     ...(options.keeps !== false && { snapshot: record("snapshot"), restore: record("restore") }),
+    ...(options.slots === true && { snapshotSlots: true }),
   }
 
   return { env, calls }
@@ -53,11 +58,25 @@ describe("StartingPoint", () => {
     const start = new StartingPoint(env, () => forgotten++)
 
     await start.clean()
+    start.touch()
     await start.again()
+    start.touch()
     await start.clean()
 
     expect(calls).toEqual(["reset", "snapshot", "restore", "restore"])
     expect(forgotten).toBe(1)
+  })
+
+  it("restores nothing when the environment is still where it was put", async () => {
+    const { env, calls } = countingEnv()
+    const start = new StartingPoint(env, () => {})
+
+    await start.clean()
+    expect(start.untouched).toBe(true)
+    await start.again()
+    await start.clean()
+
+    expect(calls).toEqual(["reset", "snapshot"])
   })
 
   it("restores a file's setup until the next file, which resets again", async () => {
@@ -65,24 +84,89 @@ describe("StartingPoint", () => {
     const start = new StartingPoint(env, () => {})
 
     await start.clean()
+    start.touch()
     await start.keep("file")
+    start.touch()
     await start.again()
+    start.touch()
     await start.clean()
 
     expect(calls).toEqual(["reset", "snapshot", "snapshot", "restore", "reset", "snapshot"])
   })
 
-  it("keeps a sign-in in the clean state, so later files restore it", async () => {
+  it("keeps each session's sign-in beside the seeded state, and a test without one starts from the seeded state", async () => {
+    const { env, calls } = countingEnv({ slots: true })
+    const start = new StartingPoint(env, () => {})
+
+    await start.clean("ada")
+    start.touch()
+    start.signedIn("ada")
+    await start.keep("session", "ada")
+    expect(start.holds("ada")).toBe(true)
+
+    start.touch()
+    await start.again()
+    expect(start.holds("ada")).toBe(false)
+
+    start.touch()
+    await start.again("ada")
+    expect(start.holds("ada")).toBe(true)
+
+    start.touch()
+    await start.clean("bob")
+    expect(start.holds("ada")).toBe(false)
+
+    expect(calls).toEqual([
+      "reset",
+      "snapshot pristine",
+      "snapshot pristine+ada",
+      "restore pristine",
+      "restore pristine+ada",
+      "restore pristine",
+    ])
+  })
+
+  it("keeps a session's sign-in on a file's setup only while that file runs", async () => {
+    const { env, calls } = countingEnv({ slots: true })
+    const start = new StartingPoint(env, () => {})
+
+    await start.clean()
+    start.touch()
+    await start.keep("file")
+    start.touch()
+    start.signedIn("ada")
+    await start.keep("session", "ada")
+    start.touch()
+    await start.again("ada")
+    start.touch()
+    await start.clean("ada")
+
+    expect(calls).toEqual([
+      "reset",
+      "snapshot pristine",
+      "snapshot file",
+      "snapshot file+ada",
+      "restore file+ada",
+      "restore pristine",
+    ])
+    expect(start.holds("ada")).toBe(false)
+  })
+
+  it("keeps no sign-in when the environment keeps one state, so the session signs in again", async () => {
     const { env, calls } = countingEnv()
-    let forgotten = 0
-    const start = new StartingPoint(env, () => forgotten++)
+    const start = new StartingPoint(env, () => {})
 
     await start.clean()
-    await start.keep("session")
-    await start.clean()
+    start.touch()
+    start.signedIn("ada")
+    await start.keep("session", "ada")
+    expect(start.holds("ada")).toBe(true)
 
-    expect(calls).toEqual(["reset", "snapshot", "snapshot", "restore"])
-    expect(forgotten).toBe(1)
+    start.touch()
+    await start.again("ada")
+
+    expect(calls).toEqual(["reset", "snapshot", "restore"])
+    expect(start.holds("ada")).toBe(false)
   })
 
   it("resets every time without a snapshot, and does nothing without a reset", async () => {
@@ -91,6 +175,7 @@ describe("StartingPoint", () => {
     const resetting = new StartingPoint(plain.env, () => forgotten++)
 
     await resetting.clean()
+    resetting.touch()
     await resetting.again()
     await resetting.keep("file")
     expect(plain.calls).toEqual(["reset", "reset"])
@@ -99,10 +184,13 @@ describe("StartingPoint", () => {
     const fixed = countingEnv({ keeps: false, resets: false })
     const unmoved = new StartingPoint(fixed.env, () => forgotten++)
 
+    unmoved.signedIn("ada")
     await unmoved.clean()
+    unmoved.touch()
     await unmoved.again()
     expect(fixed.calls).toEqual([])
     expect(forgotten).toBe(2)
+    expect(unmoved.holds("ada")).toBe(true)
   })
 })
 
