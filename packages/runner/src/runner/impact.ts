@@ -67,7 +67,10 @@ export function impactOf(input: {
     .map((log) => appRoute(log.text, input.baseUrl))
     .filter((route) => route !== undefined)
   const calls = [
-    ...input.exchanges.map((exchange) => routeOf(exchange)),
+    /* The page loading its own scripts and styles is no call the app makes; a change to it is. */
+    ...input.exchanges
+      .filter((exchange) => exchange.asset !== true)
+      .map((exchange) => routeOf(exchange)),
     ...input.deliveries.map((delivery) => `webhook ${delivery.topic}`),
   ]
 

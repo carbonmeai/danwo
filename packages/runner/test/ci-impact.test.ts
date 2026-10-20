@@ -170,6 +170,20 @@ describe("what a test touched", () => {
       ],
     })
   })
+
+  it("leaves out the page's own asset loads", () => {
+    const impact = impactOf({
+      appLog: [],
+      exchanges: [
+        { ...exchange("GET", "localhost", "/assets/tasks-3zigwz0Z.js"), asset: true },
+        exchange("POST", "localhost", "/tasks"),
+      ],
+      deliveries: [],
+      baseUrl: "http://localhost:3000",
+    })
+
+    expect(impact.calls).toEqual(["POST localhost/tasks"])
+  })
 })
 
 describe("selecting by change", () => {
