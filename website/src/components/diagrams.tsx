@@ -187,3 +187,153 @@ export function MatrixFlow(): ReactNode {
     </Figure>
   )
 }
+
+/** A dashed region labelled with what it holds, drawn behind boxes. */
+function Region(props: {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+  readonly label: string
+  readonly strong?: boolean
+}): ReactNode {
+  return (
+    <g>
+      <rect
+        x={props.x}
+        y={props.y}
+        width={props.width}
+        height={props.height}
+        rx={12}
+        style={{
+          fill: "none",
+          stroke: props.strong === true ? TEXT : BORDER,
+          strokeWidth: 1.5,
+          strokeDasharray: "6 5",
+        }}
+      />
+      <text x={props.x + 14} y={props.y + 20} style={{ fill: MUTED, fontSize: 11 }}>
+        {props.label}
+      </text>
+    </g>
+  )
+}
+
+/**
+ * The one rule: what runs inside danwo's proxy can be emulated and faulted; what runs elsewhere
+ * reaches the real services, unseen.
+ */
+export function ProxyBoundary(): ReactNode {
+  return (
+    <Figure
+      width={760}
+      height={270}
+      label="Inside danwo's proxy: the browser or device danwo drives, the apps danwo starts, the emulators and the data proxies. Outside: servers danwo did not start, and the real providers they call."
+      caption="Everything inside the dashed line goes through danwo's proxy. Outside it, danwo sees nothing."
+    >
+      <Region x={10} y={10} width={470} height={250} label="inside danwo's proxy" strong />
+      <Box x={30} y={45} width={130} label="Browser or device" note="danwo drives it" />
+      <Box x={30} y={135} width={130} label="Apps danwo starts" note="your dev servers" />
+      <Box x={190} y={90} width={110} label="danwo proxy" note="records, faults" stroke={TEXT} />
+      <Box x={330} y={45} width={130} label="Emulators" note="Stripe, Clerk, …" />
+      <Box x={330} y={135} width={130} label="Data proxies" note="Postgres, Redis" />
+      <Arrow from={[160, 70]} to={[186, 105]} />
+      <Arrow from={[160, 160]} to={[186, 125]} />
+      <Arrow from={[300, 105]} to={[326, 70]} />
+      <Arrow from={[300, 125]} to={[326, 160]} />
+      <Region x={510} y={10} width={240} height={250} label="outside: danwo sees nothing" />
+      <Box
+        x={530}
+        y={70}
+        width={200}
+        label="Servers danwo didn't start"
+        note="staging, a remote API"
+      />
+      <Box x={530} y={160} width={200} label="Real providers" note="what those servers call" />
+      <Arrow from={[630, 120]} to={[630, 156]} />
+    </Figure>
+  )
+}
+
+/** One place a test's requests go, and whether it sits inside danwo's proxy. */
+interface Hop {
+  readonly label: string
+  readonly note: string
+  readonly inside: boolean
+}
+
+/** The request path of each setup on the "Where danwo runs" pages. */
+const SETUPS = {
+  "full-stack": [
+    { label: "Browser", note: "danwo drives it", inside: true },
+    { label: "Your app", note: "pages, API, actions", inside: true },
+    { label: "Emulators", note: "Stripe, Resend, …", inside: true },
+  ],
+  split: [
+    { label: "Browser", note: "danwo drives it", inside: true },
+    { label: "Frontend", note: "danwo starts it", inside: true },
+    { label: "API", note: "danwo starts it", inside: true },
+    { label: "Emulators", note: "Stripe, Clerk, …", inside: true },
+  ],
+  "frontend-only": [
+    { label: "Browser", note: "danwo drives it", inside: true },
+    { label: "Frontend", note: "danwo starts it", inside: true },
+    { label: "Remote API", note: "already running", inside: false },
+    { label: "Real providers", note: "what it calls", inside: false },
+  ],
+  staging: [
+    { label: "Browser", note: "danwo drives it", inside: true },
+    { label: "Staging site", note: "deployed", inside: false },
+    { label: "Sandboxes", note: "real test accounts", inside: false },
+  ],
+  production: [
+    { label: "Browser", note: "danwo drives it", inside: false },
+    { label: "Production", note: "live site", inside: false },
+    { label: "Real providers", note: "live accounts", inside: false },
+  ],
+} satisfies Readonly<Record<string, readonly Hop[]>>
+
+const HOP_WIDTH = 150
+const HOP_GAP = 40
+
+/** A scenario's request path, left to right, with danwo's proxy drawn around the hops it covers. */
+export function Setup(props: { readonly kind: keyof typeof SETUPS }): ReactNode {
+  const hops: readonly Hop[] = SETUPS[props.kind]
+  const inside = hops.filter((hop) => hop.inside).length
+
+  return (
+    <Figure
+      width={760}
+      height={150}
+      label={hops
+        .map((hop) => `${hop.label}, ${hop.inside ? "inside" : "outside"} danwo's proxy`)
+        .join("; then ")}
+      caption={
+        inside === 0
+          ? "No proxy: danwo drives and records the browser, and nothing else."
+          : "The dashed line is danwo's proxy: what's inside can be emulated and faulted."
+      }
+    >
+      {inside > 0 && (
+        <Region
+          x={4}
+          y={8}
+          width={inside * (HOP_WIDTH + HOP_GAP) - HOP_GAP / 2 + 6}
+          height={134}
+          label="inside danwo's proxy"
+          strong
+        />
+      )}
+      {hops.map((hop, i) => {
+        const x = 10 + i * (HOP_WIDTH + HOP_GAP)
+
+        return (
+          <g key={hop.label}>
+            {i > 0 && <Arrow from={[x - HOP_GAP, 87]} to={[x - 4, 87]} />}
+            <Box x={x} y={62} width={HOP_WIDTH} label={hop.label} note={hop.note} />
+          </g>
+        )
+      })}
+    </Figure>
+  )
+}

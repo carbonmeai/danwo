@@ -3,7 +3,7 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs"
 import defaultMdxComponents from "fumadocs-ui/mdx"
 import type { MDXComponents } from "mdx/types"
 
-import { HowItWorks, MatrixFlow } from "./diagrams.tsx"
+import { HowItWorks, MatrixFlow, ProxyBoundary, Setup } from "./diagrams.tsx"
 
 /**
  * The components MDX pages can use: the docs defaults (cards, callouts, code blocks), steps,
@@ -18,6 +18,8 @@ export function useMdxComponents(components?: MDXComponents) {
     Tabs,
     HowItWorks,
     MatrixFlow,
+    ProxyBoundary,
+    Setup,
     ...components,
   } satisfies MDXComponents
 }
