@@ -55,6 +55,18 @@ export function webHost(url: string): string | undefined {
   }
 }
 
+/** Who opened a filmed tab, the host it showed, and whether it closed before `closedAt`. */
+function tabOrigin(
+  entry: Filmed,
+  closedAt: number,
+): Pick<CapturedVideo, "opener" | "host" | "closed"> {
+  return {
+    ...(entry.opener !== undefined && { opener: entry.opener }),
+    ...(entry.host !== undefined && { host: entry.host }),
+    ...(entry.closedAt !== undefined && entry.closedAt < closedAt && { closed: true }),
+  }
+}
+
 /** The tabs being filmed, in the order they opened. */
 export class TabFilm {
   private readonly filmed: Filmed[] = []
@@ -116,9 +128,7 @@ export class TabFilm {
           durationMs: Math.max((entry.closedAt ?? closedAt) - entry.startedAt, 0),
           tab: at + 1,
           ...(this.user !== undefined && { user: this.user }),
-          ...(entry.opener !== undefined && { opener: entry.opener }),
-          ...(entry.host !== undefined && { host: entry.host }),
-          ...(entry.closedAt !== undefined && entry.closedAt < closedAt && { closed: true }),
+          ...tabOrigin(entry, closedAt),
         })
       } catch {
         /* The tab never painted a frame, or its file is gone: there is nothing to show. */

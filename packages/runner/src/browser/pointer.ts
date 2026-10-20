@@ -10,13 +10,13 @@ import type { BrowserContext, Locator as PlaywrightLocator } from "playwright-co
 export type PointerKind = "click" | "type" | "hover"
 
 /** The id of the element the pointer is drawn in. */
-export const POINTER_HOST = "danwo-pointer"
+const POINTER_HOST = "danwo-pointer"
 
 /** A screenshot style that hides the pointer, for baselines and the model's screenshots. */
 export const HIDE_POINTER = `#${POINTER_HOST} { display: none !important; }`
 
 /** How long the pointer takes to reach an element; the action waits for it before it runs. */
-export const POINTER_MS = 180
+const POINTER_MS = 180
 
 /** The box of an element in CSS pixels of the viewport. */
 interface Box {
@@ -125,8 +125,11 @@ const FIND_MS = 1000
  * Moves the pointer to `target` and shows `kind` there, then waits for it to arrive. Never throws:
  * an element not there yet is left to the action itself, which waits for it and names it.
  */
-export async function pointAt(target: PlaywrightLocator, kind: PointerKind): Promise<void> {
-  if (!drawing.has(target.page().context())) return
+export async function pointAt(
+  target: PlaywrightLocator,
+  kind: PointerKind | undefined,
+): Promise<void> {
+  if (kind === undefined || !drawing.has(target.page().context())) return
 
   try {
     const box = await target.boundingBox({ timeout: FIND_MS })

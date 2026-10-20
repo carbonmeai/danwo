@@ -57,9 +57,7 @@ export async function operate(
   operation: Operation,
   timeout: number,
 ): Promise<void> {
-  const kind = POINTER_OF[operation.kind]
-
-  if (kind !== undefined) await pointAt(element, kind)
+  await pointAt(element, POINTER_OF[operation.kind])
 
   switch (operation.kind) {
     case "click":

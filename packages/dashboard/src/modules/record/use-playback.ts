@@ -291,28 +291,62 @@ function useSwitchedSeek({ tab, startMs, endMs, seek, pickTab, videoRef, held }:
 function useFollow(state: {
   readonly replay: Replay
   readonly tab: number
+  readonly video: ReplayVideo | undefined
+  readonly videoRef: RefObject<HTMLVideoElement | null>
+  /** Where the video playing ends, on the record's clock. */
+  readonly endMs: number
   readonly ms: number
   readonly playing: boolean
   readonly marks: readonly ReplayMark[]
-  readonly follow: (to: number, ms: number) => void
   readonly held: RefObject<boolean>
-}): RefObject<number | undefined> {
-  const { replay, tab, ms, playing, marks, follow, held } = state
+  readonly pending: ReturnType<typeof useSwitchedSeek>["pending"]
+  readonly forgetLink: () => void
+  readonly setMs: (ms: number) => void
+  readonly setTab: (tab: number) => void
+  readonly pickTab: (index: number) => void
+}): (index: number) => void {
+  const { replay, tab, video, videoRef, endMs, ms, playing, marks, held, pending } = state
+  const { forgetLink, setMs, setTab, pickTab } = state
   const followed = useRef<number>(undefined)
   const step = stepAt(marks, ms)
+
+  /* Moves to video `to` at `at` and plays on there; nothing when it is the one playing. */
+  const follow = useCallback(
+    (to: number, at: number) => {
+      if (to === tab) return
+
+      forgetLink()
+      held.current = true
+      pending.current = { ms: at, play: true }
+      setMs(at)
+      setTab(to)
+    },
+    [tab, forgetLink, held, pending, setMs, setTab],
+  )
 
   useEffect(() => {
     if (!playing || held.current || step === followed.current) return
 
     followed.current = step
-
-    const to = followedVideo(replay, tab, ms)
-
-    if (to !== tab) follow(to, ms)
+    follow(followedVideo(replay, tab, ms), ms)
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- a new step, not each frame, moves the player
   }, [playing, step])
 
-  return followed
+  /* A popup's video ends where it closed: the run goes on in the tab that opened it. */
+  useVideoEvent(videoRef, video, ENDED, () => follow(followedVideo(replay, tab, endMs), endMs))
+
+  return useCallback(
+    (index: number) => {
+      followed.current = stepAt(marks, ms)
+      pickTab(index)
+    },
+    [marks, ms, pickTab],
+  )
+}
+
+/** Where the player's clock reads 0:00: the first frame of the earliest video. */
+function originOf(replay: Replay, startMs: number): number {
+  return replay.videos.reduce((first, each) => Math.min(first, each.startMs), startMs)
 }
 
 /**
@@ -402,40 +436,28 @@ export function usePlayback(replay: Replay): Playback {
     held,
   })
 
-  const follow = useCallback(
-    (to: number, at: number) => {
-      forgetLink()
-      held.current = true
-      pending.current = { ms: at, play: true }
-      setMs(at)
-      setTab(to)
-    },
-    [forgetLink, pending],
-  )
-
-  const followed = useFollow({ replay, tab, ms, playing, marks, follow, held })
-
-  /* A popup's video ends where it closed: the run goes on in the tab that opened it. */
-  useVideoEvent(videoRef, video, ENDED, () => {
-    const at = startMs + length
-    const to = followedVideo(replay, tab, at)
-
-    if (to !== tab) follow(to, at)
+  const pickByHand = useFollow({
+    replay,
+    tab,
+    video,
+    videoRef,
+    endMs,
+    ms,
+    playing,
+    marks,
+    held,
+    pending,
+    forgetLink,
+    setMs,
+    setTab,
+    pickTab,
   })
-
-  const pickByHand = useCallback(
-    (index: number) => {
-      followed.current = stepAt(marks, ms)
-      pickTab(index)
-    },
-    [followed, marks, ms, pickTab],
-  )
 
   return {
     ms,
     startMs,
     endMs,
-    originMs: replay.videos.reduce((first, each) => Math.min(first, each.startMs), startMs),
+    originMs: originOf(replay, startMs),
     playing,
     rate,
     segments: replay.segments,
