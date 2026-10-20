@@ -72,6 +72,30 @@ export interface StepAction {
   readonly recorded: RecordedAction | null | undefined
 }
 
+/**
+ * The answer with each tool call once: a provider can repeat a call under the same id, and every
+ * call the transcript keeps must get exactly one result, or the next request is refused.
+ */
+export function onceEachCall(messages: readonly ModelMessage[]): ModelMessage[] {
+  const seen = new Set<string>()
+
+  return messages.map((message) =>
+    message.role === "assistant" && typeof message.content !== "string"
+      ? {
+          ...message,
+          content: message.content.filter((part) => {
+            if (part.type !== "tool-call") return true
+            if (seen.has(part.toolCallId)) return false
+
+            seen.add(part.toolCallId)
+
+            return true
+          }),
+        }
+      : message,
+  )
+}
+
 /** The tool calls in a model's answer. */
 export function toolCallsOf(messages: readonly ModelMessage[]): ToolCallPart[] {
   return messages.flatMap((message) =>
@@ -216,7 +240,9 @@ export abstract class ToolLoop<View, Call, Done extends Outcome> {
     this.loop.spends.call(cost)
     this.loop.onModelCall(cost)
 
-    return { calls: toolCallsOf(result.response.messages), response: result.response.messages }
+    const response = onceEachCall(result.response.messages)
+
+    return { calls: toolCallsOf(response), response }
   }
 
   private async carryOut(calls: readonly ToolCallPart[], view: View): Promise<Done[]> {

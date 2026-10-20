@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest"
 
 import { Spend, Spends } from "../src/agent/budget.ts"
 import { LoopGuard } from "../src/agent/guard.ts"
+import { onceEachCall, toolCallsOf } from "../src/agent/loop.ts"
 import { Transcript, VIEW_MARK } from "../src/agent/transcript.ts"
 
 const cost = (costUsd?: number) => ({
@@ -149,5 +150,24 @@ describe("transcript", () => {
     expect(sent[1]?.providerOptions).toEqual({
       anthropic: { cacheControl: { type: "ephemeral" } },
     })
+  })
+})
+
+describe("a model's answer", () => {
+  it("keeps a call repeated under the same id once, so it gets one result", () => {
+    const look = { type: "tool-call" as const, toolCallId: "toolu_1", toolName: "look", input: {} }
+    const click = {
+      type: "tool-call" as const,
+      toolCallId: "toolu_2",
+      toolName: "click",
+      input: {},
+    }
+    const answer = onceEachCall([
+      { role: "assistant", content: [{ type: "text", text: "Looking" }, look, click, look] },
+      { role: "assistant", content: [look] },
+    ])
+
+    expect(toolCallsOf(answer).map((call) => call.toolCallId)).toEqual(["toolu_1", "toolu_2"])
+    expect(answer[0]?.content).toHaveLength(3)
   })
 })
