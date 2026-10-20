@@ -70,6 +70,8 @@ describe("a stack of apps behind one proxy", () => {
 
     expect(out).toContain("1 passed")
     expect(out).not.toContain("runs without danwo's preload")
+    /* The page's stream and socket are dropped when the test ends; that is not worth a line. */
+    expect(out).not.toContain("Response error")
     expect(code).toBe(0)
 
     const record = await newestRecord("adds-a-task")
