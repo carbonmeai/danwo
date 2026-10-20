@@ -295,6 +295,35 @@ describe("effects", () => {
     })
   })
 
+  it("leaves out relative times, dates and clock times however the page writes them", () => {
+    const volatile = [
+      "7 sec. ago",
+      "Updated 7s ago",
+      "12 mins ago",
+      "3 hrs. ago",
+      "a minute ago",
+      "an hour ago",
+      "a few seconds ago",
+      "just now",
+      "Due in 3 days",
+      "Renews in a month",
+      "Oct 20",
+      "Created Sept. 3",
+      "20 October 2026",
+      "Today at 3pm",
+      "9:41 AM",
+      "Sent 10 a.m.",
+    ]
+    const steady = ["Signed in as Ada", "Assigned to Bob", "3 marks", "Version 2 of the plan"]
+    const after = pageDescriptions(
+      [...volatile, ...steady].map((text, n) => `- paragraph [ref=e${n}]: ${text}`).join("\n"),
+    )
+
+    expect(pageEffect([], after, { values: [], ignore: [] }).appeared).toEqual(
+      steady.map((text) => `paragraph: ${text}`),
+    )
+  })
+
   it("names missing calls, and extra calls but not webhooks that land late", () => {
     expect(backendMismatch([CHECKOUT], [])).toBe(`expected ${CHECKOUT}, saw none`)
     expect(backendMismatch([], ["GET api.stripe.com/v1/prices"])).toBe(

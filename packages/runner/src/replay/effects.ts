@@ -33,13 +33,25 @@ const TELLING_ROLES = [
   "link",
 ]
 
-/** Text that changes from run to run on its own: clock times, dates, long numbers, ids. */
+/** A unit of a relative time, long or short, with an optional dot: `sec.`, `mins`, `hrs`, `days`. */
+const UNIT =
+  "(?:s|secs?|seconds?|m|mins?|minutes?|h|hrs?|hours?|d|days?|w|wks?|weeks?|mos?|months?|y|yrs?|years?)\\.?"
+/** How many of a unit: a number, or a word set off from its unit (`a minute`, not `as`). */
+const COUNT = "(?:\\d+\\s*|(?:a|an|one|a few)\\s+)"
+/** A month's name or its abbreviation. */
+const MONTH =
+  "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?"
+
+/** Text that changes from run to run on its own: clock times, dates, relative times, long numbers, ids. */
 const VOLATILE = [
   /\b\d{1,2}:\d{2}(?::\d{2})?\b/,
+  /\b\d{1,2}\s*[ap]\.?m\b\.?/i,
   /\b\d{4}-\d{2}-\d{2}\b/,
   /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/,
+  new RegExp(`\\b${MONTH}\\s+\\d{1,2}(?!\\d)|\\b\\d{1,2}\\s+${MONTH}(?![a-z])`, "i"),
   /\b\d{6,}\b/,
-  /\b(?:just now|\d+\s*(?:s|sec|seconds?|m|min|minutes?|h|hours?|d|days?) ago)\b/i,
+  /\b(?:just now|moments? ago|a moment ago)(?!\w)/i,
+  new RegExp(`\\b(?:${COUNT}${UNIT}\\s+ago|in\\s+${COUNT}${UNIT})(?!\\w)`, "i"),
   /\b[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\b/i,
   /\b[a-z]{2,8}_(?:test_|live_)?[A-Za-z0-9]{8,}\b/,
 ]
