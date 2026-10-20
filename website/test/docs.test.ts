@@ -3,6 +3,7 @@ import { join } from "node:path"
 
 import { beforeAll, describe, expect, it } from "vitest"
 
+import { copyGuides } from "../src/generator/agent-guides.ts"
 import { GUIDES_DIR, readGuide, REPO_ROOT } from "../src/generator/danwo.ts"
 import { EXAMPLES, exampleFolders } from "../src/generator/examples.ts"
 import {
@@ -44,14 +45,36 @@ function sources(): PageSource[] {
 }
 
 describe("the docs plan", () => {
-  it("gives every guide exactly one page", () => {
-    const planned = sources().flatMap((source) => (source.kind === "guide" ? [source.topic] : []))
-    const homes = [...planned, ...PROVIDERS.flatMap((provider) => provider.guide ?? [])]
+  it("lists every guide once, as raw markdown, on the one page for coding agents", () => {
     const guides = readdirSync(GUIDES_DIR)
       .filter((file) => file.endsWith(".md"))
       .map((file) => file.slice(0, -".md".length))
+    const pages = sources().filter((source) => source.kind === "agent-guides")
+    const page = [...files.values()].find(
+      (text) => field(text, "source") === '"packages/skill/guides"',
+    )
+    const links = [...(page ?? "").matchAll(/\]\(\/guides\/([\w-]+)\.md\)/g)].map(
+      (match) => match[1] ?? "",
+    )
 
-    expect(guides.filter((topic) => !homes.includes(topic))).toEqual([])
+    expect(pages).toHaveLength(1)
+    expect(links.toSorted()).toEqual(guides.toSorted())
+  })
+
+  it("serves each guide's raw markdown as it is", () => {
+    const copied = join(WEBSITE, "public", "guides")
+
+    copyGuides(join(WEBSITE, "public"))
+
+    for (const file of readdirSync(GUIDES_DIR).filter((name) => name.endsWith(".md")))
+      expect(readFileSync(join(copied, file), "utf8")).toBe(
+        readFileSync(join(GUIDES_DIR, file), "utf8"),
+      )
+  })
+
+  it("gives each provider's guide at most one provider page", () => {
+    const homes = PROVIDERS.flatMap((provider) => provider.guide ?? [])
+
     expect(homes.filter((topic, i) => homes.indexOf(topic) !== i)).toEqual([])
   })
 
@@ -94,16 +117,9 @@ describe("the docs plan", () => {
   })
 
   it("gives every section moved off its guide's page exactly one other home", () => {
-    const homes = [
-      ...sources().flatMap((source) =>
-        source.kind === "sections"
-          ? source.sections.map((heading) => `${source.topic}#${heading}`)
-          : [],
-      ),
-      ...PROVIDERS.flatMap((provider) =>
-        provider.guideSection ? [`providers#${provider.guideSection}`] : [],
-      ),
-    ]
+    const homes = PROVIDERS.flatMap((provider) =>
+      provider.guideSection ? [`providers#${provider.guideSection}`] : [],
+    )
     const moved = Object.entries(MOVED_SECTIONS).flatMap(([topic, headings]) =>
       headings.map((heading) => `${topic}#${heading}`),
     )

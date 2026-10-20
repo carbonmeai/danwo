@@ -16,16 +16,10 @@ import {
 import { dirname, join, relative } from "node:path"
 
 import { PROVIDERS } from "../lib/providers.ts"
-import { readGuide, readReadme, readSpec, REPO_ROOT, type SpecSection } from "./danwo.ts"
+import { agentGuidesPage } from "./agent-guides.ts"
+import { readReadme, readSpec, REPO_ROOT, type SpecSection } from "./danwo.ts"
 import { EXAMPLES, examplePage, examplesIndex } from "./examples.ts"
-import {
-  frontmatter,
-  guidePage,
-  onlySections,
-  referenceBody,
-  section,
-  withoutSections,
-} from "./markdown.ts"
+import { frontmatter, referenceBody, section } from "./markdown.ts"
 import {
   PLAN,
   type PageSource,
@@ -91,13 +85,6 @@ function copied(file: string, place: Placement): string {
     : text
 
   return body
-}
-
-/** A guide as a markdown page. */
-function guideFile(place: Placement, topic: string, drop: readonly string[] = []): string {
-  const page = guidePage(readGuide(topic))
-
-  return `${head(place, page.description, `packages/skill/guides/${topic}.md`)}\n${withoutSections(page.body, drop)}\n`
 }
 
 /** The code a reference page opens with, under a tab naming its file. */
@@ -200,11 +187,7 @@ const BUILDERS: {
   ) => Built
 } = {
   file: (source, { place }) => ["mdx", copied(source.file, place)],
-  guide: (source, { place }) => ["md", guideFile(place, source.topic, source.drop)],
-  sections: (source, { place }) => [
-    "md",
-    `${head(place, source.description, `packages/skill/guides/${source.topic}.md`)}\n${onlySections(readGuide(source.topic), source.sections)}\n`,
-  ],
+  "agent-guides": (_, { place }) => ["md", agentGuidesPage(place)],
   readme: (source, { place, inputs }) => [
     "md",
     `${head(place, source.description, "README.md")}\n${section(inputs.readme, source.heading)}\n`,

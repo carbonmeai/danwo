@@ -7,6 +7,7 @@ import { join } from "node:path"
 
 import type { Plugin } from "vite"
 
+import { copyGuides } from "./agent-guides.ts"
 import { BRAND_DIR, copyBrand } from "./brand.ts"
 import { codeSamples } from "./code-samples.ts"
 import { GUIDES_DIR, REPO_ROOT } from "./danwo.ts"
@@ -22,6 +23,12 @@ const PUBLIC = join(WEBSITE, "public")
 const SAMPLES_ID = "virtual:danwo/code-samples"
 const RESOLVED_SAMPLES_ID = `\0${SAMPLES_ID}`
 
+/** Copies the brand files or the raw guides into `public/` again when `path` is one of them. */
+function copyChanged(path: string): void {
+  if (path.startsWith(BRAND_DIR)) copyBrand(PUBLIC)
+  if (path.startsWith(GUIDES_DIR)) copyGuides(PUBLIC)
+}
+
 /** The Vite plugin that keeps `generated/docs` in step with its sources. */
 export function danwoDocs(): Plugin {
   return {
@@ -31,6 +38,7 @@ export function danwoDocs(): Plugin {
     config() {
       generateDocs()
       copyBrand(PUBLIC)
+      copyGuides(PUBLIC)
     },
     resolveId(id) {
       return id === SAMPLES_ID ? RESOLVED_SAMPLES_ID : undefined
@@ -43,7 +51,7 @@ export function danwoDocs(): Plugin {
     configureServer(server) {
       server.watcher.add([...WATCHED, BRAND_DIR])
       server.watcher.on("all", (_event, path) => {
-        if (path.startsWith(BRAND_DIR)) copyBrand(PUBLIC)
+        copyChanged(path)
         if (!WATCHED.some((watched) => path.startsWith(watched))) return
 
         const changed = generateDocs()

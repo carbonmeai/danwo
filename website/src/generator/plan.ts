@@ -1,8 +1,8 @@
 /**
  * The docs' table of contents: the tabs across the top, the sections of each tab's sidebar, and
- * every page with its short title, its icon and where its text comes from. Most pages are
- * danwo's own guides, README sections and spec topics, so the docs say what `danwo guide` and
- * `danwo spec` say; the rest are written for the website, under `content/docs`.
+ * every page with its short title, its icon and where its text comes from. Pages for people are
+ * written for the website, under `content/docs`; the reference comes from `danwo spec`, and the
+ * guides for coding agents are listed on one page and served as raw markdown.
  */
 import { EXAMPLES, exampleIcon } from "./examples.ts"
 
@@ -19,15 +19,6 @@ export interface ReferenceExample {
 export type PageSource =
   /** A page written for the website, under `content/docs`. */
   | { readonly kind: "file"; readonly file: string }
-  /** A `danwo guide`, minus the sections that have pages of their own. */
-  | { readonly kind: "guide"; readonly topic: string; readonly drop?: readonly string[] }
-  /** Some `##` sections of a guide, as a page of their own. */
-  | {
-      readonly kind: "sections"
-      readonly topic: string
-      readonly sections: readonly string[]
-      readonly description: string
-    }
   /** One `##` section of the README. */
   | { readonly kind: "readme"; readonly heading: string; readonly description: string }
   /** Topics of `danwo spec`, each entry a section with its members in a table. */
@@ -49,6 +40,8 @@ export type PageSource =
   | { readonly kind: "examples" }
   /** One example project's page. */
   | { readonly kind: "example"; readonly example: string }
+  /** The one page that lists the guides for coding agents, each linked as raw markdown. */
+  | { readonly kind: "agent-guides" }
 
 /** A page: its slug inside its tab, the short title the sidebar and its heading show, its icon. */
 export interface PlannedPage {
@@ -78,41 +71,6 @@ export interface PlannedTab {
 /** A page written for the website. */
 function file(slug: string, title: string, icon: string, path = `${slug}.mdx`): PlannedPage {
   return { slug, title, icon, source: { kind: "file", file: path } }
-}
-
-/** A page from a guide. */
-function guide(
-  slug: string,
-  title: string,
-  icon: string,
-  topic = slug,
-  drop?: readonly string[],
-): PlannedPage {
-  return { slug, title, icon, source: { kind: "guide", topic, ...(drop && { drop }) } }
-}
-
-/** A page from some sections of a guide; the guide's own page drops them. */
-function sections(
-  slug: string,
-  title: string,
-  icon: string,
-  source: {
-    readonly topic: string
-    readonly keep: readonly string[]
-    readonly description: string
-  },
-): PlannedPage {
-  return {
-    slug,
-    title,
-    icon,
-    source: {
-      kind: "sections",
-      topic: source.topic,
-      sections: source.keep,
-      description: source.description,
-    },
-  }
 }
 
 /** A reference page from spec topics. */
@@ -156,19 +114,12 @@ export const PROVIDER_GUIDE_SECTIONS = [
   "Tiptap",
 ]
 
-/** Sections of the providers guide on running a real app's services, a page of their own. */
-const REAL_STACK_SECTIONS = [
-  "Any app, started by its own command",
-  "Several apps",
-  "Hosts no service answers",
-]
-
 /**
- * Every guide section that is shown on a page of its own rather than its guide's page, by guide:
- * the guide's page drops them, and the docs test checks each has exactly one home.
+ * Every guide section that is shown on a page of its own, by guide; the docs test checks each has
+ * exactly one home.
  */
 export const MOVED_SECTIONS = {
-  providers: [...PROVIDER_GUIDE_SECTIONS, ...REAL_STACK_SECTIONS],
+  providers: [...PROVIDER_GUIDE_SECTIONS],
 }
 
 /** The entries of the spec's test API that are about fixtures rather than declaring tests. */
@@ -340,39 +291,17 @@ export const PLAN: readonly PlannedTab[] = [
       },
       {
         /*
-         * The guides danwo hands coding agents, kept whole where a page written for the website
-         * has taken their place above, so every guide still has a page.
+         * The guides danwo hands coding agents are not pages for people: one page lists them, each
+         * linked as its raw markdown, which `/llms-full.txt` also carries.
          */
         title: "For coding agents",
         pages: [
-          guide("agents-first-test", "First test guide", "Bot", "first-test"),
-          guide("agents-matrix", "Matrix guide", "Bot", "matrix"),
-          guide("agents-locators", "Locators guide", "Bot", "locators-vs-agent"),
-          guide(
-            "agents-providers",
-            "Providers guide",
-            "Bot",
-            "providers",
-            MOVED_SECTIONS.providers,
-          ),
-          guide("agents-debugging", "Debugging guide", "Bot", "debugging"),
-          guide("agents-secrets", "Secrets guide", "Bot", "secrets"),
-          guide("agents-email-and-otp", "Email and OTP guide", "Bot", "email-and-otp"),
-          guide("agents-sessions", "Sessions guide", "Bot", "sessions"),
-          guide("agents-time", "Time guide", "Bot", "time"),
-          guide("agents-infrastructure", "Infrastructure guide", "Bot", "infrastructure"),
-          guide("agents-lint", "Lint guide", "Bot", "lint"),
-          sections("agents-real-stacks", "Real stacks guide", "Bot", {
-            topic: "providers",
-            keep: REAL_STACK_SECTIONS,
-            description:
-              "The coding agents' guide to running a real app under danwo: its own start command, several apps behind one proxy, background jobs, sockets and the hosts no emulator answers.",
-          }),
-          guide("agents-mobile", "Mobile guide", "Bot", "mobile"),
-          guide("agents-playwright", "Playwright guide", "Bot", "playwright"),
-          guide("agents-ci", "CI guide", "Bot", "ci"),
-          guide("agents-dashboard", "Dashboard guide", "Bot", "dashboard"),
-          guide("agents-fidelity", "Fidelity guide", "Bot", "fidelity"),
+          {
+            slug: "for-coding-agents",
+            title: "Guides for agents",
+            icon: "Bot",
+            source: { kind: "agent-guides" },
+          },
         ],
       },
     ],

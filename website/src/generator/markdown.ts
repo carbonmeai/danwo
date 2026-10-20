@@ -83,27 +83,6 @@ export function section(markdown: string, heading: string): string {
     .trim()
 }
 
-/**
- * The sections under the headings named in `keep`, in the order given, each with its own heading
- * at `##` and its subheadings shifted with it, so they read as one page.
- */
-export function onlySections(markdown: string, keep: readonly string[]): string {
-  const lines = markdown.split("\n")
-  const levels = headingLevels(lines)
-
-  return keep
-    .map((heading) => {
-      const { start, level, end } = bounds(lines, heading)
-
-      return lines
-        .slice(start, end)
-        .map((line, i) => ((levels[start + i] ?? 0) > 0 ? line.slice(level - 2) : line))
-        .join("\n")
-        .trim()
-    })
-    .join("\n\n")
-}
-
 /** `markdown` without the sections under the headings named in `drop`. */
 export function withoutSections(markdown: string, drop: readonly string[]): string {
   let lines = markdown.split("\n")
