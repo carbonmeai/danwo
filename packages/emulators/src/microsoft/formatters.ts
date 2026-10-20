@@ -138,7 +138,7 @@ export function graphUser(user: MicrosoftUser) {
     mail: user.email,
     mobilePhone: null,
     officeLocation: null,
-    preferredLanguage: null,
+    preferredLanguage: "en-US",
     surname: user.family_name,
     userPrincipalName: user.email,
     id: user.oid,

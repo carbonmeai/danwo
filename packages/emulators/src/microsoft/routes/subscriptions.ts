@@ -269,7 +269,10 @@ export function subscriptionRoutes(context: MicrosoftRouteContext): void {
       .subscriptions.all()
       .filter((s) => s.clientId === caller.clientId && Date.parse(s.expiresAt) > now)
 
-    return c.json({ value: mine.map(subscriptionObject) })
+    return c.json({
+      "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#subscriptions",
+      value: mine.map(subscriptionObject),
+    })
   })
 
   context.app.get("/v1.0/subscriptions/:id", (c) => {
