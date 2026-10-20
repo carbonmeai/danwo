@@ -365,7 +365,6 @@ function previewLines(focused: FocusedPlan, cleanMs: number, workers: number): s
 
   return [
     ...focused.trials.map((fault) => `  ${fault.label}`),
-    ...focusLines(focused),
     ...(focused.skipped.budget.length > 0
       ? [
           `over the budget: ${focused.skipped.budget.slice(0, 10).join("; ")}${focused.skipped.budget.length > 10 ? "; …" : ""}`,
@@ -634,7 +633,9 @@ export async function runMatrix(
     const reportPath = await closeRecording(recording, cwd, write)
 
     await cache.done()
-    if (outcome !== undefined) await reportMatrix(run, outcome.result, reportPath)
+    /* A plan preview ran no faults: it is no matrix result for the run history. */
+    if (outcome !== undefined && !run.focus.preview)
+      await reportMatrix(run, outcome.result, reportPath)
     await feed.finish(outcome?.code ?? 1, Date.now() - run.began)
   }
 }
