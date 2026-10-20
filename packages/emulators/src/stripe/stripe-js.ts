@@ -332,6 +332,14 @@ export const STRIPE_JS = String.raw`(function () {
     return { canMakePayment: function () { return Promise.resolve(null); }, on: function () {}, off: function () {}, show: function () {}, update: function () {}, isShowing: function () { return false; } };
   };
 
+  /*
+   * The version the page asked for, read from its script URL (js.stripe.com/dahlia/stripe.js is
+   * "dahlia", /v3 is 3), as @stripe/stripe-js checks Stripe.version against the one it expects.
+   */
+  var source = (document.currentScript && document.currentScript.src) || "";
+  var named = /js\.stripe\.com\/([^/?#]+)\/stripe\.js/.exec(source);
+  Stripe.version = named ? named[1] : 3;
+
   window.Stripe = Stripe;
 })();
 `
