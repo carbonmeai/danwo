@@ -33,6 +33,7 @@ import { type ErrorClass, exitCodeOf, notJudged } from "../support/codes.ts"
 import { type CatalogEntry, catalogOf } from "./catalog.ts"
 import { type DanwoConfig, type LoadedConfig, loadConfig } from "./config.ts"
 import { Crew } from "./crew.ts"
+import { type CleanCost, estimateText, estimateTrials } from "./estimate.ts"
 import { DEFAULT_WEBHOOK_FAULTS, defaultDataFaults, defaultOutboundFaults } from "./faults.ts"
 import { historyReporter } from "./history.ts"
 import { type LiveFeed, newRunId, openLiveFeed } from "./live.ts"
@@ -46,7 +47,7 @@ import {
   type TrialFindings,
 } from "./reporting.ts"
 import type { TrialReport } from "./tasks.ts"
-import { type TrialTimings, timingsLine } from "./timings.ts"
+import { noTimings, type TrialTimings, timingsLine } from "./timings.ts"
 import { runPool, shuffledOrder } from "./trial-pool.ts"
 
 /** Which test and which of its faults a matrix run covers. */
@@ -118,6 +119,7 @@ function outcomeOf(report: TrialReport, fault: PlannedFault | null): RunOutcome 
     errorClass,
     usage: _usage,
     timings: _timings,
+    restoreMs: _restoreMs,
     pace: _pace,
     lint: _lint,
     races: _races,
@@ -147,6 +149,7 @@ function trialRunner(crew: Crew, run: MatrixRun) {
         cacheDir: run.cacheDir,
         ...(pace && { pace }),
         ...(run.focus.includeSetup && { includeSetup: true }),
+        ...(fault === null && run.focus.preview && { timeRestore: true }),
       })
 
       keepTrialFacts(run, fault, report)
@@ -195,7 +198,14 @@ function keepTrialFacts(run: MatrixRun, fault: PlannedFault | null, report: Tria
     return
   }
 
+  keepCleanFacts(run, report)
+}
+
+/** What the run keeps of its clean trial: its races, its phases and its check pace. */
+function keepCleanFacts(run: MatrixRun, report: TrialReport): void {
   run.races.current = report.races
+  if (report.timings !== undefined)
+    run.clean.current = { timings: report.timings, restoreMs: report.restoreMs }
   if (run.test.invariant) run.pace.current = paceFrom(report, run.loaded.config.matrix?.checkPace)
 }
 
@@ -299,7 +309,12 @@ interface TrialsSetup {
   readonly races: () => RaceEvidence | undefined
   /** Hears how many faulted trials will run, once they are planned. */
   readonly planned?: (count: number) => void
+  /** What the clean trial measured, once it ran: what `--plan` estimates the trials from. */
+  readonly cleanTrial?: () => CleanTrial | undefined
 }
+
+/** The clean trial's phases and, when it was timed, one restore of the kept starting state. */
+type CleanTrial = Omit<CleanCost, "startMs">
 
 /** How the plan is focused, and whether the run stops once it is printed. */
 interface PlanFocus extends FocusOptions {
@@ -358,10 +373,11 @@ function summaryOf(focused: FocusedPlan): PlanSummary {
 
 /**
  * The plan as `--plan` prints it: each trial, what was left out, and about how long the trials
- * would take on the crew, from the clean trial's time.
+ * would take on the crew, from what the clean run measured.
  */
-function previewLines(focused: FocusedPlan, cleanMs: number, workers: number): string[] {
-  const minutes = Math.ceil((cleanMs * focused.trials.length) / Math.max(1, workers) / 60_000)
+function previewLines(focused: FocusedPlan, cost: CleanCost, workers: number): string[] {
+  const count = focused.trials.length
+  const took = estimateText(estimateTrials(focused.trials, cost, workers))
 
   return [
     ...focused.trials.map((fault) => `  ${fault.label}`),
@@ -370,8 +386,20 @@ function previewLines(focused: FocusedPlan, cleanMs: number, workers: number): s
           `over the budget: ${focused.skipped.budget.slice(0, 10).join("; ")}${focused.skipped.budget.length > 10 ? "; …" : ""}`,
         ]
       : []),
-    `about ${minutes} min for ${focused.trials.length} trials on ${workers} workers`,
+    `${took} for ${count} trials on ${workers} workers`,
   ]
+}
+
+/**
+ * What the clean run cost: its phases, and the rest of its whole time as the worker's start. A
+ * clean trial that kept no phases counts its whole time as its body.
+ */
+function cleanCost(trial: CleanTrial | undefined, cleanMs: number): CleanCost {
+  if (trial === undefined) return { timings: { ...noTimings(), body: cleanMs }, startMs: 0 }
+
+  const phases = Object.values(trial.timings).reduce((sum, ms) => sum + ms, 0)
+
+  return { ...trial, startMs: Math.max(0, cleanMs - phases) }
 }
 
 /**
@@ -392,7 +420,12 @@ function announcePlan(
   write(planLine(plan.length, of, setup.filter))
   for (const line of focusLines(focused)) write(line)
   if (setup.focus.preview)
-    for (const line of previewLines(focused, cleanMs, setup.dispatch.workers)) write(line)
+    for (const line of previewLines(
+      focused,
+      cleanCost(setup.cleanTrial?.(), cleanMs),
+      setup.dispatch.workers,
+    ))
+      write(line)
 
   return { plan, summary: focused.total === plan.length ? {} : { plan: summaryOf(focused) } }
 }
@@ -504,6 +537,8 @@ interface MatrixRun {
   readonly lint: TrialFindings[]
   /** The clean trial's browser-side evidence, once it ran: what races are planned from. */
   readonly races: { current: RaceEvidence | undefined }
+  /** The clean trial's phases, once it ran: what a plan preview estimates the trials from. */
+  readonly clean: { current: CleanTrial | undefined }
   /** Where the run says what it is doing as it does it. */
   readonly feed: LiveFeed
 }
@@ -519,6 +554,7 @@ async function trialsOrAbort(run: MatrixRun): Promise<{ result: FaultMatrixResul
       focus: run.focus,
       dispatch: run.dispatch,
       races: () => run.races.current,
+      cleanTrial: () => run.clean.current,
       planned: (count) =>
         run.feed.write({ type: "plan", at: new Date().toISOString(), planned: count + 1 }),
     })
@@ -628,6 +664,7 @@ export async function runMatrix(
     pace: { current: undefined },
     lint: [],
     races: { current: undefined },
+    clean: { current: undefined },
     feed,
   }
 

@@ -690,6 +690,24 @@ async function runTrial(
 }
 
 /**
+ * How long one restore of the kept starting state takes, for a plan's estimate: the environment
+ * is put back where it already is, so the trial starts as it would have. Undefined when the
+ * environment keeps no snapshots and resets instead.
+ */
+async function restoreTime(session: string | undefined): Promise<number | undefined> {
+  const { start } = benchOrFail()
+
+  if (start?.keeps !== true) return undefined
+
+  const began = performance.now()
+
+  start.touch()
+  await start.again(session)
+
+  return Math.round(performance.now() - began)
+}
+
+/**
  * Puts the environment where every trial starts. The worker's first trial resets it and, when
  * the environment can, keeps a snapshot; every later trial restores that snapshot instead of
  * resetting, which skips app restarts and reseeding.
@@ -711,18 +729,23 @@ async function trial(task: TrialTask): Promise<TrialReport> {
   const session = sessionOf(declarations, findDeclared(declarations, task.file, task.testId))
 
   await timed(timings, "prepare", async () => start?.clean(atBody ? session : undefined))
+  const restoreMs =
+    task.timeRestore === true ? await restoreTime(atBody ? session : undefined) : undefined
+
   start?.touch()
   keepSignIns = atBody && start?.keeps === true
   if (!atBody) applyFault(env, task.fault)
 
   try {
-    return await runTrial(
+    const report = await runTrial(
       task,
       env,
       timings,
       atBody ? () => applyFault(env, task.fault) : undefined,
       declarations,
     )
+
+    return restoreMs === undefined ? report : { ...report, restoreMs }
   } finally {
     keepSignIns = false
     env.proxy.setFault(undefined)

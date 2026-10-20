@@ -24,10 +24,15 @@ clean run passed; 18 faults planned
   forged on webhook checkout.session.completed
   double-submit on POST /buy
   …
-about 2 min for 18 trials on 2 workers
+about 13–24 s for 18 trials on 2 workers
 ```
 
 Use it before a long run, or to check a fault you expect is in the plan.
+
+The time is a range built from the clean trial's own phases. Each trial pays a restore of the
+starting state (or a reset, when nothing is snapshotted), then the browser, the body and the
+close. A delay fault adds its delay, up to how long a check waits for it. A fault that breaks the
+run, like a reset or a 500, can end its body early, which is why the low end is lower.
 
 ## Only the test's body
 

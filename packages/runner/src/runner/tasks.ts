@@ -58,6 +58,8 @@ export interface TrialTask {
    * in again under it: for plans that include setup (`--include-setup`).
    */
   readonly includeSetup?: boolean
+  /** For the clean trial of a plan preview: also times one restore of the kept starting state. */
+  readonly timeRestore?: boolean
 }
 
 /** One attempt of a test, as the parent reports it. */
@@ -121,6 +123,8 @@ export interface TrialReport {
   readonly usage?: Usage
   /** Milliseconds in each phase of the trial. */
   readonly timings?: TrialTimings
+  /** Milliseconds one restore of the kept starting state took, when the task asked to time it. */
+  readonly restoreMs?: number
   /** For a passing clean trial: how long each of its checks took, by `checkKey`. */
   readonly pace?: Readonly<Record<string, number>>
   /** What the integration lint found in the trial. */
