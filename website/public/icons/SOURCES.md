@@ -45,8 +45,23 @@ Files ending `-on-dark` are the variant for dark backgrounds. `wordmarks/` holds
 | wordmarks/bachs-on-dark.png                     | https://bachs.io/_astro/logo-white.Dqv-qvVY.png                                                                      | Proprietary, Bachs trademark; identification only       |
 | wordmarks/bachs.png                             | the same, recoloured to #0a1217                                                                                      | Proprietary, Bachs trademark; identification only       |
 
-Not in theSVG: Paystack, Flutterwave, Tigris, Bachs (taken from each provider's own site, above).
-Bachs has only raster logos; ask them for an SVG before launch.
+| pusher.svg | thesvg `pusher/default.svg` | CC0-1.0 (theSVG) |
+| pusher-on-dark.svg | the same, ink recoloured to #ffffff | CC0-1.0 (theSVG) |
+| novu.svg | thesvg `novu/default.svg` | CC0-1.0 (theSVG) |
+| novu-on-dark.svg | the same, ink recoloured to #ffffff | CC0-1.0 (theSVG) |
+| gemini.svg | thesvg `gemini/default.svg` | MIT (theSVG) |
+| perplexity.svg | thesvg `perplexity/default.svg` | CC0-1.0 (theSVG) |
+| bedrock.svg | thesvg `aws-amazon-bedrock/default.svg` | CC-BY-ND-2.0 (theSVG; AWS architecture icons) |
+| nylas.png | https://www.nylas.com/favicon.ico (32×32, scaled to 64×64; no SVG found) | Proprietary, Nylas trademark; identification only |
+| nango.png | https://www.nango.dev/apple-touch-icon.png (180×180) | Proprietary, Nango trademark; identification only |
+| nango-on-dark.png | the same, colours inverted | Proprietary, Nango trademark; identification only |
+| unipile.png | https://www.unipile.com/apple-touch-icon.png (180×180) | Proprietary, Unipile trademark; identification only |
+| tiptap.png | the 32×32 favicon on https://tiptap.dev/ (scaled to 64×64; no SVG found) | Proprietary, Tiptap trademark; identification only |
+| tiptap-on-dark.png | the same, colours inverted | Proprietary, Tiptap trademark; identification only |
+
+Not in theSVG: Paystack, Flutterwave, Tigris, Bachs, Nylas, Nango, Unipile and Tiptap (taken from
+each provider's own site, above). Bachs, Nylas and Tiptap have only small raster marks; ask them for
+an SVG before launch.
 
 ## danwo's own brand
 

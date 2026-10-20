@@ -3,7 +3,7 @@ import { join } from "node:path"
 
 import { beforeAll, describe, expect, it } from "vitest"
 
-import { GUIDES_DIR, readGuide } from "../src/generator/danwo.ts"
+import { GUIDES_DIR, readGuide, REPO_ROOT } from "../src/generator/danwo.ts"
 import { EXAMPLES, exampleFolders } from "../src/generator/examples.ts"
 import {
   CONTENT,
@@ -13,6 +13,7 @@ import {
   WEBSITE,
 } from "../src/generator/generate.ts"
 import {
+  MOVED_SECTIONS,
   type PageSource,
   PLAN,
   plannedPages,
@@ -21,7 +22,7 @@ import {
 import { docsSlugs, postSlugs, prerenderedPaths } from "../src/generator/routes.ts"
 import { resolveIcon } from "../src/lib/icons.tsx"
 import { markdownPath, slugsOfMarkdown } from "../src/lib/paths.ts"
-import { PROVIDERS } from "../src/lib/providers.ts"
+import { PROVIDERS, SHARED_EMULATOR_FOLDERS } from "../src/lib/providers.ts"
 
 /** The planned docs tree, built once from the installed danwo's spec and README. */
 let files: Map<string, string>
@@ -87,10 +88,52 @@ describe("the docs plan", () => {
     expect(names.filter((icon) => resolveIcon(icon) === undefined)).toEqual([])
   })
 
-  it("names only sections the providers guide has", () => {
-    const guide = readGuide("providers")
+  it("names only sections the guides have", () => {
+    for (const [topic, headings] of Object.entries(MOVED_SECTIONS))
+      for (const heading of headings) expect(readGuide(topic)).toContain(`\n## ${heading}\n`)
+  })
 
-    for (const heading of PROVIDER_GUIDE_SECTIONS) expect(guide).toContain(`\n## ${heading}\n`)
+  it("gives every section moved off its guide's page exactly one other home", () => {
+    const homes = [
+      ...sources().flatMap((source) =>
+        source.kind === "sections"
+          ? source.sections.map((heading) => `${source.topic}#${heading}`)
+          : [],
+      ),
+      ...PROVIDERS.flatMap((provider) =>
+        provider.guideSection ? [`providers#${provider.guideSection}`] : [],
+      ),
+    ]
+    const moved = Object.entries(MOVED_SECTIONS).flatMap(([topic, headings]) =>
+      headings.map((heading) => `${topic}#${heading}`),
+    )
+
+    expect(homes.toSorted()).toEqual(moved.toSorted())
+    expect(PROVIDERS.flatMap((provider) => provider.guideSection ?? []).toSorted()).toEqual(
+      [...PROVIDER_GUIDE_SECTIONS].toSorted(),
+    )
+  })
+
+  it("gives every emulator a provider page", () => {
+    const folders = readdirSync(join(REPO_ROOT, "packages", "emulators", "src"), {
+      withFileTypes: true,
+    })
+      .filter((entry) => entry.isDirectory() && !SHARED_EMULATOR_FOLDERS.includes(entry.name))
+      .map((entry) => entry.name)
+    const covered = PROVIDERS.flatMap((provider) => provider.emulators)
+
+    expect(covered.toSorted()).toEqual(folders.toSorted())
+  })
+
+  it("names only fidelity suites that have a golden", () => {
+    for (const suite of PROVIDERS.flatMap((provider) => provider.fidelity ?? []))
+      expect(existsSync(join(REPO_ROOT, "fidelity", `${suite}.json`)), suite).toBe(true)
+  })
+
+  it("shows every topic of danwo spec on a reference page", () => {
+    const shown = sources().flatMap((source) => (source.kind === "reference" ? source.topics : []))
+
+    expect([...inputs.spec.keys()].filter((topic) => !shown.includes(topic))).toEqual([])
   })
 
   it("names only pages written for the website that exist", () => {

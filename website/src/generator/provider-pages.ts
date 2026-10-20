@@ -38,9 +38,16 @@ function entriesBlock(heading: string, entries: readonly SpecEntry[]): string[] 
 function fidelityBlock(provider: Provider): string[] {
   if (!provider.fidelity) return []
 
+  const suites = provider.fidelity.join(" ")
+
   return [
     "## Checked against the real API",
-    `\`danwo fidelity ${provider.fidelity}\` compares this emulator's answers with the provider's own by structure; see [Fidelity](/docs/fidelity).`,
+    [
+      `\`danwo fidelity ${suites}\` compares this emulator's answers with the provider's own by structure; see [Fidelity](/docs/fidelity).`,
+      provider.fidelityNote,
+    ]
+      .filter(Boolean)
+      .join(" "),
   ]
 }
 

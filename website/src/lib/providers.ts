@@ -16,12 +16,16 @@ export interface Provider {
   readonly summary: string
   /** Lower-case prefixes of the spec's environment and helper names that belong to it. */
   readonly prefixes: readonly string[]
+  /** The folders of `packages/emulators/src` this page covers. */
+  readonly emulators: readonly string[]
   /** A `##` section of the providers guide written about this provider. */
   readonly guideSection?: string
   /** A whole guide written about this provider. */
   readonly guide?: string
-  /** The `danwo fidelity` suite that checks this emulator against the real API. */
-  readonly fidelity?: string
+  /** The `danwo fidelity` suites that check this emulator against the real API. */
+  readonly fidelity?: readonly string[]
+  /** How far those suites reach: what runs against the real API and what only offline. */
+  readonly fidelityNote?: string
 }
 
 export const PROVIDERS: readonly Provider[] = [
@@ -30,9 +34,12 @@ export const PROVIDERS: readonly Provider[] = [
     name: "Stripe",
     icon: "stripe.svg",
     summary:
-      "Payments, Checkout, customers, subscriptions and signed webhooks, answered on api.stripe.com and checkout.stripe.com.",
+      "Payments, Checkout, subscriptions, invoices, the billing portal, a Stripe.js stand-in and signed webhooks, on api.stripe.com and checkout.stripe.com.",
     prefixes: ["stripe"],
-    fidelity: "stripe",
+    emulators: ["stripe"],
+    guideSection: "Stripe",
+    fidelity: ["stripe"],
+    fidelityNote: "Checked live against a test-mode account, subscriptions and invoices included.",
   },
   {
     slug: "resend",
@@ -42,15 +49,22 @@ export const PROVIDERS: readonly Provider[] = [
     summary:
       "Sending, batches, domains, API keys and delivery webhooks, with every accepted email readable from the test.",
     prefixes: ["resend"],
-    fidelity: "resend",
+    emulators: ["resend"],
+    fidelity: ["resend"],
+    fidelityNote: "Checked live, sending only to Resend's test addresses.",
   },
   {
     slug: "s3",
     name: "S3 and Tigris",
     icon: "s3.svg",
     summary:
-      "Buckets and objects over the S3 API, for Amazon S3 and Tigris hostnames, with presigned URLs.",
+      "Objects, listings, multipart uploads, presigned URLs and conditional requests over the S3 API, for Amazon S3 and Tigris hosts, the Tigris SDK included.",
     prefixes: ["s3"],
+    emulators: ["s3"],
+    guideSection: "S3 and Tigris",
+    fidelity: ["s3"],
+    fidelityNote:
+      "Checked live against a Tigris bucket, writing only under its own prefix and deleting what it wrote.",
   },
   {
     slug: "aws",
@@ -59,6 +73,7 @@ export const PROVIDERS: readonly Provider[] = [
     summary:
       "Every other AWS service forwarded to a MiniStack you run or danwo starts, with the original hostnames kept.",
     prefixes: ["aws", "ministack"],
+    emulators: [],
   },
   {
     slug: "google",
@@ -67,7 +82,9 @@ export const PROVIDERS: readonly Provider[] = [
     summary:
       "Google sign-in, Gmail, Calendar and Drive, with mailboxes and files a test can read and change.",
     prefixes: ["google", "gmail", "revokegoogle"],
-    fidelity: "google",
+    emulators: ["google"],
+    fidelity: ["google"],
+    fidelityNote: "Checked live on Google's public sign-in endpoints.",
   },
   {
     slug: "microsoft",
@@ -76,7 +93,9 @@ export const PROVIDERS: readonly Provider[] = [
     summary:
       "Microsoft sign-in and Graph: Outlook mail and calendar, OneDrive and change subscriptions.",
     prefixes: ["microsoft", "outlook", "onedrive", "graph", "revokemicrosoft"],
-    fidelity: "microsoft",
+    emulators: ["microsoft"],
+    fidelity: ["microsoft"],
+    fidelityNote: "Checked live on Microsoft's public sign-in endpoints.",
   },
   {
     slug: "slack",
@@ -84,7 +103,9 @@ export const PROVIDERS: readonly Provider[] = [
     icon: "slack.svg",
     summary: "The Web API, OAuth installs and signed Events API deliveries for a seeded workspace.",
     prefixes: ["slack"],
-    fidelity: "slack",
+    emulators: ["slack"],
+    fidelity: ["slack"],
+    fidelityNote: "Checked live on Slack's public calls.",
   },
   {
     slug: "github",
@@ -94,15 +115,22 @@ export const PROVIDERS: readonly Provider[] = [
     summary:
       "The REST API, OAuth Apps and GitHub Apps with installations, check runs and signed webhooks.",
     prefixes: ["github", "installgithub", "uninstallgithub"],
-    fidelity: "github",
+    emulators: ["github"],
+    fidelity: ["github"],
+    fidelityNote: "Checked live on GitHub's public calls.",
   },
   {
     slug: "twilio",
     name: "Twilio",
     icon: "twilio.svg",
-    summary: "Messages and Verify, with every text readable like mail, so SMS codes replay too.",
+    summary:
+      "Messages and Verify, the account and its numbers, and trial accounts' refusals, with every text readable like mail.",
     prefixes: ["twilio"],
-    fidelity: "twilio",
+    emulators: ["twilio"],
+    guideSection: "Twilio",
+    fidelity: ["twilio"],
+    fidelityNote:
+      "Checked live without sending: account reads and the sends Twilio refuses before a message exists.",
   },
   {
     slug: "paystack",
@@ -111,7 +139,9 @@ export const PROVIDERS: readonly Provider[] = [
     summary:
       "Transactions paid on the hosted page, plans and subscriptions, transfers, refunds and banks, with signed webhooks.",
     prefixes: ["paystack"],
-    fidelity: "paystack",
+    emulators: ["paystack"],
+    fidelity: ["paystack"],
+    fidelityNote: "Checked live against a test key.",
   },
   {
     slug: "flutterwave",
@@ -120,7 +150,9 @@ export const PROVIDERS: readonly Provider[] = [
     summary:
       "Payment links paid on the hosted checkout, verification, plans, transfers and virtual accounts, with signed webhooks.",
     prefixes: ["flutterwave"],
-    fidelity: "flutterwave",
+    emulators: ["flutterwave"],
+    fidelity: ["flutterwave"],
+    fidelityNote: "Checked live against a test key.",
   },
   {
     slug: "bachs",
@@ -129,7 +161,9 @@ export const PROVIDERS: readonly Provider[] = [
     summary:
       "Checkout, payments, subscriptions with recovery, payouts and the customer portal, settling on the emulator's clock.",
     prefixes: ["bachs"],
-    fidelity: "bachs",
+    emulators: ["bachs"],
+    fidelity: ["bachs"],
+    fidelityNote: "Checked live against a sandbox key.",
   },
   {
     slug: "auth0",
@@ -138,6 +172,7 @@ export const PROVIDERS: readonly Provider[] = [
     summary:
       "Universal Login, MFA, the authentication API, OIDC discovery and the Management API, on the tenant's own domain.",
     prefixes: ["auth0"],
+    emulators: ["auth0"],
     guideSection: "Auth0",
   },
   {
@@ -146,9 +181,90 @@ export const PROVIDERS: readonly Provider[] = [
     icon: "clerk.svg",
     iconDark: "clerk-on-dark.svg",
     summary:
-      "The Backend and Frontend APIs and the Account Portal: sign-in, sign-up, sessions, organizations and emailed codes.",
+      "The Backend and Frontend APIs and the Account Portal, with svix-signed webhooks, stable seeded ids and the signing key as a PEM.",
     prefixes: ["clerk"],
+    emulators: ["clerk"],
     guideSection: "Clerk",
+    fidelity: ["clerk"],
+    fidelityNote:
+      "Checked live against a development instance, sign-up and sign-in by Clerk's test addresses included.",
+  },
+  {
+    slug: "nylas",
+    name: "Nylas",
+    icon: "nylas.png",
+    summary:
+      "Hosted auth and grants, mail, calendars, contacts and the scheduler of Nylas v3, with signed webhooks.",
+    prefixes: ["nylas"],
+    emulators: ["nylas"],
+    guideSection: "Nylas",
+    fidelity: ["nylas"],
+    fidelityNote: "Checked live: key errors, and the application's grants (reads only).",
+  },
+  {
+    slug: "nango",
+    name: "Nango",
+    icon: "nango.png",
+    iconDark: "nango-on-dark.png",
+    summary:
+      "Connect sessions and the Connect UI, refreshing connections, the proxy to other emulators, actions and signed webhooks.",
+    prefixes: ["nango"],
+    emulators: ["nango"],
+    guideSection: "Nango",
+    fidelity: ["nango"],
+    fidelityNote: "Checked live: key errors, and the project's integrations and connections.",
+  },
+  {
+    slug: "unipile",
+    name: "Unipile",
+    icon: "unipile.png",
+    summary:
+      "Hosted auth links, LinkedIn, WhatsApp and mail accounts, chats, messages and mail, with webhooks.",
+    prefixes: ["unipile"],
+    emulators: ["unipile"],
+    guideSection: "Unipile",
+    fidelity: ["unipile"],
+    fidelityNote: "Checked live: an unknown token, and the connected accounts.",
+  },
+  {
+    slug: "pusher",
+    name: "Pusher",
+    icon: "pusher.svg",
+    iconDark: "pusher-on-dark.svg",
+    summary:
+      "The Channels API and the pusher-js socket with private and presence channels, signed webhooks, and Beams.",
+    prefixes: ["pusher"],
+    emulators: ["pusher"],
+    guideSection: "Pusher",
+    fidelity: ["pusher"],
+    fidelityNote:
+      "Checked live against a test app; subscription counts follow the app's own setting.",
+  },
+  {
+    slug: "novu",
+    name: "Novu",
+    icon: "novu.svg",
+    iconDark: "novu-on-dark.svg",
+    summary:
+      "Triggers, subscribers and topics, code-first workflows through the app's bridge, and the Inbox with its realtime socket.",
+    prefixes: ["novu"],
+    emulators: ["novu"],
+    guideSection: "Novu",
+    fidelity: ["novu"],
+    fidelityNote: "Checked live against a development environment, deleting what it creates.",
+  },
+  {
+    slug: "tiptap",
+    name: "Tiptap",
+    icon: "tiptap.png",
+    iconDark: "tiptap-on-dark.png",
+    summary:
+      "Tiptap Cloud collaboration: documents synced over the Hocuspocus protocol, token permissions and the documents REST API.",
+    prefixes: ["tiptap"],
+    emulators: ["tiptap"],
+    guideSection: "Tiptap",
+    fidelity: ["tiptap"],
+    fidelityNote: "Checked live against a Tiptap Cloud app, deleting the documents it creates.",
   },
   {
     slug: "composio",
@@ -158,8 +274,10 @@ export const PROVIDERS: readonly Provider[] = [
     summary:
       "Toolkits, tools, connected accounts and triggers, with tool runs that can act on the other emulators.",
     prefixes: ["composio"],
+    emulators: ["composio"],
     guideSection: "Composio",
-    fidelity: "composio",
+    fidelity: ["composio"],
+    fidelityNote: "Checked live, reading the catalogue and the project only.",
   },
   {
     slug: "model-apis",
@@ -167,9 +285,15 @@ export const PROVIDERS: readonly Provider[] = [
     icon: "openai.svg",
     iconDark: "openai-on-dark.svg",
     summary:
-      "OpenAI, Anthropic and the Vercel AI Gateway answered from scripts: the same answers every run, at no cost.",
+      "OpenAI, Anthropic, Gemini, Perplexity, Bedrock and the Vercel AI Gateway answered from scripts: the same answers every run, at no cost.",
     prefixes: ["llm"],
+    emulators: ["llm"],
     guide: "llm",
-    fidelity: "gateway",
+    fidelity: ["gateway", "gemini", "perplexity", "bedrock"],
+    fidelityNote:
+      "The AI Gateway is checked live; Gemini, Perplexity and Bedrock against their published API descriptions.",
   },
 ]
+
+/** Folders of `packages/emulators/src` shared by several emulators rather than one provider. */
+export const SHARED_EMULATOR_FOLDERS: readonly string[] = ["oauth"]

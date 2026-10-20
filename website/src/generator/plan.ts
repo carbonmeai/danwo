@@ -21,6 +21,13 @@ export type PageSource =
   | { readonly kind: "file"; readonly file: string }
   /** A `danwo guide`, minus the sections that have pages of their own. */
   | { readonly kind: "guide"; readonly topic: string; readonly drop?: readonly string[] }
+  /** Some `##` sections of a guide, as a page of their own. */
+  | {
+      readonly kind: "sections"
+      readonly topic: string
+      readonly sections: readonly string[]
+      readonly description: string
+    }
   /** One `##` section of the README. */
   | { readonly kind: "readme"; readonly heading: string; readonly description: string }
   /** Topics of `danwo spec`, each entry a section with its members in a table. */
@@ -84,6 +91,30 @@ function guide(
   return { slug, title, icon, source: { kind: "guide", topic, ...(drop && { drop }) } }
 }
 
+/** A page from some sections of a guide; the guide's own page drops them. */
+function sections(
+  slug: string,
+  title: string,
+  icon: string,
+  source: {
+    readonly topic: string
+    readonly keep: readonly string[]
+    readonly description: string
+  },
+): PlannedPage {
+  return {
+    slug,
+    title,
+    icon,
+    source: {
+      kind: "sections",
+      topic: source.topic,
+      sections: source.keep,
+      description: source.description,
+    },
+  }
+}
+
 /** A reference page from spec topics. */
 function reference(
   slug: string,
@@ -100,7 +131,42 @@ function provider(slug: string): PlannedPage {
 }
 
 /** Sections of the providers guide that are pages under Providers instead. */
-export const PROVIDER_GUIDE_SECTIONS = ["Auth0", "Clerk", "Composio"]
+export const PROVIDER_GUIDE_SECTIONS = [
+  "S3 and Tigris",
+  "Stripe",
+  "Twilio",
+  "Auth0",
+  "Clerk",
+  "Composio",
+  "Nylas",
+  "Nango",
+  "Unipile",
+  "Pusher",
+  "Novu",
+  "Tiptap",
+]
+
+/** Sections of the providers guide on running a real app's services, a page of their own. */
+const REAL_STACK_SECTIONS = [
+  "Any app, started by its own command",
+  "Several apps",
+  "Hosts no service answers",
+]
+
+/** The providers guide's section on starting every test from the seed, a page of its own. */
+const ISOLATION_SECTIONS = ["Isolation"]
+
+/** The matrix guide's section on how faults are chosen, a page of its own. */
+const PLANNING_SECTIONS = ["What gets planned"]
+
+/**
+ * Every guide section that is shown on a page of its own rather than its guide's page, by guide:
+ * the guide's page drops them, and the docs test checks each has exactly one home.
+ */
+export const MOVED_SECTIONS = {
+  providers: [...PROVIDER_GUIDE_SECTIONS, ...REAL_STACK_SECTIONS, ...ISOLATION_SECTIONS],
+  matrix: PLANNING_SECTIONS,
+}
 
 /** The entries of the spec's test API that are about fixtures rather than declaring tests. */
 const FIXTURE_TYPES = new Set(["UseOptions", "FixtureSetup", "FixtureDefinitions"])
@@ -152,9 +218,32 @@ export const PLAN: readonly PlannedTab[] = [
             "locators-vs-agent",
           ),
           file("replay-cache", "Replay cache", "RotateCcwClock", "concepts/replay-cache.mdx"),
-          guide("emulators", "Emulators", "Server", "providers", PROVIDER_GUIDE_SECTIONS),
-          guide("fault-matrix", "Fault matrix", "Grid3x3", "matrix"),
+          guide("emulators", "Emulators", "Server", "providers", MOVED_SECTIONS.providers),
+          sections("isolation", "Isolation", "Layers", {
+            topic: "providers",
+            keep: ISOLATION_SECTIONS,
+            description:
+              "Every test, and every retry, starts from the environment's seeded state; change it per config, file or describe block.",
+          }),
+          guide("fault-matrix", "Fault matrix", "Grid3x3", "matrix", MOVED_SECTIONS.matrix),
+          sections("matrix-planning", "Matrix planning", "ListFilter", {
+            topic: "matrix",
+            keep: PLANNING_SECTIONS,
+            description:
+              "Which faults a matrix runs: the test's body only, repeats grouped, the most telling fault kinds, within a budget you set.",
+          }),
           guide("flight-records", "Flight records", "FileSearch", "debugging"),
+        ],
+      },
+      {
+        title: "Real stacks",
+        pages: [
+          sections("real-stacks", "Apps and services", "Network", {
+            topic: "providers",
+            keep: REAL_STACK_SECTIONS,
+            description:
+              "Running a real app under danwo: its own start command, several apps behind one proxy, background jobs, sockets and the hosts no emulator answers.",
+          }),
         ],
       },
       {
@@ -201,6 +290,8 @@ export const PLAN: readonly PlannedTab[] = [
         title: "Identity and workspace",
         pages: ["google", "microsoft", "github", "auth0", "clerk"].map(provider),
       },
+      { title: "Connectors", pages: ["nylas", "nango", "unipile"].map(provider) },
+      { title: "Realtime", pages: ["pusher", "novu", "tiptap"].map(provider) },
       { title: "Storage and cloud", pages: ["s3", "aws"].map(provider) },
       { title: "AI", pages: ["model-apis", "composio"].map(provider) },
     ],
@@ -316,6 +407,11 @@ danwo serve --open`,
           reference("cache", "Cache outcomes", "RotateCcwClock", {
             topics: ["cache"],
             description: "What the replay cache did with each recorded step.",
+          }),
+          reference("exports", "Every export", "Package", {
+            topics: ["exports"],
+            description:
+              "Every name `@danwo/sdk` exports, with its kind and what it is: one list to search.",
           }),
         ],
       },

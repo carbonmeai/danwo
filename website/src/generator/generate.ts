@@ -18,7 +18,14 @@ import { dirname, join, relative } from "node:path"
 import { PROVIDERS } from "../lib/providers.ts"
 import { readGuide, readReadme, readSpec, REPO_ROOT, type SpecSection } from "./danwo.ts"
 import { EXAMPLES, examplePage, examplesIndex } from "./examples.ts"
-import { frontmatter, guidePage, referenceBody, section, withoutSections } from "./markdown.ts"
+import {
+  frontmatter,
+  guidePage,
+  onlySections,
+  referenceBody,
+  section,
+  withoutSections,
+} from "./markdown.ts"
 import {
   PLAN,
   type PageSource,
@@ -194,6 +201,10 @@ const BUILDERS: {
 } = {
   file: (source, { place }) => ["mdx", copied(source.file, place)],
   guide: (source, { place }) => ["md", guideFile(place, source.topic, source.drop)],
+  sections: (source, { place }) => [
+    "md",
+    `${head(place, source.description, `packages/skill/guides/${source.topic}.md`)}\n${onlySections(readGuide(source.topic), source.sections)}\n`,
+  ],
   readme: (source, { place, inputs }) => [
     "md",
     `${head(place, source.description, "README.md")}\n${section(inputs.readme, source.heading)}\n`,
