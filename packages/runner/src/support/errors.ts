@@ -38,6 +38,20 @@ export function callerLine(): number | undefined {
   return testFileLine(new Error("caller"), "/")?.line
 }
 
+/** What the AI Gateway answers when its team's Model Allowlist leaves out the model asked for. */
+const ALLOWLIST = /restricted access to this model|Model Allowlist/i
+
+/**
+ * What to do about a failure whose provider message alone does not say it, added to the message:
+ * a model the gateway team has not allowed is fixed in the gateway's settings or the config.
+ */
+function hintFor(code: ErrorCode, message: string): string | undefined {
+  if (code === "MODEL_UNAVAILABLE" && ALLOWLIST.test(message))
+    return "The AI Gateway's Model Allowlist for this team leaves out the config's `model`: a team owner can allow it under AI Gateway → Settings → Model Allowlist, or set `model` to one the team allows."
+
+  return undefined
+}
+
 export function toTestError(error: unknown, root: string): TestError {
   const code = codeOf(error)
 
@@ -46,12 +60,13 @@ export function toTestError(error: unknown, root: string): TestError {
   }
 
   const source = testFileLine(error, root)
+  const hint = hintFor(code, error.message)
 
   return {
     code,
     class: classOf(code),
     name: error.name,
-    message: error.message,
+    message: hint === undefined ? error.message : `${error.message}\n${hint}`,
     ...(error.stack !== undefined && { stack: error.stack }),
     ...(source !== undefined && { source }),
   }

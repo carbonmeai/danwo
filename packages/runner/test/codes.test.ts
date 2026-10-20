@@ -64,6 +64,18 @@ describe("codes", () => {
     })
   })
 
+  it("says how to fix a model the gateway team has not allowed", () => {
+    const refused = Object.assign(
+      new Error("Your team has restricted access to this model. Model: anthropic/x"),
+      { name: "GatewayModelNotAllowedError" },
+    )
+    const error = toTestError(refused, "/")
+
+    expect(error.code).toBe("MODEL_UNAVAILABLE")
+    expect(error.message).toContain("Model Allowlist")
+    expect(error.message).toContain("set `model`")
+  })
+
   it("ends a step blocked or inconclusive by its error's class", async () => {
     const steps = new StepRecorder({ projectRoot: "/", redact: (text) => text })
     const fail = (code: "CLAIM_BLOCKED" | "CLAIM_INCONCLUSIVE" | "CLAIM_FAILED") =>
