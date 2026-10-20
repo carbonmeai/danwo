@@ -3,7 +3,7 @@ import { requireCaller } from "../auth.ts"
 import type { TwilioRouteContext } from "../context.ts"
 import type { Account, Message } from "../entities.ts"
 import type { Draft, TwilioMessaging } from "../events.ts"
-import { API_VERSION, boundedInt, formOf, isE164, notFound, twilioError } from "../helpers.ts"
+import { API_VERSION, formOf, isE164, legacyPage, notFound, twilioError } from "../helpers.ts"
 
 const MESSAGES = `/${API_VERSION}/Accounts/:account/Messages`
 /** The longest body Twilio accepts: ten 160-character segments. */
@@ -165,25 +165,13 @@ function listed(c: Context, context: TwilioRouteContext, account: Account): Mess
 /** One page of the list, in the 2010 API's paging shape. */
 function list(c: Context, context: TwilioRouteContext): Response {
   const account = requireCaller(c, context.twilio)
-  const all = listed(c, context, account)
-  const size = boundedInt(c.req.query("PageSize"), 50, 1000)
-  const page = Number(c.req.query("Page") ?? 0) || 0
-  const start = page * size
-  const items = all.slice(start, start + size)
-  const base = `/${API_VERSION}/Accounts/${account.id}/Messages.json`
-  const uriFor = (n: number) => `${base}?PageSize=${size}&Page=${n}`
 
-  return c.json({
-    messages: items,
-    start,
-    end: start + Math.max(0, items.length - 1),
-    page,
-    page_size: size,
-    uri: uriFor(page),
-    first_page_uri: uriFor(0),
-    previous_page_uri: page > 0 ? uriFor(page - 1) : null,
-    next_page_uri: start + size < all.length ? uriFor(page + 1) : null,
-  })
+  return legacyPage(
+    c,
+    listed(c, context, account),
+    `/${API_VERSION}/Accounts/${account.id}/Messages.json`,
+    "messages",
+  )
 }
 
 /** The account's message `sid`, or a 404 answer. */

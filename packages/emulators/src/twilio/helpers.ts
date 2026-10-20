@@ -59,8 +59,39 @@ export async function formOf(c: Context): Promise<URLSearchParams> {
 }
 
 /** A whole-number query value within limits, or `fallback`. */
-export function boundedInt(value: string | undefined, fallback: number, max: number): number {
+function boundedInt(value: string | undefined, fallback: number, max: number): number {
   const parsed = Number(value)
 
   return Number.isInteger(parsed) && parsed > 0 ? Math.min(parsed, max) : fallback
+}
+
+/**
+ * One page of `all` in the 2010 API's paging shape, read from the request's `PageSize` and `Page`:
+ * the items under `field`, with the page's position and the URIs of the first, previous and next
+ * pages of `path` (a list's `.json` path under the account).
+ */
+export function legacyPage<T>(
+  c: Context,
+  all: readonly T[],
+  path: string,
+  field: string,
+  item: (value: T) => unknown = (value) => value,
+): Response {
+  const size = boundedInt(c.req.query("PageSize"), 50, 1000)
+  const page = Number(c.req.query("Page") ?? 0) || 0
+  const start = page * size
+  const items = all.slice(start, start + size)
+  const uriFor = (n: number) => `${path}?PageSize=${size}&Page=${n}`
+
+  return c.json({
+    [field]: items.map(item),
+    start,
+    end: start + Math.max(0, items.length - 1),
+    page,
+    page_size: size,
+    uri: uriFor(page),
+    first_page_uri: uriFor(0),
+    previous_page_uri: page > 0 ? uriFor(page - 1) : null,
+    next_page_uri: start + size < all.length ? uriFor(page + 1) : null,
+  })
 }

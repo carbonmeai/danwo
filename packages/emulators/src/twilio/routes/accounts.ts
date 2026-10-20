@@ -2,7 +2,7 @@ import type { Context } from "../../http.ts"
 import { requireCaller } from "../auth.ts"
 import type { TwilioRouteContext } from "../context.ts"
 import type { Account, AccountResource, IncomingNumber, PhoneNumber } from "../entities.ts"
-import { API_VERSION, boundedInt, notFound } from "../helpers.ts"
+import { API_VERSION, legacyPage, notFound } from "../helpers.ts"
 
 /** The lists an account's resource links to, by their `subresource_uris` key, and their paths. */
 const SUBRESOURCES: Readonly<Record<string, string>> = {
@@ -95,24 +95,14 @@ function incomingNumber(number: PhoneNumber, account: Account): IncomingNumber {
 function numberPage(c: Context, context: TwilioRouteContext): Response {
   const account = requireCaller(c, context.twilio)
   const all = context.twilio.numbers.where((number) => number.accountSid === account.id)
-  const size = boundedInt(c.req.query("PageSize"), 50, 1000)
-  const page = Number(c.req.query("Page") ?? 0) || 0
-  const start = page * size
-  const items = all.slice(start, start + size)
-  const base = `/${API_VERSION}/Accounts/${account.id}/IncomingPhoneNumbers.json`
-  const uriFor = (n: number) => `${base}?PageSize=${size}&Page=${n}`
 
-  return c.json({
-    end: start + Math.max(0, items.length - 1),
-    first_page_uri: uriFor(0),
-    incoming_phone_numbers: items.map((number) => incomingNumber(number, account)),
-    next_page_uri: start + size < all.length ? uriFor(page + 1) : null,
-    page,
-    page_size: size,
-    previous_page_uri: page > 0 ? uriFor(page - 1) : null,
-    start,
-    uri: uriFor(page),
-  })
+  return legacyPage(
+    c,
+    all,
+    `/${API_VERSION}/Accounts/${account.id}/IncomingPhoneNumbers.json`,
+    "incoming_phone_numbers",
+    (number) => incomingNumber(number, account),
+  )
 }
 
 /** Reading the account and the numbers it owns: `/2010-04-01/Accounts/{sid}.json` and its numbers. */
