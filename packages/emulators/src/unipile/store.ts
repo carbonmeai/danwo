@@ -104,8 +104,7 @@ export function unipileStore(store: Store) {
     webhooks: objectTable<UnipileWebhookRecord>(store, "unipile.webhooks"),
     /** The access tokens accepted; when none are seeded, any non-empty one is. */
     tokens: () => store.getData(TOKENS) ?? [],
-    addTokens: (tokens: readonly string[]) =>
-      store.setData(TOKENS, [...(store.getData(TOKENS) ?? []), ...tokens]),
+    addTokens: (tokens: readonly string[]) => store.appendData(TOKENS, tokens),
     /** Every hosted link's notify URL, so its notifications have somewhere to go. */
     notifyUrls: () => store.getData(NOTIFY) ?? [],
     addNotifyUrl: (url: string) =>

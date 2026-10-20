@@ -47,8 +47,7 @@ export function nylasStore(store: Store) {
     tokens: objectTable<NylasToken>(store, "nylas.tokens"),
     /** The API keys accepted; when none are seeded, any `nyk_` key is. */
     apiKeys: () => store.getData(API_KEYS) ?? [],
-    addApiKeys: (keys: readonly string[]) =>
-      store.setData(API_KEYS, [...(store.getData(API_KEYS) ?? []), ...keys]),
+    addApiKeys: (keys: readonly string[]) => store.appendData(API_KEYS, keys),
     /** The application id events and tokens carry. */
     applicationId: () => store.getData(APPLICATION) ?? "danwo-nylas-application",
     setApplicationId: (id: string) => store.setData(APPLICATION, id),

@@ -43,11 +43,9 @@ export function composioStore(store: Store) {
     ),
     /** The project keys accepted; when none are seeded, any `ak_` key is. */
     apiKeys: () => store.getData(API_KEYS) ?? [],
-    addApiKeys: (keys: readonly string[]) =>
-      store.setData(API_KEYS, [...(store.getData(API_KEYS) ?? []), ...keys]),
+    addApiKeys: (keys: readonly string[]) => store.appendData(API_KEYS, keys),
     results: () => store.getData(RESULTS) ?? [],
-    addResults: (results: readonly SeededResult[]) =>
-      store.setData(RESULTS, [...(store.getData(RESULTS) ?? []), ...results]),
+    addResults: (results: readonly SeededResult[]) => store.appendData(RESULTS, results),
     /** A number that goes up by one on every call, for sample ids. */
     next(): number {
       const n = (store.getData(COUNTER) ?? 0) + 1

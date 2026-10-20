@@ -239,6 +239,11 @@ export class Store {
     this.values.set(key.name, value)
   }
 
+  /** Adds `items` to the end of the list kept under `key`, starting an empty one if there is none. */
+  appendData<V>(key: DataKey<V[]>, items: readonly V[]): void {
+    this.setData(key, [...(this.getData(key) ?? []), ...items])
+  }
+
   /** Empties every collection and value; collections keep their indexes. A restore resets first. */
   reset(): void {
     for (const collection of this.collections.values()) collection.clear()
