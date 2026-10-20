@@ -73,8 +73,20 @@ arguments for tests the project lists, one run at a time, with further requests 
 
 Every run adds a small summary to `.danwo/history/` (the latest 200 are kept), whatever its record
 mode. Flight records under `.danwo/runs/` are kept for every run by default (`record: "always"`), or
-only failed runs with `record: "on-failure"`; the latest 20 runs keep theirs. Nothing the dashboard shows is new data: the
+only failed runs with `record: "on-failure"`; the newest 50 runs keep theirs
+(`record: { mode, keepRuns }` in the config, `--keep-runs <n>` for one run), and older runs'
+folders are deleted as each run finishes. A row whose recordings were deleted reads "recording
+deleted" and its Watch button is turned off; a recording opened by an old link shows why it is
+gone, when its run was, and a rerun of the test. Nothing the dashboard shows is new data: the
 summaries and records are redacted when danwo writes them, so secrets never reach the page.
+
+## Whose failure
+
+Every failed test and trial carries a verdict (app bug, test issue, environment, danwo bug or
+undecided; certain or likely) with its reason. The dashboard shows it as a badge on failed rows
+and in a recording's header (a "?" marks a likely one, the reason is in its tooltip), splits the
+run page's Failed card by it, and filters Runs and Tests by it (**Whose failure**, `?verdict=app`).
+The debugging guide lists the rules.
 
 ## Video
 
@@ -88,7 +100,9 @@ and fault as an offset into it. Which videos are kept:
 | `on` (default)                | with every record kept; every run is kept by default (`record: "always"`)              |
 | `off`                         | none; nothing is filmed                                                                |
 
-A short test's video is tens of kilobytes. Video shows the screen as it was: fields holding a
+A short test's video is tens of kilobytes (50 to 250 KB is typical); a run's folder is usually
+under 1 MB for a small suite, so the 50 runs kept come to tens of megabytes, more with Android
+screen recordings. Video shows the screen as it was: fields holding a
 secret show as dots, but a secret the app prints as text is on screen, and so is anything else the
 page shows. Turn video off (`video: "off"`) for suites that show secrets.
 

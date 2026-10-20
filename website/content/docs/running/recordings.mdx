@@ -53,13 +53,30 @@ calls and faults around it. The menu next to it copies the same page as Markdown
 
 ## What's kept
 
-| Setting                      | Kept                                                      |
-| ---------------------------- | --------------------------------------------------------- |
-| `record: "always"` (default) | every run's flight record; the latest 20 runs keep theirs |
-| `record: "on-failure"`       | only failed runs'                                         |
-| `video: "on"` (default)      | a video with every record                                 |
-| `video: "retain-on-failure"` | videos of runs that didn't pass                           |
-| `video: "off"`               | no video                                                  |
+| Setting                      | Kept                                        |
+| ---------------------------- | ------------------------------------------- |
+| `record: "always"` (default) | every run's flight record                   |
+| `record: "on-failure"`       | only failed runs'                           |
+| `record: { keepRuns: 50 }`   | how many of the newest runs keep recordings |
+| `video: "on"` (default)      | a video with every record                   |
+| `video: "retain-on-failure"` | videos of runs that didn't pass             |
+| `video: "off"`               | no video                                    |
+
+Older runs' recordings are deleted as each run finishes. `danwo test --keep-runs 200` keeps more
+for one run. The run summaries the dashboard lists stay longer (200 runs), so an old run's row
+reads **recording deleted** and its Watch button is turned off.
+
+## How much disk it takes
+
+A browser test's video is usually 50 to 250 KB. A run's folder, with its videos, screenshots and
+records, is typically under 1 MB for a small suite and grows with the number of tests. Fifty runs
+of a 20-test suite come to tens of megabytes. Mobile screen recordings are larger; turn video to
+`"retain-on-failure"` to keep only the ones you'll watch.
+
+```ts title="danwo.config.ts · recordings"
+record: { mode: "always", keepRuns: 100 },
+video: "retain-on-failure",
+```
 
 <Callout type="warn">
   Video shows the screen as it was. Fields holding a secret show as dots, but a secret your app

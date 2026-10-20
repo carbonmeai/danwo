@@ -277,6 +277,12 @@ export const PLAN: readonly PlannedTab[] = [
           file("shards", "Shards and JUnit", "Split", "running/shards.mdx"),
           file("dashboard", "Dashboard", "LayoutDashboard", "running/dashboard.mdx"),
           file("recordings", "Recordings", "Video", "running/recordings.mdx"),
+          file(
+            "reading-failures",
+            "Reading failures",
+            "Scale",
+            "running/reading-failures.mdx",
+          ),
           file("live-runs", "Live runs and reruns", "Radio", "running/live-runs.mdx"),
           file("impact", "Changed tests", "GitCompare", "running/impact.mdx"),
           file("fidelity", "Fidelity", "Scale", "running/fidelity.mdx"),

@@ -13,6 +13,30 @@ Every failed run keeps a flight record under `.danwo/runs/<run>/`; start from it
 4. Then what was behind the page: console errors, the failed or faulted provider calls through the
    proxy, webhook deliveries and the emulators' state at the end.
 
+## Whose failure it is
+
+Each failed attempt carries a verdict, at the top of its failure page, in the CLI's failure header
+(`[App bug]`, with a `why:` line), the summary line, the dashboard, the pull request comment and
+the GitHub check. It says what to fix first. The rules, in order:
+
+| Evidence                                                                             | Verdict                                             |
+| ------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| the run was interrupted                                                              | undecided, certain                                  |
+| `ENVIRONMENT_FAILED`, `BROWSER_FAILED`, `MODEL_UNAVAILABLE`                          | environment, certain                                |
+| `CONFIG_INVALID`, `SECRET_REFUSED`                                                   | test issue, certain                                 |
+| a blocked or inconclusive code                                                       | undecided, certain                                  |
+| `APP_ERROR`, `PROVIDER_ERROR`                                                        | app bug, certain                                    |
+| a matrix trial whose check (not a crash) failed under its fault                      | app bug, certain                                    |
+| `TEST_FAILED` with a `TypeError`-like crash whose top frame is inside danwo          | danwo bug, likely: report it with the flight record |
+| any other `TEST_FAILED`                                                              | test issue (certain with a test file line)          |
+| an app that stopped, an unfaulted 5xx from the app itself, or an uncaught page error | app bug, certain                                    |
+| `LOCATOR_*`, `SESSION_SETUP_FAILED`, an agent step code, all on a healthy page       | test issue, likely                                  |
+| `TIMED_OUT` on a healthy page                                                        | undecided, likely                                   |
+| any other failed check on a healthy page                                             | app bug, likely                                     |
+
+Emulator answers and faulted calls never count as the app's errors, and page assets are left out.
+Treat a likely verdict as where to look first, not as proof.
+
 ## What the code says to do
 
 | Code                                        | Look at                                                                                                                                          |

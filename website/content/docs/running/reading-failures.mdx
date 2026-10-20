@@ -1,0 +1,78 @@
+---
+title: Reading failures
+description: Every failed test gets a verdict that says whose failure it was, the app's, the test's, the environment's or danwo's, and the evidence behind it.
+icon: Scale
+---
+
+Every failed test gets a **verdict**: whose failure it was, how sure danwo is, and the evidence
+that decided it. The terminal, the dashboard, the pull request comment and the GitHub check all
+show it.
+
+## Why it helps
+
+A red test only says something went wrong. The verdict says who should act: fix the app, fix the
+test, fix the setup, or report a bug in danwo. You stop opening every recording to find out.
+
+```text
+✗ tests/checkout.danwo.ts › pays  [App bug]
+  EXPECTATION_FAILED: expected "Thanks for your order" to be visible
+  why: the app answered POST localhost:3000/api/checkout with 500, then EXPECTATION_FAILED
+  record: .danwo/runs/20261020-101500-3f2a/tests-checkout-pays/attempt-1
+
+3 passed, 2 failed (1 app bug · 1 test issue)
+```
+
+## The verdicts
+
+| Verdict     | What it means                                      | Decided by                                                                                                                                                                          |
+| ----------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App bug     | the test caught the app misbehaving                | a check that failed after the app answered with a 5xx, threw an uncaught page error or stopped; a provider failure it did not recover from; a matrix check that broke under a fault |
+| Test issue  | the test broke or went stale while the app behaved | the test's own code threw; a locator matched nothing on a page with no app errors; a saved session's setup failed; the config is invalid                                            |
+| Environment | the run never got to test the app                  | the environment, browser or model was unavailable, a key was missing, or the app did not start                                                                                      |
+| danwo bug   | danwo itself crashed                               | a `TypeError` or similar thrown inside danwo's own code                                                                                                                             |
+| Undecided   | nothing points either way yet                      | the run was stopped, blocked or inconclusive, or ran past its deadline with no app errors                                                                                           |
+
+## How sure it is
+
+Each verdict is **certain** or **likely**. Certain means the evidence names the cause: a 500 from
+the app, a stack frame in your test file. Likely means it points that way: a missing element on a
+healthy page usually means a stale locator, but the app may also have stopped rendering it.
+
+The dashboard marks a likely verdict with a question mark, and the terminal and GitHub add
+"(likely)".
+
+<Callout type="info">
+  Calls an emulator answered and calls a fault broke don't count as the app's own errors. Only your
+  app's unfaulted 5xx answers do.
+</Callout>
+
+## Where it shows
+
+| Place             | What you see                                                                        |
+| ----------------- | ----------------------------------------------------------------------------------- |
+| Terminal          | the summary line split by verdict; each failure's header tagged, with a `why:` line |
+| Dashboard         | a badge on failed rows and in a recording's header, the reason in its tooltip       |
+| Dashboard filters | **Whose failure** on Runs and Tests narrows to one verdict                          |
+| Run page          | the Failed card split, such as "1 app bug · 1 test issue"                           |
+| Pull request      | the headline split, and each failure's verdict and reason                           |
+| GitHub check      | a **Whose** column in the failures table                                            |
+
+## Hand it to a coding agent
+
+**Copy prompt to fix**, in a [recording](/docs/recordings), starts with the verdict and what it
+asks for: fix the app for an app bug, fix the test for a test issue, fix neither for a danwo bug.
+The failure page under `.danwo/runs/` opens with the same lines.
+
+## Next
+
+<Cards>
+  <Card title="Recordings" href="/docs/recordings">
+    Open a failure's video, steps and provider calls.
+  </Card>
+  <Card title="Dashboard" href="/docs/dashboard">
+    Filter runs and tests by whose failure they had.
+  </Card>
+  <Card title="Pull request comment" href="/docs/pr-comment">
+    See the verdicts where your team reviews.
+  </Card>
+</Cards>
