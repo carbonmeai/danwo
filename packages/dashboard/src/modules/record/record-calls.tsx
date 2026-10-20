@@ -10,7 +10,7 @@ import { Ident, Pre } from "../../components/code.tsx"
 import { ScrollTable } from "../../components/scroll-table.tsx"
 import { duration } from "../../lib/format.ts"
 import type { RecordView } from "./record-data.ts"
-import { statusColor } from "./record-values.ts"
+import { bodyText, statusColor } from "./record-values.ts"
 
 /** An HTTP status or outcome in its colour, in the mono face. */
 function Outcome({ outcome, bad }: { readonly outcome: string; readonly bad: boolean }) {
@@ -157,8 +157,7 @@ function Message({
               .join("\n") || "(no headers)"}
           </Pre>
           <Pre bg="surface.panel" maxH="20rem">
-            {message.body ?? `(${message.bytes} bytes, not text)`}
-            {message.truncated ? "\n… cut short" : ""}
+            {bodyText(message)}
           </Pre>
         </>
       )}

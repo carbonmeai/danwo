@@ -469,6 +469,35 @@ describe("flight records", () => {
     expect(text).not.toContain("sk_test_123456")
   })
 
+  it("keeps a multipart body's fields and files, redacted like any other body", () => {
+    const env = environment([
+      exchange({
+        path: "/v1/files",
+        request: {
+          headers: { "content-type": "multipart/form-data; boundary=b" },
+          body: null,
+          bytes: 817,
+          truncated: false,
+          form: [
+            { name: "purpose", value: "identity_document" },
+            { name: "password", value: PASSWORD },
+            { name: "note", value: `pw ${PASSWORD}` },
+            { name: "file", file: `${PASSWORD}.png`, type: "image/png", bytes: 512 },
+          ],
+        },
+      }),
+    ])
+    const record = buildRecord(input(env, { exchanges: 0, deliveries: 0 }))
+
+    expect(record.exchanges[0]?.request?.form).toEqual([
+      { name: "purpose", value: "identity_document" },
+      { name: "password", value: "[redacted]" },
+      { name: "note", value: "pw [secret password]" },
+      { name: "file", file: "[secret password].png", type: "image/png", bytes: 512 },
+    ])
+    expect(JSON.stringify(record)).not.toContain(PASSWORD)
+  })
+
   it("redacts a Graph download link in an exchange path, which only names it with its host", () => {
     const env = environment([
       exchange({ host: "graph.microsoft.com", path: "/download/Gr4ntT0ken?alt=1" }),

@@ -296,7 +296,7 @@ const Fetched = z.object({
 
 async function fetchThrough(
   env: NodeJS.ProcessEnv,
-  requests: ReadonlyArray<{ url: string; method?: string; body?: string }>,
+  requests: ReadonlyArray<{ url: string; method?: string; body?: string; contentType?: string }>,
 ): Promise<z.infer<typeof Fetched>[]> {
   const { stdout } = await run(process.execPath, [FETCH_APP, JSON.stringify(requests)], {
     env,
@@ -1183,6 +1183,50 @@ describe("forwarding to an upstream", () => {
       expect(small?.response).toMatchObject({ body: '{"received":5}', truncated: false })
       expect(large?.request).toMatchObject({ bytes: 20_000, truncated: true })
       expect(large?.request?.body).toHaveLength(MAX_CAPTURED_BODY_BYTES)
+    } finally {
+      await proxy.stop()
+    }
+  })
+
+  it("captures a multipart body as its fields and files, without the files' content", async () => {
+    const proxy = await startProxy({
+      routes: [{ hosts: ["api.danwo.test"], handler: async () => Response.json({ ok: true }) }],
+      unmatched: "block",
+    })
+    const body = [
+      "--b0undary",
+      'Content-Disposition: form-data; name="title"',
+      "",
+      "Receipt",
+      "--b0undary",
+      'Content-Disposition: form-data; name="photo"; filename="receipt.png"',
+      "Content-Type: image/png",
+      "",
+      "x".repeat(300),
+      "--b0undary--",
+      "",
+    ].join("\r\n")
+
+    try {
+      await fetchThrough(proxy.env(), [
+        {
+          url: "https://api.danwo.test/upload",
+          method: "POST",
+          body,
+          contentType: "multipart/form-data; boundary=b0undary",
+        },
+      ])
+      await proxy.settled()
+
+      const [upload] = proxy.exchanges()
+
+      expect(upload?.request?.body).toBeNull()
+      expect(upload?.request?.form).toEqual([
+        { name: "title", value: "Receipt" },
+        { name: "photo", file: "receipt.png", type: "image/png", bytes: 300 },
+      ])
+      expect(JSON.stringify(upload?.request)).not.toContain("x".repeat(300))
+      expect(upload?.response?.form).toBeUndefined()
     } finally {
       await proxy.stop()
     }

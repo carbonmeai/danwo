@@ -315,6 +315,7 @@ function redactMessage(message: CapturedMessage, redactor: Redactor): CapturedMe
     headers: redactor.headers(message.headers),
     body:
       message.body === null ? null : redactor.body(message.body, message.headers["content-type"]),
+    ...(message.form && { form: redactor.form(message.form) }),
   }
 }
 

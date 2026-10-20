@@ -9,7 +9,7 @@ import {
   planNote,
   ruleOf,
 } from "../src/modules/matrix/matrix-values.ts"
-import { cacheTone, statusColor } from "../src/modules/record/record-values.ts"
+import { bodyText, cacheTone, statusColor } from "../src/modules/record/record-values.ts"
 import { cacheLine, sortedTests, testFigures } from "../src/modules/run/run-values.ts"
 import type { RunRow } from "../src/modules/runs/runs-data.ts"
 import { countLine, median, runText, verdictOf } from "../src/modules/runs/runs-values.ts"
@@ -221,6 +221,32 @@ describe("a flight record", () => {
     expect(statusColor({ outcome: "503", bad: true })).toBe("verdict.failed.fg")
     expect(statusColor({ outcome: "aborted", bad: true })).toBe("verdict.failed.fg")
     expect(statusColor({ outcome: "done", bad: false })).toBe("ink.muted")
+  })
+
+  it("shows a multipart body as its fields and files, and other bodies as they came", () => {
+    const headers = { "content-type": "multipart/form-data; boundary=b" }
+    const form = [
+      { name: "title", value: "Receipt" },
+      { name: "photo", file: "receipt.png", type: "image/png", bytes: 300 },
+      { name: "blob", file: "data", type: "", bytes: 2 },
+    ]
+
+    expect(bodyText({ headers, body: null, bytes: 817, truncated: false, form })).toBe(
+      [
+        "title: Receipt",
+        'photo: file "receipt.png" (image/png, 300 bytes)',
+        'blob: file "data" (no type, 2 bytes)',
+      ].join("\n"),
+    )
+    expect(bodyText({ headers, body: null, bytes: 44, truncated: false, form: [] })).toBe(
+      "(an empty form)",
+    )
+    expect(bodyText({ headers: {}, body: '{"a":1}', bytes: 7, truncated: true })).toBe(
+      '{"a":1}\n… cut short',
+    )
+    expect(bodyText({ headers: {}, body: null, bytes: 1200, truncated: false })).toBe(
+      "(1200 bytes, not text)",
+    )
   })
 })
 

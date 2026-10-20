@@ -7,6 +7,8 @@ interface Wanted {
   readonly url: string
   readonly method?: string
   readonly body?: string
+  /** Sent as the request's `content-type`, for a body that is not plain text. */
+  readonly contentType?: string
 }
 
 /** What came back for one request. */
@@ -22,9 +24,13 @@ const parsed: unknown = JSON.parse(process.argv[2] ?? "[]")
 const requests = Array.isArray(parsed) ? parsed.filter(isWanted) : []
 const out: Got[] = []
 
-for (const { url, method = "GET", body } of requests) {
+for (const { url, method = "GET", body, contentType } of requests) {
   try {
-    const res = await fetch(url, { method, ...(body !== undefined && { body }) })
+    const res = await fetch(url, {
+      method,
+      ...(body !== undefined && { body }),
+      ...(contentType !== undefined && { headers: { "content-type": contentType } }),
+    })
 
     out.push({ status: res.status, body: await res.text() })
   } catch (error) {

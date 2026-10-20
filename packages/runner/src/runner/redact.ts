@@ -3,6 +3,8 @@
  * credentials an app's calls carry (headers, body fields, provider key formats), at any depth.
  */
 
+import type { FormPart } from "@danwo/proxy"
+
 import { REDACTED, redactCredentials } from "../secrets/index.ts"
 
 /** Headers that carry credentials or signatures, by exact name or by a telling word in it. */
@@ -28,6 +30,8 @@ export interface Redactor {
   headers(headers: Readonly<Record<string, string>>): Record<string, string>
   /** A request or response body: JSON and form fields by name, then the text itself. */
   body(body: string, contentType: string | undefined): string
+  /** A multipart body's parts: credential fields blanked, every other value and file name redacted. */
+  form(parts: readonly FormPart[]): FormPart[]
   /** Any JSON-like value, deep: sensitive keys blanked, strings redacted and clipped. */
   value(value: unknown): unknown
   /** Like `value`, without clipping: for records whose text is the point (steps, errors). */
@@ -83,6 +87,7 @@ export function createRedactor(secrets: (text: string) => string): Redactor {
         ]),
       ),
     body: (input, contentType) => text(redactFields(input, contentType ?? "", body)),
+    form: (parts) => parts.map((part) => redactPart(part, text)),
     value: (input) => redactDeep(input, state),
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the copy has the input's shape: only string values and sensitive keys' values change
     deep: <T>(input: T) => redactDeep(input, body) as T,
@@ -114,6 +119,13 @@ function redactJson(input: string, walk: Walk): string {
     // A body cut at the capture limit is not valid JSON; its text is still redacted.
     return input
   }
+}
+
+/** A multipart part with a credential field's value blanked, and its text through `text`. */
+function redactPart(part: FormPart, text: (input: string) => string): FormPart {
+  if ("file" in part) return { ...part, file: text(part.file) }
+
+  return { ...part, value: isSensitiveField(part.name) ? REDACTED : text(part.value) }
 }
 
 /** A form body, decoded for reading, with credential fields blanked. */
