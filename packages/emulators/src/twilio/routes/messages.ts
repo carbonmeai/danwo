@@ -4,6 +4,7 @@ import type { TwilioRouteContext } from "../context.ts"
 import type { Account, Message } from "../entities.ts"
 import type { Draft, TwilioMessaging } from "../events.ts"
 import { API_VERSION, formOf, isE164, legacyPage, notFound, twilioError } from "../helpers.ts"
+import { trialTemplateText } from "../trial-templates.ts"
 
 const MESSAGES = `/${API_VERSION}/Accounts/:account/Messages`
 /** The longest body Twilio accepts: ten 160-character segments. */
@@ -72,9 +73,17 @@ function contentProblem(draft: Omit<Draft, "account">): Problem | undefined {
   return undefined
 }
 
+/** What Twilio answers when a trial account asks for something only an upgraded one can do. */
+const TRIAL_ONLY: Problem = [
+  20003,
+  "This feature is not available on a Trial account. Please upgrade your account to gain access.",
+  401,
+]
+
 /**
  * What a trial account refuses before anything else: a malformed parameter or a missing body, with
- * Twilio's code 0, then a recipient the account has not verified (422, code 572002).
+ * Twilio's code 0, then a recipient the account has not verified (422, code 572002), then a body
+ * that is not one of the predefined templates (code 572006).
  */
 function trialProblem(account: Account, draft: Omit<Draft, "account">): Problem | undefined {
   if (account.type !== "Trial" || draft.to === "") return undefined
@@ -91,6 +100,8 @@ function trialProblem(account: Account, draft: Omit<Draft, "account">): Problem 
       "No Twilio trial phone number is assigned for messaging to this destination number. Please add the 'to' number as a verified recipient.",
       422,
     ]
+  if (draft.media.length === 0 && trialTemplateText(draft.body) === undefined)
+    return [572006, "Invalid template name. Trial accounts can only use predefined SMS templates."]
 
   return undefined
 }
@@ -128,11 +139,13 @@ async function create(c: Context, context: TwilioRouteContext, messaging: Twilio
   }
   const problem = problemWith(context, account, draft)
 
-  if (problem) return twilioError(c, problem[2] ?? 400, problem[0], problem[1])
+  if (problem) return refuse(c, problem)
 
   const from = draft.from || serviceSender(context, account)
+  /* A trial account's message carries the text of the template its body names. */
+  const body = account.type === "Trial" ? (trialTemplateText(draft.body) ?? draft.body) : draft.body
 
-  return c.json(messaging.send({ ...draft, from, account }), 201)
+  return c.json(messaging.send({ ...draft, body, from, account }), 201)
 }
 
 /** Whether `message` was sent on `day` (`YYYY-MM-DD`). */
@@ -193,12 +206,32 @@ export function messageRoutes(context: TwilioRouteContext, messaging: TwilioMess
 
     return message instanceof Response ? message : c.json(message)
   })
+  app.post(`${MESSAGES}/:file`, async (c) => {
+    const message = found(c, context)
+
+    if (message instanceof Response) return message
+    if (requireCaller(c, context.twilio).type === "Trial") return refuse(c, TRIAL_ONLY)
+
+    /* An update can only redact: an empty `Body` blanks the stored text. */
+    const body = (await formOf(c)).get("Body")
+
+    if (body !== "") return refuse(c, [21602, "Message body is required."])
+
+    return c.json(context.twilio.messages.change(message.sid, { body: "" }) ?? message)
+  })
   app.delete(`${MESSAGES}/:file`, (c) => {
     const message = found(c, context)
 
     if (message instanceof Response) return message
+    /* A trial account cannot delete its messages: they stay in its log. */
+    if (requireCaller(c, context.twilio).type === "Trial") return refuse(c, TRIAL_ONLY)
     context.twilio.messages.remove(message.sid)
 
     return c.body(null, 204)
   })
+}
+
+/** Answers with a refusal, at its status (400 unless it names another). */
+function refuse(c: Context, [code, text, status = 400]: Problem): Response {
+  return twilioError(c, status, code, text)
 }

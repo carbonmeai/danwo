@@ -197,8 +197,35 @@ describe("Twilio accounts", () => {
     expect(await errorOf(client.messages.create({ from, to: "555", body: "x" }))).toBe(0)
     expect(await errorOf(client.messages.create({ from, to: PERSON, body: "x" }))).toBe(572002)
     expect(await errorOf(client.messages.create({ from, to: PERSON, body: "" }))).toBe(0)
-    expect((await client.messages.create({ from, to: VERIFIED, body: "hi" })).status).toBe("queued")
+    expect(await errorOf(client.messages.create({ from, to: VERIFIED, body: "hi" }))).toBe(572006)
+
+    const sent = await client.messages.create({ from, to: VERIFIED, body: "sms_internal_alerts" })
+
+    expect(sent.status).toBe("queued")
+    expect(sent.body).toMatch(/^Alert: System downtime detected\..*Test message from Twilio\.$/)
     expect((await client.api.v2010.accounts(TRIAL).fetch()).type).toBe("Trial")
+  })
+
+  it("keeps a trial account's messages: it can neither delete nor redact them", async () => {
+    const client = twilioClient(emulator, TRIAL, TRIAL_TOKEN, TRIAL)
+    const sent = await client.messages.create({
+      from: "+15005550010",
+      to: VERIFIED,
+      body: "sms_account_alerts",
+    })
+
+    expect(await errorOf(client.messages(sent.sid).remove())).toBe(20003)
+    expect(await errorOf(client.messages(sent.sid).update({ body: "" }))).toBe(20003)
+    expect((await client.messages(sent.sid).fetch()).body).not.toBe("")
+  })
+
+  it("redacts and deletes a full account's message", async () => {
+    const client = twilioClient(emulator)
+    const sent = await client.messages.create({ from: APP_NUMBER, to: PERSON, body: "hello" })
+
+    expect((await client.messages(sent.sid).update({ body: "" })).body).toBe("")
+    expect(await client.messages(sent.sid).remove()).toBe(true)
+    expect(await errorOf(client.messages(sent.sid).fetch())).toBe(20404)
   })
 })
 
