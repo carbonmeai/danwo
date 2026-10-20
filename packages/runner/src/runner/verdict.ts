@@ -6,6 +6,8 @@
  */
 import { fileURLToPath } from "node:url"
 
+import { routeOf } from "@danwo/matrix"
+
 import type { ErrorCode } from "../support/codes.ts"
 import type { TestError } from "../support/errors.ts"
 import type { FailureVerdict, Verdict, VerdictConfidence } from "./verdict-words.ts"
@@ -19,6 +21,20 @@ export interface VerdictCall {
   readonly fault: string | null
   readonly disposition?: "routed" | "passthrough" | "blocked"
   readonly asset?: boolean
+  readonly startedAt?: string
+  readonly durationMs?: number | null
+  /** Who sent it: a page (`browser`) or a server, such as the app's own backend. */
+  readonly client?: "browser" | "server"
+}
+
+/** A step of the attempt as the verdict reads it. */
+export interface VerdictStep {
+  readonly index: number
+  readonly kind: string
+  readonly api: string
+  readonly status: string
+  readonly startedAt: string
+  readonly durationMs: number
 }
 
 /** A line the app's page logged, as the verdict reads it. */
@@ -26,6 +42,8 @@ export interface VerdictLog {
   readonly level: string
   readonly source: string
   readonly text: string
+  /** The step that was running when it was logged. */
+  readonly step?: number
 }
 
 /** What a failed attempt left behind that the verdict weighs. */
@@ -37,6 +55,10 @@ export interface VerdictEvidence {
   readonly appLog: readonly VerdictLog[]
   /** Apps of the environment that stopped during the attempt. */
   readonly appsDown?: readonly string[]
+  /** The attempt's steps, which place the failure in time. */
+  readonly steps?: readonly VerdictStep[]
+  /** Routes that answered 5xx in attempts that passed: noise the app makes either way. */
+  readonly baseline?: ReadonlySet<string>
 }
 
 /** Codes that mean the run never really got to test the app. */
@@ -88,21 +110,157 @@ function isDanwo(file: string): boolean {
   )
 }
 
-/** An app call that failed on its own: a 5xx no fault put there, page loads left out. */
-function appFailure(calls: readonly VerdictCall[]): VerdictCall | undefined {
-  return calls.find(
-    (call) =>
-      call.asset !== true &&
-      call.fault === null &&
-      call.disposition !== "routed" &&
-      call.status !== null &&
-      call.status >= 500,
+/**
+ * A 5xx the app answered on its own: no fault put it there, no route or block answered it, and
+ * it is no page load.
+ */
+function isServerError(call: VerdictCall): boolean {
+  return (
+    call.asset !== true &&
+    call.fault === null &&
+    call.disposition !== "routed" &&
+    call.disposition !== "blocked" &&
+    call.status !== null &&
+    call.status >= 500
   )
 }
 
-/** An uncaught error the page threw. */
-function pageError(appLog: readonly VerdictLog[]): VerdictLog | undefined {
-  return appLog.find((line) => line.source === "page-error")
+/** The routes of the app's own 5xx answers among `calls`, for the baseline passing attempts keep. */
+export function serverErrorRoutes(calls: readonly VerdictCall[]): string[] {
+  return calls.filter(isServerError).map(routeOf)
+}
+
+/** When a call or step started, in ms; undefined when it carries no time. */
+function startOf(item: { readonly startedAt?: string }): number | undefined {
+  const at = item.startedAt === undefined ? NaN : Date.parse(item.startedAt)
+
+  return Number.isNaN(at) ? undefined : at
+}
+
+/**
+ * Whether `call` failed only on a refusal: a server's call to a blocked or unrouted host went out
+ * while the app answered it, so its 5xx says the run cut the app off, not that the app broke.
+ */
+function proxiesBlocked(call: VerdictCall, calls: readonly VerdictCall[]): boolean {
+  const from = startOf(call)
+
+  if (from === undefined) return false
+
+  const to = from + (call.durationMs ?? 0)
+
+  return calls.some((other) => {
+    const at = startOf(other)
+
+    return (
+      other.disposition === "blocked" &&
+      other.client !== "browser" &&
+      at !== undefined &&
+      at >= from &&
+      at <= to
+    )
+  })
+}
+
+/** Whether a step checks what came before it: an assertion, a value check, a judged claim. */
+function verifies(step: VerdictStep): boolean {
+  return step.kind === "assertion" || step.kind === "check" || step.api === "agent.assert"
+}
+
+/**
+ * Where the failure is read: from the first step after the last check that held to the end of
+ * the step that failed, in time and by step index.
+ */
+interface StepWindow {
+  readonly from: number
+  readonly to: number
+  readonly first: number
+  readonly last: number
+}
+
+/** The failing work's window; undefined when no step failed, so the whole attempt counts. */
+function stepWindow(steps: readonly VerdictStep[]): StepWindow | undefined {
+  const failing = steps.findLastIndex(
+    (step) => step.status !== "passed" && step.status !== "running",
+  )
+  const failed = steps[failing]
+
+  if (failed === undefined) return undefined
+
+  const held = steps
+    .slice(0, failing)
+    .findLastIndex((step) => step.status === "passed" && verifies(step))
+  const first = steps[held + 1] ?? failed
+
+  return {
+    from: startOf(first) ?? -Infinity,
+    to: (startOf(failed) ?? Infinity) + failed.durationMs,
+    first: first.index,
+    last: failed.index,
+  }
+}
+
+/** Whether a call started inside the window; one with no time, or with no window, is inside. */
+function inWindow(call: VerdictCall, window: StepWindow | undefined): boolean {
+  const at = startOf(call)
+
+  return window === undefined || at === undefined || (at >= window.from && at <= window.to)
+}
+
+/** Whether a call started before the failing step ended. */
+function beforeEnd(call: VerdictCall, window: StepWindow | undefined): boolean {
+  const at = startOf(call)
+
+  return window === undefined || at === undefined || at <= window.to
+}
+
+function isWrite(call: VerdictCall): boolean {
+  return call.method !== "GET" && call.method !== "HEAD"
+}
+
+/** The app's 5xx that best explains the failure, and where it fell. */
+interface AppFailure {
+  readonly call: VerdictCall
+  readonly inWindow: boolean
+}
+
+/**
+ * The 5xx that matters. A route that also failed in passing attempts, and a call that failed only
+ * on a refused call of its own, are left out. Of the rest, a write while the failing work ran
+ * wins, then any call then, then a write before it, then any call before it; the one closest to
+ * the failing step first.
+ */
+function appFailure(
+  evidence: VerdictEvidence,
+  window: StepWindow | undefined,
+): AppFailure | undefined {
+  const { calls, baseline } = evidence
+  const before = calls.filter(
+    (call) =>
+      isServerError(call) &&
+      baseline?.has(routeOf(call)) !== true &&
+      !proxiesBlocked(call, calls) &&
+      beforeEnd(call, window),
+  )
+  const during = before.filter((call) => inWindow(call, window))
+  const call =
+    during.filter(isWrite).at(-1) ?? during.at(-1) ?? before.filter(isWrite).at(-1) ?? before.at(-1)
+
+  return call === undefined ? undefined : { call, inWindow: inWindow(call, window) }
+}
+
+/** An uncaught error the page threw before the failing step ended, one thrown during it first. */
+function pageError(
+  appLog: readonly VerdictLog[],
+  window: StepWindow | undefined,
+): { readonly line: VerdictLog; readonly inWindow: boolean } | undefined {
+  const at = (line: VerdictLog) => line.step ?? window?.last ?? 0
+  const thrown = appLog.filter(
+    (line) => line.source === "page-error" && (window === undefined || at(line) <= window.last),
+  )
+  const during = thrown.filter((line) => window === undefined || at(line) >= window.first)
+  const line = during.at(-1) ?? thrown.at(-1)
+
+  return line === undefined ? undefined : { line, inWindow: during.includes(line) }
 }
 
 /** The first line of a message, trimmed for a reason. */
@@ -112,22 +270,50 @@ function brief(text: string): string {
   return first.length > 120 ? `${first.slice(0, 117)}…` : first
 }
 
-/** The app's own misbehaviour in the evidence, as a reason; undefined when it behaved. */
-function appEvidence(evidence: VerdictEvidence): string | undefined {
+/** The app's own misbehaviour, as a reason, with how sure it makes the verdict. */
+interface AppEvidence {
+  readonly reason: string
+  readonly confidence: VerdictConfidence
+  /** Whether it happened while the failing work ran. */
+  readonly inWindow: boolean
+}
+
+/**
+ * The app's own misbehaviour in the evidence; undefined when it behaved. Only an app that stopped,
+ * or a 5xx on a write while the failing work ran, is certain.
+ */
+function appEvidence(evidence: VerdictEvidence): AppEvidence | undefined {
   const down = evidence.appsDown?.[0]
 
-  if (down !== undefined) return `the app ${down} stopped during the test`
+  if (down !== undefined)
+    return {
+      reason: `the app ${down} stopped during the test`,
+      confidence: "certain",
+      inWindow: true,
+    }
 
-  const call = appFailure(evidence.calls)
+  const window = stepWindow(evidence.steps ?? [])
+  const failed = appFailure(evidence, window)
 
-  if (call !== undefined)
-    return `the app answered ${call.method} ${call.host}${call.path.split("?")[0] ?? ""} with ${call.status}`
+  if (failed !== undefined) {
+    const { call } = failed
 
-  const thrown = pageError(evidence.appLog)
+    return {
+      reason: `the app answered ${call.method} ${call.host}${call.path.split("?")[0] ?? ""} with ${call.status}`,
+      confidence: failed.inWindow && isWrite(call) ? "certain" : "likely",
+      inWindow: failed.inWindow,
+    }
+  }
 
-  if (thrown !== undefined) return `the page threw an uncaught error: ${brief(thrown.text)}`
+  const thrown = pageError(evidence.appLog, window)
 
-  return undefined
+  if (thrown === undefined) return undefined
+
+  return {
+    reason: `the page threw an uncaught error: ${brief(thrown.line.text)}`,
+    confidence: "likely",
+    inWindow: thrown.inWindow,
+  }
 }
 
 function judged(verdict: Verdict, confidence: VerdictConfidence, reason: string): FailureVerdict {
@@ -174,7 +360,9 @@ function settledByCode(error: TestError): FailureVerdict | undefined {
 function weighedVerdict(evidence: VerdictEvidence, error: TestError): FailureVerdict {
   const app = appEvidence(evidence)
 
-  if (app !== undefined) return judged("app", "certain", `${app}, then ${error.code}`)
+  if (error.code === "CLAIM_FAILED" && app?.inWindow !== true)
+    return judged("undecided", "likely", "the judge says the claim doesn't hold")
+  if (app !== undefined) return judged("app", app.confidence, `${app.reason}, then ${error.code}`)
   if (LOCATOR_CODES.has(error.code))
     return judged(
       "test",
@@ -203,8 +391,9 @@ function weighedVerdict(evidence: VerdictEvidence, error: TestError): FailureVer
  * Whose failure `evidence` is. Rules, in order: a matrix trial whose check broke under its fault
  * is the app's; the code's class settles environment, config and undecided failures; a crash is
  * danwo's when thrown inside danwo, else the test's; then the app's own errors (a 5xx, an
- * uncaught page error, an app that stopped) make it the app's, and without them a missing
- * element is likely the test's while a failed check is likely the app's.
+ * uncaught page error, an app that stopped) make it the app's. A judged claim that failed with no
+ * app error while its work ran is undecided; without app errors a missing element is likely the
+ * test's while a failed check is likely the app's.
  */
 export function failureVerdict(evidence: VerdictEvidence): FailureVerdict {
   const { error } = evidence

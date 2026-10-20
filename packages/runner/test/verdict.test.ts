@@ -5,9 +5,11 @@ import { describe, expect, it } from "vitest"
 import { fixAdvice, verdictSummary } from "../src/runner/verdict-words.ts"
 import {
   failureVerdict,
+  serverErrorRoutes,
   stackFiles,
   type VerdictCall,
   type VerdictEvidence,
+  type VerdictStep,
 } from "../src/runner/verdict.ts"
 import { classOf, type ErrorCode } from "../src/support/codes.ts"
 import type { TestError } from "../src/support/errors.ts"
@@ -33,6 +35,26 @@ function call(status: number, more: Partial<VerdictCall> = {}): VerdictCall {
 function evidence(more: Partial<VerdictEvidence>): VerdictEvidence {
   return { error: undefined, calls: [], appLog: [], ...more }
 }
+
+/** A time `s` seconds into the attempt. */
+const at = (s: number) => new Date(Date.UTC(2026, 9, 20, 19) + s * 1000).toISOString()
+
+/** A step `index` that ran from second `s` for one second. */
+function step(index: number, s: number, more: Partial<VerdictStep> = {}): VerdictStep {
+  return {
+    index,
+    kind: "locator",
+    api: "locator.click",
+    status: "passed",
+    startedAt: at(s),
+    durationMs: 1000,
+    ...more,
+  }
+}
+
+const changelogs = (s: number) =>
+  call(502, { method: "GET", path: "/api/changelogs", startedAt: at(s), durationMs: 400 })
+const createTask = (s: number) => call(500, { startedAt: at(s), durationMs: 200 })
 
 describe("failure verdicts", () => {
   it("calls a failed check after the app answered a 5xx an app bug, for certain", () => {
@@ -154,6 +176,108 @@ describe("failure verdicts", () => {
 
     expect(failureVerdict(evidence({ error: failing })).verdict).toBe("test")
     expect(failureVerdict(evidence({ error: failing, calls: [call(503)] })).verdict).toBe("app")
+  })
+
+  describe("which 5xx explains the failure", () => {
+    /* Opens the board, checks it shows, creates a task, then fails a check of the result. */
+    const steps = [
+      step(0, 0),
+      step(1, 2, { kind: "assertion", api: "expect.toBeVisible" }),
+      step(2, 4),
+      step(3, 6, { kind: "assertion", api: "expect.toBeVisible", status: "failed" }),
+    ]
+    const failed = error("EXPECTATION_FAILED", "expected the notification")
+
+    it("names a write the failing work made over an earlier GET, for certain", () => {
+      const found = failureVerdict(
+        evidence({ error: failed, steps, calls: [changelogs(0), createTask(4)] }),
+      )
+
+      expect(found).toMatchObject({ verdict: "app", confidence: "certain" })
+      expect(found.reason).toContain("POST 127.0.0.1:3000/tasks with 500")
+    })
+
+    it("names the 5xx closest before the failing step, and none after it", () => {
+      const found = failureVerdict(
+        evidence({
+          error: failed,
+          steps,
+          calls: [
+            createTask(0.5),
+            call(503, { path: "/later", startedAt: at(4.5) }),
+            createTask(9),
+          ],
+        }),
+      )
+
+      expect(found.reason).toContain("/later with 503")
+    })
+
+    it("is only likely for a GET, or for a write before the failing work", () => {
+      const get = failureVerdict(evidence({ error: failed, steps, calls: [changelogs(4)] }))
+      const earlier = failureVerdict(evidence({ error: failed, steps, calls: [createTask(0.5)] }))
+
+      expect(get).toMatchObject({ verdict: "app", confidence: "likely" })
+      expect(earlier).toMatchObject({ verdict: "app", confidence: "likely" })
+    })
+
+    it("leaves out a route that also failed in passing attempts", () => {
+      const found = failureVerdict(
+        evidence({
+          error: failed,
+          steps,
+          calls: [changelogs(4)],
+          baseline: new Set(["GET 127.0.0.1:3000/api/changelogs"]),
+        }),
+      )
+
+      expect(found).toMatchObject({ verdict: "app", confidence: "likely" })
+      expect(found.reason).toContain("the app answering without errors")
+      expect(
+        serverErrorRoutes([changelogs(0), call(500, { path: "/tasks/42" }), call(200)]),
+      ).toEqual(["GET 127.0.0.1:3000/api/changelogs", "POST 127.0.0.1:3000/tasks/:id"])
+    })
+
+    it("leaves out a 5xx that only passed on a blocked host's refusal", () => {
+      const blocked = call(502, {
+        method: "GET",
+        host: "cms.danwo.invalid",
+        path: "/api/changelogs",
+        disposition: "blocked",
+        client: "server",
+        startedAt: at(4.1),
+      })
+      const found = failureVerdict(
+        evidence({ error: failed, steps, calls: [changelogs(4), blocked] }),
+      )
+
+      expect(found.reason).toContain("the app answering without errors")
+    })
+
+    it("calls a failed claim with no app error while it ran undecided", () => {
+      const claim = error("CLAIM_FAILED", "the judge says Bob is not assigned")
+      const judgedSteps = [
+        step(0, 0, { kind: "agent", api: "agent.assert" }),
+        step(1, 2, { kind: "agent", api: "agent.act" }),
+        step(2, 4, { kind: "agent", api: "agent.assert", status: "failed" }),
+      ]
+      const clean = failureVerdict(evidence({ error: claim, steps: judgedSteps }))
+      /* The only 5xx came before the claim that held, so it is not the failing work's. */
+      const noise = failureVerdict(
+        evidence({ error: claim, steps: judgedSteps, calls: [changelogs(0.5)] }),
+      )
+      const broke = failureVerdict(
+        evidence({ error: claim, steps: judgedSteps, calls: [createTask(2.5)] }),
+      )
+
+      expect(clean).toEqual({
+        verdict: "undecided",
+        confidence: "likely",
+        reason: "the judge says the claim doesn't hold",
+      })
+      expect(noise.verdict).toBe("undecided")
+      expect(broke).toMatchObject({ verdict: "app", confidence: "certain" })
+    })
   })
 
   it("reads stack frames, leaving out Node's own", () => {

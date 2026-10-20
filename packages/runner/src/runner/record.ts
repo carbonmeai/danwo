@@ -199,6 +199,8 @@ export interface RecordInput {
   readonly video?: boolean
   /** Apps of the environment that stopped during the run, for its verdict. */
   readonly appsDown?: readonly string[]
+  /** Routes that answered 5xx in runs that passed, which the verdict leaves out as noise. */
+  readonly baseline?: ReadonlySet<string>
 }
 
 function redactorOf(input: Pick<RecordInput, "flight">): Redactor {
@@ -290,7 +292,9 @@ export function runVerdict(input: RecordInput): FailureVerdict | undefined {
     ...(input.run.kind === "matrix" && { fault: input.run.fault?.label ?? null }),
     calls: (input.env?.proxy?.exchanges() ?? []).slice(input.mark.exchanges),
     appLog: input.flight.session.appLog(),
+    steps: input.flight.session.steps(),
     ...(input.appsDown !== undefined && { appsDown: input.appsDown }),
+    ...(input.baseline !== undefined && { baseline: input.baseline }),
   })
 }
 

@@ -68,6 +68,7 @@ import type {
   WorkerStart,
 } from "./tasks.ts"
 import { noTimings, TRIAL_PHASES, type TrialPhase, timed } from "./timings.ts"
+import { serverErrorRoutes } from "./verdict.ts"
 import { answerCalls, sendNote } from "./wire.ts"
 
 /** What `beforeAll` and `afterAll` receive: there is no browser session outside a test. */
@@ -96,6 +97,18 @@ interface Bench {
 let keepSignIns = false
 
 let bench: Bench | undefined
+/**
+ * Routes that answered 5xx in this worker's passing runs: errors the app makes whether or not a
+ * test fails, which a failure's verdict does not blame.
+ */
+const passingErrors = new Set<string>()
+
+/** Adds a passing run's 5xx routes to the baseline failures are weighed against. */
+function noteBaseline(env: WorkerEnvironment | undefined, mark: EvidenceMark): void {
+  for (const route of serverErrorRoutes((env?.proxy?.exchanges() ?? []).slice(mark.exchanges)))
+    passingErrors.add(route)
+}
+
 /** The worker's browser, launched on first use; each attempt opens its own context in it. */
 let browser: Promise<Browser> | undefined
 
@@ -297,7 +310,11 @@ async function runTest(
 
     attempts.push(await reportAttempt({ id, n, result, recordDir, mark, down: appsDownNow(env) }))
 
-    if (result.status === "passed") impact = attemptImpact(result, mark)
+    if (result.status === "passed") {
+      impact = attemptImpact(result, mark)
+      noteBaseline(env, mark)
+    }
+
     if (!worthRetrying(result.status)) break
   }
 
@@ -337,6 +354,7 @@ async function reportAttempt(attempt: FinishedAttempt): Promise<AttemptReport> {
     mark: attempt.mark,
     video: videoKept(result.status === "passed"),
     appsDown: down,
+    baseline: passingErrors,
   }
   const inspected = inspect(input)
   const record = await keepRecord(attempt.recordDir, result.status !== "passed", () =>
@@ -663,6 +681,8 @@ async function runTrial(
 
   const reported = withRace(trialReport(result, env, { mark, body, messages }), race)
   const verdict = { ...reported, timings, ...cleanPace(task, result) }
+
+  if (task.fault === null && verdict.status === "passed") noteBaseline(env, mark)
   const input: RecordInput = {
     test: task.testId,
     run: { kind: "matrix", fault: task.fault },
@@ -677,6 +697,7 @@ async function runTrial(
     mark,
     /* A trial that passed keeps no video, even when its record is kept to show a fault never fired. */
     video: videoKept(verdict.status === "passed"),
+    baseline: passingErrors,
   }
   const inspected = inspect(input)
   const report = { ...verdict, ...lintOf(inspected) }
