@@ -75,12 +75,7 @@ export function requireToken(context: UnipileRouteContext, c: Context): void {
       "The X-API-KEY header is missing.",
     )
   if (tokens.length > 0 && !tokens.includes(token))
-    throw new UnipileError(
-      401,
-      "errors/invalid_credentials",
-      "Invalid credentials",
-      "",
-    )
+    throw new UnipileError(401, "errors/invalid_credentials", "Invalid credentials", "")
 }
 
 /** A Unipile-style id: 22 base64url characters. */
