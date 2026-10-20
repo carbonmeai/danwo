@@ -180,6 +180,16 @@ Calls to hosts no service emulates pass through to the real host by default
 - **Telemetry** (PostHog, Sentry, Segment, Amplitude, Datadog, hosted trace backends, Google
   Analytics and the like) is blocked by default, so a run neither sends real data out nor fills its
   record with noise; `telemetry: "passthrough"` lets it go.
+- **Page assets** still pass under `block` (`assets: "passthrough"`, the default): a browser GET
+  whose `Sec-Fetch-Dest` is `image`, `font`, `style`, `video`, `audio` or `track`, or, with no such
+  header, a GET of an image or font file whose `Accept` starts with `image/` or `font/`. They are
+  recorded as assets. Scripts, documents, frames, workers, `fetch()` (`empty`), non-GETs and a
+  server's own calls stay blocked, and so do telemetry and `blocked` hosts. `assets: "block"`
+  refuses page assets too.
+- **What the pages were refused** is counted by host and kind. The run prints it once at the end,
+  and each attempt's record carries it as a note (shown in the dashboard overlay): "Blocked hosts
+  the pages tried to load: cdn.example.com (19 images), api.example.com (2 requests). Add the ones
+  the app needs to `allow`, or set `assets: "passthrough"` for images and fonts."
 
 The page loading itself (static files, and a dev server's modules and hot reload such as
 `/@vite/client` or `/src/main.ts?v=…`) is in the flight record but left out of readiness, effects

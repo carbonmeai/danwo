@@ -37,6 +37,45 @@ export default defineConfig({
   to emulate, allow or start locally.
 </Callout>
 
+## What still passes under block
+
+Blocking stops your app's calls to the real world. It doesn't stop the page from showing a logo
+from a CDN. Under `block`, these still go through:
+
+| Call                                                    | Under `block`                |
+| ------------------------------------------------------- | ---------------------------- |
+| to this machine (`localhost`, `127.0.0.1`, `::1`)       | passes                       |
+| to a host in `allow`                                    | passes                       |
+| a page's image, font, stylesheet, video, audio or track | passes, recorded as an asset |
+| a page's script, frame, worker, or `fetch()`            | 502                          |
+| a server's own call, or any call that isn't a GET       | 502                          |
+| to a telemetry host or a host in `blocked`              | 502, even for an image       |
+
+The browser says what each request loads, so danwo can tell a logo from a data call to the same
+host. A script is never let through: it runs code that calls on.
+
+## Missing images or fonts in a recording
+
+Images and fonts go missing when you set `assets: "block"`, which refuses page assets too, or when
+the page loads them with `fetch()`. Either way, the run names the hosts once at the end:
+
+```text
+Blocked hosts the pages tried to load: cdn.sanity.io (19 images), api.example.com (2 requests).
+Add the ones the app needs to `allow`, or set `assets: "passthrough"` for images and fonts.
+```
+
+The same line is a note on the attempt's flight record, so it shows in the dashboard too. Allow
+the hosts the page needs, or go back to the default:
+
+```ts title="danwo.config.ts (fragment)"
+appEnvironment({
+  app: { command: "npm run dev", url: "http://localhost:3000" },
+  unmatched: "block",
+  assets: "passthrough",
+  allow: ["cdn.sanity.io"],
+})
+```
+
 ## This machine always passes
 
 Calls to this machine (`localhost`, `127.0.0.1`, `::1`) always go through, even when other hosts
@@ -57,6 +96,7 @@ That usually means a service your app needs, such as a search server, isn't runn
 | `allow`     | hosts that always pass, even under `block`                                          |
 | `blocked`   | hosts that always get 502, even under `passthrough`; beats `allow` and this machine |
 | `telemetry` | `block` (default) or `passthrough` for analytics hosts                              |
+| `assets`    | `passthrough` (default) or `block` for a page's images, fonts and media under block |
 
 ## Analytics and telemetry stay out
 

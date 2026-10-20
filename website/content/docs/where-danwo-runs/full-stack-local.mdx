@@ -69,7 +69,8 @@ through the proxy too.
 
 - **A build that fetches during start-up.** Fonts or remote config fetched at build time go
   through the proxy too. Pass `unmatched: "passthrough"` (the default) or add those hosts to
-  `allow` when you block the rest.
+  `allow` when you block the rest. The page's own images and fonts still load under block; see
+  [Outside hosts](/docs/outside-hosts).
 - **A start script that sets `NODE_OPTIONS`.** danwo keeps its settings anyway, through a small
   `node` wrapper on the app's `PATH`. See [Real stacks](/docs/real-stacks).
 - **Other runtimes.** danwo covers Node and Bun servers. We haven't checked Deno, or

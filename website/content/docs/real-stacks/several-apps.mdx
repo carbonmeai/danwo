@@ -123,6 +123,7 @@ apart from the tests' own records.
 | `baseUrl`                       | the name of the app the browser opens                                | the first app                            |
 | `unmatched`                     | what happens to hosts no service answers: `passthrough` or `block`   | `passthrough`                            |
 | `allow`, `blocked`, `telemetry` | which outside hosts pass or are refused                              | see [Outside hosts](/docs/outside-hosts) |
+| `assets`                        | whether a page's images and fonts still load under `block`           | `passthrough`                            |
 | `secrets`                       | live-looking keys an app would use: `warn`, `fail` or `ignore`       | `warn`                                   |
 | `nodeShim`                      | keep danwo's preload even when a script sets `NODE_OPTIONS`          | `true`                                   |
 

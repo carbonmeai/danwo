@@ -163,9 +163,14 @@ export function apiSections(index = new SourceIndex()): SpecSection[] {
       /^[a-z0-9]+(Environment|Service)$/i.test(d.name) ||
       /^[a-z]+(Snapshot|WorkerDatabase|WorkerFile)$/.test(d.name) ||
       PROVIDER_OPTIONS.test(d.name) ||
-      ["startServices", "Services", "Seed", "EnvironmentContext", "MINISTACK_IMAGE"].includes(
-        d.name,
-      ),
+      [
+        "startServices",
+        "Services",
+        "UnroutedHosts",
+        "Seed",
+        "EnvironmentContext",
+        "MINISTACK_IMAGE",
+      ].includes(d.name),
   )
   const seeds = SEED_CONFIGS.map((name) => describe("emulators", name))
 
