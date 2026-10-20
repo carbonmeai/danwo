@@ -234,6 +234,53 @@ invariants: `resendInbox`, `s3Objects`, `auth0Tenant`, `gmailMailbox`, `googleCa
 `nylasApplication`, `nangoProject`, `unipileWorkspace`, and the `*SignIns` helpers. `danwo spec --topic emulators` lists them with their
 signatures, and `--topic environments` the seed shapes.
 
+## S3 and Tigris
+
+`s3Service()` (or `s3Environment()`) answers S3 and Tigris on their own hosts: Tigris's
+`t3.storage.dev` and `fly.storage.tigris.dev`, `s3.amazonaws.com` and `s3.us-east-1.amazonaws.com`
+(add `endpoints` for other regions), path-style or virtual-hosted. The official AWS SDK
+(`@aws-sdk/client-s3`, `lib-storage`, the presigners) and the Tigris SDK (`@tigrisdata/storage`)
+work unchanged; `env()` hands the app what both read:
+
+```ts
+import { s3Environment } from "@danwo/sdk"
+
+const s3 = await s3Environment({
+  seed: {
+    buckets: [{ name: "uploads" }],
+    credentials: [{ accessKeyId: "tid_app", secretAccessKey: "tsec_app" }],
+  },
+})
+const app = await startApp(s3.proxy.env({ ...process.env, ...s3.env() }))
+```
+
+`env()` sets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` (`auto`),
+`AWS_ENDPOINT_URL_S3` and `AWS_ENDPOINT_URL`, and the Tigris SDK's `TIGRIS_STORAGE_ACCESS_KEY_ID`,
+`TIGRIS_STORAGE_SECRET_ACCESS_KEY`, `TIGRIS_STORAGE_ENDPOINT` and `TIGRIS_STORAGE_BUCKET`, all
+pointing at Tigris's endpoint (`env({ endpoint })` for another the service answers).
+
+It answers objects (put, get with ranges, head, copy, Tigris's rename, delete and delete-many),
+listings (v1 and v2, prefixes, delimiters, pages), multipart uploads with ListParts and
+ListMultipartUploads, conditional reads and writes (`If-Match`, `If-None-Match`,
+`If-Modified-Since`, `If-Unmodified-Since`, `If-None-Match: *` on put), the checksums a write
+sends, presigned URLs and browser form uploads, and Tigris's presign call
+(`POST /?func=presign`, which the Tigris SDK's `getPresignedUrl` uses). Errors are S3's
+documents, naming the resource, bucket and key.
+
+Signatures: with `credentials` seeded, each request's SigV4 signature (header or presigned URL)
+is checked against the key's secret, and an unknown key or a wrong signature is refused as S3
+refuses them (`InvalidAccessKeyId`, `SignatureDoesNotMatch`). Without any, every well-formed
+signature is accepted.
+
+A Tigris host gets Tigris's small differences (an empty `Owner` in listings, a
+`ContinuationToken` element on every page, checksums on every full read, the copy's ETag as a
+header, no `Location` in a completed upload); any other host gets AWS's. The emulator is checked
+against Tigris live (`danwo fidelity s3`). `s3Objects(s3.emulator)` reads what the app stored.
+
+Not emulated: versioning, object lock, tagging, lifecycle, CORS and the other bucket
+subresources (answered 501), server-side encryption headers, bucket management through
+Tigris's own API, and the Tigris SDK's snapshots, forks and bundles.
+
 ## Auth0
 
 `auth0Environment({ seed })` (or `auth0Service` in `startServices`) answers `<tenant>.auth0.com`,
