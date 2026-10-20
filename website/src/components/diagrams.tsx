@@ -152,6 +152,102 @@ export function HowItWorks(): ReactNode {
   )
 }
 
+/** A short label under a box, in the lighter colour. */
+function Note(props: { readonly x: number; readonly y: number; readonly text: string }): ReactNode {
+  return (
+    <text x={props.x} y={props.y} textAnchor="middle" style={{ fill: MUTED, fontSize: 11 }}>
+      {props.text}
+    </text>
+  )
+}
+
+/**
+ * An agent step's first run asks the model and keeps what it did; later runs replay that
+ * recording with no model, and hand the step back to the model only when the page changed.
+ */
+export function ReplayFlow(): ReactNode {
+  return (
+    <Figure
+      width={760}
+      height={210}
+      label="The first run asks the model and records the step. Later runs replay the recording with no model call, unless the page changed, when the model takes the step over and records it afresh."
+      caption="The model runs once per step. After that, the recording replays it."
+    >
+      <Box x={10} y={20} width={150} label="First run" note="no recording yet" />
+      <Arrow from={[160, 45]} to={[216, 45]} />
+      <Box x={220} y={20} width={150} label="Model acts" note="and is checked" />
+      <Arrow from={[370, 45]} to={[426, 45]} />
+      <Box x={430} y={20} width={150} label="Recording kept" note="in cache.dir" stroke={TEXT} />
+      <Box x={10} y={130} width={150} label="Next run" note="recording found" />
+      <Arrow from={[160, 155]} to={[216, 155]} />
+      <Box x={220} y={130} width={150} label="Replayed" note="0 model calls" stroke={PASS} />
+      <Arrow from={[370, 155]} to={[596, 155]} />
+      <Box x={600} y={130} width={150} label="Page changed?" note="model takes over" />
+      <Arrow from={[675, 130]} to={[580, 70]} />
+      <Note x={505} y={115} text="records it afresh" />
+    </Figure>
+  )
+}
+
+/**
+ * The app calls a provider's real hostname; danwo's proxy answers it from that provider's
+ * emulator, seeded by the config, and the test reads the emulator's state through a fixture.
+ */
+export function EmulatorFlow(): ReactNode {
+  return (
+    <Figure
+      width={760}
+      height={230}
+      label="Your app calls api.stripe.com as usual. danwo's proxy sends the call to the Stripe emulator, which the config seeded. The test reads what the emulator holds through the stripe fixture."
+      caption="The app never knows. The test can ask the emulator what the app did."
+    >
+      <Box x={10} y={30} width={130} label="Your app" note="calls api.stripe.com" />
+      <Arrow from={[140, 55]} to={[226, 55]} />
+      <Box x={230} y={30} width={130} label="danwo proxy" note="records the call" stroke={TEXT} />
+      <Arrow from={[360, 55]} to={[446, 55]} />
+      <Box x={450} y={30} width={150} label="Stripe emulator" note="customers, sessions…" />
+      <Box x={450} y={150} width={150} label="seed" note="from danwo.config.ts" />
+      <Arrow from={[525, 150]} to={[525, 82]} />
+      <Box x={640} y={30} width={110} label="Your test" note="stripe fixture" />
+      <Arrow from={[640, 55]} to={[604, 55]} />
+      <Note x={295} y={110} text="webhooks go back" />
+      <Note x={295} y={125} text="to your app, signed" />
+    </Figure>
+  )
+}
+
+const SLOTS: readonly { readonly label: string; readonly note: string; readonly used: string }[] = [
+  { label: "pristine", note: "seeded state", used: "tests with no session" },
+  { label: "pristine + ada", note: "Ada signed in", used: "tests using ada" },
+  { label: "pristine + bob", note: "Bob signed in", used: "tests using bob" },
+]
+
+/** A worker keeps a clean snapshot and one per saved session, and restores the right one. */
+export function IsolationSlots(): ReactNode {
+  return (
+    <Figure
+      width={760}
+      height={220}
+      label="After the environment starts, the worker keeps a pristine snapshot. Each saved session gets a snapshot of its own on top of it. Before every test the worker restores the snapshot that test needs."
+      caption="Each test starts from the snapshot it needs, never from the last test's leftovers."
+    >
+      <Box x={10} y={85} width={140} label="Environment" note="started and seeded" />
+      {SLOTS.map((slot, i) => {
+        const y = 15 + i * 70
+
+        return (
+          <g key={slot.label}>
+            <Arrow from={[150, 110]} to={[246, y + 25]} />
+            <Box x={250} y={y} width={170} label={slot.label} note={slot.note} stroke={TEXT} />
+            <Arrow from={[420, y + 25]} to={[496, y + 25]} />
+            <Box x={500} y={y} width={250} label={slot.used} />
+          </g>
+        )
+      })}
+    </Figure>
+  )
+}
+
 const TRIALS: readonly { readonly fault: string; readonly verdict: "PASS" | "FAIL" }[] = [
   { fault: "Stripe answers 500", verdict: "PASS" },
   { fault: "webhook arrives twice", verdict: "FAIL" },
