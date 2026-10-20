@@ -6,11 +6,12 @@
  *
  * 1. the test's body only: calls, deliveries, statements and sockets from before the body began
  *    (a saved session signing in, fixtures, `beforeEach`) are setup, and get no faults;
- * 2. background work dropped: health checks, metrics, static assets, signing-key fetches, token
- *    refreshes and job-runner housekeeping;
- * 3. while the plan is over its budget: later occurrences of a route or statement folded into
- *    the first, then each target's faults thinned to the ones that matter most for it, then the
- *    plan cut at the budget, writes and races first.
+ * 2. while the plan is over its budget: background work dropped (health checks, metrics, static
+ *    assets, token refreshes and job-runner housekeeping), then later occurrences of a route or
+ *    statement folded into the first, then each target's faults thinned to the ones that matter
+ *    most for it, then the plan cut at the budget, races, webhooks and writes first.
+ *
+ * A plan within its budget runs whole, so a small test keeps every fault it had.
  */
 import type { DataCall } from "@danwo/infra"
 
@@ -70,9 +71,12 @@ export function setupSize(setup: SetupSpan | undefined): number {
   return setup.exchanges + setup.deliveries + setup.sockets + data
 }
 
-/** Paths an app's infrastructure asks for on its own: health, readiness, metrics, signing keys. */
+/**
+ * Paths an app's infrastructure asks for on its own: health, readiness, metrics. Signing keys are
+ * not among them: an app that cannot fetch them must refuse the tokens they would verify.
+ */
 const BACKGROUND_PATH =
-  /(?:^|\/)(?:health|healthz|ready|readyz|livez|ping|metrics|favicon\.ico|\.well-known\/[^/]+|jwks(?:\.json)?)(?:\/|$)/i
+  /(?:^|\/)(?:health|healthz|ready|readyz|livez|ping|metrics|favicon\.ico)(?:\/|$)/i
 
 /** Static files a page loads: scripts, styles, fonts, images, maps. */
 const ASSET_PATH = /\.(?:js|mjs|css|map|png|jpe?g|gif|svg|webp|ico|woff2?|ttf)$/i
@@ -216,7 +220,7 @@ export interface FocusedPlan {
   readonly skipped: {
     /** Faults on setup: the saved session signing in, fixtures, `beforeEach`. */
     readonly setup: number
-    /** Faults on health checks, assets, signing keys, refreshes and job-runner housekeeping. */
+    /** Faults on health checks, assets, token refreshes and job-runner housekeeping. */
     readonly background: number
     /** Faults on later occurrences of a route or statement already faulted on its first. */
     readonly repeats: number
@@ -295,10 +299,15 @@ export function focusPlan(
   if (options.all === true) return { trials: [...body], total, skipped: nothing }
 
   const budget = Math.max(1, Math.floor(options.budget ?? DEFAULT_BUDGET))
-  let plan = body.filter((planned) => !isBackground(planned))
-  const background = body.length - plan.length
+  let plan = [...body]
+  let background = 0
   let repeats = 0
   let kinds = 0
+
+  if (plan.length > budget) {
+    plan = plan.filter((planned) => !isBackground(planned))
+    background = body.length - plan.length
+  }
 
   if (plan.length > budget && options.everyOccurrence !== true) {
     const folded = foldRepeats(plan)

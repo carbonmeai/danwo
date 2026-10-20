@@ -138,14 +138,20 @@ describe("bodyOf", () => {
 })
 
 describe("focusPlan", () => {
-  it("keeps every fault but background work while the plan is under its budget", () => {
+  it("keeps every fault, background work included, while the plan is within its budget", () => {
     const body = plan(bodyOf(realisticRun()))
     const focused = focusPlan(body, 0, { budget: 10_000 })
 
-    expect(focused.trials.length).toBe(body.filter((fault) => !isBackground(fault)).length)
-    expect(focused.skipped.repeats).toBe(0)
-    expect(focused.skipped.kinds).toBe(0)
+    expect(focused.trials).toHaveLength(body.length)
+    expect(focused.skipped).toEqual({ setup: 0, background: 0, repeats: 0, kinds: 0, budget: [] })
+  })
+
+  it("drops background work first once the plan is over its budget", () => {
+    const body = plan(bodyOf(realisticRun()))
+    const focused = focusPlan(body, 0, { budget: body.length - 1 })
+
     expect(focused.skipped.background).toBeGreaterThan(0)
+    expect(focused.trials.some(isBackground)).toBe(false)
   })
 
   it("folds repeats, thins kinds and cuts at the budget, writes and races first", () => {
@@ -204,23 +210,27 @@ describe("focusPlan", () => {
   })
 })
 
-describe("isBackground", () => {
-  it("names health checks, signing keys, token refreshes, assets and job-runner housekeeping", () => {
-    const at = (method: string, route: string): PlannedFault => ({
-      target: "outbound",
-      call: { method, host: "h", path: "/", index: 0 },
-      route: `${method} ${route}`,
-      occurrence: 0,
-      fault: { kind: "status", status: 500 },
-      label: route,
-    })
+/** A 5xx planned on `route` with `method`. */
+function onRoute(method: string, route: string): PlannedFault {
+  return {
+    target: "outbound",
+    call: { method, host: "h", path: "/", index: 0 },
+    route: `${method} ${route}`,
+    occurrence: 0,
+    fault: { kind: "status", status: 500 },
+    label: route,
+  }
+}
 
-    expect(isBackground(at("GET", "api.test/health"))).toBe(true)
-    expect(isBackground(at("GET", "clerk.test/.well-known/jwks.json"))).toBe(true)
-    expect(isBackground(at("POST", "clerk.test/v1/client/sessions/:id/tokens"))).toBe(true)
-    expect(isBackground(at("GET", "app.test/assets/main.js"))).toBe(true)
-    expect(isBackground(at("PUT", "worker.test/api/inngest"))).toBe(true)
-    expect(isBackground(at("POST", "api.stripe.com/v1/customers"))).toBe(false)
-    expect(isBackground(at("POST", "inngest.test/e/:id"))).toBe(false)
+describe("isBackground", () => {
+  it("names health checks, token refreshes, assets and job-runner housekeeping", () => {
+    expect(isBackground(onRoute("GET", "api.test/health"))).toBe(true)
+    /* An app that cannot fetch signing keys must refuse tokens: those faults are the test's. */
+    expect(isBackground(onRoute("GET", "clerk.test/.well-known/jwks.json"))).toBe(false)
+    expect(isBackground(onRoute("POST", "clerk.test/v1/client/sessions/:id/tokens"))).toBe(true)
+    expect(isBackground(onRoute("GET", "app.test/assets/main.js"))).toBe(true)
+    expect(isBackground(onRoute("PUT", "worker.test/api/inngest"))).toBe(true)
+    expect(isBackground(onRoute("POST", "api.stripe.com/v1/customers"))).toBe(false)
+    expect(isBackground(onRoute("POST", "inngest.test/e/:id"))).toBe(false)
   })
 })
