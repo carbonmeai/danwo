@@ -48,8 +48,11 @@ export interface InngestService extends Service {
 
 /** Run statuses that will not change any more. */
 const DONE = new Set(["completed", "failed", "cancelled"])
-/** How long an event may show no runs before `settle()` takes it as triggering none. */
-const NO_RUNS_MS = 1_500
+/**
+ * How long an event may show no runs before `settle()` takes it as triggering none: a busy dev
+ * server takes a few seconds to schedule what an event triggers.
+ */
+const NO_RUNS_MS = 5_000
 const POLL_MS = 150
 
 /** The ids the dev server gave the events in one recorded send (`{ "ids": [...] }`). */
@@ -152,18 +155,26 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
       .filter((e) => e.host === INNGEST_HOST && e.method === "POST" && e.path.startsWith("/e/"))
       .flatMap((e) => eventIds(e.response?.body))
 
+  /**
+   * Waits until every event sent so far has finished its runs, the ones those runs send included:
+   * the sent events are read again on every poll, and each event gets its own time to show runs.
+   */
   const settle = async () => {
     const deadline = Date.now() + (options.settleTimeoutMs ?? 30_000)
-    const events = sentEvents()
-    const firstSeen = Date.now()
+    const firstSeen = new Map<string, number>()
 
     for (;;) {
+      const events = sentEvents()
+      const now = Date.now()
+
+      for (const event of events) if (!firstSeen.has(event)) firstSeen.set(event, now)
+
       const all = (await Promise.all(events.map((event) => runsOf(url, event)))).flat()
       const waiting = events.some((event) => {
         const own = all.filter((run) => run.event === event)
 
         return own.length === 0
-          ? Date.now() - firstSeen < NO_RUNS_MS
+          ? Date.now() - (firstSeen.get(event) ?? now) < NO_RUNS_MS
           : own.some((r) => !DONE.has(r.status))
       })
 

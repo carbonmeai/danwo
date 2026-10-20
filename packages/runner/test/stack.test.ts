@@ -130,9 +130,10 @@ function json(res: ServerResponse, value: unknown): void {
 
 /**
  * A stand-in for the Inngest dev server's event and runs API: an event it accepts triggers one
- * run, which finishes `runMs` later.
+ * run, which finishes `runMs` later and shows up only `lagMs` after the event, as a busy dev
+ * server schedules it.
  */
-async function devServer(runMs: number): Promise<{ server: Server; url: string }> {
+async function devServer(runMs: number, lagMs = 0): Promise<{ server: Server; url: string }> {
   const accepted = new Map<string, number>()
   const server = createServer((req, res) => {
     if (req.method === "POST" && req.url?.startsWith("/e/")) {
@@ -147,7 +148,7 @@ async function devServer(runMs: number): Promise<{ server: Server; url: string }
     const id = /^\/v1\/events\/([^/]+)\/runs$/.exec(req.url ?? "")?.[1] ?? ""
     const at = accepted.get(id)
 
-    json(res, { data: at === undefined ? [] : [runOf(id, at, runMs)] })
+    json(res, { data: at === undefined || Date.now() - at < lagMs ? [] : [runOf(id, at, runMs)] })
   })
 
   server.listen(0, "127.0.0.1")
@@ -191,6 +192,34 @@ describe("Inngest", () => {
       dev.server.close()
     }
   })
+
+  it("waits for events the runs send while it settles, and for runs a busy server shows late", async () => {
+    const dev = await devServer(300, 2_000)
+    const inngest = await inngestService({ url: dev.url })
+    const services = await startServices([inngest])
+
+    try {
+      await sendThrough(services.proxy.url)
+      /* A function the first event started sends a second one once settling has begun. */
+      const followUp = new Promise<void>((resolve) => {
+        setTimeout(() => void sendThrough(services.proxy.url).then(resolve), 500)
+      })
+
+      await services.settle()
+      await followUp
+      expect(services.state()).toMatchObject({
+        inngest: {
+          runs: [
+            { event: "evt_1", status: "completed" },
+            { event: "evt_2", status: "completed" },
+          ],
+        },
+      })
+    } finally {
+      await services.close()
+      dev.server.close()
+    }
+  }, 20_000)
 
   it("faults event sends: down, accepted but unanswered, and slow", () => {
     const kinds = inngestOutboundFaults({
