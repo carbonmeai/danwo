@@ -263,6 +263,45 @@ describe("the pull request comment's markdown", () => {
     )
   })
 
+  it("splits the failures by whose they are, and says why in each failure", async () => {
+    const appBug = failed("tests/checkout.danwo.ts › pays")
+    const testIssue = failed("tests/sign-in.danwo.ts › signs in")
+    const withVerdict = (
+      report: TestReport,
+      verdict: NonNullable<TestReport["attempts"][0]["verdict"]>,
+    ): TestReport => ({
+      ...report,
+      attempts: report.attempts.map((attempt) => ({ ...attempt, verdict })),
+    })
+    const body = commentBody(
+      undefined,
+      await testSection(
+        testRun([
+          withVerdict(appBug, {
+            verdict: "app",
+            confidence: "certain",
+            reason: "the app answered POST 127.0.0.1:3000/buy with 500, then EXPECTATION_FAILED",
+          }),
+          withVerdict(testIssue, {
+            verdict: "test",
+            confidence: "likely",
+            reason: "LOCATOR_NOT_FOUND on a page that loaded with no app errors",
+          }),
+        ]),
+        links(),
+      ),
+    )
+    const lines = body.split("\n")
+
+    expect(lines).toContain("### ❌ danwo test · 0 passed · 2 failed (1 app bug · 1 test issue)")
+    expect(lines).toContain(
+      "<details><summary>❌ tests/sign-in.danwo.ts › signs in: EXPECTATION_FAILED · Test issue (likely)</summary>",
+    )
+    expect(lines).toContain(
+      "- **Whose:** App bug: the app answered POST 127.0.0.1:3000/buy with 500, then EXPECTATION_FAILED",
+    )
+  })
+
   it("gives a matrix its verdict and a row per fault that did not hold", () => {
     const body = commentBody(undefined, matrixSection(matrixRun(), links()))
     const lines = body.split("\n")

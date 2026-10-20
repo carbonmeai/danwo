@@ -12,7 +12,15 @@ import type { MatrixRunReport, TestReport, TestRunReport } from "@danwo/runner/r
 
 import { shown } from "./annotations.ts"
 import { type FailureDetails, failureDetails } from "./record-details.ts"
-import { cell, FAILED, recordInArtifact, seconds, STATUS_MARK } from "./summary.ts"
+import {
+  cell,
+  FAILED,
+  recordInArtifact,
+  seconds,
+  STATUS_MARK,
+  verdictSplit,
+  verdictText,
+} from "./summary.ts"
 
 /** Marks danwo's comment among the pull request's others. */
 export const COMMENT_MARKER = "<!-- danwo:pr-comment -->"
@@ -87,7 +95,7 @@ function testCounts(reports: readonly TestReport[]): string {
 
   return [
     `${countOf(reports, (s) => s === "passed")} passed`,
-    `${countOf(reports, (s) => FAILED.has(s))} failed`,
+    `${countOf(reports, (s) => FAILED.has(s))} failed${verdictSplit(reports)}`,
     ...optional.filter(([, n]) => n > 0).map(([label, n]) => `${n} ${label}`),
   ].join(" · ")
 }
@@ -156,10 +164,13 @@ async function failureBlock(report: TestReport, cwd: string, links: CommentLinks
   const error = failing?.error
   const record = report.attempts.findLast((attempt) => attempt.record)?.record
   const where = error?.source ? ` (${error.source.file}:${error.source.line})` : ""
+  const verdict = report.attempts.at(-1)?.verdict
+  const whose = verdict ? ` · ${verdictText(verdict)}` : ""
 
   return [
-    `<details><summary>${STATUS_MARK[report.status] ?? ""} ${cell(report.id)}${error ? `: ${error.code}` : ""}</summary>`,
+    `<details><summary>${STATUS_MARK[report.status] ?? ""} ${cell(report.id)}${error ? `: ${error.code}` : ""}${whose}</summary>`,
     "",
+    ...(verdict ? [`- **Whose:** ${verdictText(verdict)}: ${cell(verdict.reason)}`] : []),
     ...(error
       ? [`- **Error:** \`${error.code}\` (${error.class}): ${cell(error.message)}${where}`]
       : []),

@@ -5,10 +5,13 @@
 import type { RunOutcome } from "@danwo/matrix"
 import {
   distinctFindings,
+  type FailureVerdict,
   type LintFinding,
   type MatrixRunReport,
   type TestReport,
   type TestRunReport,
+  VERDICT_LABELS,
+  verdictSummary,
 } from "@danwo/runner/runner"
 
 import { fileOfTestId, shown } from "./annotations.ts"
@@ -65,12 +68,30 @@ function recordsSection(link: RecordsLink, records: readonly [string, string][])
   ]
 }
 
+/** Whose failure it is, as a cell or a line shows it: "App bug (likely)". */
+export function verdictText(verdict: FailureVerdict | undefined): string {
+  if (verdict === undefined) return ""
+
+  const label = VERDICT_LABELS[verdict.verdict]
+
+  return verdict.confidence === "likely" ? `${label} (likely)` : label
+}
+
+/** The failed tests' verdicts split out, "(2 app bugs · 1 test issue)", or nothing. */
+export function verdictSplit(reports: readonly TestReport[]): string {
+  const split = verdictSummary(
+    reports.filter((r) => FAILED.has(r.status)).map((r) => r.attempts.at(-1)?.verdict),
+  )
+
+  return split === "" ? "" : ` (${split})`
+}
+
 function tally(reports: readonly TestReport[]): string {
   const count = (pick: (status: string) => boolean) =>
     reports.filter((report) => pick(report.status)).length
   const parts = [
     `${count((s) => s === "passed")} passed`,
-    `${count((s) => FAILED.has(s))} failed`,
+    `${count((s) => FAILED.has(s))} failed${verdictSplit(reports)}`,
     `${count((s) => s === "flaky")} flaky`,
     `${count((s) => s === "skipped")} skipped`,
   ]
@@ -83,8 +104,9 @@ function testRow(report: TestReport): string {
   const error = failing?.error
   const where = error?.source ? ` (${error.source.file}:${error.source.line})` : ""
   const failure = error ? `${error.code}: ${error.message}${where}` : ""
+  const whose = verdictText(report.attempts.at(-1)?.verdict)
 
-  return `| ${STATUS_MARK[report.status] ?? ""} | ${cell(report.id)} | ${report.attempts.length} | ${cell(failure)} |`
+  return `| ${STATUS_MARK[report.status] ?? ""} | ${cell(report.id)} | ${report.attempts.length} | ${cell(whose)} | ${cell(failure)} |`
 }
 
 /** The title line of a `danwo test` check. */
@@ -122,7 +144,12 @@ export function testSummary(run: TestRunReport, link: RecordsLink): string {
     `### danwo test: ${testTitle(run)} in ${seconds(run.durationMs)}`,
     ...(notable.length === 0
       ? []
-      : ["", "| | Test | Attempts | Failure |", "|---|---|---|---|", ...notable.map(testRow)]),
+      : [
+          "",
+          "| | Test | Attempts | Whose | Failure |",
+          "|---|---|---|---|---|",
+          ...notable.map(testRow),
+        ]),
     ...run.brokenFiles.map(
       (broken) => `\n❌ \`${broken.file}\` could not run: ${cell(broken.error)}`,
     ),
