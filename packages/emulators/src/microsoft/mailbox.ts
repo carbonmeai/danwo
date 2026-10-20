@@ -188,8 +188,8 @@ export function moveMessage(
   return moved
 }
 
-/** Removes a message for good. */
-function purgeMessage(state: GraphState, message: MessageRecord): void {
+/** Removes a message for good, as `permanentDelete` does: it skips Deleted Items. */
+export function purgeMessage(state: GraphState, message: MessageRecord): void {
   state.microsoft().messages.delete(message.id)
   recordChange(state, {
     owner: message.owner,

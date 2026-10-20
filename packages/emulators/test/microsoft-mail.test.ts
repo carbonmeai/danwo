@@ -246,6 +246,20 @@ describe("writing and sending mail", () => {
       code: "ErrorItemNotFound",
     })
   })
+
+  it("deletes a message for good with permanentDelete, skipping Deleted Items", async () => {
+    const client = graphClient(emulator, ADA, READ_WRITE)
+    const [briefing] = (
+      await client.api("/me/messages").filter("subject eq 'Morning briefing'").get()
+    ).value
+
+    await client.api(`/me/messages/${briefing.id}/permanentDelete`).post({})
+
+    expect(outlookMailbox(emulator, ADA).latest("deleteditems")?.id).not.toBe(briefing.id)
+    await expect(client.api(`/me/messages/${briefing.id}`).get()).rejects.toMatchObject({
+      statusCode: 404,
+    })
+  })
 })
 
 describe("the inbox delta", () => {

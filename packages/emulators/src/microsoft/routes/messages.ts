@@ -12,6 +12,7 @@ import {
   findFolder,
   mailFolders,
   moveMessage,
+  purgeMessage,
   updateMessage,
   wellKnownFolder,
 } from "../mailbox.ts"
@@ -155,6 +156,18 @@ export function messageRoutes(context: MicrosoftRouteContext): void {
     "Mail.ReadWrite",
     withMessage((c, _call, message) => {
       deleteMessage(context, message)
+
+      return c.body(null, 204)
+    }),
+  )
+
+  userRoute(
+    context,
+    "post",
+    "/messages/:id/permanentDelete",
+    "Mail.ReadWrite",
+    withMessage((c, _call, message) => {
+      purgeMessage(context, message)
 
       return c.body(null, 204)
     }),
