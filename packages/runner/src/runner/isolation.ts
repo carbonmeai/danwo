@@ -133,6 +133,8 @@ export class StartingPoint {
 
     this.#present.add(session)
     await this.#snapshot(sessionSlot(this.#base, session))
+    // A sign-in is kept in the middle of an attempt, which goes on changing the state after it.
+    this.#at = undefined
   }
 
   /** The slot `again` would restore for `session`: its kept sign-in, else the base, if kept. */

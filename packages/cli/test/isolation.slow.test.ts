@@ -39,7 +39,7 @@ afterAll(removeWorkCopies)
 async function run(
   files: readonly string[],
   env: NodeJS.ProcessEnv = {},
-): Promise<{ code: number; out: string; found: Record<string, Observed> }> {
+): Promise<{ code: number; out: string; found: Record<string, Observed>; setups: number }> {
   const state = await mkdtemp(join(tmpdir(), "danwo-isolation-"))
 
   try {
@@ -65,8 +65,11 @@ async function run(
     const found = Object.fromEntries(
       lines.map((line) => Observed.parse(JSON.parse(line))).map((seen) => [seen.test, seen]),
     )
+    const setups = (await readFile(join(state, "setups.jsonl"), "utf8").catch(() => ""))
+      .split("\n")
+      .filter(Boolean).length
 
-    return { code, out, found }
+    return { code, out, found, setups }
   } finally {
     await rm(state, { recursive: true, force: true })
   }
@@ -136,6 +139,44 @@ describe("isolation between tests", () => {
     expect(code, out).toBe(0)
     expect(stateOf(found, "a2")).toEqual(after(1))
     expect(stateOf(found, "b1")).toEqual(after(2))
+  }, 180_000)
+})
+
+/** What every test found: the member's tests start signed in (one customer more), the others not. */
+function expectSignedInOnlyAsMember(found: Record<string, Observed>) {
+  const { seeded } = seededIn(found)
+  const signedIn = { ...seeded, customers: seeded.customers + 1 }
+
+  expect(stateOf(found, "a2")).toEqual(seeded)
+  expect(stateOf(found, "b1")).toEqual(seeded)
+  expect(stateOf(found, "m1")).toEqual(signedIn)
+  expect(stateOf(found, "m2")).toEqual(signedIn)
+}
+
+describe("isolation with a saved session", () => {
+  for (const files of [
+    ["member.danwo.ts", "a.danwo.ts", "b.danwo.ts"],
+    ["a.danwo.ts", "member.danwo.ts", "b.danwo.ts"],
+  ]) {
+    it(`starts signed-out tests signed out after a signed-in file, in either order (${files.join(", ")})`, async () => {
+      const { code, out, found, setups } = await run(files)
+
+      expect(code, out).toBe(0)
+      expectSignedInOnlyAsMember(found)
+      // The member's sign-in is kept in a slot of its own and restored for its second test.
+      expect(setups).toBe(1)
+    }, 180_000)
+  }
+
+  it("signs the member in again for each test when the environment keeps a single snapshot", async () => {
+    const { code, out, found, setups } = await run(
+      ["member.danwo.ts", "a.danwo.ts", "b.danwo.ts"],
+      { FIXTURE_ONE_SLOT: "1" },
+    )
+
+    expect(code, out).toBe(0)
+    expectSignedInOnlyAsMember(found)
+    expect(setups).toBe(2)
   }, 180_000)
 })
 

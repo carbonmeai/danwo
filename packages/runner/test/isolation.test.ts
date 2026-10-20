@@ -103,8 +103,9 @@ describe("StartingPoint", () => {
     start.signedIn("ada")
     await start.keep("session", "ada")
     expect(start.holds("ada")).toBe(true)
+    // The attempt that signed in goes on after its sign-in is kept: the next test restores.
+    expect(start.untouched).toBe(false)
 
-    start.touch()
     await start.again()
     expect(start.holds("ada")).toBe(false)
 
