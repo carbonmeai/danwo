@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="Pocket notebooks, set of 3">
+  <rect width="400" height="400" fill="#ece8df"/>
+  <rect x="84" y="118" width="120" height="176" rx="6" fill="#b88e5f" transform="rotate(-10 144 206)"/>
+  <rect x="206" y="118" width="120" height="176" rx="6" fill="#a87c4f" transform="rotate(9 266 206)"/>
+  <rect x="146" y="108" width="120" height="176" rx="6" fill="#c9a171"/>
+  <rect x="166" y="140" width="80" height="22" rx="3" fill="#efe3cf"/>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="Hills print">
+  <rect width="400" height="400" fill="#e9e4da"/>
+  <rect x="80" y="60" width="240" height="280" fill="#fbf8f2"/>
+  <rect x="100" y="80" width="200" height="220" fill="#f6dccb"/>
+  <circle cx="246" cy="132" r="26" fill="#ef8a5b"/>
+  <path d="M100 236c40-40 70-46 100-20s60 10 100-24v108H100z" fill="#3e7b6b"/>
+  <path d="M100 262c50-28 90-30 120-10s50 12 80-4v52H100z" fill="#255848"/>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="Little mug">
+  <rect width="400" height="400" fill="#e3e7f1"/>
+  <ellipse cx="200" cy="292" rx="118" ry="16" fill="#cbd2e2"/>
+  <ellipse cx="200" cy="286" rx="104" ry="14" fill="#f2f4f8"/>
+  <path d="M252 206c30 0 38 14 38 30s-10 30-38 32" fill="none" stroke="#24427a" stroke-width="14" stroke-linecap="round"/>
+  <path d="M138 180h124v76c0 16-13 28-28 28h-68c-16 0-28-12-28-28z" fill="#2c4f8f"/>
+  <ellipse cx="200" cy="180" rx="62" ry="11" fill="#1c3566"/>
+  <path d="M150 196c6 26 6 52 0 74" stroke="#4d6fae" stroke-width="5" fill="none"/>
+</svg>

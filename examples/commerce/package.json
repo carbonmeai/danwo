@@ -1,0 +1,48 @@
+{
+  "name": "@danwo/example-commerce",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A small shop selling mugs, notebooks and prints: a Next.js storefront and admin, a Hono API, Postgres, and Stripe, Resend and S3, all emulated.",
+  "type": "module",
+  "scripts": {
+    "db": "docker compose up --detach --wait",
+    "db:down": "docker compose down",
+    "build": "next build web",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p web",
+    "test": "npm run build && danwo test",
+    "test:deterministic": "npm run build && danwo test tests/deterministic.danwo.ts",
+    "test:agentic": "npm run build && danwo test tests/agentic.danwo.ts",
+    "matrix": "npm run build && danwo matrix tests/deterministic.danwo.ts --grep \"pays for a mug\"",
+    "matrix:refund": "npm run build && danwo matrix tests/deterministic.danwo.ts --grep \"refunds an order\"",
+    "matrix:plan": "npm run build && danwo matrix tests/deterministic.danwo.ts --grep \"pays for a mug\" --plan",
+    "serve": "danwo serve"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1154.0",
+    "@hono/node-server": "2.1.5",
+    "drizzle-orm": "0.45.4",
+    "hono": "4.13.13",
+    "next": "16.4.2",
+    "pg": "8.23.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "resend": "6.34.1",
+    "stripe": "23.0.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@danwo/cli": "0.1.0-beta.0",
+    "@danwo/sdk": "0.1.0-beta.0",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "^24",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "drizzle-kit": "0.31.11",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

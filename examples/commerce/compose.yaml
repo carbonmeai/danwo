@@ -1,0 +1,14 @@
+# Postgres for the tests, on a port of its own so it never meets another Postgres on 5432.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "127.0.0.1:55432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 1s
+      timeout: 3s
+      retries: 30

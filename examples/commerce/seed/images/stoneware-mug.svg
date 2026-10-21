@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="Stoneware mug">
+  <rect width="400" height="400" fill="#efe6dc"/>
+  <ellipse cx="200" cy="318" rx="118" ry="16" fill="#d9cbbb"/>
+  <path d="M272 168c44 0 56 22 56 48s-16 50-58 54" fill="none" stroke="#6b4f3f" stroke-width="20" stroke-linecap="round"/>
+  <path d="M108 128h170v150c0 22-18 40-40 40h-90c-22 0-40-18-40-40z" fill="#7a5a47"/>
+  <path d="M108 128h170v34H108z" fill="#9c7a63"/>
+  <ellipse cx="193" cy="128" rx="85" ry="14" fill="#5a4033"/>
+  <path d="M128 190c10 40 10 80 0 110" stroke="#8d6b56" stroke-width="6" fill="none" opacity=".6"/>
+</svg>
