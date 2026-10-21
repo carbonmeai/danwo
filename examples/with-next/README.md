@@ -79,8 +79,20 @@ clean run passed; 16 faults planned
   double-submit on POST /api/join
 ```
 
-Drop `--plan` to run them; `npm run matrix` is the same command. Then open the dashboard over what
-the runs recorded:
+Drop `--plan` to run them; `npm run matrix` is the same command. Every trial passes:
+
+```text
+PASS  status 429 on POST api.resend.com/emails
+PASS  reset-after on POST api.resend.com/emails
+PASS  reset-after on INSERT signups (postgres)
+PASS  double-submit on POST /api/join
+        POST /api/join sent twice at once: 200 and 200
+  …
+faults: 16 passed
+17 runs in 32 s
+```
+
+Then open the dashboard over what the runs recorded:
 
 ```sh
 npx @danwo/cli serve
@@ -95,8 +107,9 @@ npx @danwo/cli serve
 | The `INSERT` was lost, or ran but its answer was lost | retries an upsert: one row per email, whichever happened                  |
 | The form is sent twice at once                        | both requests reach the same row and the same idempotency key: one email  |
 
-Remove the idempotency key in `lib/mail.ts` and `reset-after on POST api.resend.com/emails`
-fails: the retry sends a second welcome email, and the invariant counts two.
+To see it break, delete the `idempotencyKey` line in `lib/mail.ts` and run the matrix again. Two
+trials fail, `reset-after on POST api.resend.com/emails` and `double-submit on POST /api/join`,
+each with `expected [ … ] to have a length of 1 but got 2`: a second welcome email went out.
 
 ## Agent tests
 
