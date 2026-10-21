@@ -277,6 +277,18 @@ async function beginAttempt(isolated: boolean, session: string | undefined): Pro
   start?.touch()
 }
 
+/** How a `danwo test` task's attempts use the replay cache. */
+function replayUseOf(task: TestFileTask): ReplayUse {
+  if (task.cacheDir === undefined) return { kind: "none" }
+
+  return {
+    kind: "learn",
+    dir: task.cacheDir,
+    readOnly: task.cacheReadOnly ?? false,
+    replayOnly: task.replayOnly ?? false,
+  }
+}
+
 /** A test with its retries; every retry loads the file afresh. `isolated` restores before each. */
 async function runTest(
   task: TestFileTask,
@@ -285,15 +297,7 @@ async function runTest(
   isolated: boolean,
 ): Promise<TestReport> {
   const { env, workerIndex } = benchOrFail()
-  const replay: ReplayUse =
-    task.cacheDir === undefined
-      ? { kind: "none" }
-      : {
-          kind: "learn",
-          dir: task.cacheDir,
-          readOnly: task.cacheReadOnly ?? false,
-          replayOnly: task.replayOnly ?? false,
-        }
+  const replay = replayUseOf(task)
   const tries = 1 + (findDeclared(first, task.file, id).options.retries ?? task.retries)
   const attempts: AttemptReport[] = []
   let impact: TestImpact | undefined

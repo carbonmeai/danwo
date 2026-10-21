@@ -418,7 +418,7 @@ class SessionAgent implements Agent {
 
   private async step(call: ActCall): Promise<ActResult> {
     const { index, instruction, params, files } = call
-    const { steps, store } = this.options
+    const { store } = this.options
 
     if (this.divergence !== undefined) return this.skipped(this.divergence)
 
@@ -427,23 +427,12 @@ class SessionAgent implements Agent {
     const watch = await this.watchFor(call, key)
     const replayed = await this.replayRecording(key, params, files, watch)
 
-    if (replayed.ok) {
-      const models = store?.crossModel(replayed, "act") ?? {}
-
-      steps.cache(replayed.relocated ? "relocated" : "replayed", models)
-      this.checkApp(mark)
-
-      return { summary: "replayed the recording", modelCalls: 0, actions: replayed.actions }
-    }
+    if (replayed.ok) return this.replayed(replayed, mark)
 
     const miss = await this.missFor(key, replayed)
 
-    if (this.options.replayOnly === true) {
-      steps.cache(replayed.reason === undefined ? miss.mode : "diverged", divergedNote(miss))
-      throw new ReplayMissing("agent.act", this.options.vault.redact(instruction), missWhy(miss))
-    }
-
-    if (this.options.strict) return this.stopStrict(index, instruction, replayed.reason, miss)
+    if (this.options.replayOnly === true || this.options.strict)
+      return this.withoutModel(index, instruction, replayed.reason, miss)
 
     const result = await this.runModel(call, mark).catch((error: unknown) => {
       this.noteApp(mark)
@@ -458,6 +447,32 @@ class SessionAgent implements Agent {
       modelCalls: result.modelCalls,
       actions: result.recorded?.length ?? 0,
     }
+  }
+
+  /** A step whose recording replayed: noted, with the model that made it when another did. */
+  private replayed(replayed: Replayed & { ok: true }, mark: FailureMark | undefined): ActResult {
+    const models = this.options.store?.crossModel(replayed, "act")
+
+    this.options.steps.cache(replayed.relocated ? "relocated" : "replayed", models)
+    this.checkApp(mark)
+
+    return { summary: "replayed the recording", modelCalls: 0, actions: replayed.actions }
+  }
+
+  /**
+   * A step with no recording that replays, when no model may run it: under replay-only it fails,
+   * under strict replay it fails or stops the session's replay there.
+   */
+  private withoutModel(
+    index: number,
+    instruction: string,
+    reason: string | undefined,
+    miss: CacheNote,
+  ): ActResult {
+    if (this.options.replayOnly !== true) return this.stopStrict(index, instruction, reason, miss)
+
+    this.options.steps.cache(reason === undefined ? miss.mode : "diverged", divergedNote(miss))
+    throw new ReplayMissing("agent.act", this.options.vault.redact(instruction), missWhy(miss))
   }
 
   /** A step after a strict replay diverged does nothing. */

@@ -431,14 +431,20 @@ function replayOptions(setup: AttemptSetup): Partial<WebSessionOptions> {
 
   if (replay.kind === "none") return {}
 
-  const learner = replay.kind === "learn" ? replay : undefined
-  const readOnly = learner?.readOnly === true || learner?.replayOnly === true
-  const mode = readOnly ? "read-only" : "read-write"
-  const cache = { dir: replay.dir, mode, journey: setup.id } as const
+  if (replay.kind === "replay-only")
+    return {
+      cache: { dir: replay.dir, mode: "read-write", journey: setup.id },
+      replay: { mode: "strict-stop" },
+    }
 
-  if (replay.kind === "replay-only") return { cache, replay: { mode: "strict-stop" } }
+  const writes = replay.readOnly !== true && replay.replayOnly !== true
+  const cache = {
+    dir: replay.dir,
+    mode: writes ? "read-write" : "read-only",
+    journey: setup.id,
+  } as const
 
-  return learner?.replayOnly === true ? { cache, replay: { mode: "replay-only" } } : { cache }
+  return replay.replayOnly === true ? { cache, replay: { mode: "replay-only" } } : { cache }
 }
 
 /** Where the flight recorder keeps the attempt's screenshots, one after every step, and its video. */

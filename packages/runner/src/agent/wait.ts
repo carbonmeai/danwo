@@ -128,26 +128,8 @@ export async function waitStep(step: JudgedStep, context: WaitStepContext): Prom
       ? await missOf(store, key)
       : { mode: "handed-off", reason: recorded.reason }
 
-  if (context.replayOnly === true) {
-    const api = kind === "assert" ? "agent.assert" : "agent.waitFor"
-
-    context.cache(recorded.reason === undefined ? miss.mode : "diverged", {
-      ...(recorded.reason !== undefined && { reason: recorded.reason }),
-    })
-    throw new ReplayMissing(api, context.redact(condition), missWhy(miss))
-  }
-
-  if (context.strict) {
-    if (recorded.reason === undefined) {
-      context.cache(miss.mode, miss)
-      throw missError(step.index, condition, miss)
-    }
-
-    context.cache("diverged", { reason: recorded.reason })
-    context.diverge(recorded.reason)
-
-    return { replayed: false }
-  }
+  if (context.replayOnly === true || context.strict)
+    return withoutJudge(step, recorded, miss, context)
 
   const { verdict, page } = await judgeUntil(condition, context.judge(), context.poll)
 
@@ -159,6 +141,39 @@ export async function waitStep(step: JudgedStep, context: WaitStepContext): Prom
   const saved = await keep(key, step, verdict.evidence, page, context)
 
   context.cache(miss.mode, { ...miss, saved })
+
+  return { replayed: false }
+}
+
+/**
+ * A step with no evidence that shows, when no judge may decide it: under replay-only it fails;
+ * under strict replay it fails with no recording, and stops the session's replay with one.
+ */
+function withoutJudge(
+  step: JudgedStep,
+  recorded: { readonly reason: string | undefined },
+  miss: CacheNote,
+  context: WaitStepContext,
+): WaitResult {
+  const { reason } = recorded
+
+  if (context.replayOnly === true) {
+    const api = step.kind === "assert" ? "agent.assert" : "agent.waitFor"
+
+    context.cache(
+      reason === undefined ? miss.mode : "diverged",
+      reason === undefined ? {} : { reason },
+    )
+    throw new ReplayMissing(api, context.redact(step.condition), missWhy(miss))
+  }
+
+  if (reason === undefined) {
+    context.cache(miss.mode, miss)
+    throw missError(step.index, step.condition, miss)
+  }
+
+  context.cache("diverged", { reason })
+  context.diverge(reason)
 
   return { replayed: false }
 }
