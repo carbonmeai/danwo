@@ -7,6 +7,7 @@
 import type { ChildProcess } from "node:child_process"
 
 import { spawnOwned } from "../support/children.ts"
+import { checkRouting, routingRefusal, unroutedProblems } from "./app-checks.ts"
 import type { ProcessLog, WorkerEnvironment } from "./environment.ts"
 import {
   type Service,
@@ -217,9 +218,24 @@ export async function appEnvironment(
   const { app } = options
   let started: StartedApp | undefined
 
+  const strict = options.unmatched === "block"
+  let notes: string[] = []
+
   try {
-    if (typeof app === "object") started = await startApp(app, services.proxy.env())
+    if (typeof app === "object")
+      started = await startApp(app, services.proxy.env(process.env, { requireProxy: strict }))
   } catch (error) {
+    /* An app process that exited at start because it missed the proxy: say so, not only "exited". */
+    const problems = await unroutedProblems(services.proxy)
+
+    await services.close()
+    throw problems.length === 0 ? error : new Error(routingRefusal(problems), { cause: error })
+  }
+
+  try {
+    notes = await checkRouting(services.proxy, strict)
+  } catch (error) {
+    await started?.stop()
     await services.close()
     throw error
   }
@@ -239,6 +255,7 @@ export async function appEnvironment(
 
       return exit === undefined ? [] : [`the app ${exit}`]
     },
+    notes: () => notes,
     state: () => services.state(),
     async close() {
       await started?.stop()

@@ -5,7 +5,13 @@
  * owned by the run (stopped with it, whatever happens) and have their output in the flight record.
  */
 
-import { liveKeyWarnings, preloadWarnings } from "./app-checks.ts"
+import {
+  checkRouting,
+  liveKeyWarnings,
+  preloadWarnings,
+  routingRefusal,
+  unroutedProblems,
+} from "./app-checks.ts"
 import { type AppCommand, type StartedApp, startApp } from "./app-environment.ts"
 import type { WorkerEnvironment } from "./environment.ts"
 import {
@@ -46,6 +52,8 @@ export interface StackEnvironmentOptions extends UnroutedHosts {
   /**
    * Live-looking provider keys an app would use against providers this run does not emulate:
    * `warn` (default) prints a warning per key (names only), `fail` refuses to start, `ignore`.
+   * `fail`, like `unmatched: "block"`, also refuses a run with an app process whose calls miss
+   * the proxy (one on a Node the preload cannot route); otherwise that is a warning.
    */
   readonly secrets?: "warn" | "fail" | "ignore"
   /**
@@ -100,6 +108,14 @@ function report(warnings: readonly string[], mode: StackEnvironmentOptions["secr
   for (const warning of warnings) process.stderr.write(`danwo: ${warning}\n`)
 }
 
+/**
+ * Whether nothing may reach a real provider in this run, so an app process that misses the proxy
+ * refuses the run instead of warning.
+ */
+function strictRouting(options: StackEnvironmentOptions): boolean {
+  return options.unmatched === "block" || options.secrets === "fail"
+}
+
 /** What starting one app of the stack needs to know about the rest. */
 interface StackContext {
   readonly options: StackEnvironmentOptions
@@ -112,7 +128,10 @@ interface StackContext {
 async function startOne(app: StackApp, context: StackContext): Promise<StartedApp> {
   const { options, services } = context
   const env = ownEnv(app, context.urls)
-  const proxyEnv = services.proxy.env(process.env, { nodeShim: options.nodeShim ?? true })
+  const proxyEnv = services.proxy.env(process.env, {
+    nodeShim: options.nodeShim ?? true,
+    requireProxy: strictRouting(options),
+  })
 
   report(
     await liveKeyWarnings({
@@ -161,6 +180,48 @@ function stoppedApps(started: ReadonlyMap<string, StartedApp>): string[] {
   })
 }
 
+/** Stops the started apps, the last started first. */
+async function stopApps(started: ReadonlyMap<string, StartedApp>): Promise<void> {
+  for (const app of [...started.values()].toReversed()) await app.stop()
+}
+
+/**
+ * Starts every app in `order` into `started` and checks how they run behind the proxy, returning
+ * the warnings for the run's notes. On any failure it stops what it started and the services.
+ */
+async function startAll(
+  order: readonly (readonly StackApp[])[],
+  context: StackContext,
+  started: Map<string, StartedApp>,
+): Promise<string[]> {
+  const { options, services } = context
+
+  try {
+    for (const batch of order)
+      await Promise.all(
+        batch.map(async (app) => started.set(app.name, await startOne(app, context))),
+      )
+  } catch (error) {
+    /* An app process that exited at start because it missed the proxy: say so, not only "exited". */
+    const problems = await unroutedProblems(services.proxy)
+
+    await stopApps(started)
+    await services.close()
+    throw problems.length === 0 ? error : new Error(routingRefusal(problems), { cause: error })
+  }
+
+  try {
+    return [
+      ...(await checkRouting(services.proxy, strictRouting(options))),
+      ...(await preloadCheck(started, services)),
+    ]
+  } catch (error) {
+    await stopApps(started)
+    await services.close()
+    throw error
+  }
+}
+
 /**
  * A worker environment for a stack of apps: the services behind one proxy, every app started
  * through it in `dependsOn` order, and the lifecycle `danwo matrix` needs. Apps keep running
@@ -177,26 +238,8 @@ export async function stackEnvironment(
   const services = await startServices(serviceList, unroutedOf(options))
   const urls: StackUrls = Object.fromEntries(options.apps.map((app) => [app.name, app.url]))
   const started = new Map<string, StartedApp>()
-  const warnings: string[] = []
-
-  const stopAll = async () => {
-    for (const app of [...started.values()].toReversed()) await app.stop()
-  }
-
-  try {
-    for (const batch of order)
-      await Promise.all(
-        batch.map(async (app) =>
-          started.set(app.name, await startOne(app, { options, services, serviceList, urls })),
-        ),
-      )
-
-    warnings.push(...(await preloadCheck(started, services)))
-  } catch (error) {
-    await stopAll()
-    await services.close()
-    throw error
-  }
+  const stopAll = () => stopApps(started)
+  const warnings = await startAll(order, { options, services, serviceList, urls }, started)
 
   const browserApp = options.baseUrl ?? options.apps[0]?.name ?? ""
 

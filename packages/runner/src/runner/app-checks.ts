@@ -1,8 +1,9 @@
 /**
- * Two things worth knowing once an app has started behind the proxy: whether each of its Node
+ * Three things worth knowing once an app has started behind the proxy: whether each of its Node
  * processes loaded danwo's preload (a start script that sets its own NODE_OPTIONS drops it, and
- * then SDKs with their own agents skip the proxy), and whether its environment still holds real
- * provider keys that would reach real providers. Neither check prints a value.
+ * then SDKs with their own agents skip the proxy), whether the processes that loaded it really go
+ * through the proxy (the preload's start-up probe says), and whether its environment still holds
+ * real provider keys that would reach real providers. None of the checks prints a value.
  */
 import { execFile } from "node:child_process"
 import { readFile } from "node:fs/promises"
@@ -71,15 +72,50 @@ function isNode(command: string): boolean {
  * as warnings naming each one and the fix.
  */
 export async function preloadWarnings(app: string, root: number, proxy: Proxy): Promise<string[]> {
-  const preloaded = new Set(await proxy.preloaded())
+  /* A process that loaded the preload but missed the proxy is `unroutedProblems`'s to report. */
+  const accounted = new Set([
+    ...(await proxy.preloaded()),
+    ...(await proxy.unrouted()).map((row) => row.pid),
+  ])
   const missing = familyOf(await processTable(), root).filter(
-    (row) => isNode(row.command) && !preloaded.has(row.pid),
+    (row) => isNode(row.command) && !accounted.has(row.pid),
   )
 
   return missing.map(
     (row) =>
       `${app}: process ${row.pid} (${row.command.slice(0, 80)}) runs without danwo's preload, so SDKs with their own HTTP agent call real hosts. Its start script likely sets NODE_OPTIONS itself: run it through PATH's node (danwo's shim is on PATH), or append danwo's NODE_OPTIONS ("NODE_OPTIONS=\\"$NODE_OPTIONS --max-old-space-size=…\\"").`,
   )
+}
+
+/**
+ * The app processes whose calls the preload found do not reach the proxy, one line each naming
+ * the process, its Node and what missed. Empty when every process that loaded the preload is
+ * routed.
+ */
+export async function unroutedProblems(proxy: Proxy): Promise<string[]> {
+  return (await proxy.unrouted()).map((row) =>
+    `process ${row.pid}${row.command === "" ? "" : ` (node ${row.command.slice(0, 80)})`} runs Node ${row.node}, and its calls do not go through danwo's proxy (${row.missed.join(", ")} missed it), so they would reach the real providers. ${row.fix}`.trimEnd(),
+  )
+}
+
+/**
+ * Refuses the run when an app process does not go through the proxy and the run's settings say
+ * nothing may reach a real provider (`unmatched: "block"`, or `secrets: "fail"`); otherwise
+ * prints each problem and returns them, for the run's notes.
+ */
+export async function checkRouting(proxy: Proxy, strict: boolean): Promise<string[]> {
+  const problems = await unroutedProblems(proxy)
+
+  if (problems.length === 0) return []
+  if (strict) throw new Error(routingRefusal(problems))
+  for (const problem of problems) process.stderr.write(`danwo: ${problem}\n`)
+
+  return problems
+}
+
+/** The error a run that refuses unrouted app processes fails with. */
+export function routingRefusal(problems: readonly string[]): string {
+  return `danwo refuses the run, because an app process does not go through its proxy:\n${problems.join("\n")}`
 }
 
 /** A provider's live key, by the shape of its value (and, where shapes are shared, its name). */

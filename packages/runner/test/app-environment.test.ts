@@ -143,3 +143,37 @@ describe("appEnvironment", () => {
     ).rejects.toThrow("exited with code 3")
   })
 })
+
+describe("an app process that misses the proxy", () => {
+  /* NO_PROXY naming every host sends the app's calls around the proxy, as an old Node would. */
+  const unrouted = { NO_PROXY: "*", no_proxy: "*" }
+
+  it("refuses the run while unmatched hosts are blocked, naming the process and its Node", async () => {
+    await expect(
+      appEnvironment({ app: await appCommand(unrouted), unmatched: "block" }),
+    ).rejects.toThrow(
+      new RegExp(`danwo refuses the run.*\\nprocess \\d+ .*runs Node ${process.version}`),
+    )
+  }, 30_000)
+
+  it("refuses a stack's run when live secrets fail it", async () => {
+    await expect(
+      stackEnvironment({
+        apps: [{ name: "web", ...(await appCommand(unrouted)) }],
+        secrets: "fail",
+      }),
+    ).rejects.toThrow(`runs Node ${process.version}`)
+  }, 30_000)
+
+  it("otherwise runs, with the problem in the run's notes", async () => {
+    const env = await appEnvironment({ app: await appCommand(unrouted) })
+
+    try {
+      expect(env.notes?.()).toEqual([
+        expect.stringMatching(/do not go through danwo's proxy .*would reach the real providers/),
+      ])
+    } finally {
+      await env.close()
+    }
+  }, 30_000)
+})
