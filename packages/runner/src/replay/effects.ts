@@ -85,6 +85,30 @@ export function pageDescriptions(tree: string): string[] {
   })
 }
 
+/** Roles a live region reads out, which a framework's route announcer takes. */
+const LIVE_ROLES = new Set(["alert", "status", "log"])
+
+/**
+ * The descriptions without what a framework announced on its own: a live region (`alert`,
+ * `status`, `log`) whose text is the page's title or what its route announcer holds. A router fills
+ * its announcer some time after a client-side navigation, so whether a view has it is a race.
+ */
+export function withoutAnnouncements(
+  descriptions: readonly string[],
+  announced: readonly string[],
+): string[] {
+  const texts = announced
+    .map((text) => clip(text.replace(/\s+/g, " ").trim()))
+    .filter((text) => text !== "")
+  const said = new Set(
+    [...LIVE_ROLES].flatMap((role) =>
+      texts.flatMap((text) => [`${role} ${JSON.stringify(text)}`, `${role}: ${text}`]),
+    ),
+  )
+
+  return descriptions.filter((description) => !said.has(description))
+}
+
 /** What may not be recorded as an effect: run-to-run text and the step's own values. */
 export interface EffectFilter {
   /** Values that differ between runs: the step's params, codes read from mail, secrets. */

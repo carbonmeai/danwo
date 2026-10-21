@@ -12,7 +12,12 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import type { Backend, BackendEvent } from "../src/browser/readiness.ts"
 import { openWebSession, type WebSession, type WebSessionOptions } from "../src/index.ts"
-import { backendMismatch, pageDescriptions, pageEffect } from "../src/replay/effects.ts"
+import {
+  backendMismatch,
+  pageDescriptions,
+  pageEffect,
+  withoutAnnouncements,
+} from "../src/replay/effects.ts"
 import { serveHtml, type HtmlServer } from "./fixtures/html-server.ts"
 import { type Move, ref, scripted } from "./fixtures/scripted.ts"
 
@@ -32,6 +37,34 @@ const app = {
   /** Make the provider call this long after the save, as a queued job would. */
   lateMs: 0,
   calls: [] as BackendEvent[],
+  /** How long the route announcer takes to fill after a navigation; never when negative. */
+  announceMs: 100,
+}
+
+/**
+ * A page that navigates on the client, with a route announcer as Next.js adds one: a custom
+ * element whose shadow root holds an `alert`, filled with the title some time after.
+ */
+function routedPage(announceMs: number): string {
+  return `<!doctype html><title>Home</title><h1>Home</h1>
+<a href="/routed/notes" id="go">All notes</a>
+<next-route-announcer></next-route-announcer>
+<script>
+const host = document.querySelector("next-route-announcer")
+const region = document.createElement("div")
+region.setAttribute("role", "alert")
+region.setAttribute("aria-live", "assertive")
+region.id = "__next-route-announcer__"
+region.style.cssText = "position:absolute;width:1px;height:1px;overflow:hidden"
+host.attachShadow({ mode: "open" }).append(region)
+document.getElementById("go").addEventListener("click", (event) => {
+  event.preventDefault()
+  history.pushState({}, "", "/routed/notes")
+  document.querySelector("h1").textContent = "All notes"
+  document.title = "Acme Notes"
+  if (${announceMs} >= 0) setTimeout(() => { region.textContent = document.title }, ${announceMs})
+})
+</script>`
 }
 
 const PAGE = `<!doctype html><title>Notes</title><h1>Notes</h1>
@@ -76,6 +109,7 @@ let dir: string
 beforeAll(async () => {
   site = await serveHtml((url) => {
     if (url.pathname === "/") return PAGE
+    if (url.pathname.startsWith("/routed")) return routedPage(app.announceMs)
     if (url.pathname === "/api/add")
       return {
         status: 200,
@@ -101,6 +135,7 @@ beforeEach(async () => {
     fault: null,
     lateMs: 0,
     calls: [],
+    announceMs: 100,
   })
 })
 
@@ -284,6 +319,60 @@ describe("replayed effects", () => {
 
     expect(replayed).toBeUndefined()
   }, 60_000)
+})
+
+const OPEN: readonly Move[] = [(view) => ["click", { ref: ref(view, "link", "All notes") }]]
+
+/** Opens all notes on the routed page, and how the step went. */
+async function openNotes(options: Partial<WebSessionOptions>) {
+  const session = await openWebSession({
+    baseUrl: site.url,
+    backend,
+    assertionTimeout: 2_000,
+    cache: { dir, mode: "read-write", journey: "routed" },
+    ...options,
+  })
+
+  try {
+    await session.app.open("/routed")
+    await session.agent.act("open all notes")
+    await session.expect(session.screen.getByRole("heading")).toHaveText("All notes")
+
+    const step = session.flight.steps().find((s) => s.api === "agent.act")
+
+    return { cache: step?.cache, divergence: session.divergence() }
+  } finally {
+    await session.close()
+  }
+}
+
+describe("route announcers", () => {
+  it("never records what the router announced, so a replay it announces later in matches", async () => {
+    await openNotes({ model: scripted(OPEN) })
+
+    const recorded = JSON.parse(await recording())
+
+    expect(recorded.effects.page.appeared).toContain('heading "All notes"')
+    expect(JSON.stringify(recorded.effects)).not.toContain("alert")
+
+    app.announceMs = -1
+
+    const replayed = await openNotes({ replay: { mode: "strict-stop" } })
+
+    expect(replayed.divergence).toBeUndefined()
+    expect(replayed.cache).toEqual({ mode: "replayed" })
+  }, 60_000)
+
+  it("drops live regions holding the title or the announcer's text, and keeps other alerts", () => {
+    const descriptions = ["alert: Acme Notes", 'status "Acme Notes"', "alert: Card declined"]
+
+    expect(withoutAnnouncements(descriptions, ["Acme  Notes ", ""])).toEqual([
+      "alert: Card declined",
+    ])
+    expect(withoutAnnouncements(['heading "Acme Notes"'], ["Acme Notes"])).toEqual([
+      'heading "Acme Notes"',
+    ])
+  })
 })
 
 describe("effects", () => {

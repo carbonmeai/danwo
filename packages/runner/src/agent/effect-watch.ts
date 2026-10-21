@@ -11,6 +11,8 @@
  */
 import { setTimeout as sleep } from "node:timers/promises"
 
+import type { Page } from "playwright-core"
+
 import type { BackendActivity, BackendEvent } from "../browser/readiness.ts"
 import type { Tabs } from "../browser/tabs.ts"
 import type { EffectsEvent } from "../record/steps.ts"
@@ -21,6 +23,7 @@ import {
   pageDescriptions,
   pageEffect,
   pageMismatch,
+  withoutAnnouncements,
 } from "../replay/effects.ts"
 import { viewPage } from "../snapshot/view.ts"
 
@@ -37,6 +40,33 @@ const POLL_MS = 150
 const STILL_MS = 600
 /** The longest it waits for that, for a backend that never stops (a poll, a heartbeat). */
 const STILL_CAP_MS = 3_000
+
+/**
+ * The route announcers frameworks add to every page: an element that reads the new page's title
+ * out after a client-side navigation. What they hold is never a step's effect.
+ */
+const ANNOUNCERS = [
+  "next-route-announcer",
+  "#__next-route-announcer__",
+  "#gatsby-announcer",
+  "#svelte-announcer",
+  ".nuxt-route-announcer",
+]
+
+/** The page's title and the text of its route announcers; none when the page cannot be read. */
+async function announcements(page: Page, redact: (text: string) => string): Promise<string[]> {
+  const texts = await page
+    .evaluate((selectors) => {
+      const found = [...document.querySelectorAll(selectors.join(","))].map(
+        (element) => (element.shadowRoot ?? element).textContent ?? "",
+      )
+
+      return [document.title, ...found]
+    }, ANNOUNCERS)
+    .catch((): string[] => [])
+
+  return texts.map(redact)
+}
 
 /** Where a step's effects are read from, for the whole session. */
 export type EffectSources = EffectCommon &
@@ -125,13 +155,17 @@ export class EffectWatch {
     return new EffectWatch(sources, { before, mark: markOf(sources.activity), session })
   }
 
+  /**
+   * The page's elements, without what its route announcer said. The announcer is read after the
+   * view, since it fills in late: text it gained in between is left out all the same.
+   */
   private static async page(sources: EffectSources): Promise<string[]> {
-    const tree =
-      "tree" in sources
-        ? await sources.tree()
-        : (await viewPage(sources.tabs.page, sources.redact)).tree
+    if ("tree" in sources) return pageDescriptions(await sources.tree())
 
-    return pageDescriptions(tree)
+    const { page } = sources.tabs
+    const descriptions = pageDescriptions((await viewPage(page, sources.redact)).tree)
+
+    return withoutAnnouncements(descriptions, await announcements(page, sources.redact))
   }
 
   private now(): BackendActivity {
