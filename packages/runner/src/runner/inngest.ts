@@ -16,6 +16,13 @@ import {
 } from "@danwo/proxy"
 
 import { type OwnedChild, spawnOwned } from "../support/children.ts"
+import { cronDue } from "./cron.ts"
+import {
+  invokeFunction,
+  type RegisteredFunction,
+  registeredFunctions,
+  runTriggers,
+} from "./inngest-dev-api.ts"
 import type { Service } from "./services.ts"
 
 /** The host the apps send Inngest events to; the proxy routes it to the dev server. */
@@ -174,26 +181,6 @@ async function runsOf(url: string, event: string): Promise<ListedRun[]> {
   }
 }
 
-/** The dev server's GraphQL query for what every function it has registered is triggered by. */
-const TRIGGERS_QUERY = "{ functions { triggers { type value } } }"
-
-/** The event names (`*` a wildcard) the functions in a `TRIGGERS_QUERY` answer are triggered by. */
-function eventTriggers(answer: unknown): string[] | undefined {
-  const functions = fieldOf(fieldOf(answer, "data"), "functions")
-
-  if (!Array.isArray(functions)) return undefined
-
-  return functions.flatMap((fn: unknown) => {
-    const triggers = fieldOf(fn, "triggers")
-
-    return (Array.isArray(triggers) ? triggers : []).flatMap((trigger: unknown) => {
-      const value = fieldOf(trigger, "value")
-
-      return fieldOf(trigger, "type") === "EVENT" && typeof value === "string" ? [value] : []
-    })
-  })
-}
-
 /** Whether `pattern`, an event trigger, starts a run for an event called `name`; `*` is a wildcard. */
 function triggeredBy(pattern: string, name: string): boolean {
   if (!pattern.includes("*")) return pattern === name
@@ -208,22 +195,21 @@ function triggeredBy(pattern: string, name: string): boolean {
  * has registered; undefined when it cannot say (a dev server without the query, no functions
  * registered yet, no answer). A function whose trigger has a condition still counts as listening.
  */
-async function listeners(url: string): Promise<((name: string) => boolean) | undefined> {
-  try {
-    const response = await fetch(new URL("/v0/gql", url), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ query: TRIGGERS_QUERY }),
-      signal: AbortSignal.timeout(1_000),
-    })
-    const patterns = response.ok ? eventTriggers(await response.json()) : undefined
+async function listeners(registry: Registry): Promise<((name: string) => boolean) | undefined> {
+  const patterns = (await registry())?.flatMap((fn) => fn.events)
 
-    if (patterns === undefined || patterns.length === 0) return undefined
+  if (patterns === undefined || patterns.length === 0) return undefined
 
-    return (name) => patterns.some((pattern) => triggeredBy(pattern, name))
-  } catch {
-    return undefined
-  }
+  return (name) => patterns.some((pattern) => triggeredBy(pattern, name))
+}
+
+/** The dev server's registered functions, asked for once, when first needed. */
+type Registry = () => Promise<readonly RegisteredFunction[] | undefined>
+
+function registryOf(url: string): Registry {
+  let asked: Promise<RegisteredFunction[] | undefined> | undefined
+
+  return () => (asked ??= registeredFunctions(url))
 }
 
 /** An event sent through the proxy: the id the dev server gave it, and its name when readable. */
@@ -236,7 +222,7 @@ interface SentEvent {
  * For one settle: the events sent so far that no registered function listens to, given the runs
  * listed. The dev server is asked for its functions once, when an event first shows no run.
  */
-function unheardEvents(url: string) {
+function unheardEvents(registry: Registry) {
   const unheard = new Set<string>()
   let listening: Promise<((name: string) => boolean) | undefined> | undefined
 
@@ -245,7 +231,7 @@ function unheardEvents(url: string) {
 
     if (runless.length === 0) return unheard
 
-    listening ??= listeners(url)
+    listening ??= listeners(registry)
 
     const listened = await listening
 
@@ -369,6 +355,36 @@ function stillWaiting(
   })
 }
 
+/** How much earlier than a moment noted here the dev server may have queued a run, by its clock. */
+const CLOCK_SLACK_MS = 1_000
+
+/** Runs of one function that settling expects although no app's event started them. */
+interface ExpectedRuns {
+  readonly functionId: string
+  /** When they were started, give or take `CLOCK_SLACK_MS`. */
+  readonly since: number
+  readonly count: number
+}
+
+/** The events the dev server started `expected`'s runs with, one per run it has queued so far. */
+function startedBy(url: string, expected: ExpectedRuns): Promise<string[]> {
+  return runTriggers(url, expected.functionId, expected.since)
+}
+
+/**
+ * `listed`'s runs, each named by its function's slug: the dev server lists a run by its own id for
+ * the function.
+ */
+async function named(registry: Registry, listed: readonly ListedRun[]): Promise<InngestRun[]> {
+  const functions = listed.length > 0 ? await registry() : undefined
+  const slugs = new Map(functions?.map((fn) => [fn.id, fn.slug]))
+
+  return listed.map(({ run }) => ({
+    ...run,
+    functionId: slugs.get(run.functionId) || run.functionId,
+  }))
+}
+
 /** `event` with its `ts` moved `ms` earlier, when it has one. */
 function earlier(event: unknown, ms: number): unknown {
   const ts = fieldOf(event, "ts")
@@ -427,6 +443,25 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
   const owned = await startDevServer(options, url)
   let proxy: Proxy | undefined
   let runs: InngestRun[] = []
+  /** Runs started since the last reset that no app's event started: cron functions travel invoked. */
+  let expected: ExpectedRuns[] = []
+
+  /**
+   * After the apps' clocks have moved `ms` ahead, runs each cron function that fell due on the
+   * way, once, at the new time, as a dev server left asleep runs its cron functions when it wakes.
+   */
+  const travel = async (ms: number) => {
+    const to = Date.now() + (proxy?.clock.offset() ?? ms)
+    const due = ((await registeredFunctions(url)) ?? []).filter((fn) =>
+      fn.crons.some((cron) => cronDue(cron, to - ms, to)),
+    )
+
+    for (const fn of due) {
+      const since = Date.now() - CLOCK_SLACK_MS
+
+      if (await invokeFunction(url, fn.slug)) expected.push({ functionId: fn.id, since, count: 1 })
+    }
+  }
 
   /**
    * Events sent through the proxy since the last reset, which clears the proxy's log, each with
@@ -472,17 +507,22 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
    * finished once it has sent no checkpoint for a while and no app's call through the proxy is
    * still waiting for its answer. An event no registered function listens
    * to is not given that time: the dev server is asked, once, when such an event first shows.
+   * Runs no app's event started (a cron function a time travel invoked) are found through the
+   * events the dev server started them with, and waited for the same way.
    */
   const settle = async () => {
     const deadline = Date.now() + (options.settleTimeoutMs ?? 30_000)
     const firstSeen = new Map<string, number>()
-    const unheard = unheardEvents(url)
+    const registry = registryOf(url)
+    const unheard = unheardEvents(registry)
 
     for (;;) {
       const sent = sentEvents()
-      const events = sent.map(({ id }) => id)
+      const found = await Promise.all(expected.map((runs) => startedBy(url, runs)))
+      const events = [...new Set([...sent.map(({ id }) => id), ...found.flat()])]
 
       for (const { id, at } of sent) if (!firstSeen.has(id)) firstSeen.set(id, at)
+      markSeen(firstSeen, events)
 
       const listed = (await Promise.all(events.map((event) => runsOf(url, event)))).flat()
 
@@ -490,11 +530,17 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
         firstSeen,
         listed.map(({ run }) => run.runId),
       )
-      runs = listed.map(({ run }) => run)
+      runs = await named(registry, listed)
 
       const nobody = await unheard(sent, listed)
+      const missing = expected.some(
+        (runs, n) => (found[n]?.length ?? 0) < runs.count && Date.now() - runs.since < NO_RUNS_MS,
+      )
 
-      if (!stillWaiting(events, listed, firstSeen, lastCheckpoints(), nobody, appCallOpen()))
+      if (
+        !missing &&
+        !stillWaiting(events, listed, firstSeen, lastCheckpoints(), nobody, appCallOpen())
+      )
         return waitedFor(events, runs)
       if (Date.now() > deadline)
         throw new Error(
@@ -512,9 +558,11 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
       proxy = attached
     },
     settle,
+    travel,
     state: () => ({ runs }),
     async reset() {
       runs = []
+      expected = []
     },
     async close() {
       await owned?.stop()

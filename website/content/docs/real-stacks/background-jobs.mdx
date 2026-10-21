@@ -99,10 +99,30 @@ record lists every run under `inngest`, with its function, status and duration.
 
 ## After time travel
 
-[`time.travel`](/docs/time-travel) moves your apps' clocks, so the Inngest SDK stamps each event
-days ahead. The dev server runs on real time, so the proxy moves every event's timestamp back
-before it arrives, and the runs it starts begin at once. A `step.sleep` still sleeps in real time:
-start a job from a provider's webhook instead, such as Stripe's trial-ending notice.
+[`time.travel`](/docs/time-travel) moves your apps' clocks, and Inngest keeps up:
+
+- **Cron functions.** Each one that falls due on the way runs once, at the new time, the way a
+  dev server left asleep catches up when it wakes. `settle()` waits for that run and for the runs
+  its events start.
+- **Events.** An event your app sends after the jump runs at once. The SDK stamps it with the
+  app's clock, days ahead, and the dev server would otherwise hold it until real time caught up.
+
+```ts title="tests/digest.danwo.ts"
+test("sends the digest at nine", async ({ app, screen, expect, time }) => {
+  await app.open("/digests/new")
+  // …schedule it for tomorrow at 09:00…
+
+  await time.travel({ days: 1 })
+  await app.open("/digests")
+  await expect(screen.getByRole("row", { name: /Weekly notes/ })).toContainText("Sent")
+})
+```
+
+<Callout type="warn">
+  A run already asleep in `step.sleep` or `step.sleepUntil` still wakes at real time: the dev server
+  keeps its own clock. For work you schedule, store when it is due and let a cron function pick it
+  up, or start the job from a provider's webhook, such as Stripe's trial-ending notice.
+</Callout>
 
 ## Break the sends
 

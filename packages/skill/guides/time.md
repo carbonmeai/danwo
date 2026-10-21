@@ -60,6 +60,9 @@ tool. Each jump it takes is recorded, so a replay travels the same way with no m
 
 - **Node apps:** through the preload in `NODE_OPTIONS`.
 - **Bun apps:** through `BUN_OPTIONS`.
+- **Inngest:** with `inngestService`, each cron function that falls due on the way runs once at
+  the new time, and events sent after the jump run at once. A run already asleep in `step.sleep`
+  or `step.sleepUntil` still wakes at real time.
 - **Apps in other languages** see the page's clock and the emulators move, but not their own
   `Date`. Tools such as libfaketime can shift a process's clock.
 - **Environments without `travel`.** The service environments (`stripeEnvironment`,

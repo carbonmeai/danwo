@@ -213,6 +213,9 @@ describe("Inngest", () => {
 
       req.on("data", (chunk: Buffer) => (text += chunk.toString()))
       req.on("end", () => {
+        /* Travel asks the GraphQL API for cron functions; this dev server has none. */
+        if (req.url === "/v0/gql") return json(res, { data: { functions: [] } })
+
         received.push(JSON.parse(text))
         json(res, { ids: ["evt_1"] })
       })
