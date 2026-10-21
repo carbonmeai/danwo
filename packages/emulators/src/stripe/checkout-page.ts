@@ -87,6 +87,8 @@ export interface PayPage {
   readonly card?: string
   /** Why the last attempt to pay failed, e.g. `Your card was declined.` */
   readonly error?: string
+  /** A setup-mode session: the card is saved for later, and nothing is charged. */
+  readonly setup?: boolean
 }
 
 /**
@@ -108,16 +110,21 @@ export function renderPayPage(view: PayPage): string {
     ? `<p class="error" role="alert" data-testid="checkout-error">${escapeHtml(view.error)}</p>\n`
     : ""
 
-  return page(
-    "Checkout",
-    `<h1>Pay danwo</h1>
+  const order = view.setup
+    ? `<h1>Save a card</h1>
+<p class="note">Test mode: the card is saved for future payments, and nothing is charged now.</p>`
+    : `<h1>Pay danwo</h1>
 <p class="note">Test mode: no real card is charged.</p>
 <ul aria-label="Order">${lines}</ul>
-<div class="total"><span>Total due</span><span data-testid="checkout-total">${money(view.total)}</span></div>
+<div class="total"><span>Total due</span><span data-testid="checkout-total">${money(view.total)}</span></div>`
+
+  return page(
+    "Checkout",
+    `${order}
 <form method="post" action="/checkout/${escapeHtml(view.sessionId)}/complete">
 <label>Email <input name="email" type="email" value="${escapeHtml(view.email ?? "")}" autocomplete="email"></label>
 <label>Card number <input name="card" value="${escapeHtml(view.card ?? "4242 4242 4242 4242")}" inputmode="numeric" autocomplete="cc-number"></label>
-${error}<button type="submit" data-testid="checkout-pay">Pay ${money(view.total)}</button>
+${error}<button type="submit" data-testid="checkout-pay">${view.setup ? "Save card" : `Pay ${money(view.total)}`}</button>
 </form>
 ${cancel}`,
   )

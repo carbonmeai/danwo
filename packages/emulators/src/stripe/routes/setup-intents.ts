@@ -146,6 +146,50 @@ function confirmSetup(
   )
 }
 
+/**
+ * Saves `method` for `customer` through a new SetupIntent, as a setup-mode Checkout Session does
+ * when the payer presses Save: the intent and the card as they end up, or the decline. A card that
+ * asks for 3D Secure counts as authenticated, as the hosted page completes the challenge itself.
+ */
+export function saveCardForCheckout(
+  context: StripeRouteContext,
+  fields: {
+    readonly customer: string | null
+    readonly method: PaymentMethod
+    readonly metadata: Record<string, string>
+  },
+): { readonly intent: SetupIntent } | { readonly declined: string; readonly intent: SetupIntent } {
+  const intent = context.objects.setupIntents.add(
+    setupIntentObject({
+      id: newId("seti"),
+      created: unix(context.clock()),
+      customer: fields.customer,
+      paymentMethod: null,
+      usage: "off_session",
+      description: null,
+      metadata: fields.metadata,
+      configuration: null,
+    }),
+    null,
+  )
+
+  context.events.emit("setup_intent.created", intent)
+
+  if (cardOutcome(fields.method, "setup") === "declined") {
+    const failed = context.objects.setupIntents.change(intent.id, {
+      status: "requires_payment_method",
+      latest_attempt: newId("setatt"),
+      last_setup_error: declineError(fields.method),
+    })
+
+    context.events.emit("setup_intent.setup_failed", failed ?? intent)
+
+    return { declined: "Your card was declined.", intent: failed ?? intent }
+  }
+
+  return { intent: saved(context, intent, fields.method) }
+}
+
 async function createSetup(c: Context, context: StripeRouteContext): Promise<Response> {
   const params = await readParams(c)
   const customer = textOrNull(params.customer)

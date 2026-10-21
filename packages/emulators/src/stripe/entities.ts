@@ -97,6 +97,8 @@ export interface SessionPlan {
     readonly trialDays: number | null
     readonly metadata: Record<string, string>
   }
+  /** A setup-mode session's `setup_intent_data`. */
+  readonly setup?: { readonly metadata: Record<string, string> }
 }
 
 /** A webhook endpoint keeps its signing secret, which the API shows only once. */

@@ -329,6 +329,79 @@ describe("Checkout in subscription mode", () => {
   })
 })
 
+/** A setup-mode session for a new customer, and the hosted page's Save button for it. */
+async function setupSession() {
+  const customer = await api.customers.create({ email: "ada@danwo.test" })
+  const session = await api.checkout.sessions.create({
+    mode: "setup",
+    customer: customer.id,
+    currency: "usd",
+    setup_intent_data: { metadata: { workspace: "acme" } },
+    success_url: "https://app.danwo.test/billing?setup={CHECKOUT_SESSION_ID}",
+  })
+  const save = (card: string) =>
+    fetch(`${session.url ?? ""}/complete`, {
+      method: "POST",
+      body: new URLSearchParams({ card }),
+      redirect: "manual",
+    })
+
+  return { customer, session, save }
+}
+
+describe("Checkout in setup mode", () => {
+  it("saves the typed card to the customer through a SetupIntent", async () => {
+    const { customer, session, save } = await setupSession()
+    const page = await (await fetch(session.url ?? "")).text()
+
+    expect(page).toContain("Save card")
+    expect(page).not.toContain("Total due")
+
+    const saved = await save("4242 4242 4242 4242")
+
+    expect(saved.headers.get("location")).toBe(`https://app.danwo.test/billing?setup=${session.id}`)
+
+    const completed = await api.checkout.sessions.retrieve(session.id, {
+      expand: ["setup_intent.payment_method"],
+    })
+    const intent = expanded(completed.setup_intent)
+    const method = expanded(intent.payment_method)
+
+    expect(completed).toMatchObject({ status: "complete", payment_status: "no_payment_required" })
+    expect(intent).toMatchObject({ status: "succeeded", customer: customer.id })
+    expect(intent.metadata).toEqual({ workspace: "acme" })
+    expect(method).toMatchObject({ customer: customer.id, card: { last4: "4242" } })
+    expect(eventTypes().filter((type) => type.startsWith("setup_intent."))).toEqual([
+      "setup_intent.created",
+      "setup_intent.succeeded",
+    ])
+    expect(eventTypes().indexOf("setup_intent.succeeded")).toBeLessThan(
+      eventTypes().indexOf("checkout.session.completed"),
+    )
+  })
+
+  it("saves a card that only declines when charged, and refuses one that declines at once", async () => {
+    const later = await setupSession()
+
+    await later.save("4000 0000 0000 0341")
+
+    const kept = await api.checkout.sessions.retrieve(later.session.id, {
+      expand: ["setup_intent.payment_method"],
+    })
+
+    expect(expanded(expanded(kept.setup_intent).payment_method).card?.last4).toBe("0341")
+
+    const now = await setupSession()
+    const refused = await now.save("4000 0000 0000 0002")
+    const open = await api.checkout.sessions.retrieve(now.session.id, { expand: ["setup_intent"] })
+
+    expect(refused.status).toBe(402)
+    expect(await refused.text()).toContain("Your card was declined.")
+    expect(open.status).toBe("open")
+    expect(expanded(open.setup_intent)).toMatchObject({ status: "requires_payment_method" })
+  })
+})
+
 describe("billing portal", () => {
   it("lets the customer cancel at the end of the period and sends them back", async () => {
     const price = await proPrice()

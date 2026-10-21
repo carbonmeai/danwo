@@ -327,7 +327,10 @@ unchanged.
   `past_due`, `canceled` and `incomplete_expired`.
 - **Invoices**: `pay`, `create_preview`, and lists filtered by subscription.
 - **The billing portal**: sessions, with a hosted page that cancels at the period's end.
-- **Checkout** in subscription mode, with `subscription_data.trial_period_days`.
+- **Checkout** in subscription mode, with `subscription_data.trial_period_days`, and in setup
+  mode, where the hosted page's Save card attaches the typed card to the customer through a
+  SetupIntent (`session.setup_intent`, with `setup_intent_data.metadata`); `4000 0000 0000 0002`
+  is refused, `4000 0000 0000 0341` saves and declines later.
 - **Webhooks**: `customer.subscription.created`, `.updated`, `.deleted` and `.trial_will_end`;
   `invoice.created`, `.finalized`, `.paid`, `.payment_succeeded`, `.payment_failed` and
   `.payment_action_required`; `setup_intent.created`, `.succeeded`, `.setup_failed` and

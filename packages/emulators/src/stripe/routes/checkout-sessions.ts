@@ -30,6 +30,7 @@ import {
 } from "../helpers.ts"
 import { chargeIntent, createIntent } from "../payments.ts"
 import { createPrice } from "./prices.ts"
+import { saveCardForCheckout } from "./setup-intents.ts"
 
 type Mode = "payment" | "setup" | "subscription"
 type Params = Record<string, unknown>
@@ -199,6 +200,9 @@ async function createSession(c: Context, context: StripeRouteContext): Promise<R
     intent: intentPlan(params),
     invoice: invoicePlan(params),
     ...(mode === "subscription" && { subscription: subscriptionPlan(params) }),
+    ...(mode === "setup" && {
+      setup: { metadata: metadataOf(asRecord(params.setup_intent_data)?.metadata) ?? {} },
+    }),
   }
 
   return c.json(context.objects.checkoutSessions.add(newSession(context, params, mode, plan), plan))
@@ -348,8 +352,34 @@ function orThrow(): never {
 }
 
 /**
+ * Saves the card the payer typed for later, as a setup-mode session does: through a SetupIntent,
+ * attached to the session's customer. A declined card leaves the session open.
+ */
+function setUpSession(
+  context: StripeRouteContext,
+  session: CheckoutSession,
+  plan: SessionPlan | undefined,
+  card: string,
+): Partial<CheckoutSession> | Declined {
+  const method = paymentMethodFor(context.objects, card, context.clock()) ?? orThrow()
+  const saved = saveCardForCheckout(context, {
+    customer: typeof session.customer === "string" ? session.customer : null,
+    method,
+    metadata: plan?.setup?.metadata ?? {},
+  })
+
+  if ("declined" in saved) {
+    context.objects.checkoutSessions.change(session.id, { setup_intent: saved.intent.id })
+
+    return { declined: saved.declined }
+  }
+
+  return { payment_status: "no_payment_required", setup_intent: saved.intent.id }
+}
+
+/**
  * Takes the payment for an open session with the card the payer typed, as the hosted page's Pay
- * button does. Returns the completed session, or the decline.
+ * button does (or, in setup mode, saves the card). Returns the completed session, or the decline.
  */
 function paySession(
   context: StripeRouteContext,
@@ -361,9 +391,11 @@ function paySession(
   const payment =
     plan && session.mode === "subscription"
       ? subscribeSession(context, session, plan, email)
-      : plan && session.mode !== "setup"
-        ? chargeSession(context, session, plan, { email, card: typed.card })
-        : { payment_status: "no_payment_required" as const }
+      : session.mode === "setup"
+        ? setUpSession(context, session, plan, typed.card)
+        : plan
+          ? chargeSession(context, session, plan, { email, card: typed.card })
+          : { payment_status: "no_payment_required" as const }
 
   if ("declined" in payment) return payment
 
@@ -451,6 +483,7 @@ function payPage(
     currency: session.currency ?? "usd",
     email: session.customer_email,
     cancelUrl: session.cancel_url,
+    setup: session.mode === "setup",
     ...after,
   })
 }
