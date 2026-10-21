@@ -8,6 +8,7 @@
     "examples/shop*/tests",
     "examples/shop*/*.ts",
     "examples/*.ts",
+    "examples/_kit/*.ts",
     "vitest.config.ts",
     "scripts",
     "benchmarks/app",
