@@ -2,6 +2,8 @@
  * The benchmark's baseline: every scenario written with locators and expectations only, no model.
  * A scenario locators cannot reach is skipped and counted as a coverage gap, not a pass.
  */
+import type { Screen } from "@danwo/sdk"
+
 import {
   accountsVerified,
   borealisDeleted,
@@ -16,6 +18,13 @@ test.beforeEach(resetApp)
 
 const SIGNUP_EMAIL = "lin@bench.test"
 
+/** Pays for the cart on the open checkout page: continue, approve the payment, then pay. */
+async function payForCart(screen: Screen): Promise<void> {
+  await screen.getByRole("button", { name: "Continue to payment" }).click()
+  await screen.getByRole("button", { name: "Approve payment" }).click()
+  await screen.getByTestId("checkout-pay").click()
+}
+
 test("signup [locators]", async ({ app, screen, expect, mail }) => {
   await app.open("/signup")
   await screen.getByLabel("Email").fill(SIGNUP_EMAIL)
@@ -28,17 +37,13 @@ test("signup [locators]", async ({ app, screen, expect, mail }) => {
 test("checkout [locators]", async ({ app, screen, expect }) => {
   await app.open("/checkout")
   await expect(screen.getByTestId("cart-total")).toHaveText("$24.00")
-  await screen.getByRole("button", { name: "Continue to payment" }).click()
-  await screen.getByRole("button", { name: "Approve payment" }).click()
-  await screen.getByTestId("checkout-pay").click()
+  await payForCart(screen)
   await expect(screen.getByTestId("order-status")).toHaveText("Paid")
 }).invariant(paymentsHold)
 
 test("orders [locators]", async ({ app, screen, expect }) => {
   await app.open("/checkout")
-  await screen.getByRole("button", { name: "Continue to payment" }).click()
-  await screen.getByRole("button", { name: "Approve payment" }).click()
-  await screen.getByTestId("checkout-pay").click()
+  await payForCart(screen)
   await app.open("/orders")
   await expect(screen.getByRole("table", { name: "Orders" })).toContainText("Paid")
   await expect(screen.getByRole("status")).toContainText("Credits: ")

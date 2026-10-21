@@ -154,6 +154,7 @@ export class PageDesk {
     ].join("\n")
   }
 
+  // fallow-ignore-next-line unused-class-member -- called through the session's typed `page` field
   async close(): Promise<void> {
     if (this.recording?.video) await this.finishVideo().catch(() => undefined)
     await this.context.close().catch(() => undefined)

@@ -60,9 +60,10 @@
       "packages/ui/src/icons/**",
       "packages/ui/src/illustrations/**",
       "packages/ui/src/primitives/dropdown-menu/**",
-      "examples/_kit/kit.css"
+      "examples/_kit/kit.css",
+      "packages/ui/src/theme/colors.ts"
     ],
-    "ignoredClones": ["dup:70004012:2"]
+    "ignoredClones": ["dup:70004012:2", "dup:bbfb3b8c:2"]
   },
   "rules": {
     "unused-dependencies": "warn"
