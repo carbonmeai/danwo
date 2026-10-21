@@ -39,8 +39,5 @@
   },
   "engines": {
     "node": ">=24"
-  },
-  "patchedDependencies": {
-    "mockttp@4.6.4": "patches/mockttp@4.6.4.patch"
   }
 }

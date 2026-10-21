@@ -25,6 +25,7 @@ import {
 } from "./hosts.ts"
 import { isListening, nothingListening } from "./listening.ts"
 import { type EnvOptions, preloadedPids, proxyEnvironment, writeNodeShim } from "./node-env.ts"
+import { replaceLocalPortProbe } from "./port-probe.ts"
 import { quietDroppedClients } from "./quiet.ts"
 import { forwardTo } from "./upstream.ts"
 import {
@@ -508,6 +509,8 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   const clock = createAppClock(dir)
   const preloadDir = join(dir, "preloaded")
   const shimDir = await writeNodeShim(dir)
+
+  replaceLocalPortProbe()
 
   const server = getLocal({ https: ca })
   const loud = quietDroppedClients()
