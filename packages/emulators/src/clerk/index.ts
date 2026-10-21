@@ -39,6 +39,7 @@ export type {
   ClerkEmailView,
   ClerkEventType,
   ClerkInstance,
+  ClerkMembershipView,
   ClerkMessage,
   ClerkOrganizationView,
   ClerkSessionView,

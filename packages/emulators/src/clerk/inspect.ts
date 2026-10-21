@@ -5,6 +5,7 @@ import { userByEmail } from "./routes/users.ts"
 import { endSession } from "./sessions.ts"
 import type {
   ClerkInstance,
+  ClerkMembershipView,
   ClerkMessage,
   ClerkOrganizationView,
   ClerkSessionView,
@@ -16,6 +17,8 @@ export interface ClerkInstanceView {
   /** The instance's slug, hosts and keys: hand `publishableKey` and `secretKey` to the app. */
   readonly instance: ClerkInstance & { readonly secretKey: string }
   user(email: string): ClerkUserView | undefined
+  /** Every user, oldest first: seeded, signed up, or made through the Backend API. */
+  users(): ClerkUserView[]
   /** The user's sessions, oldest first. */
   sessions(email: string): ClerkSessionView[]
   /** Revokes every active session of the user, as signing them out everywhere does. */
@@ -26,6 +29,8 @@ export interface ClerkInstanceView {
   code(to: string, timeoutMs?: number): Promise<string>
   /** The organizations, oldest first. */
   organizations(): ClerkOrganizationView[]
+  /** Every organization membership, oldest first, or only `orgId`'s. */
+  memberships(orgId?: string): ClerkMembershipView[]
   /**
    * The public key session tokens are signed with, as a PEM: what an app that verifies tokens
    * offline is configured with (`CLERK_PEM_PUBLIC_KEY`, `CLERK_JWT_KEY`, `jwtKey`).
@@ -61,6 +66,7 @@ export function clerkInstance(emulator: Pick<Emulator, "store">): ClerkInstanceV
       return { ...instance, secretKey: instance.secretKeys[0] ?? "" }
     },
     user: (email) => userByEmail(context, email),
+    users: () => context.clerk.users.all(),
     sessions: userSessions,
     revokeSessions(email) {
       const live = userSessions(email).filter((s) => s.status === "active")
@@ -77,6 +83,18 @@ export function clerkInstance(emulator: Pick<Emulator, "store">): ClerkInstanceV
         `no Clerk code was emailed to ${to}`,
       ),
     organizations: () => context.clerk.organizations.all(),
+    memberships: (orgId) =>
+      context.clerk.memberships
+        .all()
+        .filter((m) => orgId === undefined || m.organization_id === orgId)
+        .map(({ id, organization_id, user_id, role, created_at, updated_at }) => ({
+          id,
+          organization_id,
+          user_id,
+          role,
+          created_at,
+          updated_at,
+        })),
     publicKeyPem: () => signingKeyOf(context).pem,
     webhookSecret: (endpoint) => webhookSecretOf(context, endpoint),
     env: () => clerkEnv(context),

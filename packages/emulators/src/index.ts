@@ -63,6 +63,7 @@ export {
   type ClerkInstance,
   clerkInstance,
   type ClerkInstanceView,
+  type ClerkMembershipView,
   type ClerkMessage,
   clerkOutboundFaults,
   type ClerkSeedConfig,

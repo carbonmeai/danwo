@@ -67,6 +67,11 @@ export interface ClerkUserView {
   readonly has_image: boolean
   readonly primary_email_address_id: string | null
   readonly email_addresses: readonly ClerkEmailView[]
+  /** The social accounts linked to the user, such as `oauth_google`. */
+  readonly external_accounts: readonly {
+    readonly provider: string
+    readonly email_address: string
+  }[]
   readonly password_enabled: boolean
   readonly two_factor_enabled: boolean
   readonly public_metadata: Readonly<Record<string, unknown>>
@@ -91,6 +96,16 @@ export interface ClerkSessionView {
   readonly last_active_at: number
   readonly expire_at: number
   readonly abandon_at: number
+  readonly created_at: number
+  readonly updated_at: number
+}
+
+/** A user's membership in an organization, with their role in it. */
+export interface ClerkMembershipView {
+  readonly id: string
+  readonly organization_id: string
+  readonly user_id: string
+  readonly role: string
   readonly created_at: number
   readonly updated_at: number
 }

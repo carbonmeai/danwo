@@ -607,6 +607,7 @@ export {
   type ClerkInstance,
   clerkInstance,
   type ClerkInstanceView,
+  type ClerkMembershipView,
   type ClerkMessage,
   type ClerkSeedConfig,
   type ClerkSeedOrganization,
@@ -616,4 +617,5 @@ export {
   type ClerkOrganizationView,
   type ClerkSessionView,
   type ClerkUserView,
+  stableClerkId,
 } from "@danwo/emulators"
