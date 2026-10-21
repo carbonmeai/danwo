@@ -5,7 +5,7 @@
 import type { Answers } from "./answers.ts"
 import { MODEL_SOURCE_INFO, providerList } from "./catalog.ts"
 import { type Detection, keyFound, runScript } from "./detect.ts"
-import { installCommand } from "./install.ts"
+import { commandLine, installCommand } from "./install.ts"
 import { modelKeyEnv } from "./render.ts"
 import type { SetupResult } from "./setup.ts"
 
@@ -31,7 +31,7 @@ function packageLines(result: SetupResult, detection: Detection): string[] {
 
   if (notInstalled.length > 0)
     return [
-      `  not installed: run ${installCommand(detection.packageManager, notInstalled).join(" ")}`,
+      `  not installed: run ${commandLine(installCommand(detection, notInstalled), detection.root)}`,
     ]
   if (install === undefined) return ["  nothing to add"]
   if (install.ok) return [`  added: ${install.command}`]

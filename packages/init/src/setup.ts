@@ -2,6 +2,8 @@
  * Carrying out the answers: the files, danwo's skill and MCP server for the chosen coding agents,
  * and the packages. The prompts and the flags both end here, so both give the same project.
  */
+import { join, relative } from "node:path"
+
 import { initProject } from "@danwo/mcp"
 import { installSkill } from "@danwo/skill"
 
@@ -47,13 +49,42 @@ function agentTargets(answers: Pick<Answers, "agents" | "mcp">): {
   }
 }
 
-async function setUpAgents(root: string, answers: Answers): Promise<AgentFileResult[]> {
+/**
+ * The command an agent opened at `detection.agentRoot` starts danwo's MCP server with, when that
+ * is a folder above the project: the server must find the project's config from there. pnpm runs
+ * the project's own danwo in its folder; the others hoist it, and name the config.
+ */
+export function mcpCommand(
+  detection: Pick<Detection, "root" | "agentRoot" | "packageManager">,
+): readonly string[] | undefined {
+  const from = relative(detection.agentRoot, detection.root).split("\\").join("/")
+
+  if (from === "") return undefined
+  if (detection.packageManager === "pnpm") return ["pnpm", "--dir", from, "exec", "danwo", "mcp"]
+
+  return ["npx", "@danwo/cli", "mcp", "--config", `${from}/danwo.config.ts`]
+}
+
+async function setUpAgents(detection: Detection, answers: Answers): Promise<AgentFileResult[]> {
+  const root = detection.agentRoot
   const { skillDirs, mcpFiles } = agentTargets(answers)
+  const command = mcpCommand(detection)
   const skill = skillDirs.length > 0 ? await installSkill(root, skillDirs) : []
   const mcp =
-    mcpFiles.length > 0 ? await initProject({ cwd: root, clients: mcpFiles, skill: false }) : []
+    mcpFiles.length > 0
+      ? await initProject({
+          cwd: root,
+          clients: mcpFiles,
+          skill: false,
+          ...(command !== undefined && { command }),
+        })
+      : []
 
-  return [...skill, ...mcp]
+  /* Named from the project, so a file written at the workspace's root reads as `../../.mcp.json`. */
+  return [...skill, ...mcp].map((change) => ({
+    ...change,
+    file: relative(detection.root, join(root, change.file)),
+  }))
 }
 
 /** Writes `planned`, sets up the agents and installs what the files import. */
@@ -64,11 +95,11 @@ export async function applyAnswers(
   run: Runner = runCommand,
 ): Promise<SetupResult> {
   const files = await writeFiles(detection.root, planned, answers.replaceConfig)
-  const agentFiles = await setUpAgents(detection.root, answers)
+  const agentFiles = await setUpAgents(detection, answers)
   const packages = packagesToAdd(answers, detection)
   const install =
     answers.install && packages.length > 0
-      ? await installPackages(detection.root, detection.packageManager, packages, run)
+      ? await installPackages(detection, packages, run)
       : undefined
 
   return { files, agentFiles, install, notInstalled: answers.install ? [] : packages }

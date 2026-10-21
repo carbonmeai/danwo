@@ -8,7 +8,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import type { Answers } from "./answers.ts"
-import { type Detection, isRecord } from "./detect.ts"
+import type { Detection } from "./detect.ts"
 import {
   envExampleNames,
   renderApiTest,
@@ -18,6 +18,7 @@ import {
   renderWebTest,
   testDirs,
 } from "./render.ts"
+import { isRecord } from "./workspace.ts"
 
 /**
  * How a file may change: `merge` files always take their additions, a `guarded` file is replaced

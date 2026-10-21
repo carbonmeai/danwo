@@ -38,9 +38,14 @@ const WORDMARK = [
 /** What detection found, for the note that opens the prompts. */
 function detectionNote(detection: Detection): string {
   const providers = providerList(detection.providers)
+  const workspace = detection.workspace
+  const manager =
+    workspace === undefined
+      ? detection.packageManager
+      : `${detection.packageManager} workspace${workspace.path === "" ? " root" : ` package ${workspace.path}`}`
 
   return [
-    `Project    ${detection.name} (${detection.framework.label}, ${detection.packageManager})`,
+    `Project    ${detection.name} (${detection.framework.label}, ${manager})`,
     `Starts     ${detection.devCommand} → ${detection.appUrl}`,
     `Providers  ${providers === "" ? "none found" : providers}`,
     ...(detection.hasConfig

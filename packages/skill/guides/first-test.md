@@ -15,7 +15,15 @@ Set up a config, write one `*.danwo.ts` file, run it and read the result.
    `@danwo/sdk` as dev dependencies at the version of the danwo running it (`danwo --version`
    prints it), so a beta sets up that beta, not `latest`; a TypeScript project without
    `@types/node` also gets `@types/node@^24`, since danwo's declarations use Node's types.
-   `--skip-install` installs nothing and prints the command to run. For a browser engine, install
+   `--skip-install` installs nothing and prints the command to run. In a monorepo, run init in
+   the app's package: it finds the workspace root (`pnpm-workspace.yaml`, or a `workspaces` field
+   for npm, Yarn and Bun) and installs with the workspace's manager into that package (`pnpm add
+   -D` there, `npm install -D … --workspace <path>` from the root; at the root itself `pnpm add -D
+   -w` and Yarn 1's `-W`). A folder under the workspace that is not one of its packages is a
+   project of its own. When the package has no agent folders (`.claude`, `.cursor`, `.codex`, …)
+   but a folder above it in the workspace does, the skill and MCP server are written there, with
+   an MCP command that finds the package's config (`pnpm --dir <path> exec danwo mcp`, else
+   `npx @danwo/cli mcp --config <path>/danwo.config.ts`). For a browser engine, install
    the Chromium danwo drives once per machine with `npx playwright-core install chromium`
    (`--with-deps` on Linux), not `npx playwright install`, which can fetch a newer Playwright
    whose Chromium does not match; a launch that finds no browser fails `BROWSER_FAILED` naming

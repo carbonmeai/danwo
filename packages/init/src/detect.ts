@@ -6,7 +6,7 @@
  */
 import { existsSync } from "node:fs"
 import { readFile } from "node:fs/promises"
-import { basename, join } from "node:path"
+import { basename, join, relative } from "node:path"
 
 import {
   AGENT_INFO,
@@ -17,10 +17,17 @@ import {
   PROVIDERS,
   type ProviderId,
 } from "./catalog.ts"
+import {
+  declaredManager,
+  findWorkspace,
+  isRecord,
+  lockedManager,
+  PACKAGE_MANAGERS,
+  type PackageManager,
+  type Workspace,
+} from "./workspace.ts"
 
-const PACKAGE_MANAGERS = ["bun", "pnpm", "yarn", "npm"] as const
-
-export type PackageManager = (typeof PACKAGE_MANAGERS)[number]
+export type { PackageManager, Workspace } from "./workspace.ts"
 
 /** A framework danwo recognises, by the dependency that shows it. */
 export interface Framework {
@@ -50,15 +57,6 @@ const FRAMEWORKS: readonly (Framework & { readonly packages: readonly string[] }
 
 const PLAIN: Framework = { id: "plain", label: "Node app", port: 3000 }
 
-/** Lockfiles, in the order a project that has several is most likely using. */
-const LOCKFILES: readonly (readonly [string, PackageManager])[] = [
-  ["bun.lock", "bun"],
-  ["bun.lockb", "bun"],
-  ["pnpm-lock.yaml", "pnpm"],
-  ["yarn.lock", "yarn"],
-  ["package-lock.json", "npm"],
-]
-
 /** Environment files whose variable names show which providers and keys a project uses. */
 const ENV_FILES = [
   ".env",
@@ -81,6 +79,8 @@ export interface Detection {
   readonly name: string
   readonly hasPackageJson: boolean
   readonly packageManager: PackageManager
+  /** The workspace the project is a package of, or the root of; undefined for a lone project. */
+  readonly workspace: Workspace | undefined
   readonly framework: Framework
   /** The package.json script that starts the app, e.g. `dev`. */
   readonly devScript: string | undefined
@@ -94,6 +94,11 @@ export interface Detection {
   readonly envNames: ReadonlySet<string>
   readonly providers: readonly ProviderId[]
   readonly agents: readonly AgentId[]
+  /**
+   * Where the coding agents' files go: the project, or the folder above it in its workspace whose
+   * agent folders (`.claude`, `.cursor`, …) show that the agents are opened there.
+   */
+  readonly agentRoot: string
   readonly hasConfig: boolean
   readonly expo: ExpoApp | undefined
 }
@@ -117,27 +122,62 @@ async function readJson(path: string): Promise<unknown> {
   }
 }
 
-/** Whether `value` is a plain JSON object. */
-export function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
+/** The project's workspace, and the package manager: the workspace's, or the project's own. */
+function managerOf(
+  root: string,
+  pkg: PackageJson,
+  userAgent: string | undefined,
+): { workspace: Workspace | undefined; packageManager: PackageManager } {
+  const workspace = findWorkspace(root, userAgent)
+
+  return {
+    workspace,
+    packageManager: workspace?.packageManager ?? packageManagerOf(root, pkg, userAgent),
+  }
 }
 
-/** The package manager the project uses: `packageManager`, a lockfile, or the one running init. */
+/** The package manager a lone project uses: `packageManager`, a lockfile, or the one running init. */
 export function packageManagerOf(
   root: string,
   pkg: PackageJson,
   userAgent: string | undefined,
 ): PackageManager {
-  const declared = typeof pkg.packageManager === "string" ? pkg.packageManager.split("@")[0] : ""
-  const named = PACKAGE_MANAGERS.find((pm) => pm === declared)
+  return (
+    declaredManager(pkg) ??
+    lockedManager(root) ??
+    PACKAGE_MANAGERS.find((pm) => userAgent?.startsWith(`${pm}/`)) ??
+    "npm"
+  )
+}
 
-  if (named) return named
+/** The agents whose folders `folder` has, by their markers. */
+function agentsIn(folder: string): AgentId[] {
+  return AGENTS.filter((id) => existsSync(join(folder, AGENT_INFO[id].marker)))
+}
 
-  const locked = LOCKFILES.find(([file]) => existsSync(join(root, file)))
+/**
+ * The folder the coding agents work from, and the agents found there: the project's own when it
+ * has agent folders, else the nearest folder above it, up to its workspace's root, that has them.
+ */
+function agentsOf(
+  root: string,
+  workspace: Workspace | undefined,
+): { agentRoot: string; agents: AgentId[] } {
+  const own = agentsIn(root)
 
-  if (locked) return locked[1]
+  if (own.length > 0 || workspace === undefined) return { agentRoot: root, agents: own }
 
-  return PACKAGE_MANAGERS.find((pm) => userAgent?.startsWith(`${pm}/`)) ?? "npm"
+  let folder = root
+
+  while (relative(workspace.root, folder) !== "") {
+    folder = join(folder, "..")
+
+    const found = agentsIn(folder)
+
+    if (found.length > 0) return { agentRoot: folder, agents: found }
+  }
+
+  return { agentRoot: root, agents: own }
 }
 
 /** How `pm` runs a package.json script. */
@@ -254,7 +294,7 @@ export async function detectProject(
   const raw = await readJson(join(root, "package.json"))
   const pkg: PackageJson = isRecord(raw) ? raw : {}
   const scripts = isRecord(pkg.scripts) ? pkg.scripts : {}
-  const packageManager = packageManagerOf(root, pkg, env["npm_config_user_agent"])
+  const { workspace, packageManager } = managerOf(root, pkg, env["npm_config_user_agent"])
   const dependencies = dependencyNames(pkg)
   const framework = frameworkOf(dependencies)
   const devScript = devScriptOf(scripts)
@@ -267,6 +307,7 @@ export async function detectProject(
     name: typeof pkg.name === "string" ? pkg.name : basename(root),
     hasPackageJson: isRecord(raw),
     packageManager,
+    workspace,
     framework,
     devScript,
     devCommand: devScript === undefined ? "node server.js" : runScript(packageManager, devScript),
@@ -275,7 +316,7 @@ export async function detectProject(
     dependencies,
     envNames: names.set,
     providers: providersOf(dependencies, names.mentioned),
-    agents: AGENTS.filter((id) => existsSync(join(root, AGENT_INFO[id].marker))),
+    ...agentsOf(root, workspace),
     hasConfig: existsSync(join(root, "danwo.config.ts")),
     expo: framework.id === "expo" ? await expoAppOf(root) : undefined,
   }

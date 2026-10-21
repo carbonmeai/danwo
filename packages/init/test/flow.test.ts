@@ -348,19 +348,20 @@ describe("installing", () => {
       { name: "@ai-sdk/openai", version: "4.0.96" },
     ]
 
-    expect(installCommand("bun", specs)).toEqual([
-      "bun",
-      "add",
-      "-d",
-      "@danwo/sdk",
-      "@ai-sdk/openai@4.0.96",
-    ])
-    expect(installCommand("yarn", specs).slice(0, 3)).toEqual(["yarn", "add", "-D"])
+    const lone = (packageManager: "bun" | "yarn") =>
+      installCommand({ root: "/app", packageManager, workspace: undefined }, specs)
+
+    expect(lone("bun")).toEqual({
+      argv: ["bun", "add", "-d", "@danwo/sdk", "@ai-sdk/openai@4.0.96"],
+      cwd: "/app",
+    })
+    expect(lone("yarn").argv.slice(0, 3)).toEqual(["yarn", "add", "-D"])
   })
 
   it("keeps the last lines of a failed install", async () => {
     const output = Array.from({ length: 20 }, (_, n) => `line ${n}`).join("\n")
-    const result = await installPackages("/", "npm", [], async () => ({ ok: false, output }))
+    const detection = { root: "/", packageManager: "npm" as const, workspace: undefined }
+    const result = await installPackages(detection, [], async () => ({ ok: false, output }))
 
     expect(result.output.split("\n")).toHaveLength(8)
     expect(result.output).toContain("line 19")

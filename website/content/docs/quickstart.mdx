@@ -64,6 +64,11 @@ Files
 It also installs `@danwo/cli` and `@danwo/sdk` at its own version, so a beta sets up that beta. A
 TypeScript project without Node's types gets `@types/node` too, since danwo's types use them.
 
+In a monorepo, run init in the app's own folder. It finds the workspace (pnpm, npm, Yarn or Bun)
+and adds the packages to the app's `package.json` with the workspace's package manager. When your
+coding agent's folders, such as `.claude`, sit at the workspace root, the skill and MCP server go
+there too.
+
 </Step>
 <Step>
 

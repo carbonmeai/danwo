@@ -1,8 +1,10 @@
 /**
  * The packages the written files import, added with the project's own package manager. A
- * package already among the project's dependencies is left as it is.
+ * package already among the project's dependencies is left as it is. In a workspace they go to the
+ * project's own package.json, in the way the workspace's package manager takes them from there.
  */
 import { spawn } from "node:child_process"
+import { relative } from "node:path"
 
 import type { Answers } from "./answers.ts"
 import {
@@ -34,19 +36,55 @@ export function packagesToAdd(
   return wanted.filter((spec) => !detection.dependencies.has(spec.name))
 }
 
-/** The command that adds `packages` as dev dependencies with `pm`. */
-export function installCommand(pm: PackageManager, packages: readonly PackageSpec[]): string[] {
+/** A command and the folder it runs in. */
+export interface PlannedCommand {
+  readonly argv: readonly string[]
+  readonly cwd: string
+}
+
+const ADD: Readonly<Record<PackageManager, readonly string[]>> = {
+  bun: ["add", "-d"],
+  pnpm: ["add", "-D"],
+  yarn: ["add", "-D"],
+  npm: ["install", "-D"],
+}
+
+/**
+ * The command that adds `packages` as dev dependencies of the project. A lone project, and a
+ * package of a pnpm, Yarn or Bun workspace, runs its manager's add where it is. At a workspace's
+ * root, pnpm needs `-w` and Yarn 1 `-W` to add there. npm adds to a package of its workspace from
+ * the root, with `--workspace <path>`.
+ */
+export function installCommand(
+  detection: Pick<Detection, "root" | "packageManager" | "workspace">,
+  packages: readonly PackageSpec[],
+): PlannedCommand {
+  const pm = detection.packageManager
   const specs = packages.map((spec) =>
     spec.version === "latest" ? spec.name : `${spec.name}@${spec.version}`,
   )
-  const add = {
-    bun: ["add", "-d"],
-    pnpm: ["add", "-D"],
-    yarn: ["add", "-D"],
-    npm: ["install", "-D"],
+  const workspace = detection.workspace
+  const argv = [pm, ...ADD[pm], ...specs]
+
+  if (workspace === undefined) return { argv, cwd: detection.root }
+
+  if (workspace.path === "") {
+    const rootFlag = pm === "pnpm" ? ["-w"] : pm === "yarn" && !workspace.yarnBerry ? ["-W"] : []
+
+    return { argv: [...argv, ...rootFlag], cwd: detection.root }
   }
 
-  return [pm, ...add[pm], ...specs]
+  return pm === "npm"
+    ? { argv: [...argv, "--workspace", workspace.path], cwd: workspace.root }
+    : { argv, cwd: detection.root }
+}
+
+/** A planned command as a person would type it, from the project's folder. */
+export function commandLine(command: PlannedCommand, from: string): string {
+  const where = relative(from, command.cwd)
+  const line = command.argv.join(" ")
+
+  return where === "" ? line : `(cd ${where} && ${line})`
 }
 
 /** How an install went: its command, and the output's tail when it failed. */
@@ -83,19 +121,26 @@ export const runCommand: Runner = (argv, cwd) =>
     child.once("close", (code) => resolve({ ok: code === 0, output }))
   })
 
-/** Adds `packages` to the project in `cwd` with `pm`. */
-export async function installPackages(
-  cwd: string,
-  pm: PackageManager,
-  packages: readonly PackageSpec[],
+/** Runs `command` and says how it went, from the project's folder `from`. */
+async function runPlanned(
+  command: PlannedCommand,
+  from: string,
   run: Runner = runCommand,
 ): Promise<InstallResult> {
-  const argv = installCommand(pm, packages)
-  const { ok, output } = await run(argv, cwd)
+  const { ok, output } = await run(command.argv, command.cwd)
 
   return {
-    command: argv.join(" "),
+    command: commandLine(command, from),
     ok,
     output: ok ? "" : output.trim().split("\n").slice(-8).join("\n"),
   }
+}
+
+/** Adds `packages` to the project with its package manager. */
+export function installPackages(
+  detection: Pick<Detection, "root" | "packageManager" | "workspace">,
+  packages: readonly PackageSpec[],
+  run: Runner = runCommand,
+): Promise<InstallResult> {
+  return runPlanned(installCommand(detection, packages), detection.root, run)
 }
