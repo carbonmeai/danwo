@@ -153,6 +153,19 @@ export interface CacheNote {
   readonly because?: "effect"
   /** For `diverged` and `handed-off`: what stopped matching, in a line, with secrets redacted. */
   readonly reason?: string
+  /** For a replay of a recording another model made: that model, as `openai/gpt-5-mini`. */
+  readonly recordedWith?: string
+  /** With `recordedWith`: the model the session runs on, which the replay did not call. */
+  readonly runningWith?: string
+}
+
+/** `recorded with openai/gpt-5-mini, running anthropic/claude-sonnet-5`, for another model's recording. */
+export function modelText(
+  note: Pick<CacheNote, "recordedWith" | "runningWith">,
+): string | undefined {
+  if (note.recordedWith === undefined || note.runningWith === undefined) return undefined
+
+  return `recorded with ${note.recordedWith}, running ${note.runningWith}`
 }
 
 export interface StepRecord {

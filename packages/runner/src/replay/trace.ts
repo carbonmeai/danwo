@@ -134,6 +134,8 @@ export const traceSchema = z.object({
   endRoute: z.string(),
   /** What the step changed on the page and behind it; a replay must change the same (effects.ts). */
   effects: effectsSchema.optional(),
+  /** The model that made the recording, as `openai/gpt-5-mini`; absent in older recordings. */
+  recordedBy: z.string().optional(),
   identity: identity.optional(),
 })
 
@@ -141,6 +143,7 @@ export const traceSchema = z.object({
 export const storedSchema = z.object({
   instruction: z.string(),
   recordedAt: z.string(),
+  recordedBy: z.string().optional(),
   identity: identity.optional(),
 })
 
@@ -163,6 +166,8 @@ export const extractTraceSchema = z.object({
       z.object({ path: z.string(), target, as: z.enum(["text", "number", "boolean", "count"]) }),
     )
     .min(1),
+  /** The model that made the recording; absent in older recordings. */
+  recordedBy: z.string().optional(),
   identity: identity.optional(),
 })
 
@@ -178,6 +183,8 @@ export const waitTraceSchema = z.object({
   instruction: z.string(),
   recordedAt: z.string(),
   evidence: z.object({ text: z.string().min(1) }),
+  /** The judge that named the evidence; absent in older recordings. */
+  recordedBy: z.string().optional(),
   identity: identity.optional(),
 })
 

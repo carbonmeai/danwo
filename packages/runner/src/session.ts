@@ -29,6 +29,7 @@ import {
 import { registerValueEngine, type Screen } from "./locate/index.ts"
 import { MailDesk } from "./mail/desk.ts"
 import type { MailSource } from "./mail/index.ts"
+import { modelName } from "./model/resolve.ts"
 import { type StepRecord, StepRecorder } from "./record/index.ts"
 import { type CacheMode, ReplayStore } from "./replay/index.ts"
 import { type RelocationPolicy, relocationOf } from "./replay/policy.ts"
@@ -372,6 +373,7 @@ function replayStore(options: WebSessionOptions): ReplayStore | undefined {
     journey: cache.journey ?? "journey",
     appIdentity: cache.appIdentity ?? appIdentityOf(options.baseUrl),
     policy: relocationOf(options),
+    models: { actor: modelName(options.model), judge: modelName(options.judge) },
   })
 }
 

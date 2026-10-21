@@ -86,11 +86,15 @@ export function notHeld(condition: string, verdict: Unheld, reason: string, time
 async function fromRecording(
   key: StepKey | undefined,
   context: WaitStepContext,
-): Promise<{ readonly replayed: true } | { readonly reason: string | undefined }> {
+): Promise<
+  | { readonly replayed: true; readonly recordedBy: string | undefined }
+  | { readonly reason: string | undefined }
+> {
   const trace = key === undefined ? undefined : await context.store?.readWait(key.key)
 
   if (trace === undefined) return { reason: undefined }
-  if (await shown(context.tabs, trace.evidence.text, context.within)) return { replayed: true }
+  if (await shown(context.tabs, trace.evidence.text, context.within))
+    return { replayed: true, recordedBy: trace.recordedBy }
 
   return {
     reason: context.redact(`"${trace.evidence.text}" was not shown within ${context.within} ms`),
@@ -106,7 +110,7 @@ export async function waitStep(step: JudgedStep, context: WaitStepContext): Prom
   const recorded = await fromRecording(key, context)
 
   if ("replayed" in recorded) {
-    context.cache("replayed")
+    context.cache("replayed", store?.crossModel(recorded, kind))
 
     return { replayed: true }
   }

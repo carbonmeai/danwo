@@ -20,6 +20,13 @@ export type RecordingCounts = Readonly<Partial<Record<RecordingFate, number>>>
 /** Every fate, in the order the `cache:` line lists them. */
 const FATES: readonly RecordingFate[] = ["kept", "staged", "test-failed", "unchecked"]
 
+/** Steps that replayed a recording another model made, by the pair of models. */
+export interface ModelSwap {
+  readonly recordedWith: string
+  readonly runningWith: string
+  readonly steps: number
+}
+
 /** Model calls and what they took: tokens each way, and dollars as the gateway billed them. */
 export interface Spent {
   readonly calls: number
@@ -52,6 +59,8 @@ export interface Usage {
   readonly cache: CacheCounts
   /** What became of the new recordings the steps made; absent in older reports. */
   readonly recordings?: RecordingCounts
+  /** Replays of recordings another model made; absent when there were none. */
+  readonly models?: readonly ModelSwap[]
   readonly spent: Spent
   /** The agent steps that called the model, in order. */
   readonly steps: readonly StepCost[]
@@ -107,11 +116,40 @@ function fateOf(step: StepRecord): RecordingFate | undefined {
   return step.cache.recording ?? (step.cache.saved === true ? "kept" : undefined)
 }
 
+/** Swaps added up by their pair of models, in the order each pair first came. */
+function swapsOf(all: readonly ModelSwap[]): ModelSwap[] {
+  const pairs = new Map<string, ModelSwap>()
+
+  for (const swap of all) {
+    const pair = JSON.stringify([swap.recordedWith, swap.runningWith])
+    const steps = (pairs.get(pair)?.steps ?? 0) + swap.steps
+
+    pairs.set(pair, { ...swap, steps })
+  }
+
+  return [...pairs.values()]
+}
+
+/** The step's model swap, when it replayed another model's recording. */
+function swapOf(step: StepRecord): ModelSwap[] {
+  const { recordedWith, runningWith } = step.cache ?? {}
+
+  return recordedWith === undefined || runningWith === undefined
+    ? []
+    : [{ recordedWith, runningWith, steps: 1 }]
+}
+
+/** `models`, only when there were any. */
+function withModels(swaps: readonly ModelSwap[]): Pick<Usage, "models"> {
+  return swaps.length === 0 ? {} : { models: swaps }
+}
+
 /** The usage of an attempt's steps. */
 export function usageOf(steps: readonly StepRecord[]): Usage {
   const costs = steps.map(stepCost).filter((cost) => cost.spent.calls > 0)
 
   return {
+    ...withModels(swapsOf(steps.flatMap(swapOf))),
     cache: countsOf(
       steps.flatMap((step) => (step.cache === undefined ? [] : [{ [step.cache.mode]: 1 }])),
       CACHE_OUTCOMES,
@@ -132,6 +170,7 @@ export function usageOf(steps: readonly StepRecord[]): Usage {
 /** Several attempts' usage added up; their per-step lists are joined. */
 export function addUsage(all: readonly Usage[]): Usage {
   return {
+    ...withModels(swapsOf(all.flatMap((usage) => usage.models ?? []))),
     cache: countsOf(
       all.map((usage) => usage.cache),
       CACHE_OUTCOMES,
@@ -161,10 +200,14 @@ const ALWAYS: readonly CacheOutcome[] = ["replayed", "relocated", "handed-off", 
 /**
  * `cache: 12 replayed · 1 relocated · 1 handed off · 2 missed · 2 recorded`, or undefined with no
  * agent steps. New recordings are listed by what became of them: `recorded`, or `not kept` and why.
+ * Replays of recordings another model made end the line, as `recorded with openai/gpt-5-mini
+ * (4 steps), running anthropic/claude-sonnet-5`: no model ran for them, so the configured one is
+ * untried there.
  */
 export function cacheLine(
   counts: CacheCounts,
   recordings: RecordingCounts = {},
+  models: readonly ModelSwap[] = [],
 ): string | undefined {
   const total = Object.values(counts).reduce((sum, n) => sum + (n ?? 0), 0)
 
@@ -176,8 +219,12 @@ export function cacheLine(
   const fates = FATES.filter((fate) => (recordings[fate] ?? 0) > 0).map(
     (fate) => `${recordings[fate]} ${recordingText({ recording: fate })}`,
   )
+  const swaps = models.map(
+    (swap) =>
+      `recorded with ${swap.recordedWith} (${swap.steps} step${swap.steps === 1 ? "" : "s"}), running ${swap.runningWith}`,
+  )
 
-  return `cache: ${[...parts, ...fates].join(" · ")}`
+  return `cache: ${[...parts, ...fates, ...swaps].join(" · ")}`
 }
 
 /** Thousands as `k`, for token counts. */

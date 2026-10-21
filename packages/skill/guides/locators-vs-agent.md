@@ -82,6 +82,12 @@ twice in one test is two recordings: the second and later are keyed by their occ
 that runs the same steps as different people should name the person in `params`
 (`{ persona: "admin" }`), since the key has no other account field.
 
+Each recording keeps the model that made it (`recordedBy`, e.g. `openai/gpt-5-mini`; the judge for
+`assert` and `waitFor`). A different configured model still replays it with no call, and the step's
+cache note says `recorded with openai/gpt-5-mini, running anthropic/claude-sonnet-5`; the `cache:`
+line ends with `recorded with … (n steps), running …`. Clear the cache to have the new model run
+them.
+
 Values in braces come from `params`: `unique(...)` gives a fresh value each run that replays still
 accept, `secret(name)` keeps the value from the model, and values the agent reads from mail are
 recorded by where they came from, not as text.

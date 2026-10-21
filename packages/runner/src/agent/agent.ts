@@ -148,7 +148,13 @@ interface ActCall {
  * actions it carried out before it stopped.
  */
 type Replayed =
-  | { readonly ok: true; readonly actions: number; readonly relocated: boolean }
+  | {
+      readonly ok: true
+      readonly actions: number
+      readonly relocated: boolean
+      /** The model that made the recording, when it says. */
+      readonly recordedBy?: string | undefined
+    }
   | {
       readonly ok: false
       readonly reason: string | undefined
@@ -406,7 +412,9 @@ class SessionAgent implements Agent {
     const replayed = await this.replayRecording(key, params, files, watch)
 
     if (replayed.ok) {
-      steps.cache(replayed.relocated ? "relocated" : "replayed")
+      const models = store?.crossModel(replayed, "act") ?? {}
+
+      steps.cache(replayed.relocated ? "relocated" : "replayed", models)
       this.checkApp(mark)
 
       return { summary: "replayed the recording", modelCalls: 0, actions: replayed.actions }
@@ -499,6 +507,7 @@ class SessionAgent implements Agent {
       ok: true,
       actions: trace.actions.length,
       relocated: outcome.moved.length + outcome.movedPlaces.length > 0,
+      recordedBy: trace.recordedBy,
     }
   }
 

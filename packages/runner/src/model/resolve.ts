@@ -8,6 +8,20 @@ export function resolveModel(model: LanguageModel): Exclude<LanguageModel, strin
   return typeof model === "string" ? gateway(model) : model
 }
 
+/**
+ * The model's name as a recording keeps it: its id, as `openai/gpt-5-mini`. A model instance is
+ * named by its provider and id, unless its id already names the provider (the AI Gateway's do).
+ */
+export function modelName(model: LanguageModel | undefined): string | undefined {
+  if (model === undefined) return undefined
+  if (typeof model === "string") return model
+  if (model.modelId.includes("/")) return model.modelId
+
+  const provider = model.provider.split(".")[0] ?? model.provider
+
+  return `${provider}/${model.modelId}`
+}
+
 export interface CallCost {
   readonly inputTokens: number
   readonly outputTokens: number

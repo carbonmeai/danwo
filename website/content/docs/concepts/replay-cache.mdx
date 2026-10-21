@@ -81,6 +81,18 @@ cache: 3 replayed · 0 relocated · 0 handed off · 2 missed · 1 recorded · 1 
 
 A step that wasn't kept asks the model again on the next run.
 
+## When you change the model
+
+Each recording keeps the name of the model that made it. Changing `model` in your config doesn't
+throw recordings away: steps still replay with no model call. The cache line says the new model
+didn't run for them:
+
+```text
+cache: 4 replayed · 0 relocated · 0 handed off · 0 missed · recorded with openai/gpt-5-mini (4 steps), running anthropic/claude-sonnet-5
+```
+
+To try the new model on those steps, clear the cache with `danwo cache clear` and run again.
+
 ## Why a step was re-asked
 
 A step is handed back to the model only when its recording stopped matching the page. The failure

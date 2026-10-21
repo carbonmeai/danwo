@@ -1,20 +1,26 @@
 /**
  * What a recording is kept under and what it holds: a route built from a `unique()` value replays
- * on a run with a fresh one, and the same instruction twice in a test is two recordings.
+ * on a run with a fresh one, the same instruction twice in a test is two recordings, and each
+ * recording names the model that made it.
  */
 import { createHash } from "node:crypto"
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { MockLanguageModelV4 } from "ai/test"
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest"
 
 import { openWebSession, type WebSession, type WebSessionOptions } from "../src/index.ts"
+import { modelName } from "../src/model/resolve.ts"
+import { addUsage, cacheLine } from "../src/record/usage.ts"
 import { unique } from "../src/replay/params.ts"
 import { routeMatches, templateRoute } from "../src/replay/route.ts"
 import { ReplayStore } from "../src/replay/store.ts"
 import { serveHtml, type HtmlServer } from "./fixtures/html-server.ts"
 import { type Move, ref, scripted } from "./fixtures/scripted.ts"
+
+const NOTHING = { calls: 0, retries: 0, tokens: [0, 0], usd: 0 } as const
 
 /** A page that creates a company and moves to its page, its name in the path. */
 const PAGE = `<!doctype html><title>Companies</title><h1>Companies</h1>
@@ -212,5 +218,66 @@ describe("step keys", () => {
     expect(new Set([first.key, between.key, second.key]).size).toBe(3)
     expect(store.key({ ...call, step: 0 }).key).toBe(first.key)
     expect(store.key({ ...call, step: 2 }).key).toBe(second.key)
+  })
+})
+
+describe("the model in each recording", () => {
+  it("is kept, and a replay on another model says so without calling it", async () => {
+    await withSession({ model: scripted(CONTINUE) }, continuedTwice, "/wizard")
+
+    const kept = await recordings()
+
+    expect(kept.map((trace) => trace["recordedBy"])).toEqual([
+      "mock/toolbox-actor",
+      "mock/toolbox-actor",
+    ])
+
+    const other = new MockLanguageModelV4({ provider: "gateway", modelId: "anthropic/claude-x" })
+    const notes = await withSession(
+      { model: other },
+      async (session) => {
+        await continuedTwice(session)
+
+        return session.flight.steps().flatMap((step) => (step.cache ? [step.cache] : []))
+      },
+      "/wizard",
+    )
+    const swapped = {
+      mode: "replayed",
+      recordedWith: "mock/toolbox-actor",
+      runningWith: "anthropic/claude-x",
+    }
+
+    expect(notes).toEqual([swapped, swapped])
+    expect(other.doGenerateCalls).toHaveLength(0)
+
+    const same = await withSession({ model: scripted([]) }, continuedTwice, "/wizard")
+
+    expect(same).toEqual(["replayed", "replayed"])
+  }, 60_000)
+
+  it("is named by its id, with the provider when the id has none", () => {
+    expect(modelName("openai/gpt-5-mini")).toBe("openai/gpt-5-mini")
+    expect(modelName(new MockLanguageModelV4({ provider: "openai.chat", modelId: "gpt-5" }))).toBe(
+      "openai/gpt-5",
+    )
+    expect(modelName(undefined)).toBeUndefined()
+  })
+
+  it("ends the cache line with the steps another model recorded", () => {
+    const models = [
+      { recordedWith: "openai/gpt-5-mini", runningWith: "anthropic/claude-x", steps: 4 },
+    ]
+    const usage = addUsage([
+      { cache: { replayed: 3 }, models, spent: NOTHING, steps: [] },
+      { cache: { replayed: 1 }, models: [{ ...models[0]!, steps: 0 }], spent: NOTHING, steps: [] },
+    ])
+
+    expect(cacheLine(usage.cache, usage.recordings, usage.models)).toBe(
+      "cache: 4 replayed · 0 relocated · 0 handed off · 0 missed · recorded with openai/gpt-5-mini (4 steps), running anthropic/claude-x",
+    )
+    expect(cacheLine({ replayed: 1 })).toBe(
+      "cache: 1 replayed · 0 relocated · 0 handed off · 0 missed",
+    )
   })
 })

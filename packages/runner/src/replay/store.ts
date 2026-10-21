@@ -40,6 +40,18 @@ export interface ReplayStoreOptions {
   readonly appIdentity: string
   /** How replays find recorded elements; part of every key. Default `similar-v1`. */
   readonly policy?: RelocationPolicy
+  /**
+   * The models the session runs on, by name (`openai/gpt-5-mini`): the actor, and the judge for
+   * waits and asserts (the actor when there is none). Each new recording keeps the name of the
+   * model that made it; a replay of one another model made says so.
+   */
+  readonly models?: { readonly actor?: string | undefined; readonly judge?: string | undefined }
+}
+
+/** A recording made by another model than the one this session runs on: both names. */
+export interface CrossModel {
+  readonly recordedWith: string
+  readonly runningWith: string
 }
 
 /** One agent step as the store keys it: what kind, which one in the journey, and what it said. */
@@ -189,7 +201,10 @@ export class ReplayStore {
     if (!this.writes) return
 
     await mkdir(this.options.dir, { recursive: true })
-    await this.writeFileAtomic(this.file(step.key), { ...trace, identity: step.identity })
+    await this.writeFileAtomic(this.file(step.key), {
+      ...this.stamped(trace, step.identity.kind),
+      identity: step.identity,
+    })
   }
 
   private async readAs<T>(key: string, schema: z.ZodType<T>): Promise<T | undefined> {
@@ -208,6 +223,39 @@ export class ReplayStore {
     }
   }
 
+  /** The name of the model that runs a step of `kind` in this session. */
+  private modelFor(kind: StepIdentity["kind"]): string | undefined {
+    const { models } = this.options
+
+    return kind === "wait" || kind === "assert" ? (models?.judge ?? models?.actor) : models?.actor
+  }
+
+  /** A recording with the name of the model that made it: as it was, or this session's. */
+  private stamped<T extends { readonly recordedBy?: string | undefined }>(
+    trace: T,
+    kind: StepIdentity["kind"],
+  ): T {
+    const model = trace.recordedBy ?? this.modelFor(kind)
+
+    return model === undefined ? trace : { ...trace, recordedBy: model }
+  }
+
+  /**
+   * Both models' names when `trace` was recorded by another model than this session runs `kind`
+   * on; empty otherwise, and for a recording that does not say which model made it.
+   */
+  crossModel(
+    trace: { readonly recordedBy?: string | undefined },
+    kind: StepIdentity["kind"],
+  ): CrossModel | Record<string, never> {
+    const running = this.modelFor(kind)
+    const recorded = trace.recordedBy
+
+    if (recorded === undefined || running === undefined || recorded === running) return {}
+
+    return { recordedWith: recorded, runningWith: running }
+  }
+
   private async writeFileAtomic(file: string, value: unknown): Promise<void> {
     const partial = `${file}.${randomBytes(4).toString("hex")}.tmp`
 
@@ -219,7 +267,7 @@ export class ReplayStore {
   stage(key: StepKey, step: number, trace: Trace): void {
     if (!this.writes) return
 
-    const kept = { ...trace, identity: key.identity }
+    const kept = { ...this.stamped(trace, key.identity.kind), identity: key.identity }
 
     this.staged = [
       ...this.staged.filter((entry) => entry.key !== key.key),

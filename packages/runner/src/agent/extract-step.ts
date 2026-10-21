@@ -95,7 +95,10 @@ async function fromRecording<T>(
   key: StepKey | undefined,
   schema: z.ZodType<T>,
   context: ExtractStepContext,
-): Promise<{ value: T; moved: ExtractTrace | undefined } | { reason: string | undefined }> {
+): Promise<
+  | { value: T; moved: ExtractTrace | undefined; recordedBy: string | undefined }
+  | { reason: string | undefined }
+> {
   const trace = key === undefined ? undefined : await context.store?.readExtract(key.key)
 
   if (trace === undefined) return { reason: undefined }
@@ -104,7 +107,11 @@ async function fromRecording<T>(
     const read = await replayExtract(trace, schema, context)
     const moved = read.trace.fields.some((field, at) => field.target !== trace.fields[at]?.target)
 
-    return { value: read.value, moved: moved ? read.trace : undefined }
+    return {
+      value: read.value,
+      moved: moved ? read.trace : undefined,
+      recordedBy: trace.recordedBy,
+    }
   } catch (error) {
     return { reason: context.redact(error instanceof Error ? error.message : String(error)) }
   }
@@ -124,7 +131,10 @@ export async function extractStep<T>(
   if ("value" in recorded) {
     if (recorded.moved !== undefined && key !== undefined)
       await store?.writeExtract(key, recorded.moved)
-    context.cache(recorded.moved === undefined ? "replayed" : "relocated")
+    context.cache(
+      recorded.moved === undefined ? "replayed" : "relocated",
+      store?.crossModel(recorded, "extract"),
+    )
 
     return recorded.value
   }

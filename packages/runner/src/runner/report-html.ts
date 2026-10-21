@@ -7,7 +7,7 @@
 import type { ScreenshotEvent } from "../assert/screenshot.ts"
 import { findingPlace } from "../lint/index.ts"
 import { effectNotes, effectsOf } from "../record/effect-notes.ts"
-import { recordingText } from "../record/steps.ts"
+import { modelText, recordingText } from "../record/steps.ts"
 import { dollars, type Spent, tokensText, usageOf } from "../record/usage.ts"
 import { afterBody, checkLine } from "./checks-text.ts"
 import type { FlightRecord, RecordedExchange, RecordedStep } from "./record.ts"
@@ -133,8 +133,10 @@ function cacheFact(cache: NonNullable<RecordedStep["cache"]>): string {
   const changed = cache.changed ? ` (${cache.changed.join(", ")} changed)` : ""
   const because = cache.because === undefined ? "" : ` (${cache.because})`
   const reason = cache.reason === undefined ? "" : `: ${cache.reason}`
+  const models = modelText(cache)
+  const other = models === undefined ? "" : ` (${models})`
 
-  return `cache ${cache.mode}${because}${saved}${changed}${reason}`
+  return `cache ${cache.mode}${because}${saved}${other}${changed}${reason}`
 }
 
 function stepsBlock(loaded: Loaded): string {
