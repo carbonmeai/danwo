@@ -179,6 +179,19 @@ function newSession(
   })
 }
 
+/** What a session does once paid: its lines, and its mode's intent, invoice, subscription or setup. */
+function sessionPlan(params: Params, mode: Mode, lines: readonly SessionLine[]): SessionPlan {
+  return {
+    lines,
+    intent: intentPlan(params),
+    invoice: invoicePlan(params),
+    ...(mode === "subscription" && { subscription: subscriptionPlan(params) }),
+    ...(mode === "setup" && {
+      setup: { metadata: metadataOf(asRecord(params.setup_intent_data)?.metadata) ?? {} },
+    }),
+  }
+}
+
 /** Creates a Checkout Session from the request's parameters. */
 async function createSession(c: Context, context: StripeRouteContext): Promise<Response> {
   const params = await readParams(c)
@@ -195,15 +208,7 @@ async function createSession(c: Context, context: StripeRouteContext): Promise<R
   if ("fault" in lines) return refuse(c, lines.fault)
   if (mode !== "setup" && lines.length === 0) return badParam(c, "line_items")
 
-  const plan: SessionPlan = {
-    lines,
-    intent: intentPlan(params),
-    invoice: invoicePlan(params),
-    ...(mode === "subscription" && { subscription: subscriptionPlan(params) }),
-    ...(mode === "setup" && {
-      setup: { metadata: metadataOf(asRecord(params.setup_intent_data)?.metadata) ?? {} },
-    }),
-  }
+  const plan = sessionPlan(params, mode, lines)
 
   return c.json(context.objects.checkoutSessions.add(newSession(context, params, mode, plan), plan))
 }
