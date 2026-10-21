@@ -5,17 +5,31 @@
 import { spawn } from "node:child_process"
 
 import type { Answers } from "./answers.ts"
-import { DANWO_PACKAGES, MOBILE_PACKAGES, MODEL_SOURCE_INFO, type PackageSpec } from "./catalog.ts"
+import {
+  DANWO_PACKAGES,
+  MOBILE_PACKAGES,
+  MODEL_SOURCE_INFO,
+  NODE_TYPES,
+  type PackageSpec,
+} from "./catalog.ts"
 import type { Detection, PackageManager } from "./detect.ts"
 
-/** The packages the answers' files import that the project does not have yet. */
+/**
+ * The packages the answers' files import that the project does not have yet, plus Node's types in
+ * a TypeScript project, since danwo's declarations use them.
+ */
 export function packagesToAdd(
   answers: Pick<Answers, "engine" | "modelSource">,
-  detection: Pick<Detection, "dependencies">,
+  detection: Pick<Detection, "dependencies" | "typescript">,
 ): PackageSpec[] {
   const model = MODEL_SOURCE_INFO[answers.modelSource].package
   const mobile = answers.engine === "mobile" || answers.engine === "both"
-  const wanted = [...DANWO_PACKAGES, ...(model ? [model] : []), ...(mobile ? MOBILE_PACKAGES : [])]
+  const wanted = [
+    ...DANWO_PACKAGES,
+    ...(model ? [model] : []),
+    ...(mobile ? MOBILE_PACKAGES : []),
+    ...(detection.typescript ? [NODE_TYPES] : []),
+  ]
 
   return wanted.filter((spec) => !detection.dependencies.has(spec.name))
 }

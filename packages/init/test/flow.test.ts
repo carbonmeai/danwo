@@ -173,6 +173,49 @@ describe("danwo init without prompts", () => {
     expect(second.result.files.every((file) => file.outcome === "unchanged")).toBe(true)
   })
 
+  it("adds Node's types to a TypeScript project that lacks them, or names them when not installing", async () => {
+    const root = await project({ "package.json": nextApp(), "tsconfig.json": {} })
+    const run = recordingRunner()
+    const flags = { yes: true, modelSource: "none", skills: "none" } as const
+
+    await runInit({ cwd: root, flags, env: {}, run, checkDevice: noDevice })
+
+    const skipped = await runInit({
+      cwd: root,
+      flags: { ...flags, skipInstall: true },
+      env: {},
+      run,
+      checkDevice: noDevice,
+    })
+
+    expect(run.calls).toEqual([
+      ["npm", "install", "-D", "@danwo/cli", "@danwo/sdk", "@types/node@^24"],
+    ])
+    expect(skipped.summary).toContain(
+      "not installed: run npm install -D @danwo/cli @danwo/sdk @types/node@^24",
+    )
+  })
+
+  it("leaves Node's types alone in a project that has them or has no TypeScript", async () => {
+    const typed = await project({
+      "package.json": {
+        ...nextApp(),
+        devDependencies: { typescript: "5.9.3", "@types/node": "24.0.0" },
+      },
+    })
+    const plain = await project({ "package.json": nextApp() })
+    const run = recordingRunner()
+    const flags = { yes: true, modelSource: "none", skills: "none" } as const
+
+    for (const cwd of [typed, plain])
+      await runInit({ cwd, flags, env: {}, run, checkDevice: noDevice })
+
+    expect(run.calls).toEqual([
+      ["npm", "install", "-D", "@danwo/cli", "@danwo/sdk"],
+      ["npm", "install", "-D", "@danwo/cli", "@danwo/sdk"],
+    ])
+  })
+
   it("writes a mobile config for an Expo app on the AVD the device check found", async () => {
     const root = await project({
       "package.json": { name: "app", dependencies: { expo: "54.0.0" } },

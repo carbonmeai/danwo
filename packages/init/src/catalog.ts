@@ -352,6 +352,9 @@ export const MOBILE_PACKAGES: readonly PackageSpec[] = [
   { name: "@danwo/expo", version: ADDED_VERSION },
 ]
 
+/** Node's types: danwo's declarations use them, so a TypeScript project needs them to type-check. */
+export const NODE_TYPES: PackageSpec = { name: "@types/node", version: "^24" }
+
 /** Checks whether `value` is one of `choices`. */
 export function isOneOf<T extends string>(choices: readonly T[], value: string): value is T {
   return (choices as readonly string[]).includes(value)
