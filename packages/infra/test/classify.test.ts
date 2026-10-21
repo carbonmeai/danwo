@@ -23,6 +23,18 @@ describe("classify (SQL)", () => {
       "write",
     ],
     ["WITH t AS (SELECT 1) SELECT * FROM orders", "SELECT orders", "read"],
+    [
+      "WITH c AS (SELECT id FROM outbox LIMIT 5 FOR UPDATE SKIP LOCKED) UPDATE outbox o SET status = 'busy' FROM c",
+      "UPDATE outbox",
+      "write",
+    ],
+    [
+      "WITH c AS (SELECT id FROM jobs FOR NO KEY UPDATE OF jobs NOWAIT) SELECT * FROM c",
+      "SELECT jobs",
+      "read",
+    ],
+    ["SELECT * FROM jobs WHERE id = $1 FOR UPDATE SKIP LOCKED", "SELECT jobs", "read"],
+    ["SELECT * FROM jobs FOR SHARE", "SELECT jobs", "read"],
     ["/* hi */ -- note\n  (SELECT id FROM orders WHERE id = 1)", "SELECT orders", "read"],
     ["SELECT 1", "SELECT", "other"],
     ["SET search_path TO public", "SET", "other"],

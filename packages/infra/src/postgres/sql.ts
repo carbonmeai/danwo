@@ -33,6 +33,15 @@ const WRITES: readonly (readonly [string, RegExp])[] = [
   ["MERGE", new RegExp(String.raw`\bmerge\s+into\s+(${NAME})`, "i")],
 ]
 
+/**
+ * A row-locking clause (`FOR UPDATE SKIP LOCKED`, `FOR NO KEY UPDATE OF t NOWAIT`, `FOR SHARE`).
+ * It locks what a SELECT reads and writes nothing, so it must not read as an `UPDATE`.
+ */
+const LOCKING = new RegExp(
+  String.raw`\bfor\s+(?:no\s+key\s+update|update|key\s+share|share)\b(?:\s+of\s+${NAME}(?:\s*,\s*${NAME})*)?(?:\s+nowait|\s+skip\s+locked)?`,
+  "gi",
+)
+
 const FROM = new RegExp(String.raw`\bfrom\s+(?:only\s+)?(${NAME})`, "i")
 
 /** The statement without leading comments, whitespace and opening parentheses. */
@@ -54,8 +63,10 @@ function tableName(name: string): string {
 
 /** The first data-changing clause anywhere in the statement (a `WITH … UPDATE` reads that way). */
 function writeIn(sql: string): Statement | undefined {
+  const unlocked = sql.replace(LOCKING, " ")
+
   for (const [verb, pattern] of WRITES) {
-    const match = pattern.exec(sql)
+    const match = pattern.exec(unlocked)
 
     if (match?.[1] !== undefined) return { verb, table: tableName(match[1]), role: "write" }
   }
