@@ -32,7 +32,7 @@ function readme(manifest: Manifest): string {
     "npx @danwo/cli init",
     "```",
     "",
-    `Documentation: https://danwo.dev. Source: https://github.com/danwo-dev/danwo/tree/main/packages/${folder}.`,
+    `Documentation: https://danwo.dev. Source: https://github.com/carbonmeai/danwo/tree/main/packages/${folder}.`,
     "Licensed under the Apache License 2.0.",
     "",
   ].join("\n")

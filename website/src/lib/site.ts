@@ -15,7 +15,7 @@ export const SITE = {
    * The public repository, as `owner/name`. While it is unset, links to it point at the docs
    * and the star count is hidden.
    */
-  repo: "danwo-dev/danwo" as string | undefined,
+  repo: "carbonmeai/danwo" as string | undefined,
   branch: "main",
   /** How the site describes the licence: danwo is open source under Apache-2.0. */
   licence: {

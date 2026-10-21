@@ -4,11 +4,11 @@
   "private": true,
   "description": "danwo's environments, emulators, faults, invariants and fault matrix for Playwright Test suites.",
   "homepage": "https://danwo.dev",
-  "bugs": "https://github.com/danwo-dev/danwo/issues",
+  "bugs": "https://github.com/carbonmeai/danwo/issues",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/danwo-dev/danwo.git",
+    "url": "git+https://github.com/carbonmeai/danwo.git",
     "directory": "packages/playwright"
   },
   "bin": {

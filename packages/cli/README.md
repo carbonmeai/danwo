@@ -25,4 +25,4 @@ npm run test:danwo
 | `danwo guide`         | Prints the guides, for you or a coding agent.                        |
 
 `danwo --help` lists every command and option. Documentation: https://danwo.dev. Source:
-https://github.com/danwo-dev/danwo. Licensed under the Apache License 2.0.
+https://github.com/carbonmeai/danwo. Licensed under the Apache License 2.0.

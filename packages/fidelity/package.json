@@ -4,11 +4,11 @@
   "private": true,
   "description": "Checks that danwo's emulators answer like the real providers: one scenario suite run against both, compared by structure.",
   "homepage": "https://danwo.dev",
-  "bugs": "https://github.com/danwo-dev/danwo/issues",
+  "bugs": "https://github.com/carbonmeai/danwo/issues",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/danwo-dev/danwo.git",
+    "url": "git+https://github.com/carbonmeai/danwo.git",
     "directory": "packages/fidelity"
   },
   "files": [
