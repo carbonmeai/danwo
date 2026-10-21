@@ -118,4 +118,30 @@ describe("routes", () => {
       routeOf("http://127.0.0.1:5123/blog/how-we-test-our-checkout", "http://127.0.0.1:5123"),
     ).toBe("app/blog/how-we-test-our-checkout")
   })
+
+  it("turns short prefixed, keyed and hex ids into :id, and keeps words and versioned names", () => {
+    const app = "http://127.0.0.1:5123"
+    const route = (path: string) => routeOf(`${app}${path}`, app)
+
+    expect(route("/projects/PROJ-016")).toBe("app/projects/:id")
+    expect(route("/invoices/INV-2041")).toBe("app/invoices/:id")
+    expect(route("/orders/ord_9xK2")).toBe("app/orders/:id")
+    expect(route("/p/8f3a2b1c")).toBe("app/p/:id")
+    expect(route("/p/8F3A2B1C")).toBe("app/p/:id")
+    expect(route("/items/abc123def")).toBe("app/items/:id")
+    expect(route("/items/1a2b3c4d")).toBe("app/items/:id")
+
+    for (const kept of [
+      "/orders/ord_new",
+      "/blog/top-10",
+      "/downloads/windows11",
+      "/releases/release2026",
+      "/teams/deadbeef",
+      "/docs/accepted",
+      "/Projects/Roadmap",
+      "/p/8f3a2b",
+      "/items/a1b2c3",
+    ])
+      expect(route(kept)).toBe(`app${kept}`)
+  })
 })
