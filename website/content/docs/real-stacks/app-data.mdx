@@ -1,0 +1,276 @@
+---
+title: Your app's data in tests
+description: Read and seed your app's own database from a test, so invariants check what was saved and not only what the screen showed.
+icon: DatabaseSearch
+---
+
+Your tests can query your app's database directly. A small helper runs SQL on the test database,
+and you use it to check rows in an invariant, seed rows before a run and wait for rows a webhook
+writes.
+
+## Why read the database
+
+An [invariant](/docs/invariants) is the rule the fault matrix checks after every trial. The screen
+can say "Order placed" while the order row was never written, or was written twice. Only the
+database knows what your app saved, so the strongest invariants compare its rows with what the
+provider recorded.
+
+```ts title="tests/one-order.danwo.ts"
+import { test } from "@danwo/sdk"
+
+import { sql } from "./db.ts"
+
+test("places an order", async ({ app, screen }) => {
+  await app.open("/products/mug")
+  await screen.getByRole("button", { name: "Buy now" }).click()
+}).invariant(async ({ expect }) => {
+  const orders = await sql("select id from orders where email = $1", ["ada@shop.test"])
+
+  expect(orders.length).toBeLessThanOrEqual(1)
+})
+```
+
+## Write a query helper
+
+Put the helper in a file next to your tests. This one uses the `pg` driver and opens a connection
+for each query:
+
+```ts title="tests/db.ts"
+import { Client, type QueryResultRow } from "pg"
+
+export const TEST_DATABASE_URL =
+  process.env.TEST_DATABASE_URL ?? "postgres://postgres@127.0.0.1:5432/shop_test"
+
+if (!new URL(TEST_DATABASE_URL).pathname.endsWith("_test"))
+  throw new Error(`not a test database: ${TEST_DATABASE_URL}`)
+
+/** Runs one statement on the app's test database and returns its rows. */
+export async function sql<Row extends QueryResultRow = QueryResultRow>(
+  text: string,
+  values: readonly unknown[] = [],
+): Promise<Row[]> {
+  const client = new Client({ connectionString: TEST_DATABASE_URL })
+
+  await client.connect()
+  try {
+    return (await client.query<Row>(text, [...values])).rows
+  } finally {
+    await client.end()
+  }
+}
+```
+
+Install the driver with `npm install -D pg @types/pg`. A connection per query is slower than a
+pool, but it never holds a connection that a [snapshot restore](#isolation-puts-the-rows-back)
+has closed.
+
+<Callout type="warn">
+  Point the helper at a database made for tests, never at production or a shared staging database.
+  Seeding empties tables, and the name check makes a wrong URL fail before the first query.
+</Callout>
+
+### Or use psql
+
+If your machine has `psql`, you can skip the driver. Send the SQL on standard input and pass each
+value with `-v`, so psql quotes it for you:
+
+```ts title="tests/psql.ts"
+import { spawnSync } from "node:child_process"
+
+const url = process.env.TEST_DATABASE_URL ?? "postgres://postgres@127.0.0.1:5432/shop_test"
+
+/** Runs `text` with psql; `:'name'` in it reads `values.name`, quoted as a literal. */
+export function psql(text: string, values: Readonly<Record<string, string>> = {}): string {
+  const vars = Object.entries(values).flatMap(([name, value]) => ["-v", `${name}=${value}`])
+  const result = spawnSync("psql", [url, "-v", "ON_ERROR_STOP=1", "-Atq", ...vars], {
+    input: text,
+    encoding: "utf8",
+  })
+
+  if (result.status !== 0) throw new Error(`psql failed: ${result.stderr}`)
+
+  return result.stdout.trim()
+}
+```
+
+Call it as `psql("select count(*) from orders where email = :'email'", { email })`. It returns
+psql's plain text: one row per line, columns split by `|`.
+
+<Callout type="info">
+  psql fills in variables only for SQL it reads from standard input or a file. With `-c`, a
+  `:'email'` is a syntax error.
+</Callout>
+
+## Keep values out of the SQL text
+
+Pass every value as a parameter, never glue it into the string. A name with an apostrophe breaks a
+glued query, and a hostile one runs as SQL.
+
+<Tabs items={["Good", "Bad"]}>
+  <Tab value="Good">
+
+```ts title="tests/db.ts · a parameter"
+await sql("select status from orders where email = $1", [email])
+```
+
+  </Tab>
+  <Tab value="Bad">
+
+```ts title="tests/db.ts · a glued value"
+await sql(`select status from orders where email = '${email}'`)
+```
+
+  </Tab>
+</Tabs>
+
+Table and column names can't be parameters. Keep those as fixed text in your helpers.
+
+## Check rows in an invariant
+
+The best invariant reads one fact from two sides. Here the shop's paid orders must match the
+checkout sessions Stripe marked paid, whichever way the trial went:
+
+```ts title="tests/checkout.danwo.ts"
+import { type StripeFixtures, test as base } from "@danwo/sdk"
+
+import { sql } from "./db.ts"
+
+const test = base.extend<StripeFixtures>()
+
+test("pays for a mug", async ({ app, screen }) => {
+  await app.open("/products/mug")
+  await screen.getByRole("button", { name: "Buy now" }).click()
+  await screen.getByTestId("checkout-pay").click()
+}).invariant(async ({ stripe, expect }) => {
+  const res = await stripe.fetch(
+    new Request("https://api.stripe.com/v1/checkout/sessions?payment_status=paid", {
+      headers: { authorization: "Bearer sk_test_any" },
+    }),
+  )
+  const { data } = (await res.json()) as { data: unknown[] }
+  const paid = await sql("select id from orders where status = $1", ["paid"])
+
+  expect(paid).toHaveLength(data.length)
+  expect(paid.length).toBeLessThanOrEqual(1)
+})
+```
+
+A trial where the payment failed passes with zero on both sides. A trial where a retried webhook
+marked two orders paid fails.
+
+## Seed before a run
+
+Rows every test needs, like the products in the shop, go in at the top of `environment()`. That
+runs once per worker, before the apps start:
+
+```ts title="danwo.config.ts · seeding"
+async environment() {
+  /* The last run's rows would end up in this run's snapshot. */
+  await sql("truncate orders, products restart identity cascade")
+  await sql("insert into products (sku, name, price_cents) values ($1, $2, $3)", ["mug", "Mug", 1200])
+
+  const postgres = await startPostgresProxy({ upstream: TEST_DATABASE_URL })
+  // start the stack with DATABASE_URL: postgres.url(TEST_DATABASE_URL), as on Databases
+}
+```
+
+Empty the tables first. danwo keeps its snapshot after the stack starts, so anything left over
+from the last run would be in every test's starting state.
+
+## Seed for one session
+
+Rows that belong to one signed-in user go in that [session's](/docs/sessions) `setup`. danwo keeps
+them in the session's own snapshot slot, beside its sign-in, when the environment sets
+`snapshotSlots: true`:
+
+```ts title="danwo.config.ts · a session"
+sessions: {
+  "ada-with-address": {
+    async setup({ app, screen }) {
+      await sql(
+        "insert into addresses (email, line1, city) values ($1, $2, $3) on conflict do nothing",
+        ["ada@shop.test", "12 Crescent Road", "London"],
+      )
+      await app.open("/login")
+      await screen.getByLabel("Email").fill("ada@shop.test")
+      await screen.getByRole("button", { name: "Sign in" }).click()
+    },
+  },
+},
+```
+
+A test that names `ada-with-address` starts signed in with her address saved. A test without it
+starts from the seeded state, with no address.
+
+## Wait for rows written in the background
+
+Before an invariant runs, danwo settles the stack. It waits until every webhook has been delivered
+and every [background job](/docs/background-jobs) has finished. That covers most rows.
+
+Some apps answer a webhook first and write the row a moment later. Then settling ends before the
+row exists. Poll for it:
+
+```ts title="tests/eventually.ts"
+import { sql } from "./db.ts"
+
+/** Waits up to `ms` for `text` to return a row, and returns the rows. */
+export async function eventually(text: string, values: readonly unknown[] = [], ms = 10_000) {
+  const deadline = Date.now() + ms
+
+  for (;;) {
+    const rows = await sql(text, values)
+
+    if (rows.length > 0) return rows
+    if (Date.now() > deadline) throw new Error(`no rows within ${ms} ms: ${text}`)
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+}
+```
+
+Use it in an invariant only for a row that must appear. A row that may rightly be missing, like an
+order after a declined card, would wait out the whole timeout.
+
+## Isolation puts the rows back
+
+With a [snapshot](/docs/stack-databases) in your environment, every test starts from the seeded
+rows. What one test writes is gone before the next, so an invariant counts only its own test's
+orders. See [Isolation](/docs/isolation) for the slots that keep each session apart.
+
+| Rows written in                   | Seen by                                     |
+| --------------------------------- | ------------------------------------------- |
+| `environment()`, before the stack | every test                                  |
+| a session's `setup`               | every test that uses that session           |
+| a test's body or invariant        | that test only; the next restore removes it |
+
+The `recreate` and `swap` strategies close every connection to the database while they restore.
+That's why the helper above opens a fresh one for each query.
+
+## Your reads skip the faults
+
+The fault matrix breaks your app's database calls through danwo's **data proxy**: a small server
+on its own port that passes statements on to Postgres. Only connections made to the proxy's URL go
+through it. Nothing reroutes other traffic to the database.
+
+| Who connects               | To                    | Recorded and faulted |
+| -------------------------- | --------------------- | -------------------- |
+| your app                   | `postgres.url(url)`   | yes                  |
+| your helper in a test      | the test database URL | no                   |
+| danwo's `postgresSnapshot` | the test database URL | no                   |
+
+So point the helper at the real database URL, never the proxy's. A trial's fault stays armed until
+the trial ends, invariant included. Through the proxy, your reads could be the ones faulted, and
+the clean trial would list them among the test's statements for the matrix to plan faults on.
+
+## Next
+
+<Cards>
+  <Card title="Databases" href="/docs/stack-databases">
+    Wire the proxy and the snapshot into your stack.
+  </Card>
+  <Card title="Writing invariants" href="/docs/invariants">
+    Rules that hold whichever way a trial went.
+  </Card>
+  <Card title="Database and cache faults" href="/docs/data-faults">
+    What the matrix does to your app's statements.
+  </Card>
+</Cards>

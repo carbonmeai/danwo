@@ -227,6 +227,7 @@ export const PLAN: readonly PlannedTab[] = [
           file("node-preload", "The Node preload", "Cpu", "real-stacks/preload.mdx"),
           file("processes", "Processes", "Activity", "real-stacks/processes.mdx"),
           file("stack-databases", "Databases", "Database", "real-stacks/databases.mdx"),
+          file("app-data", "Your app's data", "DatabaseSearch", "real-stacks/app-data.mdx"),
           file(
             "stack-example",
             "A worked example",
