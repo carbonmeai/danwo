@@ -319,7 +319,7 @@ describe("danwo matrix", () => {
 
     expect(out).toContain("FAIL  duplicate on webhook checkout.session.completed")
     expect(out).toContain("invariant: expected 1000 to be 500")
-    expect(out).toContain("faults: 17 passed, 1 failed")
+    expect(out).toContain("faults: 18 passed, 1 failed")
     expect(code).toBe(1)
 
     // Only the failed run is kept, and the run's report shows why it failed.
@@ -339,7 +339,7 @@ describe("danwo matrix", () => {
     // The GitHub check: failed, with the duplicate annotated in the test file, and no secrets.
     expect(bodyOf(fake, 0)?.name).toBe("danwo matrix")
     expect(bodyOf(fake, -1)?.conclusion).toBe("failure")
-    expect(bodyOf(fake, -1)?.output?.title).toBe("faults: 17 passed · 1 failed")
+    expect(bodyOf(fake, -1)?.output?.title).toBe("faults: 18 passed · 1 failed")
     expect(bodyOf(fake, -1)?.output?.annotations).toEqual([
       expect.objectContaining({
         path: `examples/${basename(SHOP)}/tests/buy-credits.danwo.ts`,
