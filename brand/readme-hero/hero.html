@@ -1,0 +1,249 @@
+<!doctype html>
+<!--
+  The README's hero banner. render.ts opens it as hero.html?theme=dark|light&tiles=<folder> and
+  screenshots it; each tile is a screenshot of danwo's own UI that render.ts captured into <folder>.
+-->
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <title>danwo README hero</title>
+    <style>
+      @font-face {
+        font-family: "Inter";
+        font-weight: 100 900;
+        src: url("../../packages/dashboard/public/fonts/InterVariable.woff2") format("woff2");
+      }
+
+      @font-face {
+        font-family: "Geist Mono";
+        font-weight: 100 900;
+        src: url("../../packages/dashboard/public/fonts/GeistMono-Variable.woff2") format("woff2");
+      }
+
+      :root {
+        --bg: #0a0a0a;
+        --text: #ffffff;
+        --muted: #a3a3a6;
+        --faint: #6e6e73;
+        --pill-bg: #151515;
+        --pill-border: #2a2a2c;
+        --tile-border: rgb(255 255 255 / 0.1);
+        --tile-shadow: 0 24px 48px rgb(0 0 0 / 0.55);
+      }
+
+      :root[data-theme="light"] {
+        --bg: #ffffff;
+        --text: #0a0a0a;
+        --muted: #55555a;
+        --faint: #8e8e93;
+        --pill-bg: #f4f4f5;
+        --pill-border: #e2e2e5;
+        --tile-border: rgb(0 0 0 / 0.09);
+        --tile-shadow: 0 20px 44px rgb(10 18 23 / 0.16);
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 800px;
+        height: 400px;
+        overflow: hidden;
+        background: var(--bg);
+        font-family: "Inter", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .wall {
+        position: absolute;
+        inset: 0 0 0 360px;
+        overflow: hidden;
+        -webkit-mask-image:
+          linear-gradient(to right, transparent 0, #000 26%, #000 82%, transparent 100%),
+          linear-gradient(to bottom, transparent 0, #000 16%, #000 84%, transparent 100%);
+        -webkit-mask-composite: source-in;
+        mask-image:
+          linear-gradient(to right, transparent 0, #000 26%, #000 82%, transparent 100%),
+          linear-gradient(to bottom, transparent 0, #000 16%, #000 84%, transparent 100%);
+        mask-composite: intersect;
+      }
+
+      .plane {
+        position: absolute;
+        top: 0;
+        left: 0;
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        transform-origin: 0 0;
+        transform: translate(-420px, 300px) rotate(-30deg) skewX(30deg) scaleY(0.866);
+      }
+
+      .column {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 170px;
+      }
+
+      .column.wide {
+        width: 300px;
+      }
+
+      .column:nth-child(1) {
+        margin-top: 40px;
+      }
+
+      .column:nth-child(2) {
+        margin-top: -70px;
+      }
+
+      .column:nth-child(3) {
+        margin-top: -20px;
+      }
+
+      .column:nth-child(4) {
+        margin-top: 60px;
+      }
+
+      .column:nth-child(5) {
+        margin-top: 120px;
+      }
+
+      .tile {
+        margin: 0;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid var(--tile-border);
+        box-shadow: var(--tile-shadow);
+        background: var(--bg);
+      }
+
+      .tile img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .panel {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 400px;
+        padding: 0 0 0 44px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+
+      .lockup {
+        height: 28px;
+        width: auto;
+        align-self: flex-start;
+      }
+
+      h1 {
+        margin: 34px 0 0;
+        font-size: 26px;
+        line-height: 1.16;
+        font-weight: 600;
+        letter-spacing: -0.035em;
+        color: var(--text);
+      }
+
+      h1 span {
+        display: block;
+        color: var(--muted);
+      }
+
+      p {
+        margin: 14px 0 0;
+        max-width: 300px;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+
+      .pill {
+        margin-top: 26px;
+        align-self: flex-start;
+        padding: 8px 15px;
+        border-radius: 999px;
+        border: 1px solid var(--pill-border);
+        background: var(--pill-bg);
+        font-family: "Geist Mono", monospace;
+        font-size: 12px;
+        color: var(--text);
+      }
+
+      .pill b {
+        font-weight: 400;
+        color: var(--faint);
+        margin-right: 8px;
+      }
+
+      [data-only="dark"],
+      [data-only="light"] {
+        display: none;
+      }
+
+      :root[data-theme="dark"] [data-only="dark"],
+      :root[data-theme="light"] [data-only="light"] {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wall">
+      <div class="plane">
+        <div class="column">
+          <figure class="tile"><img data-tile="overview" alt="" /></figure>
+          <figure class="tile"><img data-tile="verdict" alt="" /></figure>
+        </div>
+        <div class="column">
+          <figure class="tile"><img data-tile="terminal" alt="" /></figure>
+          <figure class="tile"><img data-tile="trial" alt="" /></figure>
+        </div>
+        <div class="column wide">
+          <figure class="tile"><img data-tile="breaks" alt="" /></figure>
+          <figure class="tile"><img data-tile="matrix" alt="" /></figure>
+          <figure class="tile"><img data-tile="pr-comment" alt="" /></figure>
+        </div>
+        <div class="column">
+          <figure class="tile"><img data-tile="providers" alt="" /></figure>
+          <figure class="tile"><img data-tile="calls" alt="" /></figure>
+        </div>
+        <div class="column">
+          <figure class="tile"><img data-tile="replay" alt="" /></figure>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <img
+        class="lockup"
+        data-only="dark"
+        src="../svg/danwo-lockup-horizontal-on-dark.svg"
+        alt="dánwò"
+      />
+      <img
+        class="lockup"
+        data-only="light"
+        src="../svg/danwo-lockup-horizontal-on-light.svg"
+        alt="dánwò"
+      />
+      <h1>Drive the UI.<span>Judge everything behind it.</span></h1>
+      <p>Emulated providers, a fault matrix and a flight record for every run.</p>
+      <div class="pill"><b>$</b>npx @danwo/cli init</div>
+    </div>
+
+    <script>
+      const query = new URLSearchParams(location.search)
+      const theme = query.get("theme") === "light" ? "light" : "dark"
+      const tiles = query.get("tiles") ?? "tiles"
+
+      document.documentElement.dataset.theme = theme
+      for (const img of document.querySelectorAll("[data-tile]"))
+        img.src = `${tiles}/${theme}/${img.dataset.tile}.png`
+    </script>
+  </body>
+</html>

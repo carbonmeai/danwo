@@ -13,7 +13,8 @@
     "benchmarks/bench",
     "benchmarks/tests",
     "benchmarks/test",
-    "benchmarks/*.ts"
+    "benchmarks/*.ts",
+    "brand/readme-hero"
   ],
   "compilerOptions": {
     "allowJs": true

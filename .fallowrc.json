@@ -80,7 +80,8 @@
     "packages/*/test/fixtures/**",
     "packages/recorder/src/page-script.ts",
     "benchmarks/app/server.ts",
-    "benchmarks/bench/run.ts"
+    "benchmarks/bench/run.ts",
+    "brand/readme-hero/tiles.css"
   ],
   "ignoreDependencies": ["@danwo/example-shop"],
   "publicPackages": ["@danwo/ui"],

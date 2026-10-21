@@ -1,0 +1,143 @@
+/* The two tiles render.ts draws as HTML: the pull request comment and the terminal. */
+html,
+body {
+  margin: 0;
+  background: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  padding: 0;
+  width: 560px;
+}
+
+.comment {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  font:
+    14px/1.5 -apple-system,
+    "Segoe UI",
+    "Noto Sans",
+    Helvetica,
+    Arial,
+    sans-serif;
+}
+
+.comment header {
+  padding: 9px 16px;
+  background: var(--head);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.comment header b {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.comment .bot {
+  margin: 0 2px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.comment article {
+  padding: 4px 16px 14px;
+}
+
+.comment h2 {
+  margin: 12px 0 8px;
+  padding-bottom: 6px;
+  font-size: 21px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+}
+
+.comment h3 {
+  margin: 14px 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.comment p {
+  margin: 0 0 10px;
+}
+
+.comment a {
+  color: #4493f8;
+  text-decoration: none;
+}
+
+.comment code {
+  padding: 0.15em 0.4em;
+  border-radius: 6px;
+  background: var(--code);
+  font:
+    85% "Geist Mono",
+    ui-monospace,
+    monospace;
+}
+
+.comment table {
+  width: 100%;
+  margin: 0 0 12px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.comment th,
+.comment td {
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.comment th {
+  font-weight: 600;
+}
+
+.comment details {
+  margin-bottom: 10px;
+}
+
+.comment sub {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.terminal {
+  margin: 0;
+  padding: 16px 18px;
+  background: var(--term);
+  color: var(--fg);
+  border-radius: 10px;
+  font:
+    11.5px/1.6 "Geist Mono",
+    ui-monospace,
+    monospace;
+  white-space: pre;
+  overflow: hidden;
+}
+
+.terminal .prompt {
+  color: var(--muted);
+}
+
+.terminal i {
+  font-style: normal;
+  font-weight: 600;
+}
+
+.terminal .pass {
+  color: var(--pass);
+}
+
+.terminal .fail {
+  color: var(--fail);
+}

@@ -27,15 +27,19 @@
     "bench": "bun run --cwd benchmarks bench",
     "website:dev": "bun run --cwd website dev",
     "website:build": "bun run --cwd website build",
-    "website:preview": "bun run --cwd website preview"
+    "website:preview": "bun run --cwd website preview",
+    "readme-hero": "node brand/readme-hero/render.ts"
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "5.10.0",
     "@types/node": "^24",
     "fallow": "3.33.1",
+    "micromark": "4.0.3",
+    "micromark-extension-gfm": "3.0.0",
     "oxfmt": "0.73.0",
     "oxlint": "1.88.0",
     "oxlint-tsgolint": "7.0.2004",
+    "playwright-core": "1.64.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   },
