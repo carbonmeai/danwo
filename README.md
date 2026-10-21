@@ -3,6 +3,25 @@
   <img src="brand/readme-hero/hero-light.png" alt="dánwò: Drive the UI. Judge everything behind it." width="100%">
 </picture>
 
+<br>
+
+<h3 align="center">dánwò</h3>
+
+<p align="center">
+  The open-source testing framework that drives your app through its UI like a user,<br>
+  and then checks everything that happened behind it.
+  <br>
+  <a href="https://danwo.dev"><strong>Learn more »</strong></a>
+</p>
+
+<p align="center">
+  <a href="https://danwo.dev/docs/quickstart">Quickstart</a> ·
+  <a href="https://danwo.dev/docs">Docs</a> ·
+  <a href="https://danwo.dev/docs/fault-matrix/overview">Fault matrix</a> ·
+  <a href="https://danwo.dev/docs/coding-agents/overview">Coding agents</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
+
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-Apache--2.0-blue" alt="Licence: Apache-2.0"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A524-339933?logo=nodedotjs&logoColor=white" alt="Node ≥ 24">
@@ -10,15 +29,7 @@
   <img src="https://img.shields.io/badge/TypeScript-3178c6?logo=typescript&logoColor=white" alt="TypeScript">
 </p>
 
-<p align="center">
-  <a href="https://danwo.dev">Website</a> ·
-  <a href="https://danwo.dev/docs">Docs</a> ·
-  <a href="https://danwo.dev/docs/quickstart">Quickstart</a> ·
-  <a href="https://danwo.dev/docs/fault-matrix/overview">Fault matrix</a> ·
-  <a href="https://danwo.dev/docs/coding-agents/overview">Coding agents</a>
-</p>
-
-**dánwò** (`danwo`) is an open-source testing framework that drives your app through its UI like a user, and then checks everything that happened behind it.
+<br>
 
 Coding agents made writing code cheap; verifying it is now the bottleneck. A test that clicks "Pay" and sees "Thank you" proves little: was the card charged once, did the webhook arrive, was the email sent, does the ledger add up? danwo answers one question per change: **what did this break, and how sure are we?**
 
