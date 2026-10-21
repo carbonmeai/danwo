@@ -35,7 +35,16 @@ describe("the dashboard's Vite dependency cache", () => {
   })
 
   it("is the config danwo serve starts with, with React loaded once", () => {
-    expect(config.cacheDir).toMatch(/[/\\]node_modules[/\\]\.vite[/\\]deps-[0-9a-f]{12}$/)
-    expect(config.resolve?.dedupe).toEqual([...DEDUPE])
+    const served = config({ command: "serve", mode: "development" })
+
+    expect(served.cacheDir).toMatch(/[/\\]node_modules[/\\]\.vite[/\\]deps-[0-9a-f]{12}$/)
+    expect(served.resolve?.dedupe).toEqual([...DEDUPE])
+  })
+
+  it("bundles the built server's dependencies but the runner", () => {
+    expect(config({ command: "serve", mode: "development" }).environments).toBeUndefined()
+    expect(config({ command: "build", mode: "production" }).environments?.ssr?.resolve).toEqual({
+      noExternal: true,
+    })
   })
 })

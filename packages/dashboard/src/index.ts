@@ -4,11 +4,14 @@
  * danwo CLI, which writes as any run does.
  */
 import { spawn } from "node:child_process"
+import { existsSync } from "node:fs"
+import type { Server } from "node:http"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { nearestConfig } from "@danwo/runner/runner"
-import { createServer, type ViteDevServer } from "vite"
+
+import { serveBuilt } from "./built.ts"
 
 export interface DashboardOptions {
   /** The project whose `.danwo` folder to show. */
@@ -25,13 +28,15 @@ export interface Dashboard {
 }
 
 const CONFIG = fileURLToPath(new URL("../vite.config.ts", import.meta.url))
+/** What `bun run build` writes; the published package carries it instead of the source. */
+const BUILT = fileURLToPath(new URL("../dist/", import.meta.url))
 /** The CLI beside this package, in the workspace and once installed alike. */
 const CLI = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "cli", "bin", "danwo.mjs")
 const DEFAULT_PORT = 4310
 
 /** The server's local URL once it listens. */
-function urlOf(server: ViteDevServer): string {
-  const address = server.httpServer?.address()
+function urlOf(server: Pick<Server, "address"> | null | undefined): string {
+  const address = server?.address()
 
   if (address === null || address === undefined || typeof address === "string")
     throw new Error("the dashboard did not start listening")
@@ -39,11 +44,9 @@ function urlOf(server: ViteDevServer): string {
   return `http://127.0.0.1:${address.port}/`
 }
 
-export async function startDashboard(options: DashboardOptions): Promise<Dashboard> {
-  process.env.DANWO_PROJECT_ROOT = options.root
-  process.env.DANWO_CLI_BIN = options.cli ?? CLI
-
-  const port = options.port ?? DEFAULT_PORT
+/** The dashboard from its source under Vite's dev server, as it runs in danwo's repository. */
+async function fromSource(port: number): Promise<Dashboard> {
+  const { createServer } = await import("vite")
   const server = await createServer({
     configFile: CONFIG,
     logLevel: "warn",
@@ -53,7 +56,38 @@ export async function startDashboard(options: DashboardOptions): Promise<Dashboa
 
   await server.listen()
 
-  return { url: urlOf(server), close: () => server.close() }
+  return { url: urlOf(server.httpServer), close: () => server.close() }
+}
+
+/** The dashboard from its build, as an installed danwo runs it. */
+async function fromBuild(port: number): Promise<Dashboard> {
+  const server = await serveBuilt(BUILT, port)
+
+  return {
+    url: urlOf(server),
+    close: () =>
+      new Promise((resolve) => {
+        server.close(() => resolve())
+        server.closeAllConnections()
+      }),
+  }
+}
+
+/**
+ * Starts the dashboard: from source where its Vite config is (danwo's own repository), else from
+ * the build the package ships.
+ */
+export async function startDashboard(options: DashboardOptions): Promise<Dashboard> {
+  process.env.DANWO_PROJECT_ROOT = options.root
+  process.env.DANWO_CLI_BIN = options.cli ?? CLI
+
+  const port = options.port ?? DEFAULT_PORT
+
+  if (existsSync(CONFIG)) return fromSource(port)
+  if (!existsSync(join(BUILT, "server", "server.js")))
+    throw new Error(`the dashboard has neither its source nor its build at ${BUILT}`)
+
+  return fromBuild(port)
 }
 
 export interface ServeOptions {
