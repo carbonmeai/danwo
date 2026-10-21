@@ -51,7 +51,7 @@
     "@clerk/clerk-js": "6.39.1",
     "@clerk/shared": "4.40.0",
     "@clerk/ui": "1.40.2",
-    "@composio/client": "2.0.0-rc.17",
+    "@composio/client": "2.0.0-rc.19",
     "@composio/core": "0.25.0",
     "@google/genai": "2.30.0",
     "@hocuspocus/provider": "4.0.0",

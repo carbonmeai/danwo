@@ -187,7 +187,7 @@
         "@clerk/clerk-js": "6.39.1",
         "@clerk/shared": "4.40.0",
         "@clerk/ui": "1.40.2",
-        "@composio/client": "2.0.0-rc.17",
+        "@composio/client": "2.0.0-rc.19",
         "@composio/core": "0.25.0",
         "@google/genai": "2.30.0",
         "@hocuspocus/provider": "4.0.0",
@@ -661,7 +661,7 @@
 
     "@coinbase/wallet-sdk": ["@coinbase/wallet-sdk@4.3.7", "", { "dependencies": { "@noble/hashes": "^1.4.0", "clsx": "^1.2.1", "eventemitter3": "^5.0.1", "preact": "^10.24.2", "viem": "^2.27.2" } }, "sha512-z6e5XDw6EF06RqkeyEa+qD0dZ2ZbLci99vx3zwDY//XO8X7166tqKJrR2XlQnzVmtcUuJtCd5fCvr9Cu6zzX7w=="],
 
-    "@composio/client": ["@composio/client@2.0.0-rc.17", "", { "peerDependencies": { "effect": "*" }, "optionalPeers": ["effect"] }, "sha512-j1fqyiAwAO6kOmbLwkLn4fb4//GNveV2yo0iMo4wTwOk9euRwQNK6lodVcRhJT6ZeRCSS2Xv8uUsJtmGsPTyiA=="],
+    "@composio/client": ["@composio/client@2.0.0-rc.19", "", { "peerDependencies": { "effect": "*" }, "optionalPeers": ["effect"] }, "sha512-EdBq7KXefbLXwK4F4wUtlG/e37pSxBQCAjJLRAgb0tHhiifDVqsmB/9AzLzpDsDfDKL/3UMUtYUiVUYaD87BVA=="],
 
     "@composio/core": ["@composio/core@0.25.0", "", { "dependencies": { "@composio/client": "2.0.0-rc.17", "@composio/json-schema-to-zod": "0.3.4", "@types/json-schema": "^7.0.15", "is-fs-case-sensitive": "^2.0.0", "openai": "^7.32.0", "picocolors": "^1.1.1", "pusher-js": "^8.6.0", "semver": "^7.8.5", "undici": "^7.30.0", "zod-to-json-schema": "^3.25.2" }, "peerDependencies": { "zod": ">=3.25.76 <5" } }, "sha512-oxzr0etEDb2EzoyCQfyunoui0sRZq+v97w1l4Wj445cbks/VGauQsgVjVSxMqMc74MnSnzvvZ4saQbpkycBN+g=="],
 
@@ -3492,6 +3492,8 @@
     "@clerk/ui/input-otp": ["input-otp@1.4.2", "", { "peerDependencies": { "react": "^16.8 || ^17.0 || ^18.0 || ^19.0.0 || ^19.0.0-rc", "react-dom": "^16.8 || ^17.0 || ^18.0 || ^19.0.0 || ^19.0.0-rc" } }, "sha512-l3jWwYNvrEa6NTCt7BECfCm48GvwuZzkoeG3gBL2w4CHeOXW3eKFmf9UNYkNfYc3mxMrthMnxjIE07MT0zLBQA=="],
 
     "@coinbase/wallet-sdk/clsx": ["clsx@1.2.1", "", {}, "sha512-EcR6r5a8bj6pu3ycsa/E/cKVGuTgZJZdsyUYHOksG/UHIiKfjxzRxYJpyVBwYaQeOvghal9fcc4PidlgzugAQg=="],
+
+    "@composio/core/@composio/client": ["@composio/client@2.0.0-rc.17", "", { "peerDependencies": { "effect": "*" }, "optionalPeers": ["effect"] }, "sha512-j1fqyiAwAO6kOmbLwkLn4fb4//GNveV2yo0iMo4wTwOk9euRwQNK6lodVcRhJT6ZeRCSS2Xv8uUsJtmGsPTyiA=="],
 
     "@danwo/proxy/express": ["express@5.3.0", "", { "dependencies": { "accepts": "^2.0.0", "body-parser": "^2.3.0", "content-disposition": "^2.0.1", "content-type": "^2.0.0", "cookie": "^0.7.1", "cookie-signature": "^1.2.1", "debug": "^4.4.0", "depd": "^2.0.0", "encodeurl": "^2.0.0", "escape-html": "^1.0.3", "etag": "^1.8.1", "finalhandler": "^2.1.0", "fresh": "^2.0.0", "http-errors": "^2.0.0", "merge-descriptors": "^2.0.0", "mime-types": "^3.0.0", "on-finished": "^2.4.1", "once": "^1.4.0", "parseurl": "^1.3.3", "proxy-addr": "^2.0.8", "qs": "^6.16.0", "range-parser": "^1.2.1", "router": "^2.2.0", "send": "^1.1.0", "serve-static": "^2.2.0", "statuses": "^2.0.1", "type-is": "^2.1.0", "vary": "^1.1.2" } }, "sha512-qCqy1xSoaugxOD4IVHb1ZWdkvCF2W3aE2okKouWj8VwJ+ztskSiXoBnCSJqfKT+cVPJhuJqe9YLbY425+Zh00g=="],
 
