@@ -4,9 +4,9 @@
     "packages/*/src",
     "packages/*/test",
     "packages/*/*.mjs",
-    "examples/*/src",
-    "examples/*/tests",
-    "examples/*/*.ts",
+    "examples/shop*/src",
+    "examples/shop*/tests",
+    "examples/shop*/*.ts",
     "examples/*.ts",
     "vitest.config.ts",
     "scripts",
@@ -20,5 +20,5 @@
   "compilerOptions": {
     "allowJs": true
   },
-  "exclude": ["packages/ui", "packages/dashboard", "examples/with-*"]
+  "exclude": ["packages/ui", "packages/dashboard"]
 }

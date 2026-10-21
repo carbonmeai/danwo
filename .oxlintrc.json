@@ -63,7 +63,8 @@
     "**/routeTree.gen.ts",
     "**/styled-system/**",
     "examples/shop-mobile/app/**",
-    "examples/with-*/**"
+    "examples/[!s_]*/**",
+    "examples/s[!h]*/**"
   ],
   "jsPlugins": ["@stylistic/eslint-plugin"],
   "overrides": [

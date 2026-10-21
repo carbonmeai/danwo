@@ -1,5 +1,13 @@
 import { execFileSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -135,24 +143,80 @@ function matches(pattern: string, path: string): boolean {
   return new RegExp(`^${pattern.replaceAll("*", "[^/]*")}$`).test(path)
 }
 
+/** The examples whose `example.json` says how they install: `npm` (standalone) or `workspace`. */
+function examplesBy(install: "npm" | "workspace"): string[] {
+  const root = join(ROOT, "examples")
+
+  return readdirSync(root)
+    .filter((name) => existsSync(join(root, name, "example.json")))
+    .filter((name) => {
+      const notes: unknown = JSON.parse(readFileSync(join(root, name, "example.json"), "utf8"))
+
+      return Reflect.get(Object(notes), "install") === install
+    })
+    .toSorted()
+}
+
+/** A JSON config's string list at `key`, e.g. `.oxlintrc.json`'s `ignorePatterns`. */
+function listIn(file: string, key: string): string[] {
+  const config: unknown = JSON.parse(readFileSync(join(ROOT, file), "utf8"))
+  const list: unknown = Reflect.get(Object(config), key)
+
+  return Array.isArray(list) ? list.map(String) : []
+}
+
+/** Whether a glob with `*` and `[!…]` classes, such as `examples/s[!h]*`, matches `path`. */
+function globMatches(pattern: string, path: string): boolean {
+  const source = pattern
+    .replaceAll("**", "\0")
+    .replaceAll("*", "[^/]*")
+    .replaceAll("[!", "[^")
+    .replaceAll("\0", ".*")
+
+  return new RegExp(`^${source}$`).test(path)
+}
+
 describe("the standalone examples", () => {
-  const standalone = kitTargets().filter((name) => name.startsWith("with-"))
+  const standalone = examplesBy("npm")
 
   it("are not workspaces of the repository", () => {
     const root: unknown = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"))
     const workspaces: unknown = Reflect.get(Object(root), "workspaces")
     const patterns = Array.isArray(workspaces) ? workspaces.map(String) : []
 
-    expect(standalone.length).toBeGreaterThan(0)
+    expect(standalone).toEqual(expect.arrayContaining(["commerce", "with-next"]))
     for (const name of standalone)
       expect(patterns.filter((pattern) => matches(pattern, `examples/${name}`))).toEqual([])
+  })
+
+  it("are left to their own toolchain: the repository's lint and fallow skip them", () => {
+    for (const file of [".oxlintrc.json", ".fallowrc.json"]) {
+      const ignored = listIn(file, "ignorePatterns")
+
+      for (const name of standalone)
+        expect(
+          ignored.some((pattern) => globMatches(pattern, `examples/${name}/app.ts`)),
+          `${file} ignores examples/${name}`,
+        ).toBe(true)
+      for (const name of examplesBy("workspace"))
+        expect(
+          ignored.some((pattern) => globMatches(pattern, `examples/${name}/src/app.ts`)),
+          `${file} lints examples/${name}`,
+        ).toBe(false)
+    }
   })
 
   it("commit no lockfile", () => {
     /* What git holds or would add: tracked files, and untracked ones no .gitignore leaves out. */
     const tracked = execFileSync(
       "git",
-      ["ls-files", "--cached", "--others", "--exclude-standard", ":(glob)examples/with-*/**"],
+      [
+        "ls-files",
+        "--cached",
+        "--others",
+        "--exclude-standard",
+        ...standalone.map((name) => `examples/${name}`),
+      ],
       { cwd: ROOT, encoding: "utf8" },
     )
 
