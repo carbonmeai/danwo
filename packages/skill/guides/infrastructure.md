@@ -52,7 +52,10 @@ proxies, like its own app. `service` names a proxy in labels (default `postgres`
 **Postgres:** the frontend/backend wire protocol, simple and extended queries alike. A call is one
 Query, or the Parse/Bind/Execute messages up to a Sync, so pipelined drivers work. Each call is
 labelled by its statement: `BEGIN`, `COMMIT`, `ROLLBACK`, `SAVEPOINT`, `INSERT orders`,
-`UPDATE stock`, `DELETE sessions`, `SELECT orders`. `WITH … UPDATE` reads as the UPDATE. The
+`UPDATE stock`, `DELETE sessions`, `SELECT orders`. `WITH … UPDATE` reads as the UPDATE.
+Row-locking clauses (`FOR UPDATE SKIP LOCKED`, `FOR NO KEY UPDATE OF t NOWAIT`, `FOR SHARE`)
+are ignored when looking for the write, so a job-claim query such as `WITH next AS (SELECT …
+FOR UPDATE SKIP LOCKED) UPDATE jobs …` reads as `UPDATE jobs`. The
 table is read from the SQL text on a best-effort basis: its last name part, unquoted, in lower
 case. Startup, authentication, COPY data, notices and notifications pass through untouched.
 

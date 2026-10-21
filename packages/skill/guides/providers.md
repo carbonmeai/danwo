@@ -163,9 +163,12 @@ every event a test sends is in its flight record and `danwo matrix` can fault it
 down, an event accepted whose answer was lost, so a retrying app sends it twice, and a slow send).
 `settle()` (and readiness with `settle: true`) waits until the function runs those events
 triggered have finished, so an invariant reads what the background jobs wrote; the record lists
-each run with its function, status and duration under `inngest`. After `time.travel`, the proxy
-moves each sent event's `ts` back to real time, as the dev server runs on it; otherwise their runs
-would be scheduled days ahead. `step.sleep` still sleeps in real time.
+each run with its function, status and duration under `inngest`. An event no registered
+function's trigger matches starts nothing and is not waited for; any other event that has not
+started a run yet gets a few seconds from when it was sent for one to show (a dev server that
+cannot list its functions' triggers gets that wait for every event). After `time.travel`, the
+proxy moves each sent event's `ts` back to real time, as the dev server runs on it; otherwise
+their runs would be scheduled days ahead. `step.sleep` still sleeps in real time.
 
 ## Hosts no service answers
 
@@ -319,6 +322,12 @@ Tigris's own API, and the Tigris SDK's snapshots, forks and bundles.
 customers, products and prices, payment intents and refunds, Checkout Sessions with the hosted
 page, events and webhooks signed as Stripe signs them, so `stripe` and `@stripe/stripe-js` work
 unchanged.
+
+On the hosted Checkout page (`checkout-pay` pays, `checkout-cancel` returns to `cancel_url`) the
+card number field holds `4242 4242 4242 4242`; typing `4000 0000 0000 0002` declines it as Stripe
+does: an alert with test id `checkout-error`, the session stays open, no event is sent, and the
+payer can try another card. `danwo matrix` also tries the page's Pay as a declined card
+(the fault `card_declined`), whatever card the test typed.
 
 ### Subscriptions and billing
 
@@ -495,7 +504,12 @@ Seed `instance.signingKey` (a PKCS#8 PEM) to keep one key across runs, and `inst
 app's origin) to put it in the `azp` of tokens the Backend API mints, so `authorizedParties`
 checks pass for those too; tokens minted for the browser carry its `Origin`.
 
-In tests, `clerkInstance(clerk)` reads users, sessions and codes, and
+In tests, `clerkInstance(clerk)` reads users (`user(email)`, `users()`: every one, oldest first,
+seeded, signed up or made through the Backend API, each with its linked `external_accounts`),
+sessions, organizations, memberships (`memberships(orgId?)`: id, organization, user and role) and
+codes, so an invariant can compare the app's own rows with Clerk's. The view types are danwo's
+own (`ClerkUserView`, `ClerkSessionView`, `ClerkOrganizationView`, `ClerkMembershipView`;
+`ClerkUser` was renamed `ClerkUserView`), and `stableClerkId` is exported from `@danwo/sdk`. And
 `revokeSessions(email)` signs a user out everywhere mid-test: the next token refresh is refused
 and the next handshake signs the app out. `danwo matrix` faults the Backend API (429 with
 `Retry-After`, 500, 503, a slow answer, resets), the signing keys and handshake payloads (500,

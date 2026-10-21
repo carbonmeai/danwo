@@ -10,6 +10,17 @@ Set up a config, write one `*.danwo.ts` file, run it and read the result.
    danwo init --yes --engine web --model-source gateway --providers stripe,resend --skills claude
    ```
 
+   danwo needs Node.js 24 or newer; on an older Node every `danwo` command exits 1 with
+   `danwo needs Node.js 24 or newer; this is Node.js v…`. init installs `@danwo/cli` and
+   `@danwo/sdk` as dev dependencies at the version of the danwo running it (`danwo --version`
+   prints it), so a beta sets up that beta, not `latest`; a TypeScript project without
+   `@types/node` also gets `@types/node@^24`, since danwo's declarations use Node's types.
+   `--skip-install` installs nothing and prints the command to run. For a browser engine, install
+   the Chromium danwo drives once per machine with `npx playwright-core install chromium`
+   (`--with-deps` on Linux), not `npx playwright install`, which can fetch a newer Playwright
+   whose Chromium does not match; a launch that finds no browser fails `BROWSER_FAILED` naming
+   that command.
+
    The config it writes starts the app with its dev command through danwo's proxy, with the
    chosen providers emulated (`APP_URL` set instead tests an app that already runs):
 

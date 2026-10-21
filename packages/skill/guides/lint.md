@@ -118,7 +118,9 @@ cannot tell its own sign-in from a forged one.
 ### messages-duplicate-send
 
 The same email, text or chat message (same endpoint, same body) was sent twice within one step.
-Messages in different steps may rightly look alike, so only one step counts.
+Messages in different steps may rightly look alike, so only one step counts. A retry that sends
+the first send's `Idempotency-Key` to the same endpoint is the same message (the provider answers
+it with the first send) and is not counted.
 
 ### resilience-no-retry-on-read
 

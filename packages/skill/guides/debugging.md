@@ -24,21 +24,30 @@ Each failed attempt carries a verdict, at the top of its failure page, in the CL
 (`[App bug]`, with a `why:` line), the summary line, the dashboard, the pull request comment and
 the GitHub check. It says what to fix first. The rules, in order:
 
-| Evidence                                                                             | Verdict                                             |
-| ------------------------------------------------------------------------------------ | --------------------------------------------------- |
-| the run was interrupted                                                              | undecided, certain                                  |
-| `ENVIRONMENT_FAILED`, `BROWSER_FAILED`, `MODEL_UNAVAILABLE`                          | environment, certain                                |
-| `CONFIG_INVALID`, `SECRET_REFUSED`                                                   | test issue, certain                                 |
-| a blocked or inconclusive code                                                       | undecided, certain                                  |
-| `APP_ERROR`, `PROVIDER_ERROR`                                                        | app bug, certain                                    |
-| a matrix trial whose check (not a crash) failed under its fault                      | app bug, certain                                    |
-| `TEST_FAILED` with a `TypeError`-like crash whose top frame is inside danwo          | danwo bug, likely: report it with the flight record |
-| any other `TEST_FAILED`                                                              | test issue (certain with a test file line)          |
-| an app that stopped, an unfaulted 5xx from the app itself, or an uncaught page error | app bug, certain                                    |
-| `LOCATOR_*`, `SESSION_SETUP_FAILED`, an agent step code, all on a healthy page       | test issue, likely                                  |
-| `TIMED_OUT` on a healthy page                                                        | undecided, likely                                   |
-| any other failed check on a healthy page                                             | app bug, likely                                     |
+| Evidence                                                                           | Verdict                                             |
+| ---------------------------------------------------------------------------------- | --------------------------------------------------- |
+| the run was interrupted                                                            | undecided, certain                                  |
+| `ENVIRONMENT_FAILED`, `BROWSER_FAILED`, `MODEL_UNAVAILABLE`                        | environment, certain                                |
+| `CONFIG_INVALID`, `SECRET_REFUSED`                                                 | test issue, certain                                 |
+| a blocked or inconclusive code                                                     | undecided, certain                                  |
+| `APP_ERROR`, `PROVIDER_ERROR`                                                      | app bug, certain                                    |
+| a matrix trial whose check (not a crash) failed under its fault                    | app bug, certain                                    |
+| `TEST_FAILED` with a `TypeError`-like crash whose top frame is inside danwo        | danwo bug, likely: report it with the flight record |
+| any other `TEST_FAILED`                                                            | test issue (certain with a test file line)          |
+| a failed `agent.assert` (`CLAIM_FAILED`) with no app error while its work ran      | undecided, likely                                   |
+| an app that stopped                                                                | app bug, certain                                    |
+| an unfaulted 5xx from the app on a write (not GET/HEAD) while the failing work ran | app bug, certain                                    |
+| any other unfaulted 5xx from the app, or an uncaught page error                    | app bug, likely                                     |
+| `LOCATOR_*`, `SESSION_SETUP_FAILED`, an agent step code, all on a healthy page     | test issue, likely                                  |
+| `TIMED_OUT` on a healthy page                                                      | undecided, likely                                   |
+| a failed check after an `agent.act` the model carried out (not replayed)           | undecided, likely: the model may only claim it      |
+| any other failed check on a healthy page                                           | app bug, likely                                     |
 
+"The failing work" runs from the step after the last check that passed to the end of the step
+that failed. The 5xx a verdict names is picked from the calls before that step ended: a route
+that also answered 5xx in attempts that passed is noise and skipped, as is a server call that
+failed only because one of its own calls was blocked; then a write during the failing work wins,
+then any call during it, then a write before it, then any call before it, the latest first.
 Emulator answers and faulted calls never count as the app's errors, and page assets are left out.
 Treat a likely verdict as where to look first, not as proof.
 
@@ -54,7 +63,7 @@ Treat a likely verdict as where to look first, not as proof.
 | `STALE_RECORDING`, `NOTHING_RECORDED`       | the step's recording key changed or never existed: rerun `danwo test` to record, then the matrix                                                 |
 | `AGENT_LOOPING`, `BUDGET_EXCEEDED`          | the step instruction is too vague or the page changed; split the step or use locators                                                            |
 | `MODEL_OUTPUT_INVALID`, `MODEL_UNAVAILABLE` | the model provider, not the app; retry or change model                                                                                           |
-| `BROWSER_FAILED`, `ENVIRONMENT_FAILED`      | the browser or the environment hook: app start-up, emulators, ports                                                                              |
+| `BROWSER_FAILED`, `ENVIRONMENT_FAILED`      | the browser or the environment hook: app start-up, emulators, ports; no Chromium: `npx playwright-core install chromium`                         |
 | `CONFIG_INVALID`                            | the config or the call named in the message                                                                                                      |
 
 `danwo spec --topic errors` lists every code with its class and exit code. `danwo cache ls`,
@@ -65,3 +74,8 @@ Treat a likely verdict as where to look first, not as proof.
 A browser dropping a stream or socket as a page or test closes (`read ECONNRESET`, `EPIPE`,
 `socket hang up`) is expected and not printed. Set `DANWO_DEBUG=proxy` (a comma-separated list, or
 `*`) to see those lines when chasing a connection problem; every other proxy error always prints.
+
+The proxy replaces mockttp's local port check (it leaked an error listener per probe of a free
+`::1` port) once per process. A mockttp version that moved that check gets the warning
+`danwo: this mockttp version has no isLocalPortActive to replace; using its own local port check`
+once, and the proxy runs on mockttp's own check; keep the one mockttp `@danwo/proxy` installs.

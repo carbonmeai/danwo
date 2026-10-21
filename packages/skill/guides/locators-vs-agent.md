@@ -49,7 +49,20 @@ Every kind of agent step replays:
 A step whose recording no longer matches is re-asked (`handed-off`), and its record says why: an
 element no longer on the page or matching several, an effect that did not happen, evidence not
 shown. Read that reason before rewriting the step; a reason that names an app change means the
-replay caught it.
+replay caught it. A step the model took over from a replay keeps the actions the replay had
+already done in its new recording.
+
+A step's recorded page effects leave out text that changes between runs: times and dates,
+relative times (`7 sec. ago`, `a minute ago`, `in 3 days`), month dates (`Oct 20`) and am/pm times
+(`3pm`), so a replay does not wait for them.
+
+A new `agent.act` recording is staged until a later check (an assertion, a value check or a passed
+`agent.assert`) passes: the step reads `recorded, kept only if the test passes` while the attempt
+runs, then at the end `recorded` (a check after it passed; its record's `cache.saved` is true),
+`not kept: the test failed` (a later step failed before any check passed) or `not kept: no check
+after it passed` (`saved` false for both). The `cache:` line counts them after the outcomes,
+e.g. `cache: 3 replayed · 0 relocated · 0 handed off · 1 missed · 1 not kept: the test failed`; a
+step not kept calls the model again next run.
 
 Values in braces come from `params`: `unique(...)` gives a fresh value each run that replays still
 accept, `secret(name)` keeps the value from the model, and values the agent reads from mail are

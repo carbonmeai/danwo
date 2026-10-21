@@ -12,9 +12,11 @@ danwo serve -p 0     # any free port
 folder of the nearest `danwo.config.ts`). It reads the project's `.danwo` folder and never writes
 to it, so it can stay open while you run tests; reload a page to see new runs.
 
-The server keeps its pre-built dependencies in a folder keyed by the installed packages
-(`node_modules/.vite/deps-<hash>` beside the dashboard) and loads React once, so upgrading danwo
-under a running dashboard needs only a restart, never a cleared cache.
+Installed from npm, `@danwo/dashboard` ships a prebuilt build that `danwo serve` runs behind a
+plain Node server, with no Vite and no build step; it depends on the runner alone. In danwo's own
+repository it runs from source under Vite, keeping its pre-built dependencies in a folder keyed
+by the installed packages (`node_modules/.vite/deps-<hash>`) and loading React once, so an
+upgrade needs only a restart, never a cleared cache.
 
 ## Pages
 
