@@ -16,6 +16,7 @@ import {
   backendMismatch,
   pageDescriptions,
   pageEffect,
+  pageMismatch,
   withoutAnnouncements,
 } from "../src/replay/effects.ts"
 import { serveHtml, type HtmlServer } from "./fixtures/html-server.ts"
@@ -394,7 +395,36 @@ describe("effects", () => {
     expect(pageEffect(before, after, filter)).toEqual({
       appeared: ["listitem: Groceries"],
       vanished: ["paragraph: Idle"],
+      states: true,
     })
+  })
+
+  it("keeps a state a step changed in place, and compares older recordings without states", () => {
+    const before = pageDescriptions(
+      '- checkbox "Agree" [ref=e1]\n- button "Menu" [ref=e2]\n- tab "Billing" [ref=e3]',
+    )
+    const after = pageDescriptions(
+      '- checkbox "Agree" [checked] [ref=e1]\n- button "Menu" [expanded] [active] [ref=e2]\n- tab "Billing" [selected] [ref=e3]',
+    )
+    const effect = pageEffect(before, after, { values: [], ignore: [] })
+
+    expect(effect.appeared).toEqual([
+      'button "Menu" [expanded]',
+      'checkbox "Agree" [checked]',
+      'tab "Billing" [selected]',
+    ])
+    expect(effect.vanished).toEqual(['button "Menu"', 'checkbox "Agree"', 'tab "Billing"'])
+    expect(pageMismatch(effect, after)).toBeUndefined()
+    expect(pageMismatch(effect, before)).toBe(
+      'expected button "Menu" [expanded], checkbox "Agree" [checked], tab "Billing" [selected] on the page, saw none',
+    )
+
+    const older = { appeared: ['button "Save"'], vanished: ['checkbox "Agree"'] }
+
+    expect(pageMismatch(older, ['button "Save"', 'checkbox "Agree" [checked]'])).toBe(
+      'expected checkbox "Agree" to be gone, still there',
+    )
+    expect(pageMismatch({ ...older, vanished: [] }, ['button "Save" [pressed]'])).toBeUndefined()
   })
 
   it("leaves out relative times, dates and clock times however the page writes them", () => {

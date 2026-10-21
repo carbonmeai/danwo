@@ -9,7 +9,15 @@ import { z } from "zod"
 import { viewElements } from "../snapshot/view.ts"
 
 export const effectsSchema = z.object({
-  page: z.object({ appeared: z.array(z.string()), vanished: z.array(z.string()) }),
+  page: z.object({
+    appeared: z.array(z.string()),
+    vanished: z.array(z.string()),
+    /**
+     * Set when the descriptions carry their elements' states (`checkbox "Agree" [checked]`); a
+     * recording made before states were kept is compared without them.
+     */
+    states: z.literal(true).optional(),
+  }),
   /** Distinct provider calls (`POST api.stripe.com/v1/…`) and deliveries (`webhook …`), sorted. */
   backend: z.array(z.string()),
 })
@@ -73,16 +81,49 @@ function clip(text: string): string {
   return text.length > MAX_DESCRIPTION ? `${text.slice(0, MAX_DESCRIPTION)}…` : text
 }
 
-/** Each element of a page view as `role "name"`, or `role: text`, once per occurrence. */
+/**
+ * The states a view shows on an element's line that a step can change in place: a box checked, a
+ * menu expanded, a tab selected, a toggle pressed. Focus and disabled are left out: they flicker
+ * while the page works.
+ */
+const STATE = /\[(?:checked(?:=mixed)?|expanded|selected|pressed)\]/g
+
+/** The states on each element's line of a view, by ref, as ` [checked]`. */
+function statesByRef(tree: string): Map<string, string> {
+  const states = new Map<string, string>()
+
+  for (const line of tree.split("\n")) {
+    const ref = /\[ref=([a-z0-9]+)\]/.exec(line)?.[1]
+    const shown = line.match(STATE)
+
+    if (ref !== undefined && shown !== null) states.set(ref, ` ${shown.join(" ")}`)
+  }
+
+  return states
+}
+
+/**
+ * Each element of a page view as `role "name"`, or `role: text`, once per occurrence, with the
+ * states it shows (`checkbox "Agree" [checked]`), so a step that only ticks a box has an effect.
+ */
 export function pageDescriptions(tree: string): string[] {
+  const states = statesByRef(tree)
+
   return viewElements(tree).flatMap((element) => {
+    const state = states.get(element.ref) ?? ""
+
     if (element.name !== undefined && element.name !== "")
-      return [`${element.role} ${JSON.stringify(clip(element.name))}`]
+      return [`${element.role} ${JSON.stringify(clip(element.name))}${state}`]
     if (element.text !== undefined && element.text !== "")
-      return [`${element.role}: ${clip(element.text)}`]
+      return [`${element.role}${state}: ${clip(element.text)}`]
 
     return []
   })
+}
+
+/** A description without its states, as recordings made before states were kept describe it. */
+function stateless(description: string): string {
+  return description.replaceAll(new RegExp(` ${STATE.source}`, "g"), "")
 }
 
 /** Roles a live region reads out, which a framework's route announcer takes. */
@@ -155,7 +196,11 @@ export function pageEffect(
   after: readonly string[],
   filter: EffectFilter,
 ): Effects["page"] {
-  return { appeared: surplus(after, before, filter), vanished: surplus(before, after, filter) }
+  return {
+    appeared: surplus(after, before, filter),
+    vanished: surplus(before, after, filter),
+    states: true,
+  }
 }
 
 /** Distinct signatures, sorted: order and repeats (retries, duplicates) do not count. */
@@ -172,7 +217,7 @@ export function pageMismatch(
   recorded: Effects["page"],
   now: readonly string[],
 ): string | undefined {
-  const present = new Set(now)
+  const present = new Set(recorded.states === true ? now : now.map(stateless))
   const missing = recorded.appeared.filter((description) => !present.has(description))
   const left = recorded.vanished.filter((description) => present.has(description))
 
