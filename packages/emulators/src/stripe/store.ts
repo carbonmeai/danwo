@@ -8,6 +8,7 @@ import type {
   DeletedCustomer,
   EndpointSecret,
   Invoice,
+  InvoiceItem,
   InvoiceIncludes,
   PaymentIntent,
   PaymentMethod,
@@ -37,6 +38,8 @@ export interface StripeStore {
   paymentMethods: ObjectTable<PaymentMethod>
   checkoutSessions: ObjectTable<CheckoutSession, SessionPlan>
   invoices: ObjectTable<Invoice>
+  /** One-off charges waiting for the customer's next invoice. */
+  invoiceItems: ObjectTable<InvoiceItem>
   /** What each invoice shows when expanded (`payments`, `confirmation_secret`), by invoice id. */
   invoiceIncludes: ObjectTable<InvoiceIncludes>
   subscriptions: ObjectTable<Subscription, SubscriptionState>
@@ -63,6 +66,7 @@ export function stripeStore(store: Store): StripeStore {
     paymentMethods: kind("payment_methods"),
     checkoutSessions: kind("checkout_sessions"),
     invoices: kind("invoices"),
+    invoiceItems: kind("invoice_items"),
     invoiceIncludes: kind("invoice_includes"),
     subscriptions: kind("subscriptions"),
     setupIntents: kind("setup_intents"),

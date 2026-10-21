@@ -643,3 +643,63 @@ describe("refunds and deleted customers", () => {
     expect(saved.data.map((pm) => pm.id)).toEqual([attached.id])
   })
 })
+
+describe("invoice items", () => {
+  it("bills a customer's usage by price and quantity, once per idempotency key", async () => {
+    const s = client()
+    const customer = await s.customers.create({ email: "team@digest.test" })
+    const price = await s.prices.create({
+      currency: "usd",
+      unit_amount: 2,
+      product_data: { name: "Digest emails" },
+    })
+    const bill = () =>
+      s.invoiceItems.create(
+        {
+          customer: customer.id,
+          pricing: { price: price.id },
+          quantity: 3,
+          description: "3 digest emails",
+          metadata: { digest: "dg_1" },
+        },
+        { idempotencyKey: "usage-dg_1" },
+      )
+
+    const item = await bill()
+    const again = await bill()
+
+    expect(item).toMatchObject({
+      object: "invoiceitem",
+      amount: 6,
+      currency: "usd",
+      customer: customer.id,
+      quantity: 3,
+      invoice: null,
+      description: "3 digest emails",
+      metadata: { digest: "dg_1" },
+      pricing: { price_details: { price: price.id } },
+    })
+    expect(String(item.pricing?.unit_amount_decimal)).toBe("2")
+    expect(again.id).toBe(item.id)
+    expect((await s.invoiceItems.retrieve(item.id)).amount).toBe(6)
+    expect((await s.invoiceItems.list({ customer: customer.id })).data.map((i) => i.id)).toEqual([
+      item.id,
+    ])
+    expect(outboxEvents().filter((event) => event.type === "invoiceitem.created")).toHaveLength(1)
+  })
+
+  it("takes a plain amount, and refuses an unknown customer or a missing currency", async () => {
+    const s = client()
+    const customer = await s.customers.create({ email: "one-off@digest.test" })
+
+    expect(
+      await s.invoiceItems.create({ customer: customer.id, amount: 500, currency: "usd" }),
+    ).toMatchObject({ amount: 500, quantity: 1 })
+    await expect(
+      s.invoiceItems.create({ customer: "cus_missing", amount: 500, currency: "usd" }),
+    ).rejects.toMatchObject({ code: "resource_missing", param: "customer" })
+    await expect(
+      s.invoiceItems.create({ customer: customer.id, amount: 500 }),
+    ).rejects.toMatchObject({ code: "parameter_missing", param: "currency" })
+  })
+})

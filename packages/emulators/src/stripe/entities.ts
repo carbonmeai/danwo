@@ -17,6 +17,7 @@ export type Price = Json<Stripe.Price>
 export type PaymentIntent = Json<Stripe.PaymentIntent>
 export type Charge = Json<Stripe.Charge>
 export type Refund = Json<Stripe.Refund>
+export type InvoiceItem = Json<Stripe.InvoiceItem>
 export type DeletedCustomer = Json<Stripe.DeletedCustomer>
 export type PaymentMethod = Json<Stripe.PaymentMethod>
 export type CheckoutSession = Json<Stripe.Checkout.Session>

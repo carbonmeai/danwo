@@ -319,9 +319,9 @@ Tigris's own API, and the Tigris SDK's snapshots, forks and bundles.
 ## Stripe
 
 `stripeService()` (or `stripeEnvironment()`) answers `api.stripe.com` and `checkout.stripe.com`:
-customers, products and prices, payment intents and refunds, Checkout Sessions with the hosted
-page, events and webhooks signed as Stripe signs them, so `stripe` and `@stripe/stripe-js` work
-unchanged.
+customers, products and prices, payment intents and refunds, invoice items for usage, Checkout
+Sessions with the hosted page, events and webhooks signed as Stripe signs them, so `stripe` and
+`@stripe/stripe-js` work unchanged.
 
 On the hosted Checkout page (`checkout-pay` pays, `checkout-cancel` returns to `cancel_url`) the
 card number field holds `4242 4242 4242 4242`; typing `4000 0000 0000 0002` declines it as Stripe

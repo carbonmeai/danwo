@@ -22,6 +22,7 @@ import { chargeRoutes } from "./routes/charges.ts"
 import { checkoutSessionRoutes } from "./routes/checkout-sessions.ts"
 import { customerSessionRoutes } from "./routes/customer-sessions.ts"
 import { customerRoutes } from "./routes/customers.ts"
+import { invoiceItemRoutes } from "./routes/invoice-items.ts"
 import { invoiceRoutes } from "./routes/invoices.ts"
 import { paymentIntentRoutes } from "./routes/payment-intents.ts"
 import { paymentMethodConfigurationRoutes } from "./routes/payment-method-configurations.ts"
@@ -242,6 +243,7 @@ function routes(context: StripeRouteContext): void {
     checkoutSessionRoutes,
     customerSessionRoutes,
     invoiceRoutes,
+    invoiceItemRoutes,
     subscriptionRoutes,
     setupIntentRoutes,
     billingPortalRoutes,
