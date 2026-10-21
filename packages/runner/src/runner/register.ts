@@ -1,19 +1,24 @@
 /*
  * Loaded into every danwo process with `--import`: Node 24 strips TypeScript types natively; this
- * adds the two resolutions a TypeScript project expects on top, a `.js` specifier that names a
- * `.ts` file and an extensionless relative specifier. It also loads a project's `.ts` files as
- * ES modules when its package.json says CommonJS.
+ * adds the resolutions a TypeScript project expects on top: a `.js` specifier that names a `.ts`
+ * file, an extensionless relative specifier, and, for the project's own files, the aliases its
+ * `tsconfig.json` `paths` declare. It also loads a project's `.ts` files as ES modules when its
+ * package.json says CommonJS. Each resolution is tried only after Node's own finds nothing.
  */
 import { existsSync } from "node:fs"
 import { registerHooks, type ResolveFnOutput } from "node:module"
 import { fileURLToPath } from "node:url"
+
+import { aliasedFile } from "./tsconfig-paths.ts"
 
 registerHooks({
   resolve(specifier, context, nextResolve) {
     try {
       return asModule(nextResolve(specifier, context))
     } catch (error) {
-      const url = typeScriptCandidate(specifier, context.parentURL)
+      const url =
+        typeScriptCandidate(specifier, context.parentURL) ??
+        aliasedFile(specifier, context.parentURL)
 
       if (url === undefined) {
         throw error

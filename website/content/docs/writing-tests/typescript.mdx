@@ -1,0 +1,85 @@
+---
+title: TypeScript in tests
+description: What test and config files may contain, since danwo runs them with Node's own type stripping.
+icon: FileCode
+---
+
+danwo runs your test files and `danwo.config.ts` as TypeScript with no build step. Node removes
+the types as it loads each file. Nothing is compiled, so a few TypeScript features that need
+compiling don't load.
+
+Most tests never meet this. You'll see it when you move a suite over from a tool that compiled
+your tests, or import a helper written for a bundler.
+
+## What works
+
+Types, interfaces, generics, `as` casts, `satisfies` and type-only imports all load as they are:
+
+```ts title="tests/cart.danwo.ts"
+import { test } from "@danwo/sdk"
+
+type Plan = "free" | "pro"
+
+const PLANS = { free: 0, pro: 500 } as const satisfies Record<Plan, number>
+
+test("shows the pro plan", async ({ app, screen, expect }) => {
+  await app.open("/pricing")
+  await expect(screen.getByText(`${PLANS.pro} credits`)).toBeVisible()
+})
+```
+
+## Imports
+
+danwo resolves imports the way a TypeScript project expects, on top of what Node does:
+
+| Import                                  | Loads                                           |
+| --------------------------------------- | ----------------------------------------------- |
+| `./helpers/cart.ts`                     | the file, as Node does                          |
+| `./helpers/cart` or `./helpers/cart.js` | `cart.ts`, or `cart/index.ts`                   |
+| `@/helpers/cart`                        | the file your `tsconfig.json` `paths` map it to |
+| `@danwo/sdk`                            | an installed package, as Node does              |
+
+Aliases come from the nearest `tsconfig.json` above the importing file, and from the configs it
+extends by a relative path. They apply to your own files, not to installed packages.
+
+## What does not load
+
+These need compiling, so the file stops loading. Write the plain form instead:
+
+| Not supported                         | Write instead                                                     |
+| ------------------------------------- | ----------------------------------------------------------------- |
+| `enum Plan { Free, Pro }`             | `const Plan = { Free: "free", Pro: "pro" } as const`              |
+| `constructor(private cart: Cart) {}`  | declare `cart` in the class body and assign it in the constructor |
+| `namespace Shop { … }`                | export the values from the module itself                          |
+| `<Cart>value`                         | `value as Cart`                                                   |
+| `import x = require("x")`, `export =` | `import` and `export`                                             |
+| decorators                            | a plain function call                                             |
+
+The same applies to every file a test or the config imports, except installed packages.
+
+## When a file doesn't load
+
+danwo names the file and line, what isn't supported, and what to write. The run exits with code 2
+before any test starts:
+
+```text
+danwo: tests/helpers/plans.ts:3: an `enum` cannot load in the test file tests/cart.danwo.ts or a
+file it imports. danwo runs TypeScript with Node's type stripping, which removes types and
+compiles nothing. Instead, use a plain object with `as const` …
+```
+
+<Callout type="info">
+  Type errors never stop a run: types are removed, not checked. Run `tsc --noEmit` in CI to check
+  your tests against danwo's types.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="Configuration" href="/docs/configuration">
+    Every part of `danwo.config.ts`, grouped by what it's for.
+  </Card>
+  <Card title="Debugging a failure" href="/docs/debugging">
+    What each error code means and where to look.
+  </Card>
+</Cards>

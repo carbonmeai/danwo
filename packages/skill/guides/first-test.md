@@ -74,6 +74,18 @@ Set up a config, write one `*.danwo.ts` file, run it and read the result.
 
 3. Run it: `danwo test` (all files) or `danwo test home` (paths containing "home").
 
+Test files, `danwo.config.ts` and everything they import (installed packages aside) load under
+Node's type stripping: types are removed, nothing is compiled, nothing is type-checked (run
+`tsc --noEmit` for that). Not supported: `enum` (use `const X = { … } as const`), constructor
+parameter properties (`constructor(private x: T)`: declare the field and assign it), `namespace`,
+`<T>value` assertions (`value as T`), `import x = require()` / `export =`, and decorators. Imports
+resolve as Node does, plus: an extensionless or `.js` relative specifier finds the `.ts` file or
+`index.ts`, and a bare specifier no installed package answers is tried against the nearest
+`tsconfig.json`'s `compilerOptions.paths` (with `baseUrl`, and configs it `extends` by a relative
+path), for the project's own files only. A file that fails on any of this stops the run before
+any test with `CONFIG_INVALID` (exit 2), naming the file and line, the feature and the plain form
+to write; an alias that matches nothing says so.
+
 A test body receives fixtures: `app` (open paths, the base URL), `screen` (locators), `expect`,
 `agent` (plain-language steps), `secret` and `mail`. `test.describe`, `beforeEach`/`afterEach`,
 `beforeAll`/`afterAll`, `test.only`, `test.skip` and per-test options (`retries`, `timeout`,

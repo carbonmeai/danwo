@@ -239,6 +239,7 @@ export const PLAN: readonly PlannedTab[] = [
       {
         title: "Writing tests",
         pages: [
+          file("typescript", "TypeScript in tests", "FileCode", "writing-tests/typescript.mdx"),
           file("secrets", "Secrets", "KeyRound", "writing-tests/secrets.mdx"),
           file("email-and-otp", "Email and 2FA codes", "Mail", "writing-tests/email-and-otp.mdx"),
           file("sessions", "Saved sessions", "UserCheck", "writing-tests/sessions.mdx"),

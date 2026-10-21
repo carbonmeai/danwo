@@ -9,6 +9,7 @@ import { DanwoError } from "../support/codes.ts"
 import { findTestFiles } from "../tests/discover.ts"
 import { declarationsOf, type DeclaredTest, type FileDeclarations } from "../tests/registry.ts"
 import type { LoadedConfig } from "./config.ts"
+import { explainLoadError } from "./load-errors.ts"
 
 const DEFAULT_TEST_MATCH = ["**/*.danwo.ts"]
 
@@ -44,7 +45,11 @@ export function loadTestFile(file: string): Promise<FileDeclarations> {
 
   url.searchParams.set("danwo-realm", `${process.pid}-${loads}`)
 
-  return declarationsOf(() => import(url.href))
+  return declarationsOf(() =>
+    import(url.href).catch((error: unknown) => {
+      throw explainLoadError(error, file, "test")
+    }),
+  )
 }
 
 /** The project's test files, narrowed to those whose path contains one of `patterns`. */

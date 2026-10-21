@@ -19,6 +19,7 @@ import type { VisionSetting } from "../vision/desk.ts"
 import type { EnvironmentContext, WorkerEnvironment } from "./environment.ts"
 import type { ImpactConfig } from "./impact.ts"
 import type { Isolation } from "./isolation.ts"
+import { explainLoadError } from "./load-errors.ts"
 import type { RecordMode, RecordOptions } from "./record.ts"
 import type { Reporter } from "./reporting.ts"
 
@@ -249,7 +250,11 @@ export async function loadConfig(cwd: string, explicit?: string): Promise<Loaded
   if (path === undefined) return { config: {}, path: undefined, root: cwd }
   if (!existsSync(path)) throw new DanwoError("CONFIG_INVALID", `config file not found: ${path}`)
 
-  const module: { default?: unknown } = await import(/* @vite-ignore */ pathToFileURL(path).href)
+  const module: { default?: unknown } = await import(
+    /* @vite-ignore */ pathToFileURL(path).href
+  ).catch((error: unknown) => {
+    throw explainLoadError(error, path, "config")
+  })
 
   if (!isConfig(module.default)) {
     throw new DanwoError(
