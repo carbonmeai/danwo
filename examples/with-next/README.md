@@ -137,6 +137,15 @@ node examples/link.ts with-next
 `link.ts` copies the example to a temporary folder, points danwo's packages at the tarballs in
 `dist/release`, runs `npm install` there and prints the folder. Run the commands above from it.
 
+To work on the example in this folder, with your editor finding React's and danwo's types,
+install it in place instead:
+
+```sh
+node examples/link.ts with-next --here
+```
+
+That leaves only `node_modules`, which git ignores. The package.json is put back as it was.
+
 ## The files
 
 | File                           | What it does                                                         |
