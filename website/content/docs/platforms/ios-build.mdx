@@ -1,0 +1,82 @@
+---
+title: iOS builds
+description: Build an Expo app as a Release iOS Simulator app, and reuse it until its sources change.
+icon: Hammer
+---
+
+danwo tests a Release build of your app, with its JavaScript bundled in, so no Metro server runs
+during tests. `danwo build-ios` makes that build for the Simulator, without code signing.
+
+## Build it
+
+```sh
+npx @danwo/cli build-ios app
+```
+
+```text
+built app/.danwo/builds/dd5eb4ac77e9aa9b.app in 111 s (log: app/.danwo/builds/build-ios.log)
+```
+
+`app` is the folder of your Expo project, which needs an `ios.bundleIdentifier` in its config.
+danwo:
+
+1. runs `expo prebuild --platform ios`, which also installs the CocoaPods;
+2. lets the app make plain HTTP calls, which the proxy routes to your backend;
+3. runs `xcodebuild` for the Simulator, Release, for this Mac's CPU only, unsigned.
+
+HTTPS needs nothing in the build: danwo trusts its certificate in the simulator itself.
+
+## Reuse it
+
+The build is kept under `<project>/.danwo/builds/`, keyed by a hash of the app's sources. An
+unchanged app isn't built again. Force a rebuild with `--force`, and see the tools' output with
+`--verbose`.
+
+| Build                     | Time on an Apple silicon Mac |
+| ------------------------- | ---------------------------- |
+| first                     | about 3 minutes, with pods   |
+| after a JavaScript change | about 100 s                  |
+| unchanged                 | instant: the kept build      |
+
+## Build it from the config
+
+`buildIos` from `@danwo/expo` does the same inside your environment, so a test run always has a
+current build:
+
+```ts title="build.ts"
+import { buildIos } from "@danwo/expo"
+
+export async function currentApp(): Promise<string> {
+  const build = await buildIos({ project: "app" })
+
+  return build.app
+}
+```
+
+<Callout type="warn">
+  This build allows plain HTTP to any host. Use it only for testing; ship your store builds without
+  it.
+</Callout>
+
+## Close the in-app browser
+
+On Android, a Custom Tab closes when Checkout links back to the app. On iOS, a Safari view stays
+over the app until the app closes it. Close it when the link arrives:
+
+```tsx title="App.tsx · closing the Safari view"
+useEffect(() => {
+  if (Platform.OS === "ios" && returned?.startsWith("danwoshop://"))
+    WebBrowser.dismissBrowser().catch(() => undefined)
+}, [returned])
+```
+
+`openAuthSessionAsync` closes itself, but iOS first asks the user to allow the sign-in, and the
+test taps **Continue** like a person would.
+
+## Next
+
+<Cards>
+  <Card title="iOS tests" href="/docs/ios-tests">
+    Install the build on a simulator and test it.
+  </Card>
+</Cards>

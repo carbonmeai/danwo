@@ -1,0 +1,105 @@
+---
+title: iOS setup
+description: Get a Mac ready to test a React Native or Expo app on an iOS Simulator with danwo.
+icon: Smartphone
+---
+
+danwo runs the same tests, invariants and fault matrix against a React Native or Expo app on an
+iOS Simulator. The app's calls, and the checkout page it opens, go through danwo's proxy, so
+Stripe and the rest are emulated there too. This page gets the Mac ready.
+
+## What you need
+
+| Need           | Why                                                             |
+| -------------- | --------------------------------------------------------------- |
+| a Mac          | the iOS Simulator only runs on macOS                            |
+| Xcode          | it brings the Simulator, `simctl` and the compiler for your app |
+| an iOS runtime | the iOS version the simulator runs; Xcode installs one          |
+| CocoaPods      | only to build an Expo app (`danwo build-ios`)                   |
+
+No simulator needs to exist: danwo creates its own the first time, an iPhone on the newest iOS
+you have, and keeps it for later runs.
+
+## Get Xcode ready
+
+<Steps>
+<Step>
+
+### Install Xcode
+
+Install it from the App Store and open it once, so it finishes installing its components.
+
+</Step>
+<Step>
+
+### Point the tools at it
+
+The command-line tools alone have no Simulator. Select the full Xcode:
+
+```sh
+sudo xcode-select -s /Applications/Xcode.app
+```
+
+</Step>
+<Step>
+
+### Add an iOS runtime
+
+In Xcode, open **Settings → Components** and install an iOS Simulator runtime if none is listed.
+
+</Step>
+</Steps>
+
+## Check the Mac
+
+```sh
+npx @danwo/cli device doctor --platform ios
+```
+
+```text
+ok    Xcode: Xcode 26.6, Build version 17F113 (/Applications/Xcode.app/Contents/Developer)
+ok    simctl: xcrun simctl
+ok    iOS runtimes: iOS 18.6, iOS 26.5
+ok    simulators: danwo creates "danwo iPhone" (iPhone 17 Pro, iOS 26.5) on first use
+ok    CocoaPods: 1.17.0
+```
+
+Without `--platform`, the doctor checks Android and iOS, and passes when either is ready.
+
+## How the network is bound
+
+A simulator shares the Mac's network, but keeps its own proxy setting in memory. danwo sets that
+setting for its simulator only, and trusts the run's certificate in the simulator's keychain. The
+Mac's own network settings are never touched.
+
+| What                      | Reaches the proxy                                          |
+| ------------------------- | ---------------------------------------------------------- |
+| the app's own calls       | yes: `fetch`, `URLSession` and libraries built on them     |
+| a Safari view             | yes, the checkout page `WebBrowser.openBrowserAsync` opens |
+| a sign-in session         | yes, `ASWebAuthenticationSession` (`openAuthSessionAsync`) |
+| other simulators, the Mac | no: they keep their own settings                           |
+
+<Callout type="warn">
+  Apps that pin their TLS certificates ignore danwo's certificate, so their calls can't be emulated.
+  Turn pinning off in the build you test.
+</Callout>
+
+## What works on iOS today
+
+| Works                                         | Not yet                                             |
+| --------------------------------------------- | --------------------------------------------------- |
+| locators, `expect`, screenshots, the agent    | `getByRole("heading")`: iOS reports no heading role |
+| Safari views and sign-in sessions             | physical iPhones, and keys other than Enter         |
+| the fault matrix, on one simulator or several | reading mail from a test, saved sessions            |
+| films of each attempt, the app's log          | moving the device's own clock                       |
+
+## Next
+
+<Cards>
+  <Card title="iOS builds" href="/docs/ios-build">
+    Build your Expo app for the Simulator.
+  </Card>
+  <Card title="iOS tests" href="/docs/ios-tests">
+    The config and what a test can do on a simulator.
+  </Card>
+</Cards>

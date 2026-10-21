@@ -50,7 +50,7 @@ Give it a short name, such as `danwo_spike`. Your config refers to it by that na
 ## Check the machine
 
 ```sh
-npx @danwo/cli device doctor
+npx @danwo/cli device doctor --platform android
 ```
 
 ```text
@@ -72,12 +72,12 @@ proxy setting from an earlier run, and about images missing their files.
 
 ## What works on Android today
 
-| Works                                        | Not yet                                                  |
-| -------------------------------------------- | -------------------------------------------------------- |
-| locators, `expect`, screenshots, the agent   | `hover`, `setInputFiles`, `dragTo`                       |
-| Custom Tabs (a web checkout inside the app)  | reading mail from a test, saved sessions                 |
-| the fault matrix, on one emulator or several | iOS, and Flutter apps (their accessibility tree is thin) |
-| time travel for your services and backend    | moving the device's own clock                            |
+| Works                                        | Not yet                                         |
+| -------------------------------------------- | ----------------------------------------------- |
+| locators, `expect`, screenshots, the agent   | `hover`, `setInputFiles`, `dragTo`              |
+| Custom Tabs (a web checkout inside the app)  | reading mail from a test, saved sessions        |
+| the fault matrix, on one emulator or several | Flutter apps (their accessibility tree is thin) |
+| time travel for your services and backend    | moving the device's own clock                   |
 
 ## Next
 
@@ -87,5 +87,8 @@ proxy setting from an earlier run, and about images missing their files.
   </Card>
   <Card title="Android tests" href="/docs/android-tests">
     The config and what a test can do on a device.
+  </Card>
+  <Card title="iOS setup" href="/docs/ios-setup">
+    The same tests on an iOS Simulator.
   </Card>
 </Cards>

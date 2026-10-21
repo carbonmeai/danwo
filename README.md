@@ -37,7 +37,7 @@ what your app does when a provider fails.
 
 |                            |                                                                                                                                       |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| **Drives your app**        | In a browser or on Android, with locators, plain-English agent steps, or both. Agent steps replay later with no model calls.          |
+| **Drives your app**        | In a browser, on Android or on iOS, with locators, plain-English agent steps, or both. Agent steps replay later with no model calls.  |
 | **Emulates the providers** | Stripe, Clerk, Resend, Google, Slack and 20 more answer from local emulators behind a proxy. No sandbox keys, no code changes.        |
 | **Breaks it on purpose**   | `danwo matrix` reruns a test once per fault: 500s, declines, duplicate webhooks, lost database commits. An invariant judges each run. |
 | **Explains every run**     | A flight record with video, steps, calls, webhooks and database statements, in a dashboard, a PR comment and over MCP.                |
@@ -111,6 +111,7 @@ More in the [examples gallery](https://danwo.dev/docs/examples).
 | ----------------------------------------------------- | -------------------------------------------------------------------------- |
 | [Web apps](https://danwo.dev/docs/web)                | Any framework, started by danwo or already running.                        |
 | [Android](https://danwo.dev/docs/android-tests)       | React Native and Expo on an emulator.                                      |
+| [iOS](https://danwo.dev/docs/ios-tests)               | React Native and Expo on an iOS Simulator.                                 |
 | [Playwright Test](https://danwo.dev/docs/playwright)  | Keep your tests, add emulators and the matrix.                             |
 | [Real stacks](https://danwo.dev/docs/real-stacks)     | Several apps, workers, databases and background jobs behind one proxy.     |
 | [CI](https://danwo.dev/docs/ci)                       | A GitHub Check and a PR comment that say what broke and whose fault it is. |

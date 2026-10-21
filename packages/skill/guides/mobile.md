@@ -1,6 +1,6 @@
-# Mobile apps on Android
+# Mobile apps on Android and iOS
 
-Run the same tests, invariants and fault matrix against a React Native or Expo app on an Android emulator, through danwo's proxy and emulators.
+Run the same tests, invariants and fault matrix against a React Native or Expo app on an Android emulator or an iOS Simulator, through danwo's proxy and emulators. Android comes first below; the iOS Simulator section says what differs.
 
 ```ts
 import type { DeviceFixtures } from "@danwo/device"
@@ -194,6 +194,85 @@ The shop's agent test, recorded with `anthropic/claude-sonnet-5.5`: 6 model call
 model call. `DANWO_MODEL=scripted` records with the shop's own scripted model, for machines
 without a model key.
 
+## iOS Simulator
+
+The same tests run on an iOS Simulator on a Mac. Select it however your config likes; the shop
+uses `DANWO_PLATFORM=ios`:
+
+```ts
+import { IOS_BACKGROUND_HOSTS, iosWorkers, withIosDevice } from "@danwo/device"
+import { buildIos } from "@danwo/expo"
+
+// in defineConfig: workers: iosWorkers(),
+// in environment({ workerIndex }):
+const build = await buildIos({ project: "app" })
+const services = await startServices([stripeService({ seed }), backendRoute], {
+  blocked: IOS_BACKGROUND_HOSTS,
+})
+
+return withIosDevice(
+  { ...servicesLifecycle, proxy: services.proxy, fixtures: services.fixtures, baseUrl, close },
+  {
+    worker: workerIndex,
+    app: { bundleId: "com.danwo.shopmobile", app: build.app, scheme: "danwoshop" },
+  },
+)
+```
+
+**Setup.** Xcode (not only its command-line tools: `xcode-select -p` must point into
+`Xcode.app`), an iOS runtime (Xcode → Settings → Components), and CocoaPods to build Expo apps.
+`danwo device doctor --platform ios` checks them; without `--platform` the doctor checks both
+platforms and passes when either is ready.
+
+**The build.** `danwo build-ios [project]` (or `buildIos({ project })`): `expo prebuild --platform
+ios` (installs the pods), App Transport Security set to `NSAllowsArbitraryLoads` alone (iOS ignores
+it when a finer key such as `NSAllowsLocalNetworking` is present), then `xcodebuild` Release for
+the simulator, this Mac's CPU only, `CODE_SIGNING_ALLOWED=NO`. Kept under
+`<project>/.danwo/builds/<hash>.app`. The Expo config needs `ios.bundleIdentifier`. About 100 s
+after a JavaScript change on Apple silicon.
+
+**The simulator.** `withIosDevice` finds its simulator by name (default `danwo iPhone`; worker n
+from the second on uses `danwo iPhone <n + 1>`), creates it when missing (the newest iOS runtime's
+newest iPhone Pro, or `runtime` and `deviceType`), boots it headless and waits with `bootstatus`.
+A simulator it booted is shut down on close; one it created is kept for the next run unless
+`remove: true`. `udid` uses an existing simulator as it is.
+
+**The network**, with nothing changed on the Mac:
+
+1. `simctl keychain <udid> add-root-cert` trusts the run's CA for every process in the simulator
+   (the app, Safari views, sign-in sessions). It survives reboots; there is no per-certificate
+   removal, which is why danwo uses its own simulators.
+2. The simulator's own system proxy (`State:/Network/Global/Proxies` in its configuration store,
+   which it otherwise copies from the Mac) is pointed at the proxy on 127.0.0.1, by a small helper
+   built with Xcode into `~/Library/Caches/danwo/ios` on first use and run with `simctl spawn`. The
+   simulator shares the Mac's loopback, so nothing is forwarded. The setting lives in memory: it is
+   written again before each attempt, and `close` puts back what was there.
+
+Proxy environment variables (`SIMCTL_CHILD_HTTPS_PROXY`) do nothing: iOS's networking ignores them.
+
+**Each attempt:** the app and Safari are stopped, the app's data container is emptied (its
+metadata kept, `Documents`, `Library/Caches`, `Library/Preferences`, `SystemData` and `tmp`
+recreated), `app.permissions` are granted with `simctl privacy`, and the app is launched with
+`app.launchArgs` and `app.env`. The app's log (`log stream`, its process, `default` level and
+above) goes to the flight record; `recordVideo` films each attempt.
+
+**What differs from Android:**
+
+- The driver measures in points; danwo scales boxes to screenshot pixels and taps back to points.
+- A Safari view or sign-in session is read in the same tree; `device.foreground()` reports
+  `com.apple.SafariViewService` with the page the proxy saw.
+- A Safari view stays over the app when Checkout links back: the app must call
+  `WebBrowser.dismissBrowser()` (iOS only) when the link arrives. A shared (not ephemeral)
+  `ASWebAuthenticationSession` first asks "Wants to Use … to Sign In"; tap **Continue**.
+- No heading role (`getByRole("heading")` finds nothing); find titles by text.
+- `back()` uses the screen's back or close control. `press` knows Enter only.
+- A tap the keyboard covers puts the keyboard away and taps the same element again.
+- Agent recordings are keyed by platform (`ios:<bundle id>`): record once per platform.
+
+The shop on an iPhone 17 Pro simulator (iOS 26.5): both tests in about 50 s with the agent's steps
+replayed; the `buy-credits` matrix of 23 runs in 370 s on one simulator; the agent's matrix of 23
+runs in 298 s on two.
+
 ## The flight record
 
 Each attempt keeps:
@@ -207,11 +286,12 @@ server's.
 
 ## Limits for now
 
-- **Android only.** Flutter apps draw their own widgets, and their accessibility tree is thin.
+- **Flutter.** Flutter apps draw their own widgets, and their accessibility tree is thin.
+- **iOS: Simulator only.** Physical iPhones and native Swift apps without React Native are not covered yet.
 - **Pinned apps.** Apps that pin certificates ignore danwo's CA.
 - **Play images.** Google Play system images cannot be rooted.
 - **Not yet.** `hover`, `setInputFiles`, `dragTo`, `mail.open`, agent steps that read mail, and
-  saved sessions say they are not supported on Android yet.
+  saved sessions say they are not supported on devices yet.
 - **Time travel** moves the services and the backend, not the device's clock.
 
 ## CI
@@ -220,8 +300,9 @@ server's.
   `avdmanager`.
 - **macOS:** Apple silicon runs `arm64-v8a` images.
 
-The slow test runs only when asked, and skips cleanly without an SDK or AVD:
+The slow tests run only when asked, and skip cleanly without an SDK and AVD, or without Xcode:
 
 ```bash
 DANWO_ANDROID=1 DANWO_AVD=<avd> DANWO_AVD_SNAPSHOT=<snapshot> bun run test:slow packages/cli/test/android.slow.test.ts
+DANWO_IOS=1 bun run test:slow packages/cli/test/ios.slow.test.ts
 ```

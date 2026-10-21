@@ -125,7 +125,7 @@ export const Hero = forwardRef<HTMLElement>(function Hero(_props, ref) {
     <section className="hero" id="hero" ref={ref}>
       <div className="wrap">
         <Link className="pill" to="/docs/$" params={{ _splat: "mobile" }}>
-          <b>New</b>Android apps: same tests, same matrix
+          <b>New</b>Android and iOS apps: same tests, same matrix
           <span className="more">
             <ChevronIcon size={12} />
           </span>

@@ -256,8 +256,8 @@ function MobileTile() {
     <Reveal as="article" className="tile c2">
       <h3>Mobile</h3>
       <p>
-        The same tests, invariants and matrix on React Native and Expo apps for Android, Custom Tabs
-        included.
+        The same tests, invariants and matrix on React Native and Expo apps for Android and iOS,
+        in-app checkout browsers included.
       </p>
       <div className="art">
         <div className="phone">
