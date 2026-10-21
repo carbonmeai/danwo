@@ -38,6 +38,10 @@ took keep running on real time. Sockets, HTTP retries, database pools, animation
 timers all rely on real durations, and freezing them breaks apps in ways real users never see. An
 offset changes what time it is, never how fast it passes.
 
+The browser keeps cookies by its real clock, so a cookie the page writes with an `expires` date
+from its travelled clock is stored with that date moved back by the offset. A page that deletes a
+cookie by dating it in the past (as Clerk's sign-out does) still deletes it after a jump.
+
 ## Faults after travelling
 
 `danwo matrix` plans faults on the webhooks that fall due after a jump, just like any other. A

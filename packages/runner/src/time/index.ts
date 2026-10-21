@@ -108,10 +108,78 @@ export interface SessionTime {
 /** What `sessionTime` records each travel with: the step recorder's `run`. */
 type RunStep = (label: string, act: () => Promise<void>) => Promise<void>
 
-/** The page's clock: shifted, never frozen, so timers on the page keep running. */
+/** The page global holding how far its clock is ahead of real time, for `keepCookieExpiries`. */
+const TRAVEL_GLOBAL = "__danwoTravelMs"
+
+/**
+ * In the page: a cookie written through `document.cookie` with an `expires` date by the page's
+ * travelled clock is stored with that date moved back to real time, as the browser keeps cookies
+ * by its real clock. Otherwise a page deleting a cookie the usual way, with a date a day "ago",
+ * would keep it until that day comes in real time, and an app's sign-out (Clerk's, for one) would
+ * leave the old cookie beside the new one.
+ */
+function keepCookieExpiries(name: string): void {
+  const descriptor = Object.getOwnPropertyDescriptor(Document.prototype, "cookie")
+
+  if (!descriptor?.set) return
+
+  // oxlint-disable-next-line typescript/unbound-method -- called below with the document as `this`
+  const write: (this: Document, value: string) => void = descriptor.set
+
+  Object.defineProperty(Document.prototype, "cookie", {
+    ...descriptor,
+    set(this: Document, value: string) {
+      const ahead = Number(Reflect.get(globalThis, name) ?? 0)
+      const moved = value.replace(/;\s*expires=([^;]*)/i, (whole, date: string) => {
+        const at = Date.parse(date)
+
+        return Number.isNaN(at) || ahead === 0
+          ? whole
+          : `; expires=${new Date(at - ahead).toUTCString()}`
+      })
+
+      write.call(this, moved)
+    },
+  })
+}
+
+/** Contexts whose pages already move cookie expiries back to real time. */
+const keepingCookies = new WeakSet<BrowserContext>()
+
+/**
+ * The page's clock: shifted, never frozen, so timers on the page keep running. The cookies its
+ * script writes still expire by real time (see `keepCookieExpiries`).
+ */
 export async function showTime(context: BrowserContext, machine: TimeMachine): Promise<void> {
-  if (Math.abs(machine.now().getTime() - Date.now()) > SECOND)
-    await context.clock.setSystemTime(machine.now())
+  const ahead = machine.now().getTime() - Date.now()
+
+  if (Math.abs(ahead) <= SECOND) return
+
+  await context.clock.setSystemTime(machine.now())
+
+  if (!keepingCookies.has(context)) {
+    keepingCookies.add(context)
+    await context.addInitScript(keepCookieExpiries, TRAVEL_GLOBAL)
+    await Promise.all(
+      context
+        .pages()
+        .map((page) => page.evaluate(keepCookieExpiries, TRAVEL_GLOBAL).catch(() => {})),
+    )
+  }
+
+  const travelled = { name: TRAVEL_GLOBAL, ms: ahead }
+
+  /* Later documents read the newest offset; pages already open are told it now. */
+  await context.addInitScript(({ name, ms }) => Reflect.set(globalThis, name, ms), travelled)
+  await Promise.all(
+    context
+      .pages()
+      .map((page) =>
+        page
+          .evaluate(({ name, ms }) => Reflect.set(globalThis, name, ms), travelled)
+          .catch(() => {}),
+      ),
+  )
 }
 
 /**

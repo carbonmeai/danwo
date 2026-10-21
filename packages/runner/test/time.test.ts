@@ -20,8 +20,21 @@ let site: Server
 let siteUrl: string
 
 beforeAll(async () => {
-  site = createServer((_request, response) => {
+  site = createServer((request, response) => {
     response.setHeader("content-type", "text/html")
+
+    if (request.url === "/cookies") {
+      /* Sets a cookie for a year, or deletes it the usual way, with a date a day before "now". */
+      response.end(
+        `<!doctype html><title>Cookies</title><output></output>` +
+          `<button onclick="document.cookie = 'kept=1; path=/; expires=' + new Date(Date.now() + 365 * 864e5).toUTCString(); show()">Set</button>` +
+          `<button onclick="document.cookie = 'kept=; path=/; expires=' + new Date(Date.now() - 864e5).toUTCString(); show()">Delete</button>` +
+          `<script>function show() { document.querySelector("output").textContent = document.cookie || "none" } show()</script>`,
+      )
+
+      return
+    }
+
     response.end(
       `<!doctype html><title>Clock</title><h1 id="now"></h1>` +
         `<script>setInterval(() => { document.getElementById("now").textContent = String(Date.now()) }, 20)</script>`,
@@ -127,6 +140,27 @@ describe("a session's time", () => {
     } finally {
       await session.close()
       await services.close()
+    }
+  }, 60_000)
+
+  it("lets a travelled page delete a cookie by giving it a date in its past", async () => {
+    const session = await openWebSession({ baseUrl: siteUrl })
+
+    try {
+      await session.app.open("/cookies")
+      await session.screen.getByRole("button", { name: "Set" }).click()
+      await session.time.travel({ days: 8 })
+      await session.app.open("/cookies")
+
+      const shown = session.screen.getByRole("status")
+
+      await session.expect(shown).toHaveText("kept=1")
+      await session.screen.getByRole("button", { name: "Delete" }).click()
+      await session.expect(shown).toHaveText("none")
+      await session.app.open("/cookies")
+      expect(await shown.innerText()).toBe("none")
+    } finally {
+      await session.close()
     }
   }, 60_000)
 
