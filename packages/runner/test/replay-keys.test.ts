@@ -1,7 +1,8 @@
 /**
  * What a recording is kept under and what it holds: a route built from a `unique()` value replays
- * on a run with a fresh one.
+ * on a run with a fresh one, and the same instruction twice in a test is two recordings.
  */
+import { createHash } from "node:crypto"
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -11,6 +12,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { openWebSession, type WebSession, type WebSessionOptions } from "../src/index.ts"
 import { unique } from "../src/replay/params.ts"
 import { routeMatches, templateRoute } from "../src/replay/route.ts"
+import { ReplayStore } from "../src/replay/store.ts"
 import { serveHtml, type HtmlServer } from "./fixtures/html-server.ts"
 import { type Move, ref, scripted } from "./fixtures/scripted.ts"
 
@@ -26,6 +28,20 @@ document.getElementById("create").addEventListener("click", () => {
 })
 </script>`
 
+/** A wizard whose Continue button moves to the next step, each at its own path. */
+const WIZARD = `<!doctype html><title>Wizard</title><h1>Step 1</h1>
+<button type="button" id="next">Continue</button>
+<script>
+let at = 1
+document.getElementById("next").addEventListener("click", () => {
+  at += 1
+  history.pushState({}, "", "/wizard/" + ["", "", "details", "review"][at])
+  document.querySelector("h1").textContent = "Step " + at
+})
+</script>`
+
+const CONTINUE: readonly Move[] = [(view) => ["click", { ref: ref(view, "button", "Continue") }]]
+
 const CREATE: readonly Move[] = [
   (view, conversation) => {
     const name = /"company":\s*"([^"]+)"/.exec(conversation)?.[1] ?? ""
@@ -39,7 +55,12 @@ let site: HtmlServer
 let dir: string
 
 beforeAll(async () => {
-  site = await serveHtml((url) => (url.pathname === "/" ? PAGE : undefined))
+  site = await serveHtml((url) => {
+    if (url.pathname === "/") return PAGE
+    if (url.pathname.startsWith("/wizard")) return WIZARD
+
+    return undefined
+  })
 })
 
 afterAll(async () => {
@@ -58,6 +79,7 @@ afterEach(async () => {
 async function withSession<T>(
   options: Partial<WebSessionOptions>,
   run: (session: WebSession) => Promise<T>,
+  path = "/",
 ): Promise<T> {
   const session = await openWebSession({
     baseUrl: site.url,
@@ -67,7 +89,7 @@ async function withSession<T>(
   })
 
   try {
-    await session.app.open("/")
+    await session.app.open(path)
 
     return await run(session)
   } finally {
@@ -128,5 +150,67 @@ describe("a unique() value in the route", () => {
     expect(routeMatches("app/c/acme-k3j9x2", "app/c/{name}", fresh)).toBe(false)
     expect(routeMatches("app/c/acme-p0q1r2", "app/c/{other}", fresh)).toBe(false)
     expect(routeMatches("app/thanks", "app/thanks", fresh)).toBe(true)
+  })
+})
+
+/** Continues twice through the wizard, checking each step; the agent steps' cache modes. */
+async function continuedTwice(session: WebSession) {
+  await session.agent.act("click Continue")
+  await session.expect(session.screen.getByRole("heading")).toHaveText("Step 2")
+  await session.agent.act("click Continue")
+  await session.expect(session.screen.getByRole("heading")).toHaveText("Step 3")
+
+  return session.flight
+    .steps()
+    .filter((step) => step.api === "agent.act")
+    .map((step) => step.cache?.mode)
+}
+
+describe("the same instruction twice in a test", () => {
+  it("is two recordings, each replayed by its own step", async () => {
+    const recorded = await withSession({ model: scripted(CONTINUE) }, continuedTwice, "/wizard")
+
+    expect(recorded).toEqual(["missed", "missed"])
+
+    const kept = await recordings()
+    const routes = kept.map((trace) => String(trace["endRoute"]))
+    const occurrences = kept.map((trace) =>
+      JSON.stringify(trace["identity"]).includes('"occurrence":1') ? 1 : 0,
+    )
+
+    expect(routes.toSorted((a, b) => a.localeCompare(b))).toEqual([
+      "app/wizard/details",
+      "app/wizard/review",
+    ])
+    expect(occurrences.toSorted((a, b) => a - b)).toEqual([0, 1])
+
+    const idle = scripted([])
+
+    expect(await withSession({ model: idle }, continuedTwice, "/wizard")).toEqual([
+      "replayed",
+      "replayed",
+    ])
+    expect(idle.doGenerateCalls).toHaveLength(0)
+  }, 60_000)
+})
+
+describe("step keys", () => {
+  const options = { dir: "unused", mode: "read-write", projectId: "p", journey: "j" } as const
+  const call = { kind: "act", instruction: "click Continue", params: {} } as const
+
+  it("key the first occurrence as before, and later ones by how many came first", () => {
+    const store = new ReplayStore({ ...options, appIdentity: "http://127.0.0.1" })
+    const first = store.key({ ...call, step: 0 })
+    const between = store.key({ ...call, step: 1, instruction: "click Back" })
+    const second = store.key({ ...call, step: 2 })
+    const { step: _step, ...keyed } = first.identity
+    const before = createHash("sha256").update(JSON.stringify(keyed)).digest("hex").slice(0, 32)
+
+    expect(first.key).toBe(before)
+    expect(first.identity).not.toHaveProperty("occurrence")
+    expect(second.identity).toMatchObject({ step: 2, occurrence: 1 })
+    expect(new Set([first.key, between.key, second.key]).size).toBe(3)
+    expect(store.key({ ...call, step: 0 }).key).toBe(first.key)
+    expect(store.key({ ...call, step: 2 }).key).toBe(second.key)
   })
 })

@@ -116,6 +116,11 @@ const identity = z.object({
   instruction: z.string(),
   params: z.record(z.string(), z.string()),
   policy: z.string(),
+  /**
+   * How many steps of the journey before it had the same instruction and params, when any did;
+   * part of the key, so each replays its own recording.
+   */
+  occurrence: z.number().int().positive().optional(),
 })
 
 export type StepIdentity = z.infer<typeof identity>

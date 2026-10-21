@@ -1,7 +1,8 @@
 /**
  * Recordings on disk, one file per step. A step's key covers what makes it the same step: the
  * project, the journey, the app, the instruction as written, its params (plain values in full;
- * `unique()` values and secrets by kind only) and the relocation policy it replays under. A
+ * `unique()` values and secrets by kind only), the relocation policy it replays under, and for
+ * the second and later step with all of those the same, its occurrence. A
  * recording made in this session is held back until a later check confirms what it did; only then
  * is it written. Each file also keeps the parts of its key, so a step that finds no recording under
  * its own key can still say which recording of the same step it missed, and what changed.
@@ -74,6 +75,8 @@ function changedParts(now: StepIdentity, recorded: StepIdentity): string[] {
 export class ReplayStore {
   private readonly options: ReplayStoreOptions
   private staged: Staged[] = []
+  /** The positions of the steps keyed so far, by everything else in their keys. */
+  private readonly seen = new Map<string, number[]>()
 
   constructor(options: ReplayStoreOptions) {
     this.options = options
@@ -87,10 +90,15 @@ export class ReplayStore {
     return this.options.mode === "read-write"
   }
 
-  /** The key of a step: a digest of everything that makes it the same step. */
+  /**
+   * The key of a step: a digest of everything that makes it the same step. The same instruction
+   * with the same params twice in a journey is two steps: the second is keyed by its occurrence
+   * (1 for the second time, and so on), so each replays its own recording. A step inserted
+   * elsewhere in the test changes no key; the first occurrence is keyed as it always was.
+   */
   key(call: StepCall): StepKey {
     const { projectId, journey, appIdentity } = this.options
-    const identity: StepIdentity = {
+    const base: StepIdentity = {
       format: KEY_FORMAT,
       projectId,
       journey,
@@ -101,10 +109,26 @@ export class ReplayStore {
       params: paramIdentity(call.params),
       policy: this.options.policy ?? DEFAULT_RELOCATION,
     }
-    const { step: _position, ...keyed } = identity
-    const key = createHash("sha256").update(JSON.stringify(keyed)).digest("hex").slice(0, 32)
+    const { step: _position, ...keyed } = base
+    const occurrence = this.occurrence(JSON.stringify(keyed), call.step)
+    const identity = occurrence === 0 ? base : { ...base, occurrence }
+    const digested = occurrence === 0 ? keyed : { ...keyed, occurrence }
+    const key = createHash("sha256").update(JSON.stringify(digested)).digest("hex").slice(0, 32)
 
     return { key, identity }
+  }
+
+  /** How many steps before `step` had the same key: 0 for the first. */
+  private occurrence(keyed: string, step: number): number {
+    const steps = this.seen.get(keyed) ?? []
+
+    if (!steps.includes(step))
+      this.seen.set(
+        keyed,
+        [...steps, step].toSorted((a, b) => a - b),
+      )
+
+    return (this.seen.get(keyed) ?? []).indexOf(step)
   }
 
   /** The recording under `key`, or undefined when there is none or it cannot be read. */

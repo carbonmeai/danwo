@@ -116,6 +116,11 @@ cache: 3 replayed · 0 relocated · 0 handed off · 0 missed · 1 stale
 
 Rerun the test to record the new version. The failure page names what changed.
 
+The step's position in the test isn't part of the key, so adding a step before it changes
+nothing. The same instruction twice in one test, such as two `click Continue` steps, is recorded
+twice, once for each time it appears. A test that runs the same steps as different users should
+name the user in `params`, as in `{ persona: "admin" }`.
+
 ## Replay in CI
 
 Commit the cache folder, set by `cache.dir` in your config, so CI replays with no model calls:

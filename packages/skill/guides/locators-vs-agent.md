@@ -76,6 +76,12 @@ after it passed` (`saved` false for both). The `cache:` line counts them after t
 e.g. `cache: 3 replayed · 0 relocated · 0 handed off · 1 missed · 1 not kept: the test failed`; a
 step not kept calls the model again next run.
 
+A recording is keyed by the journey, the instruction as written and its params, not by the step's
+position, so a step inserted before it changes nothing. The same instruction with the same params
+twice in one test is two recordings: the second and later are keyed by their occurrence. A test
+that runs the same steps as different people should name the person in `params`
+(`{ persona: "admin" }`), since the key has no other account field.
+
 Values in braces come from `params`: `unique(...)` gives a fresh value each run that replays still
 accept, `secret(name)` keeps the value from the model, and values the agent reads from mail are
 recorded by where they came from, not as text.
