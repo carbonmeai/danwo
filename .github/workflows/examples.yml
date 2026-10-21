@@ -1,10 +1,10 @@
 name: Examples
 
-# The standalone examples (`examples/with-*`), installed from the release tarballs as a user would
-# install them from npm, then tested end to end: each one's tests and a small fault matrix.
-# Nightly, by hand, and on pull requests that change an example. Every `examples/with-*` folder
-# with an `example.json` is picked up, so a new example needs no change here. The ruleset
-# requires `examples gate` alone.
+# The standalone examples (the starters `examples/with-*` and the showcase apps such as
+# `examples/commerce`), installed from the release tarballs as a user would install them from npm,
+# then tested end to end: each one's tests and a small fault matrix. Nightly, by hand, and on pull
+# requests that change an example. Every example whose `example.json` says `"install": "npm"` is
+# picked up, so a new example needs no change here. The ruleset requires `examples gate` alone.
 on:
   schedule:
     - cron: "23 3 * * *"
@@ -38,7 +38,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          all="$(find examples -mindepth 2 -maxdepth 2 -path 'examples/with-*/example.json' | cut -d/ -f2 | sort | jq -Rsc 'split("\n") | map(select(. != ""))')"
+          all="$(for notes in examples/*/example.json; do jq -r --arg dir "$(basename "$(dirname "$notes")")" 'select(.install == "npm") | $dir' "$notes"; done | sort | jq -Rsc 'split("\n") | map(select(. != ""))')"
           if [ "$EVENT" != "pull_request" ]; then
             picked="$all"
           else
