@@ -27,6 +27,8 @@ const SKIPPED = new Set([
   "node_modules",
   ".next",
   ".next-build-lock",
+  "dist",
+  ".web-build-lock",
   ".danwo",
   "package-lock.json",
 ])

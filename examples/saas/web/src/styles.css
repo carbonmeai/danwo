@@ -1,0 +1,6 @@
+@import "tailwindcss";
+@import "../../kit/kit.css";
+@import "../../kit/tailwind.css";
+
+/* Tailwind scans the web app's own files. */
+@source ".";

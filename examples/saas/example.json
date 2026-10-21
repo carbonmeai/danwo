@@ -1,0 +1,18 @@
+{
+  "name": "SaaS with integrations",
+  "summary": "Relay, a team-notes app: workspaces on Clerk organizations, a Stripe trial and billing, Slack and Google Calendar connected by OAuth, live notes over Pusher, and Inngest jobs that send email through Resend.",
+  "icon": "tanstack.svg",
+  "iconDark": "tanstack-on-dark.svg",
+  "stack": ["TanStack Start", "Hono", "Inngest", "Postgres", "Drizzle", "Tailwind CSS"],
+  "providers": ["clerk", "stripe", "slack", "google", "pusher", "resend"],
+  "runsOn": "A TanStack Start app, a Hono API, an Inngest worker and the Inngest dev server, with Postgres in Docker",
+  "install": "npm",
+  "shows": [
+    "Onboarding that makes one workspace, one Clerk organization, one Stripe customer and one trialing subscription, however Clerk and Stripe fail on the way (102 trials)",
+    "Time travel through a trial: Stripe's trial_will_end on day 11 and the first invoice on day 14 start Inngest jobs, and the app's status matches Stripe's",
+    "A note posted to Slack exactly once under Slack 429s, 5xx and lost answers, and seen live by a teammate in a second browser",
+    "`SAAS_BUG` switches that turn one safeguard off, so you can watch the matrix catch it"
+  ],
+  "test": "tests/notes.danwo.ts",
+  "guide": { "title": "Background jobs", "href": "/docs/background-jobs" }
+}
