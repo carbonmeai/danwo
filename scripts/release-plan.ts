@@ -245,6 +245,20 @@ export function summaryLines(tarballs: readonly Tarball[], out: string): string[
   ]
 }
 
+/** The processes in `ps -axo pid=,command=` output whose command line mentions `marker`. */
+export function processesUnder(
+  table: string,
+  marker: string,
+): { readonly pid: number; readonly command: string }[] {
+  return table.split("\n").flatMap((line) => {
+    const match = /^\s*(\d+)\s+(.*)$/.exec(line)
+
+    return match?.[1] !== undefined && match[2]?.includes(marker) === true
+      ? [{ pid: Number(match[1]), command: match[2] }]
+      : []
+  })
+}
+
 /** How a check step ended: its exit status, everything it printed, and how long it took. */
 export interface StepResult {
   readonly status: number | null

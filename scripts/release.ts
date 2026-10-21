@@ -8,7 +8,8 @@
  *   repository's LICENSE and NOTICE and a README added), and writes one tarball per package with
  *   `npm pack` to `--out` (`dist/release`). The packages' own package.json files are not touched.
  * - `--verify` then installs every tarball into a fresh npm project and runs `danwo --version`,
- *   `danwo init`, `danwo test` and a strict `tsc --noEmit` there; any failure exits non-zero.
+ *   `danwo init`, `danwo test` and a strict `tsc --noEmit` there, then checks danwo left nothing
+ *   running; any failure exits non-zero.
  * - `--publish` packs, then publishes the tarballs with `npm publish --provenance`, dependencies
  *   first, under `beta` for a prerelease and `latest` otherwise. Only CI runs it.
  *
@@ -36,6 +37,7 @@ import {
   type Manifest,
   packedTarball,
   parseReleaseArgs,
+  processesUnder,
   publicPackages,
   publishOrder,
   refusals,
@@ -139,6 +141,9 @@ function freePort(): Promise<number> {
   })
 }
 
+/** How long what danwo started may take to stop after it exits: its guardian's grace, and some. */
+const LEFTOVER_GRACE_MS = 5_000
+
 /** One command the check runs in the fresh project. */
 interface CheckStep {
   readonly label: string
@@ -163,6 +168,51 @@ function step({ label, argv, expected }: CheckStep, cwd: string): boolean {
   for (const line of report.lines) console.log(line)
 
   return report.ok
+}
+
+/** The processes whose command line names the check project in `dir`. */
+function runningUnder(dir: string): ReturnType<typeof processesUnder> {
+  const table = execFileSync("ps", ["-axo", "pid=,command="], { encoding: "utf8" })
+
+  return processesUnder(table, basename(dir))
+}
+
+/** What still runs from `dir` once danwo's guardian had its grace period to stop it. */
+async function leftRunning(dir: string): Promise<ReturnType<typeof processesUnder>> {
+  const deadline = Date.now() + LEFTOVER_GRACE_MS
+
+  while (runningUnder(dir).length > 0 && Date.now() < deadline)
+    await new Promise((done) => setTimeout(done, 200))
+
+  return runningUnder(dir)
+}
+
+function kill(pid: number): void {
+  try {
+    process.kill(pid, "SIGKILL")
+  } catch {
+    /* Already gone. */
+  }
+}
+
+/**
+ * Whether danwo stopped everything it started in the check project (the app, workers, emulators).
+ * What is still running fails the check, and is stopped so the check leaves nothing behind.
+ */
+async function nothingLeftRunning(dir: string): Promise<boolean> {
+  const left = await leftRunning(dir)
+
+  for (const { pid } of left) kill(pid)
+
+  const lines = stepReport("nothing left running", {
+    status: left.length === 0 ? 0 : 1,
+    output: left.map((found) => `${found.pid} ${found.command}`).join("\n"),
+    ms: 0,
+  }).lines
+
+  for (const line of lines) console.log(line)
+
+  return left.length === 0
 }
 
 /** The app `danwo test` starts in the check project: one page on `port`. */
@@ -293,11 +343,12 @@ async function verify(packed: readonly Packed[], version: string): Promise<boole
       before: () => writeTypedProject(dir),
     },
   ]
-  const ok = steps.every((check) => {
+  const passed = steps.every((check) => {
     check.before?.()
 
     return step(check, dir)
   })
+  const ok = (await nothingLeftRunning(dir)) && passed
 
   if (ok) rmSync(dir, { recursive: true, force: true })
   else console.log(`\nThe check project is kept at ${dir}`)
