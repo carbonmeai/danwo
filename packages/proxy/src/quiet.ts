@@ -3,16 +3,17 @@
  * whenever a client goes away while its response is still being written, and `Failed to handle
  * request: socket hang up` when a passed-through stream is dropped mid-answer. Browsers do that all the
  * time at the end of a page or a test: they drop server-sent event streams, long polls and
- * sockets. Those lines say nothing about the run, so they are kept out of the output while any
+ * sockets. An iOS Simulator's own services also open TLS with protocol versions the proxy does not
+ * serve (`Unknown TLS error: … unsupported protocol`). Those lines say nothing about the run, so they are kept out of the output while any
  * proxy runs. Every other line passes through, and `DANWO_DEBUG=proxy` shows the dropped ones too.
  */
 
 /** The ways a client going away shows up on the socket the response was being written to. */
 const DROPPED =
-  /\b(?:ECONNRESET|EPIPE|ECONNABORTED|ERR_STREAM_PREMATURE_CLOSE|ERR_STREAM_DESTROYED)\b|socket hang up|aborted/
+  /\b(?:ECONNRESET|EPIPE|ECONNABORTED|ERR_STREAM_PREMATURE_CLOSE|ERR_STREAM_DESTROYED|ERR_SSL_UNSUPPORTED_PROTOCOL)\b|socket hang up|aborted/
 
 /** The line prefixes the interception library writes these errors with. */
-const PREFIXES = new Set(["Response error:", "Failed to handle request:"])
+const PREFIXES = new Set(["Response error:", "Failed to handle request:", "Unknown TLS error:"])
 
 function messageOf(value: unknown): string {
   return value instanceof Error

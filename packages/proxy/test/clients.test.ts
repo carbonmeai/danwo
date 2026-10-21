@@ -39,6 +39,16 @@ describe("dropped clients", () => {
     expect(isDroppedClientLine(["read ECONNRESET"])).toBe(false)
     expect(isDroppedClientLine(["Failed to handle request:", "socket hang up"])).toBe(true)
     expect(isDroppedClientLine(["Failed to handle request:", "No rule matched"])).toBe(false)
+
+    const oldTls = Object.assign(
+      new Error("tls_early_post_process_client_hello:unsupported protocol"),
+      {
+        code: "ERR_SSL_UNSUPPORTED_PROTOCOL",
+      },
+    )
+
+    expect(isDroppedClientLine(["Unknown TLS error:", oldTls])).toBe(true)
+    expect(isDroppedClientLine(["Unknown TLS error:", new Error("bad decrypt")])).toBe(false)
   })
 
   it("keeps passed-through streams dropped mid-answer out of console.error too", () => {
