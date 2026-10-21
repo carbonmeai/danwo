@@ -625,40 +625,85 @@ program
 program
   .command("device")
   .description(
-    "check this machine for Android testing: SDK, adb, emulator, rootable images, AVDs, JDK",
+    "check this machine for mobile testing: Android (SDK, adb, emulator, rootable images, AVDs, JDK) and, on a Mac, iOS (Xcode, simctl, runtimes, CocoaPods)",
   )
   .addArgument(new Argument("<action>").choices(["doctor"]))
-  .action(async () => {
-    const { deviceDoctor } = await import("@danwo/device")
-    const checks = await deviceDoctor()
-
-    for (const check of checks)
-      console.log(`${check.status.padEnd(4)}  ${check.name}: ${check.detail}`)
-    process.exitCode = checks.some((check) => check.status === "fail") ? 1 : 0
-  })
-
-program
-  .command("build-android")
-  .description(
-    "build the danwo build of an Expo app as a release APK (trusting danwo's per-run CA); unchanged sources reuse the kept build",
+  .addOption(
+    new Option("--platform <platform>", "check one platform only").choices(["android", "ios"]),
   )
-  .argument("[project]", "the Expo project's folder", ".")
-  .option("--force", "build again even when the sources are unchanged")
-  .option("--verbose", "print the build tools' output")
-  .action(async (project: string, options: { force?: boolean; verbose?: boolean }) => {
-    const { buildAndroid } = await import("@danwo/expo")
-    const build = await buildAndroid({
-      project: resolvePath(project),
-      force: options.force === true,
-      ...(options.verbose === true && { onLine: (line: string) => console.log(line) }),
+  .action(async (_action: string, options: { platform?: "android" | "ios" }) => {
+    const { deviceDoctor } = await import("@danwo/device")
+    const checks = await deviceDoctor(undefined, {
+      ...(options.platform !== undefined && { platform: options.platform }),
     })
+    const platforms = [...new Set(checks.map((check) => check.platform))]
 
-    console.log(
-      build.cached
-        ? `reused ${build.apk}`
-        : `built ${build.apk} in ${Math.round(build.durationMs / 1000)} s (log: ${build.log})`,
+    for (const platform of platforms) {
+      if (platforms.length > 1) console.log(platform === "ios" ? "iOS" : "Android")
+      for (const check of checks.filter((each) => each.platform === platform))
+        console.log(`${check.status.padEnd(4)}  ${check.name}: ${check.detail}`)
+    }
+
+    /* Without --platform, a machine ready for one platform passes. */
+    const broken = platforms.filter((platform) =>
+      checks.some((check) => check.platform === platform && check.status === "fail"),
     )
+
+    process.exitCode = broken.length > 0 && broken.length === platforms.length ? 1 : 0
   })
+
+/** What `build-android` and `build-ios` both report. */
+interface AppBuild {
+  readonly cached: boolean
+  readonly durationMs: number
+  readonly log: string
+}
+
+/** Registers `danwo <name> [project]`: `build` makes (or reuses) the build, `where` says where it is. */
+function buildCommand<B extends AppBuild>(
+  name: string,
+  description: string,
+  build: (options: {
+    readonly project: string
+    readonly force: boolean
+    readonly onLine?: (line: string) => void
+  }) => Promise<B>,
+  where: (build: B) => string,
+): void {
+  program
+    .command(name)
+    .description(description)
+    .argument("[project]", "the Expo project's folder", ".")
+    .option("--force", "build again even when the sources are unchanged")
+    .option("--verbose", "print the build tools' output")
+    .action(async (project: string, options: { force?: boolean; verbose?: boolean }) => {
+      const done = await build({
+        project: resolvePath(project),
+        force: options.force === true,
+        ...(options.verbose === true && { onLine: (line: string) => console.log(line) }),
+      })
+
+      console.log(
+        done.cached
+          ? `reused ${where(done)}`
+          : `built ${where(done)} in ${Math.round(done.durationMs / 1000)} s (log: ${done.log})`,
+      )
+    })
+}
+
+buildCommand(
+  "build-android",
+  "build the danwo build of an Expo app as a release APK (trusting danwo's per-run CA); unchanged sources reuse the kept build",
+  async (options) => (await import("@danwo/expo")).buildAndroid(options),
+  (build) => build.apk,
+)
+
+buildCommand(
+  "build-ios",
+  "build the danwo build of an Expo app as a Release iOS Simulator app (plain HTTP allowed for the proxy); unchanged sources reuse the kept build",
+  async (options) => (await import("@danwo/expo")).buildIos(options),
+  (build) => build.app,
+)
 
 try {
   await program.parseAsync()
