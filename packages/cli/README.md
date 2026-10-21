@@ -13,7 +13,9 @@ npm run test:danwo
 ```
 
 `init` writes `danwo.config.ts`, an example test and a `test:danwo` script, and installs
-`@danwo/cli` and `@danwo/sdk`. Then:
+`@danwo/cli` and `@danwo/sdk` at its own version (`danwo --version` prints it), plus
+`@types/node` in a TypeScript project that lacks it. Install Chromium with `playwright-core` as
+above, not `npx playwright install`, whose browser may not match. Then:
 
 | Command               | What it does                                                         |
 | --------------------- | -------------------------------------------------------------------- |

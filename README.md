@@ -44,10 +44,11 @@ _Dánwò_ is Yorùbá for "to test". It comes from _dán … wò_, "try it and s
 
 ## Quickstart
 
-In your app's folder:
+In your app's folder, with Node.js 24 or newer:
 
 ```sh
 npx @danwo/cli init
+npx playwright-core install chromium   # once per machine, for browser tests
 ```
 
 `danwo init` looks at the project (package manager, framework, dev command, the providers it
@@ -65,7 +66,10 @@ uses) and asks what to set up:
   with danwo's MCP server registered for them.
 
 It writes `danwo.config.ts`, a `tests/example.danwo.ts` that passes on a fresh project, a
-`test:danwo` script and a `.gitignore` entry, and installs what the files import. Run it again
+`test:danwo` script and a `.gitignore` entry, and installs what the files import: `@danwo/cli` and
+`@danwo/sdk` at its own version (`danwo --version`), plus `@types/node` in a TypeScript project
+that lacks it. Install Chromium with `playwright-core`, not `npx playwright install`, which can
+fetch a newer Playwright whose browser does not match. Run it again
 and it changes nothing; a config you edited is shown as a diff and replaced only if you say so
 (`--force` without prompts). Then:
 
@@ -108,20 +112,26 @@ behaves the same.
 | `@danwo/infra`      | Fault proxies in front of the app's Postgres and Redis, for data faults in the matrix                                           |
 | `@danwo/proxy`      | The egress proxy                                                                                                                |
 | `@danwo/emulators`  | Provider emulators                                                                                                              |
-| `@danwo/fidelity`   | Checks the emulators against the real providers by structure                                                                    |
+| `@danwo/fidelity`   | Checks the emulators against the real providers by structure (not published)                                                    |
 | `@danwo/github`     | Reports runs to GitHub from Actions: a check run, a pull request comment and the job summary                                    |
 | `@danwo/skill`      | The coding-agent skill, task guides and the generated capability spec                                                           |
 | `@danwo/mcp`        | An MCP server for coding agents: run, explain and write danwo tests                                                             |
 | `@danwo/playwright` | danwo's environments, faults, invariants and matrix for Playwright Test                                                         |
 | `@danwo/dashboard`  | `danwo serve`: runs, flight records, matrix grids and flaky tests                                                               |
-| `@danwo/ui`         | The design system the dashboard is built with                                                                                   |
+| `@danwo/ui`         | The design system the dashboard is built with (not published)                                                                   |
 | `@danwo/device`     | Android emulators bound to the run's proxy and CA, driven through agent-device                                                  |
 | `@danwo/expo`       | The danwo build of an Expo app (`danwo build-android`)                                                                          |
 
 See `examples/shop` for a small app tested with `danwo test` and `danwo matrix`, and
 `examples/shop-playwright` for the same test in Playwright Test. `examples/shop-mobile` is an
 Expo app that buys the credits through Stripe Checkout in a Custom Tab, tested on an Android
-emulator.
+emulator. Those three run inside this repository.
+
+The standalone examples install danwo from npm as your project would, each with its own README:
+`examples/with-next` (a Next.js waitlist on Postgres and Resend), `examples/commerce` (a Next.js
+storefront, a Hono API, Postgres and Stripe) and `examples/clerk-login` (sign-in on the real
+ClerkJS against the Clerk emulator). The [examples gallery](https://danwo.dev/docs/examples) lists
+them all.
 
 ## Snapshots of the app's data
 
@@ -505,9 +515,11 @@ Node 24 and bun.
 
 ```bash
 bun install
-bun run check       # format, lint, fallow, typecheck, unit tests
+bun run check       # format, lint, fallow, typecheck, declarations, unit tests
 bun run test:slow   # browser and CLI tests
 ```
+
+[CONTRIBUTING.md](CONTRIBUTING.md) covers the examples, CI and releasing.
 
 ## Contributing
 
