@@ -57,6 +57,7 @@ import {
 } from "./record.ts"
 import { SessionKeeper } from "./sessions.ts"
 import { type MessageMarks, messageMarks, type RunLists, setupCaused } from "./setup-causes.ts"
+import { withTeardown } from "./suite-hooks.ts"
 import type {
   AttemptReport,
   TestFileTask,
@@ -395,8 +396,9 @@ function attemptImpact(result: AttemptResult, mark: EvidenceMark): TestImpact {
   })
 }
 
-async function runSuiteHooks(declarations: FileDeclarations, kind: "beforeAll" | "afterAll") {
-  for (const hook of suiteHooks(declarations, kind)) await hook.fn(SUITE_FIXTURES)
+/** The file's `beforeAll` hooks, outermost first; the first that throws stops the rest. */
+async function runSetupHooks(declarations: FileDeclarations) {
+  for (const hook of suiteHooks(declarations, "beforeAll")) await hook.fn(SUITE_FIXTURES)
 }
 
 /**
@@ -415,7 +417,7 @@ async function startFile(
 
   if (start !== undefined && tests.some((test) => modeOf(test) !== "none")) await start.clean()
 
-  await runSuiteHooks(declarations, "beforeAll")
+  await runSetupHooks(declarations)
   if (!setup) return (test) => modeOf(test) === "test"
 
   start?.touch()
@@ -435,25 +437,27 @@ async function testFile(task: TestFileTask): Promise<TestReport[]> {
   const chosen = declarations.tests.filter(
     (test) => selected.has(testIdOf(loaded.root, task.file, test)) && test.mode !== "skip",
   )
-  const isolated = await startFile(declarations, chosen)
 
-  for (const test of declarations.tests) {
-    const id = testIdOf(loaded.root, task.file, test)
+  /* Every afterAll runs, even when a beforeAll or an earlier afterAll threw. */
+  return withTeardown(declarations, SUITE_FIXTURES, async () => {
+    const isolated = await startFile(declarations, chosen)
 
-    if (!selected.has(id)) continue
+    for (const test of declarations.tests) {
+      const id = testIdOf(loaded.root, task.file, test)
 
-    const report =
-      test.mode === "skip"
-        ? { id, status: "skipped" as const, attempts: [], workerIndex }
-        : await runTest(task, declarations, id, isolated(test))
+      if (!selected.has(id)) continue
 
-    sendNote({ topic: "tested", data: report })
-    reports.push(report)
-  }
+      const report =
+        test.mode === "skip"
+          ? { id, status: "skipped" as const, attempts: [], workerIndex }
+          : await runTest(task, declarations, id, isolated(test))
 
-  await runSuiteHooks(declarations, "afterAll")
+      sendNote({ topic: "tested", data: report })
+      reports.push(report)
+    }
 
-  return reports
+    return reports
+  })
 }
 
 type TrialEnvironment = WorkerEnvironment & { readonly proxy: Proxy }

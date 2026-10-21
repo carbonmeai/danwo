@@ -16,6 +16,7 @@ import type { EffectsSetting, SessionSecret } from "../session.ts"
 import { DanwoError } from "../support/codes.ts"
 import type { SessionArgs, SessionDefinition } from "../tests/types.ts"
 import type { VisionSetting } from "../vision/desk.ts"
+import { configWarnings } from "./config-keys.ts"
 import type { EnvironmentContext, WorkerEnvironment } from "./environment.ts"
 import type { ImpactConfig } from "./impact.ts"
 import type { Isolation } from "./isolation.ts"
@@ -205,6 +206,8 @@ export interface LoadedConfig {
   /** The config file, or undefined when the project has none. */
   readonly path: string | undefined
   readonly root: string
+  /** Keys the config sets that danwo does not know, one warning each. */
+  readonly warnings?: readonly string[]
 }
 
 const CONFIG_FILES = ["danwo.config.ts", "danwo.config.mts", "danwo.config.js", "danwo.config.mjs"]
@@ -263,5 +266,12 @@ export async function loadConfig(cwd: string, explicit?: string): Promise<Loaded
     )
   }
 
-  return { config: module.default, path, root: dirname(path) }
+  const warnings = configWarnings(module.default)
+
+  return {
+    config: module.default,
+    path,
+    root: dirname(path),
+    ...(warnings.length > 0 && { warnings }),
+  }
 }

@@ -7,6 +7,7 @@ import { type LintFinding, lintReport, withLint } from "../lint/index.ts"
 import { DanwoError } from "../support/codes.ts"
 import { catalogOf, testFilesOf, type CatalogEntry } from "./catalog.ts"
 import { ciDefaults, inCi, parseShard, type Shard, shardFiles, shardLabel } from "./ci.ts"
+import { printConfigWarnings } from "./config-keys.ts"
 import { type LoadedConfig, loadConfig } from "./config.ts"
 import { Crew } from "./crew.ts"
 import { changedFiles } from "./git-changes.ts"
@@ -122,6 +123,9 @@ export async function runTests(options: RunTestsOptions = {}): Promise<number> {
   const cwd = options.cwd ?? process.cwd()
   const write = options.write ?? printLine
   const loaded = await loadConfig(cwd, options.config)
+
+  printConfigWarnings(loaded)
+
   const ci = options.ci ?? inCi()
   const picked = await pickTests(loaded, options, ci, write)
 

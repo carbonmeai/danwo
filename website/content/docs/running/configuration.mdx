@@ -27,6 +27,13 @@ The config loads like a test file: Node removes its types and compiles nothing, 
 `namespace` won't load. [TypeScript in tests](/docs/typescript) lists what works, imports
 included.
 
+Types aren't checked either, so a misspelt key would do nothing. danwo warns about each key it
+doesn't know, and suggests the one you likely meant:
+
+```text
+danwo: warning: unknown config key `retires` (did you mean `retries`?); danwo ignores it
+```
+
 ## Finding and running tests
 
 | Option      | Default             | What it does                                    |

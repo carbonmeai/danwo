@@ -16,6 +16,8 @@ date: 2026-10-20
 - `danwo install-browser` installs the Chromium build danwo drives with danwo's own Playwright, keeping other installs' browsers. `init` runs it after the packages, and a launch that finds no browser names it.
 - `@danwo/playwright` takes any `@playwright/test` from 1.60 to 1.x as its peer, and launches the suite's own Playwright's browser behind danwo's proxy.
 - Test and config files resolve `tsconfig.json` `paths` aliases, and a file that uses TypeScript Node's type stripping can't load (an `enum`, parameter properties, a `namespace`) fails with the file, the line and what to write instead.
+- A config key danwo doesn't know gets a warning naming the key it likely means (`retires` → `retries`).
+- Every `afterAll` hook runs, also after a `beforeAll` or an earlier `afterAll` threw, and the file names every failure.
 - Every published package ships its type declarations, so `tsc` checks your tests against danwo's types.
 - The published dashboard is prebuilt: `danwo serve` runs without Vite.
 - The proxy's fix for mockttp's local port check ships with the package; a mockttp version without that check gets one warning instead of a proxy that won't start.

@@ -31,6 +31,7 @@ import { lintReport, withLint } from "../lint/index.ts"
 import { addUsage, cacheLine, modelLine, type Usage } from "../record/usage.ts"
 import { type ErrorClass, exitCodeOf, notJudged } from "../support/codes.ts"
 import { type CatalogEntry, catalogOf } from "./catalog.ts"
+import { printConfigWarnings } from "./config-keys.ts"
 import { type DanwoConfig, type LoadedConfig, loadConfig } from "./config.ts"
 import { Crew } from "./crew.ts"
 import { type CleanCost, estimateText, estimateTrials } from "./estimate.ts"
@@ -636,6 +637,9 @@ export async function runMatrix(
   const cwd = options.cwd ?? process.cwd()
   const write = options.write ?? printLine
   const loaded = await loadConfig(cwd, options.config)
+
+  printConfigWarnings(loaded)
+
   const file = resolve(cwd, options.file)
   const test = await theTest(loaded, file, options)
   const cache = await trialCache(loaded)

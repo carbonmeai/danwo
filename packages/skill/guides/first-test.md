@@ -89,7 +89,19 @@ to write; an alias that matches nothing says so.
 A test body receives fixtures: `app` (open paths, the base URL), `screen` (locators), `expect`,
 `agent` (plain-language steps), `secret` and `mail`. `test.describe`, `beforeEach`/`afterEach`,
 `beforeAll`/`afterAll`, `test.only`, `test.skip` and per-test options (`retries`, `timeout`,
-`session`) work as you would expect.
+`session`) work as you would expect. Every `afterAll` of a file runs once its tests are done, also
+when a `beforeAll` threw (the file's tests then do not run) and when an earlier `afterAll` threw;
+the file fails with its first error, the other hooks' errors named after it
+(`seeding failed (afterAll also failed: …)`), so teardown of what setup made outside the app
+always happens.
+
+A config key danwo does not know (`retires`, `testmatch`, `matrix.budjet`) is not an error, since
+Node does not check the config's types, but `danwo test` and `danwo matrix` print a warning on
+stderr for each, with the known key it most likely means:
+
+```text
+danwo: warning: unknown config key `retires` (did you mean `retries`?); danwo ignores it
+```
 
 Add an invariant when the test touches money, messages or other state behind the app:
 `test(...).invariant(fn)` must hold however the body went, and `danwo matrix` judges every
