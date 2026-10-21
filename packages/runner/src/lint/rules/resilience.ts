@@ -62,6 +62,18 @@ function retryAfterSeconds(call: RecordedExchange): number | undefined {
   return Number.isFinite(value) && value > 0 ? value : undefined
 }
 
+/**
+ * Whether `other` is `call` sent again: the same `Idempotency-Key`, or with no key the same body.
+ * Another request on the same route (a second subscriber's email) is not a retry.
+ */
+function sameRequest(call: RecordedExchange, other: RecordedExchange): boolean {
+  const key = requestHeader(call, "idempotency-key")
+
+  if (key !== undefined) return requestHeader(other, "idempotency-key") === key
+
+  return (other.request?.body ?? null) === (call.request?.body ?? null)
+}
+
 /** A call retried before the 429 answer's `Retry-After` allowed. */
 function earlyRetries(subject: LintSubject): RuleFinding[] {
   return subject.exchanges
@@ -72,7 +84,9 @@ function earlyRetries(subject: LintSubject): RuleFinding[] {
       if (seconds === undefined) return []
 
       const allowed = timeOf(call.startedAt) + (call.durationMs ?? 0) + seconds * 1000
-      const retry = laterOnRoute(subject, call).find((other) => timeOf(other.startedAt) < allowed)
+      const retry = laterOnRoute(subject, call).find(
+        (other) => sameRequest(call, other) && timeOf(other.startedAt) < allowed,
+      )
 
       return retry === undefined
         ? []

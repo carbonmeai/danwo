@@ -332,6 +332,17 @@ describe("resilience/duplicate-create", () => {
   })
 })
 
+/** An email to `to` sent at `ms`, keyed by its recipient; a 429 asks for a second's wait. */
+function email(to: string, ms: number, status = 200): RecordedExchange {
+  return call("POST", "https://api.resend.com/emails", {
+    ms,
+    status,
+    headers: { "idempotency-key": `digest-${to}` },
+    body: JSON.stringify({ to }),
+    responseHeaders: status === 429 ? { "retry-after": "1" } : {},
+  })
+}
+
 describe("resilience/retry-after-ignored", () => {
   const limited = call("GET", "https://api.stripe.com/v1/customers/cus_a1b2c3d4e5f6", {
     status: 429,
@@ -358,6 +369,16 @@ describe("resilience/retry-after-ignored", () => {
     })
 
     expect(rules(s)).not.toContain("resilience/retry-after-ignored")
+  })
+
+  it("does not take another request on the route for a retry, and knows one by its key", () => {
+    const parallel = subject({
+      exchanges: [email("kim", 0, 429), email("ada", 5), email("kim", 1_500)],
+    })
+    const early = subject({ exchanges: [email("kim", 0, 429), email("kim", 300)] })
+
+    expect(rules(parallel)).not.toContain("resilience/retry-after-ignored")
+    expect(rules(early)).toContain("resilience/retry-after-ignored")
   })
 })
 
