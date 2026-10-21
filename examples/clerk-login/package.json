@@ -1,0 +1,41 @@
+{
+  "name": "danwo-example-clerk-login",
+  "private": true,
+  "description": "Signing in with Clerk on Next.js: sign-up and sign-in by emailed code, Google, organizations and invitations, with the app's own users in Postgres.",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "danwo test",
+    "test:agentic": "danwo test tests/agentic.danwo.ts",
+    "matrix": "danwo matrix tests/deterministic.danwo.ts --grep \"signs up with an emailed code\"",
+    "matrix:plan": "danwo matrix tests/deterministic.danwo.ts --grep \"signs up with an emailed code\" --plan",
+    "matrix:invite": "danwo matrix tests/deterministic.danwo.ts --grep \"invites Bob\"",
+    "serve": "danwo serve"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "7.9.18",
+    "next": "16.4.2",
+    "pg": "8.23.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@clerk/clerk-js": "6.40.0",
+    "@clerk/ui": "1.41.0",
+    "@danwo/cli": "0.1.0-beta.0",
+    "@danwo/sdk": "0.1.0-beta.0",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "^24",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

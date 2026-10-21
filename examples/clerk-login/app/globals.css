@@ -1,0 +1,60 @@
+@import "tailwindcss";
+@import "../kit/kit.css";
+@import "../kit/tailwind.css";
+
+/* The sign-in and sign-up pages: the brand above one bordered card, its form beside a word on Lumen. */
+.auth {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kit-space-8);
+  padding: var(--kit-space-8) var(--kit-space-4);
+  background: var(--kit-bg-subtle);
+}
+
+.auth-card {
+  display: grid;
+  width: 100%;
+  max-width: 62rem;
+  gap: var(--kit-space-8);
+  border: 1px solid var(--kit-border);
+  border-radius: var(--kit-radius-2xl);
+  background: var(--kit-surface);
+  padding: var(--kit-space-8);
+}
+
+@media (min-width: 52rem) {
+  .auth-card {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    padding: var(--kit-space-12);
+  }
+}
+
+.auth-form {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-aside {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--kit-space-4);
+  max-width: 28rem;
+}
+
+.auth-aside h2 {
+  font-size: var(--kit-text-3xl);
+  font-weight: var(--kit-weight-semibold);
+  letter-spacing: -0.02em;
+  line-height: var(--kit-leading-tight);
+}
+
+/* Clerk's card sits flat inside ours. */
+.auth-form .cl-card,
+.auth-form .cl-cardBox {
+  box-shadow: none;
+}

@@ -1,0 +1,18 @@
+{
+  "name": "Login with Clerk",
+  "summary": "Signing in with Clerk on Next.js: Clerk's own components for sign-up and sign-in by emailed code or Google, organizations and invitations, and the app's users in Postgres from Clerk's webhooks.",
+  "icon": "clerk.svg",
+  "iconDark": "clerk-on-dark.svg",
+  "stack": ["Next.js App Router", "@clerk/nextjs", "Postgres", "Tailwind CSS"],
+  "providers": ["clerk", "google"],
+  "runsOn": "A Next.js app and the real ClerkJS in Chromium, with Postgres in Docker",
+  "install": "npm",
+  "shows": [
+    "The real `<SignIn/>`, `<SignUp/>`, `<UserButton/>` and `<OrganizationSwitcher/>` against danwo's Clerk emulator: emailed codes, Google's consent screen, invitations",
+    "A second person in a second browser: Bob opens the invitation email and joins Ada's organization",
+    "Invariants that read Clerk and Postgres: one app user per Clerk user, the same memberships on both sides, every unsigned webhook refused",
+    "`danwo matrix` faulting Clerk's Backend API, its webhooks (duplicate, late, forged, stale) and the app's SQL, with `CLERK_LOGIN_BUG` switches that turn a safeguard off"
+  ],
+  "test": "tests/deterministic.danwo.ts",
+  "guide": { "title": "Clerk", "href": "/docs/providers/clerk" }
+}
