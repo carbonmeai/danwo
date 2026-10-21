@@ -39,6 +39,15 @@ interface HandshakeNonce {
   readonly directives: readonly string[]
 }
 
+/**
+ * What the emulator keeps about an invitation beyond what the API shows: the ticket its email
+ * links to, and the app page that link lands on.
+ */
+interface InvitationTicket {
+  readonly ticket: string
+  readonly redirect_url: string | null
+}
+
 /** A user's membership in an organization, as stored; formatted with both sides on the way out. */
 export interface MembershipRecord {
   readonly id: string
@@ -83,6 +92,8 @@ export interface AttemptRecord {
   password: string | null
   first_name: string | null
   last_name: string | null
+  /** The invitation ticket a `ticket` sign-in or sign-up came with; it verifies the email. */
+  ticket: string | null
   readonly created_at: number
 }
 
@@ -102,7 +113,10 @@ export function clerkStore(store: Store) {
     nonces: objectTable<HandshakeNonce>(store, "clerk.handshake_nonces"),
     organizations: objectTable<ClerkOrganization>(store, "clerk.organizations"),
     memberships: objectTable<MembershipRecord>(store, "clerk.memberships"),
-    invitations: objectTable<OrganizationInvitationJSON>(store, "clerk.organization_invitations"),
+    invitations: objectTable<OrganizationInvitationJSON, InvitationTicket>(
+      store,
+      "clerk.organization_invitations",
+    ),
     signInTokens: objectTable<SignInTokenJSON>(store, "clerk.sign_in_tokens"),
     jwtTemplates: objectTable<JwtTemplateRecord>(store, "clerk.jwt_templates"),
     attempts: objectTable<AttemptRecord>(store, "clerk.attempts"),

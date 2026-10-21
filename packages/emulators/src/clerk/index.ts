@@ -19,6 +19,7 @@ import { instanceRoutes } from "./routes/instance.ts"
 import { meApiRoutes } from "./routes/me.ts"
 import { organizationRoutes } from "./routes/organizations.ts"
 import { sessionRoutes } from "./routes/sessions.ts"
+import { ticketRoutes } from "./routes/tickets.ts"
 import { userRoutes } from "./routes/users.ts"
 import { clerkScripts } from "./scripts.ts"
 import { instanceFrom } from "./seed.ts"
@@ -162,6 +163,7 @@ export const clerk = defineEmulator({
     clientApiRoutes(apps.frontend, context)
     attemptRoutes(apps.frontend, context)
     meApiRoutes(apps.frontend, context)
+    ticketRoutes(apps.frontend, context)
     accountsRoutes(apps.accounts, context)
   },
   seed: ({ store }) => {

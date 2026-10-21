@@ -78,6 +78,7 @@ export function newAttempt(
       first_name: fields.firstName ?? null,
       last_name: fields.lastName ?? null,
       created_session_id: null,
+      ticket: null,
       created_at: now(context),
     },
     null,
@@ -114,7 +115,10 @@ export function checkCode(
   return "incorrect"
 }
 
-/** Creates the user a completed sign-up asked for, its email verified by the code. */
+/**
+ * Creates the user a completed sign-up asked for, its email verified by the code (or by the
+ * invitation ticket it came with).
+ */
 export function createSignedUpUser(context: ClerkContext, attempt: AttemptRecord): string {
   const user = newUser(
     {
@@ -122,7 +126,7 @@ export function createSignedUpUser(context: ClerkContext, attempt: AttemptRecord
       firstName: attempt.first_name,
       lastName: attempt.last_name,
       hasPassword: attempt.password !== null,
-      emailStrategy: "email_code",
+      emailStrategy: attempt.ticket === null ? "email_code" : "ticket",
       timezone: BROWSER_TIMEZONE,
     },
     now(context),

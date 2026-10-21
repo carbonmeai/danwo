@@ -15,7 +15,7 @@ function verificationObject(strategy: string): string {
 function verificationOf(attempt: AttemptRecord) {
   if (attempt.strategy === null) return null
 
-  const done = attempt.status === "complete"
+  const done = attempt.status === "complete" || attempt.ticket !== null
 
   return {
     object: verificationObject(attempt.strategy),
@@ -102,7 +102,7 @@ export function signUpJson(context: ClerkContext, attempt: AttemptRecord) {
     required_fields: ["email_address", ...(instanceOf(context).password ? ["password"] : [])],
     optional_fields: ["first_name", "last_name"],
     missing_fields: missingFields(context, attempt),
-    unverified_fields: done ? [] : ["email_address"],
+    unverified_fields: done || attempt.ticket !== null ? [] : ["email_address"],
     verifications: {
       email_address: verification
         ? {

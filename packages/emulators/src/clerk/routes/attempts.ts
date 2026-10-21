@@ -19,6 +19,7 @@ import { type ClerkContext, instanceOf, now } from "../context.ts"
 import { ClerkFailure, notFound, str } from "../helpers.ts"
 import { startSession } from "../sessions.ts"
 import type { AttemptRecord } from "../store.ts"
+import { acceptInvitation, invitationForTicket } from "./tickets.ts"
 import { userByEmail } from "./users.ts"
 
 /** The attempt `id` of `kind` on the request's client, or 404. */
@@ -71,6 +72,74 @@ function complete(
       created_session_id: session.id,
     }) ?? attempt
   )
+}
+
+/**
+ * `POST /v1/client/sign_ins` with an invitation ticket: the invitee already has an account, so the
+ * ticket signs them in and into the organization.
+ */
+function ticketSignIn(
+  context: ClerkContext,
+  request: BrowserRequest,
+  body: Record<string, unknown>,
+): AttemptRecord {
+  const invitation = invitationForTicket(context, str(body.ticket) ?? "")
+  const user = userByEmail(context, invitation.email_address) ?? refuseUnknown(context, request)
+  const created = newAttempt(context, "sign_in", {
+    clientId: request.client.id,
+    identifier: invitation.email_address,
+    userId: user.id,
+    password: null,
+  })
+  const attempt =
+    context.clerk.attempts.change(created.id, {
+      strategy: "ticket",
+      ticket: str(body.ticket) ?? "",
+    }) ?? created
+
+  track(context, request, attempt)
+  acceptInvitation(context, invitation, user.id)
+
+  return complete(context, request, attempt, user.id)
+}
+
+/**
+ * A sign-up's fields from an invitation ticket: the invited address, verified by the ticket.
+ * Nothing for a sign-up without one; a taken address is refused, as without a ticket.
+ */
+function ticketFields(
+  context: ClerkContext,
+  body: Record<string, unknown>,
+): Partial<AttemptRecord> {
+  if (str(body.strategy) !== "ticket") return {}
+
+  const ticket = str(body.ticket) ?? ""
+  const invitation = invitationForTicket(context, ticket)
+
+  checkSignUp(context, invitation.email_address, undefined)
+
+  return { identifier: invitation.email_address, strategy: "ticket", ticket }
+}
+
+/**
+ * Completes a ticket sign-up once it has what the instance asks for (a password, if it asks for
+ * one): the user is created with the invited address verified, joins the organization, and is
+ * signed in.
+ */
+function finishTicket(
+  context: ClerkContext,
+  request: BrowserRequest,
+  attempt: AttemptRecord,
+): AttemptRecord {
+  if (attempt.ticket === null || attempt.status === "complete") return attempt
+  if (instanceOf(context).password && attempt.password === null) return attempt
+
+  const invitation = invitationForTicket(context, attempt.ticket)
+  const userId = createSignedUpUser(context, attempt)
+
+  acceptInvitation(context, invitation, userId)
+
+  return complete(context, request, attempt, userId)
 }
 
 /** Makes `attempt` the client's sign-in or sign-up in progress. */
@@ -141,10 +210,23 @@ function refuseUnknown(context: ClerkContext, request: BrowserRequest): never {
   throw formError("form_identifier_not_found", "identifier", "Couldn't find your account.")
 }
 
+/** A sign-in that names no account: an invitation ticket. Undefined for one by identifier. */
+function otherSignIn(
+  context: ClerkContext,
+  request: BrowserRequest,
+  body: Record<string, unknown>,
+): AttemptRecord | undefined {
+  return str(body.strategy) === "ticket" ? ticketSignIn(context, request, body) : undefined
+}
+
 /** `POST /v1/client/sign_ins`: finds the account, and checks a password sent along with it. */
 async function createSignIn(c: Context, context: ClerkContext): Promise<Response> {
   const request = browserRequest(c, context)
   const body = await bodyOf(c)
+  const other = otherSignIn(context, request, body)
+
+  if (other) return reply(c, context, request, signInJson(context, other))
+
   const identifier = str(body.identifier) ?? ""
   const user = userByEmail(context, identifier) ?? refuseUnknown(context, request)
 
@@ -269,18 +351,22 @@ function attemptVerification(
 function signUpRoutes(app: App, context: ClerkContext): void {
   app.post("/v1/client/sign_ups", async (c) => {
     const request = browserRequest(c, context)
-    const fields = signUpFields(context, await bodyOf(c))
+    const body = await bodyOf(c)
     const created = newAttempt(context, "sign_up", {
       clientId: request.client.id,
       identifier: "",
       userId: null,
       password: null,
     })
-    const attempt = context.clerk.attempts.change(created.id, fields) ?? created
+    const attempt =
+      context.clerk.attempts.change(created.id, {
+        ...signUpFields(context, body),
+        ...ticketFields(context, body),
+      }) ?? created
 
     track(context, request, attempt)
 
-    return reply(c, context, request, signUpJson(context, attempt))
+    return reply(c, context, request, signUpJson(context, finishTicket(context, request, attempt)))
   })
   app.get("/v1/client/sign_ups/:id", (c) => {
     const request = browserRequest(c, context)
@@ -298,7 +384,7 @@ function signUpRoutes(app: App, context: ClerkContext): void {
     const updated =
       context.clerk.attempts.change(attempt.id, signUpFields(context, await bodyOf(c))) ?? attempt
 
-    return reply(c, context, request, signUpJson(context, updated))
+    return reply(c, context, request, signUpJson(context, finishTicket(context, request, updated)))
   })
   app.post("/v1/client/sign_ups/:id/prepare_verification", (c) => {
     const request = browserRequest(c, context)

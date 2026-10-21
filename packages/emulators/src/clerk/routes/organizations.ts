@@ -167,6 +167,7 @@ function invitationRoutes(app: App, context: ClerkContext): void {
         email,
         str(body.role) ?? "org:member",
         str(body.inviter_user_id),
+        str(body.redirect_url),
       ),
     )
   })

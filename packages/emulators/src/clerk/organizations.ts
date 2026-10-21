@@ -2,7 +2,7 @@ import type { OrganizationInvitationJSON, OrganizationMembershipJSON } from "@cl
 
 import { type ClerkContext, instanceOf, now } from "./context.ts"
 import { type ClerkOrganization, type ClerkUser, primaryEmail } from "./entities.ts"
-import { clerkId, ClerkFailure, notFound } from "./helpers.ts"
+import { clerkId, ClerkFailure, notFound, secretToken } from "./helpers.ts"
 import type { MembershipRecord } from "./store.ts"
 
 /** The permissions Clerk's two default roles carry. */
@@ -248,17 +248,38 @@ function inviterOf(context: ClerkContext, inviterId: string | undefined) {
   }
 }
 
-/** Invites `email` to an organization with `role`, as a pending invitation valid for 30 days. */
+/**
+ * Invites `email` to an organization with `role`, as a pending invitation valid for 30 days, and
+ * emails it: the link goes to the Frontend API's `/v1/tickets/accept`, which sends the invitee on
+ * to `redirectUrl` (the app's sign-up or sign-in page) with the ticket, or to the Account Portal.
+ */
 export function inviteToOrganization(
   context: ClerkContext,
   orgId: string,
   email: string,
   role: string,
   inviterId?: string,
+  redirectUrl?: string,
 ): OrganizationInvitationJSON {
   const org = organizationOf(context, orgId)
   const at = now(context)
   const id = clerkId("orginv")
+  const ticket = secretToken(32)
+  const url = `https://${instanceOf(context).frontendApi}/v1/tickets/accept?ticket=${ticket}`
+  const inviter = inviterId === undefined ? undefined : context.clerk.users.get(inviterId)
+  const by = inviter ? (inviter.first_name ?? primaryEmail(inviter) ?? "Someone") : "Someone"
+
+  context.clerk.messages.add(
+    {
+      id: clerkId("msg"),
+      to: email,
+      subject: `${by} invited you to join ${org.name}`,
+      body: `${by} invited you to join ${org.name}. Accept the invitation: ${url} The invitation expires in 30 days.`,
+      code: null,
+      sent_at: at,
+    },
+    null,
+  )
 
   return context.clerk.invitations.add(
     {
@@ -272,11 +293,11 @@ export function inviteToOrganization(
       status: "pending",
       public_metadata: {},
       private_metadata: {},
-      url: `https://${instanceOf(context).accountsHost}/sign-up?__clerk_ticket=${id}`,
+      url,
       created_at: at,
       updated_at: at,
       expires_at: at + 30 * 24 * 60 * 60 * 1000,
     },
-    null,
+    { ticket, redirect_url: redirectUrl ?? null },
   )
 }
