@@ -148,6 +148,18 @@ Two checks run as the apps start, and neither prints a value:
   it (`nodeShim: false` turns the shim off). A `NODE_OPTIONS` in an app's own `env` is joined with
   danwo's rather than replacing it. Stripe's client with its own `https.Agent`, axios with a custom
   agent and fetch with an undici `Agent` all go through the proxy.
+- **The app's Node.** danwo needs Node 24, but an app process may run another Node (a volta, mise
+  or asdf pin, a script calling a specific `node`, Docker). The preload routes **Node 20 and
+  later**: Node 24.5+ and 22.21+ proxy fetch and their agents themselves (with
+  `NODE_USE_ENV_PROXY`), 24.0-24.4 proxy only fetch, and on 20, 22.0-22.20 and 23 the preload
+  tunnels every call through the proxy itself, following `NO_PROXY`. Node 18 and older are not
+  supported. Before the app's code runs the preload calls a probe host only the proxy answers
+  (with fetch, an `https.Agent` and an `http.Agent`); a process counts as preloaded only when all
+  three reach it. One that misses prints `danwo: process <pid> runs Node <version>, and its calls
+  do not go through danwo's proxy …`. Under `unmatched: "block"` or `secrets: "fail"` it exits at
+  once and the run is refused with that line (`danwo refuses the run, because an app process does
+  not go through its proxy`); otherwise it is a warning and a run note. The usual cause is a
+  `NO_PROXY` that names every host.
 - **Live keys.** With unrouted hosts passing through, a live-looking key (`sk_live_…`, an OpenAI or
   Anthropic key, an AWS access key…) for a provider the run does not emulate, in an app's
   environment or in a `.env` file in its folder that the run does not override, would reach the real

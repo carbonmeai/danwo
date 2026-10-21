@@ -22,6 +22,43 @@ then go through the proxy. That includes clients that build their own agent:
 | `fetch` with an undici `Agent`             | ✓                                                          |
 | a server-side WebSocket client             | only with a proxy agent ([why](/docs/sockets-and-streams)) |
 
+## Your app's Node version
+
+danwo itself needs Node 24. Your app can run on an older Node: a package pinned by volta, mise or
+asdf, a script that calls a specific `node`, or a Docker image. The preload routes **Node 20 and
+later**. Newer Nodes do part of the work themselves, and the preload does the rest:
+
+| Node running the app                  | Who routes `fetch` | Who routes `http`, `https` and their agents  |
+| ------------------------------------- | ------------------ | -------------------------------------------- |
+| 24.5 and later, 22.21 and later on 22 | Node               | Node, with the preload's help for SDK agents |
+| 24.0 to 24.4                          | Node               | the preload                                  |
+| 20, 22.0 to 22.20, 23                 | the preload        | the preload                                  |
+| 18 and older                          | not supported      | not supported                                |
+
+Where Node can't route a call, the preload opens the tunnel through the proxy itself and follows
+`NO_PROXY` as Node does.
+
+### The check at start
+
+Before your app's code runs, the preload calls a probe host that only danwo's proxy answers, with
+`fetch`, an `https.Agent` and an `http.Agent`. A process counts as routed only when all three reach
+the proxy. If one misses, the process says so on stderr, naming its pid, its Node version and what
+to do:
+
+```text title="stderr · a process that misses the proxy"
+danwo: process 41872 runs Node v22.18.0, and its calls do not go through danwo's proxy
+(fetch (ENOTFOUND) missed it): they would reach the real providers. …
+```
+
+What danwo does next depends on the run:
+
+| Run settings                              | A process that misses the proxy                         |
+| ----------------------------------------- | ------------------------------------------------------- |
+| `unmatched: "block"` or `secrets: "fail"` | stops at start, and danwo refuses the run with its name |
+| anything else                             | keeps running; danwo warns and adds it to the run notes |
+
+The usual cause is a `NO_PROXY` that names every host (`*`) or the providers' hosts.
+
 ## When a start script sets `NODE_OPTIONS`
 
 Many start scripts set `NODE_OPTIONS` themselves:
@@ -51,10 +88,11 @@ process of an app that runs without it, and says how to fix it. The usual causes
 | the script runs Node by an absolute path (`/usr/bin/node`) | call `node` from `PATH`                                 |
 | the app spawns Node with a clean environment               | pass `process.env` to the child                         |
 | the shim is off (`nodeShim: false`)                        | turn it back on, or set `NODE_OPTIONS` in `env` instead |
+| the app runs Node 18 or older                              | run it on Node 20 or later                              |
 
 <Callout type="warn">
-  A process without the preload calls the real hosts. With `unmatched: "block"` those calls still
-  can't leave this machine through the proxy, but a client that ignores proxies can.
+  A process without the preload calls the real hosts, and `unmatched: "block"` can't stop it: its
+  calls never reach the proxy.
 </Callout>
 
 ## Next
