@@ -33,6 +33,10 @@ const SETTLE_MS = 3_000
  */
 const BACKEND_SETTLE_MS = 10_000
 const POLL_MS = 150
+/** How long a recording waits for the backend to stay still before it reads the step's calls. */
+const STILL_MS = 600
+/** The longest it waits for that, for a backend that never stops (a poll, a heartbeat). */
+const STILL_CAP_MS = 3_000
 
 /** Where a step's effects are read from, for the whole session. */
 export type EffectSources = EffectCommon &
@@ -134,13 +138,40 @@ export class EffectWatch {
     return this.sources.activity?.() ?? NOTHING
   }
 
-  /** What the step changed, for its recording; `values` are what may not be recorded. */
+  /**
+   * What the step changed, for its recording; `values` are what may not be recorded. The provider
+   * calls are read once the backend has gone still, so a call the step set off that lands just
+   * after it (an email sent once the model's answer was saved) is kept: a replay, whose actions
+   * run faster, would otherwise see it within the step and take it for one it should not make.
+   */
   async effects(values: readonly string[]): Promise<Effects> {
+    await this.backendStill()
+
     const after = await EffectWatch.page(this.sources)
 
     return {
       page: pageEffect(this.before, after, { values, ignore: this.sources.ignore }),
       backend: backendEffect(signatures(between(this.now(), this.mark))),
+    }
+  }
+
+  /** Resolves once the backend's history has not grown for `STILL_MS`, or after `STILL_CAP_MS`. */
+  private async backendStill(): Promise<void> {
+    if (this.sources.activity === undefined) return
+
+    const started = Date.now()
+    let last = markOf(this.sources.activity)
+    let since = started
+
+    while (Date.now() - started < STILL_CAP_MS) {
+      await sleep(POLL_MS)
+
+      const now = markOf(this.sources.activity)
+
+      if (now.calls !== last.calls || now.deliveries !== last.deliveries) {
+        last = now
+        since = Date.now()
+      } else if (Date.now() - since >= STILL_MS) return
     }
   }
 

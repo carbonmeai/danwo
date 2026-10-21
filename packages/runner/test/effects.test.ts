@@ -218,6 +218,18 @@ describe("replayed effects", () => {
     expect(replayed.effects).toMatchObject({ result: "matched" })
   }, 60_000)
 
+  it("records a provider call that lands just after the step, so a quicker replay matches", async () => {
+    app.lateMs = 950
+    await record()
+    app.lateMs = 0
+
+    const replayed = await strictReplay()
+
+    expect(JSON.parse(await recording())).toMatchObject({ effects: { backend: [CHECKOUT] } })
+    expect(replayed.divergence).toBeUndefined()
+    expect(replayed.effects).toMatchObject({ result: "matched" })
+  }, 60_000)
+
   it("hands the step to the model outside strict replay, and its run is the new recording", async () => {
     await record()
     app.prefix = "Note: "
