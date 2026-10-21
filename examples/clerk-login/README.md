@@ -43,15 +43,15 @@ npm test
 Running 11 tests with 2 workers
   - tests/agentic.danwo.ts › the agent signs in as Ada and opens her organization 0 ms, worker 0
   - tests/agentic.danwo.ts › the agent counts the members of Ada's organization 0 ms, worker 0
-  ✓ tests/deterministic.danwo.ts › signs up with an emailed code 4124 ms, worker 1
-  ✓ tests/deterministic.danwo.ts › signs in with an emailed code 3528 ms, worker 1
-  ✓ tests/deterministic.danwo.ts › signs in with Google on Google's own page 2880 ms, worker 1
-  ✓ tests/deterministic.danwo.ts › sends a signed-out visitor from the dashboard to sign in 1414 ms, worker 1
-  ✓ tests/deterministic.danwo.ts › signs out 4465 ms, worker 1
-  ✓ tests/deterministic.danwo.ts › creates an organization and invites Bob, who joins from the email 9045 ms, worker 1
-  ✓ tests/deterministic.danwo.ts › refuses a wrong code 2457 ms, worker 1
-  ✓ tests/deterministic.danwo.ts › refuses a code once it has expired 2485 ms, worker 1
-  ✓ tests/deterministic.danwo.ts › shows Ada's seeded organization 4005 ms, worker 1
+  ✓ tests/deterministic.danwo.ts › signs up with an emailed code 3744 ms, worker 1
+  ✓ tests/deterministic.danwo.ts › signs in with an emailed code 3333 ms, worker 1
+  ✓ tests/deterministic.danwo.ts › signs in with Google on Google's own page 2489 ms, worker 1
+  ✓ tests/deterministic.danwo.ts › sends a signed-out visitor from the dashboard to sign in 1331 ms, worker 1
+  ✓ tests/deterministic.danwo.ts › signs out 4078 ms, worker 1
+  ✓ tests/deterministic.danwo.ts › creates an organization and invites Bob, who joins from the email 4429 ms, worker 1
+  ✓ tests/deterministic.danwo.ts › refuses a wrong code 2231 ms, worker 1
+  ✓ tests/deterministic.danwo.ts › refuses a code once it has expired 2268 ms, worker 1
+  ✓ tests/deterministic.danwo.ts › shows Ada's seeded organization 3592 ms, worker 1
 
 9 passed, 2 skipped
 ```
@@ -63,14 +63,14 @@ them when it ends. If Chromium is missing, danwo tells you to run
 
 The scripts:
 
-| Script                  | What it runs                                                      |
-| ----------------------- | ----------------------------------------------------------------- |
-| `npm test`              | every test; the agent tests skip without a model key              |
-| `npm run matrix:plan`   | what the sign-up's fault matrix would try, without running it     |
-| `npm run matrix`        | the sign-up's fault matrix: 25 trials, about a minute and a half  |
-| `npm run matrix:invite` | the same for creating an organization and inviting Bob: 31 trials |
-| `npm run serve`         | danwo's dashboard over everything the runs recorded               |
-| `npm run typecheck`     | `tsc` over the app and the tests                                  |
+| Script                  | What it runs                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------ |
+| `npm test`              | every test; the agent tests skip without a model key                                 |
+| `npm run matrix:plan`   | what the sign-up's fault matrix would try, without running it                        |
+| `npm run matrix`        | the sign-up's fault matrix: 25 trials, about 70 seconds                              |
+| `npm run matrix:invite` | the same for creating an organization and inviting Bob: 31 trials, under two minutes |
+| `npm run serve`         | danwo's dashboard over everything the runs recorded                                  |
+| `npm run typecheck`     | `tsc` over the app and the tests                                                     |
 
 ### Use your own Postgres
 
@@ -98,6 +98,18 @@ DATABASE_URL=postgres://postgres@127.0.0.1:5432/lumen_test npm test
 
 Two saved sessions sign Ada in once per worker: `signed-in-ada`, and `ada-org-owner`, which also
 picks her organization in the switcher.
+
+### The matrix, clean
+
+```text
+faults: 22 passed, 3 invalid (fault never fired)
+26 runs in 72 s
+```
+
+The three that never fire are expected here. The app checks session tokens offline with
+`CLERK_JWT_KEY`, so it reads Clerk's keys once per worker, not in the trial. The only return from
+Clerk's site is the dev-browser handshake on the first page, before any webhook is waiting. The
+invite's matrix passes 30 of 31 the same way.
 
 ## Make it break
 
