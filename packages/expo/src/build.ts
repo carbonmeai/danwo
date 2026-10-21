@@ -56,8 +56,8 @@ async function sourceFiles(dir: string, root: string): Promise<string[]> {
 }
 
 /** The build's key: the recipe and every source file's path and bytes. */
-export async function sourceHash(project: string): Promise<string> {
-  const hash = createHash("sha256").update(RECIPE)
+export async function sourceHash(project: string, recipe: string = RECIPE): Promise<string> {
+  const hash = createHash("sha256").update(recipe)
 
   for (const file of await sourceFiles(project, project)) {
     hash
@@ -130,28 +130,70 @@ function buildEnv(): NodeJS.ProcessEnv {
   }
 }
 
-/** Builds the danwo APK of the Expo app in `options.project`, or returns the kept one. */
-export async function buildAndroid(options: BuildAndroidOptions): Promise<AndroidBuild> {
-  const started = Date.now()
+/** Where one build is kept and logged, and how its tools run. */
+export interface BuildSlot {
+  /** The kept build: `<project>/.danwo/builds/<file>`. */
+  readonly path: string
+  readonly log: string
+  /** True when a build of the same sources is kept and no build is asked for. */
+  readonly reuse: boolean
+  /** Runs a tool in the project (or `cwd`), its output appended to the log. */
+  readonly step: (command: string, args: readonly string[], cwd?: string) => Promise<void>
+  /** Installs the project's packages when it has none yet. */
+  readonly install: () => Promise<void>
+}
+
+/** The slot for a build of `project` kept as `file`, logged to `logName`. */
+export async function buildSlot(options: {
+  readonly project: string
+  readonly file: string
+  readonly logName: string
+  readonly force?: boolean
+  readonly onLine?: (line: string) => void
+  /** The tools' environment, asked for only when a build runs. */
+  readonly env: () => NodeJS.ProcessEnv
+}): Promise<BuildSlot> {
   const { project, onLine } = options
   const builds = join(project, ".danwo", "builds")
-  const apk = join(builds, `${await sourceHash(project)}.apk`)
-  const log = join(builds, "build.log")
+  const path = join(builds, options.file)
+  const log = join(builds, options.logName)
+  let env: NodeJS.ProcessEnv | undefined
 
   await mkdir(builds, { recursive: true })
 
-  if (options.force !== true && existsSync(apk)) {
-    return { apk, cached: true, durationMs: Date.now() - started, log }
+  const step = (command: string, args: readonly string[], cwd = project) => {
+    env ??= options.env()
+
+    return run(command, args, { cwd, env, log }, onLine)
   }
 
-  const env = buildEnv()
-  const step = (command: string, args: readonly string[], cwd = project) =>
-    run(command, args, { cwd, env, log }, onLine)
-
-  if (!existsSync(join(project, "node_modules"))) {
-    await step("npm", ["install", "--no-audit", "--no-fund"])
+  return {
+    path,
+    log,
+    reuse: options.force !== true && existsSync(path),
+    step,
+    async install() {
+      if (!existsSync(join(project, "node_modules")))
+        await step("npm", ["install", "--no-audit", "--no-fund"])
+    },
   }
+}
 
+/** Builds the danwo APK of the Expo app in `options.project`, or returns the kept one. */
+export async function buildAndroid(options: BuildAndroidOptions): Promise<AndroidBuild> {
+  const started = Date.now()
+  const { project } = options
+  const slot = await buildSlot({
+    ...options,
+    file: `${await sourceHash(project)}.apk`,
+    logName: "build.log",
+    env: buildEnv,
+  })
+  const { path: apk, log, step } = slot
+
+  if (slot.reuse) return { apk, cached: true, durationMs: Date.now() - started, log }
+
+  await slot.install()
   await step("npx", ["expo", "prebuild", "--platform", "android", "--no-install"])
   await applyNetworkConfig(join(project, "android"))
   await step("./gradlew", ["assembleRelease", "--console=plain"], join(project, "android"))

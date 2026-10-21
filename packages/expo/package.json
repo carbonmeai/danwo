@@ -2,7 +2,7 @@
   "name": "@danwo/expo",
   "version": "0.0.0",
   "private": true,
-  "description": "The danwo build of an Expo app: trusts danwo's per-run CA, built with `danwo build-android`.",
+  "description": "The danwo build of an Expo app: trusts danwo's per-run CA, built with `danwo build-android` or `danwo build-ios`.",
   "homepage": "https://danwo.dev",
   "bugs": "https://github.com/carbonmeai/danwo/issues",
   "license": "Apache-2.0",
