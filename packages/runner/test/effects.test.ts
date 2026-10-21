@@ -337,6 +337,33 @@ describe("effects", () => {
     )
   })
 
+  it("leaves out result counts, ranges, durations and number-only badges", () => {
+    const after = pageDescriptions(
+      [
+        "- paragraph [ref=e1]: Showing 1 to 9 of 9 results",
+        "- paragraph [ref=e2]: Showing 1 to 5 of 5 results in 321ms",
+        "- paragraph [ref=e3]: Took 1.2s",
+        "- generic [ref=e4]: 11",
+        "- status [ref=e5]: 3 records imported",
+        "- paragraph [ref=e6]: 1-20 of 143",
+        '- button "99+" [ref=e7]',
+        "- paragraph [ref=e8]: Rendered in 0.4 s",
+        "- paragraph [ref=e9]: 12 matches",
+        "- paragraph [ref=e10]: Invoice paid",
+        "- paragraph [ref=e11]: 3 seats on the plan",
+        "- paragraph [ref=e12]: Step 2 of the guide",
+        '- button "Save 2 drafts" [ref=e13]',
+      ].join("\n"),
+    )
+
+    expect(pageEffect([], after, { values: [], ignore: [] }).appeared).toEqual([
+      "paragraph: Invoice paid",
+      "paragraph: 3 seats on the plan",
+      "paragraph: Step 2 of the guide",
+      'button "Save 2 drafts"',
+    ])
+  })
+
   it("names missing calls, and extra calls but not webhooks that land late", () => {
     expect(backendMismatch([CHECKOUT], [])).toBe(`expected ${CHECKOUT}, saw none`)
     expect(backendMismatch([], ["GET api.stripe.com/v1/prices"])).toBe(

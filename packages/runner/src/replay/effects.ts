@@ -42,7 +42,13 @@ const COUNT = "(?:\\d+\\s*|(?:a|an|one|a few)\\s+)"
 const MONTH =
   "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?"
 
-/** Text that changes from run to run on its own: clock times, dates, relative times, long numbers, ids. */
+/** Nouns a list or a search counts its rows in: `9 results`, `3 records imported`. */
+const ROWS = "(?:results?|records?|rows?|entries|entry|matches|hits)"
+
+/**
+ * Text that changes from run to run on its own: clock times, dates, relative times, durations,
+ * result counts and ranges, long numbers, ids, and a badge that is only a number.
+ */
 const VOLATILE = [
   /\b\d{1,2}:\d{2}(?::\d{2})?\b/,
   /\b\d{1,2}\s*[ap]\.?m\b\.?/i,
@@ -54,6 +60,13 @@ const VOLATILE = [
   new RegExp(`\\b(?:${COUNT}${UNIT}\\s+ago|in\\s+${COUNT}${UNIT})(?!\\w)`, "i"),
   /\b[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\b/i,
   /\b[a-z]{2,8}_(?:test_|live_)?[A-Za-z0-9]{8,}\b/,
+  /** How long something took: `321ms`, `1.2s`, `0.4 s`. */
+  /\b\d+(?:\.\d+)?\s*(?:ms|s)\b/,
+  /** Where a page of results sits in all of them: `1 to 9 of 9`, `1-20 of 143`. */
+  /\b\d+\s*(?:to|-|–)\s*\d+\s+of\s+\d+\b/i,
+  new RegExp(`\\b\\d+\\s+${ROWS}\\b`, "i"),
+  /** A count badge: an element whose whole text or name is a small number, as `generic: 11`. */
+  /^[a-z]+(?:: | ")\d{1,4}\+?"?$/,
 ]
 
 function clip(text: string): string {
