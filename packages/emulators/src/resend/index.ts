@@ -4,7 +4,7 @@ import type { Store } from "../store.ts"
 import type { WebhookEndpoint } from "../webhooks.ts"
 import { resendApiKey } from "./auth.ts"
 import type { ResendRouteContext } from "./context.ts"
-import { isEventType, type KeyPermission, type Region } from "./entities.ts"
+import { isEventType } from "./entities.ts"
 import { ResendEvents } from "./events.ts"
 import { domainObject } from "./formatters.ts"
 import { newUuid, resendError } from "./helpers.ts"
@@ -22,7 +22,11 @@ export { type InboxEmail, type ResendInbox, resendInbox } from "./inbox.ts"
 export type ResendSeedConfig = Partial<{
   /** When set, only these addresses may receive mail, as on a sandboxed account. */
   readonly allowlist: readonly string[]
-  readonly domains: readonly { readonly name: string; readonly region?: Region }[]
+  /** Sending domains, in `us-east-1` unless a `region` says otherwise. */
+  readonly domains: readonly {
+    readonly name: string
+    readonly region?: "us-east-1" | "eu-west-1" | "sa-east-1" | "ap-northeast-1"
+  }[]
   /**
    * API keys the account has issued. Any `re_` key is accepted anyway; seed one with
    * `permission: "sending_access"` to have reads refused with it, as a sending-only key is.
@@ -30,7 +34,7 @@ export type ResendSeedConfig = Partial<{
   readonly keys: readonly {
     readonly name: string
     readonly token: string
-    readonly permission?: KeyPermission
+    readonly permission?: "full_access" | "sending_access"
   }[]
   /** Endpoints to deliver webhooks to; without a `secret`, a random one. */
   readonly webhooks: readonly {

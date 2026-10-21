@@ -1,7 +1,8 @@
 import { createSigningKey, type SigningKey } from "../oauth/jwt.ts"
 import type { Outbox } from "../outbox.ts"
 import type { Clock, Store } from "../store.ts"
-import { INSTANCE, SIGNING_KEY, type ClerkInstance, type ClerkStore } from "./store.ts"
+import { INSTANCE, SIGNING_KEY, type ClerkStore } from "./store.ts"
+import type { ClerkInstance } from "./views.ts"
 import type { ClerkEvents } from "./webhooks.ts"
 
 /** What Clerk's routes share: the tables, the clocks, the webhook events and the signing key. */

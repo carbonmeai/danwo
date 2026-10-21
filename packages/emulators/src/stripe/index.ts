@@ -4,7 +4,6 @@ import type { Store } from "../store.ts"
 import { signedOnWallClock, type WebhookEndpoint } from "../webhooks.ts"
 import { stripeApiKey } from "./auth.ts"
 import type { StripeRouteContext } from "./context.ts"
-import type { DisplayPreference, PaymentMethodConfiguration, Price } from "./entities.ts"
 import { StripeEvents } from "./events.ts"
 import { stripeExpand } from "./expand.ts"
 import {
@@ -38,8 +37,6 @@ import { stripeStore } from "./store.ts"
 import { STRIPE_JS } from "./stripe-js.ts"
 import { runDue, scheduleNext } from "./subscribing.ts"
 
-export type * from "./entities.ts"
-export { STRIPE_API_VERSION } from "./events.ts"
 export { stripeOutboundFaults } from "./faults.ts"
 export { stripeSignature } from "./signature.ts"
 
@@ -54,7 +51,8 @@ export type SeedProduct = { name: string; metadata?: Record<string, string> } & 
  * makes it a subscription price; `lookup_key` lets an app find it by a name of its own, as a
  * `plans` table that stores lookup keys does.
  */
-export type SeedPrice = Pick<Price, "currency"> & {
+export type SeedPrice = {
+  currency: string
   product_name: string
   unit_amount: number
   id?: string
@@ -66,8 +64,12 @@ export type SeedPrice = Pick<Price, "currency"> & {
 /** A webhook endpoint; without a `secret`, a random signing secret. */
 export type SeedWebhookEndpoint = { url: string; events: string[]; secret?: string }
 
-export type SeedPaymentMethodConfiguration = Pick<PaymentMethodConfiguration, "name"> &
-  Partial<{ id: string; active: boolean; preferences: Record<string, DisplayPreference> }>
+/** A payment method configuration; `preferences` turns each method `on`, `off` or `none` in Checkout. */
+export type SeedPaymentMethodConfiguration = { name: string } & Partial<{
+  id: string
+  active: boolean
+  preferences: Record<string, "on" | "off" | "none">
+}>
 
 /** Data to load into a Stripe emulator, on top of its defaults. */
 export type StripeSeedConfig = Partial<{

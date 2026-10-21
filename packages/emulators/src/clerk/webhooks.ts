@@ -13,22 +13,7 @@ import type { WebhookEndpoint } from "../webhooks.ts"
 import type { ClerkUser } from "./entities.ts"
 import { stableClerkId } from "./helpers.ts"
 import { clerkStore, INSTANCE } from "./store.ts"
-
-/** The event types the emulator sends. */
-export type ClerkEventType =
-  | "user.created"
-  | "user.updated"
-  | "user.deleted"
-  | "session.created"
-  | "session.ended"
-  | "session.removed"
-  | "session.revoked"
-  | "organization.created"
-  | "organization.updated"
-  | "organization.deleted"
-  | "organizationMembership.created"
-  | "organizationMembership.updated"
-  | "organizationMembership.deleted"
+import type { ClerkEventType } from "./views.ts"
 
 /** The `data` of each event type. */
 interface EventData {

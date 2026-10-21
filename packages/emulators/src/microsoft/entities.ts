@@ -1,5 +1,3 @@
-import type { DayOfWeek } from "@microsoft/microsoft-graph-types"
-
 import type { PersonName } from "../oauth/account.ts"
 import type { Entity } from "../store.ts"
 
@@ -80,6 +78,16 @@ export interface CalendarRecord extends Owned {
   name: string
   isDefault: boolean
 }
+
+/** A day of the week, as Graph names it. */
+export type DayOfWeek =
+  | "sunday"
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday"
 
 /** How a series repeats: Graph's `patternedRecurrence`, kept as sent. */
 export interface Recurrence {

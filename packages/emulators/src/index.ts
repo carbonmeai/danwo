@@ -70,8 +70,11 @@ export {
   type ClerkSeedTemplate,
   type ClerkSeedUser,
   type ClerkSeedWebhook,
+  type ClerkEmailView,
   type ClerkEventType,
-  type ClerkUser,
+  type ClerkOrganizationView,
+  type ClerkSessionView,
+  type ClerkUserView,
   isClerkHost,
   seedClerk,
   stableClerkId,
@@ -168,7 +171,9 @@ export {
   uninstallGithubApp,
 } from "./github/index.ts"
 export {
+  type CalendarEvent,
   type CalendarSeedEvent,
+  type DriveFile,
   type DriveSeedFile,
   GOOGLE_ENDPOINTS,
   GOOGLE_HOSTS,

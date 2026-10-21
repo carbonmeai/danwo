@@ -8,7 +8,8 @@ import { z } from "zod"
 import { createEmulator, type Emulator } from "../src/define.ts"
 import { serve } from "../src/http.ts"
 import { listeningPort } from "../src/net.ts"
-import { STRIPE_API_VERSION, stripe, stripeSignature } from "../src/stripe/index.ts"
+import { STRIPE_API_VERSION } from "../src/stripe/events.ts"
+import { stripe, stripeSignature } from "../src/stripe/index.ts"
 import { fakeKey } from "./fake-key.ts"
 
 const fixedNow = new Date("2026-10-16T12:00:00Z")

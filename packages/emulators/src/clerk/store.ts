@@ -3,25 +3,8 @@ import type { OrganizationInvitationJSON, SessionJSON, SignInTokenJSON } from "@
 import { objectTable } from "../objects.ts"
 import type { DataKey, Store } from "../store.ts"
 import type { ClerkOrganization, ClerkUser } from "./entities.ts"
+import type { ClerkInstance, ClerkMessage } from "./views.ts"
 import type { ClerkWebhookRecord } from "./webhooks.ts"
-
-/** The instance an emulator plays: its slug, keys and the hosts derived from them. */
-export interface ClerkInstance {
-  readonly slug: string
-  /** `<slug>.clerk.accounts.dev`, where browsers and ClerkJS talk to Clerk. */
-  readonly frontendApi: string
-  /** `<slug>.accounts.dev`, the hosted sign-in pages. */
-  readonly accountsHost: string
-  readonly publishableKey: string
-  readonly secretKeys: readonly string[]
-  /** Whether sign-in asks for a password; otherwise an emailed code. */
-  readonly password: boolean
-  /**
-   * The app's origin: the `azp` of tokens minted without a browser `Origin` (the Backend API's
-   * session tokens), so an app's `authorizedParties` check passes for them too.
-   */
-  readonly origin?: string
-}
 
 /** What the emulator keeps about a user beyond what the API shows. */
 interface UserSecrets {
@@ -101,16 +84,6 @@ export interface AttemptRecord {
   first_name: string | null
   last_name: string | null
   readonly created_at: number
-}
-
-/** An email Clerk sent: verification codes and sign-in links, read by tests. */
-export interface ClerkMessage {
-  readonly id: string
-  readonly to: string
-  readonly subject: string
-  readonly body: string
-  readonly code: string | null
-  readonly sent_at: number
 }
 
 /** A seeded signing key (PKCS#8 PEM) that replaces the emulator's own, so tokens verify across runs. */

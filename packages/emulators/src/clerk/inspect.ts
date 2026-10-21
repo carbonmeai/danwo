@@ -1,20 +1,23 @@
-import type { OrganizationJSON, SessionJSON } from "@clerk/backend"
-
 import type { Emulator } from "../define.ts"
 import { waitUntil } from "../poll.ts"
 import { type ClerkContext, contextOf, instanceOf, signingKeyOf } from "./context.ts"
-import type { ClerkUser } from "./entities.ts"
 import { userByEmail } from "./routes/users.ts"
 import { endSession } from "./sessions.ts"
-import type { ClerkInstance, ClerkMessage } from "./store.ts"
+import type {
+  ClerkInstance,
+  ClerkMessage,
+  ClerkOrganizationView,
+  ClerkSessionView,
+  ClerkUserView,
+} from "./views.ts"
 
 /** What a test can read and do on a Clerk emulator. */
 export interface ClerkInstanceView {
   /** The instance's slug, hosts and keys: hand `publishableKey` and `secretKey` to the app. */
   readonly instance: ClerkInstance & { readonly secretKey: string }
-  user(email: string): ClerkUser | undefined
+  user(email: string): ClerkUserView | undefined
   /** The user's sessions, oldest first. */
-  sessions(email: string): SessionJSON[]
+  sessions(email: string): ClerkSessionView[]
   /** Revokes every active session of the user, as signing them out everywhere does. */
   revokeSessions(email: string): number
   /** The emails sent to `to`, oldest first. */
@@ -22,7 +25,7 @@ export interface ClerkInstanceView {
   /** The newest code emailed to `to`, waiting up to `timeoutMs` for one to arrive. */
   code(to: string, timeoutMs?: number): Promise<string>
   /** The organizations, oldest first. */
-  organizations(): OrganizationJSON[]
+  organizations(): ClerkOrganizationView[]
   /**
    * The public key session tokens are signed with, as a PEM: what an app that verifies tokens
    * offline is configured with (`CLERK_PEM_PUBLIC_KEY`, `CLERK_JWT_KEY`, `jwtKey`).

@@ -4,13 +4,29 @@ import type { Message } from "./entities.ts"
 import { receiveMessage } from "./events.ts"
 import { twilioStore } from "./store.ts"
 
+/** Where a text is in its delivery, in Twilio's words. */
+type DeliveryStatus =
+  | "queued"
+  | "sending"
+  | "sent"
+  | "failed"
+  | "delivered"
+  | "undelivered"
+  | "receiving"
+  | "received"
+  | "accepted"
+  | "scheduled"
+  | "read"
+  | "partially_delivered"
+  | "canceled"
+
 /** One text message a phone received, as a test reads it. */
 export interface PhoneMessage {
   readonly sid: string
   readonly from: string
   readonly to: string
   readonly body: string
-  readonly status: Message["status"]
+  readonly status: DeliveryStatus
   readonly createdAt: string
   /** The first standalone run of exactly `digits` digits (4 to 8 when not given), e.g. a sign-in code. */
   code(digits?: number): string | undefined

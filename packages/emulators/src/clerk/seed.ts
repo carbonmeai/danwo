@@ -6,7 +6,8 @@ import { type ClerkUser, newUser } from "./entities.ts"
 import { clerkId, publishableKeyFor, stableClerkId } from "./helpers.ts"
 import { addMembership, createOrganization } from "./organizations.ts"
 import { userByEmail } from "./routes/users.ts"
-import { INSTANCE, SIGNING_KEY, type ClerkInstance } from "./store.ts"
+import { INSTANCE, SIGNING_KEY } from "./store.ts"
+import type { ClerkInstance } from "./views.ts"
 
 /**
  * A seeded user: an email address, and a password unless sign-in is by emailed code. Its id is

@@ -35,7 +35,7 @@ import {
 } from "./seed.ts"
 import { googleStore } from "./store.ts"
 
-export type * from "./entities.ts"
+export type { CalendarEvent, DriveFile } from "./views.ts"
 export { googleOutboundFaults } from "./faults.ts"
 export { GOOGLE_ENDPOINTS, GOOGLE_HOSTS, GOOGLE_ISSUER } from "./helpers.ts"
 export type { SignIn, SignIns } from "../oauth/sign-ins.ts"

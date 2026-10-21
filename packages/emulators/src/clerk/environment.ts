@@ -1,6 +1,6 @@
 import type { EnvironmentJSON } from "@clerk/shared/types"
 
-import type { ClerkInstance } from "./store.ts"
+import type { ClerkInstance } from "./views.ts"
 
 /** An identifier attribute: whether it is on, required, and how it is verified and used. */
 function attribute(

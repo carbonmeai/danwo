@@ -1,7 +1,5 @@
 import { randomBytes } from "node:crypto"
 
-import type { calendar_v3 } from "googleapis"
-
 import { Outbox } from "../outbox.ts"
 import type { Store } from "../store.ts"
 import { insertEvent, primaryCalendar } from "./calendar.ts"
@@ -11,6 +9,7 @@ import { deliverMessage, mailboxOf, SYSTEM_LABELS } from "./gmail.ts"
 import type { IncomingMail } from "./inbox.ts"
 import type { PushContext } from "./push.ts"
 import { googleStore } from "./store.ts"
+import type { CalendarEvent } from "./views.ts"
 
 /** A message already in a mailbox when the emulator starts. Labels are ids or label names. */
 export type GmailSeedMessage = Omit<IncomingMail, "date" | "labelIds"> & {
@@ -100,7 +99,7 @@ export function seedPubSub(store: Store, subscriptions: readonly PubSubSeedSubsc
 }
 
 /** An event already on a primary calendar when the emulator starts. */
-export type CalendarSeedEvent = calendar_v3.Schema$Event
+export type CalendarSeedEvent = CalendarEvent
 
 /** Fills primary calendars: `{ "ada@x": [events] }`. */
 export function seedCalendar(

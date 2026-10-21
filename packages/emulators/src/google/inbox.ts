@@ -1,5 +1,3 @@
-import type { calendar_v3, drive_v3 } from "googleapis"
-
 import type { Emulator } from "../define.ts"
 import { cancelEvent, eventOf, expireSyncTokens, insertEvent, primaryCalendar } from "./calendar.ts"
 import { createFile, deleteFile, isRoot } from "./drive.ts"
@@ -8,6 +6,7 @@ import { deliverMessage, expireHistory, mailboxOf } from "./gmail.ts"
 import { bodyText, type Composition, decodeWords, headerOf, parseMime } from "./mime.ts"
 import type { PushContext } from "./push.ts"
 import { googleStore } from "./store.ts"
+import type { CalendarEvent, DriveFile } from "./views.ts"
 
 /**
  * One message in a Gmail mailbox, as a test reads it: ids and labels, the From, To and Subject
@@ -136,9 +135,9 @@ export function revokeGoogleAccess(
 /** Reads and changes `email`'s primary calendar from a test. */
 export interface GoogleCalendar {
   /** Events on the calendar that are not cancelled, oldest first. */
-  events(): calendar_v3.Schema$Event[]
+  events(): CalendarEvent[]
   /** Adds an event as if made elsewhere (another device); watchers are told. */
-  add(event: calendar_v3.Schema$Event): calendar_v3.Schema$Event
+  add(event: CalendarEvent): CalendarEvent
   /** Cancels an event as if deleted elsewhere. */
   cancel(eventId: string): void
   /** Makes every sync token issued so far get 410 Gone, so the app must sync in full. */
@@ -169,11 +168,11 @@ export function googleCalendar(
 /** Reads and changes `email`'s Drive from a test. */
 export interface GoogleDrive {
   /** The user's own files (not trashed or deleted), oldest first. */
-  files(): drive_v3.Schema$File[]
+  files(): DriveFile[]
   /** A file's bytes. */
   read(fileId: string): Buffer | undefined
   /** Adds a file as if uploaded elsewhere; it shows up in the change feed and on watches. */
-  add(file: { name: string; mimeType?: string; content?: string | Buffer }): drive_v3.Schema$File
+  add(file: { name: string; mimeType?: string; content?: string | Buffer }): DriveFile
   /** Deletes a file as if removed elsewhere. */
   remove(fileId: string): void
 }

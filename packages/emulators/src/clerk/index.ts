@@ -35,9 +35,15 @@ export {
   seedClerk,
 } from "./seed.ts"
 export { stableClerkId } from "./helpers.ts"
-export type { ClerkEventType } from "./webhooks.ts"
-export type { ClerkInstance, ClerkMessage } from "./store.ts"
-export type { ClerkUser } from "./entities.ts"
+export type {
+  ClerkEmailView,
+  ClerkEventType,
+  ClerkInstance,
+  ClerkMessage,
+  ClerkOrganizationView,
+  ClerkSessionView,
+  ClerkUserView,
+} from "./views.ts"
 
 /** What an error answer carries under `meta`: the Frontend API puts the browser's client there. */
 type ErrorMeta = (c: Context) => Readonly<Record<string, unknown>> | undefined
