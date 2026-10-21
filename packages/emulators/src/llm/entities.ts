@@ -23,9 +23,16 @@ export interface LlmSource {
 }
 
 /**
+ * An error a script answers with instead of a reply, in the provider's own shape and status: a
+ * 429 with its rate-limit headers, a 500, or the provider overloaded (529 on Anthropic, else 503).
+ */
+export type LlmScriptedError = "rate-limit" | "server-error" | "overloaded"
+
+/**
  * What the model answers: text, tool calls, a structured object (for a `response_format` or JSON
  * response), or a refusal; `stop` ends it early, as running out of tokens or a content filter does.
  * `sources` are the pages a search-backed answer cites; providers without citations leave them out.
+ * `error` answers with a provider error instead, so a test can fail a call on cue.
  */
 export interface LlmReply {
   readonly text?: string
@@ -34,6 +41,7 @@ export interface LlmReply {
   readonly refusal?: string
   readonly stop?: "length" | "content_filter"
   readonly sources?: readonly LlmSource[]
+  readonly error?: LlmScriptedError
 }
 
 /** A pattern as stored: a regular expression's source and flags. */

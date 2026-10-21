@@ -70,9 +70,26 @@ Every field given must match. Leave `match` out to answer every call.
 | `refusal`   | A refusal, in the provider's own shape.                             |
 | `stop`      | An early end: `length`, as when out of tokens, or `content_filter`. |
 | `sources`   | The pages a search-backed answer cites, as Perplexity lists them.   |
+| `error`     | An error instead: `rate-limit`, `server-error` or `overloaded`.     |
 
 Give `reply` a list to answer in turn: the first call gets the first reply, the next the second,
 and the last one repeats.
+
+An `error` comes back in the provider's own shape and status, as the matrix's faults do: a 429
+with `Retry-After`, a 500, or a 503 (529 on Anthropic). A list makes a test's retries exact:
+
+```ts title="tests/busy.danwo.ts"
+llmScripts(llm).add({
+  match: { user: /where is my order/i },
+  /* The first three calls are rate-limited, the fourth answers. */
+  reply: [
+    { error: "rate-limit" },
+    { error: "rate-limit" },
+    { error: "rate-limit" },
+    { text: "It ships today." },
+  ],
+})
+```
 
 ## Use it in a test
 

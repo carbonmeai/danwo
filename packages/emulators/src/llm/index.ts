@@ -1,5 +1,6 @@
 import { defineEmulator } from "../define.ts"
 import { providerErrors } from "../errors.ts"
+import { ScriptedFailure } from "./answer.ts"
 import { llmAuth } from "./auth.ts"
 import { llmError } from "./helpers.ts"
 import { anthropicRoutes } from "./routes/anthropic.ts"
@@ -11,7 +12,7 @@ import { openaiRoutes } from "./routes/openai.ts"
 import { perplexityRoutes } from "./routes/perplexity.ts"
 
 export { LLM_BEHAVIOURS, type LlmBehaviour } from "./behaviours.ts"
-export type { LlmProvider, LlmReply, LlmSource, LlmToolCall } from "./entities.ts"
+export type { LlmProvider, LlmReply, LlmScriptedError, LlmSource, LlmToolCall } from "./entities.ts"
 export { llmOutboundFaults } from "./faults.ts"
 export { BEDROCK_HOSTS, GOOGLE_AI_HOST, LLM_HOSTS, PERPLEXITY_HOST } from "./helpers.ts"
 export { type LlmCall, type LlmCalls, llmCalls, type LlmScripts, llmScripts } from "./inspect.ts"
@@ -37,7 +38,12 @@ export { type LlmSeedConfig, seedLlm } from "./seed.ts"
 export const llm = defineEmulator({
   name: "llm",
   setup(emulator) {
-    emulator.app.onError(providerErrors(llmError))
+    const providerError = providerErrors(llmError)
+
+    /* A script's error is already the provider's answer; anything else is shaped as theirs. */
+    emulator.app.onError((error, c) =>
+      error instanceof ScriptedFailure ? error.response : providerError(error, c),
+    )
     emulator.app.use(llmAuth)
     openaiRoutes(emulator)
     anthropicRoutes(emulator)

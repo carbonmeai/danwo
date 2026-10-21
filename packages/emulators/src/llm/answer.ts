@@ -8,6 +8,7 @@ import { HttpError } from "../errors.ts"
 import type { Context } from "../http.ts"
 import { actOut, behaviourOf, type LlmBehaviour } from "./behaviours.ts"
 import type { LlmReply, LlmRequest, LlmUsage } from "./entities.ts"
+import { scriptedErrorResponse } from "./faults.ts"
 import type { LlmApi } from "./parse.ts"
 import { recordedReply, scrubKeys } from "./record.ts"
 import { schemaProblems } from "./schema.ts"
@@ -98,5 +99,19 @@ export async function answer(
     cost,
   })
 
+  if (reply.error !== undefined)
+    throw new ScriptedFailure(scriptedErrorResponse(request.provider, reply.error))
+
   return { reply, usage, cost, behaviour }
+}
+
+/** A script's error, thrown so the call is answered with the provider's error response. */
+export class ScriptedFailure extends Error {
+  readonly response: Response
+
+  constructor(response: Response) {
+    super(`danwo: a script answered with status ${response.status}`)
+    this.name = "ScriptedFailure"
+    this.response = response
+  }
 }

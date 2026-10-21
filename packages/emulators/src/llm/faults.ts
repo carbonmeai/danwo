@@ -5,7 +5,7 @@
  * or cut-off answer, a content filter, a malformed tool call, a stream that stops half-way).
  */
 import { LLM_BEHAVIOURS } from "./behaviours.ts"
-import type { LlmProvider } from "./entities.ts"
+import type { LlmProvider, LlmScriptedError } from "./entities.ts"
 import { type ErrorKind, errorBody, errorHeaders, providerOfHost } from "./helpers.ts"
 
 const json = { "content-type": "application/json" }
@@ -104,6 +104,22 @@ function limited(provider: LlmProvider): LlmFault {
     rateHeaders(provider),
     "rate_limit_exceeded",
   )
+}
+
+/** The fault a scripted error stands for, on `provider`'s API. */
+const SCRIPTED: Record<LlmScriptedError, (provider: LlmProvider) => LlmFault> = {
+  "rate-limit": limited,
+  "server-error": broken,
+  overloaded,
+}
+
+/** A script's error as `provider` answers it: its status, headers and body. */
+export function scriptedErrorResponse(provider: LlmProvider, error: LlmScriptedError): Response {
+  const fault = SCRIPTED[error](provider)
+
+  if (fault.kind !== "status") throw new Error(`a scripted ${error} is not an answer`)
+
+  return new Response(fault.body, { status: fault.status, headers: fault.headers })
 }
 
 /** Routes that generate an answer, where every kind of fault applies. */

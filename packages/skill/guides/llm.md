@@ -51,7 +51,9 @@ const llm = await llmEnvironment({
 - `reply` is `text`, `toolCalls`, `json` (a structured answer, checked against the schema the call
   asked for), `refusal`, or `stop: "length" | "content_filter"`, plus `sources` (`{ url, title,
   snippet, date }`), which Perplexity answers as its citations and search results. A list of replies
-  is given out in turn, the last one repeating. On Bedrock, a `json` reply to the AI SDK's
+  is given out in turn, the last one repeating. `error: "rate-limit" | "server-error" | "overloaded"`
+  answers with the provider's own 429 (with `Retry-After`), 500 or 503 (529 on Anthropic), so a list
+  such as `[{ error: "rate-limit" }, { text: "…" }]` fails a call on cue and lets the retry through. On Bedrock, a `json` reply to the AI SDK's
   structured output comes back as a call to the `json` tool the SDK adds, as Bedrock models answer.
 - `unscripted: "echo"` (the default) answers an unscripted call with its own words, marked
   `[danwo: unscripted]`; `"fail"` answers it with a 500, so a test notices.

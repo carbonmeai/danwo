@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 import { z } from "zod"
 
 import { createEmulator, type Emulator } from "../src/define.ts"
-import { llm, llmCalls, seedLlm } from "../src/llm/index.ts"
+import { llm, llmCalls, llmScripts, seedLlm } from "../src/llm/index.ts"
 import { emulatorFetch } from "./llm-client.ts"
 
 let emulator: Emulator
@@ -96,6 +96,51 @@ describe("AI Gateway", () => {
 
     expect(a.embedding).toHaveLength(1536)
     expect(b.embedding).toEqual(a.embedding)
+  })
+
+  it("answers a scripted rate limit in the gateway's shape, which the AI SDK retries", async () => {
+    llmScripts(emulator).clear()
+    seedLlm(emulator.store, {
+      scripts: [
+        {
+          match: { user: /busy/ },
+          reply: [{ error: "rate-limit" }, { text: "Here now." }],
+        },
+      ],
+    })
+
+    const result = await generateText({
+      model: gatewayFor()("openai/gpt-5-mini"),
+      prompt: "are you busy?",
+      maxRetries: 1,
+    })
+
+    expect(result.text).toBe("Here now.")
+    expect(
+      llmCalls(emulator)
+        .all()
+        .map((call) => call.reply.error ?? null),
+    ).toEqual(["rate-limit", null])
+  })
+
+  it("answers scripted outages with the gateway's status and error type", async () => {
+    llmScripts(emulator).clear()
+    seedLlm(emulator.store, {
+      scripts: [
+        { match: { user: /down/ }, reply: { error: "server-error" } },
+        { match: { user: /full/ }, reply: { error: "overloaded" } },
+      ],
+    })
+
+    const down = await gatewayFor()("openai/gpt-5-mini")
+      .doGenerate({ prompt: [{ role: "user", content: [{ type: "text", text: "down?" }] }] })
+      .catch((error: unknown) => error)
+    const full = await gatewayFor()("openai/gpt-5-mini")
+      .doGenerate({ prompt: [{ role: "user", content: [{ type: "text", text: "full?" }] }] })
+      .catch((error: unknown) => error)
+
+    expect(down).toMatchObject({ statusCode: 500, type: "internal_server_error" })
+    expect(full).toMatchObject({ statusCode: 503 })
   })
 
   it("refuses an unlisted model as the gateway does, when asked to", async () => {

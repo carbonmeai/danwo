@@ -479,6 +479,7 @@ export {
   type LlmRecordOptions,
   type LlmReply,
   type LlmScript,
+  type LlmScriptedError,
   type LlmScripts,
   llmScripts,
   type LlmSeedConfig,
