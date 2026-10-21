@@ -4,12 +4,27 @@ description: What is on main since the website's first build and not yet in a re
 date: 2026-10-20
 ---
 
+## Breaking
+
+- The types a test reads from the emulators are danwo's own, not the provider SDKs'. `ClerkUser` is now `ClerkUserView`, and Clerk's sessions, organizations and memberships have views named the same way. Google's Calendar events and Drive files have types of their own too.
+
+## Install
+
+- Every package declares Node.js 24, and `danwo` on an older Node says so and exits instead of failing on a missing export.
+- `danwo --version` prints the version, and `danwo init` installs danwo's packages at that version rather than the latest. It also adds `@types/node` to a TypeScript project that lacks it.
+- Install danwo's Chromium with `npx playwright-core install chromium`. `init` says so in its next steps, and a launch that finds no browser names that command.
+- Every published package ships its type declarations, so `tsc` checks your tests against danwo's types.
+- The published dashboard is prebuilt: `danwo serve` runs without Vite.
+- The proxy's fix for mockttp's local port check ships with the package; a mockttp version without that check gets one warning instead of a proxy that won't start.
+
 ## Emulators
 
 - **New providers:** Nylas v3 (hosted auth, grants, mail, calendars, contacts, the scheduler), Nango (connect sessions and the Connect UI, refreshing connections, the proxy to other emulators, actions), Unipile (hosted auth links, LinkedIn, WhatsApp and mail accounts, chats and messages), Pusher (the Channels API, the `pusher-js` socket with private and presence channels, Beams), Novu (triggers, subscribers and topics, code-first workflows through the app's bridge, the Inbox and its socket) and Tiptap Cloud collaboration (the Hocuspocus protocol and the documents API).
 - **Model APIs:** Gemini, Perplexity and Bedrock alongside OpenAI, Anthropic and the AI Gateway.
 - **Stripe:** setup intents, subscriptions with trials and renewals on the emulator's clock, invoices, the billing portal, subscription-mode Checkout, setup-mode Checkout that saves the typed card through a SetupIntent, Stripe's test payment methods for declines and authentication, and a Stripe.js stand-in on `js.stripe.com`.
-- **Clerk:** svix-signed webhooks, seeded ids that survive resets, the signing key as a PEM, and Frontend API answers matched to a live development instance.
+- **Clerk:** svix-signed webhooks, seeded ids that survive resets (`stableClerkId`), the signing key as a PEM, and Frontend API answers matched to a live development instance. Sign-in with Google through the Google emulator, the organization switcher, emailed organization invitations whose ticket signs the invitee up or in, and `users()` and `memberships()` for invariants.
+- **Stripe Checkout:** the hosted page declines `4000 0000 0000 0002` as Stripe does, and the matrix tries a declined card on its Pay button.
+- **Forged webhooks** are signed with a key that really differs from the endpoint's, even for a base64 secret ending in `=`.
 - **S3 and Tigris:** SigV4 checks for seeded keys, conditional requests, checksums, multipart listings, Tigris's own presign and rename calls, and the Tigris SDK's environment variables.
 - **Twilio:** account and number reads, and trial accounts' refusals.
 - **Pusher:** subscription counts follow the app's own setting, off by default.
@@ -23,16 +38,22 @@ date: 2026-10-20
 - **The preload:** a `node` shim keeps it when a start script replaces `NODE_OPTIONS`, undici's agent is routed, and a process that escaped it is reported.
 - **Live keys:** a run warns, or fails with `secrets: "fail"`, when an app holds live-looking keys for providers it does not emulate.
 - **Processes:** every child danwo starts is owned and stopped on exit, on a signal or when its owner dies; `spawnOwned()` does the same for an environment's own processes.
-- **Recording:** every run keeps its flight record and its video by default.
+- **Recording:** every run keeps its flight record and its video by default, for the newest 50 runs (`record.keepRuns`, `--keep-runs`). Each step records the tab it ran in, filmed pages show a pointer with a ripple on clicks, and the value checks and the wait for background work are steps of the record.
 - **Inngest settling:** a run the SDK checkpoints itself counts as going while an app's call through the proxy is still open, so a step waiting ten seconds on a provider is waited for.
 - **Inngest after time travel:** events a travelled app sends are put back on real time before they reach the dev server, so their runs start at once instead of days ahead.
 - **Time travel:** a cookie the page dates by its travelled clock is stored by real time, so deleting one with a past date works after a jump (Clerk's sign-out left a stale dev-browser cookie behind before).
+- **Replay without a model:** `agent.assert`, `agent.waitFor` and a count `agent.extract` replay with no model call, and a re-asked step says why.
+- **Verdicts:** every failed test says whose failure it is: an app bug, a test issue, the environment, a danwo bug, or undecided. The 5xx it names is the one the failing work made, with routes that fail in passing runs left out. Only a 5xx on a write makes it certain, and a check failing after an agent step the model carried out is undecided.
+- **Replay:** a new agent recording is kept only once a check after it passes, and the `cache:` line counts the ones not kept. A step's effects leave out relative times such as `7 sec. ago`, dates and `3pm`, so replays stop re-asking the model for them.
+- **Faster waits:** readiness checks the page a second time only when the backend did something, and settling no longer waits for an Inngest event no function listens to.
+- A row-locking `SELECT … FOR UPDATE SKIP LOCKED` inside a `WITH` reads as the `UPDATE` on its real table, and a multipart body is recorded as its fields and files.
 - `expect(value, message)`, `environment-<worker>.json` with what a worker's environment did while it started, the stack app that went down named in a failure, and a rows restore for Postgres snapshots that closes no connection.
 
 ## Matrix
 
 - **Planning:** faults go on the test's body only; repeated routes and statements are faulted once, each call keeps its most telling fault kinds, and the plan stays within a budget (40 by default). `--plan` previews it; `--budget`, `--all`, `--thorough`, `--every-occurrence` and `--include-setup` change it.
 - Trials restore the saved session's sign-in instead of signing in again.
+- A trial whose body broke before its fault could fire is **not judged**, not invalid, and either makes `danwo matrix` exit 1.
 - Every WebSocket the clean run opened is tried with its upgrade refused and its connection dropped, and Inngest event sends get their own faults.
 
 ## Dashboard
@@ -40,18 +61,23 @@ date: 2026-10-20
 - A collapsible sidebar, Overview, a test library, filtered runs, the matrix across the suite, and Settings.
 - Every recording opens in a two-pane overlay: the steps with "Copy prompt to fix" on the left, and Replay, Console, Network, Providers, Emulator state, Effects and Matrix on the right.
 - Runs stream in live; reruns, the matrix for one test and cancelling a run start from the page.
+- Failures carry whose-failure badges and a filter; the player follows the run into a popup and back, and lists the checks after the steps.
+- Each page loads in a skeleton shaped like it.
 - The dánwò brand throughout.
 
 ## CI
 
 - The GitHub reporter posts one pull request comment beside the check run and edits it in place on later runs.
+- `messages/duplicate-send` no longer flags a retry that reuses the first send's idempotency key.
 
 ## Fidelity
 
 - **Cleanup:** every live run undoes what it creates, even when a scenario fails, tags everything `danwo-fidelity`, and `--sweep` removes tagged leftovers; `--keep` keeps them for debugging.
+- **Google and Microsoft:** `danwo fidelity login google|microsoft` signs a test account in, and Gmail, Calendar, Drive and Graph suites run as it. A scenario the account can't reach is skipped, naming the setup it needs.
 - **Live suites:** Clerk, S3 on Tigris, Novu, Tiptap, Nylas, Nango, Unipile and Pusher join Stripe, Resend, Paystack, Flutterwave, Bachs, Composio, the AI Gateway and the public Slack, GitHub, Google and Microsoft calls. Twilio runs live without sending anything.
 
 ## Website
 
+- An examples gallery, built from each example's own notes: a Next.js waitlist (`with-next`), a shop on Next.js, Hono, Postgres and Stripe (`commerce`), and a Clerk login on the real ClerkJS (`clerk-login`).
 - Docs in four tabs, provider pages with their logos and fidelity, pages for isolation, real stacks and matrix planning, and the dánwò brand.
 - The docs test now fails when an emulator, a guide section, a spec topic or a fidelity suite has no page.
