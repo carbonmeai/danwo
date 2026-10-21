@@ -22,6 +22,11 @@ function client(key = "re_test_emulated"): Resend {
   return new Resend(key, { baseUrl })
 }
 
+/** Sends a short email to `to`. */
+function sendTo(to: string) {
+  return client().emails.send({ from: "News <news@danwo.test>", to, subject: "Hi", text: "Hi" })
+}
+
 beforeAll(async () => {
   server = serve({ fetch: (request) => emulator.fetch(request), port: 0 })
   await once(server, "listening")
@@ -135,6 +140,16 @@ describe("emails", () => {
     })
 
     expect(res.status).toBe(422)
+  })
+
+  it("refuses an address in a form Resend does not take, and takes a named one", async () => {
+    expect((await sendTo("kim@northwind")).error).toMatchObject({
+      statusCode: 422,
+      name: "validation_error",
+      message: expect.stringMatching(/^Invalid `to` field\. The email address needs to follow/),
+    })
+    expect((await sendTo("Kim <kim@northwind.test>")).error).toBeNull()
+    expect(resendInbox(emulator).list()).toHaveLength(1)
   })
 
   it("sends a batch", async () => {

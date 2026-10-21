@@ -35,15 +35,39 @@ interface Remembered {
 const ALLOWLIST: DataKey<string[]> = { name: "resend.allowlist" }
 const IDEMPOTENCY: DataKey<Map<string, Remembered>> = { name: "resend.idempotency" }
 
+/** Why a send cannot go out: Resend's error name and message. */
+interface Problem {
+  readonly name: "missing_required_field" | "validation_error"
+  readonly problem: string
+}
+
+/** `email@example.com` or `Name <email@example.com>`: the forms Resend takes an address in. */
+const ADDRESS = /^(?:[^<>]*<\s*[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+\s*>|[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+)$/
+
+/** The 422 Resend answers for an address in a form it does not take. */
+function badAddress(field: string): Problem {
+  return {
+    name: "validation_error",
+    problem: `Invalid \`${field}\` field. The email address needs to follow the \`email@example.com\` or \`Name <email@example.com>\` format.`,
+  }
+}
+
+/** The 422 Resend answers for a send without a field it needs. */
+function missing(field: string): Problem {
+  return { name: "missing_required_field", problem: `Missing \`${field}\` field.` }
+}
+
 /** The email a send request describes, or why it cannot be sent. */
-function draftOf(body: Record<string, unknown>): Draft | { readonly problem: string } {
+function draftOf(body: Record<string, unknown>): Draft | Problem {
   const from = textOf(body.from)
   const to = addresses(body.to)
   const subject = textOf(body.subject)
 
-  if (!from) return { problem: "Missing `from` field." }
-  if (to.length === 0) return { problem: "Missing `to` field." }
-  if (subject === undefined) return { problem: "Missing `subject` field." }
+  if (!from) return missing("from")
+  if (to.length === 0) return missing("to")
+  if (subject === undefined) return missing("subject")
+  if (!ADDRESS.test(from.trim())) return badAddress("from")
+  if (!to.every((address) => ADDRESS.test(address.trim()))) return badAddress("to")
 
   const html = textOf(body.html) ?? null
 
@@ -156,7 +180,7 @@ async function once(
 function sendOne(c: Context, context: ResendRouteContext, body: Record<string, unknown>): Response {
   const draft = draftOf(body)
 
-  if ("problem" in draft) return resendError(c, 422, "missing_required_field", draft.problem)
+  if ("problem" in draft) return resendError(c, 422, draft.name, draft.problem)
   if (!allowed(context, draft))
     return resendError(
       c,
@@ -177,7 +201,7 @@ function sendBatch(c: Context, context: ResendRouteContext, list: unknown): Resp
   const bad = drafts.find((draft) => "problem" in draft)
 
   if (drafts.length === 0) return resendError(c, 422, "validation_error", "The batch is empty.")
-  if (bad && "problem" in bad) return resendError(c, 422, "missing_required_field", bad.problem)
+  if (bad && "problem" in bad) return resendError(c, 422, bad.name, bad.problem)
 
   if (!ready.every((draft) => allowed(context, draft)))
     return resendError(
