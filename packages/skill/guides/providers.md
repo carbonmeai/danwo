@@ -497,8 +497,21 @@ and the next handshake signs the app out. `danwo matrix` faults the Backend API 
 reset) and ClerkJS's token refresh (500, 503). Recordings redact `sk_test_` keys, session
 tokens, Clerk cookies, dev browser tokens and handshake nonces.
 
-Not emulated: social and enterprise sign-in, phone codes, passkeys, MFA, waitlists, billing,
-and the `email.*`, `sms.*`, invitation, role, permission and billing webhooks.
+**Google sign-in.** Seed `social: [{ provider: "google", clientId, clientSecret }]` and pass
+`clerkService({ social: [googleService({ seed })] })`, with the same OAuth client seeded on Google
+(redirect URI `https://<slug>.clerk.accounts.dev/v1/oauth_callback`). "Continue with Google" goes
+to the Google emulator's chooser and back to `/v1/oauth_callback`; a new person is signed up
+(ClerkJS's transfer), one whose email Clerk has is signed in with Google linked.
+
+**Organizations in the browser and invitations.** The Frontend API answers
+`<OrganizationSwitcher/>` (`/v1/me/organization_memberships`, invitations, suggestions, creating an
+organization). A Backend API invitation emails the invitee (`clerkInstance(clerk).messages(email)`,
+`mail.link(email, { match: "ticket" })`) a `/v1/tickets/accept` link that lands on its
+`redirect_url` with `__clerk_ticket`; `<SignUp/>` or `<SignIn/>` there joins them to the
+organization. `img.clerk.com` (avatars, provider logos) is served too.
+
+Not emulated: social sign-in other than Google, enterprise sign-in, phone codes, passkeys, MFA,
+waitlists, billing, and the `email.*`, `sms.*`, invitation, role, permission and billing webhooks.
 
 ## Composio
 

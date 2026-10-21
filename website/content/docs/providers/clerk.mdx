@@ -52,6 +52,7 @@ export default defineConfig({
 | `organizations` | Organizations and their members' roles.                                                                                 |
 | `jwtTemplates`  | JWT templates by name, with claims and lifetime.                                                                        |
 | `webhooks`      | Endpoints, events, secret and extra headers.                                                                            |
+| `social`        | Social connections, such as Google, with the OAuth client the instance signs in to the provider with.                   |
 | `announce`      | Send `user.created` and the like for the seeded records, so an app that builds its rows from webhooks has them.         |
 
 ### Stable ids
@@ -100,15 +101,66 @@ development instance.
 
 `clerkMail(clerk)` gives the codes to the `mail` fixture.
 
+## Sign in with Google
+
+Seed a `social` connection and hand `clerkService` the Google service it signs in on. Clerk's
+sign-in and sign-up components then show "Continue with Google". The browser picks an account on
+the Google emulator's chooser, and Clerk signs that person in, links Google to the account with
+that email, or signs them up:
+
+```ts title="danwo.config.ts · Google"
+const google = googleService({
+  seed: {
+    users: [{ email: "lin@example.com", name: "Lin Wu" }],
+    oauth_clients: [
+      {
+        client_id: "my-app.apps.googleusercontent.com",
+        client_secret: "my-app-google-secret",
+        name: "My app",
+        redirect_uris: ["https://my-app.clerk.accounts.dev/v1/oauth_callback"],
+      },
+    ],
+  },
+})
+const clerk = clerkService({
+  social: [google],
+  seed: {
+    instance: { slug: "my-app" },
+    social: [
+      {
+        provider: "google",
+        clientId: "my-app.apps.googleusercontent.com",
+        clientSecret: "my-app-google-secret",
+      },
+    ],
+  },
+})
+```
+
+Put both in `services`. The redirect URI is the instance's Frontend API, as with a real Google app.
+
+## Organizations and invitations
+
+`<OrganizationSwitcher/>` lists the signed-in user's organizations and creates new ones. An
+invitation goes out like this:
+
+| Step                                                             | What happens                                                       |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `organizations.createOrganizationInvitation({ …, redirectUrl })` | Clerk emails the invitee a link to the Frontend API                |
+| `mail.link(email, { match: "ticket" })`                          | the test reads that link                                           |
+| The invitee opens it                                             | they land on `redirectUrl` with Clerk's ticket                     |
+| `<SignUp/>` there                                                | signs them up, address verified, and adds them to the organization |
+| `<SignIn/>` there                                                | does the same for someone who already has an account               |
+
 ## What's covered
 
-| Area           | Covered                                                                                  |
-| -------------- | ---------------------------------------------------------------------------------------- |
-| Backend API    | Users, sessions and tokens, organizations and invitations, JWT templates, keys.          |
-| Frontend API   | The client, sign-up and sign-in by password or email code, token refresh, the handshake. |
-| ClerkJS        | Served from the Frontend API, so `<ClerkProvider>` and Clerk's components load.          |
-| Account Portal | Sign-in with a password or a code, sign-up with a code.                                  |
-| Tokens         | Session tokens with organization claims and your templates.                              |
+| Area           | Covered                                                                                                                                       |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend API    | Users, sessions and tokens, organizations and invitations, JWT templates, keys.                                                               |
+| Frontend API   | The client, sign-up and sign-in by password, email code, Google or invitation ticket, token refresh, the handshake, the user's organizations. |
+| ClerkJS        | Served from the Frontend API, so `<ClerkProvider>` and Clerk's components load, with their images.                                            |
+| Account Portal | Sign-in with a password or a code, sign-up with a code.                                                                                       |
+| Tokens         | Session tokens with organization claims and your templates.                                                                                   |
 
 ## Faults
 
@@ -140,7 +192,7 @@ addresses and `424242`. All 5 match. Webhooks are checked offline.
 
 ## Not covered yet
 
-- Social and enterprise sign-in (OAuth, SAML)
+- Social sign-in other than Google, and enterprise sign-in (SAML)
 - Phone numbers, SMS codes and passkeys
 - Production instances, satellite domains and the Clerk Dashboard
 - Billing
