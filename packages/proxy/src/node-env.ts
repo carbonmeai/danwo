@@ -1,9 +1,10 @@
 /**
  * The environment that routes a Node app through the proxy, and the ways it can be lost and kept:
  * a start script that sets its own NODE_OPTIONS drops the preload, so a `node` shim first on PATH
- * loads it whatever NODE_OPTIONS says, and every process that loaded it leaves a heartbeat.
+ * loads it whatever NODE_OPTIONS says, and every process that loaded it leaves a heartbeat that
+ * says whether its calls reached the proxy's probe host.
  */
-import { chmod, mkdir, readdir, writeFile } from "node:fs/promises"
+import { chmod, mkdir, readdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
@@ -13,6 +14,21 @@ const PRELOAD = fileURLToPath(new URL("../preload.mjs", import.meta.url))
 
 /** Where each process that loaded the preload leaves a file named after its pid. */
 export const PRELOAD_DIR_VARIABLE = "DANWO_PRELOAD_DIR"
+
+/** The URL the preload calls at start to check that the process goes through the proxy. */
+const PROBE_VARIABLE = "DANWO_PROXY_PROBE"
+
+/** Set to `1`, a process the probe finds unrouted exits at once instead of running on. */
+const REQUIRE_VARIABLE = "DANWO_REQUIRE_PROXY"
+
+/**
+ * The host the proxy answers for the preload's check, with `PROBE_HEADER`. `.invalid` never
+ * resolves, so a process that calls it directly gets no answer.
+ */
+export const PROBE_HOST = "proxy-probe.danwo.invalid"
+
+/** The header, set to `1`, that marks the probe host's answer as the proxy's. */
+export const PROBE_HEADER = "x-danwo-probe"
 
 /** The preload's `file:` URL, for the shim. */
 const PRELOAD_URL_VARIABLE = "DANWO_PRELOAD_URL"
@@ -62,6 +78,11 @@ export interface EnvOptions {
    * replaces NODE_OPTIONS. Default true; off on Windows, where there is no shim.
    */
   readonly nodeShim?: boolean
+  /**
+   * Make a Node process whose calls do not reach the proxy (it runs a Node the preload cannot
+   * route) exit at start, before it can call a real provider. Default false: it warns on stderr.
+   */
+  readonly requireProxy?: boolean
 }
 
 /**
@@ -103,6 +124,8 @@ export function proxyEnvironment(
     [APP_CLOCK_VARIABLE]: inputs.clock.file,
     [PRELOAD_DIR_VARIABLE]: inputs.preloadDir,
     [PRELOAD_URL_VARIABLE]: preloadUrl,
+    [PROBE_VARIABLE]: `https://${PROBE_HOST}/`,
+    ...(options.requireProxy === true && { [REQUIRE_VARIABLE]: "1" }),
     ...(shim && { PATH: [inputs.shimDir, base.PATH].filter(Boolean).join(":") }),
   }
 }
@@ -118,9 +141,95 @@ function alive(pid: number): boolean {
   }
 }
 
-/** The pids of the processes that loaded the preload and are still running. */
-export async function preloadedPids(preloadDir: string): Promise<readonly number[]> {
-  const names = await readdir(preloadDir).catch(() => [])
+/** A Node process that loaded the preload but whose calls did not reach the proxy. */
+export interface UnroutedProcess {
+  readonly pid: number
+  /** Its Node version, `v22.18.0`. */
+  readonly node: string
+  /** Its command line, without the `node` itself. */
+  readonly command: string
+  /** The ways of calling the probe host that missed the proxy, each with what happened. */
+  readonly missed: readonly string[]
+  /** What to do about it, for its Node. */
+  readonly fix: string
+  /** Whether it still runs: under `requireProxy` it has exited. */
+  readonly running: boolean
+}
 
-  return names.map(Number).filter((pid) => Number.isInteger(pid) && pid > 0 && alive(pid))
+/** What a heartbeat file says, as the preload writes it. */
+interface Heartbeat {
+  readonly routed: boolean
+  readonly node: string
+  readonly command: string
+  readonly missed: readonly string[]
+  readonly fix: string
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+/** A heartbeat file's contents, or undefined when the preload did not write them. */
+export function parseHeartbeat(text: string): Heartbeat | undefined {
+  let value: unknown
+
+  try {
+    value = JSON.parse(text)
+  } catch {
+    return undefined
+  }
+
+  if (!isRecord(value) || typeof value.routed !== "boolean") return undefined
+
+  return {
+    routed: value.routed,
+    node: typeof value.node === "string" ? value.node : "unknown",
+    command: typeof value.command === "string" ? value.command : "",
+    missed: Array.isArray(value.missed)
+      ? value.missed.filter((entry): entry is string => typeof entry === "string")
+      : [],
+    fix: typeof value.fix === "string" ? value.fix : "",
+  }
+}
+
+/** Every heartbeat in `preloadDir`, by pid. */
+async function heartbeats(preloadDir: string): Promise<ReadonlyMap<number, Heartbeat>> {
+  const names = await readdir(preloadDir).catch(() => [])
+  const found = new Map<number, Heartbeat>()
+
+  for (const name of names) {
+    const pid = Number(name)
+
+    if (!Number.isInteger(pid) || pid <= 0) continue
+
+    const beat = parseHeartbeat(await readFile(join(preloadDir, name), "utf8").catch(() => ""))
+
+    if (beat !== undefined) found.set(pid, beat)
+  }
+
+  return found
+}
+
+/**
+ * The pids of the processes that loaded the preload, reached the proxy through it, and are still
+ * running.
+ */
+export async function preloadedPids(preloadDir: string): Promise<readonly number[]> {
+  return [...(await heartbeats(preloadDir))]
+    .filter(([pid, beat]) => beat.routed && alive(pid))
+    .map(([pid]) => pid)
+}
+
+/** The processes that loaded the preload and found that their calls do not reach the proxy. */
+export async function unroutedProcesses(preloadDir: string): Promise<readonly UnroutedProcess[]> {
+  return [...(await heartbeats(preloadDir))]
+    .filter(([, beat]) => !beat.routed)
+    .map(([pid, beat]) => ({
+      pid,
+      node: beat.node,
+      command: beat.command,
+      missed: beat.missed,
+      fix: beat.fix,
+      running: alive(pid),
+    }))
 }

@@ -24,7 +24,16 @@ import {
   TELEMETRY_HOSTS,
 } from "./hosts.ts"
 import { isListening, nothingListening } from "./listening.ts"
-import { type EnvOptions, preloadedPids, proxyEnvironment, writeNodeShim } from "./node-env.ts"
+import {
+  type EnvOptions,
+  PROBE_HEADER,
+  PROBE_HOST,
+  preloadedPids,
+  proxyEnvironment,
+  type UnroutedProcess,
+  unroutedProcesses,
+  writeNodeShim,
+} from "./node-env.ts"
 import { replaceLocalPortProbe } from "./port-probe.ts"
 import { quietDroppedClients } from "./quiet.ts"
 import { forwardTo } from "./upstream.ts"
@@ -225,10 +234,16 @@ export interface Proxy {
    */
   env(base?: NodeJS.ProcessEnv, options?: EnvOptions): NodeJS.ProcessEnv
   /**
-   * The pids of the processes started with `env()` that loaded the preload and still run: a Node
-   * process of the app's that is missing from here calls providers without the proxy.
+   * The pids of the processes started with `env()` that loaded the preload, reached the proxy
+   * through it, and still run: a Node process of the app's that is missing from here calls
+   * providers without the proxy.
    */
   preloaded(): Promise<readonly number[]>
+  /**
+   * The processes started with `env()` that loaded the preload but whose calls missed the proxy
+   * (a Node the preload cannot route), running or not.
+   */
+  unrouted(): Promise<readonly UnroutedProcess[]>
   /** The clock of every app started with `env()`: an offset ahead of real time the runner moves. */
   readonly clock: AppClock
   exchanges(): readonly Exchange[]
@@ -591,6 +606,14 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
 
     return route.hosts.map((host) => ({ host, handler }))
   })
+
+  /* The preload's check, ahead of every route and left out of the record. */
+  await server
+    .forAnyRequest()
+    .forHostname(PROBE_HOST)
+    .always()
+    .thenReply(204, "", { [PROBE_HEADER]: "1" })
+
   const exact = bound.filter((b) => !b.host.startsWith("*."))
   const wildcards = bound
     .filter((b) => b.host.startsWith("*."))
@@ -641,6 +664,9 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   // `request-initiated` always comes first; `request` can arrive after a fast `response`.
   await server.on("request-initiated", (req) => {
     const host = req.destination.hostname
+
+    if (host === PROBE_HOST) return
+
     const load = loadKind(req.path, req.headers)
 
     log.set(req.id, {
@@ -718,6 +744,7 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
       return proxyEnvironment({ url, caCertPath, clock, preloadDir, shimDir }, base, envOptions)
     },
     preloaded: () => preloadedPids(preloadDir),
+    unrouted: () => unroutedProcesses(preloadDir),
     exchanges: () => [...log.values()],
     sockets: () => sockets.sockets(),
     setFault(rule) {
