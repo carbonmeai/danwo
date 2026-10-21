@@ -37,7 +37,7 @@ import { stripeStore } from "./store.ts"
 import { STRIPE_JS } from "./stripe-js.ts"
 import { runDue, scheduleNext } from "./subscribing.ts"
 
-export { stripeOutboundFaults } from "./faults.ts"
+export { STRIPE_BEHAVIOURS, stripeOutboundFaults } from "./faults.ts"
 export { stripeSignature } from "./signature.ts"
 
 export type SeedCustomer = Partial<Record<"id" | "email" | "name" | "description", string>>

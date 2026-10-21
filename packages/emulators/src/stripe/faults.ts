@@ -1,3 +1,6 @@
+/** What the Stripe emulator can be asked to do in place of a normal answer: decline the card. */
+export const STRIPE_BEHAVIOURS = ["card_declined"] as const
+
 /** The hosted Checkout page's Pay button, as the browser posts it. */
 const HOSTED_PAY = /^\/checkout\/[^/?]+\/complete(\?|$)/
 
@@ -41,6 +44,6 @@ export function stripeOutboundFaults(call: {
   const writes = [...faults, { kind: "reset-after" }] as const
 
   return call.host === "checkout.stripe.com" && HOSTED_PAY.test(call.path ?? "")
-    ? ([...writes, { kind: "emulate", behaviour: "card_declined" }] as const)
+    ? ([...writes, { kind: "emulate", behaviour: STRIPE_BEHAVIOURS[0] }] as const)
     : writes
 }

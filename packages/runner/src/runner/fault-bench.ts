@@ -1,4 +1,4 @@
-import { LLM_BEHAVIOURS, type WebhookFault } from "@danwo/emulators"
+import { LLM_BEHAVIOURS, STRIPE_BEHAVIOURS, type WebhookFault } from "@danwo/emulators"
 /**
  * Faults armed by name (from a live session, a test, or a matrix trial), in the words `danwo
  * matrix` reports them:
@@ -46,10 +46,14 @@ export const FAULT_FORMS = [
   "status <code> on <METHOD> <host><path>   e.g. status 500 on POST api.stripe.com/v1/checkout/sessions",
   "reset | reset-after | delay <ms>ms | slow-then-retry <ms>ms on <METHOD> <host><path>",
   `${LLM_BEHAVIOURS.join(" | ")} on <METHOD> <model API host><path>   e.g. refusal on POST api.openai.com/v1/chat/completions`,
+  `${STRIPE_BEHAVIOURS.join(" | ")} on POST checkout.stripe.com/checkout/:id/complete   (the hosted Checkout page's Pay button)`,
   "duplicate | forged | delay <ms>ms | stale <seconds>s on [<service> ]webhook <topic>   e.g. duplicate on webhook checkout.session.completed",
   "reorder [<service> ]webhooks <first>, <second>   e.g. reorder webhooks payment_intent.created, payment_intent.succeeded",
   "append #<n> to fault the n-th matching call or delivery instead of the next one",
 ]
+
+/** What an emulator can be asked to do in place of a normal answer: model failures, a declined card. */
+const EMULATED_BEHAVIOURS: readonly string[] = [...LLM_BEHAVIOURS, ...STRIPE_BEHAVIOURS]
 
 function unknownFault(label: string): Error {
   return new Error(`cannot read the fault "${label}". Write one of:\n${FAULT_FORMS.join("\n")}`)
@@ -70,8 +74,7 @@ function outboundFault(spec: string, label: string): NamedOutboundFault {
   }
 
   if (spec === "reset" || spec === "reset-after") return { kind: spec }
-  if (LLM_BEHAVIOURS.some((behaviour) => behaviour === spec))
-    return { kind: "emulate", behaviour: spec }
+  if (EMULATED_BEHAVIOURS.includes(spec)) return { kind: "emulate", behaviour: spec }
 
   throw unknownFault(label)
 }

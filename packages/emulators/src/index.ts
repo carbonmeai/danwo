@@ -324,7 +324,13 @@ export {
   type LlmToolCall,
   seedLlm,
 } from "./llm/index.ts"
-export { seedStripe, stripe, stripeOutboundFaults, type StripeSeedConfig } from "./stripe/index.ts"
+export {
+  seedStripe,
+  STRIPE_BEHAVIOURS,
+  stripe,
+  stripeOutboundFaults,
+  type StripeSeedConfig,
+} from "./stripe/index.ts"
 export {
   connectNovuEmail,
   NOVU_DEFAULTS,

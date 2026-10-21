@@ -93,10 +93,10 @@ describe("@danwo/playwright on the shop", () => {
     async () => {
       const { code, out } = await inExample([BIN, "matrix", "tests/buy-credits.spec.ts"])
 
-      expect(out).toContain("clean run passed; 15 of 15 planned faults to run")
+      expect(out).toContain("clean run passed; 16 of 16 planned faults to run")
       expect(out).toMatch(/^PASS {2}duplicate on webhook checkout\.session\.completed$/m)
       expect(out).toMatch(/^PASS {2}reset-after on POST api\.stripe\.com\/v1\/checkout\/sessions$/m)
-      expect(out).toContain("faults: 15 passed")
+      expect(out).toContain("faults: 16 passed")
       expect(code).toBe(0)
     },
     MATRIX_TIMEOUT,
@@ -117,7 +117,7 @@ describe("@danwo/playwright on the shop", () => {
         /record: test-results\/danwo-matrix\/\d+-duplicate-on-webhook[^\n]*danwo-flight-record\.json/,
       )
       expect(out.match(/^FAIL /gm)).toHaveLength(1)
-      expect(out).toContain("faults: 14 passed, 1 failed")
+      expect(out).toContain("faults: 15 passed, 1 failed")
       expect(code).toBe(1)
     },
     MATRIX_TIMEOUT,
@@ -132,7 +132,7 @@ describe("@danwo/playwright on the shop", () => {
       "^forged",
     ])
 
-    expect(out).toContain("clean run passed; 1 of 15 planned faults to run")
+    expect(out).toContain("clean run passed; 1 of 16 planned faults to run")
     expect(out).toContain("faults: 1 passed")
     expect(code).toBe(0)
   })
