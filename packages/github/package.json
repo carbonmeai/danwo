@@ -25,5 +25,8 @@
   "devDependencies": {
     "@danwo/emulators": "workspace:*",
     "zod": "4.6.1"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

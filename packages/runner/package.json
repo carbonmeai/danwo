@@ -49,5 +49,8 @@
     "@aws-sdk/client-sqs": "3.1152.0",
     "@tigrisdata/storage": "3.23.0",
     "@types/pngjs": "6.0.5"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

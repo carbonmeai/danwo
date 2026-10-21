@@ -5,9 +5,16 @@
  * inside `node_modules`: everything else loads as Node would load it.
  */
 import { readFileSync } from "node:fs"
-import { registerHooks, stripTypeScriptTypes } from "node:module"
+import * as nodeModule from "node:module"
 import { fileURLToPath } from "node:url"
 
+/* An older Node lacks the hooks below; say so instead of failing on a missing export. */
+if (Number(process.versions.node.split(".")[0]) < 24 || !("registerHooks" in nodeModule)) {
+  process.stderr.write(`danwo needs Node.js 24 or newer; this is Node.js ${process.version}.\n`)
+  process.exit(1)
+}
+
+const { registerHooks, stripTypeScriptTypes } = nodeModule
 const INSTALLED_TYPESCRIPT = /\/node_modules\/.+\.m?ts$/
 const emitWarning = process.emitWarning.bind(process)
 

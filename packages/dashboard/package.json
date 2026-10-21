@@ -42,5 +42,8 @@
     "react-dom": "19.2.8",
     "recharts": "3.10.1",
     "vite": "8.2.2"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

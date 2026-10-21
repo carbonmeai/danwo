@@ -33,5 +33,8 @@
   },
   "peerDependencies": {
     "@playwright/test": "1.64.0"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

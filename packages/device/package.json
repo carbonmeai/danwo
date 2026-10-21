@@ -23,5 +23,8 @@
     "@danwo/proxy": "workspace:*",
     "@danwo/runner": "workspace:*",
     "agent-device": "0.21.28"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

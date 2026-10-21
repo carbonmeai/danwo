@@ -27,5 +27,8 @@
     "@danwo/runner": "workspace:*",
     "@danwo/sdk": "workspace:*",
     "oxc-parser": "0.154.0"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

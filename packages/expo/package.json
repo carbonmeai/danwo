@@ -20,5 +20,8 @@
   },
   "dependencies": {
     "@danwo/device": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

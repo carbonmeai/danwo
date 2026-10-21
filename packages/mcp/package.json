@@ -31,5 +31,8 @@
   },
   "devDependencies": {
     "@danwo/sdk": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

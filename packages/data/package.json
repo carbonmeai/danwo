@@ -30,5 +30,8 @@
     "pg": {
       "optional": true
     }
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

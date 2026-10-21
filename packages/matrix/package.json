@@ -27,5 +27,8 @@
   "devDependencies": {
     "@danwo/example-shop": "workspace:*",
     "zod": "4.6.1"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

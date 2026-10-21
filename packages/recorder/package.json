@@ -26,5 +26,8 @@
   "devDependencies": {
     "@danwo/emulators": "workspace:*",
     "@danwo/sdk": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

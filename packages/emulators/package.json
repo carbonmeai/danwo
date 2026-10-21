@@ -74,5 +74,8 @@
     "twilio": "6.2.0",
     "unipile-node-sdk": "1.9.3",
     "zod": "4.6.1"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }
