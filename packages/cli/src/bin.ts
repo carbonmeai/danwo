@@ -444,13 +444,32 @@ program
     console.log(options.json ? specJson(shown) : renderSpec(shown))
   })
 
+/**
+ * The fidelity checks. They compare the emulators with goldens kept in danwo's own repository, so
+ * they are not published: a clone of that repository has them, an installed danwo does not.
+ */
+async function fidelity() {
+  try {
+    return await import("@danwo/fidelity")
+  } catch (error) {
+    if (Reflect.get(Object(error), "code") !== "ERR_MODULE_NOT_FOUND") throw error
+
+    throw new Error(
+      "danwo fidelity runs in a clone of the danwo repository, which holds its goldens",
+      {
+        cause: error,
+      },
+    )
+  }
+}
+
 /** `danwo fidelity login <provider>`: signs a test account in and keeps its refresh token. */
 async function fidelityLogin(
   provider: string,
   root: string,
   options: { redirectUri?: string; port?: number },
 ): Promise<number> {
-  const { loginCommand } = await import("@danwo/fidelity")
+  const { loginCommand } = await fidelity()
 
   return loginCommand({
     provider,
@@ -508,7 +527,7 @@ program
         port?: number
       },
     ) => {
-      const { fidelityCommand, sweepCommand } = await import("@danwo/fidelity")
+      const { fidelityCommand, sweepCommand } = await fidelity()
       const root = options.root ?? process.cwd()
 
       if (providers[0] === "login") {
