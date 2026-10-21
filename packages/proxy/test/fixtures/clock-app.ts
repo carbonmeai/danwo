@@ -14,6 +14,7 @@ const server = createServer((_request, response) => {
         now: Date.now(),
         constructed: new Date().getTime(),
         isDate: new Date() instanceof Date,
+        ownStatics: ["UTC", "parse", "now"].every((name) => Object.hasOwn(Date, name)),
         timerMs: performance.now() - started,
       }),
     )

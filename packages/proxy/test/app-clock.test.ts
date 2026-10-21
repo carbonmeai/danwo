@@ -15,6 +15,7 @@ const Reading = z.object({
   now: z.number(),
   constructed: z.number(),
   isDate: z.boolean(),
+  ownStatics: z.boolean(),
   timerMs: z.number(),
 })
 
@@ -72,6 +73,7 @@ describe("the app's clock", () => {
         expect(after.now - Date.now()).toBeLessThan(30 * DAY + 2_000)
         expect(after.constructed - after.now).toBeLessThan(50)
         expect(after.isDate).toBe(true)
+        expect(after.ownStatics).toBe(true)
         expect(after.timerMs).toBeGreaterThan(90)
         expect(after.timerMs).toBeLessThan(1_000)
 

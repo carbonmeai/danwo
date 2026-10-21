@@ -73,6 +73,13 @@ function shiftClock(file) {
   }
 
   Object.setPrototypeOf(ShiftedDate, RealDate)
+  /*
+   * `Date.UTC` and `Date.parse` as own properties too, not only through the prototype chain:
+   * frameworks that wrap `Date` (Next.js does) copy its own statics, and drop inherited ones.
+   */
+  for (const name of Object.getOwnPropertyNames(RealDate))
+    if (!["length", "name", "prototype"].includes(name))
+      Object.defineProperty(ShiftedDate, name, Object.getOwnPropertyDescriptor(RealDate, name))
   ShiftedDate.prototype = RealDate.prototype
   ShiftedDate.now = () => RealDate.now() + offset
   RealDate.prototype.constructor = ShiftedDate
