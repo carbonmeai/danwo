@@ -1,0 +1,47 @@
+name: Slow tests
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: slow-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  slow:
+    name: slow (${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        # vitest splits the slow test files across the shards; each runs four at a time.
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          chromium: "true"
+      # Docker (Typesense, MiniStack, Postgres) comes with the runner; the Android tests skip
+      # themselves without DANWO_ANDROID=1.
+      - run: >-
+          bun run test:slow --shard=${{ matrix.shard }}/4
+          --reporter=default --reporter=junit --outputFile.junit=reports/slow-${{ matrix.shard }}.xml
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: slow-${{ matrix.shard }}
+          path: |
+            reports/
+            **/.danwo/
+            !**/node_modules/**
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14

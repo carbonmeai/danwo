@@ -1,0 +1,79 @@
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directories: ["/", "/.github/actions/*"]
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Every dependency is pinned to an exact version, so each bump is a reviewed change.
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: build
+    ignore:
+      # The proxy relies on mockttp's internals (its local port check among them); bump it by hand,
+      # with the proxy's slow tests.
+      - dependency-name: mockttp
+      # Node 24 is the supported runtime; its types follow it.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # An Expo SDK upgrade moves expo, react-native and react together; done by hand.
+      - dependency-name: expo
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "expo-*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: react-native
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+    groups:
+      # Every workspace moves to the same zod at once.
+      zod:
+        patterns: ["zod"]
+      # playwright-core decides the Chromium build CI installs; @playwright/test must match it.
+      playwright:
+        patterns: ["playwright-core", "@playwright/test", "playwright"]
+      # The provider SDKs the emulators answer; a bump can show a fidelity gap, so they land together
+      # and get a fidelity run.
+      provider-sdks:
+        patterns:
+          - "stripe"
+          - "twilio"
+          - "resend"
+          - "openai"
+          - "ai"
+          - "nylas"
+          - "pusher"
+          - "pusher-js"
+          - "auth0"
+          - "googleapis"
+          - "google-auth-library"
+          - "paystack-sdk"
+          - "unipile-node-sdk"
+          - "openid-client"
+          - "express-openid-connect"
+          - "@aws-sdk/*"
+          - "pg"
+          - "ioredis"
+      toolchain:
+        patterns:
+          - "typescript"
+          - "oxlint"
+          - "oxlint-tsgolint"
+          - "oxfmt"
+          - "oxc-parser"
+          - "fallow"
+          - "vitest"
+          - "@vitest/*"
+          - "vite"
+          - "@vitejs/*"
+          - "esbuild"
+      minor-and-patch:
+        update-types: ["minor", "patch"]

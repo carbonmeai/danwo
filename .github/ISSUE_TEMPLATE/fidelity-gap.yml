@@ -1,0 +1,31 @@
+name: Emulator fidelity gap
+description: An emulator answers differently from the real provider.
+labels: [fidelity]
+body:
+  - type: input
+    id: provider
+    attributes:
+      label: Provider
+      description: e.g. Stripe, Twilio, Resend.
+    validations:
+      required: true
+  - type: textarea
+    id: call
+    attributes:
+      label: The call
+      description: The endpoint or SDK method, and the request you sent.
+      render: ts
+    validations:
+      required: true
+  - type: textarea
+    id: difference
+    attributes:
+      label: Real provider vs emulator
+      description: What the real API returns and what the emulator returns. Use test-mode data only; leave out keys and personal data.
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: danwo and the provider SDK, e.g. `@danwo/emulators 0.1.0, stripe 23.0.0`.

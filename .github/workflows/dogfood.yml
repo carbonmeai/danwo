@@ -1,0 +1,50 @@
+name: Dogfood
+
+# danwo tests its own example shop and reports back the way a user's CI would: a check with
+# annotations, one pull request comment and the job summary. No secrets: the shop's tests run
+# against the Stripe emulator and need no model key.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+concurrency:
+  group: dogfood-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  shop:
+    name: examples/shop
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: examples/shop
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          chromium: "true"
+      # A pull request from a fork gets a read-only token; the reporter says so and the job's
+      # result still follows the tests. The shop's scripts run `danwo test` and
+      # `danwo matrix tests/buy-credits.danwo.ts` from the workspace.
+      - run: bun run test:e2e --reporter github,junit
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - run: bun run matrix --reporter github
+        if: ${{ !cancelled() }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: danwo-runs
+          path: examples/shop/.danwo/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14

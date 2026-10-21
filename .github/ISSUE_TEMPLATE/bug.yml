@@ -1,0 +1,30 @@
+name: Bug
+description: danwo did something wrong, crashed or gave a confusing result.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, and what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: The smallest test or config that shows it. A failing test's flight record (`.danwo/runs`) helps most.
+      render: ts
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: The command's output or error, trimmed to what matters.
+      render: text
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: danwo, Node and OS, e.g. `@danwo/cli 0.1.0, Node 24.4, Ubuntu 24.04`.
+    validations:
+      required: true

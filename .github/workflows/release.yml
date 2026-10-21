@@ -1,0 +1,146 @@
+name: Release
+
+# Publishes every public package to npm with trusted publishing (GitHub OIDC, so no NPM_TOKEN),
+# with provenance, then creates the GitHub release with notes from the commits since the last tag.
+#
+# One-time setup on npmjs.com, per package:
+#
+#   A package can only get a trusted publisher once it exists on npm, so publish each package the
+#   first time by hand, with 2FA (`npm publish --access public` from its folder, after
+#   `bun scripts/release.ts <version> --pack --verify`). Then, on the package's Settings page,
+#   under "Trusted publishing", add a GitHub Actions publisher:
+#
+#     Organization or user:  carbonmeai
+#     Repository:            danwo
+#     Workflow filename:     release.yml
+#     Environment name:      npm
+#
+#   and, once it publishes from here, set "Publishing access" to require 2FA and disallow tokens.
+#   A package added later needs the same: one manual publish, then its trusted publisher.
+#
+# The publish job runs in the `npm` environment, so a required reviewer on that environment
+# (Settings > Environments > npm) holds every publish until a human approves it.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, without the v (e.g. 0.1.0-beta.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: check and pack
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - id: version
+        name: Read the version
+        env:
+          REQUESTED: ${{ inputs.version || github.ref_name }}
+        run: |
+          version="${REQUESTED#v}"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::\"$REQUESTED\" is not a semver version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: bun run check
+      - run: bun scripts/release.ts "$RELEASE_VERSION" --pack --verify
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+
+  publish:
+    name: publish to npm
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: npm
+    permissions:
+      contents: read
+      # The OIDC token npm trades for a short-lived publish token and signs provenance with.
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      # Trusted publishing needs npm 11.5.1 or later.
+      - run: npm install --global npm@^11.5.1
+      - run: bun scripts/release.ts "$RELEASE_VERSION" --publish
+        env:
+          RELEASE_VERSION: ${{ needs.verify.outputs.version }}
+
+  github-release:
+    name: GitHub release
+    needs: [verify, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      RELEASE_VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Write the notes
+        run: |
+          # The last v* tag before this commit; none means every commit so far.
+          previous="$(git describe --tags --abbrev=0 --match 'v*' HEAD^ 2>/dev/null || true)"
+          range="${previous:+$previous..}HEAD"
+          # One file of lines per Conventional Commits type the notes show.
+          sections="$(mktemp -d)"
+          for sha in $(git rev-list --no-merges "$range"); do
+            subject="$(git log -1 --format=%s "$sha")"
+            line="- $subject (${sha:0:7})"
+            if [[ "$subject" =~ ^[a-z]+(\([^\)]*\))?!: ]] ||
+              git log -1 --format=%b "$sha" | grep -q '^BREAKING[ -]CHANGE'; then
+              echo "$line" >> "$sections/breaking"
+            fi
+            type="${subject%%[(!:]*}"
+            case "$type" in
+              feat | fix | perf | docs) echo "$line" >> "$sections/$type" ;;
+            esac
+          done
+          {
+            for section in "breaking:Breaking changes" feat:Features fix:Fixes \
+              perf:Performance docs:Documentation; do
+              file="$sections/${section%%:*}"
+              [ -f "$file" ] || continue
+              printf '## %s\n\n' "${section#*:}"
+              cat "$file"
+              echo
+            done
+            if [ -n "$previous" ]; then
+              echo "**Full changelog**: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$previous...v$RELEASE_VERSION"
+            fi
+          } > notes.md
+          cat notes.md
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          flags=(--title "v$RELEASE_VERSION" --notes-file notes.md)
+          if [[ "$RELEASE_VERSION" == *-* ]]; then flags+=(--prerelease); fi
+          # A pushed tag already exists; on a manual run, --target makes the tag at this commit.
+          if [ "$EVENT" = push ]; then flags+=(--verify-tag); else flags+=(--target "$GITHUB_SHA"); fi
+          gh release create "v$RELEASE_VERSION" "${flags[@]}"

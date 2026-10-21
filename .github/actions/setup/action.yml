@@ -1,0 +1,46 @@
+name: Set up danwo
+description: Node 24, bun at the version package.json pins, and the workspace's dependencies, cached.
+
+inputs:
+  chromium:
+    description: Also install Playwright's Chromium and its system libraries.
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: 24
+
+    - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      with:
+        bun-version-file: package.json
+
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.bun/install/cache
+        key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+        restore-keys: bun-${{ runner.os }}-
+
+    - run: bun install --frozen-lockfile
+      shell: bash
+
+    # The browser build follows the pinned playwright-core, so its version keys the cache.
+    - if: inputs.chromium == 'true'
+      id: playwright
+      shell: bash
+      run: echo "version=$(node -p 'require("playwright-core/package.json").version')" >> "$GITHUB_OUTPUT"
+      working-directory: packages/runner
+
+    - if: inputs.chromium == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+    # Installs the system libraries every time and downloads Chromium only on a cache miss.
+    - if: inputs.chromium == 'true'
+      shell: bash
+      run: npx playwright-core install --with-deps chromium
+      working-directory: packages/runner

@@ -1,0 +1,26 @@
+name: Provider request
+description: Ask for an emulator for a provider danwo doesn't cover yet.
+labels: [provider]
+body:
+  - type: input
+    id: provider
+    attributes:
+      label: Provider
+      description: Its name and API docs link.
+    validations:
+      required: true
+  - type: textarea
+    id: usage
+    attributes:
+      label: What your app uses
+      description: The endpoints, webhooks or SDK calls your tests would need, and the failures worth injecting.
+    validations:
+      required: true
+  - type: dropdown
+    id: help
+    attributes:
+      label: Would you help build it?
+      options:
+        - "Yes"
+        - Maybe, with guidance
+        - "No"
