@@ -23,7 +23,7 @@ _Dánwò_ is Yorùbá for "to test". It comes from _dán … wò_, "try it and s
 In your app's folder:
 
 ```sh
-npx danwo init
+npx @danwo/cli init
 ```
 
 `danwo init` looks at the project (package manager, framework, dev command, the providers it
@@ -176,7 +176,7 @@ test("buys credits", async ({ page, danwo }) => {
   `deliveries()` since the test began, `settle()`, `inject(label)` and `clearFaults()`.
 - A failed test gets a `danwo flight record` attachment: the calls, webhooks and emulator state,
   redacted like danwo's own records.
-- `npx danwo-playwright matrix tests/buy.spec.ts [--grep …] [--faults …]` runs the test clean,
+- `npx @danwo/playwright matrix tests/buy.spec.ts [--grep …] [--faults …]` runs the test clean,
   plans faults from its calls and webhooks, and runs it once per fault in a fresh Playwright
   process. Faulted runs are judged by the invariant; each trial's results are kept under
   `test-results/danwo-matrix/`. Status faults get their provider's error body; the danwo config's
@@ -292,10 +292,10 @@ permissions:
 
 steps:
   # checkout, Node 24, install, `npx playwright install --with-deps chromium`
-  - run: npx danwo test --reporter github
+  - run: npx @danwo/cli test --reporter github
     env:
       GITHUB_TOKEN: ${{ github.token }}
-  - run: npx danwo matrix tests/buy-credits.danwo.ts --reporter github
+  - run: npx @danwo/cli matrix tests/buy-credits.danwo.ts --reporter github
     env:
       GITHUB_TOKEN: ${{ github.token }}
   - uses: actions/upload-artifact@v4
@@ -352,12 +352,12 @@ only about matrix trials that forged, aged or delayed a webhook.
 ## Coding agents (MCP)
 
 `danwo mcp` serves the project in the current folder to a coding agent over MCP (stdio).
-`npx danwo init` registers it for the agents you pick: Claude Code (`.mcp.json`), Cursor
+`npx @danwo/cli init` registers it for the agents you pick: Claude Code (`.mcp.json`), Cursor
 (`.cursor/mcp.json`) and Codex (`.codex/config.toml`), merging into files that exist
 (`--no-mcp` skips it). By hand, with Claude Code:
 
 ```bash
-claude mcp add danwo -- npx danwo mcp
+claude mcp add danwo -- npx @danwo/cli mcp
 ```
 
 ### Skill, spec and guides

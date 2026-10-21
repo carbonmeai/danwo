@@ -142,7 +142,7 @@ export function examplesIndex(): string {
     `<Cards>\n${cards.join("\n")}\n</Cards>`,
     "## Run an example",
     "Every example is a workspace of the danwo repository. Install once at the root, then run its scripts from its folder:",
-    "```sh\nbun install\ncd examples/shop\nbun run test:e2e   # danwo test\nbun run matrix     # danwo matrix tests/buy-credits.danwo.ts\nnpx danwo serve    # the dashboard over what they recorded\n```",
+    "```sh\nbun install\ncd examples/shop\nbun run test:e2e   # danwo test\nbun run matrix     # danwo matrix tests/buy-credits.danwo.ts\nnpx @danwo/cli serve # the dashboard over what they recorded\n```",
     "Each page below says what the example needs beyond that, such as an Android emulator.",
     "",
   ].join("\n\n")

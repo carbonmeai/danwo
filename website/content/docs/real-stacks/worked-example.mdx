@@ -90,7 +90,7 @@ test("adds a task across the frontend, the API and the worker", async ({ app, sc
 ## Run it
 
 ```sh
-npx danwo test tests/tasks.danwo.ts
+npx @danwo/cli test tests/tasks.danwo.ts
 ```
 
 ```text
@@ -108,7 +108,7 @@ each tagged with the app that made it.
 Ask what the matrix would try before running it:
 
 ```sh
-npx danwo matrix tests/tasks.danwo.ts --plan
+npx @danwo/cli matrix tests/tasks.danwo.ts --plan
 ```
 
 ```text
@@ -130,7 +130,7 @@ Faults land on every layer: Stripe, the job queue and the live socket.
 ## Run it and read what broke
 
 ```sh
-npx danwo matrix tests/tasks.danwo.ts
+npx @danwo/cli matrix tests/tasks.danwo.ts
 ```
 
 ```text

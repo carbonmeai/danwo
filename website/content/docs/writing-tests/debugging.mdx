@@ -13,7 +13,7 @@ error, the steps, the screen, and what happened behind it, in one place.
   <Tab value="Terminal">
 
 ```sh
-npx danwo show --format md
+npx @danwo/cli show --format md
 ```
 
 It prints one page per failed test or matrix trial of the newest run. Pass a run id for an older
@@ -23,7 +23,7 @@ one.
   <Tab value="Dashboard">
 
 ```sh
-npx danwo serve --open
+npx @danwo/cli serve --open
 ```
 
 Click the failed test. The video plays with the steps and provider calls moving along with it.
@@ -120,7 +120,7 @@ A browser dropping a socket as a page closes (`ECONNRESET`, `EPIPE`, `socket han
 so danwo doesn't print it. To see those lines while chasing a connection problem:
 
 ```sh
-DANWO_DEBUG=proxy npx danwo test
+DANWO_DEBUG=proxy npx @danwo/cli test
 ```
 
 Every other proxy error always prints.

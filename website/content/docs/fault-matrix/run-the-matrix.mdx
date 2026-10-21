@@ -10,7 +10,7 @@ replays it once per planned fault, in parallel.
 ## Run every planned fault
 
 ```sh
-npx danwo matrix tests/buy-credits.danwo.ts
+npx @danwo/cli matrix tests/buy-credits.danwo.ts
 ```
 
 Each line is one trial:
@@ -39,7 +39,7 @@ Each trial has a **label**, such as `duplicate on webhook checkout.session.compl
 trials by label with `--faults`, which takes a regular expression:
 
 ```sh
-npx danwo matrix tests/buy-credits.danwo.ts --faults "^duplicate"
+npx @danwo/cli matrix tests/buy-credits.danwo.ts --faults "^duplicate"
 ```
 
 This is how you rerun the one trial that failed while you fix it.
@@ -49,7 +49,7 @@ This is how you rerun the one trial that failed while you fix it.
 When a file has several tests, choose one with `--grep`:
 
 ```sh
-npx danwo matrix tests/checkout.danwo.ts --grep "pays with a saved card"
+npx @danwo/cli matrix tests/checkout.danwo.ts --grep "pays with a saved card"
 ```
 
 ## Options
@@ -72,7 +72,7 @@ Add the GitHub reporter. Each matrix run becomes a check on the pull request, pl
 danwo's pull request comment:
 
 ```sh
-npx danwo matrix tests/buy-credits.danwo.ts --reporter github
+npx @danwo/cli matrix tests/buy-credits.danwo.ts --reporter github
 ```
 
 <Callout type="info">

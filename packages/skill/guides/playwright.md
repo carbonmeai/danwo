@@ -37,5 +37,5 @@ test("buys credits", async ({ page, danwo }) => {
   `deliveries()`, `inject(label)` to fault the next matching call or webhook, and `clearFaults()`.
 - `test.invariant(fn)` runs after each body of the file or describe block.
 - A failed test gets a `danwo flight record` attachment next to Playwright's trace.
-- `npx danwo-playwright matrix tests/checkout.spec.ts [--grep] [--faults]` runs the fault matrix
+- `npx @danwo/playwright matrix tests/checkout.spec.ts [--grep] [--faults]` runs the fault matrix
   over one test, judged by its invariant.

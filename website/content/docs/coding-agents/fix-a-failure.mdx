@@ -34,7 +34,7 @@ Paste it into your agent.
 Print the newest run's failure pages as Markdown:
 
 ```sh
-npx danwo show --format md
+npx @danwo/cli show --format md
 ```
 
 Copy the page for the failing test into your agent, or let the agent read it with the `show_run`
@@ -88,7 +88,7 @@ await grantCredits(session.metadata.user, 500)
 Then it runs what failed, with danwo's MCP tools or the CLI:
 
 ```sh
-npx danwo matrix tests/buy-credits.danwo.ts --faults duplicate
+npx @danwo/cli matrix tests/buy-credits.danwo.ts --faults duplicate
 ```
 
 ```text

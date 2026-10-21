@@ -129,10 +129,10 @@ describe("danwo init", () => {
 
     expect(first.map((change) => change.outcome)).toEqual(["created", "created", "created"])
     expect(JSON.parse(await readFile(join(dir, ".mcp.json"), "utf8"))).toEqual({
-      mcpServers: { danwo: { command: "npx", args: ["danwo", "mcp"] } },
+      mcpServers: { danwo: { command: "npx", args: ["@danwo/cli", "mcp"] } },
     })
     expect(await readFile(join(dir, ".codex/config.toml"), "utf8")).toBe(
-      '[mcp_servers.danwo]\ncommand = "npx"\nargs = ["danwo","mcp"]\n',
+      '[mcp_servers.danwo]\ncommand = "npx"\nargs = ["@danwo/cli","mcp"]\n',
     )
     expect(initReport(await initProject({ cwd: dir, skill: false }))).toBe(
       "unchanged .mcp.json\nunchanged .cursor/mcp.json\nunchanged .codex/config.toml",
@@ -161,12 +161,12 @@ describe("danwo init", () => {
     expect(JSON.parse(await readFile(join(dir, ".mcp.json"), "utf8"))).toEqual({
       mcpServers: {
         other: { command: "other" },
-        danwo: { command: "npx", args: ["danwo", "mcp"] },
+        danwo: { command: "npx", args: ["@danwo/cli", "mcp"] },
       },
       extra: true,
     })
     expect(await readFile(join(dir, ".codex/config.toml"), "utf8")).toBe(
-      'model = "o5"\n\n[mcp_servers.danwo]\ncommand = "npx"\nargs = ["danwo","mcp"]\n\n[mcp_servers.other]\ncommand = "other"\n',
+      'model = "o5"\n\n[mcp_servers.danwo]\ncommand = "npx"\nargs = ["@danwo/cli","mcp"]\n\n[mcp_servers.other]\ncommand = "other"\n',
     )
     expect(await readFile(join(dir, "danwo.config.ts"), "utf8")).toContain("defineConfig")
   })
@@ -199,7 +199,7 @@ describe("danwo init", () => {
     expect(JSON.parse(await readFile(join(dir, ".vscode/mcp.json"), "utf8"))).toEqual({
       servers: {
         other: { type: "http", url: "http://x.test" },
-        danwo: { type: "stdio", command: "npx", args: ["danwo", "mcp"] },
+        danwo: { type: "stdio", command: "npx", args: ["@danwo/cli", "mcp"] },
       },
     })
     expect(existsSync(join(dir, ".mcp.json"))).toBe(false)

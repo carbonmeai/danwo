@@ -17,7 +17,7 @@ fixed values. Ids, times, amounts and secrets never take part, so two runs a day
 Without keys, it checks each emulator against the answers recorded from the sandbox:
 
 ```sh
-npx danwo fidelity stripe resend --offline
+npx @danwo/cli fidelity stripe resend --offline
 ```
 
 ```text
@@ -98,7 +98,7 @@ tokens. Use `--offline` to stay off the network.
 | AI Gateway, Gemini, Perplexity | `DANWO_FIDELITY_AI_GATEWAY_KEY`, `_GEMINI_KEY`, `_PERPLEXITY_KEY`                             |
 | Bedrock                        | `DANWO_FIDELITY_BEDROCK_API_KEY`                                                              |
 
-`npx danwo guide fidelity` lists each suite's scenarios and the optional keys.
+`npx @danwo/cli guide fidelity` lists each suite's scenarios and the optional keys.
 
 <Callout type="info">
   The offline check runs in danwo's own test suite, so an emulator change that breaks fidelity fails

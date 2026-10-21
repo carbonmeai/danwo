@@ -27,10 +27,10 @@ jobs:
         with: { node-version: 24 }
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npx danwo test --reporter github
+      - run: npx @danwo/cli test --reporter github
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      - run: npx danwo matrix tests/checkout.danwo.ts --reporter github
+      - run: npx @danwo/cli matrix tests/checkout.danwo.ts --reporter github
         if: ${{ !cancelled() }}
         env:
           GITHUB_TOKEN: ${{ github.token }}

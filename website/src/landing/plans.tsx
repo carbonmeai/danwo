@@ -51,9 +51,9 @@ export function Plans() {
               </Item>
             </ul>
             <div className="term-mini">
-              <span className="pr">$</span> npx danwo init{"\n"}
-              <span className="pr">$</span> npx danwo matrix tests/buy-credits.danwo.ts{"\n"}
-              <span className="pr">$</span> npx danwo serve
+              <span className="pr">$</span> npx @danwo/cli init{"\n"}
+              <span className="pr">$</span> npx @danwo/cli matrix tests/buy-credits.danwo.ts{"\n"}
+              <span className="pr">$</span> npx @danwo/cli serve
             </div>
             <div className="row">
               {github ? (

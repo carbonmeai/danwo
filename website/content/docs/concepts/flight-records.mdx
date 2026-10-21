@@ -47,7 +47,7 @@ danwo keeps the latest 50 runs (`record.keepRuns`) and deletes older ones; see [
 Open the dashboard and click a test:
 
 ```sh
-npx danwo serve --open
+npx @danwo/cli serve --open
 ```
 
 The recording opens with the steps on the left and tabs on the right: **Replay**, **Console**,
@@ -64,7 +64,7 @@ button that jumps the video there, and a playhead moves along the provider calls
 For a failed run, the terminal prints a page per failure:
 
 ```sh
-npx danwo show --format md
+npx @danwo/cli show --format md
 ```
 
 It's the same page the dashboard's **Copy prompt to fix** copies. [Debugging a
@@ -80,7 +80,7 @@ By default danwo keeps every run, with video. Change it in the config, or for on
 | `video`  | `on`, `retain-on-failure`, `off` | `on`     |
 
 ```sh
-npx danwo test --record on-failure --video retain-on-failure
+npx @danwo/cli test --record on-failure --video retain-on-failure
 ```
 
 ## Secrets are redacted

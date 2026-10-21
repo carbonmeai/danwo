@@ -118,7 +118,7 @@ npm run test:danwo
 1 passed
 ```
 
-Open the recording with `npx danwo serve --open`. The **Providers** tab shows the Checkout
+Open the recording with `npx @danwo/cli serve --open`. The **Providers** tab shows the Checkout
 calls, and the `checkout.session.completed` webhook your app received.
 
 ## Try to break it
@@ -126,7 +126,7 @@ calls, and the `checkout.session.completed` webhook your app received.
 A passing test only proves the happy path. Run the **fault matrix** on it:
 
 ```sh
-npx danwo matrix tests/buy-credits.danwo.ts
+npx @danwo/cli matrix tests/buy-credits.danwo.ts
 ```
 
 danwo runs the test once cleanly, then once per fault it could meet, and checks your invariant

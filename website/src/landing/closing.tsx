@@ -20,7 +20,7 @@ export function Closing() {
         <h2>Find the fault before your users do.</h2>
         <p>One command sets danwo up in your project, for you and for your coding agents.</p>
         <div className="ctas">
-          <CopyBox command="npx danwo init" />
+          <CopyBox command="npx @danwo/cli init" />
           {github && (
             <a className="btn btn-solid" href={github}>
               GitHub

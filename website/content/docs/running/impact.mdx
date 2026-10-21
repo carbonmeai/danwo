@@ -11,8 +11,8 @@ and a change to the README runs nothing.
 ## Run it
 
 ```sh
-npx danwo test --changed                    # uncommitted changes
-npx danwo test --changed --since origin/main # everything since main
+npx @danwo/cli test --changed                    # uncommitted changes
+npx @danwo/cli test --changed --since origin/main # everything since main
 ```
 
 ## How a test gets picked
@@ -59,7 +59,7 @@ A test with no data yet is picked by every rule that matches.
 `danwo impact` prints what a change would pick, without running anything:
 
 ```sh
-npx danwo impact src/webhooks.ts
+npx @danwo/cli impact src/webhooks.ts
 ```
 
 ```text
@@ -72,7 +72,7 @@ matrix: danwo matrix tests/buy-credits.danwo.ts
 The last line is the matrix for the picked tests, to run when the change touches payments.
 
 ```sh
-npx danwo impact README.md
+npx @danwo/cli impact README.md
 ```
 
 ```text

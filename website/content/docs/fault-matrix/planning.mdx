@@ -13,7 +13,7 @@ and stops at a **budget** of 40 trials.
 `--plan` runs the clean trial, prints what it would run, and stops:
 
 ```sh
-npx danwo matrix tests/buy-credits.danwo.ts --plan
+npx @danwo/cli matrix tests/buy-credits.danwo.ts --plan
 ```
 
 ```text
@@ -75,7 +75,7 @@ The run tells you what it left out:
 | `--include-setup`    | Faults on the setup too, such as signing in.                                           |
 
 ```sh
-npx danwo matrix tests/checkout.danwo.ts --budget 100 --thorough
+npx @danwo/cli matrix tests/checkout.danwo.ts --budget 100 --thorough
 ```
 
 <Callout type="idea">

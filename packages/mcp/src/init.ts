@@ -16,7 +16,7 @@ import { z } from "zod"
 export interface InitOptions {
   /** The project folder. */
   readonly cwd: string
-  /** The command that starts the server. Default `npx danwo mcp`. */
+  /** The command that starts the server. Default `npx @danwo/cli mcp`. */
   readonly command?: readonly string[]
   /** Also write a starter `danwo.config.ts` when the project has no config. */
   readonly starterConfig?: boolean
@@ -151,7 +151,7 @@ async function apply(
 }
 
 export async function initProject(options: InitOptions): Promise<InitChange[]> {
-  const command = options.command ?? ["npx", "danwo", "mcp"]
+  const command = options.command ?? ["npx", "@danwo/cli", "mcp"]
   const [program, ...args] = command
   const changes: InitChange[] = []
   const clients = new Set(options.clients ?? DEFAULT_CLIENTS)

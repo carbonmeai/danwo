@@ -20,7 +20,7 @@ test fails, it reads the same failure page you would, and fixes the cause.
 `danwo init` asks which agents you use and sets each one up:
 
 ```sh
-npx danwo init
+npx @danwo/cli init
 ```
 
 ```text
@@ -37,13 +37,13 @@ Coding agents
 
 ## What your agent gets
 
-| Piece             | What it is                                                                   | Where it lives                                         |
-| ----------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------ |
-| The skill         | How to write a danwo test, run the matrix, and debug a failure.              | `.claude/skills/danwo`, `.agents/skills/danwo`         |
-| The MCP server    | Tools to run tests, drive the app step by step, and read records.            | `npx danwo mcp`, registered in your agent's MCP config |
-| `danwo spec`      | Every API, config option, fault and error code, generated from danwo's code. | the CLI, and the `danwo://spec` MCP resource           |
-| `danwo guide`     | Task guides: first test, providers, matrix, debugging and more.              | the CLI, and `danwo://guide/<topic>`                   |
-| The failure pages | Each failed test as one page of evidence, ready to paste into a prompt.      | `danwo show --format md`, the dashboard                |
+| Piece             | What it is                                                                   | Where it lives                                              |
+| ----------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| The skill         | How to write a danwo test, run the matrix, and debug a failure.              | `.claude/skills/danwo`, `.agents/skills/danwo`              |
+| The MCP server    | Tools to run tests, drive the app step by step, and read records.            | `npx @danwo/cli mcp`, registered in your agent's MCP config |
+| `danwo spec`      | Every API, config option, fault and error code, generated from danwo's code. | the CLI, and the `danwo://spec` MCP resource                |
+| `danwo guide`     | Task guides: first test, providers, matrix, debugging and more.              | the CLI, and `danwo://guide/<topic>`                        |
+| The failure pages | Each failed test as one page of evidence, ready to paste into a prompt.      | `danwo show --format md`, the dashboard                     |
 
 The [MCP tools](/docs/mcp-tools) page lists every tool and what it's for.
 

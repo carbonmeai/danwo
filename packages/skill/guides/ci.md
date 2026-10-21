@@ -18,10 +18,10 @@ jobs:
         with: { node-version: 24 }
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npx danwo test --reporter github
+      - run: npx @danwo/cli test --reporter github
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      - run: npx danwo matrix tests/checkout.danwo.ts --reporter github
+      - run: npx @danwo/cli matrix tests/checkout.danwo.ts --reporter github
         if: ${{ !cancelled() }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -86,11 +86,11 @@ Split the suite across machines with `--shard i/n`; each machine runs every `n`t
 keeps its results in `.danwo/results/`. Gather those files on one machine and join them:
 
 ```yaml
-- run: npx danwo test --shard ${{ matrix.shard }}/4
+- run: npx @danwo/cli test --shard ${{ matrix.shard }}/4
 - uses: actions/upload-artifact@v4
   with: { name: "results-${{ matrix.shard }}", path: .danwo/results }
 # in a later job, after downloading every results-* artifact into .danwo/results:
-- run: npx danwo merge-reports --reporter github
+- run: npx @danwo/cli merge-reports --reporter github
 ```
 
 `--reporter junit` writes `.danwo/junit.xml` for GitLab, Jenkins, CircleCI or Buildkite.

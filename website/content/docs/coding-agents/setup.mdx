@@ -12,11 +12,11 @@ check it, commit it, or do it by hand.
 Pass the agents you use to `--skills`, or pick them when `danwo init` asks:
 
 ```sh
-npx danwo init --skills claude,cursor,codex,copilot
+npx @danwo/cli init --skills claude,cursor,codex,copilot
 ```
 
 Each agent gets two things: **the skill**, a folder of instructions it reads, and **the MCP
-server**, an entry in its MCP config that starts `npx danwo mcp`. Running `init` again changes
+server**, an entry in its MCP config that starts `npx @danwo/cli mcp`. Running `init` again changes
 nothing, and your agents' other MCP servers are kept.
 
 ## Each agent
@@ -29,7 +29,7 @@ Claude Code reads the skill from `.claude/skills/danwo/` and the server from `.m
 ```json title=".mcp.json"
 {
   "mcpServers": {
-    "danwo": { "command": "npx", "args": ["danwo", "mcp"] }
+    "danwo": { "command": "npx", "args": ["@danwo/cli", "mcp"] }
   }
 }
 ```
@@ -46,7 +46,7 @@ Cursor reads the server from `.cursor/mcp.json`. The skill goes in the shared
 ```json title=".cursor/mcp.json"
 {
   "mcpServers": {
-    "danwo": { "command": "npx", "args": ["danwo", "mcp"] }
+    "danwo": { "command": "npx", "args": ["@danwo/cli", "mcp"] }
   }
 }
 ```
@@ -61,7 +61,7 @@ Codex reads the server from `.codex/config.toml`, and the skill from `.agents/sk
 ```toml title=".codex/config.toml"
 [mcp_servers.danwo]
 command = "npx"
-args = ["danwo","mcp"]
+args = ["@danwo/cli","mcp"]
 ```
 
 `danwo init --skills codex` adds this table and keeps every other table in the file.
@@ -74,7 +74,7 @@ Copilot's agent mode in VS Code reads MCP servers from `.vscode/mcp.json`, under
 ```json title=".vscode/mcp.json"
 {
   "servers": {
-    "danwo": { "type": "stdio", "command": "npx", "args": ["danwo", "mcp"] }
+    "danwo": { "type": "stdio", "command": "npx", "args": ["@danwo/cli", "mcp"] }
   }
 }
 ```
@@ -91,7 +91,7 @@ Copilot's agent mode in VS Code reads MCP servers from `.vscode/mcp.json`, under
 ```json title="~/.codeium/windsurf/mcp_config.json"
 {
   "mcpServers": {
-    "danwo": { "command": "npx", "args": ["danwo", "mcp"] }
+    "danwo": { "command": "npx", "args": ["@danwo/cli", "mcp"] }
   }
 }
 ```
@@ -105,7 +105,7 @@ list in Windsurf's MCP settings.
 Any agent that speaks MCP can use danwo. Start the server over stdio from the project folder:
 
 ```sh
-npx danwo mcp
+npx @danwo/cli mcp
 ```
 
 `danwo init --skills agents` puts the skill in `.agents/skills/danwo/`, the folder many agents

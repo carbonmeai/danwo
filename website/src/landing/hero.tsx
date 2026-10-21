@@ -148,7 +148,7 @@ export const Hero = forwardRef<HTMLElement>(function Hero(_props, ref) {
           </div>
         </div>
         <div className="ctas">
-          <CopyBox command="npx danwo init" />
+          <CopyBox command="npx @danwo/cli init" />
           {github ? (
             <a className="btn btn-solid" href={github}>
               <GithubIcon />

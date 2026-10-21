@@ -17,7 +17,7 @@ strategy:
   matrix:
     shard: [1, 2, 3, 4]
 steps:
-  - run: npx danwo test --shard ${{ matrix.shard }}/4
+  - run: npx @danwo/cli test --shard ${{ matrix.shard }}/4
   - uses: actions/upload-artifact@v4
     with: { name: "results-${{ matrix.shard }}", path: .danwo/results }
 ```
@@ -31,7 +31,7 @@ In a later job, download every `results-*` artifact into `.danwo/results`, then 
 ```yaml title=".github/workflows/danwo.yml · the merge"
 - uses: actions/download-artifact@v4
   with: { pattern: "results-*", path: .danwo/results, merge-multiple: true }
-- run: npx danwo merge-reports --reporter github
+- run: npx @danwo/cli merge-reports --reporter github
   env:
     GITHUB_TOKEN: ${{ github.token }}
 ```
@@ -43,7 +43,7 @@ In a later job, download every `results-*` artifact into `.danwo/results`, then 
 `--last-failed` runs only what failed in the latest run, and merges into it:
 
 ```sh
-npx danwo test --last-failed
+npx @danwo/cli test --last-failed
 ```
 
 A test that failed before and passes now is reported once, as **flaky**. A test that fails and
@@ -53,7 +53,7 @@ check say so.
 ## JUnit for other CIs
 
 ```sh
-npx danwo test --reporter junit
+npx @danwo/cli test --reporter junit
 ```
 
 That writes `.danwo/junit.xml`, which GitLab, Jenkins, CircleCI and Buildkite read.

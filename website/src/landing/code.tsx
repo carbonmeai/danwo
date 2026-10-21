@@ -10,7 +10,7 @@ function MatrixOutput() {
   return (
     <div className="term">
       <span className="pr">$</span>{" "}
-      <span className="w">npx danwo matrix tests/buy-credits.danwo.ts</span>
+      <span className="w">npx @danwo/cli matrix tests/buy-credits.danwo.ts</span>
       {"\n\n"}
       <span className="d">{"  clean run"}</span>
       {"   "}
