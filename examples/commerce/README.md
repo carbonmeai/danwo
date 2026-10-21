@@ -25,6 +25,8 @@ test a fresh database, and blocks every other outside call.
 - **Bugs you can switch on.** `COMMERCE_BUG` turns one safeguard off, and the matrix shows which
   trials go red.
 
+![danwo's dashboard on the purchase's matrix: held under 86 of 86 faults](screenshots/matrix.png)
+
 ## Run
 
 You need Node 24 and Docker (or a Postgres of your own). From this folder:
