@@ -297,7 +297,10 @@ function markSeen(firstSeen: Map<string, number>, ids: readonly string[]): void 
 /**
  * Whether settling waits on: an event that has shown no runs yet, for a while, unless no function
  * listens to it (`unheard`), or a run that has not finished. `firstSeen` holds when each event and
- * run first showed, `checkpoints` when each run last checkpointed.
+ * run first showed, `checkpoints` when each run last checkpointed. A run the SDK checkpoints itself,
+ * and an event whose run the dev server doesn't list yet, also count as going while an app's call
+ * through the proxy is still open (`busy`): a first step that waits ten seconds on a provider sends
+ * no checkpoint meanwhile, and the dev server lists its run only once that step is over.
  */
 function stillWaiting(
   events: readonly string[],
@@ -305,19 +308,22 @@ function stillWaiting(
   firstSeen: ReadonlyMap<string, number>,
   checkpoints: ReadonlyMap<string, number>,
   unheard: ReadonlySet<string> = new Set(),
+  busy = false,
 ): boolean {
   const now = Date.now()
   const going = ({ run, ended }: ListedRun) =>
     !DONE.has(run.status) ||
     (!ended &&
-      now - (checkpoints.get(run.runId) ?? firstSeen.get(run.runId) ?? now) < CHECKPOINT_QUIET_MS)
+      (busy ||
+        now - (checkpoints.get(run.runId) ?? firstSeen.get(run.runId) ?? now) <
+          CHECKPOINT_QUIET_MS))
 
   return events.some((event) => {
     const own = listed.filter(({ run }) => run.event === event)
 
     if (own.length > 0) return own.some(going)
 
-    return !unheard.has(event) && now - (firstSeen.get(event) ?? now) < NO_RUNS_MS
+    return !unheard.has(event) && (busy || now - (firstSeen.get(event) ?? now) < NO_RUNS_MS)
   })
 }
 
@@ -402,11 +408,18 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
     return last
   }
 
+  /** Whether an app's own call through the proxy is still waiting for its answer. */
+  const appCallOpen = () =>
+    (proxy?.exchanges() ?? []).some(
+      (e) => e.client === "server" && e.status === null && !e.aborted && e.stream !== true,
+    )
+
   /**
    * Waits until every event sent so far has finished its runs, the ones those runs send included:
    * the sent events are read again on every poll, and each event gets its own time to show runs.
    * A run listed as finished with no end time is one the SDK checkpoints itself, and counts as
-   * finished once it has sent no checkpoint for a while. An event no registered function listens
+   * finished once it has sent no checkpoint for a while and no app's call through the proxy is
+   * still waiting for its answer. An event no registered function listens
    * to is not given that time: the dev server is asked, once, when such an event first shows.
    */
   const settle = async () => {
@@ -430,7 +443,7 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
 
       const nobody = await unheard(sent, listed)
 
-      if (!stillWaiting(events, listed, firstSeen, lastCheckpoints(), nobody))
+      if (!stillWaiting(events, listed, firstSeen, lastCheckpoints(), nobody, appCallOpen()))
         return waitedFor(events, runs)
       if (Date.now() > deadline)
         throw new Error(

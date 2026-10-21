@@ -332,6 +332,63 @@ describe("Inngest", () => {
     }
   }, 20_000)
 
+  it.each([
+    ["a checkpointed run", 3_000, 0, true],
+    ["a run the dev server lists only once its first step is over", 6_500, 6_000, false],
+  ] as const)(
+    "waits for %s while its step's call to a provider is still open",
+    async (_, callMs, lagMs, checkpointed) => {
+      const dev = await devServer(0, lagMs, checkpointed)
+      const slow = createServer((_req, res) => {
+        setTimeout(() => json(res, { ok: true }), callMs)
+      })
+
+      slow.listen(0, "127.0.0.1")
+      await once(slow, "listening")
+
+      const address = slow.address()
+      const port = typeof address === "object" && address !== null ? address.port : 0
+      const services = await startServices([await inngestService({ url: dev.url })])
+
+      try {
+        await sendThrough(services.proxy.url)
+
+        /* The step's one call, through the proxy, answers three seconds later; no checkpoint meanwhile. */
+        const call = new Promise<void>((resolve, reject) => {
+          const target = new URL(services.proxy.url)
+          const req = request(
+            {
+              host: target.hostname,
+              port: target.port,
+              path: `http://127.0.0.1:${port}/slow`,
+              headers: { host: `127.0.0.1:${port}` },
+            },
+            (res) => {
+              res.resume()
+              res.on("end", () => resolve())
+            },
+          )
+
+          req.on("error", reject)
+          req.end()
+        })
+        const began = Date.now()
+
+        await new Promise((resolve) => setTimeout(resolve, 100))
+        await services.settle()
+        /* Until the call answers, or past the five seconds an unlisted run gets, until it shows. */
+        expect(Date.now() - began).toBeGreaterThanOrEqual((lagMs || callMs) - 200)
+        expect(services.state()).toMatchObject({ inngest: { runs: [{ event: "evt_1" }] } })
+        await call
+      } finally {
+        await services.close()
+        dev.server.close()
+        slow.close()
+      }
+    },
+    20_000,
+  )
+
   it("says what it waited for: each run with its function, status and time", async () => {
     const dev = await devServer(400)
     const inngest = await inngestService({ url: dev.url })
