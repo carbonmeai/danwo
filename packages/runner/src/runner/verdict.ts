@@ -371,6 +371,13 @@ function settledByCode(error: TestError): FailureVerdict | undefined {
     return judged("environment", "certain", `${error.code}: ${brief(error.message)}`)
   if (TEST_CODES.has(error.code))
     return judged("test", "certain", `${error.code}: ${brief(error.message)}`)
+  /* The app was never tested; what the step asks, or the model it runs on, is what to change. */
+  if (error.code === "MODEL_REFUSED")
+    return judged(
+      "test",
+      "likely",
+      "MODEL_REFUSED: the model declined a step, so the app was not tested; reword the step or run it on another model",
+    )
   if (error.class === "blocked" || error.class === "inconclusive")
     return judged("undecided", "certain", `${error.code}: ${brief(error.message)}`)
   if (error.code === "APP_ERROR" || error.code === "PROVIDER_ERROR")

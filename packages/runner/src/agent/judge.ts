@@ -12,6 +12,7 @@ import { generateText, type LanguageModel, type ModelMessage, type UserContent }
 import { z } from "zod"
 
 import type { Tabs } from "../browser/tabs.ts"
+import { throwIfRefused } from "../model/refusal.ts"
 import { callCost, type CallCost } from "../model/resolve.ts"
 import { viewTabs, viewText } from "../snapshot/view.ts"
 import { DanwoError } from "../support/codes.ts"
@@ -105,7 +106,7 @@ const NO_VERDICT =
 /**
  * Asks the judge about `input`. An answer with no usable verdict is sent back with what was wrong,
  * up to `VERDICT_RETRIES` times; after that the step is `MODEL_OUTPUT_INVALID`, which says
- * nothing about the app.
+ * nothing about the app. A refusal is `MODEL_REFUSED` at once.
  */
 async function askJudge(input: JudgeInput, call: JudgeCall): Promise<Verdict> {
   const messages: ModelMessage[] = [{ role: "user", content: judgeMessage(input) }]
@@ -120,6 +121,7 @@ async function askJudge(input: JudgeInput, call: JudgeCall): Promise<Verdict> {
     const cost = callCost(result.usage, result.providerMetadata)
 
     call.onModelCall(attempt > 0 ? { ...cost, retry: true } : cost)
+    throwIfRefused(result, `to judge the claim ${JSON.stringify(input.claim)}`, call.model)
 
     const verdict = parseVerdict(result.text)
 

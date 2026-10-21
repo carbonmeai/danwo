@@ -53,19 +53,20 @@ Treat a likely verdict as where to look first, not as proof.
 
 ## What the code says to do
 
-| Code                                        | Look at                                                                                                                                          |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `LOCATOR_NOT_FOUND`, `LOCATOR_AMBIGUOUS`    | the screen at failure and the nearest candidates; fix the locator with MCP `check_locator`                                                       |
-| `EXPECTATION_FAILED`                        | expected vs received; is the app wrong, or the expectation?                                                                                      |
-| `CLAIM_FAILED`                              | the judge's reason; the claim may be too strict or the app wrong                                                                                 |
-| `APP_ERROR`                                 | the app's own 5xx or uncaught error during the step: an app bug                                                                                  |
-| `PROVIDER_ERROR`                            | the provider call that failed (often a fault the matrix injected) and whether the app recovered; check the emulator state and webhook deliveries |
-| `STALE_RECORDING`, `NOTHING_RECORDED`       | the step's recording key changed or never existed: rerun `danwo test` to record, then the matrix                                                 |
-| `REPLAY_MISSING`                            | under `--replay-only`, the step had no recording that replays; the message says none, stale or why it stopped matching: rerun without the flag   |
-| `AGENT_LOOPING`, `BUDGET_EXCEEDED`          | the step instruction is too vague or the page changed; split the step or use locators                                                            |
-| `MODEL_OUTPUT_INVALID`, `MODEL_UNAVAILABLE` | the model provider, not the app; retry or change model                                                                                           |
-| `BROWSER_FAILED`, `ENVIRONMENT_FAILED`      | the browser or the environment hook: app start-up, emulators, ports; no Chromium: `npx playwright-core install chromium`                         |
-| `CONFIG_INVALID`                            | the config or the call named in the message                                                                                                      |
+| Code                                        | Look at                                                                                                                                              |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LOCATOR_NOT_FOUND`, `LOCATOR_AMBIGUOUS`    | the screen at failure and the nearest candidates; fix the locator with MCP `check_locator`                                                           |
+| `EXPECTATION_FAILED`                        | expected vs received; is the app wrong, or the expectation?                                                                                          |
+| `CLAIM_FAILED`                              | the judge's reason; the claim may be too strict or the app wrong                                                                                     |
+| `APP_ERROR`                                 | the app's own 5xx or uncaught error during the step: an app bug                                                                                      |
+| `PROVIDER_ERROR`                            | the provider call that failed (often a fault the matrix injected) and whether the app recovered; check the emulator state and webhook deliveries     |
+| `STALE_RECORDING`, `NOTHING_RECORDED`       | the step's recording key changed or never existed: rerun `danwo test` to record, then the matrix                                                     |
+| `REPLAY_MISSING`                            | under `--replay-only`, the step had no recording that replays; the message says none, stale or why it stopped matching: rerun without the flag       |
+| `AGENT_LOOPING`, `BUDGET_EXCEEDED`          | the step instruction is too vague or the page changed; split the step or use locators                                                                |
+| `MODEL_OUTPUT_INVALID`, `MODEL_UNAVAILABLE` | the model provider, not the app; retry or change model                                                                                               |
+| `MODEL_REFUSED`                             | the model declined the step (a refusal or a content filter) and was not asked again; reword the step or run it on another model; the app is untested |
+| `BROWSER_FAILED`, `ENVIRONMENT_FAILED`      | the browser or the environment hook: app start-up, emulators, ports; no Chromium: `npx playwright-core install chromium`                             |
+| `CONFIG_INVALID`                            | the config or the call named in the message                                                                                                          |
 
 `danwo spec --topic errors` lists every code with its class and exit code. `danwo cache ls`,
 `stats` and `clear` show and reset recordings.

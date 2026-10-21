@@ -109,6 +109,7 @@ That's the bug: the app credited the account once per delivery.
 | `STALE_RECORDING`, `NOTHING_RECORDED`       | run `danwo test` once to record, then the matrix                        |
 | `AGENT_LOOPING`, `BUDGET_EXCEEDED`          | a vague instruction or a changed page. Split the step, or use locators. |
 | `MODEL_OUTPUT_INVALID`, `MODEL_UNAVAILABLE` | the model provider, not your app. Retry, or change model.               |
+| `MODEL_REFUSED`                             | the model declined the step. Reword it, or run it on another model.     |
 | `BROWSER_FAILED`, `ENVIRONMENT_FAILED`      | the browser or the environment: app start-up, emulators, ports          |
 | `CONFIG_INVALID`                            | the config, or the call the message names                               |
 

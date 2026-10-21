@@ -16,6 +16,7 @@ import {
   readInput,
 } from "../../agent/extract.ts"
 import { toolCallsOf } from "../../agent/loop.ts"
+import { refusalOr, throwIfRefused } from "../../model/refusal.ts"
 import { callCost, type CallCost } from "../../model/resolve.ts"
 import { describe } from "../../replay/target.ts"
 import { textOf } from "../match.ts"
@@ -115,6 +116,7 @@ async function askOnce<T>(
   messages: ModelMessage[],
   context: DeviceExtractContext,
 ): Promise<Answer<T>> {
+  const step = `the extraction ${JSON.stringify(instruction)}`
   const result = await generateText({
     model: context.model,
     system: DEVICE_EXTRACT_PROMPT,
@@ -122,9 +124,12 @@ async function askOnce<T>(
     tools,
     toolChoice: "required",
     ...(context.signal && { abortSignal: context.signal }),
+  }).catch((error: unknown) => {
+    throw refusalOr(error, step, context.model)
   })
 
   context.onModelCall(callCost(result.usage, result.providerMetadata))
+  throwIfRefused(result, step, context.model)
   messages.push(...result.response.messages)
 
   const call = toolCallsOf(result.response.messages).at(0)

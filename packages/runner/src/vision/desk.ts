@@ -7,6 +7,7 @@ import { generateText, type LanguageModel } from "ai"
 import type { Page } from "playwright-core"
 import { z } from "zod"
 
+import { throwIfRefused } from "../model/refusal.ts"
 import type { CallCost } from "../model/resolve.ts"
 import { callCost } from "../model/resolve.ts"
 import { GROUND_PROMPT } from "./prompts.ts"
@@ -177,6 +178,7 @@ export class VisionDesk {
     })
 
     this.options.onModelCall?.(callCost(result.usage, result.providerMetadata))
+    throwIfRefused(result, `to find ${JSON.stringify(description)} on the screen`, model)
 
     return this.placedPoint(placed.safeParse(jsonIn(result.text)).data, description)
   }

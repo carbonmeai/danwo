@@ -37,6 +37,10 @@ const ERROR_CODES = {
     "inconclusive",
     "the model kept answering in a form danwo could not use, even when told what was wrong",
   ],
+  MODEL_REFUSED: [
+    "inconclusive",
+    "the model declined a step, or its provider's content filter stopped the answer; not asked again",
+  ],
   APP_ERROR: [
     "test",
     "the app failed during a step: a 5xx response, an uncaught error, a console error",

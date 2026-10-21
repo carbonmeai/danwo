@@ -14,6 +14,7 @@ import {
   type ToolSet,
 } from "ai"
 
+import { refusalOr, throwIfRefused } from "../model/refusal.ts"
 import { callCost, type CallCost } from "../model/resolve.ts"
 import type { RecordedAction } from "../replay/trace.ts"
 import { DanwoError } from "../support/codes.ts"
@@ -126,6 +127,8 @@ export abstract class ToolLoop<View, Call, Done extends Outcome> {
   private modelCalls = 0
   /** Answers in a row that could not be used: no tool call, or only malformed ones. */
   private unusableInARow = 0
+  /** The step as a refusal names it. */
+  private step = "the step"
 
   constructor(loop: LoopContext) {
     this.loop = loop
@@ -157,6 +160,8 @@ export abstract class ToolLoop<View, Call, Done extends Outcome> {
   /** Runs the step until the model calls `done`. */
   protected async turns(instruction: string): Promise<LoopResult> {
     let view = await this.look()
+
+    this.step = `the step ${JSON.stringify(this.loop.redact(instruction))}`
 
     this.transcript.push({
       role: "user",
@@ -225,6 +230,10 @@ export abstract class ToolLoop<View, Call, Done extends Outcome> {
       toolChoice: "required",
       ...(this.loop.signal && { abortSignal: this.loop.signal }),
     }).catch((error: unknown) => {
+      /* A refusal is final: asking again would cost another call for the same answer. */
+      const refused = refusalOr(error, this.step, this.loop.model)
+
+      if (refused !== error) throw refused
       /* An answer the SDK refused (no tool call when one is required) is unusable, not a crash. */
       if (error instanceof Error && UNUSABLE_ANSWER.includes(error.name)) return undefined
 
@@ -239,6 +248,7 @@ export abstract class ToolLoop<View, Call, Done extends Outcome> {
 
     this.loop.spends.call(cost)
     this.loop.onModelCall(cost)
+    throwIfRefused(result, this.step, this.loop.model)
 
     const response = onceEachCall(result.response.messages)
 

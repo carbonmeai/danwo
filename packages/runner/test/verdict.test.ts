@@ -179,6 +179,17 @@ describe("failure verdicts", () => {
     })
   })
 
+  it("calls a model's refusal the test's to reword, saying the app was not tested", () => {
+    expect(
+      failureVerdict(evidence({ error: error("MODEL_REFUSED", "the model refused the step") })),
+    ).toEqual({
+      verdict: "test",
+      confidence: "likely",
+      reason:
+        "MODEL_REFUSED: the model declined a step, so the app was not tested; reword the step or run it on another model",
+    })
+  })
+
   it("calls a matrix trial's broken check the app's, under its fault", () => {
     const found = failureVerdict(
       evidence({

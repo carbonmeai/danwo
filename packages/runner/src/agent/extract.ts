@@ -17,6 +17,7 @@ import type { Locator, Page } from "playwright-core"
 import { z } from "zod"
 
 import type { Tabs } from "../browser/tabs.ts"
+import { refusalOr, throwIfRefused } from "../model/refusal.ts"
 import { callCost, type CallCost } from "../model/resolve.ts"
 import { describe, describeKind, describeTarget, findAll, type Target } from "../replay/target.ts"
 import { viewTabs, viewText } from "../snapshot/view.ts"
@@ -418,6 +419,7 @@ class ExtractLoop<T> {
 
   /** One model turn; resolves with its read call, or throws when it gives up or answers wrong. */
   private async ask(instruction: string): Promise<ExtractCall> {
+    const step = `the extraction ${JSON.stringify(instruction)}`
     const result = await generateText({
       model: this.context.model,
       system: this.sees ? `${EXTRACT_PROMPT}\n${EXTRACT_VISION_GUIDE}` : EXTRACT_PROMPT,
@@ -425,10 +427,13 @@ class ExtractLoop<T> {
       tools: this.sees ? visionTools : extractTools,
       toolChoice: "required",
       ...(this.context.signal && { abortSignal: this.context.signal }),
+    }).catch((error: unknown) => {
+      throw refusalOr(error, step, this.context.model)
     })
 
     this.modelCalls++
     this.context.onModelCall(callCost(result.usage, result.providerMetadata))
+    throwIfRefused(result, step, this.context.model)
     this.messages.push(...result.response.messages)
 
     const call = result.response.messages

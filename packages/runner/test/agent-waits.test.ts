@@ -10,6 +10,7 @@ import { join } from "node:path"
 import type { LanguageModelV4GenerateResult } from "@ai-sdk/provider"
 import { MockLanguageModelV4 } from "ai/test"
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest"
+import { z } from "zod"
 
 import type { Backend } from "../src/browser/readiness.ts"
 import { openWebSession, type WebSession, type WebSessionOptions } from "../src/index.ts"
@@ -206,6 +207,68 @@ describe("unusable model answers", () => {
         code: "MODEL_OUTPUT_INVALID",
       })
     })
+  })
+})
+
+/** A refusal: the provider's content filter stopped the answer, or the model declined. */
+function refusal(raw = "refusal"): LanguageModelV4GenerateResult {
+  return {
+    content: [{ type: "text", text: "I can't help with that." }],
+    finishReason: { unified: "content-filter", raw },
+    usage: {
+      inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
+      outputTokens: { total: 5, text: 5, reasoning: undefined },
+    },
+    warnings: [],
+  }
+}
+
+/** A model that refuses every call. */
+function refusing(): MockLanguageModelV4 {
+  return new MockLanguageModelV4({
+    provider: "mock",
+    modelId: "cautious-1",
+    doGenerate: async () => refusal(),
+  })
+}
+
+describe("model refusals", () => {
+  it("stops an act step at the first refusal with MODEL_REFUSED, naming the step and the model", async () => {
+    const actor = refusing()
+
+    await withSession({ model: actor }, async (session) => {
+      const error: unknown = await session.agent.act("pay for the order").catch((e: unknown) => e)
+
+      expect(codeOf(error)).toBe("MODEL_REFUSED")
+      expect(classOf(codeOf(error))).toBe("inconclusive")
+      expect(String(error)).toMatch(/mock\/cautious-1 refused the step "pay for the order"/)
+      expect(actor.doGenerateCalls).toHaveLength(1)
+    })
+  })
+
+  it("stops a judged claim at the first refusal", async () => {
+    const judge = refusing()
+
+    await withSession({ model: scripted([]), judge }, async (session) => {
+      await expect(session.agent.assert("the orders page is shown")).rejects.toMatchObject({
+        code: "MODEL_REFUSED",
+        message: expect.stringContaining('judge the claim "the orders page is shown"'),
+      })
+    })
+
+    expect(judge.doGenerateCalls).toHaveLength(1)
+  })
+
+  it("stops an extraction at the first refusal", async () => {
+    const actor = refusing()
+
+    await withSession({ model: actor }, async (session) => {
+      await expect(
+        session.agent.extract("the order total", z.object({ total: z.string() })),
+      ).rejects.toMatchObject({ code: "MODEL_REFUSED" })
+    })
+
+    expect(actor.doGenerateCalls).toHaveLength(1)
   })
 })
 
