@@ -107,6 +107,18 @@ describe("appEnvironment", () => {
     }
   })
 
+  it("hands Resend's mail on, so the mail fixture reads what the app sent", async () => {
+    const env = await appEnvironment({ app: await appCommand(), services: [resendService()] })
+
+    try {
+      expect((await fetch(`${env.baseUrl}/signup`, { method: "POST" })).status).toBe(200)
+      expect(env.mail).toHaveLength(1)
+      expect(env.mail?.[0]?.latest("ada@example.com")).toMatchObject({ subject: "Welcome" })
+    } finally {
+      await env.close()
+    }
+  }, 30_000)
+
   it("hands a stack's services' mail sources on too", async () => {
     const command = await appCommand()
     const env = await stackEnvironment({

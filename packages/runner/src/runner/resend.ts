@@ -4,6 +4,7 @@
  */
 import { resend, type ResendSeedConfig, seedResend } from "@danwo/emulators"
 
+import { resendMail } from "../mail/index.ts"
 import {
   type OAuthEnvironment,
   oauthEnvironment,
@@ -37,7 +38,9 @@ const RESEND: Provider<ResendSeedConfig> = {
  * `api.resend.com`; gives tests the `resend` fixture and `resendMail(resend)` as a mail source.
  */
 export function resendService(options: ResendOptions = {}): OAuthService {
-  return oauthService(RESEND, options.seed)
+  const service = oauthService(RESEND, options.seed)
+
+  return { ...service, mail: [resendMail(service.emulator)] }
 }
 
 /** A worker-scoped Resend emulator behind its own proxy; combine services with `startServices`. */
