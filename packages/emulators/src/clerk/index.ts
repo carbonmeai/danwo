@@ -17,6 +17,7 @@ import { clientApiRoutes } from "./routes/client.ts"
 import { frontendRoutes, methodOverride } from "./routes/frontend.ts"
 import { instanceRoutes } from "./routes/instance.ts"
 import { meApiRoutes } from "./routes/me.ts"
+import { oauthRoutes } from "./routes/oauth.ts"
 import { organizationRoutes } from "./routes/organizations.ts"
 import { sessionRoutes } from "./routes/sessions.ts"
 import { ticketRoutes } from "./routes/tickets.ts"
@@ -27,11 +28,13 @@ import { clerkStore, INSTANCE } from "./store.ts"
 import { clerkCustomHeaders, clerkEndpoints, ClerkEvents, clerkWebhookHeaders } from "./webhooks.ts"
 
 export { clerkOutboundFaults } from "./faults.ts"
+export { connectClerkUpstream } from "./upstream.ts"
 export { CLERK_HOSTS, isClerkHost } from "./helpers.ts"
 export { type ClerkInstanceView, clerkInstance } from "./inspect.ts"
 export {
   type ClerkSeedConfig,
   type ClerkSeedOrganization,
+  type ClerkSeedSocial,
   type ClerkSeedTemplate,
   type ClerkSeedUser,
   type ClerkSeedWebhook,
@@ -46,6 +49,7 @@ export type {
   ClerkMessage,
   ClerkOrganizationView,
   ClerkSessionView,
+  ClerkSocialProvider,
   ClerkUserView,
 } from "./views.ts"
 
@@ -138,6 +142,8 @@ function contextFor(emulator: EmulatorContext): ClerkContext {
  * templates, JWKS and handshake payloads); the Frontend API on `<slug>.clerk.accounts.dev` (the
  * handshake an app's middleware redirects through, and the public keys); and the Account Portal
  * on `<slug>.accounts.dev` (sign-in with a password or emailed code, sign-up, sign-in links).
+ * Seeded social connections send ClerkJS's "Continue with Google" to the provider and back to
+ * `/v1/oauth_callback`, once `connectClerkUpstream` gives the emulator a way to reach it.
  * Session tokens are RS256 JWTs with Clerk's claims, signed by a key per emulator.
  */
 export const clerk = defineEmulator({
@@ -162,6 +168,7 @@ export const clerk = defineEmulator({
     frontendRoutes(apps.frontend, context)
     clientApiRoutes(apps.frontend, context)
     attemptRoutes(apps.frontend, context)
+    oauthRoutes(apps.frontend, context)
     meApiRoutes(apps.frontend, context)
     ticketRoutes(apps.frontend, context)
     accountsRoutes(apps.accounts, context)

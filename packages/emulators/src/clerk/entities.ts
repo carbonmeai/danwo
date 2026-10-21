@@ -1,4 +1,10 @@
-import type { EmailAddressJSON, OrganizationJSON, UserJSON, VerificationJSON } from "@clerk/backend"
+import type {
+  EmailAddressJSON,
+  ExternalAccountJSON,
+  OrganizationJSON,
+  UserJSON,
+  VerificationJSON,
+} from "@clerk/backend"
 
 import { clerkId } from "./helpers.ts"
 
@@ -20,15 +26,24 @@ export type ClerkEmail = Omit<EmailAddressJSON, "verification"> & {
   updated_at: number
 }
 
+/** A social account linked to a user, verified by the provider (`verification_oauth`). */
+export type ClerkExternalAccount = Omit<ExternalAccountJSON, "verification"> & {
+  verification: IdentifierVerification | null
+}
+
 /**
  * A user, as the Backend API answers it. The SDK's type still lists `organization_memberships`
  * and `create_organizations_limit`, which the API no longer sends, and lacks fields it now does.
  */
 export type ClerkUser = Omit<
   UserJSON,
-  "email_addresses" | "organization_memberships" | "create_organizations_limit"
+  | "email_addresses"
+  | "external_accounts"
+  | "organization_memberships"
+  | "create_organizations_limit"
 > & {
   email_addresses: ClerkEmail[]
+  external_accounts: ClerkExternalAccount[]
   passkeys: unknown[]
   saml_accounts: unknown[]
   bypass_client_trust: boolean

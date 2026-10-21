@@ -3,6 +3,7 @@ import type { OrganizationInvitationJSON, SessionJSON, SignInTokenJSON } from "@
 import { objectTable } from "../objects.ts"
 import type { DataKey, Store } from "../store.ts"
 import type { ClerkOrganization, ClerkUser } from "./entities.ts"
+import type { SocialConnection, SocialProvider } from "./social.ts"
 import type { ClerkInstance, ClerkMessage } from "./views.ts"
 import type { ClerkWebhookRecord } from "./webhooks.ts"
 
@@ -71,6 +72,35 @@ export interface JwtTemplateRecord {
   updated_at: number
 }
 
+/** Who signed in at a social provider, as its profile endpoint answered. */
+export interface OAuthProfile {
+  readonly provider_user_id: string
+  readonly email: string
+  readonly first_name: string
+  readonly last_name: string
+  readonly image_url: string
+  /** The scopes the instance asked for, which the provider granted. */
+  readonly scopes: string
+}
+
+/**
+ * A social sign-in or sign-up in flight: the state the provider sends back, where the browser
+ * goes after the callback, and how it came back. `transferable` means the provider account fits
+ * no user (a sign-in, so ClerkJS signs up instead) or already has one (a sign-up, so it signs in).
+ */
+export interface OAuthState {
+  readonly provider: SocialProvider
+  readonly state: string
+  /** The PKCE verifier whose S256 challenge went to the provider. */
+  readonly code_verifier: string
+  readonly redirect_url: string
+  readonly action_complete_redirect_url: string | null
+  readonly status: "unverified" | "verified" | "transferable" | "failed"
+  /** Why it is transferable or failed, as Clerk's error code. */
+  readonly error: string | null
+  readonly profile: OAuthProfile | null
+}
+
 /** A sign-in or sign-up the Frontend API is walking a browser through. */
 export interface AttemptRecord {
   readonly id: string
@@ -94,11 +124,16 @@ export interface AttemptRecord {
   last_name: string | null
   /** The invitation ticket a `ticket` sign-in or sign-up came with; it verifies the email. */
   ticket: string | null
+  /** A social sign-in or sign-up's round trip to the provider; null for the other strategies. */
+  oauth: OAuthState | null
   readonly created_at: number
 }
 
 /** A seeded signing key (PKCS#8 PEM) that replaces the emulator's own, so tokens verify across runs. */
 export const SIGNING_KEY: DataKey<string> = { name: "clerk.signing_key" }
+
+/** The social connections the instance offers, such as Google. */
+export const SOCIAL: DataKey<readonly SocialConnection[]> = { name: "clerk.social" }
 
 /** The instance, read with `instanceOf`. */
 export const INSTANCE: DataKey<ClerkInstance> = { name: "clerk.instance" }

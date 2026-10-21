@@ -9,6 +9,7 @@ import { browserClient, browserSession } from "../frontend-json.ts"
 import { devBrowserFor } from "../handshake.ts"
 import { ClerkFailure, stableClerkId, str } from "../helpers.ts"
 import { endSession, isLive, sessionClaims, sessionHeader } from "../sessions.ts"
+import { socialSettings } from "../social.ts"
 import { templateClaims } from "../templates.ts"
 
 /**
@@ -117,8 +118,11 @@ export function clientApiRoutes(app: App, context: ClerkContext): void {
       token: devBrowser.id,
     })
   })
-  app.get("/v1/environment", (c) => c.json(environmentJson(instanceOf(context))))
-  app.patch("/v1/environment", (c) => c.json(environmentJson(instanceOf(context))))
+  const environment = (c: Context) =>
+    c.json(environmentJson(instanceOf(context), socialSettings(context.store)))
+
+  app.get("/v1/environment", environment)
+  app.patch("/v1/environment", environment)
   clientRoutes(app, context)
   sessionRoutes(app, context)
 }

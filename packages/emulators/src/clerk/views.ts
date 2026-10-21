@@ -22,6 +22,9 @@ export interface ClerkInstance {
   readonly origin?: string
 }
 
+/** The social providers an instance can offer sign-in with. */
+export type ClerkSocialProvider = "google"
+
 /** An email Clerk sent: verification codes and sign-in links, read by tests. */
 export interface ClerkMessage {
   readonly id: string

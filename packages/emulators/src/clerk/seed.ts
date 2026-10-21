@@ -6,8 +6,8 @@ import { type ClerkUser, newUser } from "./entities.ts"
 import { clerkId, publishableKeyFor, stableClerkId } from "./helpers.ts"
 import { addMembership, createOrganization } from "./organizations.ts"
 import { userByEmail } from "./routes/users.ts"
-import { INSTANCE, SIGNING_KEY } from "./store.ts"
-import type { ClerkInstance } from "./views.ts"
+import { INSTANCE, SIGNING_KEY, SOCIAL } from "./store.ts"
+import type { ClerkInstance, ClerkSocialProvider } from "./views.ts"
 
 /**
  * A seeded user: an email address, and a password unless sign-in is by emailed code. Its id is
@@ -60,6 +60,18 @@ export interface ClerkSeedWebhook {
   readonly headers?: Readonly<Record<string, string>>
 }
 
+/**
+ * A social connection the instance offers on `<SignIn/>` and `<SignUp/>`, such as "Continue with
+ * Google", with the OAuth client it signs in to the provider with. The provider's emulator must
+ * know the same client, with `https://<slug>.clerk.accounts.dev/v1/oauth_callback` as its
+ * redirect URI.
+ */
+export interface ClerkSeedSocial {
+  readonly provider: ClerkSocialProvider
+  readonly clientId: string
+  readonly clientSecret: string
+}
+
 /** A Clerk emulator's seed: the instance, and the users, organizations and JWT templates it starts with. */
 export interface ClerkSeedConfig {
   /**
@@ -81,6 +93,8 @@ export interface ClerkSeedConfig {
   readonly organizations?: readonly ClerkSeedOrganization[]
   readonly jwtTemplates?: readonly ClerkSeedTemplate[]
   readonly webhooks?: readonly ClerkSeedWebhook[]
+  /** Social connections, such as Google; none when not given. */
+  readonly social?: readonly ClerkSeedSocial[]
   /**
    * Sends `user.created`, `organization.created` and `organizationMembership.created` for the
    * seeded records, as if they had just been made, so an app that creates its own rows from
@@ -228,6 +242,7 @@ export function seedClerk(store: Store, config: ClerkSeedConfig): void {
   }
 
   store.setData(INSTANCE, instanceFrom(config.instance))
+  store.setData(SOCIAL, config.social ?? [])
   if (config.instance?.signingKey !== undefined)
     store.setData(SIGNING_KEY, config.instance.signingKey)
   seedWebhooks(context, config.webhooks ?? [])

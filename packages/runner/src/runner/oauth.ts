@@ -467,8 +467,11 @@ function customDomainsOf(seed: Seed<Auth0SeedConfig> | undefined): string[] {
   return (seed.tenants ?? []).flatMap((tenant) => tenant.custom_domains ?? [])
 }
 
-/** Sends a tenant's call to a social provider to whichever of `services` answers its host. */
-function socialUpstream(services: readonly OAuthService[]) {
+/**
+ * Sends a call to a social provider (a code exchange, a profile lookup) to whichever of `services`
+ * answers its host, for an Auth0 tenant or a Clerk instance signing someone in with it.
+ */
+export function socialUpstream(services: readonly OAuthService[]) {
   return async (request: Request): Promise<Response> => {
     const host = new URL(request.url).hostname
     const route = services

@@ -185,7 +185,7 @@ const PASSWORD_SETTINGS = {
 }
 
 /** The sign-in, sign-up and password rules. */
-function userSettings(instance: ClerkInstance) {
+function userSettings(instance: ClerkInstance, social: Record<string, unknown>) {
   return {
     attributes: attributes(instance),
     sign_in: { second_factor: { required: false } },
@@ -217,7 +217,7 @@ function userSettings(instance: ClerkInstance) {
       show_sign_in_button: true,
       satisfies_second_factor: false,
     },
-    social: {},
+    social,
     password_settings: PASSWORD_SETTINGS,
     saml: { enabled: false },
     enterprise_sso: { enabled: false, self_serve_sso: true, self_serve_directory_sync: true },
@@ -259,14 +259,14 @@ const COMMERCE_SETTINGS = {
 
 /**
  * The instance's settings as `GET /v1/environment` answers them to the browser SDK: email sign-in
- * with a password (or an emailed code), sign-up open, organizations on, no social providers,
- * billing or captcha.
+ * with a password (or an emailed code), sign-up open, organizations on, the social connections
+ * seeded (`social`), and no billing or captcha.
  */
-export function environmentJson(instance: ClerkInstance) {
+export function environmentJson(instance: ClerkInstance, social: Record<string, unknown> = {}) {
   return {
     auth_config: authConfig(instance),
     display_config: displayConfig(instance),
-    user_settings: userSettings(instance),
+    user_settings: userSettings(instance, social),
     organization_settings: ORGANIZATION_SETTINGS,
     fraud_settings: { object: "fraud_settings", native: { device_attestation_mode: "disabled" } },
     commerce_settings: COMMERCE_SETTINGS,

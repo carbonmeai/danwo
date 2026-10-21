@@ -79,6 +79,7 @@ export function newAttempt(
       last_name: fields.lastName ?? null,
       created_session_id: null,
       ticket: null,
+      oauth: null,
       created_at: now(context),
     },
     null,

@@ -1,5 +1,5 @@
 import type { Context } from "../../http.ts"
-import { asRecord } from "../../json.ts"
+import { upstreamProfile } from "../../oauth/upstream-profile.ts"
 import type { Auth0RouteContext, Upstream } from "../context.ts"
 import type {
   Auth0ConnectionRecord,
@@ -65,32 +65,16 @@ async function fetchProfile(
   code: string,
   redirectUri: string,
 ): Promise<SocialProfile | undefined> {
-  const exchange = await upstream(
-    new Request(provider.token, {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: redirectUri,
-        client_id: connection.client_id,
-        client_secret: connection.client_secret,
-      }),
-    }),
-  )
-  const token = field(asRecord(await exchange.json()) ?? {}, "access_token")
-
-  if (!exchange.ok || token === "") return undefined
-
-  const me = await upstream(
-    new Request(provider.profile, {
-      headers: { authorization: `Bearer ${token}`, accept: "application/json" },
-    }),
-  )
-  const profile = asRecord(await me.json()) ?? {}
+  const profile =
+    (await upstreamProfile(upstream, provider, {
+      code,
+      redirect_uri: redirectUri,
+      client_id: connection.client_id,
+      client_secret: connection.client_secret,
+    })) ?? {}
   const id = field(profile, "sub", "id")
 
-  return me.ok && id !== ""
+  return id !== ""
     ? { id, email: field(profile, "email"), name: field(profile, "name", "login") }
     : undefined
 }

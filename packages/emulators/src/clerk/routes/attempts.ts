@@ -17,8 +17,9 @@ import {
 } from "../browser-request.ts"
 import { type ClerkContext, instanceOf, now } from "../context.ts"
 import { ClerkFailure, notFound, str } from "../helpers.ts"
-import { startSession } from "../sessions.ts"
+import { connectionFor, startOAuth } from "../social.ts"
 import type { AttemptRecord } from "../store.ts"
+import { completeAttempt, transferSignIn, transferSignUp } from "./oauth.ts"
 import { acceptInvitation, invitationForTicket } from "./tickets.ts"
 import { userByEmail } from "./users.ts"
 
@@ -59,19 +60,7 @@ function complete(
   attempt: AttemptRecord,
   userId: string,
 ): AttemptRecord {
-  const session = startSession(context, currentClient(context, request), userId)
-
-  context.clerk.clients.change(request.client.id, {
-    last_authentication_strategy: attempt.strategy,
-  })
-
-  return (
-    context.clerk.attempts.change(attempt.id, {
-      status: "complete",
-      user_id: userId,
-      created_session_id: session.id,
-    }) ?? attempt
-  )
+  return completeAttempt(context, currentClient(context, request), attempt, userId)
 }
 
 /**
@@ -142,6 +131,25 @@ function finishTicket(
   return complete(context, request, attempt, userId)
 }
 
+/** Whether a body field says yes, as a form (`"true"`) or JSON (`true`) does. */
+function isTrue(value: unknown): boolean {
+  return value === true || value === "true"
+}
+
+/** A new attempt of `kind` on the request's client, with nothing given yet. */
+function blankAttempt(
+  context: ClerkContext,
+  request: BrowserRequest,
+  kind: AttemptRecord["kind"],
+): AttemptRecord {
+  return newAttempt(context, kind, {
+    clientId: request.client.id,
+    identifier: "",
+    userId: null,
+    password: null,
+  })
+}
+
 /** Makes `attempt` the client's sign-in or sign-up in progress. */
 function track(context: ClerkContext, request: BrowserRequest, attempt: AttemptRecord): void {
   context.clerk.clients.change(request.client.id, {
@@ -210,13 +218,26 @@ function refuseUnknown(context: ClerkContext, request: BrowserRequest): never {
   throw formError("form_identifier_not_found", "identifier", "Couldn't find your account.")
 }
 
-/** A sign-in that names no account: an invitation ticket. Undefined for one by identifier. */
+/**
+ * A sign-in that names no account: a transfer from a social sign-up, an invitation ticket, or a
+ * social sign-in on its way to the provider. Undefined for one by identifier.
+ */
 function otherSignIn(
   context: ClerkContext,
   request: BrowserRequest,
   body: Record<string, unknown>,
 ): AttemptRecord | undefined {
-  return str(body.strategy) === "ticket" ? ticketSignIn(context, request, body) : undefined
+  const social = connectionFor(context, str(body.strategy))
+
+  if (isTrue(body.transfer)) return transferSignIn(context, request)
+  if (str(body.strategy) === "ticket") return ticketSignIn(context, request, body)
+  if (!social) return undefined
+
+  const attempt = startOAuth(context, blankAttempt(context, request, "sign_in"), social, body)
+
+  track(context, request, attempt)
+
+  return attempt
 }
 
 /** `POST /v1/client/sign_ins`: finds the account, and checks a password sent along with it. */
@@ -352,17 +373,18 @@ function signUpRoutes(app: App, context: ClerkContext): void {
   app.post("/v1/client/sign_ups", async (c) => {
     const request = browserRequest(c, context)
     const body = await bodyOf(c)
-    const created = newAttempt(context, "sign_up", {
-      clientId: request.client.id,
-      identifier: "",
-      userId: null,
-      password: null,
-    })
-    const attempt =
-      context.clerk.attempts.change(created.id, {
-        ...signUpFields(context, body),
-        ...ticketFields(context, body),
-      }) ?? created
+
+    if (isTrue(body.transfer))
+      return reply(c, context, request, signUpJson(context, transferSignUp(context, request)))
+
+    const social = connectionFor(context, str(body.strategy))
+    const created = blankAttempt(context, request, "sign_up")
+    const attempt = social
+      ? startOAuth(context, created, social, body)
+      : (context.clerk.attempts.change(created.id, {
+          ...signUpFields(context, body),
+          ...ticketFields(context, body),
+        }) ?? created)
 
     track(context, request, attempt)
 
