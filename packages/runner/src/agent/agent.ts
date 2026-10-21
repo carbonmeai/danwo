@@ -18,7 +18,7 @@ import type { MailDesk } from "../mail/desk.ts"
 import type { CallCost } from "../model/resolve.ts"
 import type { StepRecorder } from "../record/index.ts"
 import type { CacheNote } from "../record/steps.ts"
-import type { Params } from "../replay/params.ts"
+import { type Params, uniqueValues } from "../replay/params.ts"
 import { type RelocationPolicy, relocates } from "../replay/policy.ts"
 import { findOrRelocate } from "../replay/relocate.ts"
 import {
@@ -27,7 +27,7 @@ import {
   type ReplayOutcome,
   type TargetFinder,
 } from "../replay/replayer.ts"
-import { routeOf } from "../replay/route.ts"
+import { routeOf, templateRoute } from "../replay/route.ts"
 import type { ReplayStore, StepKey } from "../replay/store.ts"
 import { describe } from "../replay/target.ts"
 import type { RecordedAction, Trace } from "../replay/trace.ts"
@@ -620,7 +620,8 @@ class SessionAgent implements Agent {
       mail,
       recorded: result.recorded,
       ...seen,
-      endRoute: () => routeOf(tabs.page.url(), new URL(appUrl).origin),
+      endRoute: () =>
+        templateRoute(routeOf(tabs.page.url(), new URL(appUrl).origin), uniqueValues(call.params)),
     })
   }
 

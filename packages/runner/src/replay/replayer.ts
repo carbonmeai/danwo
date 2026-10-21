@@ -19,9 +19,9 @@ import type { MailDesk } from "../mail/desk.ts"
 import { checkSecretField } from "../secrets/fields.ts"
 import type { SecretVault } from "../secrets/index.ts"
 import type { SecretSpots } from "../vision/screen.ts"
-import { paramSecret, type Params, paramText } from "./params.ts"
+import { paramSecret, type Params, paramText, uniqueValues } from "./params.ts"
 import { type VisionReplayContext, visionReplays } from "./replay-vision.ts"
-import { routeOf } from "./route.ts"
+import { routeMatches, routeOf } from "./route.ts"
 import { describe, findTarget, locatorFor, type Target } from "./target.ts"
 import type { FromMail, RecordedAction, RecordedAddress, RecordedInput, Trace } from "./trace.ts"
 
@@ -408,18 +408,22 @@ async function replayAction(action: RecordedAction, context: ReplayContext): Pro
   return aimed === undefined ? onPage(action, context) : onElement(action, aimed, context)
 }
 
-/** Waits for the browser to reach `route`; resolves with where it was when time ran out. */
+/**
+ * Waits for the browser to reach `route`, its placeholders filled with this run's `unique()`
+ * values; resolves with where it was when time ran out.
+ */
 async function reachRoute(context: ReplayContext, route: string): Promise<string | undefined> {
   const origin = new URL(context.appUrl).origin
+  const values = uniqueValues(context.params)
   const deadline = Date.now() + context.timeout
   let at = routeOf(context.tabs.page.url(), origin)
 
-  while (at !== route && Date.now() < deadline) {
+  while (!routeMatches(at, route, values) && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, ROUTE_POLL_MS))
     at = routeOf(context.tabs.page.url(), origin)
   }
 
-  return at === route ? undefined : at
+  return routeMatches(at, route, values) ? undefined : at
 }
 
 /** How a replay went: the trace with any targets that were found somewhere else. */

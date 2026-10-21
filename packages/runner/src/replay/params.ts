@@ -41,6 +41,15 @@ export function paramIdentity(params: Params): Record<string, string> {
   )
 }
 
+/** This run's `unique()` values, by param name: what a recording keeps as placeholders. */
+export function uniqueValues(params: Params): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(params).flatMap(([name, value]) =>
+      isUnique(value) ? [[name, value.value]] : [],
+    ),
+  )
+}
+
 /** The params as the model sees them: values for text, a name for each secret. */
 export function shownParams(params: Params): Record<string, string> {
   return Object.fromEntries(

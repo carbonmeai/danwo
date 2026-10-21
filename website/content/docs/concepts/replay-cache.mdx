@@ -33,7 +33,8 @@ The changes it keeps leave out text that differs on every run, so a replay doesn
 | Route announcers              | Next.js reading out the new page's title            |
 
 The page a step ends on is kept with its ids taken out, so `/projects/PROJ-016` and
-`/projects/PROJ-017` count as the same page.
+`/projects/PROJ-017` count as the same page. A [`unique()`](/docs/agent-steps) value in the path,
+such as a new company's name, is filled in with this run's value.
 
 The other agent steps are recorded too:
 

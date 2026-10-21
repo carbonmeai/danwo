@@ -64,7 +64,9 @@ The route a step ends on is kept as a template: the app's origin is `app`, and p
 look generated become `:id`: numbers, UUIDs, prefixed ids (`cs_test_…`, `ord_9xK2`), keyed numbers
 (`PROJ-016`, `INV-2041`), hex ids of 8 or more with a digit (`8f3a2b1c`) and tokens of 8 or more
 that switch between letters and digits at least twice (`abc123def`). Words and versioned names
-(`windows11`) stay as they are.
+(`windows11`) stay as they are. A `unique(...)` value in the path (as typed, percent-encoded,
+`+` for spaces, or slugged) is kept as a placeholder (`app/companies/{company}`), filled with the
+run's own value on replay.
 
 A new `agent.act` recording is staged until a later check (an assertion, a value check or a passed
 `agent.assert`) passes: the step reads `recorded, kept only if the test passes` while the attempt
