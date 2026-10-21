@@ -18,6 +18,7 @@ import { unique } from "../src/replay/params.ts"
 import { routeMatches, templateRoute } from "../src/replay/route.ts"
 import { ReplayStore } from "../src/replay/store.ts"
 import { serveHtml, type HtmlServer } from "./fixtures/html-server.ts"
+import { judging, verdict } from "./fixtures/judging.ts"
 import { type Move, ref, scripted } from "./fixtures/scripted.ts"
 
 const NOTHING = { calls: 0, retries: 0, tokens: [0, 0], usd: 0 } as const
@@ -339,5 +340,41 @@ describe("replay-only", () => {
       message: expect.stringMatching(/no recording that replays \(it no longer replays: action 1/),
     })
     expect(actor.doGenerateCalls).toHaveLength(0)
+  }, 60_000)
+})
+
+/** Asserts the wizard's first step, live; the judge's calls and the step's cache note. */
+async function assertLive(options: Partial<WebSessionOptions> = {}) {
+  const judge = judging([verdict("holds", "Step 1")])
+  const outcome = await withSession(
+    { judge, ...options },
+    async (session) => {
+      const error = await session.agent
+        .assert("the wizard is on its first step", { replay: false })
+        .catch((caught: unknown) => caught)
+
+      return { error, cache: session.flight.steps().find((s) => s.api === "agent.assert")?.cache }
+    },
+    "/wizard",
+  )
+
+  return { ...outcome, calls: judge.doGenerateCalls.length }
+}
+
+describe("an assert that does not replay", () => {
+  it("asks the judge on every run and keeps no recording", async () => {
+    expect(await assertLive()).toEqual({ error: undefined, cache: { mode: "off" }, calls: 1 })
+    expect(await assertLive()).toEqual({ error: undefined, cache: { mode: "off" }, calls: 1 })
+    expect(await recordings()).toEqual([])
+  }, 60_000)
+
+  it("fails under replay-only without asking the judge", async () => {
+    const run = await assertLive({ replay: { mode: "replay-only" } })
+
+    expect(run.calls).toBe(0)
+    expect(run.error).toMatchObject({
+      code: "REPLAY_MISSING",
+      message: expect.stringContaining("asks the judge on every run ({ replay: false })"),
+    })
   }, 60_000)
 })

@@ -44,6 +44,8 @@ export interface JudgedStep {
   readonly index: number
   readonly condition: string
   readonly params: Params
+  /** Ask the judge every run, and keep no recording (`agent.assert(…, { replay: false })`). */
+  readonly live?: boolean
 }
 
 export interface WaitResult {
@@ -110,6 +112,9 @@ export async function waitStep(step: JudgedStep, context: WaitStepContext): Prom
   const { store } = context
   const { kind, index } = step
   const key = store?.key({ kind, step: index, instruction: condition, params })
+
+  if (step.live === true) return judgeLive(step, context)
+
   const recorded = await fromRecording(key, context)
 
   if ("replayed" in recorded) {
@@ -154,6 +159,25 @@ export async function waitStep(step: JudgedStep, context: WaitStepContext): Prom
   const saved = await keep(key, step, verdict.evidence, page, context)
 
   context.cache(miss.mode, { ...miss, saved })
+
+  return { replayed: false }
+}
+
+/** A step the judge decides on every run: no recording is read or kept. */
+async function judgeLive(step: JudgedStep, context: WaitStepContext): Promise<WaitResult> {
+  if (context.replayOnly === true) {
+    context.cache("off")
+    throw new DanwoError(
+      "REPLAY_MISSING",
+      `agent.assert(${JSON.stringify(context.redact(step.condition))}) asks the judge on every run ({ replay: false }), and replay-only runs no model.`,
+    )
+  }
+
+  const { verdict } = await judgeUntil(step.condition, context.judge(), context.poll)
+
+  context.cache("off")
+  if (verdict.verdict !== "holds")
+    throw context.fail(verdict.verdict, context.redact(verdict.reason))
 
   return { replayed: false }
 }

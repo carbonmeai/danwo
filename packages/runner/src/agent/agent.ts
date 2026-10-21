@@ -299,7 +299,14 @@ class SessionAgent implements Agent {
       fail: (verdict: Unheld, reason: string) => new ClaimFailed(claim, verdict, reason),
     }
 
-    return this.judged({ kind: "assert", condition: claim, params: {} }, judged, "agent.assert")
+    const step = {
+      kind: "assert" as const,
+      condition: claim,
+      params: {},
+      live: options.replay === false,
+    }
+
+    return this.judged(step, judged, "agent.assert")
   }
 
   waitFor(condition: string, options: WaitForOptions = {}): Promise<void> {

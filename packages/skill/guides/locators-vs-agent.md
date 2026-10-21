@@ -42,7 +42,9 @@ Every kind of agent step replays:
   changes in place: `checkbox "Agree" [checked]`, `[expanded]`, `[selected]`, `[pressed]`.
 - `assert` and `waitFor`: the judge names a short text on the page that shows the claim holds; a
   replay waits for that text. A claim with no such text (something is absent) asks the judge each
-  run.
+  run. The text can stay while the claim stops holding (a total that no longer matches its
+  items); `agent.assert(claim, { replay: false })` asks the judge every run and keeps no
+  recording (cache outcome `off`; fails under `--replay-only`).
 - `extract`: the elements each value was read from. For how many of something the page lists
   when no text says the number, the model reads `as: "count"` by pointing at one item; a replay
   counts the shown elements with its test id, or its role.

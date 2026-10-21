@@ -63,6 +63,16 @@ await agent.assert("the status says paid", { poll: true })
 With `{ poll: true }`, the judge looks again until the claim holds or time runs out. Use it when
 the page gets there on its own, like after a webhook.
 
+On replay, `assert` waits for the text that proved the claim last time, with no model call. A
+claim can stop holding while that text is still shown, such as "the total matches the items"
+after a pricing change. For a claim like that, ask the judge on every run:
+
+```ts title="tests/order.danwo.ts · a claim judged every run"
+await agent.assert("the total matches the items in the cart", { replay: false })
+```
+
+It costs a judge call on every run, and fails under `--replay-only`.
+
 ## `extract`: read typed values
 
 `extract` reads values off the page and checks them against a schema. Use it for numbers you then
@@ -101,6 +111,7 @@ On replay, it waits for the text that proved the condition last time, with no mo
 | `vision`  | act, assert, extract  | Whether the step may see a screenshot: `true`, `"auto"` or `false`. | `"auto"`      |
 | `time`    | act                   | Lets the step move time forward, e.g. "wait until the trial ends".  | `false`       |
 | `poll`    | assert                | Ask again until the claim holds.                                    | off           |
+| `replay`  | assert                | `false` asks the judge on every run and keeps no recording.         | `true`        |
 | `timeout` | waitFor               | How long to wait, in milliseconds.                                  | 30 000        |
 
 <Callout type="info">

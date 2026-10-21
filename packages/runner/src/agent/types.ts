@@ -70,6 +70,12 @@ export interface AssertOptions {
    * text view misses (a canvas, unnamed buttons, unlisted frames), `false` never.
    */
   readonly vision?: VisionChoice
+  /**
+   * `false` asks the judge on every run and keeps no recording, for a claim whose meaning can
+   * change while its text stays (`the total is right`). Default true: a replay waits for the text
+   * the judge named, with no model call.
+   */
+  readonly replay?: boolean
 }
 
 /** Options of `agent.waitFor`. */
