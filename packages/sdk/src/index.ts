@@ -238,12 +238,22 @@ export interface PaystackFixtures {
 export const test: TestAPI<DanwoFixtures> =
   baseTest.extend<Omit<DanwoFixtures, keyof TestFixtures>>()
 
-/**
+/*
  * `test.describe` and the hooks, for files that import them by name. The registry's functions
  * never use `this`, so they work taken off `test`.
  */
-// oxlint-disable-next-line typescript/unbound-method
-export const { describe, beforeEach, afterEach, beforeAll, afterAll } = test
+type DanwoTest = TestAPI<DanwoFixtures>
+
+/** Groups tests under a title (`test.describe`), with `.skip` and `.only`. */
+export const describe: DanwoTest["describe"] = test.describe
+/** Runs before each test of the enclosing describe block, or of the file (`test.beforeEach`). */
+export const beforeEach: DanwoTest["beforeEach"] = test.beforeEach
+/** Runs after each test of the enclosing describe block, or of the file (`test.afterEach`). */
+export const afterEach: DanwoTest["afterEach"] = test.afterEach
+/** Runs once before the tests of the enclosing describe block, or of the file (`test.beforeAll`). */
+export const beforeAll: DanwoTest["beforeAll"] = test.beforeAll
+/** Runs once after the tests of the enclosing describe block, or of the file (`test.afterAll`). */
+export const afterAll: DanwoTest["afterAll"] = test.afterAll
 
 export {
   type AppCommand,

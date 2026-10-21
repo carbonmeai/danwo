@@ -24,12 +24,6 @@ export interface AuthorizeParams {
   incremental?: boolean
 }
 
-/** An authorization request waiting for the user to pick an account. */
-interface PendingRequest extends Entity {
-  requestId: string
-  params: AuthorizeParams
-}
-
 /** A one-time authorization code and what it was issued for. */
 export interface IssuedCode extends Entity {
   code: string
@@ -43,7 +37,11 @@ export interface IssuedCode extends Entity {
 /** One provider's OAuth state. */
 export function oauthTables(store: Store, provider: string) {
   return {
-    requests: store.collection<PendingRequest>(`${provider}.requests`, ["requestId"]),
+    /** Authorization requests waiting for the user to pick an account. */
+    requests: store.collection<Entity & { requestId: string; params: AuthorizeParams }>(
+      `${provider}.requests`,
+      ["requestId"],
+    ),
     codes: store.collection<IssuedCode>(`${provider}.codes`, ["code"]),
     tokens: store.collection<IssuedToken>(`${provider}.tokens`, ["token"]),
   }

@@ -2,7 +2,7 @@
  * The agent's tools on a device: what a person does with a phone, each aimed at an element by the
  * ref it carries in the latest view, plus `done`. The runner carries out every call itself.
  */
-import { tool } from "ai"
+import { tool, type ToolSet } from "ai"
 import { z } from "zod"
 
 import { parseToolCall, toolInputs } from "../../agent/tools.ts"
@@ -92,7 +92,7 @@ const visionTools = {
 }
 
 /** The tools a device step is offered: with the vision tools when it may see the screen. */
-export function deviceToolsFor(vision: boolean) {
+export function deviceToolsFor(vision: boolean): ToolSet {
   return vision ? { ...tools, ...visionTools } : tools
 }
 

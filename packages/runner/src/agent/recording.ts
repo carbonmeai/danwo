@@ -25,7 +25,7 @@ function now(): string {
 }
 
 /** The model a step runs on; a clear error when the session has none. */
-export function requireModel(model: LanguageModel | undefined) {
+export function requireModel(model: LanguageModel | undefined): Exclude<LanguageModel, string> {
   if (model === undefined)
     throw new DanwoError(
       "CONFIG_INVALID",

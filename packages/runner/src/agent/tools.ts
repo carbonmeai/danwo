@@ -3,7 +3,7 @@
  * carries in the latest view (`[ref=e12]`), plus `done` to end the step. The runner carries out
  * every call itself, so no tool has an `execute`.
  */
-import { tool } from "ai"
+import { tool, type ToolSet } from "ai"
 import { z } from "zod"
 
 const ref = z.string().describe('The element\'s ref from the latest page view, e.g. "e12".')
@@ -188,7 +188,7 @@ const visionTools = {
 const timeTools = { travel_time: offer("travel_time", toolInputs.travel_time) }
 
 /** The tools a step is offered: with the vision tools and the time tool when it may use them. */
-export function toolsFor(vision: boolean, time = false) {
+export function toolsFor(vision: boolean, time = false): ToolSet {
   return {
     ...agentTools,
     ...(vision ? visionTools : {}),

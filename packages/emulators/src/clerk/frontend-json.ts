@@ -8,6 +8,9 @@ import { membershipJson } from "./organizations.ts"
 import { activeSession, isLive, sessionToken } from "./sessions.ts"
 import type { ClientRecord } from "./store.ts"
 
+/** A Frontend API resource as ClerkJS reads it: plain JSON, its kind in `object`. */
+type FrontendJson = Record<string, unknown>
+
 /**
  * A user as the Frontend API shows it to the signed-in browser: the Backend API's user without its
  * private metadata or password-reset flag, with the organizations it belongs to.
@@ -39,7 +42,7 @@ export function browserSession(
   context: ClerkContext,
   session: SessionJSON,
   azp: string | undefined,
-) {
+): FrontendJson {
   const user = context.clerk.users.get(session.user_id)
   const token = {
     object: "token",
@@ -77,7 +80,7 @@ export function browserClient(
   context: ClerkContext,
   client: ClientRecord,
   azp: string | undefined,
-) {
+): FrontendJson {
   const sessions = client.session_ids
     .flatMap((id) => context.clerk.sessions.get(id) ?? [])
     .filter((s) => isLive(context, s))

@@ -54,14 +54,24 @@ export function createIntent(payments: Payments, fields: IntentFields): PaymentI
 }
 
 /** The error a declined card leaves on the intent or setup that tried it. */
-export function declineError(method: PaymentMethod) {
+export interface DeclineError {
+  code: string
+  decline_code: string
+  doc_url: string
+  message: string
+  payment_method: PaymentMethod
+  type: "card_error"
+}
+
+/** The decline `method` gets: a generic `card_declined`. */
+export function declineError(method: PaymentMethod): DeclineError {
   return {
     code: "card_declined",
     decline_code: "generic_decline",
     doc_url: "https://stripe.com/docs/error-codes/card-declined",
     message: "Your card was declined.",
     payment_method: method,
-    type: "card_error" as const,
+    type: "card_error",
   }
 }
 
