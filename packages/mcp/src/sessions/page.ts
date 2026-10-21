@@ -11,6 +11,7 @@ import { locate, locatorCode, parseLocator } from "@danwo/recorder"
 import type { SecretVault } from "@danwo/runner"
 import type { Browser, BrowserContext, Locator, Page } from "playwright-core"
 
+import { type OpenDialog, SessionDialogs } from "./dialogs.ts"
 import { snapshotChange } from "./diff.ts"
 import { checkLocator } from "./locator-check.ts"
 import type { SessionAnswer, SessionCall } from "./protocol.ts"
@@ -40,6 +41,7 @@ export type ActionCall = Extract<
       | "drag"
       | "switch_tab"
       | "close_tab"
+      | "dialog"
   }
 >
 
@@ -75,12 +77,15 @@ export class PageDesk {
   private readonly options: DeskOptions
   private context: BrowserContext
   private readonly tabs: SessionTabs
+  private readonly dialogs = new SessionDialogs()
+  /** What is left of the action an open dialog held up; it finishes once the dialog is answered. */
+  private heldUp: Promise<string> | undefined
 
   private constructor(options: DeskOptions, context: BrowserContext, page: Page) {
     this.options = options
     this.context = context
     this.tabs = new SessionTabs(page)
-    this.watch = new PageWatch(options.redact)
+    this.watch = new PageWatch(options.redact, (dialog) => this.dialogs.opened(dialog))
     this.watch.attach(context, (opened) => this.tabs.opened(opened))
   }
 
@@ -94,14 +99,22 @@ export class PageDesk {
     const context = await options.browser.newContext()
     const page = await context.newPage()
     const desk = new PageDesk(options, context, page)
+    const loaded = await desk.dialogs.run(() =>
+      page.goto(new URL(path, options.baseUrl).href, { timeout: LOAD_TIMEOUT_MS }),
+    )
 
-    await page.goto(new URL(path, options.baseUrl).href, { timeout: LOAD_TIMEOUT_MS })
+    /* A page that opens a dialog as it loads finishes loading once the dialog is answered. */
+    if ("dialog" in loaded) desk.holdUp(loaded.rest.then(() => `loaded ${path}`))
 
     return { desk, text: await desk.snapshot() }
   }
 
   /** The whole page now, with refs to act on. */
   async snapshot(): Promise<string> {
+    const open = this.dialogs.open
+
+    if (open !== undefined) return [...this.dialogLines(open), ...this.events()].join("\n")
+
     const view = await this.view()
 
     return [
@@ -116,14 +129,26 @@ export class PageDesk {
 
   /** Carries out one action, then answers with the page's change and what it reported. */
   async act(call: ActionCall): Promise<string> {
+    if (call.kind !== "dialog") this.ready()
+
     const before = this.tree
     const page = this.page
     const url = page.url()
-    const done = await perform(this, call)
+    const outcome = await this.dialogs.run(async () => {
+      const done = await perform(this, call)
 
-    await this.settle()
+      await this.settle()
 
-    const view = await this.view()
+      return { done, view: await this.view() }
+    })
+
+    if ("dialog" in outcome) {
+      this.holdUp(outcome.rest.then((rest) => rest.done))
+
+      return [...this.dialogLines(outcome.dialog), ...this.events()].join("\n")
+    }
+
+    const { done, view } = outcome.done
     const switched = this.page !== page
     const moved = !switched && this.page.url() !== url
 
@@ -138,8 +163,40 @@ export class PageDesk {
     ].join("\n")
   }
 
+  /** Keeps what is left of an action a dialog held up, for when the dialog is answered. */
+  private holdUp(rest: Promise<string>): void {
+    /* The session may close before the dialog is answered; the rest's failure is then nobody's. */
+    void rest.catch(() => undefined)
+    this.heldUp = rest
+  }
+
+  /** Answers the open dialog; then the action it held up finishes. */
+  async answerDialog(accept: boolean, text: string | undefined): Promise<string> {
+    const open = await this.dialogs.answer(accept, text)
+    const heldUp = this.heldUp
+
+    this.heldUp = undefined
+
+    const rest =
+      heldUp === undefined
+        ? undefined
+        : await heldUp.catch(
+            (error: unknown) => `the action it held up failed: ${messageOf(error)}`,
+          )
+    const typed = accept && text !== undefined ? ` with ${JSON.stringify(text)}` : ""
+
+    return this.options.redact(
+      [
+        `${accept ? "accepted" : "dismissed"} the ${open.type} dialog ${JSON.stringify(open.message)}${typed}`,
+        ...(rest === undefined ? [] : [rest]),
+      ].join("\n"),
+    )
+  }
+
   /** The `tabs` answer: every open tab, the one actions go to marked. */
   tabList(): Promise<string> {
+    this.ready()
+
     return this.tabs.lines(this.options.redact).then((lines) => lines.join("\n"))
   }
 
@@ -154,10 +211,14 @@ export class PageDesk {
   }
 
   check(expression: string): Promise<string> {
+    this.ready()
+
     return checkLocator(this.page, expression, this.tree, this.options.redact)
   }
 
   async screenshot(target: string | undefined, fullPage: boolean): Promise<SessionAnswer> {
+    this.ready()
+
     const mask = this.masks()
     const shot =
       target === undefined
@@ -171,6 +232,7 @@ export class PageDesk {
   }
 
   async startRecording(video: boolean): Promise<string> {
+    this.ready()
     if (this.recording !== undefined)
       throw new Error("this session is already recording: stop_recording first")
     if (video && this.secretFilled)
@@ -191,6 +253,7 @@ export class PageDesk {
 
     if (recording === undefined) throw new Error("this session is not recording")
 
+    this.ready()
     await this.frame("stop")
     this.recording = undefined
 
@@ -282,7 +345,9 @@ export class PageDesk {
   }
 
   private async view(): Promise<{ url: string; title: string; tree: string }> {
-    const raw = await this.page.ariaSnapshot({ mode: "ai", timeout: ACTION_TIMEOUT_MS })
+    /* One tab throughout, though another may become the active one meanwhile. */
+    const page = this.page
+    const raw = await page.ariaSnapshot({ mode: "ai", timeout: ACTION_TIMEOUT_MS })
     const capped =
       raw.length > MAX_TREE_CHARS
         ? `${raw.slice(0, MAX_TREE_CHARS)}\n… (page cut at ${MAX_TREE_CHARS} characters)`
@@ -291,7 +356,29 @@ export class PageDesk {
 
     this.tree = redact(capped)
 
-    return { url: redact(this.page.url()), title: redact(await this.page.title()), tree: this.tree }
+    return { url: redact(page.url()), title: redact(await page.title()), tree: this.tree }
+  }
+
+  /** Refuses to go on while a dialog blocks the page: nothing on it can be read until then. */
+  private ready(): void {
+    const open = this.dialogs.open
+
+    if (open !== undefined) throw new Error(this.dialogLines(open).join("\n"))
+  }
+
+  /** What an answer says about an open dialog, and how to answer it. */
+  private dialogLines(open: OpenDialog): string[] {
+    const prompt =
+      open.type === "prompt"
+        ? `; text fills the prompt (it holds ${JSON.stringify(open.defaultValue)})`
+        : ""
+
+    return [
+      this.options.redact(
+        `${/^[aeiou]/.test(open.type) ? "an" : "a"} ${open.type} dialog is open: ${JSON.stringify(open.message)}`,
+      ),
+      `the page waits for an answer: dialog with accept: true (OK) or false (Cancel)${this.options.redact(prompt)}`,
+    ]
   }
 
   /** Which tab the answer is about, when the session has several or the action moved to another. */
@@ -322,10 +409,16 @@ export class PageDesk {
       : ["", "since the last call:", ...lines.map((line) => `  ${line}`)]
   }
 
-  /** Lets the page finish what the action started: its load, then a short wait for quiet. */
+  /**
+   * Lets the page finish what the action started: its load, then a short wait for quiet. A tab
+   * the action opened becomes the active one first, and is waited for in turn.
+   */
   private async settle(): Promise<void> {
-    await this.page.waitForLoadState("load", { timeout: 5_000 }).catch(() => undefined)
-    await this.page.waitForLoadState("networkidle", { timeout: 1_500 }).catch(() => undefined)
+    const page = this.page
+
+    await quiet(page)
+    await this.tabs.caughtUp(this.context, LOAD_TIMEOUT_MS)
+    if (this.page !== page) await quiet(this.page)
   }
 
   /** What a screenshot hides: password fields, filled secrets, and any text showing a secret. */
@@ -378,6 +471,16 @@ export class PageDesk {
 
     return video === null ? undefined : this.options.redact(await video.path())
   }
+}
+
+/** Waits for `page`'s load, then briefly for its network to go quiet. */
+async function quiet(page: Page): Promise<void> {
+  await page.waitForLoadState("load", { timeout: 5_000 }).catch(() => undefined)
+  await page.waitForLoadState("networkidle", { timeout: 1_500 }).catch(() => undefined)
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 /** How a click's answer names it: `clicked X`, `double-clicked X with the right button, holding Shift`. */
@@ -462,6 +565,7 @@ const ACTIONS: {
     return `dragged ${source.name} onto ${drop.name}`
   },
   switch_tab: (desk, call) => desk.switchTab(call.tab),
+  dialog: (desk, call) => desk.answerDialog(call.accept, call.text),
   close_tab: (desk, call) => desk.closeTab(call.tab),
 }
 

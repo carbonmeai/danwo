@@ -29,6 +29,7 @@ describe("the server", () => {
       "close_session",
       "close_tab",
       "deliver_webhooks",
+      "dialog",
       "drag",
       "emulator_state",
       "exchanges",

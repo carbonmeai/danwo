@@ -4,11 +4,19 @@
  * attention follows it; when the active tab closes, the newest one left takes over. Tabs are
  * numbered from 1 in the order they opened, counting only those still open.
  */
-import type { Page } from "playwright-core"
+import type { BrowserContext, CDPSession, Page } from "playwright-core"
+
+/** A browser session that counts the context's pages as the browser has them. */
+interface TargetProbe {
+  readonly context: BrowserContext
+  readonly session: CDPSession
+  readonly contextId: string | undefined
+}
 
 export class SessionTabs {
   private readonly pages: Page[] = []
   private active: Page
+  private probe: TargetProbe | undefined
 
   constructor(first: Page) {
     this.active = first
@@ -55,6 +63,45 @@ export class SessionTabs {
     await page.close()
 
     return shown
+  }
+
+  /**
+   * Waits, up to `timeout`, for the tabs the browser has opened in `context` but not yet handed
+   * over: a popup exists in the browser a moment before its page does.
+   */
+  async caughtUp(context: BrowserContext, timeout: number): Promise<void> {
+    const opened = await this.browserTabs(context)
+
+    if (opened === undefined || opened <= this.list().length) return
+
+    await context.waitForEvent("page", { timeout }).catch(() => undefined)
+  }
+
+  /** How many tabs the browser has in `context`; undefined when it cannot say. */
+  private async browserTabs(context: BrowserContext): Promise<number | undefined> {
+    try {
+      const probe = await this.probeOf(context)
+      const { targetInfos } = await probe.session.send("Target.getTargets")
+
+      return targetInfos.filter(
+        (target) => target.type === "page" && target.browserContextId === probe.contextId,
+      ).length
+    } catch {
+      this.probe = undefined
+
+      return undefined
+    }
+  }
+
+  private async probeOf(context: BrowserContext): Promise<TargetProbe> {
+    if (this.probe?.context === context) return this.probe
+
+    const session = await context.newCDPSession(this.active)
+    const { targetInfo } = await session.send("Target.getTargetInfo")
+
+    this.probe = { context, session, contextId: targetInfo.browserContextId }
+
+    return this.probe
   }
 
   /** The `tabs` answer: one line per tab, the active one marked. */

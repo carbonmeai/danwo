@@ -29,18 +29,19 @@ Pass `format: "md"` to `show_run` to get the same failure page `danwo show --for
 A **session** is your app opened in danwo's browser, with its emulators and proxy, for the agent
 to explore before it writes a test. Every action answers with the page as it is now:
 
-| Tool                                                 | What it does                                                                              |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `open_session`, `close_session`                      | Starts the app, emulators and browser, or stops them.                                     |
-| `navigate`                                           | Goes to a path or URL, or back, forward, reload.                                          |
-| `click`, `hover`, `fill`, `press`, `select`, `check` | Acts on an element, by a ref from the last snapshot or by a locator.                      |
-| `fill_secret`                                        | Fills a field with a configured secret by name. The value never appears anywhere.         |
-| `upload`                                             | Puts files into a file input, or the file picker a button opens. Up to 10 MB a call.      |
-| `drag`                                               | Drags an element (`target`) and drops it on another (`to`), such as a card onto a column. |
-| `tabs`, `switch_tab`, `close_tab`                    | Lists the open tabs, moves actions to another, or closes one.                             |
-| `snapshot`, `screenshot`                             | The page as an accessibility tree with refs, or as an image with secrets masked.          |
-| `check_locator`                                      | Checks a locator matches exactly one element, and returns the line to paste.              |
-| `start_recording`, `stop_recording`                  | Records the session's screenshots, and video when no secret was filled.                   |
+| Tool                                                 | What it does                                                                                  |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `open_session`, `close_session`                      | Starts the app, emulators and browser, or stops them.                                         |
+| `navigate`                                           | Goes to a path or URL, or back, forward, reload.                                              |
+| `click`, `hover`, `fill`, `press`, `select`, `check` | Acts on an element, by a ref from the last snapshot or by a locator.                          |
+| `fill_secret`                                        | Fills a field with a configured secret by name. The value never appears anywhere.             |
+| `upload`                                             | Puts files into a file input, or the file picker a button opens. Up to 10 MB a call.          |
+| `drag`                                               | Drags an element (`target`) and drops it on another (`to`), such as a card onto a column.     |
+| `tabs`, `switch_tab`, `close_tab`                    | Lists the open tabs, moves actions to another, or closes one.                                 |
+| `dialog`                                             | Answers the alert, confirm or prompt the page has open: OK or Cancel, with text for a prompt. |
+| `snapshot`, `screenshot`                             | The page as an accessibility tree with refs, or as an image with secrets masked.              |
+| `check_locator`                                      | Checks a locator matches exactly one element, and returns the line to paste.                  |
+| `start_recording`, `stop_recording`                  | Records the session's screenshots, and video when no secret was filled.                       |
 
 ### Click with keys held, twice or with the right button
 
@@ -68,6 +69,21 @@ url: http://localhost:3000/receipt/42
 
 `tabs` lists every open tab by number. `switch_tab` moves back to one, and `close_tab` closes one,
 or the active tab without a number. When the active tab closes, the newest one left takes over.
+
+### Answer a dialog
+
+A dialog is the box `alert`, `confirm` or `prompt` opens. It blocks the page until someone answers
+it, so danwo holds it open and the answer tells your agent:
+
+```text
+a confirm dialog is open: "Empty the basket?"
+the page waits for an answer: dialog with accept: true (OK) or false (Cancel)
+```
+
+Call `dialog` with `accept: true` for OK or `false` for Cancel.
+
+Add `text` to type into a prompt; without it, the prompt keeps its default. The click that opened the dialog then finishes, and the
+answer shows what changed. Until then, every other page tool says the dialog is open.
 
 ### Upload a file
 

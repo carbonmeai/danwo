@@ -22,7 +22,8 @@ When the project has danwo's MCP server (`danwo init` registers it), work agains
 2. `open_session`, then walk the journey with `click`, `fill`, `fill_secret` (by name), `select`
    and `press`, using refs from each answer. `click` takes `modifiers` (`Shift`, `ControlOrMeta`,
    `Alt`…), `button: "right"` and `double: true`; `drag` drops `target` on `to`. A tab the app opens becomes the active one (the
-   answer says `tab: 2 of 2`); `tabs`, `switch_tab` and `close_tab` manage them. `upload` puts files into a file input (a project
+   answer says `tab: 2 of 2`); `tabs`, `switch_tab` and `close_tab` manage them. An `alert`, `confirm` or
+   `prompt` stays open until you answer it with `dialog` (`accept`, and `text` for a prompt). `upload` puts files into a file input (a project
    path, a `files` name from the config, or `{ name, text | base64 }`; a test then uploads them
    by their `files` name).
 3. For every element a step needs, `check_locator` with the locator you would write until it

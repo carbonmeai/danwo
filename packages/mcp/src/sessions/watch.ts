@@ -1,9 +1,9 @@
 /**
  * What a session's pages said between two tool calls: console errors and warnings, uncaught page
- * errors, requests that failed or answered with an error status, and dialogs (which are accepted
- * so the page can go on). Each call drains what happened since the previous one.
+ * errors, and requests that failed or answered with an error status. Each call drains what happened
+ * since the previous one. Dialogs go to whoever answers them.
  */
-import type { BrowserContext, Page } from "playwright-core"
+import type { BrowserContext, Dialog, Page } from "playwright-core"
 
 /** At most this many events are kept between calls; the rest are counted. */
 const MAX_EVENTS = 30
@@ -13,8 +13,11 @@ export class PageWatch {
   private dropped = 0
   private readonly redact: (text: string) => string
 
-  constructor(redact: (text: string) => string) {
+  private readonly onDialog: (dialog: Dialog) => void
+
+  constructor(redact: (text: string) => string, onDialog: (dialog: Dialog) => void) {
     this.redact = redact
+    this.onDialog = onDialog
   }
 
   /** Watches `context`'s pages, now and later; calls `onPage` for each page it opens. */
@@ -57,9 +60,6 @@ export class PageWatch {
       if (response.status() >= 400)
         this.note(`${response.request().method()} ${response.url()} → ${response.status()}`)
     })
-    page.on("dialog", (dialog) => {
-      this.note(`${dialog.type()} dialog ${JSON.stringify(dialog.message())} accepted`)
-      void dialog.accept().catch(() => {})
-    })
+    page.on("dialog", this.onDialog)
   }
 }

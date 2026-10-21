@@ -41,6 +41,7 @@ export type SessionCall =
   | { readonly kind: "navigate"; readonly to: string }
   | { readonly kind: "drag"; readonly target: Target; readonly to: Target }
   | { readonly kind: "tabs" }
+  | { readonly kind: "dialog"; readonly accept: boolean; readonly text?: string | undefined }
   | { readonly kind: "switch_tab"; readonly tab: number }
   | { readonly kind: "close_tab"; readonly tab?: number | undefined }
   | { readonly kind: "upload"; readonly target: Target; readonly files: readonly UploadFile[] }

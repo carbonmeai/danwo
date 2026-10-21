@@ -55,9 +55,21 @@ const PAGES: Readonly<Record<string, string>> = {
   "/second": `<!doctype html><title>Second</title><h1>Second</h1>
     <button type="button" onclick="window.close()">Close me</button>`,
   "/third": `<!doctype html><title>Third</title><h1>Third</h1>`,
+  "/dialogs": `<!doctype html><title>Dialogs</title><h1>Dialogs</h1>
+    <button type="button" onclick="out.textContent = confirm('Empty the basket?') ? 'emptied' : 'kept'">Empty</button>
+    <button type="button" onclick="out.textContent = 'hello ' + prompt('Your name?', 'Ada')">Name</button>
+    <button type="button" onclick="alert('Saved with ${DESK_SECRET}')">Save</button>
+    <button type="button" onclick="setTimeout(() => alert('Later'), 50)">Later</button>
+    <p role="status" id="out">nothing yet</p>`,
+  "/greet": `<!doctype html><title>Greet</title><script>alert("Welcome")</script><h1>Greet</h1>`,
 }
 
 let site: DeskSite
+
+/** The locator of the page's button called `name`. */
+function button(name: string): string {
+  return `getByRole("button", { name: "${name}" })`
+}
 
 beforeAll(async () => {
   site = await deskSite(PAGES)
@@ -273,6 +285,75 @@ describe("tabs", () => {
     await expect(desk.act({ kind: "close_tab" })).rejects.toThrow(/the session's only tab/)
     await expect(desk.act({ kind: "switch_tab", tab: 5 })).rejects.toThrow(
       /there is no tab 5: 1 tab is open/,
+    )
+  })
+})
+
+describe("dialogs", () => {
+  it("holds a confirm open until it is answered, then finishes the click", async () => {
+    const { desk } = await site.open("/dialogs")
+    const opened = await desk.act({ kind: "click", target: button("Empty") })
+
+    expect(opened).toContain('a confirm dialog is open: "Empty the basket?"')
+    expect(opened).toContain("dialog with accept: true (OK) or false (Cancel)")
+    expect(await desk.snapshot()).toContain('a confirm dialog is open: "Empty the basket?"')
+    await expect(desk.act({ kind: "click", target: button("Save") })).rejects.toThrow(
+      /a confirm dialog is open/,
+    )
+    await expect(desk.screenshot(undefined, false)).rejects.toThrow(/a confirm dialog is open/)
+
+    const accepted = await desk.act({ kind: "dialog", accept: true })
+
+    expect(accepted).toContain(
+      'accepted the confirm dialog "Empty the basket?"\nclicked screen.getByRole("button", { name: "Empty" })',
+    )
+    expect(accepted).toMatch(/status \[ref=e\d+\]: emptied/)
+
+    await desk.act({ kind: "click", target: button("Empty") })
+    expect(await desk.act({ kind: "dialog", accept: false })).toMatch(
+      /dismissed the confirm[^]*: kept/,
+    )
+    await expect(desk.act({ kind: "dialog", accept: true })).rejects.toThrow(/no dialog is open/)
+  })
+
+  it("fills a prompt, or takes its default", async () => {
+    const { desk } = await site.open("/dialogs")
+
+    expect(await desk.act({ kind: "click", target: button("Name") })).toContain(
+      'text fills the prompt (it holds "Ada")',
+    )
+    expect(await desk.act({ kind: "dialog", accept: true, text: "Grace" })).toMatch(
+      /accepted the prompt dialog "Your name\?" with "Grace"[^]*: hello Grace/,
+    )
+    await desk.act({ kind: "click", target: button("Name") })
+    expect(await desk.act({ kind: "dialog", accept: true })).toContain(": hello Ada")
+  })
+
+  it("never shows a secret a dialog's message holds", async () => {
+    const { desk } = await site.open("/dialogs")
+    const opened = await desk.act({ kind: "click", target: button("Save") })
+    const accepted = await desk.act({ kind: "dialog", accept: true })
+
+    expect(opened).toContain('"Saved with [secret deskKey]"')
+    expect(accepted).toContain('accepted the alert dialog "Saved with [secret deskKey]"')
+    for (const text of [opened, accepted]) expect(text).not.toContain(DESK_SECRET)
+  })
+
+  it("says when a dialog opened between calls, or as the page loaded", async () => {
+    const { desk } = await site.open("/dialogs")
+
+    await desk.act({ kind: "click", target: button("Later") })
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(await desk.snapshot()).toContain('an alert dialog is open: "Later"')
+    expect(await desk.act({ kind: "dialog", accept: true })).toContain(
+      'accepted the alert dialog "Later"',
+    )
+
+    const greeted = await site.open("/greet")
+
+    expect(greeted.text).toContain('an alert dialog is open: "Welcome"')
+    expect(await greeted.desk.act({ kind: "dialog", accept: true })).toMatch(
+      /accepted the alert dialog "Welcome"\nloaded \/greet[^]*heading "Greet"/,
     )
   })
 })

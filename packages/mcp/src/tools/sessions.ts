@@ -83,6 +83,8 @@ const SessionArgs = z.object({
   button,
   double,
   tab: z.number().optional(),
+  accept: z.boolean().optional(),
+  text: z.string().optional(),
 })
 
 type SessionArgs = z.infer<typeof SessionArgs>
@@ -120,7 +122,7 @@ function register(server: McpServer, sessions: SessionManager, tool: SessionTool
 }
 
 const ACTION_NOTE =
-  "Answers with what changed on the page (+ new, - gone, or the whole page after a navigation) and the console errors, failed requests and dialogs since the last call."
+  "Answers with what changed on the page (+ new, - gone, or the whole page after a navigation) and the console errors and failed requests since the last call; when the action opens a dialog, with the dialog to answer."
 
 function registerActions(server: McpServer, sessions: SessionManager): void {
   register(server, sessions, {
@@ -222,6 +224,16 @@ function registerActions(server: McpServer, sessions: SessionManager): void {
     description: `Close a tab by its number in tabs, or the active one without a number; the newest tab left becomes the active one. The session's only tab cannot be closed. ${ACTION_NOTE}`,
     input: { session, tab: tab.optional() },
     call: (args) => ({ kind: "close_tab", tab: args.tab }),
+  })
+  register(server, sessions, {
+    name: "dialog",
+    description: `Answer the alert, confirm or prompt dialog the page has open: accept: true is OK, false is Cancel; text fills a prompt. While a dialog is open nothing on the page can be read or clicked, so every other page tool says it is open. The action that opened it then finishes. ${ACTION_NOTE}`,
+    input: {
+      session,
+      accept: z.boolean().describe("true for OK, false for Cancel"),
+      text: z.string().optional().describe("what to type into a prompt; its default without it"),
+    },
+    call: (args) => ({ kind: "dialog", accept: given(args.accept, "accept"), text: args.text }),
   })
   register(server, sessions, {
     name: "navigate",

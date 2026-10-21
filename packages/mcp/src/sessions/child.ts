@@ -62,6 +62,7 @@ const ACTIONS = new Set<string>([
   "drag",
   "switch_tab",
   "close_tab",
+  "dialog",
 ])
 const PAGE_CALLS = new Set<string>([
   "snapshot",
