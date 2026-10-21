@@ -491,4 +491,4 @@ Early. APIs will change.
 
 ## License
 
-The code is licensed under the [Apache License 2.0](LICENSE). The dánwò name and logo in [`brand/`](brand/) are not covered by that licence; see [TRADEMARKS.md](TRADEMARKS.md).
+The code is licensed under the [Apache License 2.0](LICENSE). The dánwò name and logo in [`brand/`](brand/) are trademarks of Carbonme Inc and are not covered by that licence; see [TRADEMARKS.md](TRADEMARKS.md).
