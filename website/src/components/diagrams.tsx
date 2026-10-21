@@ -77,6 +77,19 @@ export function Arrow(props: {
   )
 }
 
+/** An arrow that turns corners: a line through `points`, with the arrowhead at the last one. */
+export function ElbowArrow(props: {
+  readonly points: readonly (readonly [number, number])[]
+}): ReactNode {
+  return (
+    <polyline
+      points={props.points.map(([x, y]) => `${x},${y}`).join(" ")}
+      markerEnd="url(#danwo-arrow)"
+      style={{ fill: "none", stroke: LINE, strokeWidth: 1.5, strokeLinejoin: "round" }}
+    />
+  )
+}
+
 /** The figure around a diagram: a scalable SVG with an arrowhead marker and a caption. */
 export function Figure(props: {
   readonly width: number
@@ -501,8 +514,15 @@ export function ProviderFlow(): ReactNode {
       <Box x={490} y={40} width={170} label="Stripe emulator" note="customers, sessions…" />
       <Arrow from={[575, 90]} to={[575, 146]} />
       <Box x={490} y={150} width={170} label="Your test" note="reads its state" />
-      <Arrow from={[490, 90]} to={[180, 160]} />
-      <text x={330} y={150} textAnchor="middle" style={{ fill: MUTED, fontSize: 11 }}>
+      <ElbowArrow
+        points={[
+          [520, 90],
+          [520, 122],
+          [95, 122],
+          [95, 94],
+        ]}
+      />
+      <text x={307} y={140} textAnchor="middle" style={{ fill: MUTED, fontSize: 11 }}>
         signed webhook back to your app
       </text>
     </Figure>
