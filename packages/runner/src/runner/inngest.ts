@@ -407,6 +407,20 @@ interface ExpectedRuns {
   readonly patienceFrom: number
 }
 
+/**
+ * Whether some of `wanted` have not shown yet (`found` holds, for each, the events of those that
+ * have), while there is still time for them to.
+ */
+function stillExpecting(
+  wanted: readonly ExpectedRuns[],
+  found: readonly (readonly string[])[],
+): boolean {
+  return wanted.some(
+    (some, n) =>
+      (found[n]?.length ?? 0) < some.count && Date.now() - some.patienceFrom < NO_RUNS_MS,
+  )
+}
+
 function sameRuns(a: readonly ExpectedRuns[], b: readonly ExpectedRuns[]): boolean {
   const key = (runs: readonly ExpectedRuns[]) =>
     runs.map((r) => `${r.functionId} ${r.event} ${r.since} ${r.count}`).join("\n")
@@ -585,6 +599,29 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
     )
 
   /**
+   * One look at the dev server: the events to wait on (those sent through the proxy, and those the
+   * dev server started `wanted` runs with) and the runs they started, each noted in `firstSeen`
+   * when it first shows; and whether some of `wanted` have yet to show.
+   */
+  const look = async (wanted: readonly ExpectedRuns[], firstSeen: Map<string, number>) => {
+    const sent = sentEvents()
+    const found = await Promise.all(wanted.map((some) => startedBy(url, some)))
+    const events = [...new Set([...sent.map(({ id }) => id), ...found.flat()])]
+
+    for (const { id, at } of sent) if (!firstSeen.has(id)) firstSeen.set(id, at)
+    markSeen(firstSeen, events)
+
+    const listed = (await Promise.all(events.map((event) => runsOf(url, event)))).flat()
+
+    markSeen(
+      firstSeen,
+      listed.map(({ run }) => run.runId),
+    )
+
+    return { sent, events, listed, expecting: stillExpecting(wanted, found) }
+  }
+
+  /**
    * Waits until every event sent so far has finished its runs, the ones those runs send included:
    * the sent events are read again on every poll, and each event gets its own time to show runs.
    * A run listed as finished with no end time is one the SDK checkpoints itself, and counts as
@@ -603,20 +640,8 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
     let handlers: ExpectedRuns[] = []
 
     for (;;) {
-      const sent = sentEvents()
-      const wanted = [...expected, ...handlers]
-      const found = await Promise.all(wanted.map((some) => startedBy(url, some)))
-      const events = [...new Set([...sent.map(({ id }) => id), ...found.flat()])]
+      const { sent, events, listed, expecting } = await look([...expected, ...handlers], firstSeen)
 
-      for (const { id, at } of sent) if (!firstSeen.has(id)) firstSeen.set(id, at)
-      markSeen(firstSeen, events)
-
-      const listed = (await Promise.all(events.map((event) => runsOf(url, event)))).flat()
-
-      markSeen(
-        firstSeen,
-        listed.map(({ run }) => run.runId),
-      )
       runs = await named(registry, listed)
 
       const nobody = await unheard(sent, listed)
@@ -624,18 +649,12 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
 
       handlers = await failureHandlers(registry, listed, failedAt)
 
-      const missing =
+      const waiting =
+        expecting ||
         !sameRuns(before, handlers) ||
-        wanted.some(
-          (some, n) =>
-            (found[n]?.length ?? 0) < some.count && Date.now() - some.patienceFrom < NO_RUNS_MS,
-        )
+        stillWaiting(events, listed, firstSeen, lastCheckpoints(), nobody, appCallOpen())
 
-      if (
-        !missing &&
-        !stillWaiting(events, listed, firstSeen, lastCheckpoints(), nobody, appCallOpen())
-      )
-        return waitedFor(events, runs)
+      if (!waiting) return waitedFor(events, runs)
       if (Date.now() > deadline)
         throw new Error(
           `Inngest runs were still going after ${options.settleTimeoutMs ?? 30_000} ms`,

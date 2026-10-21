@@ -57,24 +57,26 @@ function missing(field: string): Problem {
   return { name: "missing_required_field", problem: `Missing \`${field}\` field.` }
 }
 
-/** The email a send request describes, or why it cannot be sent. */
-function draftOf(body: Record<string, unknown>): Draft | Problem {
-  const from = textOf(body.from)
-  const to = addresses(body.to)
-  const subject = textOf(body.subject)
-
+/** Why a send with these fields cannot go out, or undefined when it can. */
+function problemOf(
+  from: string | undefined,
+  to: readonly string[],
+  subject: string | undefined,
+): Problem | undefined {
   if (!from) return missing("from")
   if (to.length === 0) return missing("to")
   if (subject === undefined) return missing("subject")
   if (!ADDRESS.test(from.trim())) return badAddress("from")
   if (!to.every((address) => ADDRESS.test(address.trim()))) return badAddress("to")
 
+  return undefined
+}
+
+/** What a send request asks for besides its sender, recipients and subject. */
+function extrasOf(body: Record<string, unknown>): Omit<Draft, "from" | "to" | "subject"> {
   const html = textOf(body.html) ?? null
 
   return {
-    from,
-    to,
-    subject,
     html,
     // Resend writes a plain-text part from the HTML when the send leaves it out.
     text: textOf(body.text) ?? (html === null ? null : plainText(html)),
@@ -84,6 +86,18 @@ function draftOf(body: Record<string, unknown>): Draft | Problem {
     tags: tagsOf(body.tags),
     scheduled_at: textOf(body.scheduled_at) ?? textOf(body.scheduledAt) ?? null,
   }
+}
+
+/** The email a send request describes, or why it cannot be sent. */
+function draftOf(body: Record<string, unknown>): Draft | Problem {
+  const from = textOf(body.from)
+  const to = addresses(body.to)
+  const subject = textOf(body.subject)
+  const problem = problemOf(from, to, subject)
+
+  if (problem || !from || subject === undefined) return problem ?? missing("from")
+
+  return { from, to, subject, ...extrasOf(body) }
 }
 
 /** `html` as plain text, with whitespace runs collapsed. */

@@ -47,42 +47,69 @@ function valueOf(text: string, names: readonly string[], offset: number): number
   return /^\d+$/.test(text) ? Number(text) : undefined
 }
 
-/** The values `min`..`max` that one comma-separated part (`*`, `5`, `1-5`, `*\/15`, `1-30/2`) allows. */
-function partValues(
-  part: string,
-  min: number,
-  max: number,
-  names: readonly string[],
-): number[] | undefined {
-  const [range = "", stepText] = part.split("/")
-  const step = stepText === undefined ? 1 : Number(stepText)
+/** The range one field's values come from, and the names its values may go by. */
+interface Range {
+  readonly min: number
+  readonly max: number
+  readonly names: readonly string[]
+}
 
-  if (!Number.isInteger(step) || step < 1) return undefined
+/** The five fields' ranges, in order; a weekday of 7 is Sunday again. */
+const RANGES: readonly Range[] = [
+  { min: 0, max: 59, names: [] },
+  { min: 0, max: 23, names: [] },
+  { min: 1, max: 31, names: [] },
+  { min: 1, max: 12, names: MONTHS },
+  { min: 0, max: 7, names: WEEKDAYS },
+]
 
-  const [lowText = "", highText] = range.split("-")
-  const low = range === "*" ? min : valueOf(lowText, names, min)
-  /* `5/15` runs from 5 to the end; a lone `5` is just 5. */
-  let high = highText === undefined ? low : valueOf(highText, names, min)
+/** A part's step: 1 without `/n`, undefined when `n` is not a whole number from 1. */
+function stepOf(text: string | undefined): number | undefined {
+  const step = text === undefined ? 1 : Number(text)
 
-  if (range === "*" || (highText === undefined && stepText !== undefined)) high = max
+  return Number.isInteger(step) && step >= 1 ? step : undefined
+}
 
-  if (low === undefined || high === undefined || low < min || high > max || low > high)
-    return undefined
+/**
+ * The first and last value of a part's range (`*`, `5`, `1-5`); with a step and no end (`5/15`)
+ * it runs to the end of the field. Undefined when it is not a range in `range`.
+ */
+function boundsOf(
+  text: string,
+  stepped: boolean,
+  range: Range,
+): readonly [number, number] | undefined {
+  if (text === "*") return [range.min, range.max]
+
+  const [lowText = "", highText] = text.split("-")
+  const low = valueOf(lowText, range.names, range.min)
+  let high = stepped ? range.max : low
+
+  if (highText !== undefined) high = valueOf(highText, range.names, range.min)
+  if (low === undefined || high === undefined) return undefined
+
+  return low >= range.min && high <= range.max && low <= high ? [low, high] : undefined
+}
+
+/** The values one comma-separated part (`*`, `5`, `1-5`, `*\/15`, `1-30/2`) allows. */
+function partValues(part: string, range: Range): number[] | undefined {
+  const [text = "", stepText] = part.split("/")
+  const step = stepOf(stepText)
+  const bounds = step === undefined ? undefined : boundsOf(text, stepText !== undefined, range)
+
+  if (step === undefined || bounds === undefined) return undefined
+
+  const [low, high] = bounds
 
   return Array.from({ length: Math.floor((high - low) / step) + 1 }, (_, n) => low + n * step)
 }
 
 /** One field, or undefined when it is not one. */
-function fieldOf(
-  text: string,
-  min: number,
-  max: number,
-  names: readonly string[] = [],
-): Field | undefined {
+function fieldOf(text: string, range: Range): Field | undefined {
   const values = new Set<number>()
 
   for (const part of text.split(",")) {
-    const allowed = partValues(part, min, max, names)
+    const allowed = partValues(part, range)
 
     if (allowed === undefined) return undefined
     for (const value of allowed) values.add(value)
@@ -91,29 +118,37 @@ function fieldOf(
   return { values, any: text === "*" }
 }
 
+/** The five fields of `texts`, or undefined unless there are five and each is one. */
+function fiveFields(
+  texts: readonly string[],
+): readonly [Field, Field, Field, Field, Field] | undefined {
+  const fields = texts.flatMap((text, n) => {
+    const range = RANGES[n]
+    const field = range && fieldOf(text, range)
+
+    return field ? [field] : []
+  })
+  const [minute, hour, day, month, weekday] = fields
+
+  if (texts.length !== 5 || !minute || !hour || !day || !month || !weekday) return undefined
+
+  return [minute, hour, day, month, weekday]
+}
+
 /** A schedule, or undefined when `expression` is not one this reads. */
 function parseCron(expression: string): Schedule | undefined {
   const zoned = /^(?:CRON_)?TZ=(\S+)\s+(.*)$/.exec(expression.trim())
-  const zone = zoned?.[1]
   const rest = (zoned?.[2] ?? expression).trim()
-  const fields = (SHORTHANDS[rest] ?? rest).split(/\s+/)
+  const fields = fiveFields((SHORTHANDS[rest] ?? rest).split(/\s+/))
 
-  if (fields.length !== 5) return undefined
+  if (fields === undefined) return undefined
 
-  const [minute, hour, day, month, weekday] = [
-    fieldOf(fields[0] ?? "", 0, 59),
-    fieldOf(fields[1] ?? "", 0, 23),
-    fieldOf(fields[2] ?? "", 1, 31),
-    fieldOf(fields[3] ?? "", 1, 12, MONTHS),
-    fieldOf(fields[4] ?? "", 0, 7, WEEKDAYS),
-  ]
-
-  if (!minute || !hour || !day || !month || !weekday) return undefined
+  const [minute, hour, day, month, weekday] = fields
 
   /* Sunday is 0 or 7. */
   const weekdays = new Set([...weekday.values].map((value) => value % 7))
 
-  return { minute, hour, day, month, weekday: { ...weekday, values: weekdays }, zone }
+  return { minute, hour, day, month, weekday: { ...weekday, values: weekdays }, zone: zoned?.[1] }
 }
 
 /** A moment's wall-clock fields in `zone`, or in UTC without one. */

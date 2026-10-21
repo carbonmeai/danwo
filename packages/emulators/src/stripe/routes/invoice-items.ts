@@ -36,16 +36,19 @@ function costOf(
 ): Cost | Response {
   const priceId = text(asRecord(params.pricing)?.price) ?? text(params.price)
 
-  if (priceId !== undefined) {
-    const price = context.objects.prices.get(priceId)
+  if (priceId === undefined) return givenCost(c, params, quantity)
 
-    if (!price) return noSuch(c, "price", priceId, "pricing[price]")
+  const price = context.objects.prices.get(priceId)
 
-    const unitAmount = price.unit_amount ?? 0
+  if (!price) return noSuch(c, "price", priceId, "pricing[price]")
 
-    return { unitAmount, amount: unitAmount * quantity, currency: price.currency, price }
-  }
+  const unitAmount = price.unit_amount ?? 0
 
+  return { unitAmount, amount: unitAmount * quantity, currency: price.currency, price }
+}
+
+/** The cost a request with no price names: a `unit_amount_decimal` or an `amount`, in `currency`. */
+function givenCost(c: Context, params: Record<string, unknown>, quantity: number): Cost | Response {
   const currency = text(params.currency)
 
   if (currency === undefined) return badParam(c, "currency")
