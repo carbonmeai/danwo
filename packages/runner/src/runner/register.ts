@@ -1,16 +1,17 @@
 /*
  * Loaded into every danwo process with `--import`: Node 24 strips TypeScript types natively; this
  * adds the two resolutions a TypeScript project expects on top, a `.js` specifier that names a
- * `.ts` file and an extensionless relative specifier.
+ * `.ts` file and an extensionless relative specifier. It also loads a project's `.ts` files as
+ * ES modules when its package.json says CommonJS.
  */
 import { existsSync } from "node:fs"
-import { registerHooks } from "node:module"
+import { registerHooks, type ResolveFnOutput } from "node:module"
 import { fileURLToPath } from "node:url"
 
 registerHooks({
   resolve(specifier, context, nextResolve) {
     try {
-      return nextResolve(specifier, context)
+      return asModule(nextResolve(specifier, context))
     } catch (error) {
       const url = typeScriptCandidate(specifier, context.parentURL)
 
@@ -18,10 +19,24 @@ registerHooks({
         throw error
       }
 
-      return nextResolve(url, context)
+      return asModule(nextResolve(url, context))
     }
   },
 })
+
+/**
+ * danwo's config and tests are ES modules, but in a package with no `"type": "module"` (or the
+ * `"type": "commonjs"` that `npm init` writes) Node loads a `.ts` file as CommonJS, and it fails on
+ * its first `import`. The project's own `.ts` files load as modules instead; installed packages
+ * keep the format their package says.
+ */
+function asModule(resolved: ResolveFnOutput): ResolveFnOutput {
+  const installed = /[\\/]node_modules[\\/]/.test(resolved.url)
+
+  return resolved.format === "commonjs-typescript" && !installed
+    ? { ...resolved, format: "module-typescript" }
+    : resolved
+}
 
 /** The `.ts` file a relative `.js` or extensionless specifier means, if one exists. */
 function typeScriptCandidate(specifier: string, parentURL: string | undefined): string | undefined {
