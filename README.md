@@ -14,6 +14,10 @@ Coding agents made writing code cheap; verifying it is now the bottleneck. A tes
 - **It breaks the run on purpose.** `danwo matrix` records one clean run, then replays it once per fault the app could meet: declined cards, 500s, timeouts, duplicate or forged webhooks, double-submits, lost database commits, time jumps. An invariant judges every trial.
 - **It explains every run.** A flight record keeps the video, each step, every provider call and webhook, the database statements and the emulators' state, with secrets redacted, in a dashboard, a GitHub Check and a pull request comment, and over MCP for coding agents.
 
+### The name
+
+_Dánwò_ is Yorùbá for "to test". It comes from _dán … wò_, "try it and see": you don't take something on trust, you put it to the test and watch what happens. That is the whole idea of danwo. Say it _DAHN-woh_, with the voice high on the first syllable and low on the second.
+
 ## Quickstart
 
 In your app's folder:
