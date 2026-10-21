@@ -402,42 +402,69 @@ const SETUPS = {
 } satisfies Readonly<Record<string, readonly Hop[]>>
 
 const HOP_WIDTH = 150
-const HOP_GAP = 40
+const FIGURE_WIDTH = 760
+const SIDE = 10
+/** How far the dashed line runs past the last hop it goes round. */
+const REGION_PAD = 6
 
-/** A scenario's request path, left to right, with danwo's proxy drawn around the hops it covers. */
+/** Where the `i`-th of `count` hops starts, spread so the row fills the figure. */
+function hopX(i: number, count: number): number {
+  const gap = count > 1 ? (FIGURE_WIDTH - 2 * SIDE - count * HOP_WIDTH) / (count - 1) : 0
+
+  return SIDE + i * (HOP_WIDTH + gap)
+}
+
+/**
+ * A scenario's request path, left to right. The dashed line goes round the part danwo controls:
+ * every call leaving a hop inside it passes through danwo's proxy, marked on its arrow, so it is
+ * recorded and can be emulated or faulted.
+ */
 export function Setup(props: { readonly kind: keyof typeof SETUPS }): ReactNode {
   const hops: readonly Hop[] = SETUPS[props.kind]
   const inside = hops.filter((hop) => hop.inside).length
+  const lastInside = inside > 0 ? hopX(inside - 1, hops.length) + HOP_WIDTH : 0
 
   return (
     <Figure
-      width={760}
+      width={FIGURE_WIDTH}
       height={150}
       label={hops
-        .map((hop) => `${hop.label}, ${hop.inside ? "inside" : "outside"} danwo's proxy`)
+        .map((hop) => `${hop.label}, ${hop.inside ? "inside" : "outside"} what danwo controls`)
         .join("; then ")}
       caption={
         inside === 0
           ? "No proxy: danwo drives and records the browser, and nothing else."
-          : "The dashed line is danwo's proxy: what's inside can be emulated and faulted."
+          : "Calls marked proxy go through danwo's proxy, so each is recorded and can be emulated or faulted."
       }
     >
       {inside > 0 && (
         <Region
           x={4}
           y={8}
-          width={inside * (HOP_WIDTH + HOP_GAP) - HOP_GAP / 2 + 6}
+          width={lastInside + REGION_PAD - 4}
           height={134}
-          label="inside danwo's proxy"
+          label="danwo controls this part"
           strong
         />
       )}
       {hops.map((hop, i) => {
-        const x = 10 + i * (HOP_WIDTH + HOP_GAP)
+        const x = hopX(i, hops.length)
+        const previous = hops[i - 1]
+        const from = i > 0 ? hopX(i - 1, hops.length) + HOP_WIDTH : 0
 
         return (
           <g key={hop.label}>
-            {i > 0 && <Arrow from={[x - HOP_GAP, 87]} to={[x - 4, 87]} />}
+            {previous !== undefined && <Arrow from={[from, 87]} to={[x - 4, 87]} />}
+            {previous?.inside === true && (
+              <text
+                x={(from + (hop.inside ? 0 : REGION_PAD) + x) / 2}
+                y={78}
+                textAnchor="middle"
+                style={{ fill: MUTED, fontSize: 11 }}
+              >
+                proxy
+              </text>
+            )}
             <Box x={x} y={62} width={HOP_WIDTH} label={hop.label} note={hop.note} />
           </g>
         )
