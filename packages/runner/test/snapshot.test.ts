@@ -110,5 +110,12 @@ describe("routes", () => {
       routeOf("https://checkout.stripe.com/checkout/cs_test_a1B2c3D4e5", "http://127.0.0.1:5123"),
     ).toBe("checkout.stripe.com/checkout/:id")
     expect(routeOf("http://127.0.0.1:5123/thanks", "http://127.0.0.1:5123")).toBe("app/thanks")
+    /* A random base64url id with no digit in it, and a long slug that is not an id. */
+    expect(routeOf("http://127.0.0.1:5123/c/tcGGXmkSvfDs_Zda", "http://127.0.0.1:5123")).toBe(
+      "app/c/:id",
+    )
+    expect(
+      routeOf("http://127.0.0.1:5123/blog/how-we-test-our-checkout", "http://127.0.0.1:5123"),
+    ).toBe("app/blog/how-we-test-our-checkout")
   })
 })

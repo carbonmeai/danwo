@@ -9,9 +9,16 @@ const UUID = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i
 const NUMBER = /^\d+$/
 /** A long token mixing letters and digits, e.g. a base62 id. */
 const TOKEN = /^(?=.*\d)(?=.*[A-Za-z])[A-Za-z\d_-]{16,}$/
+/**
+ * A long token mixing upper and lower case, e.g. a random base64url id that happens to hold no
+ * digit (one in thirty 16-character ids). A slug is lower case, so it never looks like one.
+ */
+const MIXED_CASE_TOKEN = /^(?=.*[a-z])(?=.*[A-Z])[A-Za-z\d_-]{16,}$/
 
 function isGenerated(segment: string): boolean {
-  return [PREFIXED_ID, UUID, NUMBER, TOKEN].some((pattern) => pattern.test(segment))
+  return [PREFIXED_ID, UUID, NUMBER, TOKEN, MIXED_CASE_TOKEN].some((pattern) =>
+    pattern.test(segment),
+  )
 }
 
 /** The route of `url` relative to the app at `appOrigin`. */
