@@ -1,0 +1,22 @@
+{
+  "name": "danwo-launch-video",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts Launch out/danwo-launch.mp4",
+    "still": "remotion still src/index.ts Launch out/still.png"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.537",
+    "@remotion/fonts": "4.0.537",
+    "@remotion/paths": "4.0.537",
+    "@remotion/transitions": "4.0.537",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.537"
+  },
+  "devDependencies": {
+    "@types/react": "^19"
+  }
+}

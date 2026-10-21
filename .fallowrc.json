@@ -67,7 +67,12 @@
   "rules": {
     "unused-dependencies": "warn"
   },
-  "ignorePatterns": ["examples/shop-mobile/app/**", "examples/[!s_]*/**", "examples/s[!h]*/**"],
+  "ignorePatterns": [
+    "brand/launch-video/**",
+    "examples/shop-mobile/app/**",
+    "examples/[!s_]*/**",
+    "examples/s[!h]*/**"
+  ],
   "usedClassMembers": [
     {
       "implements": "Locator",

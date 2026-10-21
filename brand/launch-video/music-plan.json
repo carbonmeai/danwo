@@ -1,0 +1,153 @@
+{
+  "model_id": "music_v2_5",
+  "composition_plan": {
+    "chunks": [
+      {
+        "condition_strength": null,
+        "conditioning_ref": null,
+        "context_adherence": "high",
+        "duration_ms": 7000,
+        "negative_styles": [
+          "vocals",
+          "singing",
+          "lyrics",
+          "guitar",
+          "orchestral trailer",
+          "dubstep",
+          "harsh distortion"
+        ],
+        "positive_styles": [
+          "118 BPM",
+          "sparse suspenseful intro",
+          "minimal electronic textures",
+          "short muted synth stabs",
+          "subtle low-end drone",
+          "dry close-mic ambience",
+          "delayed percussion fragments",
+          "restrained opening arrangement",
+          "instrumental",
+          "curious",
+          "quiet"
+        ],
+        "text": "[Intro]"
+      },
+      {
+        "condition_strength": null,
+        "conditioning_ref": null,
+        "context_adherence": "high",
+        "duration_ms": 3000,
+        "negative_styles": [
+          "vocals",
+          "singing",
+          "lyrics",
+          "guitar",
+          "orchestral trailer",
+          "dubstep",
+          "harsh distortion"
+        ],
+        "positive_styles": [
+          "118 BPM",
+          "rising filter sweep over 3 seconds",
+          "soft impact for logo reveal",
+          "thin synth pulse",
+          "light kick entrance",
+          "clean transient design",
+          "controlled stereo width",
+          "brief transition section",
+          "instrumental",
+          "warm chord swell"
+        ],
+        "text": "[Logo Reveal]"
+      },
+      {
+        "condition_strength": null,
+        "conditioning_ref": null,
+        "context_adherence": "high",
+        "duration_ms": 18000,
+        "negative_styles": [
+          "vocals",
+          "singing",
+          "lyrics",
+          "guitar",
+          "orchestral trailer",
+          "dubstep",
+          "harsh distortion"
+        ],
+        "positive_styles": [
+          "118 BPM",
+          "steady driving groove",
+          "tight four-on-the-floor kick",
+          "punchy electronic percussion",
+          "warm analog bassline",
+          "minimal repeating synth motif",
+          "focused midrange mix",
+          "forward momentum",
+          "sleek product film energy",
+          "instrumental",
+          "glassy arpeggio",
+          "sidechained pads"
+        ],
+        "text": "[Main Groove]"
+      },
+      {
+        "condition_strength": null,
+        "conditioning_ref": null,
+        "context_adherence": "high",
+        "duration_ms": 12000,
+        "negative_styles": [
+          "vocals",
+          "singing",
+          "lyrics",
+          "guitar",
+          "orchestral trailer",
+          "dubstep",
+          "harsh distortion"
+        ],
+        "positive_styles": [
+          "118 BPM",
+          "fuller uplifting peak",
+          "layered synth chords",
+          "stronger bass weight",
+          "brighter melodic lead",
+          "wide stereo arrangement",
+          "lifted harmonic movement",
+          "polished cinematic electronic finish",
+          "instrumental",
+          "open hi-hats",
+          "confident and optimistic"
+        ],
+        "text": "[Peak]"
+      },
+      {
+        "condition_strength": null,
+        "conditioning_ref": null,
+        "context_adherence": "high",
+        "duration_ms": 8000,
+        "negative_styles": [
+          "vocals",
+          "singing",
+          "lyrics",
+          "guitar",
+          "orchestral trailer",
+          "dubstep",
+          "harsh distortion"
+        ],
+        "positive_styles": [
+          "118 BPM",
+          "outro resolving chord",
+          "clean ending",
+          "decaying synth tail",
+          "soft percussion fade",
+          "minimal closing texture",
+          "resolved tonal center",
+          "neat final cadence",
+          "instrumental",
+          "final soft hit",
+          "fade to silence"
+        ],
+        "text": "[Outro]"
+      }
+    ]
+  },
+  "seed": 7
+}
