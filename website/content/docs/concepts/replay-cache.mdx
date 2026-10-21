@@ -22,8 +22,18 @@ A new recording is kept only once a check after it passes, such as an `expect` o
 to. If the test fails before any check confirms the step, the recording is dropped, so a step that
 went wrong never becomes the recording.
 
-The changes it keeps leave out text that differs on every run, such as `7 sec. ago`, `Oct 20` or
-`3pm`. A replay doesn't wait for a time that has moved on.
+The changes it keeps leave out text that differs on every run, so a replay doesn't wait for it:
+
+| Left out                      | For example                                         |
+| ----------------------------- | --------------------------------------------------- |
+| Times, dates, relative times  | `3pm`, `Oct 20`, `7 sec. ago`                       |
+| Durations                     | `321ms`, `Took 1.2s`                                |
+| Result counts and ranges      | `Showing 1 to 9 of 9 results`, `3 records imported` |
+| Badges that are only a number | `11`, `99+`                                         |
+| Route announcers              | Next.js reading out the new page's title            |
+
+The page a step ends on is kept with its ids taken out, so `/projects/PROJ-016` and
+`/projects/PROJ-017` count as the same page.
 
 The other agent steps are recorded too:
 

@@ -53,8 +53,18 @@ replay caught it. A step the model took over from a replay keeps the actions the
 already done in its new recording.
 
 A step's recorded page effects leave out text that changes between runs: times and dates,
-relative times (`7 sec. ago`, `a minute ago`, `in 3 days`), month dates (`Oct 20`) and am/pm times
-(`3pm`), so a replay does not wait for them.
+relative times (`7 sec. ago`, `a minute ago`, `in 3 days`), month dates (`Oct 20`), am/pm times
+(`3pm`), durations (`321ms`, `1.2s`), result counts and ranges (`Showing 1 to 9 of 9 results`,
+`3 records imported`) and badges that are only a number (`11`, `99+`), so a replay does not wait
+for them. A framework's route announcer (Next.js's `next-route-announcer`, and Gatsby's, Nuxt's and
+SvelteKit's) is never an effect, nor is a live region that only reads out the page's title. Text
+your app changes on its own in another way goes in `effects.ignore`.
+
+The route a step ends on is kept as a template: the app's origin is `app`, and path segments that
+look generated become `:id`: numbers, UUIDs, prefixed ids (`cs_test_…`, `ord_9xK2`), keyed numbers
+(`PROJ-016`, `INV-2041`), hex ids of 8 or more with a digit (`8f3a2b1c`) and tokens of 8 or more
+that switch between letters and digits at least twice (`abc123def`). Words and versioned names
+(`windows11`) stay as they are.
 
 A new `agent.act` recording is staged until a later check (an assertion, a value check or a passed
 `agent.assert`) passes: the step reads `recorded, kept only if the test passes` while the attempt
