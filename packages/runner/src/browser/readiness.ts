@@ -15,6 +15,11 @@ export type ReadinessMode = "page" | "page+backend" | "off"
 export interface Backend {
   /** Resolves once nothing the app started is still in flight, or `timeoutMs` passed. */
   quiet(timeoutMs: number): Promise<void>
+  /**
+   * A count that moves whenever a call through the proxy starts or finishes, or a webhook delivery
+   * is made: the same count before and after a wait means the backend did nothing in between.
+   */
+  pulse?(): number
   /** Provider calls that failed (5xx or no answer), oldest first, each as one line. */
   failures?(): readonly string[]
   /**
@@ -96,6 +101,26 @@ function remaining(started: number, capMs: number): number {
   return Math.max(0, capMs - (performance.now() - started))
 }
 
+/**
+ * The page settled, then the backend quiet, then the page again for what the backend answered.
+ * When the backend did nothing since the action, no answer came in after the page went quiet, so
+ * the page is not waited on twice.
+ */
+async function pageAndBackendSettled(
+  page: Page,
+  backend: Backend,
+  quietMs: number,
+  capMs: number,
+): Promise<void> {
+  const started = performance.now()
+  const mark = backend.pulse?.()
+
+  await pageSettled(page, quietMs, capMs)
+  await backend.quiet(remaining(started, capMs)).catch(() => undefined)
+  if (mark !== undefined && backend.pulse?.() === mark) return
+  await domQuiet(page, quietMs, Math.min(remaining(started, capMs), DOM_CAP_MS))
+}
+
 /** The session's waiting after actions. */
 export class Readiness {
   private readonly options: ReadinessOptions
@@ -115,13 +140,8 @@ export class Readiness {
     const started = performance.now()
     const withBackend = mode === "page+backend" && backend !== undefined
 
-    await pageSettled(page, quiet, cap)
-
-    if (withBackend) {
-      await backend.quiet(remaining(started, cap)).catch(() => undefined)
-      /* What the backend answered may change the page again. */
-      await domQuiet(page, quiet, Math.min(remaining(started, cap), DOM_CAP_MS))
-    }
+    if (withBackend) await pageAndBackendSettled(page, backend, quiet, cap)
+    else await pageSettled(page, quiet, cap)
 
     return {
       ms: Math.round(performance.now() - started),

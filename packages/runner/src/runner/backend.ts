@@ -3,8 +3,8 @@ import type { WebhookDispatcher } from "@danwo/emulators"
  * The backend side of readiness, from a worker's environment: the app's calls through the proxy
  * have all finished, and no webhook delivery is in flight. A delivery the app's call caused may
  * only be queued when that call returns, so quiet is checked again after a short pause until a
- * round sees nothing new. With `settle`, the environment's own settling (webhooks on a manual
- * clock, retries) runs as part of it.
+ * round sees nothing new; a backend that has done nothing for that long already gets no pause. With
+ * `settle`, the environment's own settling (webhooks on a manual clock, retries) runs as part of it.
  */
 import { type RunWebhooks, routeOf, webhookSources } from "@danwo/matrix"
 import { isPageAsset, type Proxy } from "@danwo/proxy"
@@ -27,6 +27,18 @@ function activity(env: WorkerEnvironment): number {
   const deliveries = dispatchers(env.webhooks).reduce((n, d) => n + d.attempts().length, 0)
 
   return calls + deliveries
+}
+
+/**
+ * What has happened so far, counting finishes too: calls started and finished at the proxy, and
+ * deliveries made. It stays the same only while the backend does nothing at all.
+ */
+function pulseOf(env: WorkerEnvironment): number {
+  const finished = (env.proxy?.exchanges() ?? []).filter(
+    (call) => call.status !== null || call.aborted,
+  ).length
+
+  return activity(env) + finished
 }
 
 function pause(ms: number): Promise<void> {
@@ -77,7 +89,24 @@ export function backendOf(
 
   const proxy = env.proxy
 
+  /**
+   * The pulse last seen, and since when: the proxy's first call tells a log cleared by a reset from
+   * the same one, should the count come back to the same number.
+   */
+  let seen = { pulse: -1, first: proxy.exchanges()[0], at: 0 }
+
+  const pulse = () => {
+    const now = pulseOf(env)
+    const first = proxy.exchanges()[0]
+
+    if (now !== seen.pulse || first !== seen.first)
+      seen = { pulse: now, first, at: performance.now() }
+
+    return now
+  }
+
   return {
+    pulse,
     activity: () => activityOf(proxy, env.webhooks),
     failures: () =>
       proxy
@@ -92,8 +121,11 @@ export function backendOf(
 
       for (let n = 0; n < MAX_ROUNDS && performance.now() < deadline; n++) {
         const before = activity(env)
+        const mark = pulse()
 
         await round(env, Math.max(1, deadline - performance.now()), options.settle ?? false)
+        /* Nothing started or finished for a pause's length already: no delivery is about to show. */
+        if (pulse() === mark && performance.now() - seen.at >= ROUND_PAUSE_MS) return
         await pause(ROUND_PAUSE_MS)
         if (activity(env) === before) return
       }
