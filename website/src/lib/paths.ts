@@ -14,3 +14,11 @@ export function slugsOfMarkdown(segments: readonly string[]): string[] {
 
   return slugs
 }
+
+/**
+ * Whether `href` on this site is a file (raw markdown or text) rather than a page, so the browser
+ * loads it itself instead of the router looking for a page at that address.
+ */
+export function isFileAddress(href: string | undefined): boolean {
+  return href !== undefined && href.startsWith("/") && /\.(md|txt)(#.*)?$/.test(href)
+}

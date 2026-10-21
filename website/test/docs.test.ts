@@ -22,7 +22,7 @@ import {
 } from "../src/generator/plan.ts"
 import { docsSlugs, postSlugs, prerenderedPaths } from "../src/generator/routes.ts"
 import { resolveIcon } from "../src/lib/icons.tsx"
-import { markdownPath, slugsOfMarkdown } from "../src/lib/paths.ts"
+import { isFileAddress, markdownPath, slugsOfMarkdown } from "../src/lib/paths.ts"
 import { PROVIDERS, SHARED_EMULATOR_FOLDERS } from "../src/lib/providers.ts"
 
 /** The planned docs tree, built once from the installed danwo's spec and README. */
@@ -262,5 +262,16 @@ describe("the logos", () => {
 
     for (const provider of PROVIDERS)
       expect(listing, provider.icon).toContain(provider.icon.replace(/\..+$/, ""))
+  })
+})
+
+describe("links to files", () => {
+  it("loads raw markdown and text on the site as files, and leaves pages to the router", () => {
+    expect(isFileAddress("/guides/ci.md")).toBe(true)
+    expect(isFileAddress("/docs/quickstart.md")).toBe(true)
+    expect(isFileAddress("/llms.txt")).toBe(true)
+    expect(isFileAddress("/docs/coding-agents")).toBe(false)
+    expect(isFileAddress("https://example.com/readme.md")).toBe(false)
+    expect(isFileAddress(undefined)).toBe(false)
   })
 })
