@@ -2,7 +2,14 @@
   "name": "@danwo/ui",
   "version": "0.0.0",
   "private": true,
+  "homepage": "https://danwo.dev",
+  "bugs": "https://github.com/danwo-dev/danwo/issues",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danwo-dev/danwo.git",
+    "directory": "packages/ui"
+  },
   "type": "module",
   "exports": {
     ".": "./src/index.ts",

@@ -3,7 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "description": "Writes danwo tests: records someone using the app, and finds the locators and invariant the test needs.",
+  "homepage": "https://danwo.dev",
+  "bugs": "https://github.com/danwo-dev/danwo/issues",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danwo-dev/danwo.git",
+    "directory": "packages/recorder"
+  },
   "files": [
     "src"
   ],

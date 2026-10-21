@@ -3,7 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "description": "Reports danwo runs to GitHub from Actions: a Check Run with annotations, a pull request comment and a job summary.",
+  "homepage": "https://danwo.dev",
+  "bugs": "https://github.com/danwo-dev/danwo/issues",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danwo-dev/danwo.git",
+    "directory": "packages/github"
+  },
   "files": [
     "src"
   ],

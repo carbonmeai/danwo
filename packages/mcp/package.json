@@ -3,7 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "description": "MCP server for coding agents: run danwo tests, read failures, inspect pages and write tests.",
+  "homepage": "https://danwo.dev",
+  "bugs": "https://github.com/danwo-dev/danwo/issues",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danwo-dev/danwo.git",
+    "directory": "packages/mcp"
+  },
   "files": [
     "src"
   ],

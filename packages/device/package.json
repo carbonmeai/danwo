@@ -3,7 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "description": "Mobile devices for danwo tests: an Android emulator bound to danwo's proxy and CA, driven through agent-device.",
+  "homepage": "https://danwo.dev",
+  "bugs": "https://github.com/danwo-dev/danwo/issues",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danwo-dev/danwo.git",
+    "directory": "packages/device"
+  },
   "files": [
     "src"
   ],

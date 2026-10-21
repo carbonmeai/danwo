@@ -3,7 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "description": "Snapshots of the app's own data stores (Postgres, SQLite, Redis) for danwo matrix.",
+  "homepage": "https://danwo.dev",
+  "bugs": "https://github.com/danwo-dev/danwo/issues",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danwo-dev/danwo.git",
+    "directory": "packages/data"
+  },
   "files": [
     "src"
   ],

@@ -4,7 +4,7 @@
 
 Please do not report security problems in public issues, discussions or pull requests.
 
-Report them privately through GitHub: open this repository's **Security** tab and choose **Report a vulnerability** ([new advisory](../../security/advisories/new)). Include what you found, how to reproduce it, and what an attacker could do with it.
+Report them privately through GitHub: open this repository's **Security** tab and choose **Report a vulnerability** ([new advisory](https://github.com/danwo-dev/danwo/security/advisories/new)). Include what you found, how to reproduce it, and what an attacker could do with it.
 
 You will get an acknowledgement within three working days. We will keep you informed while we fix it, agree a disclosure date with you, and credit you in the advisory unless you would rather we didn't.
 

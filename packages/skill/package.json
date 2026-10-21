@@ -3,7 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "description": "What coding agents read about danwo: the shipped skill, task guides and the generated capability spec.",
+  "homepage": "https://danwo.dev",
+  "bugs": "https://github.com/danwo-dev/danwo/issues",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danwo-dev/danwo.git",
+    "directory": "packages/skill"
+  },
   "files": [
     "src",
     "guides",

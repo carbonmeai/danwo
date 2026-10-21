@@ -3,7 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "description": "Provider emulators: defineEmulator, state, webhooks, OAuth, providers.",
+  "homepage": "https://danwo.dev",
+  "bugs": "https://github.com/danwo-dev/danwo/issues",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danwo-dev/danwo.git",
+    "directory": "packages/emulators"
+  },
   "files": [
     "src"
   ],
