@@ -1,0 +1,42 @@
+{
+  "name": "danwo-example-ai-chat",
+  "private": true,
+  "description": "A support assistant on Next.js and the AI SDK: it looks up orders and opens tickets from Postgres, emails through Resend, and is tested against scripted and faulted model answers.",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "danwo test",
+    "test:agentic": "danwo test tests/agentic.danwo.ts",
+    "matrix": "danwo matrix tests/deterministic.danwo.ts --grep \"opens a ticket for a broken mug\" --thorough --budget 60",
+    "matrix:plan": "danwo matrix tests/deterministic.danwo.ts --grep \"opens a ticket for a broken mug\" --thorough --budget 60 --plan",
+    "matrix:order": "danwo matrix tests/deterministic.danwo.ts --grep \"looks up an order\" --thorough --budget 60",
+    "serve": "danwo serve"
+  },
+  "dependencies": {
+    "@ai-sdk/react": "4.0.152",
+    "ai": "7.0.148",
+    "next": "16.4.2",
+    "pg": "8.23.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "resend": "6.34.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@danwo/cli": "0.1.0-beta.0",
+    "@danwo/sdk": "0.1.0-beta.0",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "^24",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

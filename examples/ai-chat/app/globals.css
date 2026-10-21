@@ -1,0 +1,198 @@
+@import "tailwindcss";
+@import "../kit/kit.css";
+@import "../kit/tailwind.css";
+
+/* The chat: a column of messages over a composer, in the kit's tokens. */
+@layer components {
+  .chat {
+    display: flex;
+    flex-direction: column;
+    gap: var(--kit-space-4);
+    max-width: 46rem;
+    margin-inline: auto;
+    min-height: calc(100dvh - var(--kit-topbar-height) - var(--kit-space-12));
+  }
+
+  .chat .empty {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .chat-log {
+    display: flex;
+    flex-direction: column;
+    gap: var(--kit-space-5);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .chat-message {
+    display: flex;
+    gap: var(--kit-space-3);
+    align-items: flex-start;
+  }
+
+  .chat-user {
+    flex-direction: row-reverse;
+  }
+
+  .chat-avatar {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--kit-radius-full);
+    background: var(--kit-bg-subtle);
+    border: 1px solid var(--kit-border);
+    color: var(--kit-fg-muted);
+    font-size: 0.625rem;
+    font-weight: var(--kit-weight-semibold);
+  }
+
+  .chat-assistant .chat-avatar {
+    background: var(--kit-primary);
+    border-color: var(--kit-primary);
+    color: var(--kit-primary-fg);
+  }
+
+  .chat-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--kit-space-2);
+    max-width: 36rem;
+    min-width: 0;
+  }
+
+  .chat-user .chat-body {
+    align-items: flex-end;
+  }
+
+  .chat-text {
+    margin: 0;
+    white-space: pre-wrap;
+    line-height: var(--kit-leading);
+  }
+
+  .chat-user .chat-text {
+    padding: var(--kit-space-2) var(--kit-space-3);
+    border-radius: var(--kit-radius-xl);
+    background: var(--kit-bg-subtle);
+    border: 1px solid var(--kit-border);
+  }
+
+  .chat-message[aria-busy="true"] .chat-text::after {
+    content: "▍";
+    margin-left: 1px;
+    color: var(--kit-fg-subtle);
+    animation: chat-blink 1s steps(2) infinite;
+  }
+
+  .chat-tool {
+    display: flex;
+    flex-direction: column;
+    gap: var(--kit-space-1);
+    padding: var(--kit-space-3);
+    border: 1px solid var(--kit-border);
+    border-radius: var(--kit-radius-lg);
+    background: var(--kit-surface);
+    box-shadow: var(--kit-shadow-sm);
+    font-size: var(--kit-text-sm);
+  }
+
+  .chat-tool-head {
+    display: flex;
+    gap: var(--kit-space-2);
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .chat-tool-pending {
+    color: var(--kit-fg-muted);
+  }
+
+  .chat-tool-error {
+    border-color: var(--kit-warning-border);
+    background: var(--kit-warning-bg);
+    color: var(--kit-warning);
+  }
+
+  .chat-note {
+    margin: 0;
+    color: var(--kit-fg-muted);
+    font-size: var(--kit-text-sm);
+    font-style: italic;
+  }
+
+  .chat-regenerate {
+    align-self: flex-start;
+  }
+
+  .chat-typing {
+    display: flex;
+    gap: 4px;
+    padding-left: calc(2rem + var(--kit-space-3));
+  }
+
+  .chat-typing span {
+    width: 6px;
+    height: 6px;
+    border-radius: var(--kit-radius-full);
+    background: var(--kit-fg-subtle);
+    animation: chat-blink 1s infinite;
+  }
+
+  .chat-typing span:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .chat-typing span:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+
+  .chat-error {
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* The composer keeps to the foot of the page; an error shows right under the last message. */
+  .chat-composer {
+    margin-top: auto;
+    position: sticky;
+    bottom: var(--kit-space-4);
+    display: flex;
+    gap: var(--kit-space-2);
+    align-items: flex-end;
+    padding: var(--kit-space-2);
+    border: 1px solid var(--kit-border);
+    border-radius: var(--kit-radius-xl);
+    background: var(--kit-surface);
+    box-shadow: var(--kit-shadow-md);
+  }
+
+  .chat-input {
+    flex: 1;
+    min-height: 2.5rem;
+    resize: none;
+    border: 0;
+    background: transparent;
+  }
+
+  .chat-input:focus {
+    box-shadow: none;
+  }
+}
+
+@keyframes chat-blink {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-message[aria-busy="true"] .chat-text::after,
+  .chat-typing span {
+    animation: none;
+  }
+}

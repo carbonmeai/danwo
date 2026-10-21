@@ -1,0 +1,19 @@
+{
+  "name": "AI chat with tools",
+  "summary": "A support assistant on Next.js and the AI SDK: it streams answers through the Vercel AI Gateway, looks orders up and opens tickets in Postgres, and emails a copy through Resend, tested against scripted and faulted model answers with no model key.",
+  "icon": "vercel.svg",
+  "iconDark": "vercel-on-dark.svg",
+  "stack": ["Next.js App Router", "AI SDK", "Vercel AI Gateway", "Postgres", "Tailwind CSS"],
+  "providers": ["model-apis", "resend"],
+  "runsOn": "A Next.js app in Chromium, with the model emulated and Postgres in Docker",
+  "install": "npm",
+  "shows": [
+    "The app's model played by danwo's emulator: every answer scripted per test, tool calls included, so the tests are exact and need no key",
+    "Model faults on cue: three rate limits then an answer, a refusal, a malformed tool call, with `llmScripts`",
+    "A matrix over every way a model call fails (429, 5xx, a lost answer, a refusal, an empty or cut-off answer, a content filter, a malformed tool call, a broken stream), Resend errors and the app's SQL",
+    "Invariants over Postgres, the Resend emulator and the page: one ticket per request, one email per ticket, tool writes only with valid arguments, the saved conversation the same as the one shown",
+    "danwo's agent driving the chat, replayed from its cache with no model calls on the second run"
+  ],
+  "test": "tests/deterministic.danwo.ts",
+  "guide": { "title": "Scripting replies", "href": "/docs/providers/model-scripts" }
+}

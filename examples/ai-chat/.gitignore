@@ -1,0 +1,9 @@
+node_modules/
+.next/
+.next-build-lock/
+next-env.d.ts
+*.tsbuildinfo
+package-lock.json
+
+# What danwo writes when it runs: flight records, the agent's recordings, reports.
+.danwo/
