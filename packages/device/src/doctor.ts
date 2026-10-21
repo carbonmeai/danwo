@@ -1,19 +1,22 @@
 /**
- * `danwo device doctor`: what a machine needs to run danwo tests on an Android emulator, checked
- * without changing anything. An SDK can look installed when its system images are only stubs, so
- * images are checked for their files, not just their folders.
+ * `danwo device doctor`: what a machine needs to run danwo tests on an Android emulator or an iOS
+ * Simulator, checked without changing anything. An SDK can look installed when its system images
+ * are only stubs, so images are checked for their files, not just their folders.
  */
 import { existsSync } from "node:fs"
 import { readdir, readFile } from "node:fs/promises"
-import { homedir } from "node:os"
+import { homedir, platform } from "node:os"
 import { join } from "node:path"
 
 import { Adb, type Exec, execProgram } from "./adb.ts"
 import { runningSerials } from "./android/emulator.ts"
+import { iosDoctor } from "./ios/doctor.ts"
 import { androidSdkRoot, javaHome } from "./toolchain.ts"
 
 /** One finding. */
 export interface DoctorCheck {
+  /** The platform the check is for. */
+  readonly platform?: "android" | "ios"
   readonly name: string
   readonly status: "ok" | "warn" | "fail"
   readonly detail: string
@@ -135,8 +138,33 @@ async function staleProxies(sdk: string, exec: Exec): Promise<DoctorCheck[]> {
   )
 }
 
-/** Every check, in the order to fix them. */
-export async function deviceDoctor(exec: Exec = execProgram): Promise<DoctorCheck[]> {
+/** Options of `deviceDoctor`. */
+export interface DoctorOptions {
+  /** Check one platform only; both by default (iOS only on a Mac). */
+  readonly platform?: "android" | "ios"
+}
+
+/** Every check, in the order to fix them: Android's, then iOS's. */
+export async function deviceDoctor(
+  exec: Exec = execProgram,
+  options: DoctorOptions = {},
+): Promise<DoctorCheck[]> {
+  const android = options.platform === "ios" ? [] : (await androidDoctor(exec)).map(on("android"))
+  const ios =
+    options.platform === "android" || (options.platform === undefined && platform() !== "darwin")
+      ? []
+      : (await iosDoctor(exec)).map(on("ios"))
+
+  return [...android, ...ios]
+}
+
+/** Tags a check with its platform. */
+function on(name: "android" | "ios") {
+  return (check: DoctorCheck): DoctorCheck => ({ platform: name, ...check })
+}
+
+/** Android's checks. */
+async function androidDoctor(exec: Exec): Promise<DoctorCheck[]> {
   const sdk = androidSdkRoot()
 
   if (sdk === undefined) {

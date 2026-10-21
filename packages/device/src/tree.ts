@@ -47,12 +47,39 @@ const ROLE_BY_CLASS: readonly (readonly [RegExp, string])[] = [
   [/TextView$/, "text"],
 ]
 
+/** iOS element types (bare names, where Android's classes are qualified) by the role they play. */
+const ROLE_BY_IOS_TYPE: Readonly<Record<string, string>> = {
+  Button: "button",
+  Link: "link",
+  StaticText: "text",
+  TextField: "textbox",
+  SecureTextField: "textbox",
+  SearchField: "textbox",
+  TextView: "textbox",
+  Image: "img",
+  Icon: "img",
+  Switch: "switch",
+  Toggle: "switch",
+  CheckBox: "checkbox",
+  RadioButton: "radio",
+  WebView: "document",
+  Alert: "alertdialog",
+}
+
 /** The node's role in web terms. */
 export function roleOf(node: DriverNode): string {
   if (node.heading === true) return "heading"
   if (node.editable === true) return "textbox"
 
   const type = node.type ?? ""
+
+  /* An iOS element: its type says what it is, and an unknown type is a plain container. */
+  if (type !== "" && !type.includes(".")) {
+    const kind = node.kind === "button" || node.kind === "link" ? node.kind : "generic"
+
+    return ROLE_BY_IOS_TYPE[type] ?? kind
+  }
+
   const byClass = ROLE_BY_CLASS.find(([pattern]) => pattern.test(type))
 
   return byClass === undefined ? roleByKind(node) : byClass[1]
@@ -67,7 +94,7 @@ function roleByKind(node: DriverNode): string {
   return node.kind === "text" ? "text" : "generic"
 }
 
-/** React Native's `testID`: Android's resource id without the package part. */
+/** React Native's `testID`: Android's resource id without the package part, or iOS's identifier. */
 function testIdOf(identifier: string | undefined): string | undefined {
   if (identifier === undefined || identifier === "") return undefined
 

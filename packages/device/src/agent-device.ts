@@ -8,16 +8,23 @@ import { mkdir } from "node:fs/promises"
 
 import { type AgentDeviceClient, createAgentDeviceClient } from "agent-device"
 
-import type { DeviceDriver } from "./driver.ts"
+import type { DeviceDriver, Point } from "./driver.ts"
 import type { DriverNode } from "./tree.ts"
 
-/** Where and on what the driver runs. */
-export interface AgentDeviceOptions {
+/** Where and on what the driver runs: an Android device by its serial, or an iOS Simulator by its udid. */
+export type AgentDeviceOptions = {
   /** The daemon's state directory; one per run (e.g. under `.danwo/`). */
   readonly stateDir: string
-  /** The device's serial, e.g. `emulator-5554`. */
-  readonly serial: string
-}
+} & (
+  | {
+      /** The Android device's serial, e.g. `emulator-5554`. */
+      readonly serial: string
+    }
+  | {
+      /** The iOS Simulator's udid. */
+      readonly udid: string
+    }
+)
 
 /** How long opening the session, one call, and shutting a stuck session down may take. */
 const OPEN_MS = 120_000
@@ -34,6 +41,17 @@ function stuck(error: unknown): boolean {
     /Daemon request timed out|request_canceled/.test(error.message)
   )
 }
+
+/** Whether `error` says the iOS runner is still finishing an earlier command. */
+function busy(error: unknown): boolean {
+  return error instanceof Error && /still finishing a previous command/.test(error.message)
+}
+
+/** How long a busy iOS runner is waited for, and the pause between tries. */
+const BUSY_MS = 30_000
+const BUSY_PAUSE_MS = 500
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 /** A ref as agent-device addresses it. */
 function target(ref: string): { readonly ref: string } {
@@ -64,14 +82,33 @@ export class AgentDeviceDriver implements DeviceDriver {
     this.app = app
     this.client = createAgentDeviceClient({
       stateDir: this.options.stateDir,
-      session: `danwo-${this.options.serial}`,
+      session: `danwo-${"serial" in this.options ? this.options.serial : this.options.udid}`,
     })
     await this.client.apps.open({
       app,
-      platform: "android",
-      serial: this.options.serial,
+      ...("serial" in this.options
+        ? { platform: "android", serial: this.options.serial }
+        : { platform: "ios", udid: this.options.udid }),
       signal: AbortSignal.timeout(OPEN_MS),
     })
+  }
+
+  /**
+   * Runs one driver call, trying it again while the iOS runner says it is still busy with an
+   * earlier one (a slow capture past its watchdog finishes on its own), up to `BUSY_MS`.
+   */
+  private async waitingOutBusy<T>(call: (signal: AbortSignal) => Promise<T>): Promise<T> {
+    const deadline = Date.now() + BUSY_MS
+
+    for (;;) {
+      try {
+        return await call(AbortSignal.timeout(CALL_MS))
+      } catch (error) {
+        if (!busy(error) || Date.now() >= deadline) throw error
+
+        await sleep(BUSY_PAUSE_MS)
+      }
+    }
   }
 
   /**
@@ -81,7 +118,7 @@ export class AgentDeviceDriver implements DeviceDriver {
    */
   private async recovering<T>(call: (signal: AbortSignal) => Promise<T>): Promise<T> {
     try {
-      return await call(AbortSignal.timeout(CALL_MS))
+      return await this.waitingOutBusy(call)
     } catch (error) {
       if (!stuck(error) || this.app === undefined) throw error
 
@@ -118,6 +155,28 @@ export class AgentDeviceDriver implements DeviceDriver {
 
   async type(text: string): Promise<void> {
     await this.recovering((signal) => this.session.interactions.type({ text, signal }))
+  }
+
+  async tapAt(x: number, y: number): Promise<void> {
+    await this.recovering((signal) =>
+      this.session.interactions.press({ x, y, settle: false, signal }),
+    )
+  }
+
+  async swipe(from: Point, to: Point): Promise<void> {
+    await this.recovering((signal) => this.session.interactions.swipe({ from, to, signal }))
+  }
+
+  async back(): Promise<void> {
+    await this.recovering((signal) => this.session.command.back({ signal }))
+  }
+
+  async pressEnter(): Promise<void> {
+    await this.recovering((signal) => this.session.command.keyboard({ action: "enter", signal }))
+  }
+
+  async dismissKeyboard(): Promise<void> {
+    await this.recovering((signal) => this.session.command.keyboard({ action: "dismiss", signal }))
   }
 
   async screenshot(path: string): Promise<boolean> {

@@ -8,6 +8,7 @@ import { type ChildProcess, spawn } from "node:child_process"
 import type { ScreenFilm } from "@danwo/runner/runner"
 
 import type { Adb } from "../adb.ts"
+import { exited } from "../exited.ts"
 
 /** Starts a program and gives back its process; tests replace it. */
 export type Spawn = (file: string, args: readonly string[]) => ChildProcess
@@ -20,20 +21,6 @@ const FINISH_MS = 10_000
 const TIME_LIMIT_S = 180
 /** Enough to read text on a phone screen, small enough to keep many films. */
 const BIT_RATE = 2_000_000
-
-/** Resolves once `child` has exited, or after `ms`. */
-function exited(child: ChildProcess, ms: number): Promise<void> {
-  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve()
-
-  return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms)
-
-    child.once("exit", () => {
-      clearTimeout(timer)
-      resolve()
-    })
-  })
-}
 
 /** Starts filming the device's screen; `stop()` pulls the film to `path`. */
 export function filmScreen(adb: Adb, path: string, start: Spawn = spawnProgram): ScreenFilm {

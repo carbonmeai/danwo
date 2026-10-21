@@ -1,6 +1,7 @@
 /**
  * adb, bound to one device. Every command goes through `exec`, which tests replace with a fake that
- * records the commands, so the binder's sequence is checked without a device.
+ * records the commands, so the binder's sequence is checked without a device. `exec` runs the iOS
+ * tools (`xcrun simctl`) the same way.
  */
 import { execFile } from "node:child_process"
 
@@ -8,7 +9,11 @@ import { execFile } from "node:child_process"
 export type Exec = (
   file: string,
   args: readonly string[],
-  options?: { readonly timeoutMs?: number },
+  options?: {
+    readonly timeoutMs?: number
+    /** Added to this process's environment for the program. */
+    readonly env?: Readonly<Record<string, string>>
+  },
 ) => Promise<string>
 
 /** Why a program failed: what it printed, else how it ended (an exit code, a signal, a timeout). */
@@ -31,7 +36,11 @@ export const execProgram: Exec = (file, args, options = {}) =>
     execFile(
       file,
       [...args],
-      { timeout: options.timeoutMs ?? 60_000, maxBuffer: 32 * 1024 * 1024 },
+      {
+        timeout: options.timeoutMs ?? 60_000,
+        maxBuffer: 32 * 1024 * 1024,
+        ...(options.env !== undefined && { env: { ...process.env, ...options.env } }),
+      },
       (error, stdout, stderr) => {
         if (error)
           reject(new Error(`${file} ${args.join(" ")}: ${failureOf(error, stdout, stderr)}`))

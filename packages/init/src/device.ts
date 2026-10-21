@@ -27,5 +27,5 @@ export function deviceCheckOf(checks: readonly DoctorCheck[]): DeviceCheck {
 export async function checkDevice(): Promise<DeviceCheck> {
   const { deviceDoctor } = await import("@danwo/device")
 
-  return deviceCheckOf(await deviceDoctor())
+  return deviceCheckOf(await deviceDoctor(undefined, { platform: "android" }))
 }

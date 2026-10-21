@@ -7,11 +7,14 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 /** What the mocked agent-device client did, in order. */
 const calls: string[] = []
 /** How many of the next fills fail as a daemon that stopped answering does. */
-const trouble = { fills: 0 }
+const trouble = { fills: 0, busy: 0 }
 
 vi.mock("agent-device", () => ({
   createAgentDeviceClient: () => ({
-    apps: { open: async ({ app }: { app: string }) => void calls.push(`open ${app}`) },
+    apps: {
+      open: async ({ app, platform, udid }: { app: string; platform: string; udid?: string }) =>
+        void calls.push(platform === "ios" ? `open ${app} on ${udid}` : `open ${app}`),
+    },
     sessions: {
       close: async ({ shutdown }: { shutdown?: boolean }) =>
         void calls.push(`close shutdown=${shutdown}`),
@@ -24,7 +27,19 @@ vi.mock("agent-device", () => ({
       },
       press: async () => void calls.push("press"),
     },
-    capture: { snapshot: async () => ({ nodes: [] }), screenshot: async () => undefined },
+    capture: {
+      snapshot: async () => {
+        calls.push("snapshot")
+
+        if (trouble.busy-- > 0)
+          throw new Error(
+            "The iOS runner is still finishing a previous command that exceeded its execution watchdog",
+          )
+
+        return { nodes: [] }
+      },
+      screenshot: async () => undefined,
+    },
   }),
 }))
 
@@ -35,6 +50,7 @@ let dir: string | undefined
 afterEach(async () => {
   calls.length = 0
   trouble.fills = 0
+  trouble.busy = 0
   if (dir !== undefined) await rm(dir, { recursive: true, force: true })
 })
 
@@ -63,6 +79,23 @@ describe("the agent-device driver", () => {
       "fill",
     ])
     expect(opened.recoveries).toBe(1)
+  })
+
+  it("opens an iOS Simulator by its udid, and waits while its runner finishes an earlier command", async () => {
+    dir = await mkdtemp(join(tmpdir(), "danwo-driver-"))
+
+    const opened = new AgentDeviceDriver({ stateDir: dir, udid: "SIM-1" })
+
+    await opened.open("com.danwo.shopmobile")
+    trouble.busy = 2
+    await expect(opened.snapshot()).resolves.toEqual([])
+    expect(calls).toEqual([
+      "open com.danwo.shopmobile on SIM-1",
+      "snapshot",
+      "snapshot",
+      "snapshot",
+    ])
+    expect(opened.recoveries).toBe(0)
   })
 
   it("gives up when the retried call is stuck too", async () => {

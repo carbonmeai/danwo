@@ -18,6 +18,7 @@ import type {
 
 import type { Exec } from "../adb.ts"
 import { AgentDeviceDriver } from "../agent-device.ts"
+import { browserPage } from "../browser-page.ts"
 import type { DeviceDriver } from "../driver.ts"
 import { type AndroidTools, androidTools } from "../toolchain.ts"
 import { deviceNodes } from "../tree.ts"
@@ -103,22 +104,6 @@ export function swipeFor(box: DeviceBox, direction: ScrollDirection): readonly n
 /** `text` as `adb shell input text` takes it: spaces as %s, the shell's own characters escaped. */
 export function inputText(text: string): string {
   return text.replaceAll(/[\\'"`$&|;<>()*?#~!{}[\]]/g, (char) => `\\${char}`).replaceAll(" ", "%s")
-}
-
-/** The page a browser in front shows: the newest document the browser fetched through the proxy. */
-function browserPage(proxy: AndroidDeviceOptions["proxy"]): string | undefined {
-  const page = proxy
-    .exchanges()
-    .toReversed()
-    .find((exchange) => {
-      const headers = exchange.request?.headers ?? {}
-
-      return (
-        headers["sec-fetch-dest"] === "document" || (headers.accept ?? "").includes("text/html")
-      )
-    })
-
-  return page === undefined ? undefined : `https://${page.host}${page.path}`
 }
 
 /** An Android device a worker's tests run on. */
@@ -274,6 +259,7 @@ export class AndroidDevice implements DeviceTarget {
   }
 
   /** Ends the driver's session, leaves the device's network as it was, and stops an emulator it booted. */
+  // fallow-ignore-next-line unused-class-member -- closed by the environment, which closes either platform's device
   async close(): Promise<void> {
     await this.driver.close()
     await this.binder.unbind()
