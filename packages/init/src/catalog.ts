@@ -3,6 +3,7 @@
  * providers danwo emulates, and the coding agents it teaches. Each choice carries what the
  * generated files need: package names, environment variable names, the SDK function to call.
  */
+import { readFileSync } from "node:fs"
 
 /** What tests drive: a browser, an Android device, both, or only the app's HTTP API. */
 export const ENGINES = ["web", "mobile", "both", "none"] as const
@@ -320,16 +321,35 @@ export const AGENT_INFO: Readonly<Record<AgentId, AgentInfo>> = {
   },
 }
 
+/** This package's version from its package.json; danwo's packages are released together. */
+function ownVersion(): string {
+  const manifest: unknown = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  )
+  const version: unknown = Reflect.get(Object(manifest), "version")
+
+  return typeof version === "string" ? version : "0.0.0"
+}
+
+/** The running danwo's version; `0.0.0` in danwo's own repository. */
+export const DANWO_VERSION = ownVersion()
+
+/**
+ * The version danwo's packages are added at: the running danwo's, so a project set up by a beta
+ * gets that beta rather than whatever `latest` is. From the repository, `latest`.
+ */
+const ADDED_VERSION = DANWO_VERSION === "0.0.0" ? "latest" : DANWO_VERSION
+
 /** The packages every danwo project needs. */
 export const DANWO_PACKAGES: readonly PackageSpec[] = [
-  { name: "@danwo/cli", version: "latest" },
-  { name: "@danwo/sdk", version: "latest" },
+  { name: "@danwo/cli", version: ADDED_VERSION },
+  { name: "@danwo/sdk", version: ADDED_VERSION },
 ]
 
 /** The packages a mobile config imports. */
 export const MOBILE_PACKAGES: readonly PackageSpec[] = [
-  { name: "@danwo/device", version: "latest" },
-  { name: "@danwo/expo", version: "latest" },
+  { name: "@danwo/device", version: ADDED_VERSION },
+  { name: "@danwo/expo", version: ADDED_VERSION },
 ]
 
 /** Checks whether `value` is one of `choices`. */

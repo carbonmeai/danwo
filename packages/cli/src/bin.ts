@@ -8,7 +8,7 @@ import { resolve as resolvePath } from "node:path"
 import "@danwo/runner/register"
 import { github } from "@danwo/github"
 import type { InitFlags } from "@danwo/init"
-import { AGENTS, ENGINES, MODEL_SOURCES, PROVIDER_IDS } from "@danwo/init/catalog"
+import { AGENTS, DANWO_VERSION, ENGINES, MODEL_SOURCES, PROVIDER_IDS } from "@danwo/init/catalog"
 import {
   type CacheAction,
   exitCodeForError,
@@ -114,6 +114,7 @@ function withReporterOptions(command: Command): Command {
 const program = new Command()
   .name("danwo")
   .description("Drive your app like a user, judge the layers below, and run the fault matrix.")
+  .version(DANWO_VERSION)
 
 withReporterOptions(withLintOptions(program.command("test")))
   .description("run test files in worker processes")
@@ -284,6 +285,7 @@ program
       cwd: process.cwd(),
       config: options.config,
       sessions: { max: options.maxSessions },
+      version: DANWO_VERSION,
       commands: cliCommands(program),
     })
   })
