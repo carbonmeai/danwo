@@ -4,9 +4,9 @@ import { Span } from "@danwo/ui/primitives/typography"
 import { ChoiceSkeleton } from "../../components/choice.tsx"
 import { ListFilterSkeleton } from "../../components/controls.tsx"
 import { Page } from "../../components/page.tsx"
-import { PanelTable } from "../../components/panel.tsx"
+import { PanelTable } from "../../components/panel-table.tsx"
 import { Bone, ControlBone, lineWidth, Repeat } from "../../components/skeleton.tsx"
-import { TESTS_DETAIL, TestRowSkeleton, TestsHead, TestsLayout } from "./tests-page.tsx"
+import { TESTS_DETAIL, TestRowSkeleton, testColumns, TestsLayout } from "./tests-page.tsx"
 
 /** Rows enough to fill a tall window; the page scrolls past the rest once they load. */
 const ROWS = 10
@@ -47,7 +47,7 @@ export function TestsSkeleton() {
       loading="Loading the tests"
     >
       <TestsLayout side={<GroupsSkeleton />}>
-        <PanelTable label="Tests" head={<TestsHead picked={false} />}>
+        <PanelTable label="Tests" columns={testColumns(false)}>
           <Repeat count={ROWS}>{(i) => <TestRowSkeleton key={i} i={i} />}</Repeat>
         </PanelTable>
       </TestsLayout>

@@ -1,13 +1,13 @@
 import { Icons } from "@danwo/ui/icons/base"
 import { Box, HStack, Stack } from "@danwo/ui/jsx"
 import { Button } from "@danwo/ui/primitives/button"
-import { TableCell, TableHead, TableRow } from "@danwo/ui/primitives/table"
+import { TableCell, TableRow } from "@danwo/ui/primitives/table"
 import { Span } from "@danwo/ui/primitives/typography"
 import { Link } from "@tanstack/react-router"
 import { useRef } from "react"
 
 import { Ident } from "../../components/code.tsx"
-import { PanelTable } from "../../components/panel.tsx"
+import { PanelTable, type TableColumn } from "../../components/panel-table.tsx"
 import { Bone, BoneCell, BoneRow, lineWidth, Repeat } from "../../components/skeleton.tsx"
 import { StatusBadge, Swatch, VerdictBadge } from "../../components/status-badge.tsx"
 import { dollars, duration, percent } from "../../lib/format.ts"
@@ -23,37 +23,26 @@ export interface TableOrder {
   readonly ascending: boolean
 }
 
-/** A column's display, hidden on screens narrower than a breakpoint. */
-const HIDDEN_BELOW = {
-  md: { base: "none", md: "table-cell" },
-  lg: { base: "none", lg: "table-cell" },
-  never: undefined,
-} as const
-
-/** A column heading that sorts the table by it, and the other way on a second click. */
-function SortHead({
-  sort,
-  sorting,
-  label,
-  align = "right",
-  hideBelow,
-}: {
-  readonly sort: BreakdownSort
-  readonly sorting: TableOrder
-  readonly label: string
-  readonly align?: "left" | "right"
-  /** Hides the column on screens narrower than this. */
-  readonly hideBelow?: "md" | "lg"
-}) {
+/** A column whose heading sorts the table by it, and the other way on a second click. */
+function sortColumn(
+  sort: BreakdownSort,
+  sorting: TableOrder,
+  label: string,
+  column: Pick<TableColumn, "w" | "hideBelow"> & { readonly align?: "left" },
+): TableColumn {
   const on = sorting.sort === sort
   const ascending = on && !sorting.ascending
 
-  return (
-    <TableHead
-      textAlign={align}
-      display={HIDDEN_BELOW[hideBelow ?? "never"]}
-      aria-sort={on ? (sorting.ascending ? "ascending" : "descending") : "none"}
-    >
+  return {
+    key: sort,
+    w: column.w,
+    hideBelow: column.hideBelow,
+    ...(column.align === undefined && { align: "right" }),
+    headProps: {
+      color: "inherit",
+      "aria-sort": on ? (sorting.ascending ? "ascending" : "descending") : "none",
+    },
+    head: (
       <Button asChild variant="ghost" size="xs" color={on ? "ink.strong" : "ink.muted"} mx="-1.5">
         <Link
           to="/insights"
@@ -73,8 +62,8 @@ function SortHead({
           )}
         </Link>
       </Button>
-    </TableHead>
-  )
+    ),
+  }
 }
 
 /** The faults that broke the test under the matrix, the most frequent named. */
@@ -187,21 +176,17 @@ function BreakdownLine({
   )
 }
 
-/** The table's header row, each figure's heading sorting by it. */
-function TestTableHead({ sorting }: { readonly sorting: TableOrder }) {
-  return (
-    <>
-      <TableHead px="3" color="ink.muted">
-        Test
-      </TableHead>
-      <SortHead sort="runs" sorting={sorting} label="Runs" />
-      <SortHead sort="pass" sorting={sorting} label="Pass rate" />
-      <SortHead sort="flake" sorting={sorting} label="Flake rate" />
-      <SortHead sort="time" sorting={sorting} label="Median time" />
-      <SortHead sort="spend" sorting={sorting} label="Spend" hideBelow="lg" />
-      <SortHead sort="faults" sorting={sorting} label="Breaks under" align="left" hideBelow="md" />
-    </>
-  )
+/** The table's columns, each figure's heading sorting by it. */
+function testTableColumns(sorting: TableOrder): readonly TableColumn[] {
+  return [
+    { key: "test", head: "Test", minW: "14rem", headProps: { px: "3" } },
+    sortColumn("runs", sorting, "Runs", { w: "4rem" }),
+    sortColumn("pass", sorting, "Pass rate", { w: "5.5rem" }),
+    sortColumn("flake", sorting, "Flake rate", { w: "5.5rem" }),
+    sortColumn("time", sorting, "Median time", { w: "6.5rem" }),
+    sortColumn("spend", sorting, "Spend", { w: "4.5rem", hideBelow: "lg" }),
+    sortColumn("faults", sorting, "Breaks under", { w: "18rem", hideBelow: "md", align: "left" }),
+  ]
 }
 
 /** Rows enough to fill a tall window; the page scrolls past the rest once they load. */
@@ -210,7 +195,7 @@ const SKELETON_ROWS = 8
 /** {@link TestTable} while the tests load: the same headings, the rows as bones. */
 export function TestTableSkeleton({ sorting }: { readonly sorting: TableOrder }) {
   return (
-    <PanelTable label="Tests" head={<TestTableHead sorting={sorting} />}>
+    <PanelTable label="Tests" columns={testTableColumns(sorting)}>
       <Repeat count={SKELETON_ROWS}>
         {(i) => (
           <BoneRow key={i}>
@@ -260,7 +245,7 @@ export function TestTable({
   const current = useListKeys(list, sorted.length)
 
   return (
-    <PanelTable label="Tests" head={<TestTableHead sorting={sorting} />} bodyRef={list}>
+    <PanelTable label="Tests" columns={testTableColumns(sorting)} bodyRef={list}>
       {sorted.map((row, i) => (
         <BreakdownLine key={row.id} row={row} current={i === current} />
       ))}

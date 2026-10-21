@@ -1,17 +1,17 @@
 import { Icons } from "@danwo/ui/icons/base"
 import { HStack, Stack } from "@danwo/ui/jsx"
 import { Button } from "@danwo/ui/primitives/button"
-import { TableCell, TableHead, TableRow } from "@danwo/ui/primitives/table"
+import { TableCell, TableRow } from "@danwo/ui/primitives/table"
 import { Span, Text } from "@danwo/ui/primitives/typography"
 import { Link, useNavigate } from "@tanstack/react-router"
 import { type RefObject, useRef, useState } from "react"
 
 import { Ident } from "../../components/code.tsx"
 import { useCopied } from "../../components/copy-link.tsx"
-import { PanelTable } from "../../components/panel.tsx"
+import { PanelTable, type TableColumn } from "../../components/panel-table.tsx"
 import { prunedWords } from "../../components/recordings.tsx"
 import { copyAddress, RowMenu } from "../../components/row-menu.tsx"
-import { Bone, BoneCell, BoneRow, lineWidth } from "../../components/skeleton.tsx"
+import { ActionsBone, Bone, BoneCell, BoneRow, lineWidth } from "../../components/skeleton.tsx"
 import { StatusBadge, VerdictStrip } from "../../components/status-badge.tsx"
 import { TimeAgo } from "../../components/time-ago.tsx"
 import { WhoseBadge } from "../../components/whose-badge.tsx"
@@ -118,32 +118,16 @@ function RunLine({
   )
 }
 
-/** The runs table's header row. */
-export function RunsHead() {
-  return (
-    <>
-      <TableHead px="3" color="ink.muted">
-        Result
-      </TableHead>
-      <TableHead color="ink.muted">What ran</TableHead>
-      <TableHead color="ink.muted" display={{ base: "none", md: "table-cell" }}>
-        Command
-      </TableHead>
-      <TableHead color="ink.muted" textAlign="right">
-        Time
-      </TableHead>
-      <TableHead color="ink.muted" textAlign="right" display={{ base: "none", lg: "table-cell" }}>
-        Spend
-      </TableHead>
-      <TableHead color="ink.muted" textAlign="right">
-        Started
-      </TableHead>
-      <TableHead>
-        <Span srOnly>Actions</Span>
-      </TableHead>
-    </>
-  )
-}
+/** The runs table's columns, which its rows and its skeleton's rows both fill. */
+export const RUN_COLUMNS: readonly TableColumn[] = [
+  { key: "result", head: "Result", w: "7.5rem", headProps: { px: "3" } },
+  { key: "what", head: "What ran", minW: "12rem" },
+  { key: "command", head: "Command", w: "10rem", hideBelow: "md" },
+  { key: "time", head: "Time", w: "6rem", align: "right" },
+  { key: "spend", head: "Spend", w: "6rem", align: "right", hideBelow: "lg" },
+  { key: "started", head: "Started", w: "9rem", align: "right" },
+  { key: "actions", head: <Span srOnly>Actions</Span>, w: "3rem" },
+]
 
 /** A run's row still loading, its cells those of {@link RunLine}. */
 export function RunLineSkeleton({ i }: { readonly i: number }) {
@@ -168,7 +152,9 @@ export function RunLineSkeleton({ i }: { readonly i: number }) {
       <BoneCell w="9rem">
         <Bone w="5rem" ml="auto" />
       </BoneCell>
-      <BoneCell w="3rem" />
+      <BoneCell>
+        <ActionsBone count={1} />
+      </BoneCell>
     </BoneRow>
   )
 }
@@ -195,7 +181,7 @@ export function RunsTable({
   return (
     <PanelTable
       label="Runs"
-      head={<RunsHead />}
+      columns={RUN_COLUMNS}
       bodyRef={list}
       after={
         shown.length === 0 ? (

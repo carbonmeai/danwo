@@ -2,7 +2,7 @@ import type { HistoryTest, TestHistory } from "@danwo/runner/runner"
 import { Icons } from "@danwo/ui/icons/base"
 import { HStack, Stack } from "@danwo/ui/jsx"
 import { Button } from "@danwo/ui/primitives/button"
-import { TableCell, TableHead, TableRow } from "@danwo/ui/primitives/table"
+import { TableCell, TableRow } from "@danwo/ui/primitives/table"
 import { Span } from "@danwo/ui/primitives/typography"
 import { Link } from "@tanstack/react-router"
 import { type ReactNode, useEffect, useRef } from "react"
@@ -10,9 +10,11 @@ import { type ReactNode, useEffect, useRef } from "react"
 import { Ident } from "../../components/code.tsx"
 import { KeyHint } from "../../components/controls.tsx"
 import { Page } from "../../components/page.tsx"
-import { Panel, PanelTable, StatCard, StatCards } from "../../components/panel.tsx"
+import { PanelTable, type TableColumn } from "../../components/panel-table.tsx"
+import { Panel, StatCard, StatCards } from "../../components/panel.tsx"
 import { DeletedRecording, useRecordings } from "../../components/recordings.tsx"
 import {
+  ActionsBone,
   Bone,
   BoneCell,
   BoneRow,
@@ -157,26 +159,14 @@ function TestLine({
   )
 }
 
-/** A test run's table header row. */
-function TestRunHead() {
-  return (
-    <>
-      <TableHead w="8rem" px="3" color="ink.muted">
-        Result
-      </TableHead>
-      <TableHead color="ink.muted">Test</TableHead>
-      <TableHead color="ink.muted" display={{ base: "none", lg: "table-cell" }}>
-        Replay cache
-      </TableHead>
-      <TableHead color="ink.muted" textAlign="right">
-        Time
-      </TableHead>
-      <TableHead>
-        <Span srOnly>Watch and run again</Span>
-      </TableHead>
-    </>
-  )
-}
+/** A test run's table columns, which its rows and its skeleton's rows both fill. */
+const TEST_RUN_COLUMNS: readonly TableColumn[] = [
+  { key: "result", head: "Result", w: "8rem", headProps: { px: "3" } },
+  { key: "test", head: "Test", minW: "10rem" },
+  { key: "cache", head: "Replay cache", w: "7rem", hideBelow: "lg" },
+  { key: "time", head: "Time", w: "4.5rem", align: "right" },
+  { key: "actions", head: <Span srOnly>Watch and run again</Span>, w: "6rem" },
+]
 
 /** A test's row of a run still loading, its cells those of {@link TestLine}. */
 function TestLineSkeleton({ i }: { readonly i: number }) {
@@ -195,8 +185,8 @@ function TestLineSkeleton({ i }: { readonly i: number }) {
       <BoneCell>
         <Bone w="2.5rem" ml="auto" />
       </BoneCell>
-      <BoneCell w="8rem">
-        <Bone w="3.5rem" ml="auto" />
+      <BoneCell>
+        <ActionsBone count={2} />
       </BoneCell>
     </BoneRow>
   )
@@ -244,7 +234,7 @@ export function TestRunSkeleton({
         <StatCardSkeleton label="Time" icon={<Icons.clock size={13} />} />
         <StatCardSkeleton label="Model spend" icon={<Icons.dollar size={13} />} />
       </StatCards>
-      <PanelTable label="Tests in this run" head={<TestRunHead />}>
+      <PanelTable label="Tests in this run" columns={TEST_RUN_COLUMNS}>
         <Repeat count={SKELETON_ROWS}>{(i) => <TestLineSkeleton key={i} i={i} />}</Repeat>
       </PanelTable>
     </Page>
@@ -310,7 +300,7 @@ export function TestRun({
         />
       </StatCards>
       <BrokenFiles run={run} />
-      <PanelTable label="Tests in this run" head={<TestRunHead />} bodyRef={list}>
+      <PanelTable label="Tests in this run" columns={TEST_RUN_COLUMNS} bodyRef={list}>
         {tests.map((test, i) => (
           <TestLine key={test.id} test={test} current={i === current} picked={test.id === focus} />
         ))}

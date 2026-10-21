@@ -1,4 +1,4 @@
-import { styled } from "@danwo/ui/jsx"
+import { HStack, styled } from "@danwo/ui/jsx"
 import { Skeleton } from "@danwo/ui/primitives/skeleton"
 import { TableCell, TableRow } from "@danwo/ui/primitives/table"
 import type { ComponentProps, ReactNode } from "react"
@@ -100,6 +100,24 @@ export function ListPanelSkeleton({
         <Repeat count={count}>{(i) => <ListRowSkeleton key={i} i={i} lines={lines} />}</Repeat>
       </ListRows>
     </Panel>
+  )
+}
+
+/**
+ * A row's icon buttons still loading, right-aligned as the real ones sit: each the library's
+ * small icon button's square, with its icon as a bone in the middle.
+ */
+export function ActionsBone({ count }: { readonly count: number }) {
+  return (
+    <HStack gap="0.5" justify="flex-end">
+      <Repeat count={count}>
+        {(i) => (
+          <HStack key={i} w="1.75rem" h="1.75rem" justify="center" flexShrink="0">
+            <Skeleton w="3.5" h="3.5" rounded="sm" />
+          </HStack>
+        )}
+      </Repeat>
+    </HStack>
   )
 }
 

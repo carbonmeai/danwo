@@ -7,9 +7,8 @@ import {
   type CardProps,
   CardTitle,
 } from "@danwo/ui/primitives/card"
-import { TableBody, TableContainer, TableHeader, TableRow } from "@danwo/ui/primitives/table"
 import { Heading, Span, Text } from "@danwo/ui/primitives/typography"
-import type { ComponentProps, ReactNode, RefObject } from "react"
+import type { ComponentProps, ReactNode } from "react"
 
 /**
  * A faint grey section on the white page, for a group of related content: the library's card on
@@ -220,37 +219,5 @@ export function ListRow(props: ComponentProps<typeof Box>) {
       _hover={{ bg: "surface.itemHover" }}
       {...props}
     />
-  )
-}
-
-/**
- * A table on a panel: the library's table under its header row, with anything else below it on
- * the panel. A page's table and its loading skeleton both build on it, so they line up.
- */
-export function PanelTable({
-  label,
-  head,
-  bodyRef,
-  after,
-  children,
-}: {
-  readonly label: string
-  /** The header row's cells. */
-  readonly head: ReactNode
-  readonly bodyRef?: RefObject<HTMLTableSectionElement | null>
-  /** What sits on the panel under the table, such as a note that nothing matched. */
-  readonly after?: ReactNode
-  readonly children: ReactNode
-}) {
-  return (
-    <Panel px="2" py="1">
-      <TableContainer aria-label={label}>
-        <TableHeader>
-          <TableRow _hover={{ bg: "transparent" }}>{head}</TableRow>
-        </TableHeader>
-        <TableBody ref={bodyRef}>{children}</TableBody>
-      </TableContainer>
-      {after}
-    </Panel>
   )
 }

@@ -161,6 +161,10 @@ describe("each page's loading skeleton", () => {
           table.getAttribute("aria-label"),
         ),
       ).toEqual(shape.tables)
+      for (const table of busy?.querySelectorAll("table") ?? [])
+        expect(
+          [...table.querySelectorAll<HTMLElement>("thead th")].filter((th) => !th.style.width),
+        ).toHaveLength(1)
       for (const section of shape.sections ?? [])
         expect(busy?.querySelector(`[aria-label="${section}"]`)).not.toBeNull()
       expect(busy?.querySelectorAll("[data-card]")).toHaveLength(shape.cards ?? 0)

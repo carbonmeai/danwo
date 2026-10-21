@@ -1,12 +1,12 @@
 import { HStack, Stack } from "@danwo/ui/jsx"
-import { TableCell, TableHead, TableRow } from "@danwo/ui/primitives/table"
+import { TableCell, TableRow } from "@danwo/ui/primitives/table"
 import { Span } from "@danwo/ui/primitives/typography"
 import { Link } from "@tanstack/react-router"
 
 import { Ident } from "../../components/code.tsx"
 import { Empty } from "../../components/empty-state.tsx"
 import { Page } from "../../components/page.tsx"
-import { PanelTable } from "../../components/panel.tsx"
+import { PanelTable, type TableColumn } from "../../components/panel-table.tsx"
 import {
   Bone,
   BoneCell,
@@ -55,21 +55,13 @@ function Latest({ row }: { readonly row: TestRow }) {
   )
 }
 
-/** The matrix table's header row. */
-function MatrixHead() {
-  return (
-    <>
-      <TableHead px="3" color="ink.muted">
-        Test
-      </TableHead>
-      <TableHead color="ink.muted">Latest matrix run</TableHead>
-      <TableHead color="ink.muted">Broke under</TableHead>
-      <TableHead>
-        <Span srOnly>Run the matrix</Span>
-      </TableHead>
-    </>
-  )
-}
+/** The matrix table's columns, which its rows and its skeleton's rows both fill. */
+const MATRIX_COLUMNS: readonly TableColumn[] = [
+  { key: "test", head: "Test", minW: "16rem", headProps: { px: "3" } },
+  { key: "latest", head: "Latest matrix run", w: "10rem" },
+  { key: "broke", head: "Broke under", w: "26rem" },
+  { key: "run", head: <Span srOnly>Run the matrix</Span>, w: "12rem" },
+]
 
 /** Rows enough to fill a tall window; the page scrolls past the rest once they load. */
 const SKELETON_ROWS = 14
@@ -82,7 +74,7 @@ const MATRIX_DETAIL =
 export function MatrixPageSkeleton() {
   return (
     <Page crumbs={["Matrix"]} title="Matrix" detail={MATRIX_DETAIL} loading="Loading the matrix">
-      <PanelTable label="Tests under the matrix" head={<MatrixHead />}>
+      <PanelTable label="Tests under the matrix" columns={MATRIX_COLUMNS}>
         <Repeat count={SKELETON_ROWS}>
           {(i) => (
             <BoneRow key={i}>
@@ -94,7 +86,7 @@ export function MatrixPageSkeleton() {
               </BoneCell>
               <BoneCell bone="6rem" />
               <BoneCell bone="1rem" />
-              <BoneCell w="12rem">
+              <BoneCell textAlign="right">
                 <ControlBone w="8.75rem" />
               </BoneCell>
             </BoneRow>
@@ -123,7 +115,7 @@ export function MatrixPage({ rows }: { readonly rows: readonly TestRow[] }) {
           command="danwo matrix <test file>"
         />
       ) : (
-        <PanelTable label="Tests under the matrix" head={<MatrixHead />}>
+        <PanelTable label="Tests under the matrix" columns={MATRIX_COLUMNS}>
           {sorted.map((row) => (
             <TableRow key={row.id} data-row>
               <TableCell minW="16rem" px="3" whiteSpace="normal">

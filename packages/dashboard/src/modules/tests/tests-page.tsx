@@ -3,7 +3,7 @@ import { Icons } from "@danwo/ui/icons/base"
 import { Box, Grid, HStack, Stack } from "@danwo/ui/jsx"
 import { Button } from "@danwo/ui/primitives/button"
 import { Checkbox } from "@danwo/ui/primitives/checkbox/checkbox"
-import { TableCell, TableHead, TableRow } from "@danwo/ui/primitives/table"
+import { TableCell, TableRow } from "@danwo/ui/primitives/table"
 import { Span } from "@danwo/ui/primitives/typography"
 import { Link, useNavigate } from "@tanstack/react-router"
 import { type ReactNode, useState } from "react"
@@ -12,9 +12,16 @@ import { ANY, Choice } from "../../components/choice.tsx"
 import { ListFilter } from "../../components/controls.tsx"
 import { Empty } from "../../components/empty-state.tsx"
 import { Page } from "../../components/page.tsx"
-import { PanelTable } from "../../components/panel.tsx"
+import { PanelTable, type TableColumn } from "../../components/panel-table.tsx"
 import { DeletedRecording } from "../../components/recordings.tsx"
-import { BlockBone, Bone, BoneCell, BoneRow, lineWidth } from "../../components/skeleton.tsx"
+import {
+  ActionsBone,
+  BlockBone,
+  Bone,
+  BoneCell,
+  BoneRow,
+  lineWidth,
+} from "../../components/skeleton.tsx"
 import { StatusBadge, VerdictBadge } from "../../components/status-badge.tsx"
 import { TimeAgo } from "../../components/time-ago.tsx"
 import { WhoseBadge } from "../../components/whose-badge.tsx"
@@ -221,40 +228,35 @@ function Groups({
   )
 }
 
-/** The tests table's header row; `onPick` picks every test shown, and is absent while loading. */
-export function TestsHead({
-  picked,
-  onPick,
-}: {
-  readonly picked: boolean
-  readonly onPick?: (picked: boolean) => void
-}) {
-  return (
-    <>
-      <TableHead px="3">
+/**
+ * The tests table's columns, which its rows and its skeleton's rows both fill; `onPick` picks
+ * every test shown, and is absent while the tests load.
+ */
+export function testColumns(
+  picked: boolean,
+  onPick?: (picked: boolean) => void,
+): readonly TableColumn[] {
+  return [
+    {
+      key: "pick",
+      w: "2.5rem",
+      headProps: { px: "3" },
+      head: (
         <Checkbox
           aria-label="Pick every test shown"
           checked={picked}
           disabled={onPick === undefined}
           onCheckedChange={(checked) => onPick?.(checked === true)}
         />
-      </TableHead>
-      <TableHead display={{ base: "none", md: "table-cell" }}>
-        <Span srOnly>Recording</Span>
-      </TableHead>
-      <TableHead color="ink.muted">Test</TableHead>
-      <TableHead color="ink.muted">Last run</TableHead>
-      <TableHead color="ink.muted" textAlign="right" display={{ base: "none", lg: "table-cell" }}>
-        Pass rate
-      </TableHead>
-      <TableHead color="ink.muted" display={{ base: "none", lg: "table-cell" }}>
-        Matrix
-      </TableHead>
-      <TableHead>
-        <Span srOnly>Actions</Span>
-      </TableHead>
-    </>
-  )
+      ),
+    },
+    { key: "recording", head: <Span srOnly>Recording</Span>, w: "7rem", hideBelow: "md" },
+    { key: "test", head: "Test", minW: "14rem" },
+    { key: "last", head: "Last run", w: "7rem" },
+    { key: "pass", head: "Pass rate", w: "5rem", align: "right", hideBelow: "lg" },
+    { key: "matrix", head: "Matrix", w: "10rem", hideBelow: "lg" },
+    { key: "actions", head: <Span srOnly>Actions</Span>, w: "5.5rem" },
+  ]
 }
 
 /** A test's row still loading, its cells those of {@link TestRowLine}. */
@@ -278,8 +280,8 @@ export function TestRowSkeleton({ i }: { readonly i: number }) {
         <Bone w="2.5rem" ml="auto" />
       </BoneCell>
       <BoneCell display={{ base: "none", lg: "table-cell" }} bone="7rem" />
-      <BoneCell w="5.5rem">
-        <Bone w="3.5rem" ml="auto" />
+      <BoneCell>
+        <ActionsBone count={2} />
       </BoneCell>
     </BoneRow>
   )
@@ -308,12 +310,9 @@ function TestsTable({
   return (
     <PanelTable
       label="Tests"
-      head={
-        <TestsHead
-          picked={shown.length > 0 && shown.every((row) => picked.has(row.id))}
-          onPick={(on) => setPicked(on ? new Set(shown.map((row) => row.id)) : new Set())}
-        />
-      }
+      columns={testColumns(shown.length > 0 && shown.every((row) => picked.has(row.id)), (on) =>
+        setPicked(on ? new Set(shown.map((row) => row.id)) : new Set()),
+      )}
     >
       {shown.map((row) => (
         <TestRowLine
