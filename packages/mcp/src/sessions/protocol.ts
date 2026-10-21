@@ -10,6 +10,16 @@ import type { JobPlace } from "../jobs/protocol.ts"
 /** What an action works on: a ref from the latest snapshot (`e12`) or a locator expression. */
 export type Target = string
 
+/**
+ * A file to upload: a path in the project, a file the config offers tests by name, or bytes the
+ * agent passes as text or base64.
+ */
+export type UploadFile =
+  | { readonly path: string }
+  | { readonly file: string }
+  | { readonly name: string; readonly text: string; readonly mimeType?: string | undefined }
+  | { readonly name: string; readonly base64: string; readonly mimeType?: string | undefined }
+
 export type SessionCall =
   | { readonly kind: "snapshot" }
   | { readonly kind: "click"; readonly target: Target }
@@ -20,6 +30,7 @@ export type SessionCall =
   | { readonly kind: "select"; readonly target: Target; readonly values: readonly string[] }
   | { readonly kind: "check"; readonly target: Target; readonly checked: boolean }
   | { readonly kind: "navigate"; readonly to: string }
+  | { readonly kind: "upload"; readonly target: Target; readonly files: readonly UploadFile[] }
   | { readonly kind: "check_locator"; readonly locator: string }
   | {
       readonly kind: "screenshot"

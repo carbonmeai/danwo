@@ -49,6 +49,7 @@ describe("the server", () => {
       "snapshot",
       "start_recording",
       "stop_recording",
+      "upload",
     ])
     expect(resources).toEqual([
       "danwo://config",

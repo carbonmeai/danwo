@@ -14,6 +14,7 @@ import type { Browser, BrowserContext, Locator, Page } from "playwright-core"
 import { snapshotChange } from "./diff.ts"
 import { checkLocator } from "./locator-check.ts"
 import type { SessionAnswer, SessionCall } from "./protocol.ts"
+import { filePayloads, putFiles, uploadAnswer } from "./upload.ts"
 import { PageWatch } from "./watch.ts"
 
 /** About 20k tokens of page text at most. */
@@ -24,7 +25,18 @@ const SECRET_MARK = "data-danwo-secret"
 
 export type ActionCall = Extract<
   SessionCall,
-  { kind: "click" | "hover" | "fill" | "fill_secret" | "press" | "select" | "check" | "navigate" }
+  {
+    kind:
+      | "click"
+      | "hover"
+      | "fill"
+      | "fill_secret"
+      | "press"
+      | "select"
+      | "check"
+      | "navigate"
+      | "upload"
+  }
 >
 
 export interface DeskOptions {
@@ -32,6 +44,10 @@ export interface DeskOptions {
   readonly baseUrl: string
   readonly vault: SecretVault
   readonly redact: (text: string) => string
+  /** The project folder, which upload paths resolve against. */
+  readonly root: string
+  /** The files the config offers tests by name, as paths in the project. */
+  readonly files?: Readonly<Record<string, string>> | undefined
   /** Where this session's recordings go, and how to name it to the agent. */
   readonly recordDir: { readonly path: string; readonly shown: string }
 }
@@ -154,7 +170,6 @@ export class PageDesk {
     ].join("\n")
   }
 
-  // fallow-ignore-next-line unused-class-member -- called through the session's typed `page` field
   async close(): Promise<void> {
     if (this.recording?.video) await this.finishVideo().catch(() => undefined)
     await this.context.close().catch(() => undefined)
@@ -204,6 +219,18 @@ export class PageDesk {
     else await this.page.goto(new URL(to, this.options.baseUrl).href, options)
 
     return `went to ${to}`
+  }
+
+  async upload(call: Extract<ActionCall, { kind: "upload" }>): Promise<string> {
+    const payloads = await filePayloads(call.files, {
+      root: this.options.root,
+      offered: this.options.files ?? {},
+    })
+    const { locator, name } = await this.target(call.target)
+
+    await putFiles(locator, payloads, ACTION_TIMEOUT_MS)
+
+    return this.options.redact(uploadAnswer(call.files, payloads, name))
   }
 
   get keyboard() {
@@ -369,6 +396,7 @@ const ACTIONS: {
     return `${call.checked ? "checked" : "unchecked"} ${name}`
   },
   navigate: (desk, call) => desk.navigate(call.to),
+  upload: (desk, call) => desk.upload(call),
 }
 
 /** Carries out `call` with the action of its kind. */
@@ -388,6 +416,8 @@ function perform(desk: PageDesk, call: ActionCall): Promise<string> {
       return ACTIONS.select(desk, call)
     case "check":
       return ACTIONS.check(desk, call)
+    case "upload":
+      return ACTIONS.upload(desk, call)
     default:
       return ACTIONS.navigate(desk, call)
   }

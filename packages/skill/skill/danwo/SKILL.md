@@ -20,7 +20,9 @@ When the project has danwo's MCP server (`danwo init` registers it), work agains
 
 1. Read `danwo://config` for where tests live, the app and the configured secrets' names.
 2. `open_session`, then walk the journey with `click`, `fill`, `fill_secret` (by name), `select`
-   and `press`, using refs from each answer.
+   and `press`, using refs from each answer. `upload` puts files into a file input (a project
+   path, a `files` name from the config, or `{ name, text | base64 }`; a test then uploads them
+   by their `files` name).
 3. For every element a step needs, `check_locator` with the locator you would write until it
    matches exactly one element; keep the line it returns. Prefer `getByRole` with a name, then
    `getByLabel`, `getByText`, `getByTestId`.

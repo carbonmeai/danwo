@@ -11,6 +11,7 @@ import { z, type ZodRawShape } from "zod"
 import { answer, progressOf } from "../reply.ts"
 import type { SessionManager } from "../sessions/manager.ts"
 import type { SessionAnswer, SessionCall } from "../sessions/protocol.ts"
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_FILES, sizeText } from "../sessions/upload.ts"
 
 const session = z.string().describe("the session id open_session returned, e.g. s1")
 const target = z
@@ -18,6 +19,24 @@ const target = z
   .describe(
     'what to act on: a ref from the latest snapshot ("e12"), or a locator as a test writes it, e.g. getByRole("button", { name: "Pay" }) or getByLabel("Email")',
   )
+
+const mimeType = z.string().optional().describe("e.g. image/png; guessed from the name if left out")
+
+/** One file to upload, in one of the ways an agent can give it. */
+const UploadFile = z.union([
+  z.strictObject({ path: z.string().describe("a path in the project, relative to its folder") }),
+  z.strictObject({ file: z.string().describe("a file the config offers tests by name (files)") }),
+  z.strictObject({
+    name: z.string(),
+    text: z.string().describe("the file's content as text"),
+    mimeType,
+  }),
+  z.strictObject({
+    name: z.string(),
+    base64: z.string().describe("the file's bytes, base64"),
+    mimeType,
+  }),
+])
 
 function reply(result: SessionAnswer): CallToolResult {
   return {
@@ -50,6 +69,7 @@ const SessionArgs = z.object({
   from: z.enum(["last", "open"]).optional(),
   bodies: z.boolean().optional(),
   fault: z.string().optional(),
+  files: z.array(UploadFile).optional(),
 })
 
 type SessionArgs = z.infer<typeof SessionArgs>
@@ -146,6 +166,16 @@ function registerActions(server: McpServer, sessions: SessionManager): void {
       kind: "check",
       target: given(args.target, "target"),
       checked: args.checked ?? true,
+    }),
+  })
+  register(server, sessions, {
+    name: "upload",
+    description: `Put files into a file input, or into the file chooser an element opens when clicked. Each file is a path in the project, a file the config offers by name, or bytes ({ name, text } or { name, base64 }); ${sizeText(MAX_UPLOAD_BYTES)} and ${MAX_UPLOAD_FILES} files at most per call. An empty list clears the input. ${ACTION_NOTE}`,
+    input: { session, target, files: z.array(UploadFile).max(MAX_UPLOAD_FILES) },
+    call: (args) => ({
+      kind: "upload",
+      target: given(args.target, "target"),
+      files: given(args.files, "files"),
     }),
   })
   register(server, sessions, {

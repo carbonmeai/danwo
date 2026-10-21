@@ -29,15 +29,38 @@ Pass `format: "md"` to `show_run` to get the same failure page `danwo show --for
 A **session** is your app opened in danwo's browser, with its emulators and proxy, for the agent
 to explore before it writes a test. Every action answers with the page as it is now:
 
-| Tool                                                 | What it does                                                                      |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `open_session`, `close_session`                      | Starts the app, emulators and browser, or stops them.                             |
-| `navigate`                                           | Goes to a path or URL, or back, forward, reload.                                  |
-| `click`, `hover`, `fill`, `press`, `select`, `check` | Acts on an element, by a ref from the last snapshot or by a locator.              |
-| `fill_secret`                                        | Fills a field with a configured secret by name. The value never appears anywhere. |
-| `snapshot`, `screenshot`                             | The page as an accessibility tree with refs, or as an image with secrets masked.  |
-| `check_locator`                                      | Checks a locator matches exactly one element, and returns the line to paste.      |
-| `start_recording`, `stop_recording`                  | Records the session's screenshots, and video when no secret was filled.           |
+| Tool                                                 | What it does                                                                         |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `open_session`, `close_session`                      | Starts the app, emulators and browser, or stops them.                                |
+| `navigate`                                           | Goes to a path or URL, or back, forward, reload.                                     |
+| `click`, `hover`, `fill`, `press`, `select`, `check` | Acts on an element, by a ref from the last snapshot or by a locator.                 |
+| `fill_secret`                                        | Fills a field with a configured secret by name. The value never appears anywhere.    |
+| `upload`                                             | Puts files into a file input, or the file picker a button opens. Up to 10 MB a call. |
+| `snapshot`, `screenshot`                             | The page as an accessibility tree with refs, or as an image with secrets masked.     |
+| `check_locator`                                      | Checks a locator matches exactly one element, and returns the line to paste.         |
+| `start_recording`, `stop_recording`                  | Records the session's screenshots, and video when no secret was filled.              |
+
+### Upload a file
+
+`upload` takes a list of files. Give each one in whichever form you have it:
+
+| Form               | What it is                                                |
+| ------------------ | --------------------------------------------------------- |
+| `{ path }`         | A file in your project, relative to the project folder.   |
+| `{ file }`         | A file your config offers tests by name, under `files`.   |
+| `{ name, text }`   | A file the agent writes on the spot, such as a small CSV. |
+| `{ name, base64 }` | Any other bytes, such as an image.                        |
+
+```json title="upload · arguments"
+{
+  "session": "s1",
+  "target": "getByLabel(\"Receipt\")",
+  "files": [{ "path": "fixtures/receipt.pdf" }, { "name": "notes.csv", "text": "item,qty\noats,2" }]
+}
+```
+
+A test uploads by name only, so a recording never holds a path. Add the file under `files` in
+`danwo.config.ts`, then call `setInputFiles("receipt")`. An empty list clears the input.
 
 ## Look behind the app
 

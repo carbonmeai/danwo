@@ -50,6 +50,7 @@ const ACTIONS = new Set<string>([
   "select",
   "check",
   "navigate",
+  "upload",
 ])
 const PAGE_CALLS = new Set<string>([
   "snapshot",
@@ -103,6 +104,7 @@ async function open(request: OpenRequest): Promise<SessionAnswer> {
       baseUrl,
       root: loaded.root,
       secrets: loaded.config.secrets,
+      files: loaded.config.files,
     })
   } catch (error) {
     await browser.close().catch(() => undefined)
@@ -117,6 +119,7 @@ interface Started {
   readonly baseUrl: string
   readonly root: string
   readonly secrets: ConstructorParameters<typeof SecretVault>[0]
+  readonly files: Readonly<Record<string, string>> | undefined
 }
 
 /** Opens the session's page on the started environment and browser. */
@@ -129,6 +132,8 @@ async function start(request: OpenRequest, started: Started): Promise<SessionAns
       baseUrl: started.baseUrl,
       vault,
       redact: (text) => redactor.text(text),
+      root: started.root,
+      files: started.files,
       recordDir: {
         path: join(started.root, ".danwo", "sessions", request.id),
         shown: `.danwo/sessions/${request.id}/`,
