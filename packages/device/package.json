@@ -12,12 +12,26 @@
     "directory": "packages/device"
   },
   "files": [
-    "src"
+    "src",
+    "dist/types",
+    "NOTICE"
   ],
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./toolchain": "./src/toolchain.ts"
+    ".": {
+      "danwo-source": "./src/index.ts",
+      "types": "./dist/types/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./toolchain": {
+      "danwo-source": "./src/toolchain.ts",
+      "types": "./dist/types/toolchain.d.ts",
+      "default": "./src/toolchain.ts"
+    }
+  },
+  "scripts": {
+    "prepack": "node ../../scripts/declarations.ts && node ../../scripts/pack-files.ts add",
+    "postpack": "node ../../scripts/pack-files.ts remove"
   },
   "dependencies": {
     "@danwo/proxy": "workspace:*",

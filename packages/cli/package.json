@@ -16,9 +16,14 @@
   },
   "files": [
     "bin",
-    "src"
+    "src",
+    "NOTICE"
   ],
   "type": "module",
+  "scripts": {
+    "prepack": "node ../../scripts/pack-files.ts add",
+    "postpack": "node ../../scripts/pack-files.ts remove"
+  },
   "dependencies": {
     "@danwo/dashboard": "workspace:*",
     "@danwo/device": "workspace:*",

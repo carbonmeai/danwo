@@ -9,6 +9,9 @@
     "website/vite.config.ts",
     "website/scripts/*.ts"
   ],
+  "resolve": {
+    "conditions": ["danwo-source"]
+  },
   "workspaces": {
     "patterns": ["packages/*", "examples/*", "benchmarks", "website"]
   },

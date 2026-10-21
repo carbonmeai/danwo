@@ -12,12 +12,26 @@
     "directory": "packages/init"
   },
   "files": [
-    "src"
+    "src",
+    "dist/types",
+    "NOTICE"
   ],
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./catalog": "./src/catalog.ts"
+    ".": {
+      "danwo-source": "./src/index.ts",
+      "types": "./dist/types/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./catalog": {
+      "danwo-source": "./src/catalog.ts",
+      "types": "./dist/types/catalog.d.ts",
+      "default": "./src/catalog.ts"
+    }
+  },
+  "scripts": {
+    "prepack": "node ../../scripts/declarations.ts && node ../../scripts/pack-files.ts add",
+    "postpack": "node ../../scripts/pack-files.ts remove"
   },
   "dependencies": {
     "@clack/prompts": "1.8.1",

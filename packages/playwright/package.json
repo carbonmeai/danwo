@@ -16,11 +16,21 @@
   },
   "files": [
     "bin",
-    "src"
+    "src",
+    "dist/types",
+    "NOTICE"
   ],
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "danwo-source": "./src/index.ts",
+      "types": "./dist/types/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "prepack": "node ../../scripts/declarations.ts && node ../../scripts/pack-files.ts add",
+    "postpack": "node ../../scripts/pack-files.ts remove"
   },
   "dependencies": {
     "@danwo/emulators": "workspace:*",

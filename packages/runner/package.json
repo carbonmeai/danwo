@@ -13,16 +13,42 @@
   },
   "files": [
     "src",
-    "strip-types.mjs"
+    "strip-types.mjs",
+    "dist/types",
+    "NOTICE"
   ],
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./runner": "./src/runner/index.ts",
-    "./verdict": "./src/runner/verdict-words.ts",
-    "./register": "./src/runner/register.ts",
-    "./children": "./src/support/children.ts",
+    ".": {
+      "danwo-source": "./src/index.ts",
+      "types": "./dist/types/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./runner": {
+      "danwo-source": "./src/runner/index.ts",
+      "types": "./dist/types/runner/index.d.ts",
+      "default": "./src/runner/index.ts"
+    },
+    "./verdict": {
+      "danwo-source": "./src/runner/verdict-words.ts",
+      "types": "./dist/types/runner/verdict-words.d.ts",
+      "default": "./src/runner/verdict-words.ts"
+    },
+    "./register": {
+      "danwo-source": "./src/runner/register.ts",
+      "types": "./dist/types/runner/register.d.ts",
+      "default": "./src/runner/register.ts"
+    },
+    "./children": {
+      "danwo-source": "./src/support/children.ts",
+      "types": "./dist/types/support/children.d.ts",
+      "default": "./src/support/children.ts"
+    },
     "./strip-types": "./strip-types.mjs"
+  },
+  "scripts": {
+    "prepack": "node ../../scripts/declarations.ts && node ../../scripts/pack-files.ts add",
+    "postpack": "node ../../scripts/pack-files.ts remove"
   },
   "dependencies": {
     "@ai-sdk/provider": "4.0.26",

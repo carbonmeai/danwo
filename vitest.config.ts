@@ -17,6 +17,7 @@ export default defineConfig({
           name: "unit",
           include: [
             "packages/*/test/**/*.test.ts",
+            "scripts/test/**/*.test.ts",
             "benchmarks/test/**/*.test.ts",
             "website/test/**/*.test.ts",
           ],

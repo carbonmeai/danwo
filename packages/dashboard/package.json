@@ -15,16 +15,23 @@
     "dist/client",
     "dist/server",
     "src/index.ts",
-    "src/built.ts"
+    "src/built.ts",
+    "dist/types",
+    "NOTICE"
   ],
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "danwo-source": "./src/index.ts",
+      "types": "./dist/types/index.d.ts",
+      "default": "./src/index.ts"
+    }
   },
   "scripts": {
     "codegen": "panda codegen",
     "build": "panda codegen && vite build",
-    "prepack": "bun run build"
+    "prepack": "bun run build && node ../../scripts/declarations.ts && node ../../scripts/pack-files.ts add",
+    "postpack": "node ../../scripts/pack-files.ts remove"
   },
   "dependencies": {
     "@danwo/runner": "workspace:*"
