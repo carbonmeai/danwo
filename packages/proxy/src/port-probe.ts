@@ -25,17 +25,39 @@ function isSocketHelpers(value: unknown): value is SocketHelpers {
 
 let replaced = false
 
-/** Replaces the library's local port check, once per process. */
+/** The library's socket helpers, or undefined when a later version moved or renamed them. */
+function socketHelpers(): SocketHelpers | undefined {
+  try {
+    const helpers: unknown = createRequire(import.meta.url)("mockttp/dist/util/socket-util")
+
+    return isSocketHelpers(helpers) ? helpers : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Replaces the library's local port check, once per process. When a later version has moved the
+ * check, the proxy runs with the library's own and says so once: that version may well have fixed
+ * the leak, and a warning is better than a proxy that will not start.
+ */
 export function replaceLocalPortProbe(): void {
   if (replaced) return
 
-  const helpers: unknown = createRequire(import.meta.url)("mockttp/dist/util/socket-util")
+  replaced = true
 
-  if (!isSocketHelpers(helpers)) throw new Error("mockttp no longer has isLocalPortActive")
+  const helpers = socketHelpers()
+
+  if (helpers === undefined) {
+    process.emitWarning(
+      "danwo: this mockttp version has no isLocalPortActive to replace; using its own local port check",
+    )
+
+    return
+  }
 
   helpers.isLocalPortActive = (host, port) =>
     host === "::1" && !helpers.isLocalIPv6Available
       ? Promise.resolve(false)
       : isListening(host, port)
-  replaced = true
 }
