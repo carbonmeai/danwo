@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "instruction": "Start buying 500 credits",
+  "recordedAt": "2026-10-21T22:20:27.813Z",
+  "actions": [
+    {
+      "kind": "click",
+      "target": {
+        "testId": "buy",
+        "role": "button"
+      }
+    }
+  ],
+  "endRoute": "checkout.stripe.com/checkout/:id",
+  "effects": {
+    "page": {
+      "appeared": [
+        "button \"Done\"",
+        "button \"Address\"",
+        "button \"Format Options\"",
+        "button \"Pay $5.00\"",
+        "button \"Back\"",
+        "button \"Share\"",
+        "button \"Reload\"",
+        "button \"Open in Safari\"",
+        "link \"Back\"",
+        "generic \"Safari\""
+      ],
+      "vanished": [
+        "button \"Buy 500 credits\"",
+        "generic \"Danwo Shop\"",
+        "text \"Danwo Shop\"",
+        "text \"Credits: 0\"",
+        "text \"Ready\""
+      ]
+    },
+    "backend": [
+      "GET checkout.stripe.com/checkout/:id",
+      "POST api.stripe.com/v1/checkout/sessions",
+      "POST shop.danwo.test/checkout"
+    ]
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent-buy.danwo.ts › buys 500 credits when asked in plain words",
+    "appIdentity": "ios:com.danwo.shopmobile",
+    "kind": "act",
+    "step": 1,
+    "instruction": "Start buying 500 credits",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

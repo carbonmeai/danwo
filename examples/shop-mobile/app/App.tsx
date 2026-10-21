@@ -1,6 +1,6 @@
 /*
  * The shop's app: shows the user's credits and buys 500 more through Stripe Checkout, opened in a
- * Custom Tab. The shop's server creates the Checkout Session and grants credits from Stripe's
+ * Custom Tab on Android and a Safari view on iOS. The shop's server creates the Checkout Session and grants credits from Stripe's
  * webhook; the app only asks it for the balance. Its server is `http://shop.danwo.test`, a name
  * the device reaches through danwo's proxy, so the build needs no address baked in.
  */
@@ -8,7 +8,7 @@ import * as Linking from "expo-linking"
 import { StatusBar } from "expo-status-bar"
 import * as WebBrowser from "expo-web-browser"
 import { useEffect, useState } from "react"
-import { Pressable, StyleSheet, Text, View } from "react-native"
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native"
 
 const SHOP = "http://shop.danwo.test"
 const USER = "u1"
@@ -73,8 +73,11 @@ export default function App() {
   }, [paid, returned])
 
   useEffect(() => {
-    if (returned?.startsWith("danwoshop://done")) setStatus("Thanks for your order")
-    if (returned?.startsWith("danwoshop://cancel")) setStatus("Checkout cancelled")
+    if (returned?.startsWith("danwoshop://") !== true) return
+    if (returned.startsWith("danwoshop://done")) setStatus("Thanks for your order")
+    if (returned.startsWith("danwoshop://cancel")) setStatus("Checkout cancelled")
+    /* iOS leaves the Safari view over the app when Checkout links back; Android's tab closes itself. */
+    if (Platform.OS === "ios") WebBrowser.dismissBrowser().catch(() => undefined)
   }, [returned])
 
   async function buy() {

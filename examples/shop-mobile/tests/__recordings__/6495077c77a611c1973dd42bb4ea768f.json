@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "instruction": "Pay for the credits with the email {email}",
+  "recordedAt": "2026-10-21T22:20:55.288Z",
+  "actions": [
+    {
+      "kind": "fill",
+      "target": {
+        "role": "textbox",
+        "name": "Email"
+      },
+      "input": {
+        "param": "email"
+      }
+    },
+    {
+      "kind": "click",
+      "target": {
+        "role": "button",
+        "name": "Pay $5.00"
+      }
+    }
+  ],
+  "endRoute": "app",
+  "effects": {
+    "page": {
+      "appeared": [
+        "button \"Buy 500 credits\"",
+        "generic \"Danwo Shop\"",
+        "text \"Danwo Shop\"",
+        "text \"Credits: 500\"",
+        "text \"Thanks for your order\""
+      ],
+      "vanished": [
+        "button \"Done\"",
+        "button \"Address\"",
+        "button \"Format Options\"",
+        "button \"Pay $5.00\"",
+        "button \"Back\"",
+        "button \"Share\"",
+        "button \"Reload\"",
+        "button \"Open in Safari\"",
+        "link \"Back\"",
+        "generic \"Safari\""
+      ]
+    },
+    "backend": [
+      "GET shop.danwo.test/credits",
+      "POST checkout.stripe.com/checkout/:id/complete",
+      "webhook checkout.session.completed"
+    ]
+  },
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent-buy.danwo.ts › buys 500 credits when asked in plain words",
+    "appIdentity": "ios:com.danwo.shopmobile",
+    "kind": "act",
+    "step": 2,
+    "instruction": "Pay for the credits with the email {email}",
+    "params": {
+      "email": "text:buyer@example.com"
+    },
+    "policy": "similar-v1"
+  }
+}

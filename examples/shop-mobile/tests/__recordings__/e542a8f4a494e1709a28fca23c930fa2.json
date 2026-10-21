@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "kind": "extract",
+  "instruction": "the credits balance",
+  "recordedAt": "2026-10-21T22:20:12.960Z",
+  "fields": [
+    {
+      "path": "credits",
+      "target": {
+        "testId": "credits",
+        "role": "text"
+      },
+      "as": "number"
+    }
+  ],
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent-buy.danwo.ts › buys 500 credits when asked in plain words",
+    "appIdentity": "ios:com.danwo.shopmobile",
+    "kind": "extract",
+    "step": 0,
+    "instruction": "the credits balance",
+    "params": {},
+    "policy": "similar-v1"
+  }
+}

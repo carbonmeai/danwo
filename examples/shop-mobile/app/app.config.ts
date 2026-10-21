@@ -13,6 +13,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   orientation: "portrait",
   userInterfaceStyle: "light",
   scheme: "danwoshop",
+  ios: { ...config.ios, bundleIdentifier: "com.danwo.shopmobile" },
   android: { ...config.android, package: "com.danwo.shopmobile" },
   plugins: ["expo-web-browser"],
 })

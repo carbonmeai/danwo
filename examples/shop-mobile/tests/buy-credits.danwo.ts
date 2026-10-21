@@ -5,12 +5,13 @@ import { grantedCredits, paidCredits } from "../../shop/src/ledger.ts"
 
 const test = base.extend<StripeFixtures & DeviceFixtures>()
 
-test("buys 500 credits through Stripe Checkout in a Custom Tab", async ({
+test("buys 500 credits through Stripe Checkout in the in-app browser", async ({
   screen,
   expect,
   device,
 }) => {
-  await expect(screen.getByRole("heading", { name: "Danwo Shop" })).toBeVisible()
+  /* By its text: iOS's driver reports no heading role. */
+  await expect(screen.getByText("Danwo Shop")).toBeVisible()
   await expect(screen.getByTestId("credits")).toHaveText(/^Credits: \d+$/)
 
   /* The worker's shop keeps its credits from test to test; this purchase adds 500. */
@@ -18,7 +19,7 @@ test("buys 500 credits through Stripe Checkout in a Custom Tab", async ({
 
   await screen.getByTestId("buy").tap()
 
-  /* Checkout opens in a Custom Tab over the app; the same locators read the web page. */
+  /* Checkout opens over the app (a Custom Tab, or a Safari view on iOS); the same locators read the page. */
   await expect(screen.getByText("Pay danwo")).toBeVisible()
   expect((await device.foreground()).browser).toBe(true)
   await screen.getByLabel("Email").fill("buyer@example.com")

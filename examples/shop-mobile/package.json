@@ -2,12 +2,15 @@
   "name": "@danwo/example-shop-mobile",
   "version": "0.0.0",
   "private": true,
-  "description": "An Expo app that buys credits through Stripe Checkout in a Custom Tab; danwo tests it on an Android emulator.",
+  "description": "An Expo app that buys credits through Stripe Checkout in a Custom Tab or a Safari view; danwo tests it on an Android emulator or an iOS Simulator.",
   "type": "module",
   "scripts": {
     "build:android": "danwo build-android app",
+    "build:ios": "danwo build-ios app",
     "test:e2e": "danwo test",
-    "matrix": "danwo matrix tests/buy-credits.danwo.ts"
+    "test:ios": "DANWO_PLATFORM=ios danwo test",
+    "matrix": "danwo matrix tests/buy-credits.danwo.ts",
+    "matrix:ios": "DANWO_PLATFORM=ios danwo matrix tests/buy-credits.danwo.ts"
   },
   "dependencies": {
     "stripe": "23.0.0",
