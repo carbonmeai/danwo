@@ -55,12 +55,16 @@ routes that host to the dev server, so every event a test sends is recorded.
 
 Leave out `start` and danwo uses a dev server at `url`:
 
-| Option            | What it does                                                      | Default                 |
-| ----------------- | ----------------------------------------------------------------- | ----------------------- |
-| `url`             | where the dev server answers                                      | `http://127.0.0.1:8288` |
-| `start`           | `true` runs `npx --yes inngest-cli dev`; a string is your command | off                     |
-| `apps`            | your apps' Inngest endpoints, which the dev server calls          | none                    |
-| `settleTimeoutMs` | how long `settle()` waits for runs to finish                      | 30 seconds              |
+| Option                 | What it does                                                       | Default                 |
+| ---------------------- | ------------------------------------------------------------------ | ----------------------- |
+| `url`                  | where the dev server answers                                       | `http://127.0.0.1:8288` |
+| `start`                | `true` runs `npx --yes inngest-cli dev`; a string is your command  | off                     |
+| `apps`                 | your apps' Inngest endpoints, which the dev server calls           | none                    |
+| `settleTimeoutMs`      | how long `settle()` waits for runs to finish                       | 30 seconds              |
+| `retryIntervalSeconds` | with `start: true`, the wait between the attempts of a failed step | 1 second                |
+
+A dev server danwo starts gets free ports for its connect gateway as well as for `url`, so each
+worker of a run can start its own.
 
 ## Wait for the jobs
 

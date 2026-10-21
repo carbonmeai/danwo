@@ -7,7 +7,12 @@ import { join } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
 
 import { liveKeyWarnings } from "../src/runner/app-checks.ts"
-import { inngestOutboundFaults, inngestService, INNGEST_HOST } from "../src/runner/inngest.ts"
+import {
+  devServerCommand,
+  inngestOutboundFaults,
+  inngestService,
+  INNGEST_HOST,
+} from "../src/runner/inngest.ts"
 import { startServices } from "../src/runner/services.ts"
 import { startOrder } from "../src/runner/stack-environment.ts"
 import { fakeKey } from "./fake-key.ts"
@@ -489,6 +494,26 @@ describe("Inngest", () => {
       dev.server.close()
     }
   }, 20_000)
+
+  it("starts each dev server on ports of its own, retrying failed steps a second apart", async () => {
+    const ports = async () => {
+      const command = await devServerCommand(
+        { apps: ["http://127.0.0.1:4100/api/inngest"] },
+        "http://127.0.0.1:9001",
+      )
+
+      expect(command).toMatch(/^npx --yes inngest-cli dev --no-discovery --port 9001 /)
+      expect(command).toContain(" --retry-interval 1 -u http://127.0.0.1:4100/api/inngest")
+
+      return [...command.matchAll(/--connect-[a-z-]+-port (\d+)/g)].map((match) => match[1])
+    }
+    const [first, second] = await Promise.all([ports(), ports()])
+
+    expect(first).toHaveLength(3)
+    expect(new Set(first).size).toBe(3)
+    expect(first).not.toContain("8289")
+    expect(first).not.toEqual(second)
+  })
 
   it("faults event sends: down, accepted but unanswered, and slow", () => {
     const kinds = inngestOutboundFaults({

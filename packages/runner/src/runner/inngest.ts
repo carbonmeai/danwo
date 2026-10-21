@@ -5,6 +5,8 @@
  * runs those events triggered have finished, so an invariant reads what the background jobs wrote,
  * and the record keeps each run's function, status and duration.
  */
+import { createServer } from "node:net"
+
 import {
   forwardTo,
   type Handler,
@@ -32,6 +34,11 @@ export interface InngestOptions {
   readonly apps?: readonly string[]
   /** How long `settle()` waits for runs to finish; default 30 seconds. */
   readonly settleTimeoutMs?: number
+  /**
+   * Seconds between the attempts of a failed step, for a dev server danwo starts; default 1, so a
+   * retry lands within a test rather than after Inngest's backoff of up to minutes.
+   */
+  readonly retryIntervalSeconds?: number
 }
 
 /** One function run an event triggered, as the flight record keeps it. */
@@ -260,6 +267,44 @@ async function answers(url: string): Promise<boolean> {
   }
 }
 
+/** A port nothing listens on yet. */
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer()
+
+    server.once("error", reject)
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address()
+
+      server.close(() => resolve(typeof address === "object" && address ? address.port : 0))
+    })
+  })
+}
+
+/**
+ * The `inngest-cli dev` command for a dev server at `url`. Besides its own port, the dev server
+ * listens on three more for its connect gateway, which default to fixed ports: each gets a free
+ * one, so every worker of a run can start a dev server of its own.
+ */
+export async function devServerCommand(options: InngestOptions, url: string): Promise<string> {
+  const port = new URL(url).port || "8288"
+  const [gateway, gatewayGrpc, executorGrpc] = await Promise.all([
+    freePort(),
+    freePort(),
+    freePort(),
+  ])
+
+  return [
+    "npx --yes inngest-cli dev --no-discovery",
+    `--port ${port}`,
+    `--connect-gateway-port ${gateway}`,
+    `--connect-gateway-grpc-port ${gatewayGrpc}`,
+    `--connect-executor-grpc-port ${executorGrpc}`,
+    `--retry-interval ${options.retryIntervalSeconds ?? 1}`,
+    ...(options.apps ?? []).map((app) => `-u ${app}`),
+  ].join(" ")
+}
+
 /** Starts the dev server when asked, and waits for it to answer. */
 async function startDevServer(
   options: InngestOptions,
@@ -267,11 +312,8 @@ async function startDevServer(
 ): Promise<OwnedChild | undefined> {
   if (options.start === undefined || options.start === false) return undefined
 
-  const port = new URL(url).port || "8288"
   const command =
-    typeof options.start === "string"
-      ? options.start
-      : `npx --yes inngest-cli dev --no-discovery --port ${port} ${(options.apps ?? []).map((app) => `-u ${app}`).join(" ")}`
+    typeof options.start === "string" ? options.start : await devServerCommand(options, url)
   const owned = spawnOwned(command, [], { shell: true, stdio: "ignore" })
   const deadline = Date.now() + 120_000
 
