@@ -47,11 +47,11 @@ per worker and reuses the browser state.
 After each action danwo waits for the page to settle. With an environment, it also waits until
 nothing your app started is still in flight at the proxy:
 
-| `readiness`    | Waits for                                                 |
-| -------------- | --------------------------------------------------------- |
-| `page+backend` | the page, then the backend's calls (default with a proxy) |
-| `page`         | the page alone                                            |
-| `off`          | nothing                                                   |
+| `readiness`    | Waits for                                                                            |
+| -------------- | ------------------------------------------------------------------------------------ |
+| `page+backend` | the page, the backend's calls, and the page again if they ran (default with a proxy) |
+| `page`         | the page alone                                                                       |
+| `off`          | nothing                                                                              |
 
 Add `settle: true` to also wait for webhooks to be delivered and background jobs to finish:
 

@@ -34,17 +34,45 @@ test, fix the setup, or report a bug in danwo. You stop opening every recording 
 
 ## How sure it is
 
-Each verdict is **certain** or **likely**. Certain means the evidence names the cause: a 500 from
-the app, a stack frame in your test file. Likely means it points that way: a missing element on a
-healthy page usually means a stale locator, but the app may also have stopped rendering it.
+Each verdict is **certain** or **likely**. Certain means the evidence names the cause: a 500 on a
+form your test just submitted, a stack frame in your test file. Likely means it points that way: a
+missing element on a healthy page usually means a stale locator, but the app may also have stopped
+rendering it.
 
 The dashboard marks a likely verdict with a question mark, and the terminal and GitHub add
 "(likely)".
+
+## Which 5xx it names
+
+A page often makes a failing request that has nothing to do with the test. So the verdict looks
+at the work that failed: the steps since the last check that passed. It picks the 5xx this way:
+
+| Rule                                                               | Why                                           |
+| ------------------------------------------------------------------ | --------------------------------------------- |
+| Skip a route that also failed in runs that passed                  | it fails either way, so it isn't the cause    |
+| Skip a call that failed because danwo blocked one of its own calls | the run cut the app off; the app didn't break |
+| Prefer a write (a POST, PUT or DELETE) during the failing work     | a broken write is the likeliest cause         |
+| Then the latest call closest to the failing step                   | it's nearest to what went wrong               |
+
+Only a 5xx on a write during the failing work makes an app bug **certain**. Any other 5xx, and an
+uncaught page error, makes it **likely**.
 
 <Callout type="info">
   Calls an emulator answered and calls a fault broke don't count as the app's own errors. Only your
   app's unfaulted 5xx answers do.
 </Callout>
+
+## When it can't tell
+
+Some failures are **undecided** because the evidence points both ways:
+
+| Failure                                                 | Why it's undecided                                     |
+| ------------------------------------------------------- | ------------------------------------------------------ |
+| A check fails after an agent step the model carried out | the model may have said it did the step when it didn't |
+| An `agent.assert` fails with no app error while it ran  | the judge may be too strict, or the app wrong          |
+
+A replayed agent step doesn't count: its actions are known. Open the recording's calls to see what
+the model really did.
 
 ## Where it shows
 

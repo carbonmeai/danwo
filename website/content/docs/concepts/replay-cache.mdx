@@ -18,6 +18,13 @@ keeps what the step changed, on the page and behind it.
 
 On the next run, danwo finds each element again by that description and repeats the actions.
 
+A new recording is kept only once a check after it passes, such as an `expect` on the page it led
+to. If the test fails before any check confirms the step, the recording is dropped, so a step that
+went wrong never becomes the recording.
+
+The changes it keeps leave out text that differs on every run, such as `7 sec. ago`, `Oct 20` or
+`3pm`. A replay doesn't wait for a time that has moved on.
+
 The other agent steps are recorded too:
 
 | Step            | What's recorded                                     | What the replay does                   |
@@ -48,6 +55,20 @@ cache: 12 replayed · 1 relocated · 1 handed off · 0 missed
 | `off`        | The session has no cache.                                             |
 
 A `handed-off` step is recorded afresh once it passes, so the next run replays again.
+
+When steps made new recordings, the line also says what became of them:
+
+```text
+cache: 3 replayed · 0 relocated · 0 handed off · 2 missed · 1 recorded · 1 not kept: the test failed
+```
+
+| Note                                 | What it means                                            |
+| ------------------------------------ | -------------------------------------------------------- |
+| `recorded`                           | The new recording was kept. The next run replays it.     |
+| `not kept: the test failed`          | A step failed before any check confirmed this one.       |
+| `not kept: no check after it passed` | Nothing confirmed the step worked. Add a check after it. |
+
+A step that wasn't kept asks the model again on the next run.
 
 ## Why a step was re-asked
 

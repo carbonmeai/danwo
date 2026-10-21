@@ -61,6 +61,12 @@ A seeded user's id is derived from their email, and an organization's from its s
 `user_…` is the same on every run. Rows in your own database that point at a Clerk user keep
 pointing at the right one after a reset. Give an `id` to choose it yourself.
 
+To seed your own database with the same ids, import `stableClerkId` from `@danwo/sdk`:
+
+```ts title="seed.ts · a user's row"
+const id = stableClerkId("user", "ada@example.com")
+```
+
 ### A key that stays put
 
 The emulator signs session tokens with its own key. If your app pins Clerk's public key in a
@@ -91,15 +97,20 @@ With emailed codes, read the code with `clerkInstance(clerk).code(email)` and ty
 "Verification code". Addresses with `+clerk_test` take the code `424242` and get no email, as on a
 development instance.
 
-| `clerkInstance(clerk)`                       | What it's for                        |
-| -------------------------------------------- | ------------------------------------ |
-| `user(email)`, `sessions(email)`             | A user, and their sessions.          |
-| `code(to)`, `messages(to)`                   | The codes and emails Clerk sent.     |
-| `organizations()`                            | The organizations.                   |
-| `revokeSessions(email)`                      | Sign a user out mid-test.            |
-| `env()`, `publicKeyPem()`, `webhookSecret()` | The keys and secrets your app needs. |
+| `clerkInstance(clerk)`                       | What it's for                         |
+| -------------------------------------------- | ------------------------------------- |
+| `user(email)`, `sessions(email)`             | A user, and their sessions.           |
+| `users()`                                    | Every user, with their linked logins. |
+| `memberships(orgId?)`                        | Members and their roles.              |
+| `code(to)`, `messages(to)`                   | The codes and emails Clerk sent.      |
+| `organizations()`                            | The organizations.                    |
+| `revokeSessions(email)`                      | Sign a user out mid-test.             |
+| `env()`, `publicKeyPem()`, `webhookSecret()` | The keys and secrets your app needs.  |
 
 `clerkMail(clerk)` gives the codes to the `mail` fixture.
+
+`users()` and `memberships()` let an invariant check your own rows against Clerk's. Each user lists
+the social accounts linked to it, such as Google, under `external_accounts`.
 
 ## Sign in with Google
 
