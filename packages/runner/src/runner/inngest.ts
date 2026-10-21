@@ -68,6 +68,32 @@ interface ListedRun {
   readonly ended: boolean
 }
 
+/** `value`'s field `name`, when `value` is an object. */
+function fieldOf(value: unknown, name: string): unknown {
+  return typeof value === "object" && value !== null ? Reflect.get(value, name) : undefined
+}
+
+/** An event's name, when it has one. */
+function nameOf(event: unknown): string | undefined {
+  const name = fieldOf(event, "name")
+
+  return typeof name === "string" ? name : undefined
+}
+
+/**
+ * The names of the events in one recorded send, in the order it sent them: the body is one event
+ * or a list of them. A name that cannot be read is undefined.
+ */
+function eventNames(body: string | null | undefined): (string | undefined)[] {
+  try {
+    const parsed: unknown = JSON.parse(body ?? "")
+
+    return Array.isArray(parsed) ? parsed.map(nameOf) : [nameOf(parsed)]
+  } catch {
+    return []
+  }
+}
+
 /** The ids the dev server gave the events in one recorded send (`{ "ids": [...] }`). */
 function eventIds(body: string | null | undefined): string[] {
   try {
@@ -135,6 +161,89 @@ async function runsOf(url: string, event: string): Promise<ListedRun[]> {
   }
 }
 
+/** The dev server's GraphQL query for what every function it has registered is triggered by. */
+const TRIGGERS_QUERY = "{ functions { triggers { type value } } }"
+
+/** The event names (`*` a wildcard) the functions in a `TRIGGERS_QUERY` answer are triggered by. */
+function eventTriggers(answer: unknown): string[] | undefined {
+  const functions = fieldOf(fieldOf(answer, "data"), "functions")
+
+  if (!Array.isArray(functions)) return undefined
+
+  return functions.flatMap((fn: unknown) => {
+    const triggers = fieldOf(fn, "triggers")
+
+    return (Array.isArray(triggers) ? triggers : []).flatMap((trigger: unknown) => {
+      const value = fieldOf(trigger, "value")
+
+      return fieldOf(trigger, "type") === "EVENT" && typeof value === "string" ? [value] : []
+    })
+  })
+}
+
+/** Whether `pattern`, an event trigger, starts a run for an event called `name`; `*` is a wildcard. */
+function triggeredBy(pattern: string, name: string): boolean {
+  if (!pattern.includes("*")) return pattern === name
+
+  const parts = pattern.split("*").map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
+
+  return new RegExp(`^${parts.join(".*")}$`).test(name)
+}
+
+/**
+ * Whether an event name can start a run at all, from the triggers of the functions the dev server
+ * has registered; undefined when it cannot say (a dev server without the query, no functions
+ * registered yet, no answer). A function whose trigger has a condition still counts as listening.
+ */
+async function listeners(url: string): Promise<((name: string) => boolean) | undefined> {
+  try {
+    const response = await fetch(new URL("/v0/gql", url), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ query: TRIGGERS_QUERY }),
+      signal: AbortSignal.timeout(1_000),
+    })
+    const patterns = response.ok ? eventTriggers(await response.json()) : undefined
+
+    if (patterns === undefined || patterns.length === 0) return undefined
+
+    return (name) => patterns.some((pattern) => triggeredBy(pattern, name))
+  } catch {
+    return undefined
+  }
+}
+
+/** An event sent through the proxy: the id the dev server gave it, and its name when readable. */
+interface SentEvent {
+  readonly id: string
+  readonly name: string | undefined
+}
+
+/**
+ * For one settle: the events sent so far that no registered function listens to, given the runs
+ * listed. The dev server is asked for its functions once, when an event first shows no run.
+ */
+function unheardEvents(url: string) {
+  const unheard = new Set<string>()
+  let listening: Promise<((name: string) => boolean) | undefined> | undefined
+
+  return async (sent: readonly SentEvent[], listed: readonly ListedRun[]) => {
+    const runless = sent.filter(({ id }) => !listed.some(({ run }) => run.event === id))
+
+    if (runless.length === 0) return unheard
+
+    listening ??= listeners(url)
+
+    const listened = await listening
+
+    if (listened === undefined) return unheard
+
+    for (const { id, name } of runless) if (name !== undefined && !listened(name)) unheard.add(id)
+
+    return unheard
+  }
+}
+
 async function answers(url: string): Promise<boolean> {
   try {
     await fetch(url, { signal: AbortSignal.timeout(1_000) })
@@ -180,15 +289,16 @@ function markSeen(firstSeen: Map<string, number>, ids: readonly string[]): void 
 }
 
 /**
- * Whether settling waits on: an event that has shown no runs yet, for a while, or a run that has
- * not finished. `firstSeen` holds when each event and run first showed, `checkpoints` when each
- * run last checkpointed.
+ * Whether settling waits on: an event that has shown no runs yet, for a while, unless no function
+ * listens to it (`unheard`), or a run that has not finished. `firstSeen` holds when each event and
+ * run first showed, `checkpoints` when each run last checkpointed.
  */
 function stillWaiting(
   events: readonly string[],
   listed: readonly ListedRun[],
   firstSeen: ReadonlyMap<string, number>,
   checkpoints: ReadonlyMap<string, number>,
+  unheard: ReadonlySet<string> = new Set(),
 ): boolean {
   const now = Date.now()
   const going = ({ run, ended }: ListedRun) =>
@@ -199,7 +309,9 @@ function stillWaiting(
   return events.some((event) => {
     const own = listed.filter(({ run }) => run.event === event)
 
-    return own.length === 0 ? now - (firstSeen.get(event) ?? now) < NO_RUNS_MS : own.some(going)
+    if (own.length > 0) return own.some(going)
+
+    return !unheard.has(event) && now - (firstSeen.get(event) ?? now) < NO_RUNS_MS
   })
 }
 
@@ -221,7 +333,15 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
   const sentEvents = () =>
     (proxy?.exchanges() ?? [])
       .filter((e) => e.host === INNGEST_HOST && e.method === "POST" && e.path.startsWith("/e/"))
-      .flatMap((e) => eventIds(e.response?.body).map((id) => ({ id, at: Date.parse(e.startedAt) })))
+      .flatMap((e) => {
+        const names = eventNames(e.request?.body)
+
+        return eventIds(e.response?.body).map((id, n) => ({
+          id,
+          at: Date.parse(e.startedAt),
+          name: names[n],
+        }))
+      })
 
   /** When each run last checkpointed through the proxy (`/v1/checkpoint/<run id>/...`). */
   const lastCheckpoints = () => {
@@ -240,11 +360,13 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
    * Waits until every event sent so far has finished its runs, the ones those runs send included:
    * the sent events are read again on every poll, and each event gets its own time to show runs.
    * A run listed as finished with no end time is one the SDK checkpoints itself, and counts as
-   * finished once it has sent no checkpoint for a while.
+   * finished once it has sent no checkpoint for a while. An event no registered function listens
+   * to is not given that time: the dev server is asked, once, when such an event first shows.
    */
   const settle = async () => {
     const deadline = Date.now() + (options.settleTimeoutMs ?? 30_000)
     const firstSeen = new Map<string, number>()
+    const unheard = unheardEvents(url)
 
     for (;;) {
       const sent = sentEvents()
@@ -259,7 +381,10 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
         listed.map(({ run }) => run.runId),
       )
       runs = listed.map(({ run }) => run)
-      if (!stillWaiting(events, listed, firstSeen, lastCheckpoints()))
+
+      const nobody = await unheard(sent, listed)
+
+      if (!stillWaiting(events, listed, firstSeen, lastCheckpoints(), nobody))
         return waitedFor(events, runs)
       if (Date.now() > deadline)
         throw new Error(

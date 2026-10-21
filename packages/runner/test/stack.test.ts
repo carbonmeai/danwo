@@ -137,6 +137,18 @@ function runOf(id: string, at: number, runMs: number, checkpointed = false) {
   }
 }
 
+/** The dev server's GraphQL answer listing its functions: one per event, with a cron beside it. */
+function functionsAnswer(events: readonly string[]) {
+  const functions = events.map((value) => ({
+    triggers: [
+      { type: "EVENT", value },
+      { type: "CRON", value: "* * * * *" },
+    ],
+  }))
+
+  return { data: { functions } }
+}
+
 function json(res: ServerResponse, value: unknown): void {
   res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(value))
 }
@@ -144,15 +156,23 @@ function json(res: ServerResponse, value: unknown): void {
 /**
  * A stand-in for the Inngest dev server's event and runs API: an event it accepts triggers one
  * run, which finishes `runMs` later and shows up only `lagMs` after the event, as a busy dev
- * server schedules it.
+ * server schedules it. Its GraphQL lists functions listening to `triggers`; with none listed,
+ * settling cannot tell which events start no run.
  */
 async function devServer(
   runMs: number,
   lagMs = 0,
   checkpointed = false,
+  triggers: readonly string[] = [],
 ): Promise<{ server: Server; url: string }> {
   const accepted = new Map<string, number>()
   const server = createServer((req, res) => {
+    if (req.url === "/v0/gql") {
+      json(res, functionsAnswer(triggers))
+
+      return
+    }
+
     if (req.method === "POST" && req.url?.startsWith("/e/")) {
       const id = `evt_${accepted.size + 1}`
 
@@ -325,6 +345,44 @@ describe("Inngest", () => {
       await services.settle()
       expect(first).toMatch(/event evt_1 started no run$/)
       expect(Date.now() - began).toBeLessThan(500)
+    } finally {
+      await services.close()
+      dev.server.close()
+    }
+  }, 20_000)
+
+  it("does not wait for a run from an event no registered function listens to", async () => {
+    /* The functions listen to other events, one through a wildcard that does not match. */
+    const dev = await devServer(0, 60_000, false, ["billing/invoice.paid", "workspace.*.deleted"])
+    const inngest = await inngestService({ url: dev.url })
+    const services = await startServices([inngest])
+
+    try {
+      await sendThrough(services.proxy.url)
+
+      const began = Date.now()
+      const [line = ""] = await services.settle()
+
+      expect(Date.now() - began).toBeLessThan(1_000)
+      expect(line).toMatch(/event evt_1 started no run$/)
+    } finally {
+      await services.close()
+      dev.server.close()
+    }
+  })
+
+  it("still gives a listened-to event time to show its run", async () => {
+    /* A wildcard trigger listens to the event, and the busy dev server shows the run late. */
+    const dev = await devServer(200, 1_500, false, ["workspace.*"])
+    const inngest = await inngestService({ url: dev.url })
+    const services = await startServices([inngest])
+
+    try {
+      await sendThrough(services.proxy.url)
+      await services.settle()
+      expect(services.state()).toMatchObject({
+        inngest: { runs: [{ event: "evt_1", status: "completed" }] },
+      })
     } finally {
       await services.close()
       dev.server.close()
