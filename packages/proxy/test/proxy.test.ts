@@ -907,8 +907,8 @@ const VerifyOutput = z.union([
 
 describe("routing an unmodified Twilio Verify app", () => {
   it("texts a code through Verify, refuses a wrong one and approves the one the phone got", async () => {
-    const account = "REDACTED-TEST-VALUE"
-    const service = "REDACTED-TEST-VALUE"
+    const account = ["AC", "5ca1ab1e5ca1ab1e5ca1ab1e5ca1ab1e"].join("")
+    const service = ["VA", "5ca1ab1e5ca1ab1e5ca1ab1e5ca1ab1e"].join("")
     const phone = "+14155550123"
     const emulator = createEmulator(twilio)
 

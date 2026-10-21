@@ -303,9 +303,9 @@ function authorizeAt(base: string, client: typeof GOOGLE_CLIENT): URL {
   return url
 }
 
-const TWILIO_ACCOUNT = "REDACTED-TEST-VALUE"
+const TWILIO_ACCOUNT = fakeKey("AC", "0000000000000000000000000000000a")
 const TWILIO_TOKEN = "0000000000000000000000000000000a"
-const PAYSTACK_KEY = "REDACTED-TEST-VALUE"
+const PAYSTACK_KEY = fakeKey("sk_test_", "00000000000000000000000000000000000000aa")
 const SIGNED_S3 =
   "AWS4-HMAC-SHA256 Credential=k/20260101/auto/s3/aws4_request, SignedHeaders=host, Signature=0"
 

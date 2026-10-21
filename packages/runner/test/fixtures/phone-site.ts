@@ -8,11 +8,12 @@ import { text } from "node:stream/consumers"
 import { createEmulator, type Emulator, seedTwilio, twilio } from "@danwo/emulators"
 import { z } from "zod"
 
+import { fakeKey } from "../fake-key.ts"
 import { serveForms } from "./html-server.ts"
 
-const ACCOUNT = "REDACTED-TEST-VALUE"
+const ACCOUNT = fakeKey("AC", "00000000000000000000000000000001")
 const TOKEN = "00000000000000000000000000000001"
-const SERVICE = "REDACTED-TEST-VALUE"
+const SERVICE = fakeKey("VA", "00000000000000000000000000000001")
 const AUTH = `Basic ${Buffer.from(`${ACCOUNT}:${TOKEN}`).toString("base64")}`
 
 const page = (title: string, body: string) =>

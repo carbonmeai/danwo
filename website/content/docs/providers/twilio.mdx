@@ -15,7 +15,7 @@ the app:
 import { appEnvironment, defineConfig, twilioService } from "@danwo/sdk"
 
 const url = "http://localhost:3000"
-const account = { sid: "REDACTED-TEST-VALUE", authToken: "danwo-auth-token" }
+const account = { sid: `AC${"0".repeat(32)}`, authToken: "danwo-auth-token" }
 
 export default defineConfig({
   testDir: "tests",
@@ -93,7 +93,7 @@ twilioService({
   seed: {
     accounts: [
       {
-        sid: "REDACTED-TEST-VALUE",
+        sid: `AC${"0".repeat(32)}`,
         authToken: "danwo-auth-token",
         type: "Trial",
         verified: ["+15551234567"],

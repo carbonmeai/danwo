@@ -201,7 +201,7 @@ describe("flight recorder redaction", () => {
     )
     expect(
       redactor.text(
-        "post to https://REDACTED-TEST-VALUE or https://hooks.slack.com/actions/T1/9/abc",
+        `post to ${fakeKey("https://hooks.slack.com/", "services/T1/B2/xyz")} or https://hooks.slack.com/actions/T1/9/abc`,
       ),
     ).toBe("post to https://hooks.slack.com/[redacted] or https://hooks.slack.com/[redacted]")
     expect(

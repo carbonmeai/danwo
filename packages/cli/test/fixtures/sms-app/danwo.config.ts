@@ -3,11 +3,12 @@ import { fileURLToPath } from "node:url"
 import { defineConfig, twilioEnvironment } from "@danwo/sdk"
 
 import { freePort, launchApp } from "../app-process.ts"
+import { fakeKey } from "../fake-key.ts"
 
 const APP = fileURLToPath(new URL("./app.ts", import.meta.url))
-const ACCOUNT = "REDACTED-TEST-VALUE"
+const ACCOUNT = fakeKey("AC", "51515151515151515151515151515151")
 const TOKEN = "7e57ab1e7e57ab1e7e57ab1e7e57ab1e"
-const SERVICE = "REDACTED-TEST-VALUE"
+const SERVICE = fakeKey("VA", "51515151515151515151515151515151")
 const FROM = "+15005550006"
 
 export default defineConfig({

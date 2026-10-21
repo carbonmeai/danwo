@@ -54,7 +54,9 @@ beforeEach(() => {
     accounts: [{ sid: ACCOUNT, authToken: TOKEN }],
     apiKeys: [{ sid: fakeKey("SK", "0123456789abcdef0123456789abcdef"), secret: "key-secret" }],
     numbers: [{ number: APP_NUMBER, smsUrl: SMS_URL }],
-    verifyServices: [{ friendlyName: "Acme", sid: "REDACTED-TEST-VALUE" }],
+    verifyServices: [
+      { friendlyName: "Acme", sid: fakeKey("VA", "0123456789abcdef0123456789abcdef") },
+    ],
     unreachable: [{ number: UNREACHABLE }],
   })
 })
@@ -171,7 +173,7 @@ describe("Twilio messages", () => {
 })
 
 describe("Twilio accounts", () => {
-  const TRIAL = "REDACTED-TEST-VALUE"
+  const TRIAL = fakeKey("AC", "00000000000000000000000000000001")
   const TRIAL_TOKEN = "trial-token"
   const VERIFIED = "+14155550142"
 
@@ -261,7 +263,7 @@ describe("incoming messages", () => {
 })
 
 describe("Twilio Verify", () => {
-  const SERVICE = "REDACTED-TEST-VALUE"
+  const SERVICE = fakeKey("VA", "0123456789abcdef0123456789abcdef")
 
   it("texts a code, refuses a wrong one and approves the right one", async () => {
     const verify = twilioClient(emulator).verify.v2.services(SERVICE)

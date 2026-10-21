@@ -362,7 +362,7 @@ describe("slackService and githubService", () => {
 })
 
 describe("twilioService", () => {
-  const ACCOUNT = "REDACTED-TEST-VALUE"
+  const ACCOUNT = fakeKey("AC", "0000000000000000000000000000000a")
   const TOKEN = "0000000000000000000000000000000a"
   const AUTH = `Basic ${Buffer.from(`${ACCOUNT}:${TOKEN}`).toString("base64")}`
 
@@ -432,7 +432,7 @@ function faultsAt(host: string, path: string) {
 }
 
 describe("paystackService", () => {
-  const SECRET = "REDACTED-TEST-VALUE"
+  const SECRET = fakeKey("sk_test_", "00000000000000000000000000000000000000aa")
 
   it("joins Stripe behind one proxy, plays signed events on settle, and reseeds on reset", async () => {
     const app = await receiver()
