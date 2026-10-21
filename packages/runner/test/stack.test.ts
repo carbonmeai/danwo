@@ -499,18 +499,7 @@ describe("Inngest", () => {
   }, 20_000)
 
   it("starts each dev server on ports of its own, retrying failed steps a second apart", async () => {
-    const ports = async () => {
-      const command = await devServerCommand(
-        { apps: ["http://127.0.0.1:4100/api/inngest"] },
-        "http://127.0.0.1:9001",
-      )
-
-      expect(command).toMatch(/^npx --yes inngest-cli dev --no-discovery --port 9001 /)
-      expect(command).toContain(" --retry-interval 1 -u http://127.0.0.1:4100/api/inngest")
-
-      return [...command.matchAll(/--connect-[a-z-]+-port (\d+)/g)].map((match) => match[1])
-    }
-    const [first, second] = await Promise.all([ports(), ports()])
+    const [first, second] = await Promise.all([connectPorts(), connectPorts()])
 
     expect(first).toHaveLength(3)
     expect(new Set(first).size).toBe(3)
@@ -532,6 +521,19 @@ describe("Inngest", () => {
     ).toEqual([])
   })
 })
+
+/** The connect gateway's ports in a dev server's start command, which it checks as it goes. */
+async function connectPorts(): Promise<(string | undefined)[]> {
+  const command = await devServerCommand(
+    { apps: ["http://127.0.0.1:4100/api/inngest"] },
+    "http://127.0.0.1:9001",
+  )
+
+  expect(command).toMatch(/^npx --yes inngest-cli dev --no-discovery --port 9001 /)
+  expect(command).toContain(" --retry-interval 1 -u http://127.0.0.1:4100/api/inngest")
+
+  return [...command.matchAll(/--connect-[a-z-]+-port (\d+)/g)].map((match) => match[1])
+}
 
 /**
  * Sends one event to the Inngest host through the proxy, the way an app's SDK would: the test

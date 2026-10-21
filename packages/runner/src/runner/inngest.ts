@@ -86,6 +86,8 @@ const CHECKPOINT = /^\/v1\/checkpoint\/([^/?]+)/
 interface ListedRun {
   readonly run: InngestRun
   readonly ended: boolean
+  /** When it started, as a time in ms; `Date.now()` when the dev server did not say. */
+  readonly startedAt: number
 }
 
 /** `value`'s field `name`, when `value` is an object. */
@@ -149,6 +151,7 @@ function runOf(event: string, value: unknown): ListedRun | undefined {
       durationMs: Number.isNaN(started) || Number.isNaN(ended) ? null : ended - started,
     },
     ended: !Number.isNaN(ended),
+    startedAt: Number.isNaN(started) ? Date.now() : started,
   }
 }
 
@@ -361,9 +364,52 @@ const CLOCK_SLACK_MS = 1_000
 /** Runs of one function that settling expects although no app's event started them. */
 interface ExpectedRuns {
   readonly functionId: string
-  /** When they were started, give or take `CLOCK_SLACK_MS`. */
+  /** They were queued after this, give or take `CLOCK_SLACK_MS`. */
   readonly since: number
   readonly count: number
+  /** When settling began to expect them: it waits `NO_RUNS_MS` from here for them to show. */
+  readonly patienceFrom: number
+}
+
+function sameRuns(a: readonly ExpectedRuns[], b: readonly ExpectedRuns[]): boolean {
+  const key = (runs: readonly ExpectedRuns[]) =>
+    runs.map((r) => `${r.functionId} ${r.since} ${r.count}`).join("\n")
+
+  return key(a) === key(b)
+}
+
+/**
+ * The `onFailure` handler runs that `listed`'s failed runs start: one per failed run of a function
+ * with a handler, queued after the first of them started. The dev server starts a handler with its
+ * own `inngest/function.failed` event, which no app sends. `failedAt` notes when settling first saw
+ * each run failed, which is when it starts to wait for the handler.
+ */
+async function failureHandlers(
+  registry: Registry,
+  listed: readonly ListedRun[],
+  failedAt: Map<string, number>,
+): Promise<ExpectedRuns[]> {
+  const failed = listed.filter(({ run }) => run.status === "failed")
+
+  if (failed.length === 0) return []
+
+  const handlerOf = new Map((await registry())?.map((fn) => [fn.id, fn.failureHandler]))
+  const byHandler = new Map<string, ListedRun[]>()
+
+  for (const entry of failed) {
+    const handler = handlerOf.get(entry.run.functionId)
+
+    if (handler === undefined) continue
+    if (!failedAt.has(entry.run.runId)) failedAt.set(entry.run.runId, Date.now())
+    byHandler.set(handler, [...(byHandler.get(handler) ?? []), entry])
+  }
+
+  return [...byHandler].map(([functionId, runs]) => ({
+    functionId,
+    since: Math.min(...runs.map((entry) => entry.startedAt)) - CLOCK_SLACK_MS,
+    count: runs.length,
+    patienceFrom: Math.min(...runs.map((entry) => failedAt.get(entry.run.runId) ?? Date.now())),
+  }))
 }
 
 /** The events the dev server started `expected`'s runs with, one per run it has queued so far. */
@@ -459,7 +505,8 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
     for (const fn of due) {
       const since = Date.now() - CLOCK_SLACK_MS
 
-      if (await invokeFunction(url, fn.slug)) expected.push({ functionId: fn.id, since, count: 1 })
+      if (await invokeFunction(url, fn.slug))
+        expected.push({ functionId: fn.id, since, count: 1, patienceFrom: since })
     }
   }
 
@@ -515,10 +562,13 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
     const firstSeen = new Map<string, number>()
     const registry = registryOf(url)
     const unheard = unheardEvents(registry)
+    const failedAt = new Map<string, number>()
+    let handlers: ExpectedRuns[] = []
 
     for (;;) {
       const sent = sentEvents()
-      const found = await Promise.all(expected.map((runs) => startedBy(url, runs)))
+      const wanted = [...expected, ...handlers]
+      const found = await Promise.all(wanted.map((some) => startedBy(url, some)))
       const events = [...new Set([...sent.map(({ id }) => id), ...found.flat()])]
 
       for (const { id, at } of sent) if (!firstSeen.has(id)) firstSeen.set(id, at)
@@ -533,9 +583,16 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
       runs = await named(registry, listed)
 
       const nobody = await unheard(sent, listed)
-      const missing = expected.some(
-        (runs, n) => (found[n]?.length ?? 0) < runs.count && Date.now() - runs.since < NO_RUNS_MS,
-      )
+      const before = handlers
+
+      handlers = await failureHandlers(registry, listed, failedAt)
+
+      const missing =
+        !sameRuns(before, handlers) ||
+        wanted.some(
+          (some, n) =>
+            (found[n]?.length ?? 0) < some.count && Date.now() - some.patienceFrom < NO_RUNS_MS,
+        )
 
       if (
         !missing &&

@@ -94,8 +94,10 @@ test("adds a task", async ({ app, screen, expect }) => {
 })
 ```
 
-With `readiness: { settle: true }`, each step also waits for the runs it started. The flight
-record lists every run under `inngest`, with its function, status and duration.
+With `readiness: { settle: true }`, each step also waits for the runs it started. A run that fails
+for good starts its function's `onFailure` handler, and `settle()` waits for that too, so an
+invariant can check what the handler did. The flight record lists every run under `inngest`, with
+its function, status and duration.
 
 ## After time travel
 

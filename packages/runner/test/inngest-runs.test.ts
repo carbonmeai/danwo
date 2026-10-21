@@ -2,6 +2,7 @@ import { once } from "node:events"
 import { createServer, type IncomingMessage, request, type ServerResponse } from "node:http"
 
 import { describe, expect, it } from "vitest"
+import { z } from "zod"
 
 import { inngestService, INNGEST_HOST } from "../src/runner/inngest.ts"
 import { startServices } from "../src/runner/services.ts"
@@ -72,11 +73,46 @@ async function send(proxyUrl: string, body: string, headers: Record<string, stri
   })
 }
 
-/** A run the stand-in started for an invocation: its event, and when it began and ends. */
-interface Invoked {
+/** A run a stand-in started: the event that started it, its function, and when it began. */
+interface Started {
   readonly event: string
   readonly functionId: string
   readonly at: number
+}
+
+/** `started` as the dev server's runs API lists it: running for `runMs`, then `outcome`. */
+function listed(started: Started, runMs: number, outcome = "Completed") {
+  const done = Date.now() - started.at >= runMs
+
+  return {
+    run_id: `run_${started.event}`,
+    function_id: started.functionId,
+    status: done ? outcome : "Running",
+    run_started_at: new Date(started.at).toISOString(),
+    ...(done && { ended_at: new Date(started.at + runMs).toISOString() }),
+  }
+}
+
+/** A GraphQL call settling and travel make. */
+const Gql = z.object({
+  query: z.string(),
+  variables: z
+    .object({
+      slug: z.string().optional(),
+      from: z.string().optional(),
+      functions: z.array(z.string()).optional(),
+    })
+    .default({}),
+})
+
+/** The edges of a `runs` answer for `started`, those of the asked functions since `from`. */
+function runEdges(started: readonly Started[], variables: z.infer<typeof Gql>["variables"]) {
+  const from = Date.parse(variables.from ?? "")
+  const edges = started
+    .filter((entry) => variables.functions?.includes(entry.functionId) && entry.at >= from)
+    .map((entry) => ({ node: { triggerIDs: [entry.event] } }))
+
+  return { data: { runs: { edges } } }
 }
 
 /**
@@ -85,7 +121,7 @@ interface Invoked {
  * the runs of a function since a moment, with the events that started them.
  */
 async function cronDevServer(runMs: number) {
-  const invoked: Invoked[] = []
+  const invoked: Started[] = []
   const functions = [
     {
       id: "fn-hourly",
@@ -94,23 +130,9 @@ async function cronDevServer(runMs: number) {
     },
     { id: "fn-yearly", slug: "digests-yearly", triggers: [{ type: "CRON", value: "@yearly" }] },
   ]
-  const run = (entry: Invoked) => {
-    const done = Date.now() - entry.at >= runMs
-
-    return {
-      run_id: `run_${entry.event}`,
-      function_id: entry.functionId,
-      status: done ? "Completed" : "Running",
-      run_started_at: new Date(entry.at).toISOString(),
-      ...(done && { ended_at: new Date(entry.at + runMs).toISOString() }),
-    }
-  }
 
   const answer = (body: string): unknown => {
-    const { query, variables } = JSON.parse(body) as {
-      query: string
-      variables: { slug?: string; from?: string; functions?: string[] }
-    }
+    const { query, variables } = Gql.parse(JSON.parse(body))
 
     if (query.includes("invokeFunction")) {
       const fn = functions.find((f) => f.slug === variables.slug)
@@ -125,14 +147,7 @@ async function cronDevServer(runMs: number) {
       return { data: { invokeFunction: fn !== undefined } }
     }
 
-    if (query.includes("runs(")) {
-      const from = Date.parse(variables.from ?? "")
-      const edges = invoked
-        .filter((entry) => variables.functions?.includes(entry.functionId) && entry.at >= from)
-        .map((entry) => ({ node: { triggerIDs: [entry.event] } }))
-
-      return { data: { runs: { edges } } }
-    }
+    if (query.includes("runs(")) return runEdges(invoked, variables)
 
     return { data: { functions } }
   }
@@ -144,7 +159,7 @@ async function cronDevServer(runMs: number) {
       const event = /^\/v1\/events\/([^/]+)\/runs$/.exec(req.url ?? "")?.[1]
       const entry = invoked.find((e) => e.event === event)
 
-      json(res, { data: entry ? [run(entry)] : [] })
+      json(res, { data: entry ? [listed(entry, runMs)] : [] })
     })
   })
 
@@ -156,6 +171,104 @@ async function cronDevServer(runMs: number) {
 
   return { server, invoked, url: `http://127.0.0.1:${port}` }
 }
+
+/**
+ * A stand-in dev server whose one function fails every run `runMs` after its event, and whose
+ * `onFailure` handler then starts `lagMs` later, with an event of the dev server's own, and takes
+ * `runMs` too.
+ */
+async function failingDevServer(runMs: number, lagMs: number) {
+  const entries: Started[] = []
+  const functions = [
+    {
+      id: "fn-send",
+      slug: "digests-send-one",
+      triggers: [{ type: "EVENT", value: "digest/send-one" }],
+      failureHandler: { id: "fn-send-failure" },
+    },
+    {
+      id: "fn-send-failure",
+      slug: "digests-send-one-failure",
+      triggers: [{ type: "EVENT", value: "inngest/function.failed" }],
+      failureHandler: null,
+    },
+  ]
+
+  /* A failed run's handler is queued `lagMs` after the run failed. */
+  const handlerRuns = (): Started[] =>
+    entries
+      .filter((entry) => Date.now() - entry.at >= runMs + lagMs)
+      .map((entry) => ({
+        event: `evt_failed_${entry.event}`,
+        functionId: "fn-send-failure",
+        at: entry.at + runMs + lagMs,
+      }))
+
+  const server = createServer((req, res) => {
+    void bodyOf(req).then((body) => {
+      if (req.method === "POST" && req.url?.startsWith("/e/")) {
+        const event = `evt_${entries.length + 1}`
+
+        entries.push({ event, functionId: "fn-send", at: Date.now() })
+
+        return json(res, { ids: [event] })
+      }
+
+      if (req.url === "/v0/gql") {
+        const { query, variables } = Gql.parse(JSON.parse(body))
+
+        return json(
+          res,
+          query.includes("runs(") ? runEdges(handlerRuns(), variables) : { data: { functions } },
+        )
+      }
+
+      const event = /^\/v1\/events\/([^/]+)\/runs$/.exec(req.url ?? "")?.[1]
+      const sent = entries.find((e) => e.event === event)
+      const handler = handlerRuns().find((e) => e.event === event)
+
+      json(res, {
+        data: [
+          ...(sent ? [listed(sent, runMs, "Failed")] : []),
+          ...(handler ? [listed(handler, runMs)] : []),
+        ],
+      })
+    })
+  })
+
+  server.listen(0, "127.0.0.1")
+  await once(server, "listening")
+
+  const address = server.address()
+  const port = typeof address === "object" && address !== null ? address.port : 0
+
+  return { server, url: `http://127.0.0.1:${port}` }
+}
+
+describe("Inngest onFailure handlers", () => {
+  it("waits for the handler a failed run starts, and lists it", async () => {
+    const dev = await failingDevServer(300, 400)
+    const inngest = await inngestService({ url: dev.url })
+    const services = await startServices([inngest])
+
+    try {
+      await send(services.proxy.url, JSON.stringify({ name: "digest/send-one" }))
+
+      const began = Date.now()
+      const lines = await services.settle()
+
+      expect(Date.now() - began).toBeGreaterThanOrEqual(900)
+      expect(lines).toEqual([
+        expect.stringMatching(
+          /^inngest · \d+\.\d s · digests-send-one failed in 0\.3 s · digests-send-one-failure completed in 0\.3 s$/,
+        ),
+      ])
+    } finally {
+      await services.close()
+      dev.server.close()
+    }
+  }, 20_000)
+})
 
 describe("Inngest after a time travel", () => {
   it("runs each cron function that fell due on the way, once, and settles once it has run", async () => {
