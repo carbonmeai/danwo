@@ -481,6 +481,7 @@ class SessionAgent implements Agent {
         tabs,
         redact: vault.redact,
         ignore: effects?.ignore ?? [],
+        patience: this.options.actionTimeout,
         ...(activity !== undefined && { activity }),
       },
       this.sessionMark,

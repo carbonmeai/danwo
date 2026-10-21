@@ -37,8 +37,9 @@ explains the cache outcomes).
 Every kind of agent step replays:
 
 - `act`: its actions, found again by what each element was; a replay must also have the step's
-  recorded effects on the page and behind it (a provider call made by background work is waited
-  for up to 10 s).
+  recorded effects on the page and behind it (a page effect is waited for up to the action
+  timeout, a provider call made by background work up to 10 s). Effects include the states a step
+  changes in place: `checkbox "Agree" [checked]`, `[expanded]`, `[selected]`, `[pressed]`.
 - `assert` and `waitFor`: the judge names a short text on the page that shows the claim holds; a
   replay waits for that text. A claim with no such text (something is absent) asks the judge each
   run.

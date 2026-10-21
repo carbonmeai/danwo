@@ -27,7 +27,10 @@ import {
 } from "../replay/effects.ts"
 import { viewPage } from "../snapshot/view.ts"
 
-/** How long a replay waits for a recorded effect that has not shown yet. */
+/**
+ * How long a replay waits at least for a recorded effect that has not shown yet; a step's action
+ * timeout, when longer, is waited instead, so a page slowed by load still gets there.
+ */
 const SETTLE_MS = 3_000
 /**
  * How long it waits for a recorded provider call that has not happened yet. A call made by
@@ -82,6 +85,8 @@ interface EffectCommon {
   readonly activity?: () => BackendActivity
   /** Leave out text matching any of these, as configured. */
   readonly ignore: readonly RegExp[]
+  /** How long a replay may wait for a missing effect, at least; the step's action timeout. */
+  readonly patience?: number
 }
 
 /** How far each of the backend's histories had grown at some moment. */
@@ -225,7 +230,8 @@ export class EffectWatch {
     let check = await this.once(expected)
 
     while (check.result === "diverged" && check.note === undefined) {
-      const patience = lacksCalls(expected, check) ? BACKEND_SETTLE_MS : SETTLE_MS
+      const least = lacksCalls(expected, check) ? BACKEND_SETTLE_MS : SETTLE_MS
+      const patience = Math.max(least, this.sources.patience ?? 0)
 
       if (Date.now() - started >= patience) break
       await sleep(POLL_MS)

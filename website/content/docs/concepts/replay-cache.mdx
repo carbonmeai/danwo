@@ -111,8 +111,9 @@ page and the report say what stopped matching, next to the outcome:
 | `"…" was not shown within … ms` | The text that proved a claim or a wait isn't on the page any more. |
 
 A reason that names a real change in your app means the replay caught it. The model's new run is
-recorded once it passes. A provider call that background work makes, such as a queued job sending
-a notification, is waited for up to 10 seconds before it counts as missing. A recording waits for
+recorded once it passes. A change on the page is waited for up to the action timeout, so a page
+slowed by load still gets there. A provider call that background work makes, such as a queued
+job sending a notification, is waited for up to 10 seconds before it counts as missing. A recording waits for
 the backend to go still before it keeps a step's calls, so a call the step set off that lands just
 after it (an email sent once a model's answer was saved) is kept too, and a quicker replay that
 makes it within the step still matches.

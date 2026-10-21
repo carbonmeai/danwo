@@ -37,6 +37,8 @@ const app = {
   fault: null as string | null,
   /** Make the provider call this long after the save, as a queued job would. */
   lateMs: 0,
+  /** Show the saved notes this long after the save answers, as a page under load would. */
+  renderMs: 0,
   calls: [] as BackendEvent[],
   /** How long the route announcer takes to fill after a navigation; never when negative. */
   announceMs: 100,
@@ -68,7 +70,7 @@ document.getElementById("go").addEventListener("click", (event) => {
 </script>`
 }
 
-const PAGE = `<!doctype html><title>Notes</title><h1>Notes</h1>
+const page = () => `<!doctype html><title>Notes</title><h1>Notes</h1>
 <label>Note <input name="note"></label>
 <button type="button" id="add">Add</button>
 <ul></ul>
@@ -77,6 +79,7 @@ const PAGE = `<!doctype html><title>Notes</title><h1>Notes</h1>
 document.getElementById("add").addEventListener("click", async () => {
   const text = document.querySelector("input").value
   const notes = await (await fetch("/api/add?text=" + encodeURIComponent(text))).json()
+  await new Promise((done) => setTimeout(done, ${app.renderMs}))
   document.querySelector("ul").innerHTML = notes.map((n) => "<li>" + n + "</li>").join("")
   const ref = "ord_" + Math.random().toString(36).slice(2, 14).padEnd(12, "x")
   document.querySelector("p").textContent = "Saved at " + new Date().toTimeString().slice(0, 8) + " (" + ref + ")"
@@ -109,7 +112,7 @@ let dir: string
 
 beforeAll(async () => {
   site = await serveHtml((url) => {
-    if (url.pathname === "/") return PAGE
+    if (url.pathname === "/") return page()
     if (url.pathname.startsWith("/routed")) return routedPage(app.announceMs)
     if (url.pathname === "/api/add")
       return {
@@ -135,6 +138,7 @@ beforeEach(async () => {
     prefix: "",
     fault: null,
     lateMs: 0,
+    renderMs: 0,
     calls: [],
     announceMs: 100,
   })
@@ -251,6 +255,16 @@ describe("replayed effects", () => {
 
     expect(replayed.divergence).toBeUndefined()
     expect(replayed.cache).toEqual({ mode: "replayed" })
+    expect(replayed.effects).toMatchObject({ result: "matched" })
+  }, 60_000)
+
+  it("waits up to the action timeout for a page effect that a slow page shows late", async () => {
+    await record()
+    app.renderMs = 4_500
+
+    const replayed = await strictReplay()
+
+    expect(replayed.divergence).toBeUndefined()
     expect(replayed.effects).toMatchObject({ result: "matched" })
   }, 60_000)
 
