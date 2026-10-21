@@ -4,7 +4,7 @@
  * when their bytes differ.
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { dirname, join, relative, sep } from "node:path"
 
 import { REPO_ROOT } from "./danwo.ts"
 
@@ -17,11 +17,13 @@ export interface BrandCopy {
   readonly to: string
 }
 
-/** Every brand file the site serves: the SVG and PNG sets under `/brand/`, the `.ico` at the root. */
+/** Every brand file the site serves: the SVG and PNG sets under `/brand/`, subfolders included, and the `.ico` at the root. */
 export function brandCopies(): BrandCopy[] {
   const folder = (name: string) =>
-    readdirSync(join(BRAND_DIR, name))
-      .filter((file) => !file.startsWith("."))
+    readdirSync(join(BRAND_DIR, name), { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => relative(join(BRAND_DIR, name), join(entry.parentPath, entry.name)))
+      .filter((file) => !file.split(sep).some((part) => part.startsWith(".")))
       .toSorted()
       .map((file) => ({ from: join(BRAND_DIR, name, file), to: join("brand", name, file) }))
 

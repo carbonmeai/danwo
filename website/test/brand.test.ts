@@ -7,7 +7,9 @@ import { afterEach, describe, expect, it } from "vitest"
 import { BRAND_DIR, brandCopies, copyBrand } from "../src/generator/brand.ts"
 
 const SOURCES = ["svg", "png"].flatMap((folder) =>
-  readdirSync(join(BRAND_DIR, folder)).map((file) => join(folder, file)),
+  readdirSync(join(BRAND_DIR, folder), { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && !entry.name.startsWith("."))
+    .map((entry) => join(entry.parentPath, entry.name)),
 )
 
 /** Every `/brand/…` or root icon path the site's code and manifest refer to. */
