@@ -78,7 +78,7 @@ export function Arrow(props: {
 }
 
 /** An arrow that turns corners: a line through `points`, with the arrowhead at the last one. */
-export function ElbowArrow(props: {
+function ElbowArrow(props: {
   readonly points: readonly (readonly [number, number])[]
 }): ReactNode {
   return (
