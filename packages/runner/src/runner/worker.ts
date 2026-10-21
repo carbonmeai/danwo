@@ -288,7 +288,12 @@ async function runTest(
   const replay: ReplayUse =
     task.cacheDir === undefined
       ? { kind: "none" }
-      : { kind: "learn", dir: task.cacheDir, readOnly: task.cacheReadOnly ?? false }
+      : {
+          kind: "learn",
+          dir: task.cacheDir,
+          readOnly: task.cacheReadOnly ?? false,
+          replayOnly: task.replayOnly ?? false,
+        }
   const tries = 1 + (findDeclared(first, task.file, id).options.retries ?? task.retries)
   const attempts: AttemptReport[] = []
   let impact: TestImpact | undefined

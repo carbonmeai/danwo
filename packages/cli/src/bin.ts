@@ -132,6 +132,10 @@ withReporterOptions(withLintOptions(program.command("test")))
     integerAtLeast(1),
   )
   .option("--ci", "CI defaults even without the CI variable: 1 retry, read-only cache, no .only")
+  .option(
+    "--replay-only",
+    "replay recorded agent steps and call no model: a step with no recording that replays fails",
+  )
   .option("--list", "print the picked tests as JSON (id, file) instead of running them")
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .addOption(recordOption())
@@ -156,6 +160,7 @@ withReporterOptions(withLintOptions(program.command("test")))
         shard?: string
         maxFailures?: number
         ci?: boolean
+        replayOnly?: boolean
         list?: boolean
         config?: string
         record?: RecordMode

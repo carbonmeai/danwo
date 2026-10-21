@@ -42,6 +42,14 @@ export function divergedNote(miss: CacheNote): Omit<CacheNote, "mode"> {
   }
 }
 
+/** Why a step had no recording that replays, in a few words, for a replay-only failure. */
+export function missWhy(miss: CacheNote): string {
+  if (miss.mode === "stale") return `stale: its ${(miss.changed ?? []).join(", ")} changed`
+  if (miss.reason !== undefined) return `it no longer replays: ${miss.reason}`
+
+  return "none was recorded"
+}
+
 /** The error a strict replay fails a step with when it has nothing to replay. */
 export function missError(index: number, instruction: string, miss: CacheNote): Error {
   return miss.mode === "stale"

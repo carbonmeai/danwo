@@ -14,6 +14,7 @@ import type { TargetFinder } from "../replay/replayer.ts"
 import type { ReplayStore, StepKey } from "../replay/store.ts"
 import { describe, findAll, findTarget, type Target } from "../replay/target.ts"
 import type { ExtractTrace } from "../replay/trace.ts"
+import { ReplayMissing } from "./errors.ts"
 import {
   type ExtractContext,
   ExtractFailed,
@@ -22,7 +23,7 @@ import {
   readFields,
   sourceLabels,
 } from "./extract.ts"
-import { divergedNote, handedOff, missError, missOf } from "./miss.ts"
+import { divergedNote, handedOff, missError, missOf, missWhy } from "./miss.ts"
 
 /** A recorded element that is not back within this long is gone: the page changed. */
 const FIND_MS = 5_000
@@ -31,6 +32,8 @@ export interface ExtractStepContext {
   readonly tabs: Tabs
   readonly store: ReplayStore | undefined
   readonly strict: boolean
+  /** Replay only and call no model: a step with no recording that replays fails. */
+  readonly replayOnly?: boolean
   readonly timeout: number
   readonly redact: (text: string) => string
   readonly signal?: AbortSignal | undefined
@@ -143,6 +146,11 @@ export async function extractStep<T>(
     recorded.reason === undefined
       ? await missOf(store, key)
       : handedOff({ reason: recorded.reason }, context.redact)
+
+  if (context.replayOnly === true) {
+    context.cache(recorded.reason === undefined ? miss.mode : "diverged", divergedNote(miss))
+    throw new ReplayMissing("agent.extract", context.redact(instruction), missWhy(miss))
+  }
 
   if (context.strict) return stopStrict(step, recorded.reason, miss, context)
 

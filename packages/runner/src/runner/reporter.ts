@@ -112,14 +112,20 @@ function flakyLines(report: TestReport): string[] {
   ]
 }
 
-/** The failures in full, the flaky tests, and the summary, after every test reported. */
-export function closingLines(reports: readonly TestReport[]): string[] {
+/**
+ * The failures in full, the flaky tests, and the summary, after every test reported. A
+ * replay-only run always says how many model calls it made, which is none.
+ */
+export function closingLines(
+  reports: readonly TestReport[],
+  run: { readonly replayOnly?: boolean } = {},
+): string[] {
   return [
     ...reports.filter((report) => isFailure(report.status)).flatMap(failureLines),
     ...reports.filter((report) => report.status === "flaky").flatMap(flakyLines),
     "",
     summaryLine(reports),
-    ...usageLines(reports),
+    ...usageLines(reports, run.replayOnly === true),
   ]
 }
 
@@ -146,10 +152,10 @@ function attemptUsages(reports: readonly TestReport[]): Usage[] {
 }
 
 /** The run's `cache:` and `model:` lines, then its costliest model steps, as a small table. */
-function usageLines(reports: readonly TestReport[]): string[] {
+function usageLines(reports: readonly TestReport[], replayOnly: boolean): string[] {
   const usage = addUsage(attemptUsages(reports))
   const cache = cacheLine(usage.cache, usage.recordings, usage.models)
-  const model = modelLine(usage)
+  const model = modelLine(usage) ?? (replayOnly ? "model: 0 calls (replay-only)" : undefined)
   const costliest = usage.steps
     .toSorted((a, b) => b.spent.usd - a.spent.usd || b.spent.calls - a.spent.calls)
     .slice(0, COSTLIEST)

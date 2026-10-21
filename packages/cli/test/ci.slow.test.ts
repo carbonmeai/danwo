@@ -98,6 +98,28 @@ describe("danwo test in CI", () => {
     expect(out).toContain("stopped after 1 failed: 1 test files not run")
   }, 120_000)
 
+  it("fails a step with no recording under --replay-only, and calls no model", async () => {
+    const { code, out } = await cli(workCopy(join(FIXTURES, "replay-only")), [
+      "test",
+      "--replay-only",
+    ])
+
+    expect(code).toBe(1)
+    expect(out).toContain(
+      "replay-only: no model is called; a step with no recording that replays fails",
+    )
+    expect(out).toContain(
+      'agent.act("click the heading") has no recording that replays (none was recorded)',
+    )
+    expect(out).toContain("cache: 0 replayed · 0 relocated · 0 handed off · 1 missed")
+    expect(out).toContain("model: 0 calls (replay-only)")
+
+    const uncached = await cli(workCopy(join(FIXTURES, "basic")), ["test", "--replay-only"])
+
+    expect(uncached.code).toBe(2)
+    expect(uncached.out).toContain("--replay-only needs `cache.dir` in the config")
+  }, 120_000)
+
   it("splits the suite with --shard and joins the shards into one JUnit report", async () => {
     const one = await cli(ci, ["test", "--shard", "1/2"])
     const two = await cli(ci, ["test", "--shard", "2/2"])

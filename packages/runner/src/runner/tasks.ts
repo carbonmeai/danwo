@@ -42,6 +42,8 @@ export interface TestFileTask {
   readonly cacheDir: string | undefined
   /** Replay from the cache without writing new recordings to it (CI runs). */
   readonly cacheReadOnly?: boolean
+  /** Replay only and call no model: a step with no recording that replays fails. */
+  readonly replayOnly?: boolean
 }
 
 /** `danwo matrix`: one run of one test. The clean trial records; a faulted one only replays. */

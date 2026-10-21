@@ -1,7 +1,7 @@
 /**
  * What a recording is kept under and what it holds: a route built from a `unique()` value replays
- * on a run with a fresh one, the same instruction twice in a test is two recordings, and each
- * recording names the model that made it.
+ * on a run with a fresh one, the same instruction twice in a test is two recordings, each
+ * recording names the model that made it, and a replay-only session calls no model at all.
  */
 import { createHash } from "node:crypto"
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises"
@@ -34,9 +34,12 @@ document.getElementById("create").addEventListener("click", () => {
 })
 </script>`
 
+/** Whether the wizard shows its Continue button; tests take it away to change the page. */
+const wizard = { button: true }
+
 /** A wizard whose Continue button moves to the next step, each at its own path. */
-const WIZARD = `<!doctype html><title>Wizard</title><h1>Step 1</h1>
-<button type="button" id="next">Continue</button>
+const wizardPage = () => `<!doctype html><title>Wizard</title><h1>Step 1</h1>
+<button type="button" id="next"${wizard.button ? "" : " hidden"}>Continue</button>
 <script>
 let at = 1
 document.getElementById("next").addEventListener("click", () => {
@@ -63,7 +66,7 @@ let dir: string
 beforeAll(async () => {
   site = await serveHtml((url) => {
     if (url.pathname === "/") return PAGE
-    if (url.pathname.startsWith("/wizard")) return WIZARD
+    if (url.pathname.startsWith("/wizard")) return wizardPage()
 
     return undefined
   })
@@ -75,6 +78,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), "danwo-keys-"))
+  wizard.button = true
 })
 
 afterEach(async () => {
@@ -280,4 +284,60 @@ describe("the model in each recording", () => {
       "cache: 1 replayed · 0 relocated · 0 handed off · 0 missed",
     )
   })
+})
+
+describe("replay-only", () => {
+  const replayOnly = { replay: { mode: "replay-only" } } as const
+
+  it("replays recorded steps, and fails one with no recording without calling the model", async () => {
+    await withSession({ model: scripted(CONTINUE) }, continuedTwice, "/wizard")
+
+    const actor = scripted(CONTINUE)
+    const judge = scripted([])
+    const outcome = await withSession(
+      { ...replayOnly, model: actor, judge },
+      async (session) => {
+        const modes = await continuedTwice(session)
+        const third = await session.agent.act("click Continue").catch((error: unknown) => error)
+        const claim = await session.agent
+          .assert("the wizard is on its review step")
+          .catch((error: unknown) => error)
+
+        return { modes, third, claim }
+      },
+      "/wizard",
+    )
+
+    expect(outcome.modes).toEqual(["replayed", "replayed"])
+    expect(outcome.third).toMatchObject({
+      code: "REPLAY_MISSING",
+      message: expect.stringContaining(
+        'agent.act("click Continue") has no recording that replays (none was recorded)',
+      ),
+    })
+    expect(outcome.claim).toMatchObject({
+      code: "REPLAY_MISSING",
+      message: expect.stringContaining('agent.assert("the wizard is on its review step")'),
+    })
+    expect(actor.doGenerateCalls).toHaveLength(0)
+    expect(judge.doGenerateCalls).toHaveLength(0)
+  }, 60_000)
+
+  it("fails a step whose recording no longer replays, saying why", async () => {
+    await withSession({ model: scripted(CONTINUE) }, continuedTwice, "/wizard")
+    wizard.button = false
+
+    const actor = scripted(CONTINUE)
+    const failed = await withSession(
+      { ...replayOnly, model: actor },
+      (session) => session.agent.act("click Continue").catch((error: unknown) => error),
+      "/wizard",
+    )
+
+    expect(failed).toMatchObject({
+      code: "REPLAY_MISSING",
+      message: expect.stringMatching(/no recording that replays \(it no longer replays: action 1/),
+    })
+    expect(actor.doGenerateCalls).toHaveLength(0)
+  }, 60_000)
 })

@@ -147,6 +147,11 @@ cache: { dir: ".danwo-cache" },
   locally, check it, and commit the new recording.
 </Callout>
 
+To fail such a step instead of calling the model, run `danwo test --replay-only`, or set
+`replayOnly: true` in `cache`. A step with no recording that replays then fails with
+`REPLAY_MISSING`, and the run makes no model calls. An `agent.assert` with no recorded evidence,
+such as a claim that something is absent, fails too. See [CI and GitHub](/docs/ci).
+
 ## Manage recordings
 
 ```sh

@@ -70,6 +70,42 @@ With `CI` set (every hosted CI sets it), or with `--ci`, `danwo test`:
 
 Your config's `retries` and `--retries` still win.
 
+## Make no model calls
+
+A read-only cache still calls the model when a step has no recording. To make sure CI spends
+nothing, run with `--replay-only`:
+
+```sh
+npx @danwo/cli test --replay-only
+```
+
+Each agent step must then replay from the cache. A step that can't fails the test instead of
+calling the model:
+
+```text
+✗ tests/checkout.danwo.ts › pays for an order  [Undecided]
+  REPLAY_MISSING: agent.act("pay for the order") has no recording that replays (none was recorded), and replay-only runs no model. Run the test without --replay-only to record it, check it, and commit the cache.
+
+4 passed, 1 failed (1 undecided)
+cache: 11 replayed · 0 relocated · 0 handed off · 1 missed
+model: 0 calls (replay-only)
+```
+
+| A step with                        | Under `--replay-only`               |
+| ---------------------------------- | ----------------------------------- |
+| a recording that replays           | replays, as always                  |
+| no recording                       | fails with `REPLAY_MISSING`         |
+| a stale recording                  | fails, naming what changed          |
+| a recording that no longer matches | fails, saying what stopped matching |
+
+To make every run replay-only, set it in the config:
+
+```ts title="danwo.config.ts · the cache"
+cache: { dir: ".danwo-cache", replayOnly: true },
+```
+
+Record a failing step by running it locally without the flag, then commit the cache.
+
 ## Exit codes
 
 | Code  | Meaning                                                    |
@@ -84,7 +120,7 @@ Your config's `retries` and `--retries` still win.
 
 <Callout type="idea">
   Commit the replay cache (`cache.dir`). CI then replays recorded agent steps with no model calls,
-  so it needs a model key only when a recording is missing.
+  so it needs a model key only when a recording is missing. With `--replay-only` it never needs one.
 </Callout>
 
 Run a narrowed matrix on pull requests with `--faults`, and the full matrix on a schedule.

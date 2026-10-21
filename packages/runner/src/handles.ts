@@ -124,6 +124,8 @@ export interface Settings {
   readonly projectRoot: string
   readonly files: Readonly<Record<string, string>>
   readonly strict: boolean
+  /** Replay only and call no model; a step with no recording that replays fails. */
+  readonly replayOnly: boolean
   readonly relocation: RelocationPolicy
 }
 
@@ -272,6 +274,7 @@ function agentFor(
     vault: shared.vault,
     store: shared.store,
     strict: settings.strict,
+    replayOnly: settings.replayOnly,
     relocation: settings.relocation,
     model: options.model,
     judge: options.judge,

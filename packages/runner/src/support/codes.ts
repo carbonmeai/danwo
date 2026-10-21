@@ -47,6 +47,10 @@ const ERROR_CODES = {
     "blocked",
     "strict replay found a recording of the step made under another key",
   ],
+  REPLAY_MISSING: [
+    "blocked",
+    "under replay-only, a step had no recording that replays, and no model may run it",
+  ],
   SECRET_REFUSED: ["test", "a secret was about to go into a field its purpose does not allow"],
   SESSION_SETUP_FAILED: ["test", "a saved session's setup failed"],
   TIMED_OUT: ["test", "the test ran past its deadline"],

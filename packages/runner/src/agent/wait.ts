@@ -12,13 +12,16 @@ import { embedsValue, type Params } from "../replay/params.ts"
 import type { ReplayStore, StepKey } from "../replay/store.ts"
 import type { WaitTrace } from "../replay/trace.ts"
 import { DanwoError } from "../support/codes.ts"
+import { ReplayMissing } from "./errors.ts"
 import { type JudgeContext, judgeUntil, type Poll, type Unheld } from "./judge.ts"
-import { missError, missOf } from "./miss.ts"
+import { missError, missOf, missWhy } from "./miss.ts"
 
 export interface WaitStepContext {
   readonly tabs: Tabs
   readonly store: ReplayStore | undefined
   readonly strict: boolean
+  /** Replay only and call no judge: a step with no recorded evidence that shows fails. */
+  readonly replayOnly?: boolean
   /** How the judge keeps asking; undefined asks it once. */
   readonly poll: Poll | undefined
   /** How long a replay waits for the recorded evidence to be shown. */
@@ -119,6 +122,15 @@ export async function waitStep(step: JudgedStep, context: WaitStepContext): Prom
     recorded.reason === undefined
       ? await missOf(store, key)
       : { mode: "handed-off", reason: recorded.reason }
+
+  if (context.replayOnly === true) {
+    const api = kind === "assert" ? "agent.assert" : "agent.waitFor"
+
+    context.cache(recorded.reason === undefined ? miss.mode : "diverged", {
+      ...(recorded.reason !== undefined && { reason: recorded.reason }),
+    })
+    throw new ReplayMissing(api, context.redact(condition), missWhy(miss))
+  }
 
   if (context.strict) {
     if (recorded.reason === undefined) {

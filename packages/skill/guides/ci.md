@@ -60,11 +60,23 @@ Turn it off with `--no-pr-comment`, `DANWO_PR_COMMENT=off`, or `github({ prComme
 the config. Without `pull-requests: write` the reporter says so once and keeps the check.
 
 - Commit the replay cache (`cache.dir`) so CI replays recorded agent steps without model calls;
-  give CI a model key only if recordings may be missing.
+  give CI a model key only if recordings may be missing, or run `--replay-only` to fail a missing
+  recording instead.
 - Narrow the matrix in pull requests with `--faults` and run it in full on a schedule.
 - Exit codes: 1 a test failed or could not be judged (a matrix trial that is invalid or not
   judged counts), 2 configuration, 3 infrastructure (browser, environment, model
   provider), 130 interrupted.
+
+## Replay-only runs
+
+`danwo test --replay-only` (or `cache: { dir, replayOnly: true }` in the config) replays agent
+steps from the cache and calls no model at all, not even the judge. A step with no recording that
+replays (none, a stale one, or one that no longer matches the page) fails with `REPLAY_MISSING`
+(class `blocked`, exit 1) and its message says which and why; an `agent.assert` whose claim has no
+recorded evidence (a claim of absence) fails the same way. The cache is read-only, and the summary
+always prints `model: 0 calls (replay-only)`. It needs `cache.dir` (exit 2 without). Use it for a CI
+gate that must spend no tokens; record a failing step by running it locally without the flag and
+commit the cache.
 
 ## CI defaults
 

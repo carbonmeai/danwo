@@ -4,6 +4,7 @@ import { basename, relative, resolve } from "node:path"
 import { blockedLoadsLine, mergeBlockedLoads } from "@danwo/proxy"
 
 import { type LintFinding, lintReport, withLint } from "../lint/index.ts"
+import { DanwoError } from "../support/codes.ts"
 import { catalogOf, testFilesOf, type CatalogEntry } from "./catalog.ts"
 import { ciDefaults, inCi, parseShard, type Shard, shardFiles, shardLabel } from "./ci.ts"
 import { type LoadedConfig, loadConfig } from "./config.ts"
@@ -55,6 +56,11 @@ interface TestExecution {
   readonly maxFailures?: number
   /** Whether this is a CI run; default from the `CI` environment variable. */
   readonly ci?: boolean
+  /**
+   * Replay recorded agent steps only and call no model (`--replay-only`, or the config's
+   * `cache.replayOnly`): a step with no recording that replays fails with `REPLAY_MISSING`.
+   */
+  readonly replayOnly?: boolean
 }
 
 export interface RunTestsOptions extends TestSelection, TestExecution, RunCommandOptions {}
@@ -128,6 +134,12 @@ export async function runTests(options: RunTestsOptions = {}): Promise<number> {
   }
 
   if (ci) write("CI: retries default to 1, the replay cache is read-only, .only is refused")
+
+  if (replayOnly(loaded, options)) {
+    if (loaded.config.cache === undefined)
+      throw new DanwoError("CONFIG_INVALID", "--replay-only needs `cache.dir` in the config")
+    write("replay-only: no model is called; a step with no recording that replays fails")
+  }
 
   return executeRun({ loaded, options, ci, cwd, write, ...picked })
 }
@@ -367,7 +379,8 @@ async function runAndReport(input: RunInput, frame: RunFrame): Promise<number> {
 
   const findings = findingsOf(results.reports)
 
-  for (const line of closingLines(results.reports)) write(line)
+  for (const line of closingLines(results.reports, { replayOnly: replayOnly(loaded, options) }))
+    write(line)
   for (const line of [...lintReport(findings), ...blockedReport(results.reports)]) write(line)
   if (ran.notRun > 0)
     write(`stopped after ${options.maxFailures} failed: ${ran.notRun} test files not run`)
@@ -397,6 +410,11 @@ async function saveResults(input: RunInput, results: RunResults): Promise<RunRes
   return merged
 }
 
+/** Whether the run replays only: `--replay-only`, else the config's `cache.replayOnly`. */
+function replayOnly(loaded: LoadedConfig, options: RunTestsOptions): boolean {
+  return options.replayOnly ?? loaded.config.cache?.replayOnly ?? false
+}
+
 /** One task per file, and how many workers they get: no more than there are files. */
 function planRun(
   loaded: LoadedConfig,
@@ -410,6 +428,7 @@ function planRun(
     retries: options.retries ?? loaded.config.retries ?? defaults.retries,
     cacheDir: cache && resolve(loaded.root, cache.dir),
     cacheReadOnly: defaults.cacheReadOnly,
+    ...(replayOnly(loaded, options) && { replayOnly: true }),
   })
 
   return { tasks, size: Math.min(options.workers ?? loaded.config.workers ?? 1, tasks.length) }

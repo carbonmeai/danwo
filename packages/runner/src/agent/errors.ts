@@ -23,6 +23,20 @@ export class NothingRecorded extends DanwoError {
   }
 }
 
+/**
+ * Under replay-only, a step had no recording that replays (none, a stale one, or one that no longer
+ * matches the page), and no model may carry it out.
+ */
+export class ReplayMissing extends DanwoError {
+  constructor(api: string, instruction: string, why: string) {
+    super(
+      "REPLAY_MISSING",
+      `${api}(${JSON.stringify(instruction)}) has no recording that replays (${why}), and replay-only runs no model. Run the test without --replay-only to record it, check it, and commit the cache.`,
+    )
+    this.name = "ReplayMissing"
+  }
+}
+
 /** Under strict replay, the step's recording was made under another key, so it was not used. */
 export class StaleRecording extends DanwoError {
   readonly changed: readonly string[]

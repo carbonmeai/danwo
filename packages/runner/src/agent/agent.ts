@@ -32,16 +32,18 @@ import type { ReplayStore, StepKey } from "../replay/store.ts"
 import { describe } from "../replay/target.ts"
 import type { RecordedAction, Trace } from "../replay/trace.ts"
 import type { SecretVault } from "../secrets/index.ts"
+import { DanwoError } from "../support/codes.ts"
 import { type VisionChoice, VisionDesk, visionFor, type VisionMode } from "../vision/desk.ts"
 import { SecretSpots } from "../vision/screen.ts"
 import { type Budget, type Budgets, Spend } from "./budget.ts"
 import { type BackendMark, EffectWatch, markOf } from "./effect-watch.ts"
+import { ReplayMissing } from "./errors.ts"
 import { extractStep } from "./extract-step.ts"
 import { ExtractFailed } from "./extract.ts"
 import type { Files } from "./files.ts"
 import { ClaimFailed, type JudgeContext, type Poll, type Unheld } from "./judge.ts"
 import { type LiveResult, runLive } from "./live.ts"
-import { divergedNote, handedOff, missError, missOf } from "./miss.ts"
+import { divergedNote, handedOff, missError, missOf, missWhy } from "./miss.ts"
 import { JUDGE_PROMPT, WAIT_PROMPT } from "./prompts.ts"
 import {
   compareEffects,
@@ -94,6 +96,11 @@ export interface AgentOptions {
   readonly store: ReplayStore | undefined
   /** Replay only; stop at the first step whose recording no longer replays. */
   readonly strict: boolean
+  /**
+   * Replay only, and call no model at all: a step with no recording that replays fails with
+   * `REPLAY_MISSING`, and the test goes on to fail as any failed step would.
+   */
+  readonly replayOnly?: boolean
   /** How a replay finds recorded elements; strict replay always matches exactly. */
   readonly relocation: RelocationPolicy
   readonly model: LanguageModel | undefined
@@ -254,6 +261,7 @@ class SessionAgent implements Agent {
         tabs: this.options.tabs,
         store: this.options.store,
         strict: this.options.strict,
+        replayOnly: this.options.replayOnly === true,
         timeout: this.options.actionTimeout,
         ...this.finder(),
         redact: vault.redact,
@@ -333,6 +341,7 @@ class SessionAgent implements Agent {
         { ...step, index },
         {
           ...how,
+          replayOnly: this.options.replayOnly === true,
           tabs: this.options.tabs,
           store: this.options.store,
           redact: vault.redact,
@@ -421,6 +430,11 @@ class SessionAgent implements Agent {
     }
 
     const miss = await this.missFor(key, replayed)
+
+    if (this.options.replayOnly === true) {
+      steps.cache(replayed.reason === undefined ? miss.mode : "diverged", divergedNote(miss))
+      throw new ReplayMissing("agent.act", this.options.vault.redact(instruction), missWhy(miss))
+    }
 
     if (this.options.strict) return this.stopStrict(index, instruction, replayed.reason, miss)
 
@@ -634,7 +648,14 @@ class SessionAgent implements Agent {
     })
   }
 
+  /** The model a step calls; under replay-only none may be called, whatever asks for one. */
   private requireModel(model: LanguageModel | undefined) {
+    if (this.options.replayOnly === true)
+      throw new DanwoError(
+        "REPLAY_MISSING",
+        "a step asked for the model, and replay-only runs none. Run the test without --replay-only to record it.",
+      )
+
     return requireModel(model)
   }
 }

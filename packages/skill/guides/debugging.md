@@ -61,6 +61,7 @@ Treat a likely verdict as where to look first, not as proof.
 | `APP_ERROR`                                 | the app's own 5xx or uncaught error during the step: an app bug                                                                                  |
 | `PROVIDER_ERROR`                            | the provider call that failed (often a fault the matrix injected) and whether the app recovered; check the emulator state and webhook deliveries |
 | `STALE_RECORDING`, `NOTHING_RECORDED`       | the step's recording key changed or never existed: rerun `danwo test` to record, then the matrix                                                 |
+| `REPLAY_MISSING`                            | under `--replay-only`, the step had no recording that replays; the message says none, stale or why it stopped matching: rerun without the flag   |
 | `AGENT_LOOPING`, `BUDGET_EXCEEDED`          | the step instruction is too vague or the page changed; split the step or use locators                                                            |
 | `MODEL_OUTPUT_INVALID`, `MODEL_UNAVAILABLE` | the model provider, not the app; retry or change model                                                                                           |
 | `BROWSER_FAILED`, `ENVIRONMENT_FAILED`      | the browser or the environment hook: app start-up, emulators, ports; no Chromium: `npx playwright-core install chromium`                         |

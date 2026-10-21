@@ -181,9 +181,11 @@ interface ReplayOptions {
    * the model: on the first step whose recording no longer replays, that step and every later
    * `agent.act` return without acting, and the session keeps the divergence (`divergence()`). A
    * step with no recording at all fails. For runs whose deterministic checks then judge the state
-   * the app was left in, such as fault-matrix runs. Requires `cache`.
+   * the app was left in, such as fault-matrix runs. `replay-only` also calls no model, and fails
+   * each step that has no recording that replays (none, a stale one, or one that no longer
+   * matches) with `REPLAY_MISSING`, as a test's own failure. Requires `cache`.
    */
-  readonly replay?: { readonly mode: "strict-stop" }
+  readonly replay?: { readonly mode: "strict-stop" | "replay-only" }
   /**
    * When a recorded element is no longer where the recording found it (renamed, moved to another
    * part of the page), look for the one element that clearly matches it and carry on, noting the
@@ -411,6 +413,7 @@ function settingsOf(options: WebSessionOptions): Settings & { readonly stepScree
     ),
     stepScreenshots: options.record?.stepScreenshots ?? false,
     strict: options.replay?.mode === "strict-stop",
+    replayOnly: options.replay?.mode === "replay-only",
     relocation: relocationOf(options),
   }
 }

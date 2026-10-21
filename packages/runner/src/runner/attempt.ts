@@ -48,11 +48,18 @@ import { usersFixture } from "./users.ts"
 /**
  * How an attempt uses the replay cache: `learn` replays what it can and records new steps;
  * `replay-only` never calls the model and stops at the first step that no longer replays. A
- * `readOnly` learner replays and may call the model, but writes nothing back (CI runs).
+ * `readOnly` learner replays and may call the model, but writes nothing back (CI runs). A
+ * `replayOnly` learner writes nothing either and calls no model: a step it cannot replay fails
+ * (`danwo test --replay-only`).
  */
 export type ReplayUse =
   | { readonly kind: "none" }
-  | { readonly kind: "learn"; readonly dir: string; readonly readOnly?: boolean }
+  | {
+      readonly kind: "learn"
+      readonly dir: string
+      readonly readOnly?: boolean
+      readonly replayOnly?: boolean
+    }
   | { readonly kind: "replay-only"; readonly dir: string }
 
 export interface AttemptSetup {
@@ -424,10 +431,14 @@ function replayOptions(setup: AttemptSetup): Partial<WebSessionOptions> {
 
   if (replay.kind === "none") return {}
 
-  const mode = replay.kind === "learn" && replay.readOnly === true ? "read-only" : "read-write"
+  const learner = replay.kind === "learn" ? replay : undefined
+  const readOnly = learner?.readOnly === true || learner?.replayOnly === true
+  const mode = readOnly ? "read-only" : "read-write"
   const cache = { dir: replay.dir, mode, journey: setup.id } as const
 
-  return replay.kind === "replay-only" ? { cache, replay: { mode: "strict-stop" } } : { cache }
+  if (replay.kind === "replay-only") return { cache, replay: { mode: "strict-stop" } }
+
+  return learner?.replayOnly === true ? { cache, replay: { mode: "replay-only" } } : { cache }
 }
 
 /** Where the flight recorder keeps the attempt's screenshots, one after every step, and its video. */

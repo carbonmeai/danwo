@@ -53,8 +53,12 @@ export interface DanwoConfig {
    * `{ mode, model }` names a model of its own for reading screenshots.
    */
   readonly vision?: VisionSetting
-  /** The replay cache; relative to the config file. */
-  readonly cache?: { readonly dir: string }
+  /**
+   * The replay cache; `dir` is relative to the config file. `replayOnly: true` makes every
+   * `danwo test` run as `--replay-only`: no model is called, and a step with no recording that
+   * replays fails with `REPLAY_MISSING`.
+   */
+  readonly cache?: { readonly dir: string; readonly replayOnly?: boolean }
   /** Values the model never sees; tests pass `secret(name)`. */
   readonly secrets?: Readonly<Record<string, SessionSecret>>
   /** Files tests may upload, by name; paths are relative to the config file. */
