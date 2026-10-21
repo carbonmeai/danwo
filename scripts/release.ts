@@ -331,12 +331,16 @@ async function verify(packed: readonly Packed[], version: string): Promise<boole
         "@types/node@^24",
       ],
     },
-    { label: "npx danwo --version", argv: [...npx, "danwo", "--version"], expected: version },
     {
-      label: "npx danwo init --yes …",
-      argv: [...npx, "danwo", "init", ...INIT_FLAGS, "--app-url", `http://127.0.0.1:${port}`],
+      label: "npx @danwo/cli --version",
+      argv: [...npx, "@danwo/cli", "--version"],
+      expected: version,
     },
-    { label: "npx danwo test", argv: [...npx, "danwo", "test"] },
+    {
+      label: "npx @danwo/cli init --yes …",
+      argv: [...npx, "@danwo/cli", "init", ...INIT_FLAGS, "--app-url", `http://127.0.0.1:${port}`],
+    },
+    { label: "npx @danwo/cli test", argv: [...npx, "@danwo/cli", "test"] },
     {
       label: "npx tsc --noEmit (strict, nodenext)",
       argv: [...npx, "tsc", "--noEmit", "-p", "typed"],

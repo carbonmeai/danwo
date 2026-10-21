@@ -248,12 +248,12 @@ test("processesUnder finds the processes whose command line names the check proj
 describe("stepReport", () => {
   test("passes on exit 0 with the expected text, showing the last lines", () => {
     const output = "one\ntwo\n\nthree\nfour\n0.1.0-beta.0\n"
-    const report = stepReport("npx danwo --version", { status: 0, output, ms: 2_450 }, VERSION)
+    const report = stepReport("npx @danwo/cli --version", { status: 0, output, ms: 2_450 }, VERSION)
 
     expect(report).toEqual({
       ok: true,
       lines: [
-        "  ok     npx danwo --version (2.5 s)",
+        "  ok     npx @danwo/cli --version (2.5 s)",
         "         three",
         "         four",
         `         ${VERSION}`,
