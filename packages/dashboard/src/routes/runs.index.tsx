@@ -5,6 +5,7 @@ import { verdictParam } from "../lib/whose.ts"
 import { fetchRuns } from "../modules/runs/runs-api.ts"
 import type { RunFilter } from "../modules/runs/runs-data.ts"
 import { RunsPage } from "../modules/runs/runs-page.tsx"
+import { RunsSkeleton } from "../modules/runs/runs-skeleton.tsx"
 
 /** The runs list's address: its filters, which page, and what the filter box holds. */
 interface RunsSearch extends RunFilter {
@@ -61,4 +62,5 @@ export const Route = createFileRoute("/runs/")({
   }),
   loader: ({ deps }) => fetchRuns({ data: deps }),
   component: RunsRoute,
+  pendingComponent: () => <RunsSkeleton kind={Route.useSearch().kind} />,
 })

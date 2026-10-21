@@ -1,6 +1,7 @@
 import { HStack } from "@danwo/ui/jsx"
 import { Span } from "@danwo/ui/primitives/typography"
 import { useNavigate } from "@tanstack/react-router"
+import type { ReactNode } from "react"
 
 import { ANY, Choice } from "../../components/choice.tsx"
 import { ListFilter } from "../../components/controls.tsx"
@@ -58,7 +59,7 @@ function FilterBar({
   readonly day: string | undefined
 }) {
   return (
-    <HStack gap="2" flexWrap="wrap">
+    <>
       <RunChoice
         name="status"
         label="Status"
@@ -96,12 +97,32 @@ function FilterBar({
           ["30", "Last 30 days"],
         ]}
       />
+    </>
+  )
+}
+
+/** The bar above the table: the filters on the left, how many runs match on the right. */
+export function FilterRow({
+  filters,
+  count,
+}: {
+  readonly filters: ReactNode
+  readonly count: ReactNode
+}) {
+  return (
+    <HStack justify="space-between" gap="3" mb="3" flexWrap="wrap">
+      <HStack gap="2" flexWrap="wrap">
+        {filters}
+      </HStack>
+      <Span color="ink.muted" fontSize="1">
+        {count}
+      </Span>
     </HStack>
   )
 }
 
 /** What each kind of run is, said once. */
-const KIND_HELP: Readonly<Record<RunKind | "both", string>> = {
+export const KIND_HELP: Readonly<Record<RunKind | "both", string>> = {
   both: "danwo test runs the picked tests once each; danwo matrix replays one test once per planned fault, judged by its invariant.",
   test: "danwo test ran the picked tests once each, retrying a failure when retries are on.",
   matrix:
@@ -152,12 +173,10 @@ export function RunsPage({
       }
     >
       <LiveRuns />
-      <HStack justify="space-between" gap="3" mb="3" flexWrap="wrap">
-        <FilterBar filter={filter} day={filter.day} />
-        <Span color="ink.muted" fontSize="1">
-          {total} of {counts.test + counts.matrix} runs
-        </Span>
-      </HStack>
+      <FilterRow
+        filters={<FilterBar filter={filter} day={filter.day} />}
+        count={`${total} of ${counts.test + counts.matrix} runs`}
+      />
       {total === 0 ? (
         <Empty title="No runs match" hint="No run matches these filters." />
       ) : (

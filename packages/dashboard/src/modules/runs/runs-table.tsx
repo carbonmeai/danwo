@@ -1,28 +1,23 @@
 import { Icons } from "@danwo/ui/icons/base"
 import { HStack, Stack } from "@danwo/ui/jsx"
 import { Button } from "@danwo/ui/primitives/button"
-import {
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@danwo/ui/primitives/table"
+import { TableCell, TableHead, TableRow } from "@danwo/ui/primitives/table"
 import { Span, Text } from "@danwo/ui/primitives/typography"
 import { Link, useNavigate } from "@tanstack/react-router"
 import { type RefObject, useRef, useState } from "react"
 
 import { Ident } from "../../components/code.tsx"
 import { useCopied } from "../../components/copy-link.tsx"
-import { Panel } from "../../components/panel.tsx"
+import { PanelTable } from "../../components/panel.tsx"
 import { prunedWords } from "../../components/recordings.tsx"
 import { copyAddress, RowMenu } from "../../components/row-menu.tsx"
+import { Bone, BoneCell, BoneRow, lineWidth } from "../../components/skeleton.tsx"
 import { StatusBadge, VerdictStrip } from "../../components/status-badge.tsx"
 import { TimeAgo } from "../../components/time-ago.tsx"
 import { WhoseBadge } from "../../components/whose-badge.tsx"
 import { dollars, duration } from "../../lib/format.ts"
 import { useListKeys } from "../../lib/list-keys.ts"
+import { useKnownRuns } from "../run/known-runs.ts"
 import { MatrixIcon, TestIcon } from "./run-icons.tsx"
 import type { RunRow } from "./runs-data.ts"
 import { countLine, sharesOf, verdictOf } from "./runs-values.ts"
@@ -123,6 +118,61 @@ function RunLine({
   )
 }
 
+/** The runs table's header row. */
+export function RunsHead() {
+  return (
+    <>
+      <TableHead px="3" color="ink.muted">
+        Result
+      </TableHead>
+      <TableHead color="ink.muted">What ran</TableHead>
+      <TableHead color="ink.muted" display={{ base: "none", md: "table-cell" }}>
+        Command
+      </TableHead>
+      <TableHead color="ink.muted" textAlign="right">
+        Time
+      </TableHead>
+      <TableHead color="ink.muted" textAlign="right" display={{ base: "none", lg: "table-cell" }}>
+        Spend
+      </TableHead>
+      <TableHead color="ink.muted" textAlign="right">
+        Started
+      </TableHead>
+      <TableHead>
+        <Span srOnly>Actions</Span>
+      </TableHead>
+    </>
+  )
+}
+
+/** A run's row still loading, its cells those of {@link RunLine}. */
+export function RunLineSkeleton({ i }: { readonly i: number }) {
+  return (
+    <BoneRow>
+      <BoneCell w="7.5rem" px="3">
+        <Bone w="4rem" />
+      </BoneCell>
+      <BoneCell w="full" minW="0" whiteSpace="normal">
+        <Bone w={lineWidth(i)} />
+        <Bone w="full" display={{ base: "block", md: "none" }} />
+        <Bone w="12rem" fontSize="1" mt="1" />
+        <Bone w="6rem" fontSize="1" display={{ base: "block", md: "none" }} />
+      </BoneCell>
+      <BoneCell w="10rem" display={{ base: "none", md: "table-cell" }} bone="7rem" />
+      <BoneCell w="6rem">
+        <Bone w="3rem" ml="auto" />
+      </BoneCell>
+      <BoneCell w="6rem" display={{ base: "none", lg: "table-cell" }}>
+        <Bone w="2.5rem" ml="auto" />
+      </BoneCell>
+      <BoneCell w="9rem">
+        <Bone w="5rem" ml="auto" />
+      </BoneCell>
+      <BoneCell w="3rem" />
+    </BoneRow>
+  )
+}
+
 /** The runs on this page that match the filter, j and k moving through them. */
 export function RunsTable({
   shown,
@@ -140,48 +190,25 @@ export function RunsTable({
   const current = useListKeys(list, shown.length, box)
   const [now] = useState(() => Date.now())
 
+  useKnownRuns(shown)
+
   return (
-    <Panel px="2" py="1">
-      <TableContainer aria-label="Runs">
-        <TableHeader>
-          <TableRow _hover={{ bg: "transparent" }}>
-            <TableHead px="3" color="ink.muted">
-              Result
-            </TableHead>
-            <TableHead color="ink.muted">What ran</TableHead>
-            <TableHead color="ink.muted" display={{ base: "none", md: "table-cell" }}>
-              Command
-            </TableHead>
-            <TableHead color="ink.muted" textAlign="right">
-              Time
-            </TableHead>
-            <TableHead
-              color="ink.muted"
-              textAlign="right"
-              display={{ base: "none", lg: "table-cell" }}
-            >
-              Spend
-            </TableHead>
-            <TableHead color="ink.muted" textAlign="right">
-              Started
-            </TableHead>
-            <TableHead>
-              <Span srOnly>Actions</Span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody ref={list}>
-          {shown.map((row, i) => (
-            <RunLine key={row.id} row={row} current={i === current} now={now} keepRuns={keepRuns} />
-          ))}
-        </TableBody>
-      </TableContainer>
-      {shown.length === 0 ? (
-        <Text px="3" py="6" color="ink.muted" textAlign="center">
-          No run on this page matches “{deferred}”.
-        </Text>
-      ) : null}
-    </Panel>
+    <PanelTable
+      label="Runs"
+      head={<RunsHead />}
+      bodyRef={list}
+      after={
+        shown.length === 0 ? (
+          <Text px="3" py="6" color="ink.muted" textAlign="center">
+            No run on this page matches “{deferred}”.
+          </Text>
+        ) : null
+      }
+    >
+      {shown.map((row, i) => (
+        <RunLine key={row.id} row={row} current={i === current} now={now} keepRuns={keepRuns} />
+      ))}
+    </PanelTable>
   )
 }
 

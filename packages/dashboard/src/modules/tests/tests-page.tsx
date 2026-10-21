@@ -3,24 +3,18 @@ import { Icons } from "@danwo/ui/icons/base"
 import { Box, Grid, HStack, Stack } from "@danwo/ui/jsx"
 import { Button } from "@danwo/ui/primitives/button"
 import { Checkbox } from "@danwo/ui/primitives/checkbox/checkbox"
-import {
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@danwo/ui/primitives/table"
+import { TableCell, TableHead, TableRow } from "@danwo/ui/primitives/table"
 import { Span } from "@danwo/ui/primitives/typography"
 import { Link, useNavigate } from "@tanstack/react-router"
-import { useState } from "react"
+import { type ReactNode, useState } from "react"
 
 import { ANY, Choice } from "../../components/choice.tsx"
 import { ListFilter } from "../../components/controls.tsx"
 import { Empty } from "../../components/empty-state.tsx"
 import { Page } from "../../components/page.tsx"
-import { Panel } from "../../components/panel.tsx"
+import { PanelTable } from "../../components/panel.tsx"
 import { DeletedRecording } from "../../components/recordings.tsx"
+import { BlockBone, Bone, BoneCell, BoneRow, lineWidth } from "../../components/skeleton.tsx"
 import { StatusBadge, VerdictBadge } from "../../components/status-badge.tsx"
 import { TimeAgo } from "../../components/time-ago.tsx"
 import { WhoseBadge } from "../../components/whose-badge.tsx"
@@ -227,6 +221,70 @@ function Groups({
   )
 }
 
+/** The tests table's header row; `onPick` picks every test shown, and is absent while loading. */
+export function TestsHead({
+  picked,
+  onPick,
+}: {
+  readonly picked: boolean
+  readonly onPick?: (picked: boolean) => void
+}) {
+  return (
+    <>
+      <TableHead px="3">
+        <Checkbox
+          aria-label="Pick every test shown"
+          checked={picked}
+          disabled={onPick === undefined}
+          onCheckedChange={(checked) => onPick?.(checked === true)}
+        />
+      </TableHead>
+      <TableHead display={{ base: "none", md: "table-cell" }}>
+        <Span srOnly>Recording</Span>
+      </TableHead>
+      <TableHead color="ink.muted">Test</TableHead>
+      <TableHead color="ink.muted">Last run</TableHead>
+      <TableHead color="ink.muted" textAlign="right" display={{ base: "none", lg: "table-cell" }}>
+        Pass rate
+      </TableHead>
+      <TableHead color="ink.muted" display={{ base: "none", lg: "table-cell" }}>
+        Matrix
+      </TableHead>
+      <TableHead>
+        <Span srOnly>Actions</Span>
+      </TableHead>
+    </>
+  )
+}
+
+/** A test's row still loading, its cells those of {@link TestRowLine}. */
+export function TestRowSkeleton({ i }: { readonly i: number }) {
+  return (
+    <BoneRow>
+      <BoneCell w="2.5rem" px="3">
+        <BlockBone w="4" h="4" rounded="sm" />
+      </BoneCell>
+      <BoneCell w="7rem" display={{ base: "none", md: "table-cell" }}>
+        <BlockBone w="24" h="14" rounded="md" />
+      </BoneCell>
+      <BoneCell w="full" minW="14rem" whiteSpace="normal">
+        <Bone w={lineWidth(i)} />
+      </BoneCell>
+      <BoneCell>
+        <Bone w="4rem" />
+        <Bone w="5rem" fontSize="1" mt="1" />
+      </BoneCell>
+      <BoneCell display={{ base: "none", lg: "table-cell" }}>
+        <Bone w="2.5rem" ml="auto" />
+      </BoneCell>
+      <BoneCell display={{ base: "none", lg: "table-cell" }} bone="7rem" />
+      <BoneCell w="5.5rem">
+        <Bone w="3.5rem" ml="auto" />
+      </BoneCell>
+    </BoneRow>
+  )
+}
+
 /** The tests shown, in the library's table, picked ones marked. */
 function TestsTable({
   shown,
@@ -248,52 +306,51 @@ function TestsTable({
   }
 
   return (
-    <Panel px="2" py="1">
-      <TableContainer aria-label="Tests">
-        <TableHeader>
-          <TableRow _hover={{ bg: "transparent" }}>
-            <TableHead px="3">
-              <Checkbox
-                aria-label="Pick every test shown"
-                checked={shown.length > 0 && shown.every((row) => picked.has(row.id))}
-                onCheckedChange={(checked) =>
-                  setPicked(checked === true ? new Set(shown.map((row) => row.id)) : new Set())
-                }
-              />
-            </TableHead>
-            <TableHead display={{ base: "none", md: "table-cell" }}>
-              <Span srOnly>Recording</Span>
-            </TableHead>
-            <TableHead color="ink.muted">Test</TableHead>
-            <TableHead color="ink.muted">Last run</TableHead>
-            <TableHead
-              color="ink.muted"
-              textAlign="right"
-              display={{ base: "none", lg: "table-cell" }}
-            >
-              Pass rate
-            </TableHead>
-            <TableHead color="ink.muted" display={{ base: "none", lg: "table-cell" }}>
-              Matrix
-            </TableHead>
-            <TableHead>
-              <Span srOnly>Actions</Span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {shown.map((row) => (
-            <TestRowLine
-              key={row.id}
-              row={row}
-              picked={picked.has(row.id)}
-              onPick={(on) => pick(row.id, on)}
-              keepRuns={keepRuns}
-            />
-          ))}
-        </TableBody>
-      </TableContainer>
-    </Panel>
+    <PanelTable
+      label="Tests"
+      head={
+        <TestsHead
+          picked={shown.length > 0 && shown.every((row) => picked.has(row.id))}
+          onPick={(on) => setPicked(on ? new Set(shown.map((row) => row.id)) : new Set())}
+        />
+      }
+    >
+      {shown.map((row) => (
+        <TestRowLine
+          key={row.id}
+          row={row}
+          picked={picked.has(row.id)}
+          onPick={(on) => pick(row.id, on)}
+          keepRuns={keepRuns}
+        />
+      ))}
+    </PanelTable>
+  )
+}
+
+/** What the test library is, under its title. */
+export const TESTS_DETAIL =
+  "Every test in this project. The play button opens its latest recording; the matrix column says what the fault matrix made of it."
+
+/** The test library's two columns: the files down the side on a wide screen, and the table. */
+export function TestsLayout({
+  side,
+  children,
+}: {
+  readonly side: ReactNode
+  readonly children: ReactNode
+}) {
+  return (
+    <Grid
+      gridTemplateColumns={{ base: "1fr", lg: "15rem minmax(0, 1fr)" }}
+      gap="6"
+      alignItems="start"
+    >
+      <Box display={{ base: "none", lg: "block" }} position="sticky" top="16">
+        {side}
+      </Box>
+      {children}
+    </Grid>
   )
 }
 
@@ -343,7 +400,7 @@ export function TestsPage({
     <Page
       crumbs={["Tests"]}
       title="Tests"
-      detail="Every test in this project. The play button opens its latest recording; the matrix column says what the fault matrix made of it."
+      detail={TESTS_DETAIL}
       actions={
         <>
           <VerdictChoice verdict={verdict} />
@@ -353,14 +410,7 @@ export function TestsPage({
       }
     >
       <LiveRuns />
-      <Grid
-        gridTemplateColumns={{ base: "1fr", lg: "15rem minmax(0, 1fr)" }}
-        gap="6"
-        alignItems="start"
-      >
-        <Box display={{ base: "none", lg: "block" }} position="sticky" top="16">
-          <Groups rows={rows} file={file} />
-        </Box>
+      <TestsLayout side={<Groups rows={rows} file={file} />}>
         {found.shown.length === 0 ? (
           <Empty title="No tests here" hint="No test here matches the filters." />
         ) : (
@@ -371,7 +421,7 @@ export function TestsPage({
             keepRuns={keepRuns}
           />
         )}
-      </Grid>
+      </TestsLayout>
     </Page>
   )
 }

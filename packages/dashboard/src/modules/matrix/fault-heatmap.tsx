@@ -4,10 +4,11 @@ import { Box, Grid, HStack } from "@danwo/ui/jsx"
 import { Button } from "@danwo/ui/primitives/button"
 import { Span } from "@danwo/ui/primitives/typography"
 import { Link, useNavigate } from "@tanstack/react-router"
-import { Fragment, useState } from "react"
+import { Fragment, type ReactNode, useState } from "react"
 
 import { Ident } from "../../components/code.tsx"
 import { Item, Panel } from "../../components/panel.tsx"
+import { BlockBone, Bone, ControlBone, lineWidth, Repeat } from "../../components/skeleton.tsx"
 import { Swatch } from "../../components/status-badge.tsx"
 import { toneOf, wordOf } from "../../lib/verdicts.ts"
 import { faultGrid, type GridCell, gridGroups } from "./fault-grid.ts"
@@ -106,6 +107,62 @@ function ColumnHeads({ columns }: { readonly columns: readonly string[] }) {
   )
 }
 
+/** The heatmap's two columns: the grid, and the trial picked beside it on a wide screen. */
+function HeatmapLayout({ children }: { readonly children: ReactNode }) {
+  return (
+    <Grid
+      gridTemplateColumns={{ base: "1fr", xl: "minmax(0, 1fr) 20rem" }}
+      gap="2"
+      alignItems="start"
+    >
+      {children}
+    </Grid>
+  )
+}
+
+/** Rows and columns of cells the heatmap's skeleton shows: a typical run's. */
+const SKELETON_GRID = { rows: 8, columns: 10 } as const
+
+/** {@link FaultHeatmap} while its run loads: the grid's heads, rows of cells, and the trial. */
+export function FaultHeatmapSkeleton() {
+  return (
+    <HeatmapLayout>
+      <Panel overflowX="auto" px="5" pb="5">
+        <Box
+          display="grid"
+          style={{
+            gridTemplateColumns: `minmax(10rem, 1fr) repeat(${SKELETON_GRID.columns}, ${CELL})`,
+          }}
+          columnGap="1.5"
+          rowGap="1.5"
+          alignItems="center"
+        >
+          <Box gridColumn="1 / -1" h="7rem" />
+          <Bone w="6rem" fontSize="1" gridColumn="1 / -1" pt="3" pb="1" />
+          <Repeat count={SKELETON_GRID.rows}>
+            {(row) => (
+              <Fragment key={row}>
+                <Bone w={lineWidth(row)} fontSize="1" />
+                <Repeat count={SKELETON_GRID.columns}>
+                  {(column) => <BlockBone key={column} w={CELL} h={CELL} rounded="6px" />}
+                </Repeat>
+              </Fragment>
+            )}
+          </Repeat>
+        </Box>
+      </Panel>
+      <Panel>
+        <Item p="4" gap="3">
+          <Bone w="4rem" />
+          <Bone w="80%" fontSize="1.5" />
+          <Bone w="70%" />
+          <ControlBone w="full" />
+        </Item>
+      </Panel>
+    </HeatmapLayout>
+  )
+}
+
 /** The trials as a heatmap: what a fault landed on down the side, the kind of fault across. */
 export function FaultHeatmap({
   run,
@@ -130,11 +187,7 @@ export function FaultHeatmap({
     grid.cells.filter((cell) => cell.row === row && cell.column === column)
 
   return (
-    <Grid
-      gridTemplateColumns={{ base: "1fr", xl: "minmax(0, 1fr) 20rem" }}
-      gap="2"
-      alignItems="start"
-    >
+    <HeatmapLayout>
       <Panel overflowX="auto" px="5" pb="5">
         <Box
           display="grid"
@@ -215,6 +268,6 @@ export function FaultHeatmap({
           ) : null}
         </Item>
       </Panel>
-    </Grid>
+    </HeatmapLayout>
   )
 }

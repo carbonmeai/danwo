@@ -5,6 +5,8 @@ import { Kbd } from "@danwo/ui/primitives/kbd"
 import { Span } from "@danwo/ui/primitives/typography"
 import type { RefObject } from "react"
 
+import { ControlBone } from "./skeleton.tsx"
+
 /** The keys a list answers to. */
 export function KeyHint({ filter = false }: { readonly filter?: boolean }) {
   return (
@@ -62,6 +64,28 @@ export function SearchBox({
         onChange={(event) => onChange(event.target.value)}
       />
     </Box>
+  )
+}
+
+/**
+ * A search box still loading, as wide as the box it stands in for. On a phone that box is as wide
+ * as the library's input will go, which is the input's own width at the small size.
+ */
+function SearchBoxSkeleton({ width = "16rem" }: { readonly width?: string }) {
+  return (
+    <Box w={{ base: "full", sm: width }} minW="189px">
+      <ControlBone w="full" />
+    </Box>
+  )
+}
+
+/** A list's key hints, with its filter box still loading. */
+export function ListFilterSkeleton() {
+  return (
+    <HStack gap="3">
+      <KeyHint filter />
+      <SearchBoxSkeleton />
+    </HStack>
   )
 }
 

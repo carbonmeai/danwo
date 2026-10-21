@@ -1,20 +1,14 @@
 import { Icons } from "@danwo/ui/icons/base"
 import { Box, HStack, Stack } from "@danwo/ui/jsx"
 import { Button } from "@danwo/ui/primitives/button"
-import {
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@danwo/ui/primitives/table"
+import { TableCell, TableHead, TableRow } from "@danwo/ui/primitives/table"
 import { Span } from "@danwo/ui/primitives/typography"
 import { Link } from "@tanstack/react-router"
 import { useRef } from "react"
 
 import { Ident } from "../../components/code.tsx"
-import { Panel } from "../../components/panel.tsx"
+import { PanelTable } from "../../components/panel.tsx"
+import { Bone, BoneCell, BoneRow, lineWidth, Repeat } from "../../components/skeleton.tsx"
 import { StatusBadge, Swatch, VerdictBadge } from "../../components/status-badge.tsx"
 import { dollars, duration, percent } from "../../lib/format.ts"
 import { useListKeys } from "../../lib/list-keys.ts"
@@ -193,6 +187,63 @@ function BreakdownLine({
   )
 }
 
+/** The table's header row, each figure's heading sorting by it. */
+function TestTableHead({ sorting }: { readonly sorting: TableOrder }) {
+  return (
+    <>
+      <TableHead px="3" color="ink.muted">
+        Test
+      </TableHead>
+      <SortHead sort="runs" sorting={sorting} label="Runs" />
+      <SortHead sort="pass" sorting={sorting} label="Pass rate" />
+      <SortHead sort="flake" sorting={sorting} label="Flake rate" />
+      <SortHead sort="time" sorting={sorting} label="Median time" />
+      <SortHead sort="spend" sorting={sorting} label="Spend" hideBelow="lg" />
+      <SortHead sort="faults" sorting={sorting} label="Breaks under" align="left" hideBelow="md" />
+    </>
+  )
+}
+
+/** Rows enough to fill a tall window; the page scrolls past the rest once they load. */
+const SKELETON_ROWS = 8
+
+/** {@link TestTable} while the tests load: the same headings, the rows as bones. */
+export function TestTableSkeleton({ sorting }: { readonly sorting: TableOrder }) {
+  return (
+    <PanelTable label="Tests" head={<TestTableHead sorting={sorting} />}>
+      <Repeat count={SKELETON_ROWS}>
+        {(i) => (
+          <BoneRow key={i}>
+            <BoneCell w="full" minW="14rem" px="3" whiteSpace="normal">
+              <Bone w={lineWidth(i)} />
+              <Bone w="full" display={{ base: "block", md: "none" }} />
+              <HStack gap="2" mt="1" minH="5.5">
+                <Bone w="7rem" fontSize="1" />
+              </HStack>
+            </BoneCell>
+            <BoneCell>
+              <Bone w="1.5rem" ml="auto" />
+            </BoneCell>
+            <BoneCell>
+              <Bone w="3.5rem" ml="auto" />
+            </BoneCell>
+            <BoneCell>
+              <Bone w="3.5rem" ml="auto" />
+            </BoneCell>
+            <BoneCell>
+              <Bone w="3rem" ml="auto" />
+            </BoneCell>
+            <BoneCell display={{ base: "none", lg: "table-cell" }}>
+              <Bone w="2.5rem" ml="auto" />
+            </BoneCell>
+            <BoneCell display={{ base: "none", md: "table-cell" }} bone="4rem" />
+          </BoneRow>
+        )}
+      </Repeat>
+    </PanelTable>
+  )
+}
+
 /**
  * Every test, one row each, sortable by any figure: how often it ran and passed, how flaky it is,
  * its median time and spend, and the faults that break it under the matrix.
@@ -209,33 +260,10 @@ export function TestTable({
   const current = useListKeys(list, sorted.length)
 
   return (
-    <Panel px="2" py="1">
-      <TableContainer aria-label="Tests">
-        <TableHeader>
-          <TableRow _hover={{ bg: "transparent" }}>
-            <TableHead px="3" color="ink.muted">
-              Test
-            </TableHead>
-            <SortHead sort="runs" sorting={sorting} label="Runs" />
-            <SortHead sort="pass" sorting={sorting} label="Pass rate" />
-            <SortHead sort="flake" sorting={sorting} label="Flake rate" />
-            <SortHead sort="time" sorting={sorting} label="Median time" />
-            <SortHead sort="spend" sorting={sorting} label="Spend" hideBelow="lg" />
-            <SortHead
-              sort="faults"
-              sorting={sorting}
-              label="Breaks under"
-              align="left"
-              hideBelow="md"
-            />
-          </TableRow>
-        </TableHeader>
-        <TableBody ref={list}>
-          {sorted.map((row, i) => (
-            <BreakdownLine key={row.id} row={row} current={i === current} />
-          ))}
-        </TableBody>
-      </TableContainer>
-    </Panel>
+    <PanelTable label="Tests" head={<TestTableHead sorting={sorting} />} bodyRef={list}>
+      {sorted.map((row, i) => (
+        <BreakdownLine key={row.id} row={row} current={i === current} />
+      ))}
+    </PanelTable>
   )
 }

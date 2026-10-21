@@ -6,6 +6,13 @@ import {
   SelectValue,
 } from "@danwo/ui/primitives/select"
 
+import { ControlBone } from "./skeleton.tsx"
+
+/** A choice still loading, as wide as the dropdown it stands in for. */
+export function ChoiceSkeleton({ width = "11rem" }: { readonly width?: string }) {
+  return <ControlBone w={width} />
+}
+
 /** The value a choice reads as when nothing narrower is picked. */
 export const ANY = "any"
 

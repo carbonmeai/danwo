@@ -11,13 +11,14 @@ import { Command, Ident } from "../../components/code.tsx"
 import { Empty } from "../../components/empty-state.tsx"
 import { Page } from "../../components/page.tsx"
 import { Section } from "../../components/panel.tsx"
+import { BlockBone, Bone, ControlBone, ListPanelSkeleton } from "../../components/skeleton.tsx"
 import { LintLabel, Swatch } from "../../components/status-badge.tsx"
 import { TimeAgo } from "../../components/time-ago.tsx"
 import { duration } from "../../lib/format.ts"
 import { toneOf, wordOf } from "../../lib/verdicts.ts"
 import { RunMatrix } from "../live/run-actions.tsx"
-import { FaultHeatmap } from "./fault-heatmap.tsx"
-import { InvariantPanel } from "./invariant-panel.tsx"
+import { FaultHeatmap, FaultHeatmapSkeleton } from "./fault-heatmap.tsx"
+import { InvariantPanel, InvariantPanelSkeleton } from "./invariant-panel.tsx"
 import { LEGEND, planNote } from "./matrix-values.ts"
 import { TrialList } from "./trial-list.tsx"
 
@@ -64,6 +65,72 @@ function ViewSwitch({ runId, view }: { readonly runId: string; readonly view: Ma
   )
 }
 
+/** The trials under the legend and the switch between the grid and the list. */
+function Trials({
+  runId,
+  view,
+  children,
+}: {
+  readonly runId: string
+  readonly view: MatrixView
+  readonly children: ReactNode
+}) {
+  return (
+    <Stack gap="2" mt="6">
+      <HStack justify="space-between" gap="4" flexWrap="wrap">
+        <Legend />
+        <ViewSwitch runId={runId} view={view} />
+      </HStack>
+      {children}
+    </Stack>
+  )
+}
+
+/**
+ * {@link MatrixRun} while the run loads: its title when the runs list already said it, then the
+ * invariant, the legend and the grid or the list, as bones.
+ */
+export function MatrixRunSkeleton({
+  runId,
+  view,
+  crumbs,
+  title,
+}: {
+  readonly runId: string
+  readonly view: MatrixView
+  readonly crumbs: ReactNode
+  readonly title?: string | undefined
+}) {
+  const shown = title ?? <Bone w="24rem" />
+
+  return (
+    <Page
+      crumbs={[crumbs, shown]}
+      title={shown}
+      detail={
+        <>
+          <Bone w="40rem" />
+          <Bone w="22rem" />
+          <Bone w="full" display={{ base: "block", md: "none" }} />
+          <Bone w="60%" display={{ base: "block", md: "none" }} />
+        </>
+      }
+      actions={
+        <>
+          <BlockBone w="19rem" h="7" />
+          <ControlBone w="8.75rem" />
+        </>
+      }
+      loading="Loading the run"
+    >
+      <InvariantPanelSkeleton />
+      <Trials runId={runId} view={view}>
+        {view === "list" ? <ListPanelSkeleton count={10} lines={2} /> : <FaultHeatmapSkeleton />}
+      </Trials>
+    </Page>
+  )
+}
+
 /** A `danwo matrix` run: what must hold, how much held, and every trial as a grid or a list. */
 export function MatrixRun({
   run,
@@ -103,17 +170,13 @@ export function MatrixRun({
           command={`danwo matrix ${run.file}`}
         />
       ) : (
-        <Stack gap="2" mt="6">
-          <HStack justify="space-between" gap="4" flexWrap="wrap">
-            <Legend />
-            <ViewSwitch runId={run.id} view={view} />
-          </HStack>
+        <Trials runId={run.id} view={view}>
           {view === "list" ? (
             <TrialList run={run} focus={focus} />
           ) : (
             <FaultHeatmap run={run} focus={focus} />
           )}
-        </Stack>
+        </Trials>
       )}
       {run.lint && run.lint.length > 0 ? (
         <Section title="Integration lint" count={run.lint.reduce((sum, l) => sum + l.count, 0)}>

@@ -1,9 +1,10 @@
 import { Box, Grid, HStack, Stack } from "@danwo/ui/jsx"
 import { Span } from "@danwo/ui/primitives/typography"
 import { Link } from "@tanstack/react-router"
-import { useRef } from "react"
+import { type ReactNode, useRef } from "react"
 
 import { ListRow, ListRows, None } from "../../components/panel.tsx"
+import { BlockBone, Bone } from "../../components/skeleton.tsx"
 import { StatusBadge, Swatch } from "../../components/status-badge.tsx"
 import { useListKeys } from "../../lib/list-keys.ts"
 import { toneOf, wordOf } from "../../lib/verdicts.ts"
@@ -25,6 +26,38 @@ function OutcomeStrip({ outcomes }: { readonly outcomes: readonly Outcome[] }) {
         </Link>
       ))}
     </HStack>
+  )
+}
+
+/** A flaky test's row: the test, its verdict in each run, and its latest verdict. */
+function FlakyColumns({ children }: { readonly children: ReactNode }) {
+  return (
+    <Grid
+      gridTemplateColumns={{ base: "1fr", md: "minmax(0, 2fr) minmax(0, 2fr) 9rem" }}
+      gap="3"
+      alignItems="center"
+    >
+      {children}
+    </Grid>
+  )
+}
+
+/** A flaky test's row while the insights load, its columns those of the loaded row. */
+export function FlakyTestSkeleton() {
+  return (
+    <ListRows>
+      <ListRow data-skeleton-row _hover={{}}>
+        <FlakyColumns>
+          <Stack gap="0.5" minW="0">
+            <Bone w="90%" />
+            <Bone w="50%" />
+            <Bone w="11rem" fontSize="1" />
+          </Stack>
+          <BlockBone w="9rem" h="5" rounded="xs" />
+          <Bone w="4rem" justifySelf={{ md: "end" }} />
+        </FlakyColumns>
+      </ListRow>
+    </ListRows>
   )
 }
 
@@ -50,11 +83,7 @@ export function FlakyTests({ insights }: { readonly insights: Insights }) {
           bg={i === current ? "surface.itemHover" : "surface.item"}
           boxShadow={i === current ? "inset 2px 0 0 {colors.ink.strong}" : undefined}
         >
-          <Grid
-            gridTemplateColumns={{ base: "1fr", md: "minmax(0, 2fr) minmax(0, 2fr) 9rem" }}
-            gap="3"
-            alignItems="center"
-          >
+          <FlakyColumns>
             <Stack gap="0.5" minW="0">
               <Link to="/tests" search={{ q: test.id }}>
                 <Span fontWeight="500" overflowWrap="anywhere">
@@ -70,7 +99,7 @@ export function FlakyTests({ insights }: { readonly insights: Insights }) {
             <Box justifySelf={{ md: "end" }}>
               <StatusBadge status={test.lastStatus} />
             </Box>
-          </Grid>
+          </FlakyColumns>
         </ListRow>
       ))}
     </ListRows>

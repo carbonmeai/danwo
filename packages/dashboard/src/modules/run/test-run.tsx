@@ -2,14 +2,7 @@ import type { HistoryTest, TestHistory } from "@danwo/runner/runner"
 import { Icons } from "@danwo/ui/icons/base"
 import { HStack, Stack } from "@danwo/ui/jsx"
 import { Button } from "@danwo/ui/primitives/button"
-import {
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@danwo/ui/primitives/table"
+import { TableCell, TableHead, TableRow } from "@danwo/ui/primitives/table"
 import { Span } from "@danwo/ui/primitives/typography"
 import { Link } from "@tanstack/react-router"
 import { type ReactNode, useEffect, useRef } from "react"
@@ -17,8 +10,17 @@ import { type ReactNode, useEffect, useRef } from "react"
 import { Ident } from "../../components/code.tsx"
 import { KeyHint } from "../../components/controls.tsx"
 import { Page } from "../../components/page.tsx"
-import { Panel, StatCard, StatCards } from "../../components/panel.tsx"
+import { Panel, PanelTable, StatCard, StatCards } from "../../components/panel.tsx"
 import { DeletedRecording, useRecordings } from "../../components/recordings.tsx"
+import {
+  Bone,
+  BoneCell,
+  BoneRow,
+  ControlBone,
+  lineWidth,
+  Repeat,
+  StatCardSkeleton,
+} from "../../components/skeleton.tsx"
 import { StatusBadge, VerdictStrip } from "../../components/status-badge.tsx"
 import { TimeAgo } from "../../components/time-ago.tsx"
 import { WhoseBadge } from "../../components/whose-badge.tsx"
@@ -155,6 +157,100 @@ function TestLine({
   )
 }
 
+/** A test run's table header row. */
+function TestRunHead() {
+  return (
+    <>
+      <TableHead w="8rem" px="3" color="ink.muted">
+        Result
+      </TableHead>
+      <TableHead color="ink.muted">Test</TableHead>
+      <TableHead color="ink.muted" display={{ base: "none", lg: "table-cell" }}>
+        Replay cache
+      </TableHead>
+      <TableHead color="ink.muted" textAlign="right">
+        Time
+      </TableHead>
+      <TableHead>
+        <Span srOnly>Watch and run again</Span>
+      </TableHead>
+    </>
+  )
+}
+
+/** A test's row of a run still loading, its cells those of {@link TestLine}. */
+function TestLineSkeleton({ i }: { readonly i: number }) {
+  return (
+    <BoneRow>
+      <BoneCell px="3">
+        <Bone w="4rem" />
+      </BoneCell>
+      <BoneCell w="full" whiteSpace="normal">
+        <Bone w={lineWidth(i)} />
+        <Repeat count={2}>
+          {(line) => <Bone key={line} w="full" display={{ base: "block", md: "none" }} />}
+        </Repeat>
+      </BoneCell>
+      <BoneCell display={{ base: "none", lg: "table-cell" }} bone="4rem" />
+      <BoneCell>
+        <Bone w="2.5rem" ml="auto" />
+      </BoneCell>
+      <BoneCell w="8rem">
+        <Bone w="3.5rem" ml="auto" />
+      </BoneCell>
+    </BoneRow>
+  )
+}
+
+/** Rows enough to fill a tall window; the page scrolls past the rest once they load. */
+const SKELETON_ROWS = 14
+
+/**
+ * {@link TestRun} while the run loads: its title when the runs list already said it, then the
+ * same cards and table, as bones.
+ */
+export function TestRunSkeleton({
+  crumbs,
+  title,
+  failed,
+}: {
+  readonly crumbs: ReactNode
+  readonly title?: string | undefined
+  /** How many of its tests failed, when known: the page then offers to run them again. */
+  readonly failed: number
+}) {
+  const shown = title ?? <Bone w="6rem" />
+
+  return (
+    <Page
+      crumbs={[crumbs, shown]}
+      title={shown}
+      detail={
+        <>
+          <Ident>danwo test</Ident> run, started <Bone inline w="6rem" />
+        </>
+      }
+      actions={
+        <>
+          <KeyHint />
+          {failed > 0 ? <ControlBone w="8.5rem" /> : null}
+        </>
+      }
+      loading="Loading the run"
+    >
+      <StatCards>
+        <StatCardSkeleton label="Passed" icon={<Icons.checkCircle size={13} />} />
+        <StatCardSkeleton label="Failed" icon={<Icons.closeCircle size={13} />} />
+        <StatCardSkeleton label="Time" icon={<Icons.clock size={13} />} />
+        <StatCardSkeleton label="Model spend" icon={<Icons.dollar size={13} />} />
+      </StatCards>
+      <PanelTable label="Tests in this run" head={<TestRunHead />}>
+        <Repeat count={SKELETON_ROWS}>{(i) => <TestLineSkeleton key={i} i={i} />}</Repeat>
+      </PanelTable>
+    </Page>
+  )
+}
+
 /** A `danwo test` run: its figures, any files that did not load, and every test, failures first. */
 export function TestRun({
   run,
@@ -214,37 +310,11 @@ export function TestRun({
         />
       </StatCards>
       <BrokenFiles run={run} />
-      <Panel px="2" py="1">
-        <TableContainer aria-label="Tests in this run">
-          <TableHeader>
-            <TableRow _hover={{ bg: "transparent" }}>
-              <TableHead w="8rem" px="3" color="ink.muted">
-                Result
-              </TableHead>
-              <TableHead color="ink.muted">Test</TableHead>
-              <TableHead color="ink.muted" display={{ base: "none", lg: "table-cell" }}>
-                Replay cache
-              </TableHead>
-              <TableHead color="ink.muted" textAlign="right">
-                Time
-              </TableHead>
-              <TableHead>
-                <Span srOnly>Watch and run again</Span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody ref={list}>
-            {tests.map((test, i) => (
-              <TestLine
-                key={test.id}
-                test={test}
-                current={i === current}
-                picked={test.id === focus}
-              />
-            ))}
-          </TableBody>
-        </TableContainer>
-      </Panel>
+      <PanelTable label="Tests in this run" head={<TestRunHead />} bodyRef={list}>
+        {tests.map((test, i) => (
+          <TestLine key={test.id} test={test} current={i === current} picked={test.id === focus} />
+        ))}
+      </PanelTable>
     </Page>
   )
 }

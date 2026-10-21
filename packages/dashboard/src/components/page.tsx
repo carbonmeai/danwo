@@ -60,18 +60,37 @@ export function Page({
   title,
   detail,
   actions,
+  loading,
   children,
 }: {
   readonly crumbs: readonly ReactNode[]
   readonly title: ReactNode
   readonly detail?: ReactNode
   readonly actions?: ReactNode
+  /**
+   * What is loading, while the page's data does: the content is then its skeleton, a region
+   * marked busy under this name.
+   */
+  readonly loading?: string
   readonly children: ReactNode
 }) {
   return (
     <>
       <TopBar crumbs={crumbs} />
-      <Box maxW="1600px" mx="auto" px={{ base: "4", md: "8" }} pt="8" pb="24" w="full" minW="0">
+      <Box
+        maxW="1600px"
+        mx="auto"
+        px={{ base: "4", md: "8" }}
+        pt="8"
+        pb="24"
+        w="full"
+        minW="0"
+        {...(loading !== undefined && {
+          role: "region",
+          "aria-label": loading,
+          "aria-busy": true,
+        })}
+      >
         <HStack alignItems="flex-start" gap="4" mb="6" flexWrap="wrap">
           <Stack gap="1" minW="0" flex="1">
             <Heading

@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import { fetchLiveRun } from "../modules/live/live-api.ts"
 import type { MatrixView } from "../modules/matrix/matrix-run.tsx"
 import { RunPage } from "../modules/run/run-page.tsx"
+import { RunSkeleton } from "../modules/run/run-skeleton.tsx"
 import { fetchRun } from "../modules/runs/runs-api.ts"
 
 /** What a run's address can point at inside it: the matrix view, a test, a trial. */
@@ -51,4 +52,7 @@ export const Route = createFileRoute("/runs/$runId")({
     }
   },
   component: RunRoute,
+  pendingComponent: () => (
+    <RunSkeleton runId={Route.useParams().runId} view={Route.useSearch().view ?? "grid"} />
+  ),
 })

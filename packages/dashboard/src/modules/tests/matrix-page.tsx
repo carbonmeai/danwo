@@ -1,19 +1,20 @@
 import { HStack, Stack } from "@danwo/ui/jsx"
-import {
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@danwo/ui/primitives/table"
+import { TableCell, TableHead, TableRow } from "@danwo/ui/primitives/table"
 import { Span } from "@danwo/ui/primitives/typography"
 import { Link } from "@tanstack/react-router"
 
 import { Ident } from "../../components/code.tsx"
 import { Empty } from "../../components/empty-state.tsx"
 import { Page } from "../../components/page.tsx"
-import { Panel } from "../../components/panel.tsx"
+import { PanelTable } from "../../components/panel.tsx"
+import {
+  Bone,
+  BoneCell,
+  BoneRow,
+  ControlBone,
+  lineWidth,
+  Repeat,
+} from "../../components/skeleton.tsx"
 import { VerdictBadge } from "../../components/status-badge.tsx"
 import { RunMatrix } from "../live/run-actions.tsx"
 import { matrixWords } from "./test-values.ts"
@@ -54,6 +55,56 @@ function Latest({ row }: { readonly row: TestRow }) {
   )
 }
 
+/** The matrix table's header row. */
+function MatrixHead() {
+  return (
+    <>
+      <TableHead px="3" color="ink.muted">
+        Test
+      </TableHead>
+      <TableHead color="ink.muted">Latest matrix run</TableHead>
+      <TableHead color="ink.muted">Broke under</TableHead>
+      <TableHead>
+        <Span srOnly>Run the matrix</Span>
+      </TableHead>
+    </>
+  )
+}
+
+/** Rows enough to fill a tall window; the page scrolls past the rest once they load. */
+const SKELETON_ROWS = 14
+
+/** What the matrix does, under its title. */
+const MATRIX_DETAIL =
+  "danwo matrix records one clean run of a test, then replays it once per fault its providers could throw (a declined card, a 500, a duplicate webhook, a race), and checks the test's invariant after each."
+
+/** {@link MatrixPage} while the tests load: the same table, its rows as bones. */
+export function MatrixPageSkeleton() {
+  return (
+    <Page crumbs={["Matrix"]} title="Matrix" detail={MATRIX_DETAIL} loading="Loading the matrix">
+      <PanelTable label="Tests under the matrix" head={<MatrixHead />}>
+        <Repeat count={SKELETON_ROWS}>
+          {(i) => (
+            <BoneRow key={i}>
+              <BoneCell w="full" minW="16rem" px="3" whiteSpace="normal">
+                <Bone w={lineWidth(i)} />
+                <Repeat count={2}>
+                  {(line) => <Bone key={line} w="full" display={{ base: "block", md: "none" }} />}
+                </Repeat>
+              </BoneCell>
+              <BoneCell bone="6rem" />
+              <BoneCell bone="1rem" />
+              <BoneCell w="12rem">
+                <ControlBone w="8.75rem" />
+              </BoneCell>
+            </BoneRow>
+          )}
+        </Repeat>
+      </PanelTable>
+    </Page>
+  )
+}
+
 /**
  * The fault matrix across the suite: for each test, what its latest matrix run made of it and the
  * faults that broke it, with a way to run the matrix for any test.
@@ -64,11 +115,7 @@ export function MatrixPage({ rows }: { readonly rows: readonly TestRow[] }) {
   )
 
   return (
-    <Page
-      crumbs={["Matrix"]}
-      title="Matrix"
-      detail="danwo matrix records one clean run of a test, then replays it once per fault its providers could throw (a declined card, a 500, a duplicate webhook, a race), and checks the test's invariant after each."
-    >
+    <Page crumbs={["Matrix"]} title="Matrix" detail={MATRIX_DETAIL}>
       {rows.length === 0 ? (
         <Empty
           title="No tests yet"
@@ -76,49 +123,33 @@ export function MatrixPage({ rows }: { readonly rows: readonly TestRow[] }) {
           command="danwo matrix <test file>"
         />
       ) : (
-        <Panel px="2" py="1">
-          <TableContainer aria-label="Tests under the matrix">
-            <TableHeader>
-              <TableRow _hover={{ bg: "transparent" }}>
-                <TableHead px="3" color="ink.muted">
-                  Test
-                </TableHead>
-                <TableHead color="ink.muted">Latest matrix run</TableHead>
-                <TableHead color="ink.muted">Broke under</TableHead>
-                <TableHead>
-                  <Span srOnly>Run the matrix</Span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sorted.map((row) => (
-                <TableRow key={row.id} data-row>
-                  <TableCell minW="16rem" px="3" whiteSpace="normal">
-                    <Stack gap="0.5">
-                      <Span fontWeight="500" overflowWrap="anywhere">
-                        {row.id}
-                      </Span>
-                      {row.file ? (
-                        <Ident color="ink.muted" fontSize="1">
-                          {row.file}
-                        </Ident>
-                      ) : null}
-                    </Stack>
-                  </TableCell>
-                  <TableCell>
-                    <Latest row={row} />
-                  </TableCell>
-                  <TableCell whiteSpace="normal">
-                    <Faults row={row} />
-                  </TableCell>
-                  <TableCell w="12rem" textAlign="right">
-                    <RunMatrix testId={row.id} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </TableContainer>
-        </Panel>
+        <PanelTable label="Tests under the matrix" head={<MatrixHead />}>
+          {sorted.map((row) => (
+            <TableRow key={row.id} data-row>
+              <TableCell minW="16rem" px="3" whiteSpace="normal">
+                <Stack gap="0.5">
+                  <Span fontWeight="500" overflowWrap="anywhere">
+                    {row.id}
+                  </Span>
+                  {row.file ? (
+                    <Ident color="ink.muted" fontSize="1">
+                      {row.file}
+                    </Ident>
+                  ) : null}
+                </Stack>
+              </TableCell>
+              <TableCell>
+                <Latest row={row} />
+              </TableCell>
+              <TableCell whiteSpace="normal">
+                <Faults row={row} />
+              </TableCell>
+              <TableCell w="12rem" textAlign="right">
+                <RunMatrix testId={row.id} />
+              </TableCell>
+            </TableRow>
+          ))}
+        </PanelTable>
       )}
     </Page>
   )

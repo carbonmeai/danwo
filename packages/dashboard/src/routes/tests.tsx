@@ -5,6 +5,7 @@ import { useKeptQuery } from "../lib/kept-query.ts"
 import { verdictParam } from "../lib/whose.ts"
 import { fetchTests } from "../modules/tests/tests-api.ts"
 import { TestsPage } from "../modules/tests/tests-page.tsx"
+import { TestsSkeleton } from "../modules/tests/tests-skeleton.tsx"
 
 /** The test library's address: which file, whose failures, and what the filter holds. */
 interface TestsSearch {
@@ -43,4 +44,5 @@ export const Route = createFileRoute("/tests")({
   validateSearch: testsSearch,
   loader: () => fetchTests(),
   component: TestsRoute,
+  pendingComponent: TestsSkeleton,
 })

@@ -8,13 +8,14 @@ import {
   CollapsibleTrigger,
 } from "@danwo/ui/primitives/collapsible"
 import { Span, Text } from "@danwo/ui/primitives/typography"
-import { useRef } from "react"
+import { type ReactNode, useRef } from "react"
 
 import { Code, Ident } from "../../components/code.tsx"
-import { ListFilter } from "../../components/controls.tsx"
+import { ListFilter, ListFilterSkeleton } from "../../components/controls.tsx"
 import { Empty } from "../../components/empty-state.tsx"
 import { Page } from "../../components/page.tsx"
 import { ListRow, ListRows, Panel } from "../../components/panel.tsx"
+import { BlockBone, Bone, lineWidth, Repeat } from "../../components/skeleton.tsx"
 import { useFilter, useListKeys } from "../../lib/list-keys.ts"
 import type { ImpactRow } from "./impact-data.ts"
 
@@ -105,13 +106,7 @@ function ImpactLine({ row, current }: { readonly row: ImpactRow; readonly curren
       bg={current ? "surface.itemHover" : "surface.item"}
       boxShadow={current ? "inset 2px 0 0 {colors.ink.strong}" : undefined}
     >
-      <Grid
-        gridTemplateColumns={{
-          base: "1fr",
-          lg: "minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)",
-        }}
-        gap="4"
-      >
+      <ImpactColumns>
         <Span fontWeight="500" overflowWrap="anywhere" minW="0">
           {row.test}
         </Span>
@@ -132,8 +127,77 @@ function ImpactLine({ row, current }: { readonly row: ImpactRow; readonly curren
             <Calls calls={row.calls} />
           </Box>
         ) : null}
-      </Grid>
+      </ImpactColumns>
     </ListRow>
+  )
+}
+
+/** A test's row: the test, then what it touched in three columns, stacked on a phone. */
+function ImpactColumns({ children }: { readonly children: ReactNode }) {
+  return (
+    <Grid
+      gridTemplateColumns={{
+        base: "1fr",
+        lg: "minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)",
+      }}
+      gap="4"
+    >
+      {children}
+    </Grid>
+  )
+}
+
+/** The kinds of thing a test touches, as the row's columns name them. */
+const TOUCHED = ["Providers", "App routes", "Webhooks"] as const
+
+/** {@link ImpactLine} while the index loads: the test's name and each column's chips as bones. */
+function ImpactLineSkeleton({ i }: { readonly i: number }) {
+  return (
+    <ListRow data-skeleton-row py="3" _hover={{}}>
+      <ImpactColumns>
+        <Bone w={lineWidth(i)} />
+        {TOUCHED.map((label) => (
+          <Box key={label}>
+            <Label>{label}</Label>
+            <Stack gap="1" alignItems="flex-start">
+              <BlockBone w="7rem" h="5" rounded="md" />
+              <BlockBone w="5rem" h="5" rounded="md" />
+            </Stack>
+          </Box>
+        ))}
+      </ImpactColumns>
+    </ListRow>
+  )
+}
+
+/** What the impact index is, under its title. */
+function ImpactDetail() {
+  return (
+    <>
+      What each test touches behind the app. <Code>danwo test --changed</Code> picks tests from it.
+    </>
+  )
+}
+
+/** Rows enough to fill a tall window; the page scrolls past the rest once they load. */
+const SKELETON_ROWS = 6
+
+/** {@link ImpactPage} while the index loads: the same filter and rows, as bones. */
+export function ImpactSkeleton() {
+  return (
+    <Page
+      crumbs={["Impact"]}
+      title="Impact"
+      detail={<ImpactDetail />}
+      actions={<ListFilterSkeleton />}
+      loading="Loading the impact index"
+    >
+      <Panel px="1.5" py="1.5">
+        <ListRows>
+          <Repeat count={SKELETON_ROWS}>{(i) => <ImpactLineSkeleton key={i} i={i} />}</Repeat>
+        </ListRows>
+      </Panel>
+    </Page>
   )
 }
 
@@ -165,12 +229,7 @@ export function ImpactPage({ rows }: { readonly rows: readonly ImpactRow[] }) {
     <Page
       crumbs={["Impact"]}
       title="Impact"
-      detail={
-        <>
-          What each test touches behind the app. <Code>danwo test --changed</Code> picks tests from
-          it.
-        </>
-      }
+      detail={<ImpactDetail />}
       actions={
         <ListFilter
           label="Filter tests"

@@ -12,6 +12,7 @@ import { VerdictBadge } from "../../components/status-badge.tsx"
 import { TimeAgo } from "../../components/time-ago.tsx"
 import { duration, percent } from "../../lib/format.ts"
 import { LiveRuns } from "../live/live-runs.tsx"
+import { useKnownRuns } from "../run/known-runs.ts"
 import { type Day, type Figure, type Overview, RANGES, rangeOf } from "./overview-data.ts"
 
 /** How a figure moved against the window before, with the direction that is good for it. */
@@ -106,6 +107,8 @@ function DayLine({
 
 /** The runs worth a look: the window's failing runs, newest first. */
 function Failing({ overview }: { readonly overview: Overview }) {
+  useKnownRuns(overview.failing)
+
   return (
     <Section title="Worth a look" count={overview.failing.length}>
       {overview.failing.length === 0 ? (
@@ -164,6 +167,10 @@ function Broken({ overview }: { readonly overview: Overview }) {
   )
 }
 
+/** What the overview covers, under its title. */
+export const overviewDetail = (range: number): string =>
+  `The last ${range} days of danwo test and danwo matrix in this project`
+
 /**
  * The project at a glance: its pass rate, runs, failed tests and run time against the window
  * before, runs per day, the trends, the runs worth a look and the tests a fault breaks.
@@ -175,7 +182,7 @@ export function OverviewPage({ overview }: { readonly overview: Overview }) {
     <Page
       crumbs={["Overview"]}
       title="Overview"
-      detail={`The last ${overview.range} days of danwo test and danwo matrix in this project`}
+      detail={overviewDetail(overview.range)}
       actions={
         <Choice
           label="Date range"
