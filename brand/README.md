@@ -9,6 +9,7 @@ Colours: black #0A0A0A, white #FFFFFF.
 - On light backgrounds: `*-on-light` (black tile, white mark, black wordmark)
 - `danwo-glyph-*`: the two squares with no tile, for inline UI
 - `favicon.svg`, `favicon.ico`, `png/apple-touch-icon.png`, `png/icon-192.png`, `png/icon-512.png`: browser and app icons
+- `png/logomark/rounded/` and `png/logomark/square/`: the logomark on a rounded or square tile, on dark and on light, at 128, 256, 512 and 1024 px; `png/danwo-logomarks.zip` holds the same set as one download
 
 ## Web
 
