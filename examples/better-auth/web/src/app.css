@@ -1,0 +1,119 @@
+/* Harbor's own layout on top of the kit: the sign-in card, lists, stats and small type. */
+
+.text-sm {
+  font-size: var(--kit-text-sm);
+}
+
+.text-xs {
+  font-size: var(--kit-text-xs);
+}
+
+.loading {
+  padding: var(--kit-space-8);
+  color: var(--kit-fg-muted);
+}
+
+/* The sign-in and sign-up pages: the brand above one bordered card, its form beside a word on Harbor. */
+.auth {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kit-space-8);
+  padding: var(--kit-space-8) var(--kit-space-4);
+  background: var(--kit-bg-subtle);
+}
+
+.auth-card {
+  display: grid;
+  width: 100%;
+  max-width: 60rem;
+  gap: var(--kit-space-8);
+  border: 1px solid var(--kit-border);
+  border-radius: var(--kit-radius-2xl);
+  background: var(--kit-surface);
+  padding: var(--kit-space-8);
+}
+
+@media (min-width: 52rem) {
+  .auth-card {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    padding: var(--kit-space-12);
+  }
+}
+
+.auth-form {
+  max-width: 24rem;
+}
+
+.auth-form a {
+  color: var(--kit-fg);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.auth-aside {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--kit-space-4);
+}
+
+.auth-aside h2 {
+  font-size: var(--kit-text-3xl);
+  font-weight: var(--kit-weight-semibold);
+  letter-spacing: -0.02em;
+  line-height: var(--kit-leading-tight);
+}
+
+/* "or", between the provider buttons and the email form. */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: var(--kit-space-3);
+  color: var(--kit-fg-subtle);
+  font-size: var(--kit-text-xs);
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--kit-border);
+}
+
+/* A plain list in a card: a name on the left, a detail on the right. */
+.list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--kit-border);
+  border-radius: var(--kit-radius-lg);
+}
+
+.list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kit-space-4);
+  padding: var(--kit-space-3) var(--kit-space-4);
+}
+
+.list li + li {
+  border-top: 1px solid var(--kit-border);
+}
+
+.stats {
+  display: grid;
+  gap: var(--kit-space-4);
+}
+
+@media (min-width: 40rem) {
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.stats .stat {
+  padding: var(--kit-space-5);
+}

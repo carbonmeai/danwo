@@ -1,0 +1,47 @@
+{
+  "name": "danwo-example-better-auth",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Self-hosted sign-in with Better Auth: a Vite and React app, a Hono API on Postgres, emailed codes through Resend, and Google and GitHub sign-in, all emulated.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite web",
+    "dev:api": "node --watch api/server.ts",
+    "build": "vite build web",
+    "start": "node api/server.ts",
+    "migrate": "node api/migrate.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p web",
+    "test": "danwo test",
+    "test:agentic": "danwo test tests/agentic.danwo.ts",
+    "matrix": "danwo matrix tests/deterministic.danwo.ts --grep \"signs up with an emailed code\"",
+    "matrix:plan": "danwo matrix tests/deterministic.danwo.ts --grep \"signs up with an emailed code\" --plan",
+    "matrix:link": "danwo matrix tests/deterministic.danwo.ts --grep \"links GitHub\"",
+    "matrix:password": "danwo matrix tests/deterministic.danwo.ts --grep \"signs up with a password\"",
+    "serve": "danwo serve"
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.5",
+    "better-auth": "1.7.12",
+    "hono": "4.13.13",
+    "pg": "8.23.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-router": "8.5.0",
+    "resend": "6.34.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@danwo/cli": "0.1.0-beta.0",
+    "@danwo/sdk": "0.1.0-beta.0",
+    "@types/node": "^24",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "typescript": "5.9.3",
+    "vite": "8.3.5"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

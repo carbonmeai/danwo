@@ -1,0 +1,18 @@
+{
+  "name": "Login with Better Auth",
+  "summary": "Self-hosted sign-in with Better Auth: a Vite and React app on a Hono API and Postgres, with emailed codes through Resend, Google and GitHub sign-in, a password with a confirmed email, linked accounts and signed-in devices.",
+  "icon": "better-auth.svg",
+  "iconDark": "better-auth-on-dark.svg",
+  "stack": ["Vite", "React Router", "Hono", "Better Auth", "Postgres"],
+  "providers": ["resend", "google", "github"],
+  "runsOn": "A Vite and React app served by a Hono API in Chromium, with Postgres in Docker",
+  "install": "npm",
+  "shows": [
+    "Better Auth's own sessions, accounts and codes in your Postgres, read by invariants: one user per person, one account per provider link, signed-out sessions gone, one email per code",
+    "Emailed codes read with `mail.code`, Google's and GitHub's consent screens with no real app, a confirmation link read with `mail.link`, and a second browser signed out from the first",
+    "Brute force refused: a fourth code request in five minutes gets a 429, three wrong guesses kill the code, and `time.travel` expires it",
+    "`danwo matrix` faulting Resend, GitHub's token endpoint and Better Auth's own SQL, with `BETTER_AUTH_BUG` switches that turn a safeguard off"
+  ],
+  "test": "tests/deterministic.danwo.ts",
+  "guide": { "title": "Email and 2FA codes", "href": "/docs/email-and-otp" }
+}
