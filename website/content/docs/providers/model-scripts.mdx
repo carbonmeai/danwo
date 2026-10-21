@@ -79,15 +79,29 @@ An `error` comes back in the provider's own shape and status, as the matrix's fa
 with `Retry-After`, a 500, or a 503 (529 on Anthropic). A list makes a test's retries exact:
 
 ```ts title="tests/busy.danwo.ts"
-llmScripts(llm).add({
-  match: { user: /where is my order/i },
-  /* The first three calls are rate-limited, the fourth answers. */
-  reply: [
-    { error: "rate-limit" },
-    { error: "rate-limit" },
-    { error: "rate-limit" },
-    { text: "It ships today." },
-  ],
+import { type LlmFixtures, llmScripts, test as base } from "@danwo/sdk"
+
+const test = base.extend<LlmFixtures>()
+
+test("says the assistant is busy, and answers on retry", async ({ app, screen, expect, llm }) => {
+  llmScripts(llm).add({
+    match: { user: /where is my order/i },
+    /* The first three calls are rate-limited, the fourth answers. */
+    reply: [
+      { error: "rate-limit" },
+      { error: "rate-limit" },
+      { error: "rate-limit" },
+      { text: "It ships today." },
+    ],
+  })
+
+  await app.open("/assistant")
+  await screen.getByLabel("Ask").fill("Where is my order?")
+  await screen.getByRole("button", { name: "Send" }).click()
+  await expect(screen.getByText("The assistant is busy")).toBeVisible()
+
+  await screen.getByRole("button", { name: "Retry" }).click()
+  await expect(screen.getByText("It ships today.")).toBeVisible()
 })
 ```
 
