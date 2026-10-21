@@ -345,6 +345,23 @@ program
   })
 
 program
+  .command("install-browser")
+  .description(
+    "install the Chromium build danwo drives, with danwo's own Playwright, once per machine; other Playwright installs' browsers are kept",
+  )
+  .option("--with-deps", "also install the system libraries Chromium needs (Linux)")
+  .option(
+    "--only-shell",
+    "only the headless shell test runs use (smaller, for CI); not for danwo record",
+  )
+  .option("--dry-run", "say what would be installed, and install nothing")
+  .action(async (options: { withDeps?: boolean; onlyShell?: boolean; dryRun?: boolean }) => {
+    const { installBrowser } = await import("@danwo/runner")
+
+    process.exitCode = await installBrowser(options)
+  })
+
+program
   .command("record")
   .description(
     "record a test by using the app in a browser: locators for each action, what it caused behind the app, and a drafted invariant",

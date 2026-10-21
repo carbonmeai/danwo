@@ -65,7 +65,7 @@ Treat a likely verdict as where to look first, not as proof.
 | `AGENT_LOOPING`, `BUDGET_EXCEEDED`          | the step instruction is too vague or the page changed; split the step or use locators                                                                |
 | `MODEL_OUTPUT_INVALID`, `MODEL_UNAVAILABLE` | the model provider, not the app; retry or change model                                                                                               |
 | `MODEL_REFUSED`                             | the model declined the step (a refusal or a content filter) and was not asked again; reword the step or run it on another model; the app is untested |
-| `BROWSER_FAILED`, `ENVIRONMENT_FAILED`      | the browser or the environment hook: app start-up, emulators, ports; no Chromium: `npx playwright-core install chromium`                             |
+| `BROWSER_FAILED`, `ENVIRONMENT_FAILED`      | the browser or the environment hook: app start-up, emulators, ports; no Chromium: `npx @danwo/cli install-browser`                                   |
 | `CONFIG_INVALID`                            | the config or the call named in the message                                                                                                          |
 
 `danwo spec --topic errors` lists every code with its class and exit code. `danwo cache ls`,

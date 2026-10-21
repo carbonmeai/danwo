@@ -328,7 +328,7 @@
         "@playwright/test": "1.64.1",
       },
       "peerDependencies": {
-        "@playwright/test": "1.64.1",
+        "@playwright/test": ">=1.60.0 <2",
       },
     },
     "packages/proxy": {

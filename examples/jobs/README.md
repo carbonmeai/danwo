@@ -64,7 +64,7 @@ The first run builds the page (`vite build web`) and pulls `postgres:17-alpine`.
 starts its own Postgres container and pushes the schema with `drizzle-kit push`, starts its own
 Inngest dev server (`inngest-cli`, a dev dependency), and starts the worker, the API and
 `vite preview` behind danwo's proxy; it removes them all when it ends. If Chromium is missing,
-danwo tells you to run `npx playwright-core install chromium`.
+danwo tells you to run `npx @danwo/cli install-browser`.
 
 The scripts:
 

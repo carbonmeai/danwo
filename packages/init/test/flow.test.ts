@@ -115,6 +115,7 @@ describe("danwo init without prompts", () => {
     expect(await read(root, ".vscode/mcp.json")).toContain('"type": "stdio"')
     expect(run.calls).toEqual([
       ["pnpm", "add", "-D", "@danwo/cli", "@danwo/sdk", "@ai-sdk/anthropic@4.0.82"],
+      ["pnpm", "exec", "danwo", "install-browser"],
     ])
     expect(await read(root, "danwo.config.ts")).toContain('model: anthropic("claude-sonnet-5")')
     expect(existsSync(join(root, ".claude/skills/danwo/SKILL.md"))).toBe(true)
@@ -123,7 +124,8 @@ describe("danwo init without prompts", () => {
     expect(existsSync(join(root, ".cursor/mcp.json"))).toBe(false)
     expect(summary).toContain("added: pnpm add -D @danwo/cli")
     expect(summary).toContain("Set ANTHROPIC_API_KEY for Anthropic")
-    expect(summary).toContain("once per machine: pnpm exec playwright-core install chromium")
+    expect(summary).toContain("browser: pnpm exec danwo install-browser")
+    expect(summary).not.toContain("once per machine")
     expect(summary).toContain(
       "Run the example: pnpm test:danwo. danwo starts `pnpm dev` at http://localhost:3000 with Stripe emulated.",
     )
@@ -190,9 +192,13 @@ describe("danwo init without prompts", () => {
 
     expect(run.calls).toEqual([
       ["npm", "install", "-D", "@danwo/cli", "@danwo/sdk", "@types/node@^24"],
+      ["npx", "@danwo/cli", "install-browser"],
     ])
     expect(skipped.summary).toContain(
       "not installed: run npm install -D @danwo/cli @danwo/sdk @types/node@^24",
+    )
+    expect(skipped.summary).toContain(
+      "Install the Chromium danwo drives, once per machine: npx @danwo/cli install-browser",
     )
   })
 
@@ -210,7 +216,7 @@ describe("danwo init without prompts", () => {
     for (const cwd of [typed, plain])
       await runInit({ cwd, flags, env: {}, run, checkDevice: noDevice })
 
-    expect(run.calls).toEqual([
+    expect(run.calls.filter((argv) => argv[0] === "npm")).toEqual([
       ["npm", "install", "-D", "@danwo/cli", "@danwo/sdk"],
       ["npm", "install", "-D", "@danwo/cli", "@danwo/sdk"],
     ])
@@ -342,6 +348,26 @@ describe("danwo init at the prompts", () => {
 })
 
 describe("installing", () => {
+  it("installs no browser after a failed package install, and says how to", async () => {
+    const root = await project({ "package.json": nextApp() })
+    const calls: string[][] = []
+    const { result, summary } = await runInit({
+      cwd: root,
+      flags: { yes: true, modelSource: "none", skills: "none" },
+      env: {},
+      run: async (argv) => {
+        calls.push([...argv])
+
+        return { ok: false, output: "ERR! 404" }
+      },
+      checkDevice: noDevice,
+    })
+
+    expect(calls).toHaveLength(1)
+    expect(result.browser).toBeUndefined()
+    expect(summary).toContain("once per machine: npx @danwo/cli install-browser")
+  })
+
   it("uses each package manager's own command, with pinned versions", () => {
     const specs = [
       { name: "@danwo/sdk", version: "latest" },

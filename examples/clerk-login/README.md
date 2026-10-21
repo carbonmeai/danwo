@@ -59,7 +59,7 @@ Running 11 tests with 2 workers
 The first run builds the app (`next build`) and pulls `postgres:17-alpine`. Each worker then
 starts its own Postgres container, the Clerk and Google emulators and `next start`, and removes
 them when it ends. If Chromium is missing, danwo tells you to run
-`npx playwright-core install chromium`.
+`npx @danwo/cli install-browser`.
 
 The scripts:
 

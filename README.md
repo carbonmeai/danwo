@@ -48,7 +48,7 @@ You need Node.js 24 or newer. In your app's folder:
 
 ```sh
 npx @danwo/cli init
-npx playwright-core install chromium
+npx @danwo/cli install-browser
 npm run test:danwo
 ```
 

@@ -33,7 +33,7 @@ describe("a machine without danwo's Chromium", () => {
   it("is told the install command for the build danwo drives", async () => {
     const message = await launchWithoutBrowsers()
 
-    expect(message).toContain("npx playwright-core install chromium")
+    expect(message).toContain("npx @danwo/cli install-browser")
     expect(message).not.toContain("npx playwright install")
     expect(codeOf(new Error(message))).toBe("BROWSER_FAILED")
   }, 30_000)

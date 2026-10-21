@@ -23,11 +23,15 @@ Set up a config, write one `*.danwo.ts` file, run it and read the result.
    project of its own. When the package has no agent folders (`.claude`, `.cursor`, `.codex`, …)
    but a folder above it in the workspace does, the skill and MCP server are written there, with
    an MCP command that finds the package's config (`pnpm --dir <path> exec danwo mcp`, else
-   `npx @danwo/cli mcp --config <path>/danwo.config.ts`). For a browser engine, install
-   the Chromium danwo drives once per machine with `npx playwright-core install chromium`
-   (`--with-deps` on Linux), not `npx playwright install`, which can fetch a newer Playwright
-   whose Chromium does not match; a launch that finds no browser fails `BROWSER_FAILED` naming
-   that command.
+   `npx @danwo/cli mcp --config <path>/danwo.config.ts`). For a browser engine, init then
+   runs `danwo install-browser` with the project's package manager (`npx @danwo/cli install-browser`,
+   `pnpm exec danwo install-browser`, …), which installs the Chromium build danwo's own
+   `playwright-core` drives, once per machine (`--with-deps` on Linux for the system libraries,
+   `--only-shell` for the smaller headless-only download in CI; `danwo record` needs the full
+   browser). It keeps the browsers other Playwright installs use (`--no-remove`). Not
+   `npx playwright install` or `npx playwright-core install`: they run whichever Playwright the
+   project resolves first, whose Chromium revision may not match. A launch that finds no browser
+   fails `BROWSER_FAILED` naming `npx @danwo/cli install-browser`.
 
    The config it writes starts the app with its dev command through danwo's proxy, with the
    chosen providers emulated (`APP_URL` set instead tests an app that already runs):

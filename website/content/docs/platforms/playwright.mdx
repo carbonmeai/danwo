@@ -8,6 +8,16 @@ Already have a Playwright suite? You don't have to rewrite it. `@danwo/playwrigh
 Playwright tests behind danwo's proxy and emulators, adds invariants, and runs the fault matrix
 over a Playwright test.
 
+## Install it
+
+```sh
+npm install -D @danwo/playwright
+```
+
+It works with `@playwright/test` 1.60 or newer, so you keep the version you have. The browser is
+your own Playwright's, launched behind danwo's proxy. Install it the way you already do, with
+`npx playwright install chromium`.
+
 ## Point Playwright at your danwo config
 
 ```ts title="playwright.config.ts"

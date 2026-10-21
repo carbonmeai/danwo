@@ -40,19 +40,40 @@ function proxyFlags(proxy: BrowserProxy | undefined, extra?: BrowserFlags): Brow
   }
 }
 
+/**
+ * The launch options that put any Playwright's browser behind `proxy`: its server, and the flag
+ * that trusts the proxy's CA. Playwright Test suites launch their own Playwright's Chromium with
+ * these, so danwo never hands them a browser from another Playwright version.
+ */
+export function proxyLaunchOptions(proxy: BrowserProxy | undefined): {
+  proxy?: { server: string; bypass?: string }
+  args?: string[]
+} {
+  const flags = proxyFlags(proxy)
+
+  return {
+    ...(flags.proxy && { proxy: { ...flags.proxy } }),
+    ...(flags.args && { args: [...flags.args] }),
+  }
+}
+
 /** What Playwright says when the Chromium build it expects was never downloaded. */
 const NOT_INSTALLED = /Executable doesn't exist/
+
+/** The command that installs the Chromium build danwo drives. */
+export const INSTALL_BROWSER_COMMAND = "npx @danwo/cli install-browser"
 
 /**
  * Playwright's own advice for a missing browser is `npx playwright install`, which in a project
  * without the `playwright` package fetches its newest release, whose Chromium may not be the build
- * danwo's Playwright drives. The fix named here installs the build danwo needs.
+ * danwo's Playwright drives; `npx playwright-core install` runs whichever `playwright-core` the
+ * project resolves first. The fix named here runs danwo's own copy.
  */
 function missingBrowser(error: unknown): unknown {
   if (!(error instanceof Error) || !NOT_INSTALLED.test(error.message)) return error
 
   return new Error(
-    "browserType.launch: Chromium is not installed for danwo. Run `npx playwright-core install chromium` in the project (with --with-deps on Linux, for the system libraries it needs).",
+    `browserType.launch: Chromium is not installed for danwo. Run \`${INSTALL_BROWSER_COMMAND}\` in the project (add --with-deps on Linux, for the system libraries it needs).`,
     { cause: error },
   )
 }

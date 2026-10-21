@@ -13,7 +13,8 @@ date: 2026-10-20
 - Every package declares Node.js 24, and `danwo` on an older Node says so and exits instead of failing on a missing export.
 - `danwo --version` prints the version, and `danwo init` installs danwo's packages at that version rather than the latest. It also adds `@types/node` to a TypeScript project that lacks it.
 - `danwo init` in a monorepo package installs with the workspace's package manager (pnpm, npm, Yarn or Bun) into that package, adds `-w` at a pnpm root, and writes the skill and MCP server where the coding agent's folders are.
-- Install danwo's Chromium with `npx playwright-core install chromium`. `init` says so in its next steps, and a launch that finds no browser names that command.
+- `danwo install-browser` installs the Chromium build danwo drives with danwo's own Playwright, keeping other installs' browsers. `init` runs it after the packages, and a launch that finds no browser names it.
+- `@danwo/playwright` takes any `@playwright/test` from 1.60 to 1.x as its peer, and launches the suite's own Playwright's browser behind danwo's proxy.
 - Every published package ships its type declarations, so `tsc` checks your tests against danwo's types.
 - The published dashboard is prebuilt: `danwo serve` runs without Vite.
 - The proxy's fix for mockttp's local port check ships with the package; a mockttp version without that check gets one warning instead of a proxy that won't start.

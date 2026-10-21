@@ -10,7 +10,7 @@ import { stripVTControlCharacters } from "node:util"
 
 import type { ServiceDelivery } from "@danwo/matrix"
 import type { Exchange, Proxy } from "@danwo/proxy"
-import { launchBrowser } from "@danwo/runner"
+import { proxyLaunchOptions } from "@danwo/runner"
 import { FaultBench, type NamedFault } from "@danwo/runner/runner"
 import {
   test as base,
@@ -201,12 +201,20 @@ const fixtures = base.extend<
     },
     { scope: "worker" },
   ],
+  /*
+   * The suite's own Playwright launches the browser, so its Chromium build, its tracing and its
+   * screenshots all match the `@playwright/test` the project installed; danwo only adds its proxy
+   * and the flag that trusts the proxy's CA.
+   */
   browser: [
-    async ({ danwoWorker, launchOptions }, use) => {
+    async ({ danwoWorker, playwright, browserName, launchOptions }, use) => {
       const proxy = danwoWorker.env.proxy
-      const browser = await launchBrowser({
+      const behind = proxyLaunchOptions(proxy && { url: proxy.url, caSpki: proxy.caSpki })
+      const browser = await playwright[browserName].launch({
+        ...launchOptions,
         headless: launchOptions.headless ?? true,
-        ...(proxy && { proxy: { url: proxy.url, caSpki: proxy.caSpki } }),
+        ...(behind.proxy && { proxy: behind.proxy }),
+        args: [...(launchOptions.args ?? []), ...(behind.args ?? [])],
       })
 
       try {

@@ -12,11 +12,13 @@ import { AGENT_INFO, type PackageSpec } from "./catalog.ts"
 import type { Detection } from "./detect.ts"
 import { type FileResult, type PlannedFile, writeFiles } from "./files.ts"
 import {
+  browserCommand,
   type InstallResult,
   installPackages,
   packagesToAdd,
   type Runner,
   runCommand,
+  runPlanned,
 } from "./install.ts"
 
 /** A file the agent setup touched; `kept` is a skill copy the user edited. */
@@ -32,6 +34,8 @@ export interface SetupResult {
   readonly install: InstallResult | undefined
   /** Packages to add by hand, when installing was turned off. */
   readonly notInstalled: readonly PackageSpec[]
+  /** danwo's Chromium, installed after the packages for a browser engine; undefined when not tried. */
+  readonly browser: InstallResult | undefined
 }
 
 /** The skill folders and MCP client files the chosen agents read. */
@@ -101,6 +105,11 @@ export async function applyAnswers(
     answers.install && packages.length > 0
       ? await installPackages(detection, packages, run)
       : undefined
+  const web = answers.engine === "web" || answers.engine === "both"
+  const browser =
+    answers.install && web && install?.ok !== false
+      ? await runPlanned(browserCommand(detection), detection.root, run)
+      : undefined
 
-  return { files, agentFiles, install, notInstalled: answers.install ? [] : packages }
+  return { files, agentFiles, install, notInstalled: answers.install ? [] : packages, browser }
 }

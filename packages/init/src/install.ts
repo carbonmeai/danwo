@@ -79,6 +79,31 @@ export function installCommand(
     : { argv, cwd: detection.root }
 }
 
+/**
+ * How each package manager runs the project's danwo. A runner that falls back to the registry
+ * names the scoped package, since `danwo` there is someone else's; `pnpm exec` and `yarn` only
+ * run what the project installed.
+ */
+const DANWO: Readonly<Record<PackageManager, readonly string[]>> = {
+  npm: ["npx", "@danwo/cli"],
+  bun: ["bunx", "@danwo/cli"],
+  pnpm: ["pnpm", "exec", "danwo"],
+  yarn: ["yarn", "danwo"],
+}
+
+/**
+ * The command that installs the Chromium build danwo drives, with the project's own danwo: its
+ * Playwright's build, whatever other Playwright the project has.
+ */
+export function browserCommand(
+  detection: Pick<Detection, "root" | "packageManager">,
+): PlannedCommand {
+  return {
+    argv: [...DANWO[detection.packageManager], "install-browser"],
+    cwd: detection.root,
+  }
+}
+
 /** A planned command as a person would type it, from the project's folder. */
 export function commandLine(command: PlannedCommand, from: string): string {
   const where = relative(from, command.cwd)
@@ -122,7 +147,7 @@ export const runCommand: Runner = (argv, cwd) =>
   })
 
 /** Runs `command` and says how it went, from the project's folder `from`. */
-async function runPlanned(
+export async function runPlanned(
   command: PlannedCommand,
   from: string,
   run: Runner = runCommand,

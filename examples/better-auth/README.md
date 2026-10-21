@@ -67,7 +67,7 @@ The first run builds the web app (`vite build web`) and pulls `postgres:17-alpin
 then starts its own Postgres container, makes Better Auth's tables with the app's own
 `npm run migrate`, starts the Resend, Google and GitHub emulators and the API, and removes them
 all when it ends. If Chromium is missing, danwo tells you to run
-`npx playwright-core install chromium`.
+`npx @danwo/cli install-browser`.
 
 The scripts:
 

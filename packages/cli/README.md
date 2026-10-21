@@ -8,7 +8,7 @@ Set it up in your app's folder (Node.js 24 or later):
 
 ```sh
 npx @danwo/cli init
-npx playwright-core install chromium
+npx @danwo/cli install-browser
 npm run test:danwo
 ```
 

@@ -74,14 +74,15 @@ there too.
 
 ### Install the browser
 
-If your tests drive a browser, danwo needs its own Chromium. Install it once per machine:
+If your tests drive a browser, danwo needs its own Chromium. init installs it for you after the
+packages. With `--skip-install`, or on a new machine, install it yourself:
 
 ```sh
-npx playwright-core install chromium
+npx @danwo/cli install-browser
 ```
 
-Use `playwright-core` here. The plain `npx playwright install` can fetch a newer Playwright whose
-Chromium doesn't match. On Linux, add `--with-deps` for the system libraries.
+This runs danwo's own Playwright, so you get the Chromium build danwo drives, whatever Playwright
+your project has. On Linux, add `--with-deps` for the system libraries.
 
 </Step>
 <Step>
