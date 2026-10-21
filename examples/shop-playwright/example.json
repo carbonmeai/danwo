@@ -1,0 +1,16 @@
+{
+  "name": "Shop with Playwright",
+  "summary": "The shop's purchase test written for Playwright Test, with danwo's emulators, invariant and fault matrix.",
+  "icon": "playwright.svg",
+  "stack": ["Playwright Test", "Node.js"],
+  "providers": ["stripe"],
+  "runsOn": "Playwright Test in Chromium",
+  "install": "workspace",
+  "shows": [
+    "An existing Playwright test given danwo's emulators and flight record",
+    "The invariant declared with `test.invariant`",
+    "`danwo-playwright matrix` running the fault matrix over a Playwright test"
+  ],
+  "test": "tests/buy-credits.spec.ts",
+  "guide": { "title": "Playwright Test", "href": "/docs/playwright" }
+}

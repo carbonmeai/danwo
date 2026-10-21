@@ -1,0 +1,18 @@
+{
+  "name": "Shop on Android",
+  "summary": "An Expo app that buys credits through Stripe Checkout in a Custom Tab; danwo tests it on an Android emulator.",
+  "icon": "expo.svg",
+  "iconDark": "expo-on-dark.svg",
+  "stack": ["Expo", "React Native", "Android"],
+  "providers": ["stripe"],
+  "runsOn": "An Expo app on an Android emulator",
+  "install": "workspace",
+  "shows": [
+    "The same Stripe emulator behind an Android emulator bound to danwo's proxy",
+    "Checkout in a Custom Tab, read with the same locators as the app",
+    "Agent steps recorded once and replayed with no model",
+    "Parallel emulators, one per worker"
+  ],
+  "test": "tests/buy-credits.danwo.ts",
+  "guide": { "title": "Mobile", "href": "/docs/mobile" }
+}

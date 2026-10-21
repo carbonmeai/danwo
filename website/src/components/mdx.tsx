@@ -25,9 +25,25 @@ function PageLink(props: ComponentProps<"a">) {
   return <defaultMdxComponents.a {...props} />
 }
 
+/** A row of small labels, such as an example's stack. */
+function Badges({ items }: { readonly items: readonly string[] }) {
+  return (
+    <span className="not-prose my-2 flex flex-wrap gap-1.5">
+      {items.map((item) => (
+        <span
+          key={item}
+          className="inline-flex h-5 items-center rounded-full border border-fd-border bg-fd-muted px-2 text-xs font-medium text-fd-muted-foreground"
+        >
+          {item}
+        </span>
+      ))}
+    </span>
+  )
+}
+
 /**
  * The components MDX pages can use: the docs defaults (cards, callouts, code blocks), steps,
- * tabs, and danwo's diagrams.
+ * tabs, badges, and danwo's diagrams.
  */
 export function useMdxComponents(components?: MDXComponents) {
   return {
@@ -37,6 +53,7 @@ export function useMdxComponents(components?: MDXComponents) {
     Steps,
     Tab,
     Tabs,
+    Badges,
     HowItWorks,
     MatrixFlow,
     AwsRouting,

@@ -1,0 +1,17 @@
+{
+  "name": "Shop",
+  "summary": "A small app that sells credits through Stripe Checkout; danwo tests itself against it.",
+  "icon": "nodejs.svg",
+  "stack": ["Node.js"],
+  "providers": ["stripe"],
+  "runsOn": "A Node web app in Chromium",
+  "install": "workspace",
+  "shows": [
+    "Stripe Checkout and its webhook through the Stripe emulator, with no app code changes",
+    "An invariant: the credits granted equal the credits Stripe was paid for",
+    "`danwo matrix` breaking the purchase with a duplicated webhook",
+    "Snapshots and restores between matrix runs, so no run restarts the app"
+  ],
+  "test": "tests/buy-credits.danwo.ts",
+  "guide": { "title": "Fault matrix", "href": "/docs/fault-matrix" }
+}

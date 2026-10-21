@@ -205,7 +205,7 @@ const BUILDERS: {
 
     if (!found) throw new Error(`no example "${source.example}" for the docs`)
 
-    return ["md", examplePage(found)]
+    return ["mdx", examplePage(found)]
   },
 }
 
