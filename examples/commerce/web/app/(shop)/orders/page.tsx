@@ -20,9 +20,9 @@ export default async function MyOrders({ searchParams }: Props) {
     <div className="mx-auto max-w-2xl">
       <PageTitle title="My orders" />
       <form method="get" className="mb-6 flex items-end gap-3">
-        <label className="flex flex-1 flex-col gap-1 text-[13px] text-muted">
+        <label className="flex flex-1 flex-col gap-1 text-sm text-muted">
           Email you paid with
-          <input type="email" name="email" required defaultValue={email} className="field" />
+          <input type="email" name="email" required defaultValue={email} className="input" />
         </label>
         <button type="submit" className="btn btn-secondary">
           Find orders

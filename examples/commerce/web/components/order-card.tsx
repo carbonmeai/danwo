@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui"
 import type { Order } from "@/lib/api"
 import { money, STATUS_LABEL, when } from "@/lib/format"
 
-const TONE = { paid: "ok", refunding: "warn", refunded: "neutral" } as const
+const TONE = { paid: "success", refunding: "warning", refunded: "neutral" } as const
 
 export function StatusBadge({ status }: { readonly status: Order["status"] }) {
   return <Badge tone={TONE[status]}>{STATUS_LABEL[status]}</Badge>
@@ -17,11 +17,11 @@ export function OrderCard({ order }: { readonly order: Order }) {
           <h2 className="font-semibold" data-testid="order-number">
             Order {order.number}
           </h2>
-          <p className="text-[13px] text-muted">{when(order.createdAt)}</p>
+          <p className="text-sm text-muted">{when(order.createdAt)}</p>
         </div>
         <StatusBadge status={order.status} />
       </header>
-      <ul className="mt-4 divide-y divide-line border-y border-line text-[13px]">
+      <ul className="mt-4 divide-y divide-border border-y border-border text-sm">
         {order.lines.map((line) => (
           <li key={line.name} className="flex justify-between py-2">
             <span>

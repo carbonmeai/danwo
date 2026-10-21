@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import type { ReactNode } from "react"
 
 const LINKS = [
   { href: "/admin/orders", label: "Orders", icon: "M4 6h16M4 12h16M4 18h10" },
@@ -13,35 +14,46 @@ export function AdminNav() {
   const path = usePathname()
 
   return (
-    <nav aria-label="Admin" className="flex flex-col gap-0.5">
-      {LINKS.map((link) => {
-        const current = path.startsWith(link.href)
-
-        return (
-          <Link
-            key={link.href}
-            href={link.href}
-            aria-current={current ? "page" : undefined}
-            className={`flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] ${
-              current
-                ? "bg-surface font-medium text-ink shadow-card"
-                : "text-muted hover:bg-subtle hover:text-ink"
-            }`}
+    <nav aria-label="Admin" className="shell-nav">
+      <span className="shell-nav-label">Shop admin</span>
+      {LINKS.map((link) => (
+        <Link
+          key={link.href}
+          href={link.href}
+          aria-current={path.startsWith(link.href) ? "page" : undefined}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="size-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            aria-hidden="true"
           >
-            <svg
-              viewBox="0 0 24 24"
-              className="size-4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              aria-hidden="true"
-            >
-              <path d={link.icon} strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            {link.label}
-          </Link>
-        )
-      })}
+            <path d={link.icon} strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          {link.label}
+        </Link>
+      ))}
     </nav>
+  )
+}
+
+/** The bar over an admin page: where it is, and the page's own actions. */
+export function AdminTopbar({
+  page,
+  children,
+}: {
+  readonly page: string
+  readonly children?: ReactNode
+}) {
+  return (
+    <header className="shell-topbar">
+      <nav className="breadcrumb" aria-label="Breadcrumb">
+        <span>Admin</span>
+        <span aria-current="page">{page}</span>
+      </nav>
+      {children}
+    </header>
   )
 }

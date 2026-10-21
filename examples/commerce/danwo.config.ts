@@ -10,7 +10,7 @@ import {
 
 import { CATALOG, IMAGES_BUCKET, imageKey, imageOf } from "./seed/catalog.ts"
 import { sqlOn } from "./tests/db.ts"
-import { freePort, ROOT, seedDatabase, workerDatabase } from "./tests/environment.ts"
+import { ensureBuilt, freePort, ROOT, seedDatabase, workerDatabase } from "./tests/environment.ts"
 import { buy, CUSTOMER } from "./tests/shop.ts"
 
 /** Not a real key: the emulators accept any well-formed one. */
@@ -26,7 +26,10 @@ export default defineConfig({
    * the webhooks they caused, so no test waits or settles by hand.
    */
   readiness: { mode: "page+backend", settle: true },
+  /* The model agent steps run on. Its key is read from AI_GATEWAY_API_KEY; without one they skip. */
   model: "anthropic/claude-sonnet-5",
+  /* Verified agent steps are kept here and replayed with no model call; git ignores the folder. */
+  cache: { dir: ".danwo/cache" },
   sessions: {
     /** A customer who has bought a speckled mug already, for the refund and "my orders" tests. */
     "returning-customer": {
@@ -37,12 +40,15 @@ export default defineConfig({
   },
   matrix: { workers: 4, budget: 90 },
   async environment({ workerIndex }) {
+    await ensureBuilt()
+
     const [web, api] = await Promise.all([freePort(), freePort()])
     const apiUrl = `http://127.0.0.1:${api}`
     const webUrl = `http://127.0.0.1:${web}`
 
     /* The shop's own database, behind danwo's data proxy so the matrix can fault its statements. */
-    const database = await workerDatabase(workerIndex)
+    const worker = await workerDatabase(workerIndex)
+    const database = worker.url
     const postgres = await startPostgresProxy({ upstream: database })
     const rows = postgresSnapshot({ url: database, strategy: "rows" })
 
@@ -109,7 +115,7 @@ export default defineConfig({
           cwd: ROOT,
           url: webUrl,
           dependsOn: ["api"],
-          env: { API_URL: apiUrl, SHOP_URL: webUrl },
+          env: { API_URL: apiUrl, SHOP_URL: webUrl, NEXT_TELEMETRY_DISABLED: "1" },
         },
       ],
     })
@@ -137,8 +143,8 @@ export default defineConfig({
       },
       async close() {
         await stack.close()
-        await rows.close()
-        await postgres.close()
+        await Promise.allSettled([rows.close(), postgres.close()])
+        await worker.close()
       },
     }
   },

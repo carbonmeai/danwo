@@ -25,7 +25,7 @@ export default async function Confirmed({ searchParams }: Props) {
     return (
       <div className="mx-auto max-w-lg">
         <AutoRefresh ms={1000} />
-        <h1 className="text-[22px] font-semibold">
+        <h1 className="text-xl font-semibold">
           {payment.state === "paid" ? "Confirming your order…" : "Waiting for your payment…"}
         </h1>
         <p className="mt-2 text-muted">This takes a few seconds. You can keep this page open.</p>
@@ -37,9 +37,9 @@ export default async function Confirmed({ searchParams }: Props) {
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-6">
       <div>
-        <h1 className="text-[22px] font-semibold">Thank you for your order</h1>
+        <h1 className="text-xl font-semibold">Thank you for your order</h1>
         <p className="mt-1 text-muted">
-          A receipt is on its way to <strong className="text-ink">{order.email}</strong>.
+          A receipt is on its way to <strong className="text-fg">{order.email}</strong>.
         </p>
       </div>
       <OrderCard order={order} />

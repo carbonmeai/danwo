@@ -1,20 +1,17 @@
 {
-  "name": "@danwo/example-commerce",
+  "name": "danwo-example-commerce",
   "version": "0.0.0",
   "private": true,
   "description": "A small shop selling mugs, notebooks and prints: a Next.js storefront and admin, a Hono API, Postgres, and Stripe, Resend and S3, all emulated.",
   "type": "module",
   "scripts": {
-    "db": "docker compose up --detach --wait",
-    "db:down": "docker compose down",
     "build": "next build web",
     "typecheck": "tsc --noEmit && tsc --noEmit -p web",
-    "test": "npm run build && danwo test",
-    "test:deterministic": "npm run build && danwo test tests/deterministic.danwo.ts",
-    "test:agentic": "npm run build && danwo test tests/agentic.danwo.ts",
-    "matrix": "npm run build && danwo matrix tests/deterministic.danwo.ts --grep \"pays for a mug\"",
-    "matrix:refund": "npm run build && danwo matrix tests/deterministic.danwo.ts --grep \"refunds an order\"",
-    "matrix:plan": "npm run build && danwo matrix tests/deterministic.danwo.ts --grep \"pays for a mug\" --plan",
+    "test": "danwo test",
+    "test:agentic": "danwo test tests/agentic.danwo.ts",
+    "matrix": "danwo matrix tests/deterministic.danwo.ts --grep \"pays for a mug\"",
+    "matrix:plan": "danwo matrix tests/deterministic.danwo.ts --grep \"pays for a mug\" --plan",
+    "matrix:refund": "danwo matrix tests/deterministic.danwo.ts --grep \"refunds an order\"",
     "serve": "danwo serve"
   },
   "dependencies": {

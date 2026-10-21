@@ -21,10 +21,10 @@ function Filter({ active }: { readonly active: string | undefined }) {
             key={chip.name}
             href={chip.slug ? `/?category=${chip.slug}` : "/"}
             aria-current={selected ? "page" : undefined}
-            className={`rounded-full border px-3 py-1 text-[13px] transition-colors ${
+            className={`rounded-full border px-3 py-1 text-sm transition-colors ${
               selected
-                ? "border-ink bg-ink text-bg"
-                : "border-line-strong text-muted hover:border-ink hover:text-ink"
+                ? "border-fg bg-primary text-primary-fg"
+                : "border-border-strong text-muted hover:border-fg hover:text-fg"
             }`}
           >
             {chip.name}
@@ -44,8 +44,8 @@ export default async function Storefront({ searchParams }: Props) {
     <>
       <section className="mb-8 flex flex-wrap items-end justify-between gap-6">
         <div className="max-w-xl">
-          <h1 className="text-[28px] font-semibold tracking-tight">Things for slow mornings</h1>
-          <p className="mt-2 text-[15px] text-muted">
+          <h1 className="text-3xl font-semibold tracking-tight">Things for slow mornings</h1>
+          <p className="mt-2 text-base text-muted">
             Stoneware mugs, notebooks that lie flat and prints from a small studio. Made in small
             batches, shipped in a week.
           </p>

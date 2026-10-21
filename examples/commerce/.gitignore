@@ -2,4 +2,5 @@ node_modules/
 package-lock.json
 web/.next/
 web/next-env.d.ts
+.next-build-lock/
 .danwo/

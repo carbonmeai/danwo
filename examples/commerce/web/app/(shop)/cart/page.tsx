@@ -30,7 +30,7 @@ function Line({ line }: { readonly line: Cart["lines"][number] }) {
         <Link href={`/products/${line.slug}`} className="font-medium hover:underline">
           {line.name}
         </Link>
-        <p className="text-[13px] text-muted">{money(line.unitCents)} each</p>
+        <p className="text-sm text-muted">{money(line.unitCents)} each</p>
       </div>
       <form method="post" action={`/cart/items/${line.slug}`} className="flex items-center gap-2">
         <label className="sr-only" htmlFor={`quantity-${line.slug}`}>
@@ -40,7 +40,7 @@ function Line({ line }: { readonly line: Cart["lines"][number] }) {
           id={`quantity-${line.slug}`}
           name="quantity"
           defaultValue={String(line.quantity)}
-          className="field w-16"
+          className="input w-16"
         >
           {Array.from({ length: 10 }, (_, i) => (
             <option key={i + 1} value={i + 1}>
@@ -86,7 +86,7 @@ export default async function CartPage({ searchParams }: Props) {
     <>
       <PageTitle title="Your cart" />
       <div className="grid items-start gap-8 lg:grid-cols-[1fr_340px]">
-        <ul aria-label="Cart" className="card divide-y divide-line px-5">
+        <ul aria-label="Cart" className="card divide-y divide-border px-5">
           {cart.lines.map((line) => (
             <Line key={line.slug} line={line} />
           ))}
@@ -94,16 +94,16 @@ export default async function CartPage({ searchParams }: Props) {
         <section aria-label="Checkout" className="card flex flex-col gap-4 p-5">
           <div className="flex items-baseline justify-between">
             <span className="text-muted">Subtotal</span>
-            <span className="text-[18px] font-semibold" data-testid="cart-total">
+            <span className="text-lg font-semibold" data-testid="cart-total">
               {money(cart.totalCents)}
             </span>
           </div>
-          <p className="text-[13px] text-muted">
+          <p className="text-sm text-muted">
             Shipping is free. You pay on Stripe&apos;s secure page.
           </p>
           {error && <Notice tone="danger">{error}</Notice>}
           <form method="post" action="/cart/checkout" className="flex flex-col gap-3">
-            <label className="flex flex-col gap-1 text-[13px] text-muted">
+            <label className="flex flex-col gap-1 text-sm text-muted">
               Email for your receipt
               <input
                 type="email"
@@ -111,7 +111,7 @@ export default async function CartPage({ searchParams }: Props) {
                 required
                 defaultValue={email}
                 autoComplete="email"
-                className="field"
+                className="input"
               />
             </label>
             <button type="submit" className="btn btn-primary h-10">

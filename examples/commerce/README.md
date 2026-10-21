@@ -29,34 +29,50 @@ test a fresh database, and blocks every other outside call.
 
 ## Run
 
-You need Node 24 and Docker (or a Postgres of your own). From this folder:
+Use Node 24 and Docker. From this folder:
 
 ```sh
 npm install
-npm run db      # Postgres 17 in Docker, on 127.0.0.1:55432
-npm test        # builds the storefront, then runs every test
+npm test
 ```
+
+```text
+Running 6 tests with 2 workers
+  - tests/agentic.danwo.ts › buys the cheapest mug 0 ms, worker 0
+  - tests/agentic.danwo.ts › finds my last order 0 ms, worker 0
+  ✓ tests/deterministic.danwo.ts › browses the shop and fills a cart 2473 ms, worker 1
+  ✓ tests/deterministic.danwo.ts › pays for a mug through Stripe Checkout 3179 ms, worker 1
+  ✓ tests/deterministic.danwo.ts › a declined card shows Stripe's error and places no order 2649 ms, worker 1
+  ✓ tests/deterministic.danwo.ts › refunds an order from the admin 3411 ms, worker 1
+
+4 passed, 2 skipped
+```
+
+The first run builds the storefront (`next build web`) and pulls `postgres:17-alpine`. Each worker
+then starts its own Postgres container, pushes the schema with `drizzle-kit push`, seeds the
+catalogue, and starts the API and `next start` behind danwo's proxy; it removes them all when it
+ends. If Chromium is missing, danwo tells you to run `npx playwright-core install chromium`.
 
 The scripts:
 
-| Script                       | What it runs                                                                                   |
-| ---------------------------- | ---------------------------------------------------------------------------------------------- |
-| `npm test`                   | `next build`, then `danwo test`: the four deterministic tests (agent tests skip without a key) |
-| `npm run test:deterministic` | only `tests/deterministic.danwo.ts`                                                            |
-| `npm run matrix:plan`        | what the purchase's fault matrix would try, without running it                                 |
-| `npm run matrix`             | the purchase's fault matrix: 86 trials, about two minutes on 4 workers                         |
-| `npm run matrix:refund`      | the same for refunding an order from the admin: 35 trials                                      |
-| `npm run serve`              | danwo's dashboard over everything the runs recorded                                            |
+| Script                  | What it runs                                                   |
+| ----------------------- | -------------------------------------------------------------- |
+| `npm test`              | every test; the agent tests skip without a model key           |
+| `npm run matrix:plan`   | what the purchase's fault matrix would try, without running it |
+| `npm run matrix`        | the purchase's fault matrix: 86 trials, about two minutes      |
+| `npm run matrix:refund` | the same for refunding an order from the admin: 35 trials      |
+| `npm run serve`         | danwo's dashboard over everything the runs recorded            |
+| `npm run typecheck`     | `tsc` over the API, the tests and the storefront               |
 
-Each worker gets its own database, `commerce_w<n>_test`, created next to `commerce_test`, with the
-schema pushed by `drizzle-kit push` and the catalogue seeded. To use your own Postgres, point
-`COMMERCE_DATABASE_URL` at a database whose name ends in `_test`:
+### Use your own Postgres
+
+Without Docker, point `DATABASE_URL` at a Postgres you run. Its database name must end in `_test`;
+each worker creates `commerce_w0_test`, `commerce_w1_test` and so on beside it, so the role needs
+`CREATEDB`:
 
 ```sh
-COMMERCE_DATABASE_URL=postgres://postgres@127.0.0.1:5432/commerce_test npm test
+DATABASE_URL=postgres://postgres@127.0.0.1:5432/commerce_test npm test
 ```
-
-The role needs to create databases. `npm run db:down` stops the Docker one.
 
 ## Make it break
 
@@ -132,6 +148,20 @@ AI_GATEWAY_API_KEY="your-key" npm run test:agentic
 
 The first run records each step; later runs replay it with no model calls.
 
+## Before danwo's beta is on npm
+
+This folder pins `@danwo/cli` and `@danwo/sdk` at `0.1.0-beta.0`. Until that version is published,
+build the packages and install this example from them, from the root of the danwo repository:
+
+```sh
+bun install
+bun run release 0.1.0-beta.0 --pack
+node examples/link.ts commerce
+```
+
+`link.ts` copies the example to a temporary folder, points danwo's packages at the tarballs in
+`dist/release`, runs `npm install` there and prints the folder. Run the commands above from it.
+
 ## Where things are
 
 | Path               | What it is                                                                    |
@@ -141,6 +171,7 @@ The first run records each step; later runs replay it with no model calls.
 | `api/db/schema.ts` | the Drizzle schema `drizzle-kit push` creates                                 |
 | `seed/`            | the catalogue and its pictures, seeded into Postgres, Stripe and S3           |
 | `danwo.config.ts`  | the stack, the emulators, the database proxy and the snapshots                |
+| `kit/`             | the examples' shared styles, used through their Tailwind theme                |
 | `tests/`           | the tests, the invariants (`shop.ts`) and the database helpers                |
 
 Last checked with @danwo/cli 0.1.0-beta.0, Next.js 16.4, Hono 4.13, Drizzle 0.45, Postgres 17

@@ -1,0 +1,18 @@
+{
+  "name": "Commerce",
+  "summary": "A small shop selling mugs, notebooks and prints: a Next.js storefront and admin, a Hono API on Postgres, and Stripe Checkout, Resend receipts and S3 pictures.",
+  "icon": "nextjs.svg",
+  "iconDark": "nextjs-on-dark.svg",
+  "stack": ["Next.js App Router", "Hono", "Postgres", "Drizzle", "Tailwind CSS"],
+  "providers": ["stripe", "resend", "s3"],
+  "runsOn": "A Next.js storefront and a Hono API in Chromium, with Postgres in Docker",
+  "install": "npm",
+  "shows": [
+    "A whole stack behind one proxy: Stripe Checkout and its webhooks, Resend receipts and S3 pictures, all emulated",
+    "Invariants that read the shop's database against Stripe and Resend: one order per payment, stock taken once, one receipt per order",
+    "`danwo matrix` faulting Stripe, Resend, S3, the webhooks and Postgres itself (86 trials), and the shop surviving every one",
+    "`COMMERCE_BUG` switches that turn one safeguard off, so you can watch the matrix catch it"
+  ],
+  "test": "tests/deterministic.danwo.ts",
+  "guide": { "title": "Real stacks", "href": "/docs/real-stacks" }
+}
