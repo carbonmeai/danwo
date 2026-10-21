@@ -5,7 +5,13 @@
  * runs those events triggered have finished, so an invariant reads what the background jobs wrote,
  * and the record keeps each run's function, status and duration.
  */
-import type { OutboundCall, OutboundFault, Proxy } from "@danwo/proxy"
+import {
+  forwardTo,
+  type Handler,
+  type OutboundCall,
+  type OutboundFault,
+  type Proxy,
+} from "@danwo/proxy"
 
 import { type OwnedChild, spawnOwned } from "../support/children.ts"
 import type { Service } from "./services.ts"
@@ -315,6 +321,46 @@ function stillWaiting(
   })
 }
 
+/** `event` with its `ts` moved `ms` earlier, when it has one. */
+function earlier(event: unknown, ms: number): unknown {
+  const ts = fieldOf(event, "ts")
+
+  return typeof ts === "number" && typeof event === "object" ? { ...event, ts: ts - ms } : event
+}
+
+/**
+ * A handler that forwards to the dev server, with every event's `ts` put back on real time. After
+ * `time.travel`, an app's SDK stamps the events it sends with its own clock, days ahead; the dev
+ * server runs on the real one and would schedule their runs for that day, so they never start.
+ */
+function onRealTime(upstream: string, ahead: () => number): Handler {
+  const forward = forwardTo(upstream)
+
+  return async (request) => {
+    const ms = ahead()
+
+    if (ms === 0 || request.method !== "POST" || !new URL(request.url).pathname.startsWith("/e/"))
+      return forward(request)
+
+    const text = await request.text()
+    const resent = (body: string) =>
+      forward(new Request(request.url, { method: "POST", headers: request.headers, body }))
+    let events: unknown
+
+    try {
+      events = JSON.parse(text)
+    } catch {
+      return resent(text)
+    }
+
+    return resent(
+      JSON.stringify(
+        Array.isArray(events) ? events.map((one) => earlier(one, ms)) : earlier(events, ms),
+      ),
+    )
+  }
+}
+
 /**
  * Inngest for `startServices`: events the apps send to `inngest.danwo.test` reach the dev server
  * through the proxy, `settle` waits for the runs they triggered, and `state` lists those runs.
@@ -396,7 +442,7 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
 
   return {
     name: "inngest",
-    routes: [{ hosts: [INNGEST_HOST], upstream: url }],
+    routes: [{ hosts: [INNGEST_HOST], handler: onRealTime(url, () => proxy?.clock.offset() ?? 0) }],
     env: { INNGEST_DEV: "1", INNGEST_BASE_URL: `http://${INNGEST_HOST}` },
     attach(attached) {
       proxy = attached

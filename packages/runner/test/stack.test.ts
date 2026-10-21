@@ -201,6 +201,49 @@ async function devServer(
 }
 
 describe("Inngest", () => {
+  it("puts the events a travelled app sends back on real time, so their runs start now", async () => {
+    const received: unknown[] = []
+    const dev = createServer((req, res) => {
+      let text = ""
+
+      req.on("data", (chunk: Buffer) => (text += chunk.toString()))
+      req.on("end", () => {
+        received.push(JSON.parse(text))
+        json(res, { ids: ["evt_1"] })
+      })
+    })
+
+    dev.listen(0, "127.0.0.1")
+    await once(dev, "listening")
+
+    const address = dev.address()
+    const port = typeof address === "object" && address !== null ? address.port : 0
+    const services = await startServices([
+      await inngestService({ url: `http://127.0.0.1:${port}` }),
+    ])
+    const DAY = 86_400_000
+
+    try {
+      await services.travel(11 * DAY)
+
+      const sentAt = Date.now() + 11 * DAY
+
+      await sendThrough(services.proxy.url, "/e/key", [
+        { name: "billing/trial.ending", ts: sentAt },
+        { name: "no.ts" },
+      ])
+
+      const [batch] = received
+      const ts = Number(Reflect.get(Object(Reflect.get(Object(batch), 0)), "ts"))
+
+      expect(Math.abs(ts - (sentAt - 11 * DAY))).toBeLessThan(5_000)
+      expect(Reflect.get(Object(batch), 1)).toEqual({ name: "no.ts" })
+    } finally {
+      await services.close()
+      dev.close()
+    }
+  })
+
   it("routes events through the proxy and settles once the runs they triggered finish", async () => {
     const dev = await devServer(400)
     const inngest = await inngestService({ url: dev.url })
@@ -409,7 +452,11 @@ describe("Inngest", () => {
  * Sends one event to the Inngest host through the proxy, the way an app's SDK would: the test
  * process itself is not routed, so it speaks to the proxy directly.
  */
-async function sendThrough(proxyUrl: string, path = "/e/test-key"): Promise<void> {
+async function sendThrough(
+  proxyUrl: string,
+  path = "/e/test-key",
+  body: unknown = { name: "workspace.created" },
+): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const target = new URL(proxyUrl)
     const req = request(
@@ -427,6 +474,6 @@ async function sendThrough(proxyUrl: string, path = "/e/test-key"): Promise<void
     )
 
     req.on("error", reject)
-    req.end(JSON.stringify({ name: "workspace.created" }))
+    req.end(JSON.stringify(body))
   })
 }

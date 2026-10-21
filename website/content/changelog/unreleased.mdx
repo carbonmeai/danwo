@@ -24,6 +24,7 @@ date: 2026-10-20
 - **Live keys:** a run warns, or fails with `secrets: "fail"`, when an app holds live-looking keys for providers it does not emulate.
 - **Processes:** every child danwo starts is owned and stopped on exit, on a signal or when its owner dies; `spawnOwned()` does the same for an environment's own processes.
 - **Recording:** every run keeps its flight record and its video by default.
+- **Inngest after time travel:** events a travelled app sends are put back on real time before they reach the dev server, so their runs start at once instead of days ahead.
 - **Time travel:** a cookie the page dates by its travelled clock is stored by real time, so deleting one with a past date works after a jump (Clerk's sign-out left a stale dev-browser cookie behind before).
 - `expect(value, message)`, `environment-<worker>.json` with what a worker's environment did while it started, the stack app that went down named in a failure, and a rows restore for Postgres snapshots that closes no connection.
 

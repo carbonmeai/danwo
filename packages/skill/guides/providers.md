@@ -163,7 +163,9 @@ every event a test sends is in its flight record and `danwo matrix` can fault it
 down, an event accepted whose answer was lost, so a retrying app sends it twice, and a slow send).
 `settle()` (and readiness with `settle: true`) waits until the function runs those events
 triggered have finished, so an invariant reads what the background jobs wrote; the record lists
-each run with its function, status and duration under `inngest`.
+each run with its function, status and duration under `inngest`. After `time.travel`, the proxy
+moves each sent event's `ts` back to real time, as the dev server runs on it; otherwise their runs
+would be scheduled days ahead. `step.sleep` still sleeps in real time.
 
 ## Hosts no service answers
 

@@ -93,6 +93,13 @@ test("adds a task", async ({ app, screen, expect }) => {
 With `readiness: { settle: true }`, each step also waits for the runs it started. The flight
 record lists every run under `inngest`, with its function, status and duration.
 
+## After time travel
+
+[`time.travel`](/docs/time-travel) moves your apps' clocks, so the Inngest SDK stamps each event
+days ahead. The dev server runs on real time, so the proxy moves every event's `ts` back before it
+arrives, and the runs it starts begin at once. A `step.sleep` still sleeps in real time: start a
+job from a provider's webhook instead, such as Stripe's `customer.subscription.trial_will_end`.
+
 ## Break the sends
 
 `danwo matrix` faults each event your app sends during the test:
