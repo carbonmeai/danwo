@@ -9,8 +9,14 @@ export const getRouter = () =>
     routeTree,
     defaultPreload: "intent",
     scrollRestoration: true,
+    /**
+     * Each page brings a skeleton shaped like it; this one is for any page that has none. A page
+     * that loads within 150 ms never shows its skeleton, and one that shows it keeps it at least
+     * 300 ms, so a load that lands just after never flashes it.
+     */
     defaultPendingComponent: PageSkeleton,
-    defaultPendingMs: 200,
+    defaultPendingMs: 150,
+    defaultPendingMinMs: 300,
   })
 
 declare module "@tanstack/react-router" {
