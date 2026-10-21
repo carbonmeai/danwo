@@ -83,6 +83,8 @@ node examples/link.ts with-next --here     # or in place, so your editor finds t
 | `dogfood.yml`  | `examples/shop`'s tests and matrix on pull requests, reported as a check and a comment                     |
 | `examples.yml` | each standalone example installed from the release tarballs: its tests, then its matrix with `--budget 10` |
 | `release.yml`  | the release, on a `v*` tag (see below)                                                                     |
+| `security.yml` | `bun audit` against the allowlist, and OSV-Scanner to the Security tab, on dependency changes and weekly   |
+| `codeql.yml`   | CodeQL over the TypeScript source, on pull requests to main, pushes to main and weekly                     |
 
 `examples.yml` runs nightly and by hand on every example whose `example.json` says `"install": "npm"`, so a new example needs no change there. On a pull request it runs only the examples it changed, or all of them when it changed `examples/_kit`, `examples/link.ts` or the workflow. The ruleset requires its `examples gate` job alone, which passes when every example passed or was skipped.
 

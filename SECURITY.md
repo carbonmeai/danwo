@@ -12,6 +12,16 @@ You will get an acknowledgement within three working days. We will keep you info
 
 danwo is early and not yet at 1.0. Fixes land on the latest release only.
 
+## How dependencies are scanned
+
+The `Security` workflow scans `bun.lock` on every pull request that changes a `package.json` or a lockfile, on every push to main, and weekly:
+
+- `bun audit` is the gate. It fails on a high or critical advisory unless the advisory is in [`.github/vulnerability-allowlist.json`](.github/vulnerability-allowlist.json). Run it locally with `bun run audit`.
+- OSV-Scanner reads every lockfile in the repository and uploads what it finds to the Security tab.
+- CodeQL (`codeql.yml`) analyses the TypeScript source on pull requests to main, on pushes to main and weekly.
+
+An advisory goes on the allowlist only when the vulnerable code cannot be reached from danwo and no fixed version fits the dependency's range. Each entry says why, and has a review-by date about three months out; a unit test fails once that date passes, so every exception is looked at again. Dependabot opens the security fixes it can make as one grouped pull request.
+
 ## Scope
 
 In scope: the danwo CLI, runner, egress proxy, emulators, dashboard, MCP server and GitHub reporter in this repository. Examples of what we care about:
