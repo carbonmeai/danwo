@@ -1,0 +1,113 @@
+name: Examples
+
+# The standalone examples (`examples/with-*`), installed from the release tarballs as a user would
+# install them from npm, then tested end to end: each one's tests and a small fault matrix.
+# Nightly, by hand, and on pull requests that change an example. Every `examples/with-*` folder
+# with an `example.json` is picked up, so a new example needs no change here. The ruleset
+# requires `examples gate` alone.
+on:
+  schedule:
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: examples-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changes:
+    name: which examples
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      examples: ${{ steps.pick.outputs.examples }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # Every example on a schedule or by hand. On a pull request, the examples it changed, or all
+      # of them when it changed what they share: the kit, the linking script or this workflow.
+      - id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          all="$(find examples -mindepth 2 -maxdepth 2 -path 'examples/with-*/example.json' | cut -d/ -f2 | sort | jq -Rsc 'split("\n") | map(select(. != ""))')"
+          if [ "$EVENT" != "pull_request" ]; then
+            picked="$all"
+          else
+            changed="$(git diff --name-only "$BASE" "$HEAD")"
+            if grep -qE '^(examples/_kit/|examples/link\.ts$|\.github/workflows/examples\.yml$)' <<< "$changed"; then
+              picked="$all"
+            else
+              picked="$(jq -c --arg changed "$changed" '($changed | split("\n")) as $files | map(select(. as $e | any($files[]; startswith("examples/" + $e + "/"))))' <<< "$all")"
+            fi
+          fi
+          echo "examples=$picked" >> "$GITHUB_OUTPUT"
+          echo "examples to run: $picked"
+
+  example:
+    name: examples/${{ matrix.example }}
+    needs: changes
+    if: ${{ needs.changes.outputs.examples != '[]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        example: ${{ fromJSON(needs.changes.outputs.examples) }}
+    env:
+      EXAMPLE: ${{ matrix.example }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      # Where the installed copy goes: outside the checkout, as a user's project would be.
+      - run: echo "INSTALLED=$RUNNER_TEMP/$EXAMPLE" >> "$GITHUB_ENV"
+      # The version the example pins; the tarballs are built at it from this commit.
+      - name: Pack the release tarballs
+        run: bun run release "$(node -p "require('./examples/$EXAMPLE/package.json').devDependencies['@danwo/cli']")" --pack
+      # A copy outside the repository, with danwo's packages pointed at the tarballs.
+      - name: Install the example from them
+        run: node examples/link.ts "$EXAMPLE" --to "$INSTALLED"
+      - name: Install Chromium
+        run: npx playwright-core install --with-deps chromium
+        working-directory: ${{ env.INSTALLED }}
+      - name: npx @danwo/cli test
+        run: npx @danwo/cli test
+        working-directory: ${{ env.INSTALLED }}
+      # Each example's `matrix` script names the test it breaks; the budget keeps the night short.
+      - name: npm run matrix -- --budget 10
+        run: npm run matrix -- --budget 10
+        working-directory: ${{ env.INSTALLED }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ failure() }}
+        with:
+          name: danwo-${{ matrix.example }}
+          path: ${{ env.INSTALLED }}/.danwo/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # The one check the ruleset requires from this workflow. A skipped job passes (the change could
+  # not reach it); a failed or cancelled one fails it.
+  gate:
+    name: examples gate
+    needs: [changes, example]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every job to pass or skip
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          failed="$(jq -r '[to_entries[] | select(.value.result != "success" and .value.result != "skipped") | "\(.key) \(.value.result)"] | join(", ")' <<< "$RESULTS")"
+          [ -z "$failed" ] || { echo "::error::$failed"; exit 1; }
