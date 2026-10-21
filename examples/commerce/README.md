@@ -162,6 +162,15 @@ node examples/link.ts commerce
 `link.ts` copies the example to a temporary folder, points danwo's packages at the tarballs in
 `dist/release`, runs `npm install` there and prints the folder. Run the commands above from it.
 
+To work on the example in this folder, with your editor finding its types, install it in place
+instead:
+
+```sh
+node examples/link.ts commerce --here
+```
+
+That leaves only `node_modules`, which git ignores. The package.json is put back as it was.
+
 ## Where things are
 
 | Path               | What it is                                                                    |
