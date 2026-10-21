@@ -9,6 +9,7 @@ import { LocatorError } from "../locate/failure.ts"
 import type {
   ActionOptions,
   AriaRole,
+  FilterOptions,
   Locator,
   RoleOptions,
   Screen,
@@ -159,18 +160,17 @@ export class DeviceLocator implements Locator {
     return this.extend({ pick: index }, `nth(${index})`)
   }
 
-  filter(options: { readonly hasText?: TextMatch; readonly has?: Locator }): DeviceLocator {
-    const has = options.has instanceof DeviceLocator ? options.has : undefined
-
-    if (options.has !== undefined && has === undefined) {
-      throw new TypeError("filter({ has }) takes a locator from the same device screen")
+  filter(options: FilterOptions): DeviceLocator {
+    const has = sameDevice(options.has, "has")
+    const hasNot = sameDevice(options.hasNot, "hasNot")
+    const texts = {
+      ...(options.hasText !== undefined && { hasText: options.hasText }),
+      ...(options.hasNotText !== undefined && { hasNotText: options.hasNotText }),
     }
 
-    const hasText = options.hasText !== undefined ? { hasText: options.hasText } : {}
-
     return this.extend(
-      { ...hasText, ...(has && { has: has.chain }) },
-      filterCall({ ...hasText, ...(has && { has }) }),
+      { ...texts, ...(has && { has: has.chain }), ...(hasNot && { hasNot: hasNot.chain }) },
+      filterCall({ ...texts, ...(has && { has }), ...(hasNot && { hasNot }) }),
     )
   }
 
@@ -435,6 +435,13 @@ export class DeviceLocator implements Locator {
 }
 
 /** Locator methods a device does not support yet. */
+/** The locator a filter's `option` names, which must come from the same device screen. */
+function sameDevice(locator: Locator | undefined, option: string): DeviceLocator | undefined {
+  if (locator === undefined || locator instanceof DeviceLocator) return locator
+
+  throw new TypeError(`filter({ ${option} }) takes a locator from the same device screen`)
+}
+
 function unsupported(method: string): Promise<never> {
   return Promise.reject(
     new DanwoError("CONFIG_INVALID", `locator.${method} is not supported on Android yet`),

@@ -63,6 +63,19 @@ describe("matchers that pass", () => {
     expect(lastSteps(3)).toEqual(["passed", "passed", "passed"])
   })
 
+  it("checks computed style and whether an element is in the viewport", async () => {
+    const { screen } = session
+    const check = session.expect
+
+    await check(screen.getByTestId("status")).toHaveCSS("display", "block")
+    await check(screen.getByTestId("status")).not.toHaveCSS("display", "none")
+    await check(screen.getByRole("heading", { name: "Sign up" })).toBeInViewport()
+    await check(screen.getByText("Hidden note")).not.toBeInViewport()
+    await expect(
+      check(screen.getByTestId("status")).toHaveCSS("display", "flex", { timeout: 200 }),
+    ).rejects.toThrow(/toHaveCSS\("display", "flex"\)[\s\S]*received: "block"/)
+  })
+
   it("waits for the page to catch up", async () => {
     // "Arrived late" is added 700 ms after the page loads.
     await session.expect(session.screen.getByText("Arrived late")).toBeVisible()

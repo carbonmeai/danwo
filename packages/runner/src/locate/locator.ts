@@ -17,6 +17,7 @@ import { explain, LocatorError } from "./failure.ts"
 import type {
   ActionOptions,
   AriaRole,
+  FilterOptions,
   ReadOptions,
   Locator,
   RoleOptions,
@@ -440,24 +441,30 @@ export class ElementLocator extends Finder implements Locator {
     return this.narrow(`nth(${index})`, (target) => target.nth(index))
   }
 
-  filter(options: { readonly hasText?: TextMatch; readonly has?: Locator }): Locator {
-    const inner = options.has instanceof ElementLocator ? options.has : undefined
-
-    if (options.has !== undefined && inner === undefined)
-      throw new TypeError("filter({ has }) takes a locator from the same screen")
-
-    const shownFilter = filterCall({
+  filter(options: FilterOptions): Locator {
+    const has = sameScreen(options.has, "has")
+    const hasNot = sameScreen(options.hasNot, "hasNot")
+    const texts = {
       ...(options.hasText !== undefined && { hasText: options.hasText }),
-      ...(inner && { has: inner }),
-    })
+      ...(options.hasNotText !== undefined && { hasNotText: options.hasNotText }),
+    }
+    const shownFilter = filterCall({ ...texts, ...(has && { has }), ...(hasNot && { hasNot }) })
 
     return this.narrow(shownFilter, (target, page) =>
       target.filter({
-        ...(options.hasText !== undefined && { hasText: options.hasText }),
-        ...(inner && { has: inner.query(page) }),
+        ...texts,
+        ...(has && { has: has.query(page) }),
+        ...(hasNot && { hasNot: hasNot.query(page) }),
       }),
     )
   }
+}
+
+/** The locator a filter's `option` names, which must come from the same screen. */
+function sameScreen(locator: Locator | undefined, option: string): ElementLocator | undefined {
+  if (locator === undefined || locator instanceof ElementLocator) return locator
+
+  throw new TypeError(`filter({ ${option} }) takes a locator from the same screen`)
 }
 
 /** The session's `screen`: locators resolved against the whole page, and the page itself. */

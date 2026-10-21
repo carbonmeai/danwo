@@ -26,12 +26,26 @@ export function textCall(method: string, match: TextMatch, options: TextOptions 
   return call(method, options.exact === true ? [shown(match), "exact"] : [shown(match)])
 }
 
-/** `filter(hasText: "Ch")`. */
-export function filterCall(options: { hasText?: TextMatch; has?: { readonly text: string } }) {
-  const parts: string[] = []
+/** A filter's options as `filterCall` shows them: texts, and inner locators by their text. */
+interface ShownFilter {
+  readonly hasText?: TextMatch
+  readonly hasNotText?: TextMatch
+  readonly has?: { readonly text: string }
+  readonly hasNot?: { readonly text: string }
+}
 
-  if (options.hasText !== undefined) parts.push(`hasText: ${shown(options.hasText)}`)
-  if (options.has !== undefined) parts.push(`has: ${options.has.text}`)
+/** `filter(hasText: "Ch", hasNot: getByRole("button"))`. */
+export function filterCall(options: ShownFilter) {
+  const texts = (["hasText", "hasNotText"] as const).flatMap((key) => {
+    const match = options[key]
 
-  return call("filter", parts)
+    return match === undefined ? [] : [`${key}: ${shown(match)}`]
+  })
+  const inner = (["has", "hasNot"] as const).flatMap((key) => {
+    const locator = options[key]
+
+    return locator === undefined ? [] : [`${key}: ${locator.text}`]
+  })
+
+  return call("filter", [...texts, ...inner])
 }

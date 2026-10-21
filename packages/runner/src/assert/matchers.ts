@@ -32,6 +32,8 @@ export interface LocatorAssertions {
   readonly toBeEnabled: StateCheck
   readonly toBeDisabled: StateCheck
   readonly toBeChecked: StateCheck
+  /** Some of the element is inside the viewport as the page is scrolled now. */
+  readonly toBeInViewport: StateCheck
   /** The whole text, whitespace collapsed; a RegExp tests it. */
   readonly toHaveText: ValueCheck<TextMatch>
   readonly toContainText: ValueCheck<TextMatch>
@@ -39,6 +41,8 @@ export interface LocatorAssertions {
   readonly toHaveCount: ValueCheck<number>
   /** The attribute is present, and equals `value` when one is given. */
   toHaveAttribute(name: string, value?: TextMatch, options?: AssertOptions): Promise<void>
+  /** The computed style's `property` (`"color"`, `"display"`) equals `value`, as the browser writes it. */
+  toHaveCSS(property: string, value: TextMatch, options?: AssertOptions): Promise<void>
   /**
    * The element looks like its baseline image (`__screenshots__/` next to the test), written on
    * the first run. `name` defaults to a number in order of the checks.
@@ -141,6 +145,7 @@ export function locatorAssertions(locator: ElementLocator, negate = false): Loca
     toBeEnabled: (options) => check("toBeEnabled", "", probes.enabled, options),
     toBeDisabled: (options) => check("toBeDisabled", "", probes.disabled, options),
     toBeChecked: (options) => check("toBeChecked", "", probes.checked, options),
+    toBeInViewport: (options) => check("toBeInViewport", "", probes.inViewport, options),
     toHaveText: (expected, options) =>
       check("toHaveText", shown(expected), probes.text(expected, false), options),
     toContainText: (expected, options) =>
@@ -154,6 +159,13 @@ export function locatorAssertions(locator: ElementLocator, negate = false): Loca
         "toHaveAttribute",
         value === undefined ? JSON.stringify(name) : `${JSON.stringify(name)}, ${shown(value)}`,
         probes.attribute(name, value),
+        options,
+      ),
+    toHaveCSS: (property, value, options) =>
+      check(
+        "toHaveCSS",
+        `${JSON.stringify(property)}, ${shown(value)}`,
+        probes.css(property, value),
         options,
       ),
     toHaveScreenshot: (name, options) => {

@@ -42,6 +42,18 @@ export interface WaitOptions extends ReadOptions {
   readonly state?: "attached" | "detached" | "visible" | "hidden"
 }
 
+/** How `filter` narrows a locator's elements; every option given must hold. */
+export interface FilterOptions {
+  /** Keeps elements whose text contains this (or matches, for a RegExp). */
+  readonly hasText?: TextMatch
+  /** Keeps elements whose text does not contain this (or does not match it). */
+  readonly hasNotText?: TextMatch
+  /** Keeps elements with an element inside that this locator, from the same screen, finds. */
+  readonly has?: Locator
+  /** Keeps elements with no element inside that this locator finds. */
+  readonly hasNot?: Locator
+}
+
 /** Finds elements the way a user names them. */
 export interface Screen {
   getByRole(role: AriaRole, options?: RoleOptions): Locator
@@ -103,7 +115,7 @@ export interface Locator extends Screen {
   first(): Locator
   last(): Locator
   nth(index: number): Locator
-  filter(options: { readonly hasText?: TextMatch; readonly has?: Locator }): Locator
+  filter(options: FilterOptions): Locator
 }
 
 /** Turns a secret handle into its value at the moment it is typed. */

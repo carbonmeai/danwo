@@ -59,6 +59,15 @@ describe("finding elements", () => {
     expect(await items.allTextContents()).toEqual(["Apple", "Banana", "Cherry"])
   })
 
+  it("filters out elements by text or by what they hold", async () => {
+    const { screen } = session
+    const items = screen.getByRole("listitem")
+
+    expect(await items.filter({ hasNotText: "an" }).allTextContents()).toEqual(["Apple", "Cherry"])
+    expect(await items.filter({ hasNot: screen.getByText("Banana") }).count()).toBe(2)
+    expect(await items.filter({ hasText: /^C/, hasNotText: "x" }).textContent()).toBe("Cherry")
+  })
+
   it("reads element state", async () => {
     const { screen } = session
 

@@ -119,3 +119,32 @@ export function attribute(name: string, expected: TextMatch | undefined): Probe 
     return { pass, received: actual === null ? "no such attribute" : JSON.stringify(actual) }
   })
 }
+
+/** The element's computed style has `property` equal to `expected`. */
+export function css(property: string, expected: TextMatch): Probe {
+  return single(async (target, budget) => {
+    const actual = await target.evaluate(
+      (element, name) => getComputedStyle(element).getPropertyValue(name),
+      property,
+      { timeout: budget },
+    )
+
+    return { pass: textHolds(actual, expected, false), received: JSON.stringify(actual) }
+  })
+}
+
+/** Whether `element` shows at least a pixel inside the viewport. Runs in the page. */
+function shownInViewport(element: Element): boolean {
+  const box = element.getBoundingClientRect()
+  const across = Math.min(box.right, innerWidth) - Math.max(box.left, 0)
+  const down = Math.min(box.bottom, innerHeight) - Math.max(box.top, 0)
+
+  return across > 0 && down > 0
+}
+
+/** Some of the element is inside the viewport, as it is scrolled now. */
+export const inViewport: Probe = single(async (target, budget) => {
+  const inside = await target.evaluate(shownInViewport, undefined, { timeout: budget })
+
+  return { pass: inside, received: inside ? "in the viewport" : "outside the viewport" }
+})

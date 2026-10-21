@@ -10,7 +10,14 @@ to pin down. Both can live in one test.
 a case-insensitive substring unless you pass `{ exact: true }`; a RegExp tests the whole name.
 Actions (`click`, `fill`, `press`, `check`, `selectOption`, `hover`, `setInputFiles`, `dragTo`)
 need exactly one match and wait for the element to be ready. Narrow with `.first()`, `.nth(i)`,
-`.filter({ hasText })` or by chaining another `getBy…`.
+`.filter({ hasText, hasNotText, has, hasNot })` (every option given must hold; `has` and `hasNot`
+take a locator from the same screen) or by chaining another `getBy…`.
+
+`expect(locator)` checks retry until they hold: `toBeVisible`, `toBeHidden`, `toBeEnabled`,
+`toBeDisabled`, `toBeChecked`, `toBeInViewport` (some of it inside the viewport as scrolled now),
+`toHaveText`, `toContainText`, `toHaveValue`, `toHaveCount`, `toHaveAttribute`,
+`toHaveCSS(property, value)` (the computed style, as the browser writes it: `"rgb(0, 0, 0)"`, not
+`"black"`) and `toHaveScreenshot`; each has a `.not` form.
 
 `check`/`uncheck` (and the agent's check) handle a styled checkbox or radio whose invisible
 `<input>` is covered by its own `<label>`: danwo clicks the label, then fails unless the input

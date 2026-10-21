@@ -216,6 +216,27 @@ describe("matching on a device's screen", () => {
     expect(() => buttons.filter({ has: {} as Locator })).toThrow("same device screen")
   })
 
+  it("filters out elements by text or by what they hold", async () => {
+    const { screen } = await open(new FakeDevice())
+    const buttons = screen.getByRole("button")
+    const all = refs(resolveChain(CHECKOUT, chain(buttons)))
+    const paying = refs(resolveChain(CHECKOUT, chain(buttons.filter({ hasText: "pay" }))))
+
+    expect(refs(resolveChain(CHECKOUT, chain(buttons.filter({ hasNotText: "pay" }))))).toEqual(
+      all.filter((ref) => !paying.includes(ref)),
+    )
+    expect(
+      refs(
+        resolveChain(
+          HOME,
+          chain(screen.getByRole("button").filter({ hasNot: screen.getByText("Buy") })),
+        ),
+      ),
+    ).not.toContain("e4")
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a locator from somewhere else
+    expect(() => buttons.filter({ hasNot: {} as Locator })).toThrow("same device screen")
+  })
+
   it("compares text as web locators do", () => {
     expect(textMatches("  Credits:   500 ", "credits: 500", false)).toBe(true)
     expect(textMatches("Credits: 500", "Credits", true)).toBe(false)

@@ -98,16 +98,20 @@ await screen.getByRole("button", { name: "Start now" }).click({ force: true })
 
 An action needs exactly one match. When a finder matches several, narrow it:
 
-| Narrow with            | Keeps                                   |
-| ---------------------- | --------------------------------------- |
-| `.first()`             | the first match                         |
-| `.nth(i)`              | the match at index `i`, counting from 0 |
-| `.filter({ hasText })` | the matches that contain this text      |
-| another `getBy…` call  | elements inside the matches             |
+| Narrow with               | Keeps                                    |
+| ------------------------- | ---------------------------------------- |
+| `.first()`                | the first match                          |
+| `.nth(i)`                 | the match at index `i`, counting from 0  |
+| `.filter({ hasText })`    | the matches that contain this text       |
+| `.filter({ hasNotText })` | the matches that don't contain this text |
+| `.filter({ has })`        | the matches with this locator inside     |
+| `.filter({ hasNot })`     | the matches without this locator inside  |
+| another `getBy…` call     | elements inside the matches              |
 
 ```ts title="tests/basket.danwo.ts · narrowing"
 await screen.getByRole("listitem").filter({ hasText: "Socks" }).getByRole("button").click()
 await screen.getByRole("row").nth(2).click()
+await screen.getByRole("row").filter({ hasNotText: "Archived" }).first().click()
 ```
 
 <Callout type="info">

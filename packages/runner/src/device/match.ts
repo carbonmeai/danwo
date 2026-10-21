@@ -19,10 +19,18 @@ export type DeviceQuery =
 /** One link of a locator's chain. */
 export type ChainLink =
   | { readonly query: DeviceQuery }
-  | { readonly hasText?: TextMatch; readonly has?: Chain }
+  | DeviceFilter
   | { readonly pick: "first" | "last" | number }
 
 export type Chain = readonly ChainLink[]
+
+/** A filter link: texts the element's text must or must not hold, chains it must or must not hold. */
+export interface DeviceFilter {
+  readonly hasText?: TextMatch
+  readonly hasNotText?: TextMatch
+  readonly has?: Chain
+  readonly hasNot?: Chain
+}
 
 /** Whitespace collapsed and trimmed, as text compares on screen. */
 export function collapse(text: string): string {
@@ -160,16 +168,16 @@ function applyQuery(tree: Tree, scope: readonly DeviceNode[] | undefined, query:
   return query.by === "text" ? innermost(tree, matched) : matched
 }
 
-function applyFilter(
-  tree: Tree,
-  current: readonly DeviceNode[],
-  link: { readonly hasText?: TextMatch; readonly has?: Chain },
-): DeviceNode[] {
+function applyFilter(tree: Tree, current: readonly DeviceNode[], link: DeviceFilter): DeviceNode[] {
   return current.filter((node) => {
-    if (link.hasText !== undefined && !textMatches(tree.textWithin(node), link.hasText, false))
-      return false
+    const text = tree.textWithin(node)
+    const holds = (chain: Chain) => run(tree, chain, [node]).length > 0
 
-    return link.has === undefined || run(tree, link.has, [node]).length > 0
+    if (link.hasText !== undefined && !textMatches(text, link.hasText, false)) return false
+    if (link.hasNotText !== undefined && textMatches(text, link.hasNotText, false)) return false
+    if (link.has !== undefined && !holds(link.has)) return false
+
+    return link.hasNot === undefined || !holds(link.hasNot)
   })
 }
 

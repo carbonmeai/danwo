@@ -7,6 +7,7 @@ import { type Expect, expect as valueExpect } from "../assert/expect.ts"
 import type { AssertOptions, LocatorAssertions } from "../assert/matchers.ts"
 import { shown } from "../locate/describe.ts"
 import type { TextMatch } from "../locate/types.ts"
+import { DanwoError } from "../support/codes.ts"
 import { attributeOf } from "./attributes.ts"
 import { DeviceLocator } from "./locator.ts"
 import { collapse, textOf } from "./match.ts"
@@ -168,6 +169,7 @@ function deviceAssertions(locator: DeviceLocator, negate = false): LocatorAssert
         options,
       ),
     toBeChecked: (options) => check("toBeChecked", "", judges.checked, options),
+    toBeInViewport: () => unsupported("toBeInViewport"),
     toHaveText: (expected, options) =>
       check("toHaveText", shown(expected), judges.text(expected, false), options),
     toContainText: (expected, options) =>
@@ -185,12 +187,20 @@ function deviceAssertions(locator: DeviceLocator, negate = false): LocatorAssert
         judges.attribute(name, expected),
         options,
       ),
+    toHaveCSS: () => unsupported("toHaveCSS"),
     toHaveScreenshot: (name, options) => {
       if (negate) throw new TypeError("expect(...).not.toHaveScreenshot is not supported")
 
       return deviceScreenshot(locator, name, options)
     },
   }
+}
+
+/** A web check a device screen has no way to read. */
+function unsupported(matcher: string): Promise<never> {
+  return Promise.reject(
+    new DanwoError("CONFIG_INVALID", `expect(...).${matcher} is not supported on Android yet`),
+  )
 }
 
 /** The opposite verdict on the same reading. */
