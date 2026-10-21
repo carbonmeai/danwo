@@ -136,11 +136,15 @@ function drawMarks(input: {
   document.documentElement.append(layer)
 }
 
-/** A plain screenshot of the viewport in CSS pixels, with secret fields painted over. */
+/**
+ * A plain screenshot of the viewport in CSS pixels, with secret fields painted over. The caret is
+ * left as it is, since hiding it writes an inline style on every field of the page.
+ */
 export async function screenshot(page: Page, spots: SecretSpots): Promise<Buffer> {
   return page.screenshot({
     type: "png",
     scale: "css",
+    caret: "initial",
     mask: spots.masks(page),
     animations: "disabled",
     style: HIDE_POINTER,

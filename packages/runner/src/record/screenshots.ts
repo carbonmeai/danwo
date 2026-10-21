@@ -1,26 +1,37 @@
 /**
  * Screenshots that never show a secret: fields holding a secret's value are masked, and a page
- * whose text shows one is not captured at all.
+ * whose text shows one is not captured at all. Taking one never changes the page: an app still
+ * hydrating would report a changed attribute or style as a mismatch.
  */
 import { mkdir } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
-import type { Page } from "playwright-core"
+import type { Locator, Page } from "playwright-core"
 
-const MASKED = "data-danwo-secret"
+import { valueSelector } from "../locate/display-value.ts"
+import { SECRET_FIELD } from "../secrets/fields.ts"
 
-/** Marks fields whose value holds a secret; answers whether the page's text shows one. */
-function markSecrets(values: readonly string[]): boolean {
-  const fields = document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
-    "input, textarea",
-  )
+/** Answers whether the page's text shows a secret. Runs in the page and changes nothing there. */
+function showsSecret(values: readonly string[]): boolean {
+  const text = document.body.innerText
 
-  for (const field of fields) {
-    if (values.some((value) => field.value.includes(value)))
-      field.setAttribute("data-danwo-secret", "")
-  }
+  return values.some((value) => text.includes(value))
+}
 
-  return values.some((value) => document.body.innerText.includes(value))
+/** A regular expression that finds `value` anywhere in a field's value. */
+function containing(value: string): RegExp {
+  return new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+}
+
+/**
+ * What a screenshot paints over: password fields, fields a secret was typed into, and any field
+ * whose current value holds a secret. Each is a locator, so nothing is written into the page.
+ */
+function masks(page: Page, secrets: readonly string[]): Locator[] {
+  return [
+    page.locator(`[${SECRET_FIELD}], input[type=password]`),
+    ...secrets.map((value) => page.locator(valueSelector(containing(value)))),
+  ]
 }
 
 export interface ShotOptions {
@@ -41,7 +52,7 @@ export async function takeScreenshot(options: ShotOptions): Promise<string | und
 
   try {
     if (options.secrets.length > 0) {
-      const shown = await page.evaluate(markSecrets, [...options.secrets])
+      const shown = await page.evaluate(showsSecret, [...options.secrets])
 
       if (shown) {
         options.onSecretShown?.()
@@ -53,10 +64,12 @@ export async function takeScreenshot(options: ShotOptions): Promise<string | und
     const file = join(options.dir, options.path)
 
     await mkdir(dirname(file), { recursive: true })
+    /* Hiding the caret would write an inline style on every field, so the caret stays as it is. */
     await page.screenshot({
       path: file,
       timeout: options.timeout,
-      mask: [page.locator(`[${MASKED}], input[type=password]`)],
+      caret: "initial",
+      mask: masks(page, options.secrets),
     })
 
     return options.path
