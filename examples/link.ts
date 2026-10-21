@@ -1,13 +1,17 @@
 /**
  * Installs an example against danwo's release tarballs, before the version it pins is on npm.
  *
- * Usage: `node examples/link.ts <example> [--tarballs <dir>] [--to <dir>]`
+ * Usage: `node examples/link.ts <example> [--tarballs <dir>] [--to <dir> | --here]`
  *
  * It copies `examples/<example>` to a fresh folder (or `--to`), points every `@danwo/*` package
  * its package.json names, and every one those depend on, at the tarballs in `--tarballs`
  * (`dist/release`, which `bun run release <version> --pack` writes), and runs `npm install` there.
  * The example's own folder is left as it is. The last line it prints is the installed copy's
  * path, so a script can `cd "$(node examples/link.ts with-next | tail -n 1)"`.
+ *
+ * With `--here` it installs into the example's own folder instead, so an editor open on it finds
+ * the types: package.json is linked for the install and put back as it was afterwards, and npm
+ * writes no lockfile. Only the git-ignored `node_modules` is left behind.
  */
 import { spawnSync } from "node:child_process"
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
@@ -109,8 +113,28 @@ export function linkedManifest(manifest: Manifest, tarballs: readonly Tarball[])
   }
 }
 
-/** Copies the example, links it to the tarballs and installs it; the copy's path. */
-function link(example: string, tarballDir: string, to: string | undefined): string {
+/** Where to install: a copy (in `to`, or a fresh folder), or the example's own folder. */
+type Target = { readonly kind: "copy"; readonly to: string | undefined } | { readonly kind: "here" }
+
+/** Links the example's package.json in `dir` to the tarballs and runs `npm install` there. */
+function install(dir: string, tarballs: readonly Tarball[], lockfile: boolean): void {
+  writeFileSync(
+    join(dir, "package.json"),
+    `${JSON.stringify(linkedManifest(readManifest(dir), tarballs), null, 2)}\n`,
+  )
+
+  /* npm's own output goes to stderr, so the path is the only thing on stdout. */
+  const result = spawnSync(
+    "npm",
+    ["install", "--no-audit", "--no-fund", ...(lockfile ? [] : ["--no-package-lock"])],
+    { cwd: dir, stdio: ["ignore", process.stderr, process.stderr] },
+  )
+
+  if (result.status !== 0) throw new Error(`npm install failed in ${dir}`)
+}
+
+/** Installs the example against the tarballs, in a copy or in its own folder; where it went. */
+function link(example: string, tarballDir: string, target: Target): string {
   const source = join(ROOT, "examples", example)
 
   if (!existsSync(join(source, "package.json")))
@@ -121,41 +145,46 @@ function link(example: string, tarballDir: string, to: string | undefined): stri
   if (tarballs.length === 0)
     throw new Error(`no danwo tarballs in ${tarballDir}; run: bun run release <version> --pack`)
 
-  const target = to ?? join(mkdtempSync(join(tmpdir(), `danwo-${example}-`)), example)
+  if (target.kind === "here") {
+    const original = readFileSync(join(source, "package.json"))
 
-  cpSync(source, target, { recursive: true, filter: (path) => !SKIPPED.has(basename(path)) })
+    try {
+      install(source, tarballs, false)
+    } finally {
+      writeFileSync(join(source, "package.json"), original)
+    }
 
-  const manifest = readManifest(target)
+    return source
+  }
 
-  writeFileSync(
-    join(target, "package.json"),
-    `${JSON.stringify(linkedManifest(manifest, tarballs), null, 2)}\n`,
-  )
+  const copy = target.to ?? join(mkdtempSync(join(tmpdir(), `danwo-${example}-`)), example)
 
-  /* npm's own output goes to stderr, so the path is the only thing on stdout. */
-  const install = spawnSync("npm", ["install", "--no-audit", "--no-fund"], {
-    cwd: target,
-    stdio: ["ignore", process.stderr, process.stderr],
-  })
+  cpSync(source, copy, { recursive: true, filter: (path) => !SKIPPED.has(basename(path)) })
+  install(copy, tarballs, true)
 
-  if (install.status !== 0) throw new Error(`npm install failed in ${target}`)
-
-  return target
+  return copy
 }
 
 if (import.meta.main) {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
-    options: { tarballs: { type: "string" }, to: { type: "string" } },
+    options: {
+      tarballs: { type: "string" },
+      to: { type: "string" },
+      here: { type: "boolean", default: false },
+    },
   })
   const [example] = positionals
 
-  if (example === undefined) {
-    console.error("usage: node examples/link.ts <example> [--tarballs <dir>] [--to <dir>]")
+  if (example === undefined || (values.here && values.to !== undefined)) {
+    console.error("usage: node examples/link.ts <example> [--tarballs <dir>] [--to <dir> | --here]")
     process.exit(2)
   }
 
   const tarballs = resolve(values.tarballs ?? join(ROOT, "dist", "release"))
+  const target: Target = values.here
+    ? { kind: "here" }
+    : { kind: "copy", to: values.to === undefined ? undefined : resolve(values.to) }
 
-  console.log(link(example, tarballs, values.to === undefined ? undefined : resolve(values.to)))
+  console.log(link(example, tarballs, target))
 }
