@@ -1,22 +1,52 @@
 import { Box, styled } from "@danwo/ui/jsx"
 import {
-  type ColumnDef,
+  type ColumnDef as TableColumnDef,
+  columnSizingFeature,
+  createSortedRowModel,
   flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
-  type Row,
+  type Row as TableRow,
+  rowSortingFeature,
+  sortFn_alphanumeric,
+  sortFn_basic,
+  sortFn_datetime,
+  sortFn_text,
   type SortingState,
-  useReactTable,
+  tableFeatures,
+  useTable,
 } from "@tanstack/react-table"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { useRef, useState, type ReactNode } from "react"
 
 import { GRID_FONT_SIZE, GRID_ROW_HEIGHT } from "./constants/sizing"
 
-export type { ColumnDef, Row, SortingState }
+/**
+ * What a grid can do: sort by a header (with the sort functions a column picks by its values) and
+ * size a column. Defined once, so the table keeps the same features across renders.
+ */
+const gridFeatures = tableFeatures({
+  columnSizingFeature,
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
+  sortFns: {
+    alphanumeric: sortFn_alphanumeric,
+    basic: sortFn_basic,
+    datetime: sortFn_datetime,
+    text: sortFn_text,
+  },
+})
+
+type GridFeatures = typeof gridFeatures
+
+/** A grid column: how to read, show and size one field of a row. */
+export type ColumnDef<T extends object> = TableColumnDef<GridFeatures, T>
+
+/** A row of a grid, with the data it was built from. */
+export type Row<T extends object> = TableRow<GridFeatures, T>
+
+export type { SortingState }
 
 /** What a data grid needs: its rows, their columns, and optionally how to react to a row. */
-export interface DataGridProps<T> {
+export interface DataGridProps<T extends object> {
   readonly data: readonly T[]
   readonly columns: ColumnDef<T>[]
   /** A stable id per row, so selection and keys survive re-sorting; the row index otherwise. */
@@ -63,7 +93,7 @@ const HeaderCell = styled("button", {
 })
 
 /** The grid template: each column's width, or a share of what is left when it sets none. */
-function template<T>(columns: ColumnDef<T>[]): string {
+function template<T extends object>(columns: ColumnDef<T>[]): string {
   return columns.map((column) => (column.size ? `${column.size}px` : "minmax(0, 1fr)")).join(" ")
 }
 
@@ -79,7 +109,7 @@ function sortMark(direction: false | "asc" | "desc"): string {
  * A sortable, virtualised grid of rows: only the rows in view are in the DOM, so a run with
  * thousands of steps or trials scrolls as fast as one with ten.
  */
-export function DataGrid<T>({
+export function DataGrid<T extends object>({
   data,
   columns,
   getRowId,
@@ -91,13 +121,12 @@ export function DataGrid<T>({
 }: DataGridProps<T>) {
   const [sorting, setSorting] = useState<SortingState>(initialSorting)
   const scroller = useRef<HTMLDivElement>(null)
-  const table = useReactTable({
-    data: data as T[],
+  const table = useTable({
+    features: gridFeatures,
+    data,
     columns,
     state: { sorting },
     onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     ...(getRowId && { getRowId }),
   })
   const rows = table.getRowModel().rows
@@ -171,7 +200,7 @@ function ariaSort(direction: false | "asc" | "desc"): "ascending" | "descending"
 }
 
 /** One rendered row, placed where the virtualiser puts it. */
-function GridRow<T>({
+function GridRow<T extends object>({
   row,
   top,
   template: columnsTemplate,
@@ -202,7 +231,7 @@ function GridRow<T>({
       }}
       style={{ gridTemplateColumns: columnsTemplate, height: GRID_ROW_HEIGHT, top }}
     >
-      {row.getVisibleCells().map((cell) => (
+      {row.getAllCells().map((cell) => (
         <Cell key={cell.id} role="cell">
           {flexRender(cell.column.columnDef.cell, cell.getContext())}
         </Cell>
