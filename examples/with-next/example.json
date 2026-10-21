@@ -1,0 +1,17 @@
+{
+  "name": "Next.js waitlist",
+  "summary": "A waitlist on Next.js: the form saves an email to Postgres and sends a welcome email through Resend.",
+  "icon": "nextjs.svg",
+  "iconDark": "nextjs-on-dark.svg",
+  "stack": ["Next.js App Router", "Postgres", "Tailwind CSS"],
+  "providers": ["resend"],
+  "runsOn": "A Next.js app in Chromium, with Postgres in Docker",
+  "install": "npm",
+  "shows": [
+    "An invariant that reads both sides: exactly one row in Postgres and exactly one welcome email in the Resend emulator",
+    "`danwo matrix` faulting Resend (429, 500, a lost answer), the app's own SQL through the data proxy, and a double submit",
+    "A Postgres snapshot per worker, restored before every test and trial, with no app restart"
+  ],
+  "test": "tests/deterministic.danwo.ts",
+  "guide": { "title": "Your app's data in tests", "href": "/docs/app-data" }
+}

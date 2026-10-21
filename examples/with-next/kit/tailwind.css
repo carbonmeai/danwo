@@ -1,0 +1,73 @@
+/*
+ * The kit's tokens as a Tailwind v4 theme, for examples styled with utilities. Import it after
+ * Tailwind and `kit.css`:
+ *
+ *   @import "tailwindcss";
+ *   @import "./kit/kit.css";
+ *   @import "./kit/tailwind.css";
+ *
+ * Every value points at a `--kit-*` variable, so `bg-surface`, `text-muted` or `rounded-xl` look
+ * the same as the kit's classes and follow its light and dark themes with no `dark:` variants.
+ * Edit it in `examples/_kit/`, then run `node examples/_kit/sync.ts`.
+ */
+
+@theme inline {
+  --font-sans: var(--kit-font-sans);
+  --font-mono: var(--kit-font-mono);
+
+  --text-xs: var(--kit-text-xs);
+  --text-sm: var(--kit-text-sm);
+  --text-base: var(--kit-text-base);
+  --text-lg: var(--kit-text-lg);
+  --text-xl: var(--kit-text-xl);
+  --text-2xl: var(--kit-text-2xl);
+  --text-3xl: var(--kit-text-3xl);
+
+  /* The kit's spacing steps are 0.25rem apart, as Tailwind's are: `p-4` is `--kit-space-4`. */
+  --spacing: var(--kit-space-1);
+
+  --radius-sm: var(--kit-radius-sm);
+  --radius-md: var(--kit-radius-md);
+  --radius-lg: var(--kit-radius-lg);
+  --radius-xl: var(--kit-radius-xl);
+  --radius-2xl: var(--kit-radius-2xl);
+
+  --shadow-sm: var(--kit-shadow-sm);
+  --shadow-md: var(--kit-shadow-md);
+
+  --color-bg: var(--kit-bg);
+  --color-sidebar: var(--kit-bg-sidebar);
+  --color-subtle: var(--kit-bg-subtle);
+  --color-hover: var(--kit-bg-hover);
+  --color-surface: var(--kit-surface);
+  --color-field: var(--kit-field);
+  --color-fg: var(--kit-fg);
+  --color-muted: var(--kit-fg-muted);
+  --color-faint: var(--kit-fg-subtle);
+  --color-border: var(--kit-border);
+  --color-border-strong: var(--kit-border-strong);
+  --color-ring: var(--kit-ring);
+  --color-primary: var(--kit-primary);
+  --color-primary-fg: var(--kit-primary-fg);
+  --color-danger: var(--kit-danger);
+  --color-danger-bg: var(--kit-danger-bg);
+  --color-success: var(--kit-success);
+  --color-success-bg: var(--kit-success-bg);
+  --color-warning: var(--kit-warning);
+  --color-warning-bg: var(--kit-warning-bg);
+  --color-info: var(--kit-info);
+  --color-info-bg: var(--kit-info-bg);
+}
+
+/* `dark:` follows the kit: the system's theme, unless `data-theme` on the root pins one. */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+}

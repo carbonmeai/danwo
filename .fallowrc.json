@@ -7,13 +7,15 @@
     "packages/ui/{panda.config,source-alias}.ts",
     "website/src/routes/**/*.{ts,tsx}",
     "website/vite.config.ts",
-    "website/scripts/*.ts"
+    "website/scripts/*.ts",
+    "examples/link.ts",
+    "examples/_kit/sync.ts"
   ],
   "resolve": {
     "conditions": ["danwo-source"]
   },
   "workspaces": {
-    "patterns": ["packages/*", "examples/*", "benchmarks", "website"]
+    "patterns": ["packages/*", "examples/shop*", "benchmarks", "website"]
   },
   "health": {
     "maxCyclomatic": 10,
@@ -57,14 +59,15 @@
       "website/src/routeTree.gen.ts",
       "packages/ui/src/icons/**",
       "packages/ui/src/illustrations/**",
-      "packages/ui/src/primitives/dropdown-menu/**"
+      "packages/ui/src/primitives/dropdown-menu/**",
+      "examples/_kit/kit.css"
     ],
     "ignoredClones": ["dup:70004012:2"]
   },
   "rules": {
     "unused-dependencies": "warn"
   },
-  "ignorePatterns": ["examples/shop-mobile/app/**"],
+  "ignorePatterns": ["examples/shop-mobile/app/**", "examples/with-*/**"],
   "usedClassMembers": [
     {
       "implements": "Locator",
@@ -81,7 +84,8 @@
     "packages/recorder/src/page-script.ts",
     "benchmarks/app/server.ts",
     "benchmarks/bench/run.ts",
-    "brand/readme-hero/tiles.css"
+    "brand/readme-hero/tiles.css",
+    "examples/_kit/*.css"
   ],
   "ignoreDependencies": ["@danwo/example-shop"],
   "publicPackages": ["@danwo/ui"],

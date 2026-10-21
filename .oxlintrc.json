@@ -62,7 +62,8 @@
     "coverage",
     "**/routeTree.gen.ts",
     "**/styled-system/**",
-    "examples/shop-mobile/app/**"
+    "examples/shop-mobile/app/**",
+    "examples/with-*/**"
   ],
   "jsPlugins": ["@stylistic/eslint-plugin"],
   "overrides": [
