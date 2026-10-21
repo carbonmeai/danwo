@@ -1,6 +1,7 @@
 /** The things the agent does to the page, shared by live steps and replays. */
 import type { Locator, Page } from "playwright-core"
 
+import { setChecked } from "../browser/check.ts"
 import { pointAt, type PointerKind } from "../browser/pointer.ts"
 import type { OpenDialog, Tabs } from "../browser/tabs.ts"
 
@@ -71,7 +72,7 @@ export async function operate(
 
       return
     case "check":
-      return element.setChecked(operation.checked, { timeout })
+      return setChecked(element, operation.checked, { timeout })
     case "hover":
       return element.hover({ timeout })
     case "scroll-into-view":

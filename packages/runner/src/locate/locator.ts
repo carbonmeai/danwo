@@ -7,6 +7,7 @@ import type { Page, Locator as PlaywrightLocator } from "playwright-core"
 
 import { filePaths, type Files } from "../agent/files.ts"
 import type { ScreenshotEvent, ScreenshotSettings } from "../assert/screenshot.ts"
+import { setChecked } from "../browser/check.ts"
 import { pointAt, type PointerKind } from "../browser/pointer.ts"
 import { checkSecretField, markSecretField } from "../secrets/fields.ts"
 import { isSecret, type Secret } from "../secrets/index.ts"
@@ -16,6 +17,7 @@ import { explain, LocatorError } from "./failure.ts"
 import type {
   ActionOptions,
   AriaRole,
+  ReadOptions,
   Locator,
   RoleOptions,
   Screen,
@@ -73,6 +75,11 @@ const POINTER_OF: Readonly<Record<string, PointerKind>> = {
   clear: "type",
   press: "type",
   hover: "hover",
+}
+
+/** Playwright's `force` for an action whose options ask for it, so actionability checks are skipped. */
+function forced(options: ActionOptions | undefined): { readonly force?: true } {
+  return options?.force === true ? { force: true } : {}
 }
 
 /** The session's screenshot checks: their settings, a counter, and a note per comparison. */
@@ -190,7 +197,7 @@ export class ElementLocator extends Finder implements Locator {
   }
 
   /** The timeout an action or read runs under. */
-  private timeout(options: ActionOptions | undefined): number {
+  private timeout(options: ReadOptions | undefined): number {
     return options?.timeout ?? this.context.actionTimeout
   }
 
@@ -250,7 +257,9 @@ export class ElementLocator extends Finder implements Locator {
   }
 
   click(options?: ActionOptions): Promise<void> {
-    return this.act("click", "", options, (target, timeout) => target.click({ timeout }))
+    return this.act("click", "", options, (target, timeout) =>
+      target.click({ timeout, ...forced(options) }),
+    )
   }
 
   tap(options?: ActionOptions): Promise<void> {
@@ -269,12 +278,14 @@ export class ElementLocator extends Finder implements Locator {
 
       const typed = isSecret(value) ? await this.context.secrets.resolve(value) : value
 
-      await target.fill(typed, { timeout })
+      await target.fill(typed, { timeout, ...forced(options) })
     })
   }
 
   clear(options?: ActionOptions): Promise<void> {
-    return this.act("clear", "", options, (target, timeout) => target.clear({ timeout }))
+    return this.act("clear", "", options, (target, timeout) =>
+      target.clear({ timeout, ...forced(options) }),
+    )
   }
 
   press(key: string, options?: ActionOptions): Promise<void> {
@@ -284,18 +295,22 @@ export class ElementLocator extends Finder implements Locator {
   }
 
   check(options?: ActionOptions): Promise<void> {
-    return this.act("check", "", options, (target, timeout) => target.check({ timeout }))
+    return this.act("check", "", options, (target, timeout) =>
+      setChecked(target, true, { timeout, ...forced(options) }),
+    )
   }
 
   uncheck(options?: ActionOptions): Promise<void> {
-    return this.act("uncheck", "", options, (target, timeout) => target.uncheck({ timeout }))
+    return this.act("uncheck", "", options, (target, timeout) =>
+      setChecked(target, false, { timeout, ...forced(options) }),
+    )
   }
 
   selectOption(option: string | readonly string[], options?: ActionOptions): Promise<void> {
     const wanted = typeof option === "string" ? option : [...option]
 
     return this.act("selectOption", JSON.stringify(option), options, (target, timeout) =>
-      target.selectOption(wanted, { timeout }),
+      target.selectOption(wanted, { timeout, ...forced(options) }),
     )
   }
 
@@ -312,12 +327,14 @@ export class ElementLocator extends Finder implements Locator {
       throw new TypeError("dragTo takes a locator from the same screen")
 
     return this.act("dragTo", target.text, options, (source, timeout) =>
-      source.dragTo(target.resolve(), { timeout }),
+      source.dragTo(target.resolve(), { timeout, ...forced(options) }),
     )
   }
 
   hover(options?: ActionOptions): Promise<void> {
-    return this.act("hover", "", options, (target, timeout) => target.hover({ timeout }))
+    return this.act("hover", "", options, (target, timeout) =>
+      target.hover({ timeout, ...forced(options) }),
+    )
   }
 
   waitFor(options: WaitOptions = {}): Promise<void> {
@@ -332,19 +349,19 @@ export class ElementLocator extends Finder implements Locator {
     )
   }
 
-  textContent(options?: ActionOptions): Promise<string | null> {
+  textContent(options?: ReadOptions): Promise<string | null> {
     return this.attempt("locator.textContent", this.timeout(options), (target, timeout) =>
       target.textContent({ timeout }),
     )
   }
 
-  innerText(options?: ActionOptions): Promise<string> {
+  innerText(options?: ReadOptions): Promise<string> {
     return this.attempt("locator.innerText", this.timeout(options), (target, timeout) =>
       target.innerText({ timeout }),
     )
   }
 
-  inputValue(options?: ActionOptions): Promise<string> {
+  inputValue(options?: ReadOptions): Promise<string> {
     return this.attempt("locator.inputValue", this.timeout(options), async (target, timeout) => {
       if ((await target.getAttribute("type", { timeout })) === "password")
         throw new LocatorError(
@@ -356,7 +373,7 @@ export class ElementLocator extends Finder implements Locator {
     })
   }
 
-  getAttribute(name: string, options?: ActionOptions): Promise<string | null> {
+  getAttribute(name: string, options?: ReadOptions): Promise<string | null> {
     return this.attempt("locator.getAttribute", this.timeout(options), (target, timeout) =>
       target.getAttribute(name, { timeout }),
     )
@@ -370,19 +387,19 @@ export class ElementLocator extends Finder implements Locator {
     return this.attempt("locator.isHidden", 0, (target) => target.isHidden())
   }
 
-  isEnabled(options?: ActionOptions): Promise<boolean> {
+  isEnabled(options?: ReadOptions): Promise<boolean> {
     return this.attempt("locator.isEnabled", this.timeout(options), (target, timeout) =>
       target.isEnabled({ timeout }),
     )
   }
 
-  isDisabled(options?: ActionOptions): Promise<boolean> {
+  isDisabled(options?: ReadOptions): Promise<boolean> {
     return this.attempt("locator.isDisabled", this.timeout(options), (target, timeout) =>
       target.isDisabled({ timeout }),
     )
   }
 
-  isChecked(options?: ActionOptions): Promise<boolean> {
+  isChecked(options?: ReadOptions): Promise<boolean> {
     return this.attempt("locator.isChecked", this.timeout(options), (target, timeout) =>
       target.isChecked({ timeout }),
     )

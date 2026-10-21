@@ -12,6 +12,13 @@ Actions (`click`, `fill`, `press`, `check`, `selectOption`, `hover`, `setInputFi
 need exactly one match and wait for the element to be ready. Narrow with `.first()`, `.nth(i)`,
 `.filter({ hasText })` or by chaining another `getBy…`.
 
+`check`/`uncheck` (and the agent's check) handle a styled checkbox or radio whose invisible
+`<input>` is covered by its own `<label>`: danwo clicks the label, then fails unless the input
+changed. Every action but `press` and `setInputFiles` takes `{ force: true }`, which skips the
+visible, stable, enabled and not-covered checks; use it only on a control a user can reach that an
+action keeps timing out on (an endlessly animating button), since it also clicks disabled or
+covered elements.
+
 Prefer, in order: role with a name, label, text, test id. Check a locator against the live app
 before writing it: the MCP tool `check_locator` returns the exact line to paste.
 

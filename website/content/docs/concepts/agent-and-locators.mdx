@@ -75,6 +75,25 @@ first.
 | `setInputFiles(path)` | attaches a file to a file input  |
 | `dragTo(target)`      | drags it onto another element    |
 
+## When an action keeps waiting
+
+Component libraries often draw a checkbox or radio over an invisible `<input>`. `check()` and
+`uncheck()` handle that for you: when the input's own label covers it, danwo clicks the label, as
+a user would, and then checks that the input changed.
+
+For another control a user can reach but an action keeps waiting on, such as a button that never
+stops animating, pass `{ force: true }`. The action then skips its readiness checks and acts at
+once.
+
+```ts title="tests/install.danwo.ts · force"
+await screen.getByRole("button", { name: "Start now" }).click({ force: true })
+```
+
+<Callout type="warn">
+  `force` also clicks a disabled or covered element, so the test can pass where a user is stuck. Use
+  it only for the one control that needs it.
+</Callout>
+
 ## Narrow it to one element
 
 An action needs exactly one match. When a finder matches several, narrow it:
