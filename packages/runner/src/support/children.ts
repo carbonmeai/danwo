@@ -14,6 +14,8 @@ import { fileURLToPath } from "node:url"
 const GRACE_MS = 3_000
 const POLL_MS = 50
 const GUARDIAN = fileURLToPath(new URL("./guardian.ts", import.meta.url))
+/** Strips types under `node_modules`, where Node will not, so the guardian runs from an install. */
+const INSTALLED_HOOK = new URL("../../strip-types.mjs", import.meta.url).href
 const SIGNALS: readonly NodeJS.Signals[] = ["SIGINT", "SIGTERM", "SIGHUP"]
 const GROUPS = process.platform !== "win32"
 
@@ -57,7 +59,7 @@ function tellGuardian(line: string): void {
 function ensureGuardian(): void {
   if (guardian !== undefined || !GROUPS) return
 
-  guardian = spawn(process.execPath, [GUARDIAN, String(GRACE_MS)], {
+  guardian = spawn(process.execPath, ["--import", INSTALLED_HOOK, GUARDIAN, String(GRACE_MS)], {
     detached: true,
     stdio: ["pipe", "ignore", "ignore"],
   })
