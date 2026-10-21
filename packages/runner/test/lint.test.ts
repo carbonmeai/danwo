@@ -470,11 +470,12 @@ describe("oauth rules", () => {
   })
 })
 
-/** The same sign-in email, sent at `ms`. */
-const send = (ms: number) =>
+/** The same sign-in email, sent at `ms`, with an idempotency key when one is given. */
+const send = (ms: number, key?: string) =>
   call("POST", "https://api.resend.com/emails", {
     ms,
     body: '{"to":"ada@x.test","subject":"Code"}',
+    ...(key !== undefined && { headers: { "idempotency-key": key } }),
   })
 
 describe("messages/duplicate-send", () => {
@@ -489,6 +490,18 @@ describe("messages/duplicate-send", () => {
     })
 
     expect(rules(s)).not.toContain("messages/duplicate-send")
+  })
+
+  it("is quiet for a retry that reuses the first send's idempotency key", () => {
+    const s = subject({ exchanges: [send(10, "welcome/1"), send(20, "welcome/1")] })
+
+    expect(rules(s)).not.toContain("messages/duplicate-send")
+  })
+
+  it("flags the same email sent twice under two idempotency keys", () => {
+    const s = subject({ exchanges: [send(10, "welcome/1"), send(20, "welcome/2")] })
+
+    expect(rules(s)).toContain("messages/duplicate-send")
   })
 })
 

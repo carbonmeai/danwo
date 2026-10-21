@@ -1,6 +1,6 @@
 /** Messaging rules: the same email, text or chat message sent twice for one trigger. */
 import type { RecordedExchange } from "../../runner/record.ts"
-import { exchangeEvidence, pathOf, providerOfHost, stepAt } from "../subject.ts"
+import { exchangeEvidence, pathOf, providerOfHost, requestHeader, stepAt } from "../subject.ts"
 import type { LintRule, LintSubject, RuleFinding } from "../types.ts"
 
 /** Calls that send one message, by host and path. */
@@ -31,13 +31,34 @@ function sameness(subject: LintSubject, call: RecordedExchange): string | undefi
 }
 
 /**
+ * Whether `call` repeats an earlier send's `Idempotency-Key` to the same endpoint: a retry the
+ * provider answers with the first send, so no second message. Notes the key when it is new.
+ */
+function repeatsKey(keys: Set<string>, call: RecordedExchange): boolean {
+  const key = requestHeader(call, "idempotency-key")
+
+  if (key === undefined) return false
+
+  const scoped = `${call.host}${pathOf(call)} ${key}`
+
+  if (keys.has(scoped)) return true
+  keys.add(scoped)
+
+  return false
+}
+
+/**
  * Two sends with the same body in the same step: one action sent one message twice. Messages in
- * different steps may be legitimately alike (two sign-ins, two codes), so only one step counts.
+ * different steps may be legitimately alike (two sign-ins, two codes), so only one step counts. A
+ * retry with the first send's idempotency key is the same message, not a second one.
  */
 function duplicateSends(subject: LintSubject): RuleFinding[] {
   const seen = new Set<string>()
+  const keys = new Set<string>()
 
   return subject.exchanges.filter(isSend).flatMap((call) => {
+    if (repeatsKey(keys, call)) return []
+
     const key = sameness(subject, call)
 
     if (key === undefined) return []
