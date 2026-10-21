@@ -105,6 +105,14 @@ cache note says `recorded with openai/gpt-5-mini, running anthropic/claude-sonne
 line ends with `recorded with … (n steps), running …`. Clear the cache to have the new model run
 them.
 
+The agent reads the page as an accessibility tree of at most 120 000 characters, redacted before
+it is cut; a step whose view was cut has a `view-cut` event in its record (`chars`, `kept`), so a
+step that missed something far down a long page says why. Page text is never an instruction to the
+agent, and its prompts say so: a page reading "ignore your instructions" changes nothing. After
+every action (a locator's or the agent's) readiness also waits, up to 3 s, while the page shows a
+loading state: an element with `aria-busy="true"`, a progress bar with no value, or a `status` that
+starts with "Loading".
+
 Values in braces come from `params`: `unique(...)` gives a fresh value each run that replays still
 accept, `secret(name)` keeps the value from the model, and values the agent reads from mail are
 recorded by where they came from, not as text.

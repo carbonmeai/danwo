@@ -10,7 +10,7 @@ import type { MailDesk } from "../mail/desk.ts"
 import type { CallCost } from "../model/resolve.ts"
 import { type Params, shownParams } from "../replay/params.ts"
 import type { SecretVault } from "../secrets/index.ts"
-import { type PageView, viewTabs, viewText } from "../snapshot/view.ts"
+import { type PageView, type ViewCut, viewTabs, viewText } from "../snapshot/view.ts"
 import type { VisionDesk } from "../vision/desk.ts"
 import { VISION_GUIDE } from "../vision/prompts.ts"
 import { gapsLine, hasGaps, visualGaps } from "../vision/screen.ts"
@@ -55,6 +55,8 @@ export interface LiveContext {
   /** Called for every model call and every action, for the step's record. */
   readonly onModelCall: (cost: CallCost) => void
   readonly onAction: (label: string) => void
+  /** Told the first time the step's view of the page was cut for length. */
+  readonly onViewCut?: (cut: ViewCut) => void
 }
 
 export type LiveResult = LoopResult
@@ -93,6 +95,8 @@ function imageMessage(image: { readonly png: Buffer; readonly text: string }): M
 
 class Loop extends ToolLoop<PageView, Call, Outcome> {
   private readonly live: LiveContext
+  /** Whether the step's record already says its view was cut. */
+  private cutNoted = false
 
   constructor(live: LiveContext) {
     super({ ...live, redact: live.vault.redact })
@@ -137,8 +141,15 @@ class Loop extends ToolLoop<PageView, Call, Outcome> {
     for (const image of images) this.transcript.push(imageMessage(image))
   }
 
-  protected look() {
-    return viewTabs(this.live.tabs, this.live.vault.redact)
+  protected async look() {
+    const view = await viewTabs(this.live.tabs, this.live.vault.redact)
+
+    if (view.cut !== undefined && !this.cutNoted) {
+      this.cutNoted = true
+      this.live.onViewCut?.(view.cut)
+    }
+
+    return view
   }
 
   protected system(): string {

@@ -63,6 +63,16 @@ export type StepEvent =
     }
   /** The app failed while the step ran: an error response, an uncaught error, a console error. */
   | { readonly kind: "app-error"; readonly at: string; readonly text: string }
+  /**
+   * The page was too long for the model's view, which kept its first `kept` characters of
+   * `chars`; noted the first time it happens in a step.
+   */
+  | {
+      readonly kind: "view-cut"
+      readonly at: string
+      readonly chars: number
+      readonly kept: number
+    }
   | ScreenshotEvent
   /** A recorded element was found somewhere else: where it was, and where it is now. */
   | { readonly kind: "relocated"; readonly at: string; readonly from: string; readonly to: string }

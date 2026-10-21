@@ -13,6 +13,7 @@ import { type Params, paramText } from "../replay/params.ts"
 import type { ReplayMismatch } from "../replay/replayer.ts"
 import type { ReplayStore, StepKey } from "../replay/store.ts"
 import type { RecordedAction, Trace } from "../replay/trace.ts"
+import type { ViewCut } from "../snapshot/view.ts"
 import { DanwoError } from "../support/codes.ts"
 import { type Budget, type Budgets, DEFAULT_STEP_BUDGET, Spend, Spends } from "./budget.ts"
 import type { EffectWatch } from "./effect-watch.ts"
@@ -54,6 +55,7 @@ export function stepEvents(steps: StepRecorder) {
   return {
     onModelCall: (cost: CallCost) => steps.event({ kind: "model", at: now(), ...cost }),
     onAction: (label: string) => steps.event({ kind: "action", at: now(), label }),
+    onViewCut: (cut: ViewCut) => steps.event({ kind: "view-cut", at: now(), ...cut }),
   }
 }
 

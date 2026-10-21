@@ -1,6 +1,7 @@
 /**
  * Waiting, after each action, until there is nothing left to wait for. On the page: no navigation
- * still loading, and the DOM unchanged for a short while. Behind the page, when the session has an
+ * still loading, the DOM unchanged for a short while, and no loading state shown (an element marked
+ * `aria-busy`, a progress bar with no value, a status that says "Loading"). Behind the page, when the session has an
  * environment: no provider call the app made still open at the proxy, and no webhook delivery in
  * flight (and, with `settle`, background work such as webhooks on a manual clock played out). A
  * step that clicks "Pay" then goes on only once the app has heard back from Stripe, so tests need
@@ -62,38 +63,83 @@ const DEFAULT_CAP_MS = 5_000
 const DEFAULT_QUIET_MS = 100
 /** A page that never stops changing (a clock, an animation) is not waited on longer than this. */
 const DOM_CAP_MS = 1_000
+/** A page that keeps showing a loading state (a spinner that never goes) is not waited on longer. */
+const LOADING_CAP_MS = 3_000
 
-/** Resolves once `page`'s DOM has not changed for `quietMs`, or after `capMs`. */
-function domQuiet(page: Page, quietMs: number, capMs: number): Promise<void> {
-  return page
-    .evaluate(
-      ([quiet, cap]) =>
-        new Promise<void>((resolve) => {
-          let timer = setTimeout(done, quiet)
-          const giveUp = setTimeout(done, cap)
-          const observer = new MutationObserver(() => {
-            clearTimeout(timer)
-            timer = setTimeout(done, quiet)
-          })
+/** What shows a page is still loading; a status counts only when it says so in words. */
+const LOADING =
+  '[aria-busy="true"], [role="progressbar"]:not([aria-valuenow]), progress:not([value])'
 
-          function done() {
-            observer.disconnect()
-            clearTimeout(timer)
-            clearTimeout(giveUp)
-            resolve()
-          }
-
-          observer.observe(document, { subtree: true, childList: true, attributes: true })
-        }),
-      [quietMs, capMs] as const,
-    )
-    .catch(() => undefined)
+/** How long the page is waited on: quiet for `quiet`, giving up on changes or loading at a cap. */
+interface QuietWait {
+  readonly quiet: number
+  /** The longest the DOM may keep changing before the wait ends anyway. */
+  readonly changing: number
+  /** The longest the page may keep showing a loading state. */
+  readonly loading: number
+  readonly selector: string
 }
 
-/** The page loaded what an action started and stopped changing. */
+/**
+ * Resolves once the page's DOM has not changed for `quiet` and it shows no loading state; a DOM
+ * that keeps changing ends the wait after `changing`, a loading state after `loading`. Runs in
+ * the page.
+ */
+function waitQuiet(wait: QuietWait): Promise<void> {
+  const busy = () =>
+    [...document.querySelectorAll(wait.selector)].some((element) => element.checkVisibility()) ||
+    [...document.querySelectorAll('[role="status"]')].some(
+      (element) => element.checkVisibility() && /^loading\b/i.test(element.textContent.trim()),
+    )
+
+  return new Promise<void>((resolve) => {
+    let timer = setTimeout(settle, wait.quiet)
+    let giveUp = setTimeout(stopUnlessBusy, wait.changing)
+    const deadline = setTimeout(done, Math.max(wait.loading, wait.changing))
+    const observer = new MutationObserver(() => {
+      clearTimeout(timer)
+      timer = setTimeout(settle, wait.quiet)
+    })
+
+    function settle() {
+      if (busy()) timer = setTimeout(settle, wait.quiet)
+      else done()
+    }
+
+    function stopUnlessBusy() {
+      if (busy()) giveUp = setTimeout(stopUnlessBusy, wait.quiet)
+      else done()
+    }
+
+    function done() {
+      observer.disconnect()
+      for (const pending of [timer, giveUp, deadline]) clearTimeout(pending)
+      resolve()
+    }
+
+    observer.observe(document, { subtree: true, childList: true, attributes: true })
+  })
+}
+
+/**
+ * Resolves once `page`'s DOM has not changed for `quietMs` and it shows no loading state, or after
+ * `capMs` (and at most `LOADING_CAP_MS` of loading).
+ */
+function domQuiet(page: Page, quietMs: number, capMs: number): Promise<void> {
+  const wait: QuietWait = {
+    quiet: quietMs,
+    changing: Math.min(capMs, DOM_CAP_MS),
+    loading: Math.min(capMs, LOADING_CAP_MS),
+    selector: LOADING,
+  }
+
+  return page.evaluate(waitQuiet, wait).catch(() => undefined)
+}
+
+/** The page loaded what an action started, stopped changing and stopped showing it loads. */
 async function pageSettled(page: Page, quietMs: number, capMs: number): Promise<void> {
   await page.waitForLoadState("domcontentloaded", { timeout: capMs }).catch(() => undefined)
-  await domQuiet(page, quietMs, Math.min(capMs, DOM_CAP_MS))
+  await domQuiet(page, quietMs, capMs)
 }
 
 /** How long is left of a wait that started at `started` and lasts at most `capMs`. */
@@ -118,7 +164,7 @@ async function pageAndBackendSettled(
   await pageSettled(page, quietMs, capMs)
   await backend.quiet(remaining(started, capMs)).catch(() => undefined)
   if (mark !== undefined && backend.pulse?.() === mark) return
-  await domQuiet(page, quietMs, Math.min(remaining(started, capMs), DOM_CAP_MS))
+  await domQuiet(page, quietMs, remaining(started, capMs))
 }
 
 /** The session's waiting after actions. */

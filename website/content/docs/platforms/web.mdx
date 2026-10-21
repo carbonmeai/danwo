@@ -44,7 +44,9 @@ per worker and reuses the browser state.
 
 ## The page waits for your backend
 
-After each action danwo waits for the page to settle. With an environment, it also waits until
+After each action danwo waits for the page to settle. A page that shows it is loading doesn't
+count as settled: an element marked `aria-busy`, a progress bar with no value, or a status that
+says "Loading". That wait stops after 3 seconds. With an environment, danwo also waits until
 nothing your app started is still in flight at the proxy:
 
 | `readiness`    | Waits for                                                                            |

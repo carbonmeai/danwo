@@ -17,18 +17,33 @@ export interface PageView {
   readonly title: string
   /** The accessibility tree with refs, redacted and capped. */
   readonly tree: string
+  /** When the tree was cut: how long it was, and how much of it the view kept. */
+  readonly cut?: ViewCut
+}
+
+/** How much of a page's tree a view left out. */
+export interface ViewCut {
+  /** Characters the redacted tree had. */
+  readonly chars: number
+  /** Characters the view kept. */
+  readonly kept: number
 }
 
 /** Takes a fresh snapshot of `page`, which also makes its refs the ones actions resolve against. */
 export async function viewPage(page: Page, redact: (text: string) => string): Promise<PageView> {
   /* Redacted before it is cut: a cut through a secret would leave its first characters behind. */
   const tree = redact(await page.ariaSnapshot({ mode: "ai", timeout: SNAPSHOT_TIMEOUT_MS }))
-  const capped =
-    tree.length > MAX_VIEW_CHARS
-      ? `${tree.slice(0, MAX_VIEW_CHARS)}\n… (page cut at ${MAX_VIEW_CHARS} characters)`
-      : tree
+  const url = redact(page.url())
+  const title = redact(await page.title())
 
-  return { url: redact(page.url()), title: redact(await page.title()), tree: capped }
+  if (tree.length <= MAX_VIEW_CHARS) return { url, title, tree }
+
+  return {
+    url,
+    title,
+    tree: `${tree.slice(0, MAX_VIEW_CHARS)}\n… (page cut at ${MAX_VIEW_CHARS} characters)`,
+    cut: { chars: tree.length, kept: MAX_VIEW_CHARS },
+  }
 }
 
 /** The tabs line of a view, when more than one tab is open. */
