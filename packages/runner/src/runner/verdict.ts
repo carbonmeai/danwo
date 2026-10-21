@@ -379,13 +379,8 @@ function settledByCode(error: TestError): FailureVerdict | undefined {
   return undefined
 }
 
-/** A failure the app's behaviour has to decide. */
-function weighedVerdict(evidence: VerdictEvidence, error: TestError): FailureVerdict {
-  const app = appEvidence(evidence)
-
-  if (error.code === "CLAIM_FAILED" && app?.inWindow !== true)
-    return judged("undecided", "likely", "the judge says the claim doesn't hold")
-  if (app !== undefined) return judged("app", app.confidence, `${app.reason}, then ${error.code}`)
+/** A failure with no app errors behind it that its code alone points at. */
+function quietVerdict(error: TestError): FailureVerdict | undefined {
   if (LOCATOR_CODES.has(error.code))
     return judged(
       "test",
@@ -402,6 +397,21 @@ function weighedVerdict(evidence: VerdictEvidence, error: TestError): FailureVer
     )
   if (error.code === "TIMED_OUT")
     return judged("undecided", "likely", "the test ran past its deadline with no app errors")
+
+  return undefined
+}
+
+/** A failure the app's behaviour has to decide. */
+function weighedVerdict(evidence: VerdictEvidence, error: TestError): FailureVerdict {
+  const app = appEvidence(evidence)
+
+  if (error.code === "CLAIM_FAILED" && app?.inWindow !== true)
+    return judged("undecided", "likely", "the judge says the claim doesn't hold")
+  if (app !== undefined) return judged("app", app.confidence, `${app.reason}, then ${error.code}`)
+
+  const quiet = quietVerdict(error)
+
+  if (quiet !== undefined) return quiet
 
   const act = modelAct(evidence.steps ?? [])
 
