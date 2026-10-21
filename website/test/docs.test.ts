@@ -278,7 +278,7 @@ describe("links to files", () => {
 })
 
 describe("links to the docs from outside the website", () => {
-  it("points every danwo.dev docs address in the repository at a page the site builds", () => {
+  it("points every danwo.dev docs address in the repository, and every example's guide, at a page the site builds", () => {
     const slugs = new Set(docsSlugs())
     const tracked = execFileSync("git", ["ls-files", "*.md", "*.mdx", "*.ts", "*.tsx", "*.json"], {
       cwd: REPO_ROOT,
@@ -289,7 +289,9 @@ describe("links to the docs from outside the website", () => {
     const broken = tracked.flatMap((file) =>
       [
         ...readFileSync(join(REPO_ROOT, file), "utf8").matchAll(
-          /https:\/\/danwo\.dev\/docs\/([\w/-]*[\w-])/g,
+          file.endsWith("example.json")
+            ? /"\/docs\/([\w/-]*[\w-])"/g
+            : /https:\/\/danwo\.dev\/docs\/([\w/-]*[\w-])/g,
         ),
       ]
         .map((match) => match[1] ?? "")
