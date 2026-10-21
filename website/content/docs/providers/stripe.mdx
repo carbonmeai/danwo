@@ -87,9 +87,17 @@ test("pays for credits once", async ({ app, screen, expect, stripe }) => {
 ```
 
 On the emulator's Checkout page, `checkout-pay` pays and `checkout-cancel` goes back to your
-`cancel_url`. The card number field holds Visa's test card. Type `4000 0000 0000 0002` instead
-and the card is declined: the page shows the decline as an alert (`checkout-error`), the session
-stays open, and no `checkout.session.completed` is sent.
+`cancel_url`.
+
+The card number field holds Visa's test card. Type Stripe's declining card instead and the payment
+fails the way it does on Stripe:
+
+| Card number           | On the Checkout page                                                        |
+| --------------------- | --------------------------------------------------------------------------- |
+| `4242 4242 4242 4242` | pays, and `checkout.session.completed` is sent                              |
+| `4000 0000 0000 0002` | declined: the page shows an alert, the session stays open, no event is sent |
+
+The alert has the test id `checkout-error`, and the payer can try another card.
 
 ## What's covered
 
