@@ -17,7 +17,7 @@ const session = z.string().describe("the session id open_session returned, e.g. 
 const target = z
   .string()
   .describe(
-    'what to act on: a ref from the latest snapshot ("e12"), or a locator as a test writes it, e.g. getByRole("button", { name: "Pay" }) or getByLabel("Email")',
+    'what to act on: a ref from the latest snapshot ("e12"), or a locator as a test writes it, e.g. getByRole("button", { name: "Pay" }) or getByLabel("Email"); chain one inside another, e.g. getByRole("region", { name: "Cart" }).getByRole("button", { name: "Remove" }), and narrow with .first(), .last(), .nth(n), .filter({ hasText })',
   )
 
 const mimeType = z.string().optional().describe("e.g. image/png; guessed from the name if left out")
@@ -260,7 +260,9 @@ function registerPageTools(server: McpServer, sessions: SessionManager): void {
       session,
       locator: z
         .string()
-        .describe('as a test writes it, e.g. getByRole("button", { name: "Sign in" })'),
+        .describe(
+          'as a test writes it, e.g. getByRole("button", { name: "Sign in" }), or chained: getByRole("row", { name: "Oats" }).getByRole("button", { name: "Remove" })',
+        ),
     },
     call: (args) => ({ kind: "check_locator", locator: given(args.locator, "locator") }),
     readOnly: true,

@@ -1,4 +1,4 @@
-import { locate, locatorCode, parseLocator, type ScreenQuery } from "@danwo/recorder"
+import { locatorCode, type ScreenQuery } from "@danwo/recorder"
 /**
  * `check_locator`: whether a locator a test would use finds exactly one element on the live page.
  * One match gives the line to paste into the test; none or several say why a test using it would
@@ -6,6 +6,14 @@ import { locate, locatorCode, parseLocator, type ScreenQuery } from "@danwo/reco
  */
 import { likeness } from "@danwo/runner"
 import type { Locator, Page } from "playwright-core"
+
+import {
+  chainCode,
+  emptyLink,
+  type LocatorChain,
+  locateChain,
+  parseChain,
+} from "./locator-chain.ts"
 
 const MAX_SHOWN = 5
 const MAX_LINE = 200
@@ -66,7 +74,9 @@ async function testIds(page: Page): Promise<string[]> {
   return [...new Set(ids)].filter((id) => id !== "")
 }
 
-async function noMatch(page: Page, query: ScreenQuery, tree: string, code: string) {
+async function noMatch(page: Page, chain: LocatorChain, tree: string, code: string) {
+  const query = chain.last
+  const empty = await emptyLink(page, chain)
   const near =
     query.by === "testId"
       ? (await testIds(page))
@@ -77,6 +87,7 @@ async function noMatch(page: Page, query: ScreenQuery, tree: string, code: strin
 
   return [
     `${code} matches no element. A test using it would fail: the step waits for the element, then times out.`,
+    ...(empty === undefined ? [] : [`already ${empty} matches none; fix that part first.`]),
     ...(near.length === 0 ? [] : ["nearest on the page:", ...near.map((line) => `  ${line}`)]),
   ]
 }
@@ -95,7 +106,7 @@ async function manyMatches(
   return [
     `${code} matches ${count} elements. A test that clicks or fills with it would fail: an action needs exactly one element.`,
     ...lines,
-    "narrow it: give the role's name, add exact: true, or pick a locator that only this element has (a label, a test id).",
+    'narrow it: give the role\'s name, add exact: true, look inside a region or row (getByRole("region", { name: "Cart" }).getByRole(…)), or pick a locator that only this element has (a label, a test id).',
   ]
 }
 
@@ -106,12 +117,12 @@ export async function checkLocator(
   tree: string,
   redact: (text: string) => string,
 ): Promise<string> {
-  const query = parseLocator(expression)
-  const code = locatorCode(query)
-  const locator = locate(page, query)
+  const chain = parseChain(expression)
+  const code = chainCode(chain)
+  const locator = locateChain(page, chain)
   const count = await locator.count()
 
-  if (count === 0) return (await noMatch(page, query, tree, code)).join("\n")
+  if (count === 0) return (await noMatch(page, chain, tree, code)).join("\n")
   if (count > 1) return (await manyMatches(locator, count, code, redact)).join("\n")
 
   return [

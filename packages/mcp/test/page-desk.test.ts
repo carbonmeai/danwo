@@ -4,6 +4,7 @@ import { join } from "node:path"
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
+import { chainCode, parseChain } from "../src/sessions/locator-chain.ts"
 import { MAX_UPLOAD_BYTES } from "../src/sessions/upload.ts"
 import { DESK_SECRET, type DeskSite, deskSite } from "./desk.ts"
 
@@ -62,6 +63,20 @@ const PAGES: Readonly<Record<string, string>> = {
     <button type="button" onclick="setTimeout(() => alert('Later'), 50)">Later</button>
     <p role="status" id="out">nothing yet</p>`,
   "/greet": `<!doctype html><title>Greet</title><script>alert("Welcome")</script><h1>Greet</h1>`,
+  "/cart": `<!doctype html><title>Cart</title><h1>Cart</h1>
+    <section aria-label="Cart"><ul>
+      <li>Oats <button type="button">Remove</button></li>
+      <li>Honey <button type="button">Remove</button></li>
+    </ul></section>
+    <section aria-label="Saved"><ul><li>Tea <button type="button">Remove</button></li></ul></section>
+    <p role="status" id="out">3 items</p>
+    <script>
+      for (const remove of document.querySelectorAll("button"))
+        remove.onclick = () => {
+          remove.closest("li").remove()
+          out.textContent = document.querySelectorAll("li").length + " items"
+        }
+    </script>`,
 }
 
 let site: DeskSite
@@ -79,7 +94,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await site.close()
-})
+}, 60_000)
 
 describe("upload", () => {
   it("puts a project file and passed bytes into a file input", async () => {
@@ -355,5 +370,57 @@ describe("dialogs", () => {
     expect(await greeted.desk.act({ kind: "dialog", accept: true })).toMatch(
       /accepted the alert dialog "Welcome"\nloaded \/greet[^]*heading "Greet"/,
     )
+  })
+})
+
+describe("chained locators", () => {
+  const honey =
+    'getByRole("region", { name: "Cart" }).getByRole("listitem").filter({ hasText: "Honey" }).getByRole("button", { name: "Remove" })'
+
+  it("reads a chain and writes it back as a test would", () => {
+    expect(chainCode(parseChain(honey))).toBe(`screen.${honey}`)
+    expect(chainCode(parseChain("screen.getByText(/^o.ts/i).nth(1).first().last()"))).toBe(
+      "screen.getByText(/^o.ts/i).nth(1).first().last()",
+    )
+    expect(chainCode(parseChain('getByLabel("a.b")'))).toBe('screen.getByLabel("a.b")')
+    expect(parseChain(honey).last).toEqual({ by: "role", value: "button", name: "Remove" })
+    expect(() => parseChain('getByRole("list").locator("li")')).toThrow(
+      /"locator\("li"\)" in .* is not part of a locator/,
+    )
+    expect(() => parseChain('first().getByText("x")')).toThrow(/must start with a query/)
+  })
+
+  it("acts on an element found inside another", async () => {
+    const { desk } = await site.open("/cart")
+
+    await expect(desk.act({ kind: "click", target: button("Remove") })).rejects.toThrow(
+      /matches 3 elements[^]*\.first\(\) or \.nth\(n\) picks one/,
+    )
+
+    const removed = await desk.act({ kind: "click", target: honey })
+
+    expect(removed).toContain(`clicked screen.${honey}`)
+    expect(removed).toMatch(/status \[ref=e\d+\]: 2 items/)
+    expect(
+      await desk.act({
+        kind: "click",
+        target: 'getByRole("region", { name: "Saved" }).getByRole("button").first()',
+      }),
+    ).toMatch(/: 1 items/)
+  })
+
+  it("checks a chain, and says which link of it matches nothing", async () => {
+    const { desk } = await site.open("/cart")
+    const one = await desk.check('getByRole("region", { name: "Saved" }).getByRole("button")')
+    const none = await desk.check('getByRole("region", { name: "Basket" }).getByRole("button")')
+    const many = await desk.check('getByRole("region", { name: "Cart" }).getByRole("button")')
+
+    expect(one).toContain(
+      'use in a test: screen.getByRole("region", { name: "Saved" }).getByRole("button")',
+    )
+    expect(none).toContain(
+      'already screen.getByRole("region", { name: "Basket" }) matches none; fix that part first.',
+    )
+    expect(many).toContain("matches 2 elements")
   })
 })

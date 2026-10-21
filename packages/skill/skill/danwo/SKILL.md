@@ -20,15 +20,20 @@ When the project has danwo's MCP server (`danwo init` registers it), work agains
 
 1. Read `danwo://config` for where tests live, the app and the configured secrets' names.
 2. `open_session`, then walk the journey with `click`, `fill`, `fill_secret` (by name), `select`
-   and `press`, using refs from each answer. `click` takes `modifiers` (`Shift`, `ControlOrMeta`,
-   `Alt`…), `button: "right"` and `double: true`; `drag` drops `target` on `to`. A tab the app opens becomes the active one (the
-   answer says `tab: 2 of 2`); `tabs`, `switch_tab` and `close_tab` manage them. An `alert`, `confirm` or
-   `prompt` stays open until you answer it with `dialog` (`accept`, and `text` for a prompt). `upload` puts files into a file input (a project
-   path, a `files` name from the config, or `{ name, text | base64 }`; a test then uploads them
-   by their `files` name).
+   and `press`, using refs from each answer.
+   - `click` takes `modifiers` (`Shift`, `ControlOrMeta`, `Alt`…), `button: "right"` and
+     `double: true`; `drag` drops `target` on `to`.
+   - `upload` puts files into a file input: a project path, a `files` name from the config, or
+     `{ name, text | base64 }`. A test then uploads them by their `files` name.
+   - A tab the app opens becomes the active one (the answer says `tab: 2 of 2`); `tabs`,
+     `switch_tab` and `close_tab` manage them.
+   - An `alert`, `confirm` or `prompt` stays open until you answer it with `dialog` (`accept`, and
+     `text` for a prompt); until then every page tool says it is open.
 3. For every element a step needs, `check_locator` with the locator you would write until it
    matches exactly one element; keep the line it returns. Prefer `getByRole` with a name, then
-   `getByLabel`, `getByText`, `getByTestId`.
+   `getByLabel`, `getByText`, `getByTestId`. When several match, chain the query inside the part
+   of the page that holds it (`getByRole("region", { name: "Cart" }).getByRole("button", …)`) or
+   narrow it with `.filter({ hasText })`, `.first()`, `.nth(n)`.
 4. Look behind the app: `exchanges` (provider calls), `deliver_webhooks`, `emulator_state`. Decide
    the invariant: what must hold however the run goes, comparing the app's state with the
    provider's (credits granted = payments captured; one email per order).

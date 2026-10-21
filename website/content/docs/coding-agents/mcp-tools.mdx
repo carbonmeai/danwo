@@ -43,6 +43,27 @@ to explore before it writes a test. Every action answers with the page as it is 
 | `check_locator`                                      | Checks a locator matches exactly one element, and returns the line to paste.                  |
 | `start_recording`, `stop_recording`                  | Records the session's screenshots, and video when no secret was filled.                       |
 
+### Find an element inside another
+
+A target is a ref from the last snapshot, or a locator as a test writes it. When one locator
+matches several elements, chain it inside the part of the page that holds the one you want:
+
+```ts title="target · fragment"
+getByRole("region", { name: "Cart" }).getByRole("button", { name: "Remove" })
+```
+
+A chain can also narrow what it found:
+
+| Link                      | What it keeps                        |
+| ------------------------- | ------------------------------------ |
+| `.getBy…(…)`              | Matches inside each element so far.  |
+| `.filter({ hasText: … })` | The elements that contain this text. |
+| `.first()`, `.last()`     | The first or last element.           |
+| `.nth(n)`                 | The element at index `n`, from 0.    |
+
+`check_locator` takes chains too. When a chain matches nothing, it names the first link after
+which nothing matched, so you know which part to fix.
+
 ### Click with keys held, twice or with the right button
 
 `click` takes three options beyond its target:
@@ -82,8 +103,9 @@ the page waits for an answer: dialog with accept: true (OK) or false (Cancel)
 
 Call `dialog` with `accept: true` for OK or `false` for Cancel.
 
-Add `text` to type into a prompt; without it, the prompt keeps its default. The click that opened the dialog then finishes, and the
-answer shows what changed. Until then, every other page tool says the dialog is open.
+Add `text` to type into a prompt; without it, the prompt keeps its default. The click that opened
+the dialog then finishes, and the answer shows what changed. Until then, every other page tool
+says the dialog is open.
 
 ### Upload a file
 

@@ -7,12 +7,12 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
-import { locate, locatorCode, parseLocator } from "@danwo/recorder"
 import type { SecretVault } from "@danwo/runner"
 import type { Browser, BrowserContext, Locator, Page } from "playwright-core"
 
 import { type OpenDialog, SessionDialogs } from "./dialogs.ts"
 import { snapshotChange } from "./diff.ts"
+import { chainCode, emptyLink, locateChain, parseChain } from "./locator-chain.ts"
 import { checkLocator } from "./locator-check.ts"
 import type { SessionAnswer, SessionCall } from "./protocol.ts"
 import { SessionTabs } from "./tabs.ts"
@@ -276,16 +276,22 @@ export class PageDesk {
 
     if (ref !== undefined) return { locator: this.page.getByRef(ref), name: this.refName(ref) }
 
-    const query = parseLocator(target)
-    const code = locatorCode(query)
-    const locator = locate(this.page, query)
+    const chain = parseChain(target)
+    const code = chainCode(chain)
+    const locator = locateChain(this.page, chain)
     const count = await locator.count()
 
-    if (count !== 1)
+    if (count === 0) {
+      const empty = await emptyLink(this.page, chain)
+
       throw new Error(
-        count === 0
-          ? `${code} matches no element (check_locator shows the nearest ones)`
-          : `${code} matches ${count} elements, and an action needs exactly one (check_locator lists them)`,
+        `${code} matches no element${empty === undefined ? "" : `: already ${empty} matches none`} (check_locator shows the nearest ones)`,
+      )
+    }
+
+    if (count > 1)
+      throw new Error(
+        `${code} matches ${count} elements, and an action needs exactly one (check_locator lists them; .first() or .nth(n) picks one)`,
       )
 
     return { locator, name: code }
