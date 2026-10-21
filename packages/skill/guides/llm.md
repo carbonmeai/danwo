@@ -81,7 +81,7 @@ your secret to sign them again.
 `danwo matrix` breaks each model call in turn: a 429 with the provider's rate-limit headers, a 500,
 a 503 (529 overloaded on Anthropic), a prompt over the context window, a slow or dropped
 connection, and answers only the emulator can shape: `refusal`, `empty-completion`, `truncated`,
-`content-filter`, `malformed-tool-call` and `stream-cut`. Each error comes in the provider's own
+`content-filter`, `malformed-tool-call` (the scripted call's arguments broken off half-way, as a lenient JSON repair would half-recover them) and `stream-cut`. Each error comes in the provider's own
 shape, so its SDK raises its own error: Gemini's `RESOURCE_EXHAUSTED` and `UNAVAILABLE`, Bedrock's
 `ThrottlingException` and `ServiceUnavailableException` (named in `x-amzn-errortype`). Gemini
 answers a malformed tool call with `MALFORMED_FUNCTION_CALL` and no content, as it does. Good invariants for an assistant: the

@@ -152,6 +152,26 @@ describe("AI Gateway", () => {
     expect(cut.finishReason).toBe("length")
   })
 
+  it("breaks a malformed tool call's arguments off half-way, which the AI SDK refuses", async () => {
+    const seen: string[] = []
+    const result = await generateText({
+      model: gatewayFor("malformed-tool-call")("openai/gpt-5-mini"),
+      tools: WEATHER,
+      prompt: "what is the weather in Lagos?",
+      repairToolCall: async ({ toolCall }) => {
+        seen.push(toolCall.input)
+
+        return null
+      },
+    })
+    const [input = ""] = seen
+
+    expect(result.toolResults).toEqual([])
+    expect(input.length).toBeGreaterThan(2)
+    expect('{"city":"Lagos"}'.startsWith(input)).toBe(true)
+    expect(() => JSON.parse(input)).toThrow(SyntaxError)
+  })
+
   it("embeds the same text to the same vector", async () => {
     const model = gatewayFor().textEmbeddingModel("openai/text-embedding-3-small")
     const [a, b] = await Promise.all([

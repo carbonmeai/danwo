@@ -4,6 +4,7 @@
  * filter, a tool call whose arguments are not valid JSON, and a stream that stops half-way.
  */
 import type { LlmReply, LlmRequest } from "./entities.ts"
+import { argumentsText } from "./usage.ts"
 
 /** The behaviours an `emulate` fault can name on a model API route. */
 export const LLM_BEHAVIOURS = [
@@ -27,13 +28,21 @@ function half(text: string): string {
   return text.slice(0, Math.max(1, Math.floor(text.length / 2)))
 }
 
-/** A tool call whose arguments break off, as a model's sometimes do. */
+/**
+ * A tool call whose arguments break off half-way, as a model's sometimes do: the scripted call's
+ * own arguments, cut short, so what a lenient JSON repair would recover is what the model meant to
+ * send, minus its end. Never valid JSON: an object cut before its closing brace cannot parse.
+ */
 function malformed(reply: LlmReply, request: LlmRequest): LlmReply {
-  const name = reply.toolCalls?.[0]?.name ?? request.tools[0]
+  const call = reply.toolCalls?.[0]
+  const name = call?.name ?? request.tools[0]
 
   if (name === undefined) return reply
 
-  return { toolCalls: [{ name, arguments: '{"' }] }
+  const whole = call === undefined ? "" : argumentsText(call.arguments)
+  const cut = whole.slice(0, Math.floor(whole.length / 2))
+
+  return { toolCalls: [{ name, arguments: cut.startsWith('{"') ? cut : '{"' }] }
 }
 
 /** `reply` as `behaviour` turns it. A stream cut short is handled where the stream is written. */
