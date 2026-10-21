@@ -381,6 +381,9 @@ function earlier(event: unknown, ms: number): unknown {
  * `time.travel`, an app's SDK stamps the events it sends with its own clock, days ahead; the dev
  * server runs on the real one and would schedule their runs for that day, so they never start.
  */
+/** The header the SDK seeds the ids of the events in one send with: `<ms>,<entropy>`. */
+const EVENT_ID_SEED = "x-inngest-event-id-seed"
+
 function onRealTime(upstream: string, ahead: () => number): Handler {
   const forward = forwardTo(upstream)
 
@@ -391,8 +394,14 @@ function onRealTime(upstream: string, ahead: () => number): Handler {
       return forward(request)
 
     const text = await request.text()
+    const headers = new Headers(request.headers)
+    const [seededAt, entropy] = (headers.get(EVENT_ID_SEED) ?? "").split(",")
+
+    /* The SDK seeds the events' ids with the time it sent them at, on the same clock. */
+    if (seededAt && entropy) headers.set(EVENT_ID_SEED, `${Number(seededAt) - ms},${entropy}`)
+
     const resent = (body: string) =>
-      forward(new Request(request.url, { method: "POST", headers: request.headers, body }))
+      forward(new Request(request.url, { method: "POST", headers, body }))
     let events: unknown
 
     try {
