@@ -120,6 +120,21 @@ test("sends the digest at nine", async ({ app, screen, expect, time }) => {
 })
 ```
 
+danwo runs a due cron function the way the dev server's Invoke button does, so the run's event is
+`inngest/function.invoked`, with no data. The v4 SDK checks that event against the schemas of the
+function's typed event triggers, so a cron function that has one needs an `invoke()` trigger too:
+
+```ts title="worker/functions.ts"
+import { cron, invoke } from "inngest"
+
+inngest.createFunction(
+  { id: "scheduler", triggers: [cron("0 * * * *"), DigestScheduled, invoke(z.object({}))] },
+  async ({ step }) => {
+    /* …find what is due, then fan it out… */
+  },
+)
+```
+
 <Callout type="warn">
   A run already asleep in `step.sleep` or `step.sleepUntil` still wakes at real time: the dev server
   keeps its own clock. For work you schedule, store when it is due and let a cron function pick it
