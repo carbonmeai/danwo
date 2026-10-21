@@ -40,6 +40,19 @@ to explore before it writes a test. Every action answers with the page as it is 
 | `check_locator`                                      | Checks a locator matches exactly one element, and returns the line to paste.         |
 | `start_recording`, `stop_recording`                  | Records the session's screenshots, and video when no secret was filled.              |
 
+### Click with keys held, twice or with the right button
+
+`click` takes three options beyond its target:
+
+| Option      | What it does                                                   | Default  |
+| ----------- | -------------------------------------------------------------- | -------- |
+| `modifiers` | Keys held during the click: `Shift`, `Alt`, `Meta`, `Control`. | none     |
+| `button`    | `right` opens a context menu; `middle` is the wheel button.    | `"left"` |
+| `double`    | `true` double-clicks, such as to edit a cell or select a word. | `false`  |
+
+`ControlOrMeta` is Meta on macOS and Control elsewhere. Use it to add an item to a selection or
+open a link in a new tab, so the same step works on every machine.
+
 ### Upload a file
 
 `upload` takes a list of files. Give each one in whichever form you have it:

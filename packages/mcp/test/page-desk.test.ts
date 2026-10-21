@@ -23,6 +23,19 @@ const PAGES: Readonly<Record<string, string>> = {
       photo.onchange = () => show(photo)
       pick.onclick = () => photo.click()
     </script>`,
+  "/clicks": `<!doctype html><title>Clicks</title><h1>Clicks</h1>
+    <button type="button" id="item">Item</button>
+    <p role="status" id="seen">no click</p>
+    <script>
+      const seen = document.getElementById("seen")
+      const held = (e) =>
+        ["shift", "meta", "ctrl", "alt"].filter((key) => e[key + "Key"]).join("+") || "no keys"
+      for (const type of ["click", "dblclick", "contextmenu"])
+        item.addEventListener(type, (e) => {
+          if (type === "contextmenu") e.preventDefault()
+          seen.textContent = type + " button " + e.button + " " + held(e)
+        })
+    </script>`,
 }
 
 let site: DeskSite
@@ -126,5 +139,36 @@ describe("upload", () => {
     expect(answer).not.toContain(DESK_SECRET)
     expect(await desk.stopRecording()).toContain("recorded 3 screenshots")
     expect(readdirSync(join(site.root, "recording"))).toContain("002-upload.png")
+  })
+})
+
+describe("click", () => {
+  const item = 'getByRole("button", { name: "Item" })'
+
+  it("holds modifier keys", async () => {
+    const { desk } = await site.open("/clicks")
+    const answer = await desk.act({ kind: "click", target: item, modifiers: ["Shift", "Meta"] })
+
+    expect(answer).toContain(
+      `clicked screen.getByRole("button", { name: "Item" }), holding Shift+Meta`,
+    )
+    expect(answer).toContain("click button 0 shift+meta")
+    /* Control alone would be a context click on macOS, as it is for a person there. */
+    expect(await desk.act({ kind: "click", target: item, modifiers: ["Alt"] })).toContain(
+      "click button 0 alt",
+    )
+  })
+
+  it("double-clicks and right-clicks", async () => {
+    const { desk } = await site.open("/clicks")
+    const double = await desk.act({ kind: "click", target: item, double: true })
+    const right = await desk.act({ kind: "click", target: item, button: "right" })
+
+    expect(double).toContain("double-clicked screen.getByRole")
+    expect(double).toContain("dblclick button 0 no keys")
+    expect(right).toContain(
+      'clicked screen.getByRole("button", { name: "Item" }) with the right button',
+    )
+    expect(right).toContain("contextmenu button 2 no keys")
   })
 })

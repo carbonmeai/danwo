@@ -10,6 +10,9 @@ import type { JobPlace } from "../jobs/protocol.ts"
 /** What an action works on: a ref from the latest snapshot (`e12`) or a locator expression. */
 export type Target = string
 
+/** A key held down during a click; `ControlOrMeta` is Meta on macOS and Control elsewhere. */
+export type Modifier = "Alt" | "Control" | "ControlOrMeta" | "Meta" | "Shift"
+
 /**
  * A file to upload: a path in the project, a file the config offers tests by name, or bytes the
  * agent passes as text or base64.
@@ -22,7 +25,13 @@ export type UploadFile =
 
 export type SessionCall =
   | { readonly kind: "snapshot" }
-  | { readonly kind: "click"; readonly target: Target }
+  | {
+      readonly kind: "click"
+      readonly target: Target
+      readonly modifiers?: readonly Modifier[] | undefined
+      readonly button?: "left" | "right" | "middle" | undefined
+      readonly double?: boolean | undefined
+    }
   | { readonly kind: "hover"; readonly target: Target }
   | { readonly kind: "fill"; readonly target: Target; readonly value: string }
   | { readonly kind: "fill_secret"; readonly target: Target; readonly secret: string }

@@ -38,6 +38,13 @@ const UploadFile = z.union([
   }),
 ])
 
+const modifiers = z
+  .array(z.enum(["Alt", "Control", "ControlOrMeta", "Meta", "Shift"]))
+  .optional()
+  .describe("keys held during the click; ControlOrMeta is Meta on macOS, Control elsewhere")
+const button = z.enum(["left", "right", "middle"]).optional().describe('default "left"')
+const double = z.boolean().optional().describe("a double click")
+
 function reply(result: SessionAnswer): CallToolResult {
   return {
     content: [
@@ -70,6 +77,9 @@ const SessionArgs = z.object({
   bodies: z.boolean().optional(),
   fault: z.string().optional(),
   files: z.array(UploadFile).optional(),
+  modifiers,
+  button,
+  double,
 })
 
 type SessionArgs = z.infer<typeof SessionArgs>
@@ -112,9 +122,15 @@ const ACTION_NOTE =
 function registerActions(server: McpServer, sessions: SessionManager): void {
   register(server, sessions, {
     name: "click",
-    description: `Click an element. ${ACTION_NOTE}`,
-    input: { session, target },
-    call: (args) => ({ kind: "click", target: given(args.target, "target") }),
+    description: `Click an element: a left click by default; button: "right" for a context menu, double: true for a double click, modifiers to hold keys (Shift to select a range, ControlOrMeta to add to a selection or open a link in a new tab). ${ACTION_NOTE}`,
+    input: { session, target, modifiers, button, double },
+    call: (args) => ({
+      kind: "click",
+      target: given(args.target, "target"),
+      modifiers: args.modifiers,
+      button: args.button,
+      double: args.double,
+    }),
   })
   register(server, sessions, {
     name: "hover",

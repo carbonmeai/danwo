@@ -339,6 +339,18 @@ export class PageDesk {
   }
 }
 
+/** How a click's answer names it: `clicked X`, `double-clicked X with the right button, holding Shift`. */
+function clickedText(call: Extract<ActionCall, { kind: "click" }>, name: string): string {
+  const button =
+    call.button === undefined || call.button === "left" ? "" : ` with the ${call.button} button`
+  const held =
+    call.modifiers === undefined || call.modifiers.length === 0
+      ? ""
+      : `, holding ${call.modifiers.join("+")}`
+
+  return `${call.double === true ? "double-clicked" : "clicked"} ${name}${button}${held}`
+}
+
 /** Each action by kind, carried out on the desk; answers with what was done. */
 const ACTIONS: {
   readonly [K in ActionCall["kind"]]: (
@@ -348,10 +360,16 @@ const ACTIONS: {
 } = {
   async click(desk, call) {
     const { locator, name } = await desk.target(call.target)
+    const options = {
+      timeout: ACTION_TIMEOUT_MS,
+      ...(call.modifiers !== undefined && { modifiers: [...call.modifiers] }),
+      ...(call.button !== undefined && { button: call.button }),
+    }
 
-    await locator.click({ timeout: ACTION_TIMEOUT_MS })
+    if (call.double === true) await locator.dblclick(options)
+    else await locator.click(options)
 
-    return `clicked ${name}`
+    return clickedText(call, name)
   },
   async hover(desk, call) {
     const { locator, name } = await desk.target(call.target)
