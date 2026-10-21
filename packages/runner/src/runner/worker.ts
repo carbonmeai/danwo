@@ -517,6 +517,7 @@ function trialReport(
     ...(dataCalls !== undefined && { dataCalls }),
     sockets: env.proxy.sockets().slice(mark.sockets ?? 0),
     divergence: result.divergence,
+    stopped: stop,
     notes: [...(stop === undefined ? [] : [stop]), ...(env.notes?.() ?? [])],
   }
 }

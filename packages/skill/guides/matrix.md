@@ -32,7 +32,8 @@ below) and replays the clean run's recorded steps without the model.
 - PASS: the invariant held under the fault (the body may stop early; that is fine).
 - FAIL: the invariant broke; the report shows where the body stopped and why.
 - INVALID: the fault never fired (the app took another path); rerun with `matrix.rerunInvalid`.
-- NOT JUDGED: the trial was blocked, inconclusive or hit an infrastructure failure.
+- NOT JUDGED: the trial was blocked, inconclusive or hit an infrastructure failure, or its body
+  broke before the fault could fire (the error says where).
 
 `--faults "^duplicate"` runs only the faults whose labels match; `danwo spec --topic faults` lists
 the labels each provider gets. Without an invariant the body itself must pass under every fault.

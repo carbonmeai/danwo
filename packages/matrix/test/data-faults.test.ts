@@ -137,4 +137,27 @@ describe("applyDataFault", () => {
       }).status,
     ).toBe("passed")
   })
+
+  it("does not judge a run whose body broke before its fault could fire", () => {
+    const [fault] = planDataFaults([call("COMMIT", "boundary")], () => [{ kind: "reset" }])
+
+    if (fault === undefined) throw new Error("no plan")
+
+    const stopped = "body stopped at tests/onboarding.danwo.ts:21: expect(…).toBeVisible() failed"
+    const judged = checkFaultFired({
+      fault,
+      status: "failed",
+      error: "invariant: expected '0' to be '1'",
+      exchanges: [],
+      deliveries: [],
+      dataCalls: [],
+      notes: [stopped],
+      stopped,
+    })
+
+    expect(judged.status).toBe("not-judged")
+    expect(judged.error).toBe(
+      `not judged: the body broke before the fault point, so ${fault.label} never fired (${stopped})`,
+    )
+  })
 })

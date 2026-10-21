@@ -59,12 +59,12 @@ The failure is a real bug: a webhook delivered twice granted the credits twice.
 
 ## What each result means
 
-| Result       | Meaning                                                                                  |
-| ------------ | ---------------------------------------------------------------------------------------- |
-| `PASS`       | The invariant held under the fault. The test itself may have stopped early; that's fine. |
-| `FAIL`       | The invariant broke. The record shows where the test stopped and why.                    |
-| `INVALID`    | The fault never happened, because the app took another path.                             |
-| `NOT JUDGED` | The trial was blocked, or something outside your app failed.                             |
+| Result       | Meaning                                                                                                      |
+| ------------ | ------------------------------------------------------------------------------------------------------------ |
+| `PASS`       | The invariant held under the fault. The test itself may have stopped early; that's fine.                     |
+| `FAIL`       | The invariant broke. The record shows where the test stopped and why.                                        |
+| `INVALID`    | The fault never happened, because the app took another path.                                                 |
+| `NOT JUDGED` | The trial was blocked, the test stopped before the fault could happen, or something outside your app failed. |
 
 ## Next
 

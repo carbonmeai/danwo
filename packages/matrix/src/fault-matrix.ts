@@ -110,8 +110,9 @@ export interface RunOutcome {
   /**
    * `invalid`: the run's planned fault fired on no call or delivery (the app took another path,
    * say a cached value), so the run says nothing about that fault, pass or fail. `not-judged`: the
-   * run could not be judged (it was blocked, the judge could not tell, or the browser or model
-   * provider failed), so it says nothing about the fault either; `error` says why.
+   * run could not be judged (it was blocked, the judge could not tell, the browser or model
+   * provider failed, or the body broke before its fault could fire), so it says nothing about the
+   * fault either; `error` says why.
    */
   readonly status: "passed" | "failed" | "invalid" | "not-judged" | "environment-error"
   readonly error: string | null
@@ -127,6 +128,11 @@ export interface RunOutcome {
   readonly record?: string | undefined
   /** The test file line the run's failure passed through, relative to the project root. */
   readonly source?: { readonly file: string; readonly line: number } | undefined
+  /**
+   * Where the body broke before it finished, when it did and the run went on to judge it (a
+   * faulted trial's invariant does): `body stopped at tests/x.danwo.ts:21: …`.
+   */
+  readonly stopped?: string | undefined
   /**
    * Whether a race fault (page, users, redirect) was set up: those leave no fault label on a call
    * or delivery, so the run reports it.
@@ -316,8 +322,8 @@ const MISSED: Readonly<Record<PlannedFault["target"], string>> = {
 }
 
 /**
- * Marks a faulted run `invalid` when its fault never fired; environment errors and runs that could
- * not be judged stay as they are.
+ * Marks a faulted run whose fault never fired: `not-judged` when its body broke before it reached
+ * the fault, else `invalid`. Environment errors and runs that could not be judged stay as they are.
  */
 export function checkFaultFired(outcome: RunOutcome): RunOutcome {
   if (
@@ -327,6 +333,20 @@ export function checkFaultFired(outcome: RunOutcome): RunOutcome {
   )
     return outcome
 
+  return outcome.stopped === undefined ? missed(outcome) : brokeFirst(outcome, outcome.stopped)
+}
+
+/** A run whose body broke at `stopped`, before it reached its fault. */
+function brokeFirst(outcome: RunOutcome, stopped: string): RunOutcome {
+  return {
+    ...outcome,
+    status: "not-judged",
+    error: `not judged: the body broke before the fault point, so ${outcome.fault?.label ?? "the fault"} never fired (${stopped})`,
+  }
+}
+
+/** A run whose body ran through while its fault matched nothing. */
+function missed(outcome: RunOutcome): RunOutcome {
   return {
     ...outcome,
     status: "invalid",

@@ -113,6 +113,8 @@ export interface TrialReport {
   readonly sockets?: readonly SocketExchange[]
   readonly divergence: ReplayDivergence | undefined
   readonly notes: readonly string[]
+  /** Where the trial's body broke or its replay diverged, when either happened. */
+  readonly stopped?: string | undefined
   /** The trial's flight record directory, relative to the cwd, when it was kept. */
   readonly record?: string | undefined
   /** The test file line the trial's failure passed through, relative to the project root. */
