@@ -116,8 +116,10 @@ One saved session, `signed-in-ada`, signs Ada in with a code once per worker.
 
 ```text
 faults: 37 passed
-38 runs in 46 s
+38 runs in 55 s
 ```
+
+Linking GitHub passes all 26 of its trials, and the password sign-up all 37.
 
 Some trials stop the test early and still pass, because the invariants hold. A `COMMIT` whose
 answer was lost may have committed, so Harbor says "Something went wrong" rather than guess, and
