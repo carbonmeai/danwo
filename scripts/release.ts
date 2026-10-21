@@ -62,6 +62,7 @@ function isManifest(value: unknown): value is Manifest {
 /** Every package under `packages/`, with its package.json. */
 function workspacePackages(): WorkspacePackage[] {
   return readdirSync(join(ROOT, "packages"))
+    .toSorted()
     .filter((folder) => existsSync(join(ROOT, "packages", folder, "package.json")))
     .map((folder) => {
       const manifest: unknown = JSON.parse(
@@ -258,7 +259,7 @@ function typescriptRange(): string {
 async function verify(packed: readonly Packed[], version: string): Promise<boolean> {
   const dir = mkdtempSync(join(tmpdir(), "danwo-release-check-"))
   const port = await freePort()
-  const npx = ["npx", "--no"]
+  const npx = ["npx", "--no", "--"]
 
   console.log(`\nChecking the tarballs in a fresh project: ${dir}`)
   writeFileSync(
