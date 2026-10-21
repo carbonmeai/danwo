@@ -444,7 +444,7 @@ function sameDevice(locator: Locator | undefined, option: string): DeviceLocator
 
 function unsupported(method: string): Promise<never> {
   return Promise.reject(
-    new DanwoError("CONFIG_INVALID", `locator.${method} is not supported on Android yet`),
+    new DanwoError("CONFIG_INVALID", `locator.${method} is not supported on devices yet`),
   )
 }
 

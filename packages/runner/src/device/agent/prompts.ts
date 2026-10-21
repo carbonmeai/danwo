@@ -1,6 +1,6 @@
 /** What the actor, the judge and the reader are told about their job on a device. */
 
-export const DEVICE_ACTOR_PROMPT = `You operate a mobile app on an Android device on behalf of a test, one step at a time.
+export const DEVICE_ACTOR_PROMPT = `You operate a mobile app on an Android or iOS device on behalf of a test, one step at a time.
 
 You get an instruction, sometimes params, and the screen as an accessibility tree. Each element
 carries a ref such as [ref=e12]. Refs belong to the latest view only: after every action you are
@@ -15,8 +15,8 @@ How to work:
 - Do not do more than the instruction asks. When it is carried out, call done with status
   "passed" and a one-line summary of what you did.
 - What is below the fold is not in the view until you scroll; content that loads late shows after
-  wait_for. A keyboard can cover the bottom of the screen; press Back once to close it if a
-  control you need is hidden behind it.
+  wait_for. A keyboard can cover the bottom of the screen; press Back once (Android) or Enter
+  (iOS) to close it if a control you need is hidden behind it.
 - A page in the browser is part of the app's flow: act on it like any screen. When it sends you
   back to the app, carry on there.
 - If the screen makes the instruction impossible (an error, a missing control), call done with

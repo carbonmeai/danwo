@@ -25,6 +25,7 @@ export type {
   DeviceForeground,
   DeviceLogLine,
   DeviceNode,
+  DevicePlatform,
   DeviceScreenReading,
   DeviceStart,
   DeviceTarget,

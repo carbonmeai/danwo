@@ -39,7 +39,7 @@ export interface TestFixtures {
   readonly time: SessionTime
   /** Other people's browsers in the same test, for flows more than one person takes part in. */
   readonly users: Users
-  readonly platform: "web" | "android"
+  readonly platform: "web" | "android" | "ios"
 }
 
 /** What `beforeAll` and `afterAll` receive: no browser session exists outside a test. */

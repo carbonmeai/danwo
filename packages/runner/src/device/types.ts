@@ -1,6 +1,6 @@
 /**
  * What a mobile device gives a test in place of a browser. @danwo/device implements `DeviceTarget`
- * for an Android emulator; the runner turns it into the same `screen`, `app` and `expect` a web test
+ * for an Android emulator and an iOS Simulator; the runner turns it into the same `screen`, `app` and `expect` a web test
  * gets, with locators resolved here on the device's accessibility tree.
  */
 
@@ -16,7 +16,7 @@ export interface DeviceNode {
   readonly text: string
   /** A field's current value. */
   readonly value?: string
-  /** React Native's `testID` (Android's resource id, without the package). */
+  /** React Native's `testID`: Android's resource id without the package, iOS's accessibility identifier. */
   readonly testId?: string
   /** A field's hint, while it shows. */
   readonly placeholder?: string
@@ -43,9 +43,12 @@ export type ScrollDirection = "up" | "down" | "left" | "right"
 
 /** What is in front on the device. */
 export interface DeviceForeground {
-  /** The package of the app (or browser) in front, e.g. `com.danwo.shopmobile`. */
+  /** The package or bundle id of the app (or browser) in front, e.g. `com.danwo.shopmobile`. */
   readonly package: string
-  /** True when a browser is in front, such as a Custom Tab the app opened for checkout. */
+  /**
+   * True when a browser is in front, such as a Custom Tab (Android), or a Safari view or sign-in
+   * session (iOS), the app opened for checkout.
+   */
   readonly browser: boolean
   /** The page a browser in front is showing, when known. */
   readonly url?: string
@@ -70,10 +73,13 @@ export interface DeviceStart {
   readonly relaunched: string | undefined
 }
 
+/** The mobile platforms a device can run. */
+export type DevicePlatform = "android" | "ios"
+
 /** A device an attempt drives instead of a browser. */
 export interface DeviceTarget {
-  readonly platform: "android"
-  /** The app's package, e.g. `com.danwo.shopmobile`. */
+  readonly platform: DevicePlatform
+  /** The app's package (Android) or bundle id (iOS), e.g. `com.danwo.shopmobile`. */
   readonly app: string
   /** The app's link scheme, e.g. `danwoshop`; `app.open(path)` opens `<scheme>://<path>`. */
   readonly scheme?: string | undefined
@@ -89,7 +95,7 @@ export interface DeviceTarget {
   tap(ref: string): Promise<void>
   /** Types `text` into the field with this ref, in place of what it holds. */
   fill(ref: string, text: string): Promise<void>
-  /** Presses the device's Back button. */
+  /** Goes back: the Back button on Android; on iOS, the screen's own back or close control. */
   back(): Promise<void>
   /**
    * Scrolls the screen (or the part of it in `within`, a list's box) to show what is further

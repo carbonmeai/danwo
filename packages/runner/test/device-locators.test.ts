@@ -360,7 +360,7 @@ describe("acting on a device", () => {
     ]) {
       await expect(call()).rejects.toMatchObject({
         code: "CONFIG_INVALID",
-        message: expect.stringMatching(/Android yet/),
+        message: expect.stringMatching(/not supported on devices yet/),
       })
     }
   })

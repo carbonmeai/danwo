@@ -34,7 +34,13 @@ import { createDeviceAgent } from "./agent/agent.ts"
 import { deviceExpect } from "./expect.ts"
 import { type DeviceFilm, startDeviceFilm } from "./film.ts"
 import { type DeviceContext, DeviceReader, deviceScreen } from "./locator.ts"
-import type { DeviceForeground, DeviceNode, DeviceScreenReading, DeviceTarget } from "./types.ts"
+import type {
+  DeviceForeground,
+  DeviceNode,
+  DevicePlatform,
+  DeviceScreenReading,
+  DeviceTarget,
+} from "./types.ts"
 
 /** The agent's settings, as a web session takes them. */
 type AgentSettings = Pick<
@@ -79,7 +85,7 @@ export interface DeviceSessionOptions extends AgentSettings {
 }
 
 /** A device session: a web session's handles, on a device. */
-export type DeviceSession = WebSession & { readonly platform: "android" }
+export type DeviceSession = WebSession & { readonly platform: DevicePlatform }
 
 const DEFAULT_ACTION_MS = 15_000
 const DEFAULT_ASSERTION_MS = 15_000
@@ -185,7 +191,7 @@ function deviceStore(target: DeviceTarget, options: DeviceSessionOptions): Repla
     mode: options.replay ? "read-only" : cache.mode,
     projectId: cache.projectId ?? "danwo",
     journey: cache.journey ?? "journey",
-    appIdentity: cache.appIdentity ?? `android:${target.app}`,
+    appIdentity: cache.appIdentity ?? `${target.platform}:${target.app}`,
     policy: relocationOf(options),
   })
 }
@@ -289,7 +295,7 @@ function deviceMail(desk: MailDesk, timeout: number): SessionMail {
     link: async (to, options = {}) =>
       needMail(to, "a link", await desk.value(to, { kind: "link", match: options.match }, timeout)),
     open: () =>
-      Promise.reject(new DanwoError("CONFIG_INVALID", "mail.open is not supported on Android yet")),
+      Promise.reject(new DanwoError("CONFIG_INVALID", "mail.open is not supported on devices yet")),
   }
 }
 
@@ -370,7 +376,7 @@ export async function openDeviceSession(
     })
 
   return {
-    platform: "android",
+    platform: target.platform,
     screen: deviceScreen(context, reader),
     expect: deviceExpect,
     agent,
@@ -392,13 +398,13 @@ export async function openDeviceSession(
     flight,
     browserState: () =>
       Promise.reject(
-        new DanwoError("CONFIG_INVALID", "saved sessions are not supported on Android yet"),
+        new DanwoError("CONFIG_INVALID", "saved sessions are not supported on devices yet"),
       ),
     openUser: () =>
       Promise.reject(
         new DanwoError(
           "CONFIG_INVALID",
-          "a second person's device in one test is not supported on Android yet",
+          "a second person's device in one test is not supported on devices yet",
         ),
       ),
     /* The device's own clock stays where it is; the services behind the app move. */

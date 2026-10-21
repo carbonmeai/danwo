@@ -8,7 +8,7 @@ import type { Browser, BrowserContext } from "playwright-core"
 
 import type { CheckPace } from "../assert/pace.ts"
 import { openDeviceSession } from "../device/session.ts"
-import type { DeviceTarget } from "../device/types.ts"
+import type { DevicePlatform, DeviceTarget } from "../device/types.ts"
 import type { SessionFlight } from "../flight.ts"
 import type { FailureEvidence, StepRecord } from "../record/index.ts"
 import { videoCursorOf } from "../record/video.ts"
@@ -524,7 +524,7 @@ async function openSession(
 
   if (env?.device !== undefined) {
     if (state !== undefined) {
-      throw new DanwoError("CONFIG_INVALID", "saved sessions are not supported on Android yet")
+      throw new DanwoError("CONFIG_INVALID", "saved sessions are not supported on devices yet")
     }
 
     return openOnDevice(setup, env.device, timeout)
@@ -562,8 +562,10 @@ function builtInFixtures(
   env: WorkerEnvironment | undefined,
   sessions?: SessionContext,
 ) {
-  const platform: "web" | "android" =
-    "platform" in session && session.platform === "android" ? "android" : "web"
+  const platform: "web" | DevicePlatform =
+    "platform" in session && (session.platform === "android" || session.platform === "ios")
+      ? session.platform
+      : "web"
 
   return {
     agent: session.agent,
