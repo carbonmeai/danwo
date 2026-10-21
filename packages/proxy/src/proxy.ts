@@ -236,9 +236,19 @@ export interface Proxy {
   sockets(): readonly SocketExchange[]
   /** Sets the rule that picks a fault for each routed call; `undefined` removes it. */
   setFault(rule: OutboundFaultRule | undefined): void
+  /**
+   * Makes the next `times` (default 1) routed calls that `match` meet `fault`, ahead of the rule
+   * `setFault` set, which still faults every other call: how a test fails one step once, e.g.
+   * `proxy.failNext((call) => call.path === "/emails", { kind: "reset-after" })`. `clear()`
+   * disarms what is left.
+   */
+  failNext(match: (call: OutboundCall) => boolean, fault: OutboundFault, times?: number): void
   /** Sets the rule that refuses or drops WebSockets; `undefined` removes it. */
   setSocketFault(rule: SocketFaultRule | undefined): void
-  /** Forgets recorded exchanges and sockets and restarts call numbering, for reuse across runs. */
+  /**
+   * Forgets recorded exchanges and sockets, disarms `failNext` faults and restarts call numbering,
+   * for reuse across runs.
+   */
   clear(): void
   /**
    * Resolves once every exchange seen so far has finished (responded or aborted). The proxy
@@ -520,7 +530,22 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   const patterns = options.routes.flatMap((r) => r.hosts)
   const isRouted = (host: string) => patterns.some((pattern) => hostMatches(pattern, host))
   let faultRule: OutboundFaultRule | undefined
+  /** Faults `failNext` armed, each with how many more calls it meets. */
+  let armed: { match: (call: OutboundCall) => boolean; fault: OutboundFault; left: number }[] = []
   let callIndex = 0
+
+
+  /** The fault `failNext` armed for `call`, spent by one; undefined when none matches. */
+  const takeArmed = (call: OutboundCall): OutboundFault | undefined => {
+    const hit = armed.find((entry) => entry.left > 0 && entry.match(call))
+
+    if (hit === undefined) return undefined
+    hit.left -= 1
+    armed = armed.filter((entry) => entry.left > 0)
+
+    return hit.fault
+  }
+
   const log = new Map<string, Exchange>()
   // The route handler can run before the exchange is logged; hold its fault label until then.
   const faultLabels = new Map<string, string>()
@@ -546,7 +571,7 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
       path: req.path,
       index: callIndex++,
     }
-    const fault = faultRule?.(call)
+    const fault = takeArmed(call) ?? faultRule?.(call)
 
     if (fault) labelFault(req.id, describeOutboundFault(fault))
 
@@ -699,10 +724,14 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
     setFault(rule) {
       faultRule = rule
     },
+    failNext(match, fault, times = 1) {
+      armed.push({ match, fault, left: times })
+    },
     setSocketFault(rule) {
       sockets.setFault(rule)
     },
     clear() {
+      armed = []
       log.clear()
       sockets.clear()
       faultLabels.clear()

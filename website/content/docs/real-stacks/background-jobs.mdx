@@ -152,10 +152,25 @@ FAIL  status 500 on POST inngest.danwo.test/e/dev
 The fix is to retry the send, or to write the job to your own outbox table first and send it from
 there.
 
-<Callout type="info">
-  danwo faults the event send, not a single step inside a running function. Fault a step by having
-  it call a provider danwo emulates.
-</Callout>
+## Fail one step from a test
+
+danwo faults what crosses its proxy, so a step fails when the provider call inside it does. To
+make that happen once in a plain test, arm the fault on the `proxy` fixture:
+
+```ts title="tests/digest.danwo.ts"
+test("a send that loses its answer is retried once", async ({ app, proxy, time, settle }) => {
+  // The first email is accepted, but the step never hears back, so Inngest retries it.
+  proxy.failNext((call) => call.host === "api.resend.com" && call.path === "/emails", {
+    kind: "reset-after",
+  })
+  // …schedule the digest, then travel to its send time…
+  await settle()
+})
+```
+
+`failNext(match, fault, times)` faults the next `times` calls that `match` (default one), ahead
+of anything the matrix planned, and is disarmed when the test ends. An invariant then checks the
+retry did no double work: one email, one delivery row.
 
 ## Next
 

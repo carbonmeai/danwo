@@ -1274,6 +1274,52 @@ describe("forwarding to an upstream", () => {
       upstream.close()
     }
   })
+
+  it("fails the next matching calls a test names, ahead of the rule, until they are spent", async () => {
+    const upstream = await startUpstream()
+    const proxy = await startProxy({
+      routes: [{ hosts: ["*.svc.danwo.test"], upstream: upstream.url }],
+    })
+
+    proxy.setFault((call) =>
+      call.path === "/rule" ? { kind: "status", status: 500, body: "rule" } : undefined,
+    )
+    proxy.failNext((call) => call.path === "/send", { kind: "reset-after" })
+    proxy.failNext(
+      (call) => call.path === "/rule",
+      { kind: "status", status: 429, body: "armed" },
+      2,
+    )
+
+    const send = (names: readonly string[]) =>
+      fetchThrough(
+        proxy.env(),
+        names.map((name) => ({
+          url: `https://q.svc.danwo.test/${name}`,
+          method: "POST",
+          body: name,
+        })),
+      )
+
+    try {
+      const out = await send(["send", "send", "rule", "rule", "rule"])
+
+      expect(out[0]?.error).toBeDefined()
+      expect(out.slice(1).map((answer) => answer.body)).toEqual([
+        "ok /send",
+        "armed",
+        "armed",
+        "rule",
+      ])
+
+      proxy.failNext(() => true, { kind: "reset" })
+      proxy.clear()
+      expect((await send(["send"]))[0]).toEqual({ status: 201, body: "ok /send" })
+    } finally {
+      await proxy.stop()
+      upstream.close()
+    }
+  })
 })
 
 describe("env", () => {
