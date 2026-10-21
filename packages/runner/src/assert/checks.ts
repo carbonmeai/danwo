@@ -4,7 +4,6 @@
  * passed or failed. Locator and page checks already record themselves and pass through unchanged.
  */
 import { ElementLocator, PageScreen } from "../locate/locator.ts"
-import { preview } from "../record/steps.ts"
 import type { CheckValues, StepRecorder } from "../record/steps.ts"
 import type { Expect } from "./expect.ts"
 
@@ -23,9 +22,9 @@ function isMatcher(value: unknown): value is (...args: unknown[]) => unknown {
   return typeof value === "function"
 }
 
-/** The argument list of a matcher call, each value previewed. */
-function argumentsOf(args: readonly unknown[]): string {
-  return args.map((arg) => preview(arg)).join(", ")
+/** The argument list of a matcher call, each value previewed (and redacted before it is cut). */
+function argumentsOf(log: StepRecorder, args: readonly unknown[]): string {
+  return args.map((arg) => log.preview(arg)).join(", ")
 }
 
 /** Wraps a matcher call so it runs as a recorded check. */
@@ -38,10 +37,10 @@ function recordedMatcher(
 ) {
   return (...args: unknown[]) => {
     const path = [...wording.chain, name].join(".")
-    const label = `expect(${wording.subject}).${path}(${argumentsOf(args)})`
+    const label = `expect(${wording.subject}).${path}(${argumentsOf(log, args)})`
     const values: CheckValues = {
-      actual: preview(wording.actual),
-      ...(args.length > 0 && { expected: argumentsOf(args) }),
+      actual: log.preview(wording.actual),
+      ...(args.length > 0 && { expected: argumentsOf(log, args) }),
     }
 
     return log.check(`expect.${name}`, label, values, () => matcher.apply(target, args))
@@ -76,7 +75,7 @@ export function recordingExpect(base: Expect, log: StepRecorder): Expect {
     const assertion: object = base(actual, message)
 
     return recordedAssertion(assertion, log, {
-      subject: message ?? preview(actual),
+      subject: message ?? log.preview(actual),
       actual,
       chain: [],
     })

@@ -32,4 +32,7 @@ otherwise:
 Flight records, failure pages, MCP answers and the GitHub check redact every configured value,
 including its URL-encoded, form-encoded, HTML-escaped, base64 and other-case forms, and anything
 shaped like a credential: provider keys, bearer tokens, webhook signing secrets, OAuth tokens,
-private keys. Screenshots mask fields that hold a secret.
+private keys. Screenshots mask fields that hold a secret. Text cut to length (the agent's page view,
+a failed locator's candidates, a check's previewed sides) is redacted before the cut, and every
+string of a record gets a last pass when it is written, so a function-valued secret revealed late
+is caught in what was recorded before it.

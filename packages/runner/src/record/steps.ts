@@ -483,11 +483,16 @@ export class StepRecorder implements StepLog {
     this.options.onEnd?.({ ...running.record, events: [...running.events] })
   }
 
+  /** `value` as one short line, redacted before it is cut. */
+  preview(value: unknown): string {
+    return preview(value, this.options.redact)
+  }
+
   /** A check's sides, redacted; a failed matcher's own actual and expected win where it has them. */
   private valuesOf(values: CheckValues, error?: unknown): CheckValues {
     const fromError = (key: "actual" | "expected"): string | undefined =>
       typeof error === "object" && error !== null && key in error
-        ? preview(Reflect.get(error, key))
+        ? preview(Reflect.get(error, key), this.options.redact)
         : undefined
     const actual = fromError("actual") ?? values.actual
     const expected = fromError("expected") ?? values.expected
@@ -547,9 +552,12 @@ function objectText(value: object): string {
   }
 }
 
-/** A value as one short line for a step's label or sides, cut to length. */
-export function preview(value: unknown): string {
-  const text = asText(value)
+/**
+ * A value as one short line for a step's label or sides, cut to length. `redact` runs before the
+ * cut, so a cut through a secret leaves none of it behind.
+ */
+export function preview(value: unknown, redact: (text: string) => string = (text) => text): string {
+  const text = redact(asText(value))
 
   return text.length > PREVIEW_CHARS ? `${text.slice(0, PREVIEW_CHARS - 1)}…` : text
 }

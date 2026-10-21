@@ -69,7 +69,7 @@ function clickables(selector: string) {
         element.getAttribute("aria-label") ??
         element.getAttribute("title") ??
         element.getAttribute("placeholder") ??
-        (element.textContent ?? "").trim().slice(0, 40)
+        (element.textContent ?? "").trim().slice(0, 1_000)
 
       return {
         x: rect.x,
@@ -182,12 +182,15 @@ export async function look(page: Page, spots: SecretSpots, withMarks = true): Pr
   }
 }
 
+/** How long a mark's words may be in the model's list, cut only once they are redacted. */
+const HINT_CHARS = 64
+
 /** The marks as lines of text for the model: `7: button "Save" at 120,40 80×24`. */
 export function marksText(marks: readonly Mark[], redact: (text: string) => string): string {
   return marks
     .map(
       (mark) =>
-        `${mark.id}: ${redact(mark.hint)} at ${Math.round(mark.box.x)},${Math.round(mark.box.y)} ${Math.round(mark.box.width)}×${Math.round(mark.box.height)}`,
+        `${mark.id}: ${redact(mark.hint).slice(0, HINT_CHARS)} at ${Math.round(mark.box.x)},${Math.round(mark.box.y)} ${Math.round(mark.box.width)}×${Math.round(mark.box.height)}`,
     )
     .join("\n")
 }

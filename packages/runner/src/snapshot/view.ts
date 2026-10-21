@@ -2,7 +2,7 @@
  * The page as the agent reads it: Playwright's accessibility snapshot in "ai" mode, where every
  * element the agent may act on carries a ref (`[ref=e12]`). Refs belong to the latest snapshot of
  * the page, so the agent acts only on what it was just shown. Secret values are replaced before
- * the text leaves the session, and very large pages are cut to a budget.
+ * the text leaves the session, and very large pages are then cut to a budget.
  */
 import type { Page } from "playwright-core"
 
@@ -21,13 +21,14 @@ export interface PageView {
 
 /** Takes a fresh snapshot of `page`, which also makes its refs the ones actions resolve against. */
 export async function viewPage(page: Page, redact: (text: string) => string): Promise<PageView> {
-  const tree = await page.ariaSnapshot({ mode: "ai", timeout: SNAPSHOT_TIMEOUT_MS })
+  /* Redacted before it is cut: a cut through a secret would leave its first characters behind. */
+  const tree = redact(await page.ariaSnapshot({ mode: "ai", timeout: SNAPSHOT_TIMEOUT_MS }))
   const capped =
     tree.length > MAX_VIEW_CHARS
       ? `${tree.slice(0, MAX_VIEW_CHARS)}\n… (page cut at ${MAX_VIEW_CHARS} characters)`
       : tree
 
-  return { url: redact(page.url()), title: redact(await page.title()), tree: redact(capped) }
+  return { url: redact(page.url()), title: redact(await page.title()), tree: capped }
 }
 
 /** The tabs line of a view, when more than one tab is open. */

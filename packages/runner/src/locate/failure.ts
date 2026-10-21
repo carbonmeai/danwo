@@ -21,7 +21,10 @@ export type LocatorFailureCode =
 /** A locator failure, named the way the test wrote the locator. */
 export class LocatorError extends Error {
   readonly code: LocatorFailureCode
-  /** Text of elements near what was asked for: the ones it matched, or others with its role. */
+  /**
+   * Text of elements near what was asked for: the ones it matched, or others with its role. Not
+   * yet redacted or cut; a record lists each through `candidateLine`.
+   */
   readonly candidates: readonly string[]
 
   constructor(code: LocatorFailureCode, message: string, candidates: readonly string[] = []) {
@@ -49,16 +52,24 @@ function firstLine(message: string): string {
   return (message.split("\n")[0] ?? message).trim()
 }
 
-/** Up to five short, whitespace-collapsed texts of what `locator` matches. */
+/**
+ * Up to five whitespace-collapsed texts of what `locator` matches, whole: they are cut to length
+ * only once redacted (`candidateLine`), so a cut never leaves part of a secret behind.
+ */
 async function texts(locator: PlaywrightLocator | undefined): Promise<string[]> {
   if (locator === undefined) return []
 
   const all = await locator.allInnerTexts().catch(() => [])
 
   return all
-    .map((text) => text.replace(/\s+/g, " ").trim().slice(0, MAX_CANDIDATE_CHARS))
+    .map((text) => text.replace(/\s+/g, " ").trim())
     .filter((text) => text.length > 0)
     .slice(0, MAX_CANDIDATES)
+}
+
+/** A candidate as a record lists it: redacted by `redact`, then cut to a short line. */
+export function candidateLine(text: string, redact: (text: string) => string): string {
+  return redact(text).slice(0, MAX_CANDIDATE_CHARS)
 }
 
 /** A single match that never became actionable: disabled, hidden, or just slow. */

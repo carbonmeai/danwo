@@ -12,7 +12,7 @@ import { join, resolve as resolvePath } from "node:path"
 import type { CheckPace } from "../assert/pace.ts"
 import type { Backend } from "../browser/readiness.ts"
 import type { SessionFlight } from "../flight.ts"
-import { LocatorError } from "../locate/failure.ts"
+import { candidateLine, LocatorError } from "../locate/failure.ts"
 import { MailDesk } from "../mail/desk.ts"
 import type { MailSource } from "../mail/index.ts"
 import type { FailureEvidence, StepRecord } from "../record/index.ts"
@@ -258,7 +258,7 @@ async function failureEvidence(
   const shot = await target.screenshot(join(dir, screenshot)).catch(() => false)
   const candidates =
     error instanceof LocatorError && error.candidates.length > 0
-      ? { candidates: error.candidates.map(redact) }
+      ? { candidates: error.candidates.map((text) => candidateLine(text, redact)) }
       : {}
 
   return {

@@ -4,6 +4,7 @@
  */
 import type { Page } from "playwright-core"
 
+import { candidateLine } from "./locate/failure.ts"
 import { LocatorError } from "./locate/index.ts"
 import {
   type AppLogRecord,
@@ -127,5 +128,5 @@ function withCandidates(
 ): FailureEvidence | undefined {
   if (!(error instanceof LocatorError) || error.candidates.length === 0) return evidence
 
-  return { ...evidence, candidates: error.candidates.map(redact) }
+  return { ...evidence, candidates: error.candidates.map((text) => candidateLine(text, redact)) }
 }

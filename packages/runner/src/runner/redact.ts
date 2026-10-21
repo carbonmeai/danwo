@@ -36,6 +36,11 @@ export interface Redactor {
   value(value: unknown): unknown
   /** Like `value`, without clipping: for records whose text is the point (steps, errors). */
   deep<T>(value: T): T
+  /**
+   * Every string of `value`, at any depth, through `text`; keys and their values' shapes stay as
+   * they are. The last pass over a whole record before it is written.
+   */
+  strings<T>(value: T): T
 }
 
 /** Characters a string in recorded state keeps; base64 object bodies and blobs are clipped. */
@@ -48,6 +53,8 @@ interface Walk {
   readonly leaf: (text: string) => string
   /** Items an array keeps; the rest are counted. */
   readonly maxItems: number
+  /** Whether a sensitive key's value is blanked whatever it holds; true unless set false. */
+  readonly blankKeys?: false
 }
 
 /** Deep copy of `input` with sensitive keys blanked and every string through `walk.leaf`. */
@@ -66,7 +73,9 @@ function redactDeep(input: unknown, walk: Walk, depth = 0): unknown {
   return Object.fromEntries(
     Object.entries(input).map(([key, v]) => [
       key,
-      SENSITIVE_KEYS.test(key) ? REDACTED : redactDeep(v, walk, depth + 1),
+      walk.blankKeys !== false && SENSITIVE_KEYS.test(key)
+        ? REDACTED
+        : redactDeep(v, walk, depth + 1),
     ]),
   )
 }
@@ -76,6 +85,7 @@ export function createRedactor(secrets: (text: string) => string): Redactor {
   const text = (input: string) => redactCredentials(secrets(input))
   const state: Walk = { leaf: (s) => clip(text(s)), maxItems: MAX_STATE_ITEMS }
   const body: Walk = { leaf: text, maxItems: Number.POSITIVE_INFINITY }
+  const final: Walk = { ...body, blankKeys: false }
 
   return {
     text,
@@ -91,6 +101,8 @@ export function createRedactor(secrets: (text: string) => string): Redactor {
     value: (input) => redactDeep(input, state),
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the copy has the input's shape: only string values and sensitive keys' values change
     deep: <T>(input: T) => redactDeep(input, body) as T,
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the copy has the input's shape: only string values change
+    strings: <T>(input: T) => redactDeep(input, final) as T,
   }
 }
 

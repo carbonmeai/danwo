@@ -260,7 +260,12 @@ export function buildRecord(input: RecordInput, extras: RecordExtras = {}): Flig
   const redactor = redactorOf(input)
   const evidence = extras.evidence ?? recordEvidence(input)
 
-  return {
+  /*
+   * A last pass over every string, with every secret value the session knows by now: one revealed
+   * late (a function-valued secret) is caught in what was recorded before it, and so is any field
+   * the parts above did not redact (the verdict, the run's labels).
+   */
+  return redactor.strings<FlightRecord>({
     version: 1,
     test: input.test,
     run: input.run,
@@ -280,7 +285,7 @@ export function buildRecord(input: RecordInput, extras: RecordExtras = {}): Flig
     ...(extras.lint !== undefined && extras.lint.length > 0 && { lint: extras.lint }),
     ...videosOf(input, evidence),
     ...verdictOf(input),
-  }
+  })
 }
 
 /** A run's verdict, for one that did not pass; nothing for a run that passed or was skipped. */
