@@ -37,6 +37,7 @@ to explore before it writes a test. Every action answers with the page as it is 
 | `fill_secret`                                        | Fills a field with a configured secret by name. The value never appears anywhere.         |
 | `upload`                                             | Puts files into a file input, or the file picker a button opens. Up to 10 MB a call.      |
 | `drag`                                               | Drags an element (`target`) and drops it on another (`to`), such as a card onto a column. |
+| `tabs`, `switch_tab`, `close_tab`                    | Lists the open tabs, moves actions to another, or closes one.                             |
 | `snapshot`, `screenshot`                             | The page as an accessibility tree with refs, or as an image with secrets masked.          |
 | `check_locator`                                      | Checks a locator matches exactly one element, and returns the line to paste.              |
 | `start_recording`, `stop_recording`                  | Records the session's screenshots, and video when no secret was filled.                   |
@@ -53,6 +54,20 @@ to explore before it writes a test. Every action answers with the page as it is 
 
 `ControlOrMeta` is Meta on macOS and Control elsewhere. Use it to add an item to a selection or
 open a link in a new tab, so the same step works on every machine.
+
+### Follow a new tab
+
+When the app opens a tab, such as a popup or a link to a new window, actions go to it straight
+away. The answer says so:
+
+```text
+clicked screen.getByRole("link", { name: "Open receipt" })
+tab: 2 of 2 (actions now go to it)
+url: http://localhost:3000/receipt/42
+```
+
+`tabs` lists every open tab by number. `switch_tab` moves back to one, and `close_tab` closes one,
+or the active tab without a number. When the active tab closes, the newest one left takes over.
 
 ### Upload a file
 

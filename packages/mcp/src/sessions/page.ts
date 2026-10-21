@@ -14,6 +14,7 @@ import type { Browser, BrowserContext, Locator, Page } from "playwright-core"
 import { snapshotChange } from "./diff.ts"
 import { checkLocator } from "./locator-check.ts"
 import type { SessionAnswer, SessionCall } from "./protocol.ts"
+import { SessionTabs } from "./tabs.ts"
 import { filePayloads, putFiles, uploadAnswer } from "./upload.ts"
 import { PageWatch } from "./watch.ts"
 
@@ -37,6 +38,8 @@ export type ActionCall = Extract<
       | "navigate"
       | "upload"
       | "drag"
+      | "switch_tab"
+      | "close_tab"
   }
 >
 
@@ -71,16 +74,19 @@ export class PageDesk {
   private readonly watch: PageWatch
   private readonly options: DeskOptions
   private context: BrowserContext
-  private page: Page
+  private readonly tabs: SessionTabs
 
   private constructor(options: DeskOptions, context: BrowserContext, page: Page) {
     this.options = options
     this.context = context
-    this.page = page
+    this.tabs = new SessionTabs(page)
     this.watch = new PageWatch(options.redact)
-    this.watch.attach(context, (opened) => {
-      this.page = opened
-    })
+    this.watch.attach(context, (opened) => this.tabs.opened(opened))
+  }
+
+  /** The tab actions and reads go to. */
+  private get page(): Page {
+    return this.tabs.page
   }
 
   /** A fresh browser context on `path` of the app; answers with the first snapshot. */
@@ -98,28 +104,53 @@ export class PageDesk {
   async snapshot(): Promise<string> {
     const view = await this.view()
 
-    return [`url: ${view.url}`, `title: ${view.title}`, "", view.tree, ...this.events()].join("\n")
+    return [
+      ...this.tabLine(false),
+      `url: ${view.url}`,
+      `title: ${view.title}`,
+      "",
+      view.tree,
+      ...this.events(),
+    ].join("\n")
   }
 
   /** Carries out one action, then answers with the page's change and what it reported. */
   async act(call: ActionCall): Promise<string> {
     const before = this.tree
-    const url = this.page.url()
+    const page = this.page
+    const url = page.url()
     const done = await perform(this, call)
 
     await this.settle()
 
     const view = await this.view()
-    const moved = this.page.url() !== url
+    const switched = this.page !== page
+    const moved = !switched && this.page.url() !== url
 
     await this.frame(call.kind)
 
     return [
       done,
+      ...this.tabLine(switched),
       `url: ${view.url}${moved ? ` (was ${this.options.redact(url)})` : ""}`,
-      ...this.changeLines(moved ? "" : before, view),
+      ...this.changeLines(moved || switched ? "" : before, view),
       ...this.events(),
     ].join("\n")
+  }
+
+  /** The `tabs` answer: every open tab, the one actions go to marked. */
+  tabList(): Promise<string> {
+    return this.tabs.lines(this.options.redact).then((lines) => lines.join("\n"))
+  }
+
+  async switchTab(tab: number): Promise<string> {
+    await this.tabs.switchTo(tab)
+
+    return `switched to tab ${tab}`
+  }
+
+  async closeTab(tab: number | undefined): Promise<string> {
+    return `closed tab ${await this.tabs.close(tab)}`
   }
 
   check(expression: string): Promise<string> {
@@ -263,6 +294,17 @@ export class PageDesk {
     return { url: redact(this.page.url()), title: redact(await this.page.title()), tree: this.tree }
   }
 
+  /** Which tab the answer is about, when the session has several or the action moved to another. */
+  private tabLine(switched: boolean): string[] {
+    const open = this.tabs.list().length
+
+    if (open < 2 && !switched) return []
+
+    return [
+      `tab: ${this.tabs.numberOf(this.page)} of ${open}${switched ? " (actions now go to it)" : ""}`,
+    ]
+  }
+
   private changeLines(before: string, view: { title: string; tree: string }): string[] {
     const change = before === "" ? { kind: "whole" as const } : snapshotChange(before, view.tree)
 
@@ -321,12 +363,10 @@ export class PageDesk {
     })
     const page = await context.newPage()
 
-    this.watch.attach(context, (opened) => {
-      this.page = opened
-    })
+    this.watch.attach(context, (opened) => this.tabs.opened(opened))
+    this.tabs.opened(page)
     if (url !== "about:blank") await page.goto(url, { timeout: LOAD_TIMEOUT_MS })
     this.context = context
-    this.page = page
     await old.close()
   }
 
@@ -421,6 +461,8 @@ const ACTIONS: {
 
     return `dragged ${source.name} onto ${drop.name}`
   },
+  switch_tab: (desk, call) => desk.switchTab(call.tab),
+  close_tab: (desk, call) => desk.closeTab(call.tab),
 }
 
 type ActionOf<K extends ActionCall["kind"]> = Extract<ActionCall, { kind: K }>

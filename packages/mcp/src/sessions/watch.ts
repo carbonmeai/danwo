@@ -22,7 +22,7 @@ export class PageWatch {
     for (const page of context.pages()) this.watch(page)
     context.on("page", (page) => {
       this.watch(page)
-      this.note(`new tab: ${page.url()}`)
+      this.note("a new tab opened, and actions now go to it (tabs lists every tab)")
       onPage(page)
     })
   }

@@ -49,6 +49,12 @@ const PAGES: Readonly<Record<string, string>> = {
         count.textContent = "1 done"
       })
     </script>`,
+  "/tabs": `<!doctype html><title>Home</title><h1>Home</h1>
+    <a href="/second" target="_blank">Open second</a>
+    <button type="button" onclick="window.open('/third', 'third', 'popup')">Pop up</button>`,
+  "/second": `<!doctype html><title>Second</title><h1>Second</h1>
+    <button type="button" onclick="window.close()">Close me</button>`,
+  "/third": `<!doctype html><title>Third</title><h1>Third</h1>`,
 }
 
 let site: DeskSite
@@ -212,5 +218,61 @@ describe("drag", () => {
         to: 'getByText("Nowhere")',
       }),
     ).rejects.toThrow(/getByText\("Nowhere"\) matches no element/)
+  })
+})
+
+describe("tabs", () => {
+  it("follows a new tab and a popup, lists, switches and closes them", async () => {
+    const { desk } = await site.open("/tabs")
+    const opened = await desk.act({
+      kind: "click",
+      target: 'getByRole("link", { name: "Open second" })',
+    })
+
+    expect(opened).toContain("tab: 2 of 2 (actions now go to it)")
+    expect(opened).toContain('heading "Second"')
+    expect(opened).toContain("a new tab opened, and actions now go to it")
+
+    const listed = await desk.tabList()
+
+    expect(listed).toMatch(/^ {2}1\. Home http:\/\/127\.0\.0\.1:\d+\/tabs$/m)
+    expect(listed).toMatch(/^\* 2\. Second http:\/\/127\.0\.0\.1:\d+\/second$/m)
+
+    const back = await desk.act({ kind: "switch_tab", tab: 1 })
+
+    expect(back).toContain("switched to tab 1\ntab: 1 of 2 (actions now go to it)")
+    expect(back).toContain('heading "Home"')
+    expect(await desk.snapshot()).toMatch(/^tab: 1 of 2\n/)
+
+    const popup = await desk.act({
+      kind: "click",
+      target: 'getByRole("button", { name: "Pop up" })',
+    })
+
+    expect(popup).toContain("tab: 3 of 3 (actions now go to it)")
+    expect(popup).toContain('heading "Third"')
+
+    const closed = await desk.act({ kind: "close_tab" })
+
+    expect(closed).toContain("closed tab 3\ntab: 2 of 2 (actions now go to it)")
+    expect(closed).toContain('heading "Second"')
+  })
+
+  it("moves on when a tab closes itself, and keeps the last tab open", async () => {
+    const { desk } = await site.open("/tabs")
+
+    await desk.act({ kind: "click", target: 'getByRole("link", { name: "Open second" })' })
+
+    const gone = await desk.act({
+      kind: "click",
+      target: 'getByRole("button", { name: "Close me" })',
+    })
+
+    expect(gone).toContain("tab: 1 of 1 (actions now go to it)")
+    expect(gone).toContain('heading "Home"')
+    await expect(desk.act({ kind: "close_tab" })).rejects.toThrow(/the session's only tab/)
+    await expect(desk.act({ kind: "switch_tab", tab: 5 })).rejects.toThrow(
+      /there is no tab 5: 1 tab is open/,
+    )
   })
 })

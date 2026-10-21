@@ -27,6 +27,7 @@ describe("the server", () => {
       "clear_faults",
       "click",
       "close_session",
+      "close_tab",
       "deliver_webhooks",
       "drag",
       "emulator_state",
@@ -50,6 +51,8 @@ describe("the server", () => {
       "snapshot",
       "start_recording",
       "stop_recording",
+      "switch_tab",
+      "tabs",
       "upload",
     ])
     expect(resources).toEqual([

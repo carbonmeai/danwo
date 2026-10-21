@@ -34,7 +34,15 @@ interface Live {
 
 type PageCall = Extract<
   SessionCall,
-  { kind: "snapshot" | "check_locator" | "screenshot" | "start_recording" | "stop_recording" }
+  {
+    kind:
+      | "snapshot"
+      | "check_locator"
+      | "screenshot"
+      | "start_recording"
+      | "stop_recording"
+      | "tabs"
+  }
 >
 type ServiceCall = Extract<
   SessionCall,
@@ -52,6 +60,8 @@ const ACTIONS = new Set<string>([
   "navigate",
   "upload",
   "drag",
+  "switch_tab",
+  "close_tab",
 ])
 const PAGE_CALLS = new Set<string>([
   "snapshot",
@@ -59,6 +69,7 @@ const PAGE_CALLS = new Set<string>([
   "screenshot",
   "start_recording",
   "stop_recording",
+  "tabs",
 ])
 
 let live: Live | undefined
@@ -188,6 +199,8 @@ function pageCall(page: PageDesk, call: PageCall): Promise<string | SessionAnswe
       return page.screenshot(call.target, call.fullPage)
     case "start_recording":
       return page.startRecording(call.video)
+    case "tabs":
+      return page.tabList()
     default:
       return page.stopRecording()
   }

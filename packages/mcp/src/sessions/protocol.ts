@@ -40,6 +40,9 @@ export type SessionCall =
   | { readonly kind: "check"; readonly target: Target; readonly checked: boolean }
   | { readonly kind: "navigate"; readonly to: string }
   | { readonly kind: "drag"; readonly target: Target; readonly to: Target }
+  | { readonly kind: "tabs" }
+  | { readonly kind: "switch_tab"; readonly tab: number }
+  | { readonly kind: "close_tab"; readonly tab?: number | undefined }
   | { readonly kind: "upload"; readonly target: Target; readonly files: readonly UploadFile[] }
   | { readonly kind: "check_locator"; readonly locator: string }
   | {

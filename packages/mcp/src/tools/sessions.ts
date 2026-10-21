@@ -45,6 +45,8 @@ const modifiers = z
 const button = z.enum(["left", "right", "middle"]).optional().describe('default "left"')
 const double = z.boolean().optional().describe("a double click")
 
+const tab = z.number().int().min(1).describe("a tab's number, as tabs lists it")
+
 function reply(result: SessionAnswer): CallToolResult {
   return {
     content: [
@@ -80,6 +82,7 @@ const SessionArgs = z.object({
   modifiers,
   button,
   double,
+  tab: z.number().optional(),
 })
 
 type SessionArgs = z.infer<typeof SessionArgs>
@@ -209,6 +212,18 @@ function registerActions(server: McpServer, sessions: SessionManager): void {
     }),
   })
   register(server, sessions, {
+    name: "switch_tab",
+    description: `Make another tab the one actions go to, by its number in tabs. Answers with that tab's whole page. ${ACTION_NOTE}`,
+    input: { session, tab },
+    call: (args) => ({ kind: "switch_tab", tab: given(args.tab, "tab") }),
+  })
+  register(server, sessions, {
+    name: "close_tab",
+    description: `Close a tab by its number in tabs, or the active one without a number; the newest tab left becomes the active one. The session's only tab cannot be closed. ${ACTION_NOTE}`,
+    input: { session, tab: tab.optional() },
+    call: (args) => ({ kind: "close_tab", tab: args.tab }),
+  })
+  register(server, sessions, {
     name: "navigate",
     description: `Go to a path of the app or a full URL, or "back", "forward", "reload". ${ACTION_NOTE}`,
     input: { session, to: z.string() },
@@ -244,6 +259,14 @@ function registerPageTools(server: McpServer, sessions: SessionManager): void {
       "A PNG of the page (or one element). Password fields, filled secrets and any text showing a secret are masked.",
     input: { session, target: target.optional(), fullPage: z.boolean().optional() },
     call: (args) => ({ kind: "screenshot", target: args.target, fullPage: args.fullPage ?? false }),
+    readOnly: true,
+  })
+  register(server, sessions, {
+    name: "tabs",
+    description:
+      "The session's open tabs, numbered from 1 in the order they opened, with each one's title and URL; * marks the tab actions go to. A tab the app opens (a popup, a link to a new tab) becomes that tab by itself.",
+    input: { session },
+    call: () => ({ kind: "tabs" }),
     readOnly: true,
   })
   register(server, sessions, {
