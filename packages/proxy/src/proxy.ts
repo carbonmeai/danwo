@@ -534,7 +534,6 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   let armed: { match: (call: OutboundCall) => boolean; fault: OutboundFault; left: number }[] = []
   let callIndex = 0
 
-
   /** The fault `failNext` armed for `call`, spent by one; undefined when none matches. */
   const takeArmed = (call: OutboundCall): OutboundFault | undefined => {
     const hit = armed.find((entry) => entry.left > 0 && entry.match(call))
