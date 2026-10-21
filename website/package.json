@@ -40,6 +40,6 @@
     "playwright-core": "1.64.0",
     "shiki": "4.5.0",
     "tailwindcss": "4.3.3",
-    "vite": "8.2.2"
+    "vite": "8.3.4"
   }
 }

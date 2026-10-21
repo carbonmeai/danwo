@@ -33,7 +33,7 @@
   "devDependencies": {
     "@stylistic/eslint-plugin": "5.10.0",
     "@types/node": "^24",
-    "fallow": "3.33.1",
+    "fallow": "3.34.1",
     "micromark": "4.0.3",
     "micromark-extension-gfm": "3.0.0",
     "oxfmt": "0.73.0",
