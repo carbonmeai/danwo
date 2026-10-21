@@ -50,15 +50,15 @@ script shows up at once.
 
 Every field given must match. Leave `match` out to answer every call.
 
-| Field         | Matches                                                                     |
-| ------------- | --------------------------------------------------------------------------- |
-| `user`        | The last user message: a string (case-insensitive) or a regular expression. |
-| `system`      | The system prompt, the same way.                                            |
-| `model`       | The model name, the same way.                                               |
-| `provider`    | One API, such as `openai` or `anthropic`.                                   |
-| `tool`        | A tool the call offers, by name.                                            |
-| `toolResult`  | `true` for the turn after a tool call, `false` for the others.              |
-| `fingerprint` | The exact request, as a recording identifies it.                            |
+| Field         | Matches                                                                                            |
+| ------------- | -------------------------------------------------------------------------------------------------- |
+| `user`        | The last user message: a string (case-insensitive) or a regular expression.                        |
+| `system`      | The system prompt, the same way.                                                                   |
+| `model`       | The model name, the same way.                                                                      |
+| `provider`    | One API, such as `openai` or `anthropic`.                                                          |
+| `tool`        | A tool the call offers, by name.                                                                   |
+| `toolResult`  | `true` for the turn after a tool call, `false` for the others, or a pattern its result must match. |
+| `fingerprint` | The exact request, as a recording identifies it.                                                   |
 
 ### Write the reply
 

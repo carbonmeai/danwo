@@ -48,9 +48,18 @@ function partText(part: unknown): string {
 
   if (text !== undefined) return text
 
-  const output = asRecord(record.output)
+  return outputText(asRecord(record.output))
+}
 
-  return output === undefined ? "" : textOf(output.value)
+/**
+ * The text of a tool result's `output` as the AI SDK sends it: text or an error as is, content
+ * parts by their text, and a JSON value as JSON.
+ */
+function outputText(output: Record<string, unknown> | undefined): string {
+  if (output === undefined) return ""
+  if (typeof output.value === "string" || Array.isArray(output.value)) return textOf(output.value)
+
+  return output.value === undefined ? "" : JSON.stringify(output.value)
 }
 
 export function str(value: unknown): string {

@@ -29,6 +29,15 @@ function gatewayFor(behaviour?: string) {
   return createGateway({ apiKey: "vck_danwo_emulated", fetch: emulatorFetch(emulator, behaviour) })
 }
 
+/** The error a bare gateway call saying `text` fails with, or its answer when it doesn't fail. */
+function failure(text: string): Promise<unknown> {
+  return Promise.resolve(
+    gatewayFor()("openai/gpt-5-mini").doGenerate({
+      prompt: [{ role: "user", content: [{ type: "text", text }] }],
+    }),
+  ).catch((error: unknown) => error)
+}
+
 const WEATHER = {
   weather: tool({
     description: "The weather in a city",
@@ -62,6 +71,62 @@ describe("AI Gateway", () => {
 
     expect(result.text).toBe("It is 31°C and sunny in Lagos.")
     expect(result.steps[0]?.toolResults[0]?.output).toEqual({ city: "Lagos", celsius: 31 })
+  })
+
+  it("answers by what the tool handed back: its JSON, or its error", async () => {
+    llmScripts(emulator).clear()
+    seedLlm(emulator.store, {
+      scripts: [
+        {
+          match: { user: /weather in (\w+)/, toolResult: false },
+          reply: { toolCalls: [{ name: "weather", arguments: { city: "Atlantis" } }] },
+        },
+        { match: { toolResult: /no such city/ }, reply: { text: "I couldn't find that city." } },
+        { match: { toolResult: /"celsius":31/ }, reply: { text: "It is 31°C." } },
+      ],
+    })
+
+    const tools = {
+      weather: tool({
+        description: "The weather in a city",
+        inputSchema: z.object({ city: z.string() }),
+        execute: async ({ city }) => {
+          if (city === "Atlantis") throw new Error("no such city")
+
+          return { city, celsius: 31 }
+        },
+      }),
+    }
+    const model = gatewayFor()("openai/gpt-5-mini")
+    const failed = await generateText({
+      model,
+      tools,
+      stopWhen: stepCountIs(3),
+      prompt: "what is the weather in Atlantis?",
+    })
+
+    expect(failed.text).toBe("I couldn't find that city.")
+
+    llmScripts(emulator).clear()
+    seedLlm(emulator.store, {
+      scripts: [
+        {
+          match: { toolResult: false },
+          reply: { toolCalls: [{ name: "weather", arguments: { city: "Lagos" } }] },
+        },
+        { match: { toolResult: /no such city/ }, reply: { text: "I couldn't find that city." } },
+        { match: { toolResult: /"celsius":31/ }, reply: { text: "It is 31°C." } },
+      ],
+    })
+
+    const found = await generateText({
+      model,
+      tools,
+      stopWhen: stepCountIs(3),
+      prompt: "what is the weather in Lagos?",
+    })
+
+    expect(found.text).toBe("It is 31°C.")
   })
 
   it("streams text", async () => {
@@ -132,12 +197,8 @@ describe("AI Gateway", () => {
       ],
     })
 
-    const down = await gatewayFor()("openai/gpt-5-mini")
-      .doGenerate({ prompt: [{ role: "user", content: [{ type: "text", text: "down?" }] }] })
-      .catch((error: unknown) => error)
-    const full = await gatewayFor()("openai/gpt-5-mini")
-      .doGenerate({ prompt: [{ role: "user", content: [{ type: "text", text: "full?" }] }] })
-      .catch((error: unknown) => error)
+    const down = await failure("down?")
+    const full = await failure("full?")
 
     expect(down).toMatchObject({ statusCode: 500, type: "internal_server_error" })
     expect(full).toMatchObject({ statusCode: 503 })

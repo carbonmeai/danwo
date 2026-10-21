@@ -59,8 +59,11 @@ export interface StoredMatch {
   readonly system?: StoredPattern
   /** A tool the call offers, by name. */
   readonly tool?: string
-  /** Whether the call's last message hands back a tool's result (the turn after a tool call). */
-  readonly toolResult?: boolean
+  /**
+   * Whether the call's last message hands back a tool's result (the turn after a tool call), or a
+   * pattern that result's text must match.
+   */
+  readonly toolResult?: boolean | StoredPattern
   /** The exact request, as a recording identifies it. */
   readonly fingerprint?: string
 }

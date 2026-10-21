@@ -46,7 +46,7 @@ const llm = await llmEnvironment({
 ```
 
 - `match` takes `provider`, `model`, `user` (the last user message), `system` (regexes or strings),
-  `tool` (offered by name) and `toolResult` (the turn after a tool call). Every given field must
+  `tool` (offered by name) and `toolResult` (the turn after a tool call; a pattern also matches the tool result's text, its JSON or its error, so a script can answer a failed tool differently). Every given field must
   match; the first matching script answers.
 - `reply` is `text`, `toolCalls`, `json` (a structured answer, checked against the schema the call
   asked for), `refusal`, or `stop: "length" | "content_filter"`, plus `sources` (`{ url, title,

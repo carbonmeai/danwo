@@ -20,8 +20,11 @@ export interface LlmMatchInput {
   readonly user?: PatternInput
   readonly system?: PatternInput
   readonly tool?: string
-  /** True for the turn after a tool call (the last message is a tool's result), false for others. */
-  readonly toolResult?: boolean
+  /**
+   * True for the turn after a tool call (the last message is a tool's result), false for others; a
+   * pattern for the turn after a tool call whose result's text matches it, such as a tool's error.
+   */
+  readonly toolResult?: boolean | PatternInput
   readonly fingerprint?: string
 }
 
@@ -44,6 +47,8 @@ function storedMatch(match: LlmMatchInput = {}): StoredMatch {
   const model = stored(match.model)
   const user = stored(match.user)
   const system = stored(match.system)
+  const toolResult =
+    typeof match.toolResult === "boolean" ? match.toolResult : stored(match.toolResult)
 
   return {
     ...(match.provider !== undefined && { provider: match.provider }),
@@ -51,7 +56,7 @@ function storedMatch(match: LlmMatchInput = {}): StoredMatch {
     ...(user && { user }),
     ...(system && { system }),
     ...(match.tool !== undefined && { tool: match.tool }),
-    ...(match.toolResult !== undefined && { toolResult: match.toolResult }),
+    ...(toolResult !== undefined && { toolResult }),
     ...(match.fingerprint !== undefined && { fingerprint: match.fingerprint }),
   }
 }
@@ -89,11 +94,22 @@ function afterToolCall(request: LlmRequest): boolean {
   return role === "tool" || role === "function_call_output"
 }
 
+/**
+ * Whether the call is the turn after a tool call when `toolResult` asks for one (and its result's
+ * text matches, for a pattern), or is not when it asks for that.
+ */
+function toolResultFits(toolResult: StoredMatch["toolResult"], request: LlmRequest): boolean {
+  if (toolResult === undefined) return true
+  if (typeof toolResult === "boolean") return toolResult === afterToolCall(request)
+
+  return afterToolCall(request) && tests(toolResult, request.messages.at(-1)?.text ?? "")
+}
+
 /** Each condition a script can set, and whether a call meets it; an unset one always holds. */
 const CONDITIONS: ReadonlyArray<(match: StoredMatch, request: LlmRequest) => boolean> = [
   (match, request) => match.provider === undefined || match.provider === request.provider,
   (match, request) => match.tool === undefined || request.tools.includes(match.tool),
-  (match, request) => match.toolResult === undefined || match.toolResult === afterToolCall(request),
+  (match, request) => toolResultFits(match.toolResult, request),
   (match, request) =>
     match.fingerprint === undefined || match.fingerprint === fingerprintOf(request),
   (match, request) => tests(match.model, request.model),
