@@ -6,9 +6,14 @@ name: Release
 # One-time setup on npmjs.com, per package:
 #
 #   A package can only get a trusted publisher once it exists on npm, so publish each package the
-#   first time by hand, with 2FA (`npm publish --access public` from its folder, after
-#   `bun scripts/release.ts <version> --pack --verify`). Then, on the package's Settings page,
-#   under "Trusted publishing", add a GitHub Actions publisher:
+#   first time by hand, with 2FA. Never from its folder: that would publish version 0.0.0 with
+#   `workspace:*` dependencies. Run `bun scripts/release.ts <version> --pack --verify`, then
+#   publish its tarballs in the order it lists them (dependencies first):
+#
+#     npm publish dist/release/<tarball>.tgz --access public --tag beta
+#
+#   Then, on each package's Settings page, under "Trusted publishing", add a GitHub Actions
+#   publisher:
 #
 #     Organization or user:  carbonmeai
 #     Repository:            danwo
