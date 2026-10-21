@@ -21,7 +21,7 @@ export interface RegisteredFunction {
 const FUNCTIONS_QUERY = "{ functions { id slug triggers { type value } failureHandler { id } } }"
 const RUNS_QUERY = `query ($from: Time!, $functions: [UUID!]) {
   runs(first: 200, orderBy: [{ field: QUEUED_AT, direction: ASC }], filter: { from: $from, functionIDs: $functions }) {
-    edges { node { triggerIDs } }
+    edges { node { triggerIDs eventName } }
   }
 }`
 const INVOKE_MUTATION = "mutation ($slug: String!) { invokeFunction(functionSlug: $slug) }"
@@ -145,20 +145,27 @@ export async function registeredFunctions(url: string): Promise<RegisteredFuncti
 }
 
 /**
- * The events that started the runs of function `id` queued since `sinceMs`, one per run: the
- * dev server's own events for runs no app's event started, such as an invocation or an
- * `onFailure` handler's `inngest/function.failed`.
+ * The events called `event` that started runs of function `id` queued since `sinceMs`, one per
+ * run: the dev server's own events for runs no app's event started, an invocation's
+ * `inngest/function.invoked` or an `onFailure` handler's `inngest/function.failed`.
  */
-export async function runTriggers(url: string, id: string, sinceMs: number): Promise<string[]> {
+export async function runTriggers(
+  url: string,
+  id: string,
+  event: string,
+  sinceMs: number,
+): Promise<string[]> {
   const runs = fieldOf(
     await ask(url, RUNS_QUERY, { from: new Date(sinceMs).toISOString(), functions: [id] }),
     "runs",
   )
 
   return listOf(fieldOf(runs, "edges")).flatMap((edge) => {
-    const [trigger] = listOf(fieldOf(fieldOf(edge, "node"), "triggerIDs"))
+    const node = fieldOf(edge, "node")
+    const [trigger] = listOf(fieldOf(node, "triggerIDs"))
+    const name = fieldOf(node, "eventName")
 
-    return typeof trigger === "string" ? [trigger] : []
+    return typeof trigger === "string" && (name === undefined || name === event) ? [trigger] : []
   })
 }
 

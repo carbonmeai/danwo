@@ -73,23 +73,28 @@ async function send(proxyUrl: string, body: string, headers: Record<string, stri
   })
 }
 
-/** A run a stand-in started: the event that started it, its function, and when it began. */
+/**
+ * A run a stand-in started: the event that started it (and that event's name), its function, when
+ * it began (the stand-in shows it from then on) and, when it is not the stand-in's, how long it runs.
+ */
 interface Started {
   readonly event: string
   readonly functionId: string
   readonly at: number
+  readonly name?: string
+  readonly runMs?: number
 }
 
 /** `started` as the dev server's runs API lists it: running for `runMs`, then `outcome`. */
 function listed(started: Started, runMs: number, outcome = "Completed") {
-  const done = Date.now() - started.at >= runMs
+  const done = Date.now() - started.at >= (started.runMs ?? runMs)
 
   return {
     run_id: `run_${started.event}`,
     function_id: started.functionId,
     status: done ? outcome : "Running",
     run_started_at: new Date(started.at).toISOString(),
-    ...(done && { ended_at: new Date(started.at + runMs).toISOString() }),
+    ...(done && { ended_at: new Date(started.at + (started.runMs ?? runMs)).toISOString() }),
   }
 }
 
@@ -110,18 +115,23 @@ const Gql = z.object({
 function runEdges(started: readonly Started[], variables: z.infer<typeof Gql>["variables"]) {
   const from = Date.parse(variables.from ?? "")
   const edges = started
-    .filter((entry) => variables.functions?.includes(entry.functionId) && entry.at >= from)
-    .map((entry) => ({ node: { triggerIDs: [entry.event] } }))
+    .filter(
+      (entry) =>
+        variables.functions?.includes(entry.functionId) &&
+        entry.at >= from &&
+        entry.at <= Date.now(),
+    )
+    .map((entry) => ({ node: { triggerIDs: [entry.event], eventName: entry.name } }))
 
   return { data: { runs: { edges } } }
 }
 
 /**
  * A stand-in dev server with an hourly cron function and a yearly one, answering the GraphQL
- * calls settling and travel make: its functions, invoking one (a run that takes `runMs`), and
- * the runs of a function since a moment, with the events that started them.
+ * calls settling and travel make: its functions, invoking one (a run queued `lagMs` later that
+ * takes `runMs`), and the runs of a function since a moment, with the events that started them.
  */
-async function cronDevServer(runMs: number) {
+async function cronDevServer(runMs: number, lagMs = 0) {
   const invoked: Started[] = []
   const functions = [
     {
@@ -142,7 +152,8 @@ async function cronDevServer(runMs: number) {
         invoked.push({
           event: `evt_invoke_${invoked.length + 1}`,
           functionId: fn.id,
-          at: Date.now(),
+          at: Date.now() + lagMs,
+          name: "inngest/function.invoked",
         })
 
       return { data: { invokeFunction: fn !== undefined } }
@@ -158,7 +169,7 @@ async function cronDevServer(runMs: number) {
       if (req.url === "/v0/gql") return json(res, answer(body))
 
       const event = /^\/v1\/events\/([^/]+)\/runs$/.exec(req.url ?? "")?.[1]
-      const entry = invoked.find((e) => e.event === event)
+      const entry = invoked.find((e) => e.event === event && e.at <= Date.now())
 
       json(res, { data: entry ? [listed(entry, runMs)] : [] })
     })
@@ -203,6 +214,7 @@ async function failingDevServer(runMs: number, lagMs: number) {
         event: `evt_failed_${entry.event}`,
         functionId: "fn-send-failure",
         at: entry.at + runMs + lagMs,
+        name: "inngest/function.failed",
       }))
 
   const server = createServer((req, res) => {
@@ -371,6 +383,35 @@ describe("Inngest after a time travel", () => {
       expect(line).toMatch(/^inngest · \d+\.\d s · digests-scheduler completed in 0\.6 s/)
       expect(services.state()).toMatchObject({
         inngest: { runs: [{ event: "evt_invoke_1", functionId: "digests-scheduler" }] },
+      })
+    } finally {
+      await services.close()
+      dev.server.close()
+    }
+  }, 20_000)
+
+  it("waits for the run it invoked, not another run of the same function just before it", async () => {
+    const dev = await cronDevServer(300, 500)
+    const inngest = await inngestService({ url: dev.url })
+    const services = await startServices([inngest])
+
+    try {
+      /* The scheduler also listens to an event, which started a quick run just now. */
+      dev.invoked.push({
+        event: "evt_scheduled",
+        functionId: "fn-hourly",
+        at: Date.now(),
+        name: "digest/scheduled",
+        runMs: 0,
+      })
+      await services.travel(2 * DAY)
+
+      const began = Date.now()
+
+      await services.settle()
+      expect(Date.now() - began).toBeGreaterThanOrEqual(700)
+      expect(services.state()).toMatchObject({
+        inngest: { runs: [{ event: "evt_invoke_2", status: "completed" }] },
       })
     } finally {
       await services.close()

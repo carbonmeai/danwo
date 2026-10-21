@@ -388,11 +388,18 @@ function stillWaiting(
 }
 
 /** How much earlier than a moment noted here the dev server may have queued a run, by its clock. */
-const CLOCK_SLACK_MS = 1_000
+const CLOCK_SLACK_MS = 250
+
+/** The event the dev server starts a run with when it is invoked by hand. */
+const INVOKED = "inngest/function.invoked"
+/** The event the dev server starts an `onFailure` handler with. */
+const FAILED = "inngest/function.failed"
 
 /** Runs of one function that settling expects although no app's event started them. */
 interface ExpectedRuns {
   readonly functionId: string
+  /** The dev server's own event that starts them: `INVOKED` or `FAILED`. */
+  readonly event: string
   /** They were queued after this, give or take `CLOCK_SLACK_MS`. */
   readonly since: number
   readonly count: number
@@ -402,7 +409,7 @@ interface ExpectedRuns {
 
 function sameRuns(a: readonly ExpectedRuns[], b: readonly ExpectedRuns[]): boolean {
   const key = (runs: readonly ExpectedRuns[]) =>
-    runs.map((r) => `${r.functionId} ${r.since} ${r.count}`).join("\n")
+    runs.map((r) => `${r.functionId} ${r.event} ${r.since} ${r.count}`).join("\n")
 
   return key(a) === key(b)
 }
@@ -435,6 +442,7 @@ async function failureHandlers(
 
   return [...byHandler].map(([functionId, runs]) => ({
     functionId,
+    event: FAILED,
     since: Math.min(...runs.map((entry) => entry.startedAt)) - CLOCK_SLACK_MS,
     count: runs.length,
     patienceFrom: Math.min(...runs.map((entry) => failedAt.get(entry.run.runId) ?? Date.now())),
@@ -443,7 +451,7 @@ async function failureHandlers(
 
 /** The events the dev server started `expected`'s runs with, one per run it has queued so far. */
 function startedBy(url: string, expected: ExpectedRuns): Promise<string[]> {
-  return runTriggers(url, expected.functionId, expected.since)
+  return runTriggers(url, expected.functionId, expected.event, expected.since)
 }
 
 /**
@@ -535,7 +543,7 @@ export async function inngestService(options: InngestOptions = {}): Promise<Inng
       const since = Date.now() - CLOCK_SLACK_MS
 
       if (await invokeFunction(url, fn.slug))
-        expected.push({ functionId: fn.id, since, count: 1, patienceFrom: since })
+        expected.push({ functionId: fn.id, event: INVOKED, since, count: 1, patienceFrom: since })
     }
   }
 
