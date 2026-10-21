@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24 }
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright-core install --with-deps chromium
       - run: npx @danwo/cli test --reporter github
         env:
           GITHUB_TOKEN: ${{ github.token }}

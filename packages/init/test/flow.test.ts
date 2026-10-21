@@ -123,6 +123,7 @@ describe("danwo init without prompts", () => {
     expect(existsSync(join(root, ".cursor/mcp.json"))).toBe(false)
     expect(summary).toContain("added: pnpm add -D @danwo/cli")
     expect(summary).toContain("Set ANTHROPIC_API_KEY for Anthropic")
+    expect(summary).toContain("once per machine: pnpm exec playwright-core install chromium")
     expect(summary).toContain(
       "Run the example: pnpm test:danwo. danwo starts `pnpm dev` at http://localhost:3000 with Stripe emulated.",
     )

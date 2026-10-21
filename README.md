@@ -291,7 +291,7 @@ permissions:
   contents: read
 
 steps:
-  # checkout, Node 24, install, `npx playwright install --with-deps chromium`
+  # checkout, Node 24, install, `npx playwright-core install --with-deps chromium`
   - run: npx @danwo/cli test --reporter github
     env:
       GITHUB_TOKEN: ${{ github.token }}

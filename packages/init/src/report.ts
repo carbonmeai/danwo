@@ -58,6 +58,14 @@ export function keyLine(
   return `Set ${keyEnv} for ${MODEL_SOURCE_INFO[answers.modelSource].label}: export it in your shell, or keep it in a .env file your test command loads (danwo reads none of its own).`
 }
 
+/** How each package manager runs an installed package's command. */
+const EXEC: Readonly<Record<Detection["packageManager"], string>> = {
+  npm: "npx",
+  bun: "bunx",
+  pnpm: "pnpm exec",
+  yarn: "yarn",
+}
+
 function nextSteps(answers: Answers, detection: Detection): string[] {
   const run = runScript(detection.packageManager, "test:danwo")
   const steps: string[] = []
@@ -67,6 +75,10 @@ function nextSteps(answers: Answers, detection: Detection): string[] {
   if (key !== undefined) steps.push(key)
   if (answers.engine === "mobile" || answers.engine === "both")
     steps.push("Check this machine for Android testing: danwo device doctor (danwo guide mobile).")
+  if (answers.engine === "web" || answers.engine === "both")
+    steps.push(
+      `Install the Chromium danwo drives, once per machine: ${EXEC[detection.packageManager]} playwright-core install chromium`,
+    )
   if (answers.engine !== "mobile") {
     steps.push(
       `Run the example: ${run}. danwo starts \`${answers.devCommand}\` at ${answers.appUrl}${emulated === "" ? "" : ` with ${emulated} emulated`}.`,
