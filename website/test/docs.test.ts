@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process"
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
@@ -273,5 +274,29 @@ describe("links to files", () => {
     expect(isFileAddress("/docs/coding-agents")).toBe(false)
     expect(isFileAddress("https://example.com/readme.md")).toBe(false)
     expect(isFileAddress(undefined)).toBe(false)
+  })
+})
+
+describe("links to the docs from outside the website", () => {
+  it("points every danwo.dev docs address in the repository at a page the site builds", () => {
+    const slugs = new Set(docsSlugs())
+    const tracked = execFileSync("git", ["ls-files", "*.md", "*.mdx", "*.ts", "*.tsx", "*.json"], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+    })
+      .split("\n")
+      .filter(Boolean)
+    const broken = tracked.flatMap((file) =>
+      [
+        ...readFileSync(join(REPO_ROOT, file), "utf8").matchAll(
+          /https:\/\/danwo\.dev\/docs\/([\w/-]*[\w-])/g,
+        ),
+      ]
+        .map((match) => match[1] ?? "")
+        .filter((slug) => !slugs.has(slug))
+        .map((slug) => `${file}: /docs/${slug}`),
+    )
+
+    expect(broken).toEqual([])
   })
 })
