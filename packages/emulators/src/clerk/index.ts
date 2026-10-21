@@ -9,12 +9,14 @@ import { backendAuth } from "./backend-auth.ts"
 import { browserRequest, currentClient } from "./browser-request.ts"
 import { type ClerkContext, instanceOf, registerContext } from "./context.ts"
 import { browserClient } from "./frontend-json.ts"
-import { BAPI_HOST, ClerkFailure, clerkErrorBody } from "./helpers.ts"
+import { BAPI_HOST, ClerkFailure, clerkErrorBody, IMAGE_HOST } from "./helpers.ts"
+import { clerkImage } from "./images.ts"
 import { accountsRoutes } from "./routes/accounts.ts"
 import { attemptRoutes } from "./routes/attempts.ts"
 import { clientApiRoutes } from "./routes/client.ts"
 import { frontendRoutes, methodOverride } from "./routes/frontend.ts"
 import { instanceRoutes } from "./routes/instance.ts"
+import { meApiRoutes } from "./routes/me.ts"
 import { organizationRoutes } from "./routes/organizations.ts"
 import { sessionRoutes } from "./routes/sessions.ts"
 import { userRoutes } from "./routes/users.ts"
@@ -109,6 +111,7 @@ function byHost(
     const instance = instanceOf(context)
 
     if (host === BAPI_HOST) return apps.backend.fetch(c.req.raw)
+    if (host === IMAGE_HOST) return clerkImage(c.req.path)
     if (host === instance.frontendApi) return apps.frontend.fetch(c.req.raw)
     if (host === instance.accountsHost) return apps.accounts.fetch(c.req.raw)
 
@@ -158,6 +161,7 @@ export const clerk = defineEmulator({
     frontendRoutes(apps.frontend, context)
     clientApiRoutes(apps.frontend, context)
     attemptRoutes(apps.frontend, context)
+    meApiRoutes(apps.frontend, context)
     accountsRoutes(apps.accounts, context)
   },
   seed: ({ store }) => {

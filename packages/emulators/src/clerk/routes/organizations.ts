@@ -6,6 +6,7 @@ import {
   addMembership,
   createOrganization,
   inviteToOrganization,
+  membersOf,
   membershipJson,
   membershipOf,
   organizationJson,
@@ -86,9 +87,7 @@ function organizationCrud(app: App, context: ClerkContext): void {
 function membershipRoutes(app: App, context: ClerkContext): void {
   app.get("/v1/organizations/:id/memberships", (c) => {
     const org = organizationOf(context, c.req.param("id"))
-    const members = context.clerk.memberships
-      .where((m) => m.organization_id === org.id)
-      .map((m) => membershipJson(context, m))
+    const members = membersOf(context, org.id)
 
     return c.json(paginated(c, members))
   })

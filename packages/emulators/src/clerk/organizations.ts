@@ -214,6 +214,16 @@ export function membershipJson(
   }
 }
 
+/** An organization's memberships, as the API answers them. */
+export function membersOf(
+  context: ClerkContext,
+  orgId: string,
+): (OrganizationMembershipJSON & { role_name: string })[] {
+  return context.clerk.memberships
+    .where((m) => m.organization_id === orgId)
+    .map((m) => membershipJson(context, m))
+}
+
 /** A role's display name, as Clerk names its built-in roles. */
 function roleName(role: string): string {
   return role === "org:admin" ? "Admin" : "Member"

@@ -1,4 +1,4 @@
-import { clerkErrorBody } from "./helpers.ts"
+import { BAPI_HOST, clerkErrorBody } from "./helpers.ts"
 
 const json = { "content-type": "application/json" }
 
@@ -64,13 +64,15 @@ function backendFaults(method: string) {
  * delay and a reset, with a reset after Clerk acted for writes. Collecting a handshake's cookies
  * and loading the signing keys meet 500 and reset only, the failures a server's sign-in check
  * must survive. Of the Frontend API, only ClerkJS's token refresh fails (500 and 503), so a
- * page must cope with a token it cannot renew; the rest of the browser's calls and pages are left
- * alone. The 5xx wording is approximate.
+ * page must cope with a token it cannot renew; the rest of the browser's calls and pages (any
+ * call to a host other than `api.clerk.com`, its own `/v1/me` and `/v1/organizations` included)
+ * are left alone. The 5xx wording is approximate.
  */
-export function clerkOutboundFaults(call: { method: string; path: string }) {
+export function clerkOutboundFaults(call: { method: string; path: string; host?: string }) {
   const path = call.path.split("?")[0] ?? ""
 
   if (TOKEN_REFRESH.test(path)) return [INTERNAL, UNAVAILABLE]
+  if (call.host !== undefined && call.host !== BAPI_HOST) return []
   if (!path.startsWith("/v1/") || FRONTEND.test(path)) return []
   if (path === "/v1/jwks" || path === "/v1/clients/handshake_payload")
     return [INTERNAL, { kind: "reset" } as const]

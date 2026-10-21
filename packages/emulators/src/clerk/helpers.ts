@@ -5,16 +5,25 @@ import { HttpError } from "../errors.ts"
 /** The Backend API's host: what an app's server calls with its secret key. */
 export const BAPI_HOST = "api.clerk.com"
 
+/** Where Clerk serves avatars and provider logos, which its components show. */
+export const IMAGE_HOST = "img.clerk.com"
+
 /**
- * The hosts a Clerk development instance answers on: the Backend API, the Frontend API
- * (`<slug>.clerk.accounts.dev`) and the Account Portal (`<slug>.accounts.dev`). Route them to the
- * emulator; the instance is told apart by the slug in the host.
+ * The hosts a Clerk development instance answers on: the Backend API, the images its components
+ * show (`img.clerk.com`), the Frontend API (`<slug>.clerk.accounts.dev`) and the Account Portal
+ * (`<slug>.accounts.dev`). Route them to the emulator; the instance is told apart by the slug in
+ * the host.
  */
-export const CLERK_HOSTS = [BAPI_HOST, "*.clerk.accounts.dev", "*.accounts.dev"] as const
+export const CLERK_HOSTS = [
+  BAPI_HOST,
+  IMAGE_HOST,
+  "*.clerk.accounts.dev",
+  "*.accounts.dev",
+] as const
 
 /** Whether `host` is one a Clerk development instance answers on. */
 export function isClerkHost(host: string): boolean {
-  return host === BAPI_HOST || host.endsWith(".accounts.dev")
+  return host === BAPI_HOST || host === IMAGE_HOST || host.endsWith(".accounts.dev")
 }
 
 const ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
