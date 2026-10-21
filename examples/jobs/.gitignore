@@ -1,0 +1,6 @@
+node_modules/
+package-lock.json
+web/dist/
+.web-build-lock/
+.danwo/
+.inngest/

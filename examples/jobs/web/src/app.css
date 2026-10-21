@@ -1,0 +1,42 @@
+/* The digest app's own layout, on the kit's tokens. */
+
+/* The inline forms: fields side by side, the button on their baseline. */
+form.row {
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--kit-space-3);
+}
+
+form.row .field {
+  flex: 1 1 12rem;
+}
+
+form.row > .error,
+form.row > .toast {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.card > .table-wrap {
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
+}
+
+/* Scrolled to, a page's content stops below the sticky top bar instead of under it. */
+main.shell-content {
+  scroll-margin-top: var(--kit-topbar-height);
+}
+
+/* Names, times and statuses stay on one line; the details wrap. */
+.table td:first-child,
+.table td:has(> .badge) {
+  white-space: nowrap;
+}
+
+ul.stack {
+  gap: var(--kit-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

@@ -1,0 +1,17 @@
+{
+  "name": "Background jobs",
+  "summary": "A team digest sent by background jobs on Inngest: a React page, a Hono API on Postgres, and a worker whose cron, fan-out, retries and onFailure send through Resend and bill through Stripe.",
+  "icon": "nodejs.svg",
+  "stack": ["Inngest", "Hono", "Postgres", "Drizzle", "Vite", "React"],
+  "providers": ["resend", "stripe"],
+  "runsOn": "A Vite page, a Hono API and an Inngest worker in Chromium, with the Inngest dev server and Postgres in Docker",
+  "install": "npm",
+  "shows": [
+    "Background jobs on the real Inngest dev server: `settle()` waits for every run, its fan-out, retries and `onFailure` handler included",
+    "`time.travel` to a digest's send time runs the hourly cron, which fans out one `digest/send-one` per subscriber in batches",
+    "Invariants that read Postgres against Resend and Stripe: one email per subscriber per digest, one invoice item per batch, and every failed copy told to its owner",
+    "`danwo matrix` faulting the event sends, Resend, Stripe and the jobs' own SQL (58 trials), and `JOBS_BUG` switches that turn off the idempotency keys or the steps"
+  ],
+  "test": "tests/deterministic.danwo.ts",
+  "guide": { "title": "Background jobs", "href": "/docs/real-stacks/background-jobs" }
+}

@@ -1,0 +1,44 @@
+{
+  "name": "danwo-example-jobs",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A team digest with background jobs on Inngest: a React page, a Hono API on Postgres, and a worker whose cron, fan-out, retries and onFailure send through Resend and bill through Stripe, all emulated.",
+  "type": "module",
+  "scripts": {
+    "build": "vite build web",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p web",
+    "test": "danwo test",
+    "test:agentic": "danwo test tests/agentic.danwo.ts",
+    "matrix": "danwo matrix tests/deterministic.danwo.ts --grep \"sends a scheduled digest\"",
+    "matrix:plan": "danwo matrix tests/deterministic.danwo.ts --grep \"sends a scheduled digest\" --plan",
+    "serve": "danwo serve"
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.5",
+    "drizzle-orm": "0.45.4",
+    "hono": "4.13.13",
+    "inngest": "4.25.0",
+    "pg": "8.23.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "resend": "6.34.1",
+    "stripe": "23.0.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@danwo/cli": "0.1.0-beta.0",
+    "@danwo/sdk": "0.1.0-beta.0",
+    "@types/node": "^24",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "drizzle-kit": "0.31.11",
+    "inngest-cli": "1.46.0",
+    "typescript": "5.9.3",
+    "vite": "8.3.5"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
