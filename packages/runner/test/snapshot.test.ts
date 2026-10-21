@@ -34,7 +34,7 @@ describe("page view", () => {
   it("runs on the pinned Playwright", () => {
     const version: unknown = createRequire(import.meta.url)("playwright-core/package.json").version
 
-    expect(version).toBe("1.64.0")
+    expect(version).toBe("1.64.1")
   })
 
   it("shows roles, names and refs, and redacts what it shows", async () => {
