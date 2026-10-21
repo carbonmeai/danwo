@@ -84,8 +84,26 @@ export function cardOutcome(method: PaymentMethod, use: "setup" | "charge"): Car
   return outcome
 }
 
-/** The card a Checkout payment uses: Stripe's Visa test card. */
+/** The card a Checkout payment uses when the payer names none: Stripe's Visa test card. */
 export const CHECKOUT_TEST_CARD = "pm_card_visa"
+
+/** Stripe's test card numbers the hosted Checkout page accepts, and the test card each stands for. */
+const CHECKOUT_NUMBERS: Readonly<Record<string, string>> = {
+  "4242424242424242": "pm_card_visa",
+  "4000056655665556": "pm_card_visa_debit",
+  "5555555555554444": "pm_card_mastercard",
+  "378282246310005": "pm_card_amex",
+  "4000000000000002": "pm_card_chargeDeclined",
+  "4000000000000341": "pm_card_chargeCustomerFail",
+}
+
+/**
+ * The test card a number typed on the hosted Checkout page stands for, spaces and dashes
+ * ignored: `4000 0000 0000 0002` declines. A number that is not a test card pays with Visa.
+ */
+export function checkoutCardFor(number: string | null): string {
+  return CHECKOUT_NUMBERS[(number ?? "").replace(/[\s-]/g, "")] ?? CHECKOUT_TEST_CARD
+}
 
 /** A new card payment method, unattached unless `customer` is given. */
 export function addCard(

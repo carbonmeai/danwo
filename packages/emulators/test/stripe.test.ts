@@ -9,7 +9,7 @@ import { createEmulator, type Emulator } from "../src/define.ts"
 import { serve } from "../src/http.ts"
 import { listeningPort } from "../src/net.ts"
 import { STRIPE_API_VERSION } from "../src/stripe/events.ts"
-import { stripe, stripeSignature } from "../src/stripe/index.ts"
+import { stripe, stripeOutboundFaults, stripeSignature } from "../src/stripe/index.ts"
 import { fakeKey } from "./fake-key.ts"
 
 const fixedNow = new Date("2026-10-16T12:00:00Z")
@@ -41,6 +41,28 @@ function expandedObject<T extends object>(value: string | T | null | undefined):
 
   return value
 }
+
+/** A one-line payment session for $12, and the hosted page's Pay URL. */
+async function payableSession(): Promise<{ readonly id: string; readonly pay: string }> {
+  const session = await client().checkout.sessions.create({
+    mode: "payment",
+    line_items: [
+      {
+        price_data: { currency: "usd", product_data: { name: "Mug" }, unit_amount: 1200 },
+        quantity: 1,
+      },
+    ],
+    success_url: "https://app.test/done?session={CHECKOUT_SESSION_ID}",
+  })
+
+  return { id: session.id, pay: `${baseUrl}/checkout/${session.id}/complete` }
+}
+
+/** The kinds of fault the catalogue plans for `call`, an `emulate` fault by its behaviour. */
+const kinds = (call: { method: string; host?: string; path?: string }) =>
+  stripeOutboundFaults(call).map((fault) =>
+    fault.kind === "emulate" ? fault.behaviour : fault.kind,
+  )
 
 beforeAll(async () => {
   server = serve({ fetch: (request) => emulator.fetch(request), port: 0 })
@@ -238,6 +260,69 @@ describe("checkout", () => {
 
     expect(completed).toMatchObject({ status: "complete", payment_status: "paid" })
     expect(outboxEvents().at(-1)?.type).toBe("checkout.session.completed")
+  })
+
+  it("declines the declining test card, keeps the session open, and lets another card pay", async () => {
+    const { id, pay } = await payableSession()
+    const declined = await fetch(pay, {
+      method: "POST",
+      body: new URLSearchParams({ card: "4000 0000 0000 0002" }),
+      redirect: "manual",
+    })
+    const page = await declined.text()
+
+    expect(declined.status).toBe(402)
+    expect(page).toContain('role="alert"')
+    expect(page).toContain("Your card was declined.")
+    expect(page).toContain('value="4000 0000 0000 0002"')
+
+    const open = await client().checkout.sessions.retrieve(id)
+
+    expect(open).toMatchObject({ status: "open", payment_status: "unpaid" })
+    expect(outboxEvents().map((e) => e.type)).toContain("payment_intent.payment_failed")
+    expect(outboxEvents().map((e) => e.type)).not.toContain("checkout.session.completed")
+
+    const paid = await fetch(pay, {
+      method: "POST",
+      body: new URLSearchParams({ card: "4242 4242 4242 4242" }),
+      redirect: "manual",
+    })
+
+    expect(paid.status).toBe(303)
+
+    const completed = await client().checkout.sessions.retrieve(id)
+
+    expect(completed).toMatchObject({ status: "complete", payment_status: "paid" })
+    // The second card paid the intent the declined one left waiting.
+    expect(completed.payment_intent).toBe(open.payment_intent)
+  })
+
+  it("declines any card when the matrix asks it to", async () => {
+    const { pay } = await payableSession()
+    const declined = await fetch(pay, {
+      method: "POST",
+      headers: { "x-danwo-emulate": "card_declined" },
+      body: new URLSearchParams({ card: "4242 4242 4242 4242" }),
+    })
+
+    expect(declined.status).toBe(402)
+    expect(await declined.text()).toContain("Your card was declined.")
+  })
+})
+
+describe("stripeOutboundFaults", () => {
+  it("plans a declined card on the hosted page's Pay button only", () => {
+    expect(
+      kinds({ method: "POST", host: "checkout.stripe.com", path: "/checkout/cs_1/complete" }),
+    ).toEqual(["status", "status", "reset", "reset-after", "card_declined"])
+    expect(
+      kinds({ method: "POST", host: "api.stripe.com", path: "/v1/checkout/sessions" }),
+    ).toEqual(["status", "status", "reset", "reset-after"])
+    expect(kinds({ method: "GET", host: "checkout.stripe.com", path: "/checkout/cs_1" })).toEqual([
+      "status",
+      "status",
+      "reset",
+    ])
   })
 })
 

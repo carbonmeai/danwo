@@ -44,6 +44,8 @@ const STYLE = `
   button { width: 100%; margin-top: 18px; padding: 11px; border: 0; border-radius: 6px;
     background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
   a { color: var(--accent); }
+  .error { margin: 14px 0 0; padding: 9px 10px; border-radius: 6px; color: #df1b41;
+    background: color-mix(in srgb, #df1b41 10%, transparent); }
 `
 
 /** A whole page around `content`. */
@@ -81,11 +83,15 @@ export interface PayPage {
   readonly currency: string
   readonly email: string | null
   readonly cancelUrl: string | null
+  /** The card number in the field: what the payer typed last, else Stripe's Visa test card. */
+  readonly card?: string
+  /** Why the last attempt to pay failed, e.g. `Your card was declined.` */
+  readonly error?: string
 }
 
 /**
- * Checkout's payment page: the order, a prefilled test card and a Pay button that posts to
- * `/checkout/:id/complete`.
+ * Checkout's payment page: the order, a prefilled test card the payer may change, and a Pay
+ * button that posts to `/checkout/:id/complete`. After a decline it says why, as an alert.
  */
 export function renderPayPage(view: PayPage): string {
   const money = (amount: number) => formatMoney(amount, view.currency)
@@ -98,6 +104,9 @@ export function renderPayPage(view: PayPage): string {
   const cancel = view.cancelUrl
     ? `<p><a href="${escapeHtml(view.cancelUrl)}" data-testid="checkout-cancel">Back</a></p>`
     : ""
+  const error = view.error
+    ? `<p class="error" role="alert" data-testid="checkout-error">${escapeHtml(view.error)}</p>\n`
+    : ""
 
   return page(
     "Checkout",
@@ -107,8 +116,8 @@ export function renderPayPage(view: PayPage): string {
 <div class="total"><span>Total due</span><span data-testid="checkout-total">${money(view.total)}</span></div>
 <form method="post" action="/checkout/${escapeHtml(view.sessionId)}/complete">
 <label>Email <input name="email" type="email" value="${escapeHtml(view.email ?? "")}" autocomplete="email"></label>
-<label>Card number <input name="card" value="4242 4242 4242 4242" inputmode="numeric" readonly></label>
-<button type="submit" data-testid="checkout-pay">Pay ${money(view.total)}</button>
+<label>Card number <input name="card" value="${escapeHtml(view.card ?? "4242 4242 4242 4242")}" inputmode="numeric" autocomplete="cc-number"></label>
+${error}<button type="submit" data-testid="checkout-pay">Pay ${money(view.total)}</button>
 </form>
 ${cancel}`,
   )

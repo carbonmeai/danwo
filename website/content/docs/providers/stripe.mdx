@@ -87,7 +87,9 @@ test("pays for credits once", async ({ app, screen, expect, stripe }) => {
 ```
 
 On the emulator's Checkout page, `checkout-pay` pays and `checkout-cancel` goes back to your
-`cancel_url`.
+`cancel_url`. The card number field holds Visa's test card. Type `4000 0000 0000 0002` instead
+and the card is declined: the page shows the decline as an alert (`checkout-error`), the session
+stays open, and no `checkout.session.completed` is sent.
 
 ## What's covered
 
@@ -108,6 +110,7 @@ On the emulator's Checkout page, `checkout-pay` pays and `checkout-cancel` goes 
 | --------------------------------------------- | ---------------------------------------------------------------------- |
 | A write, such as `POST /v1/checkout/sessions` | 500, 429 rate limit, connection reset, answer lost after Stripe acted  |
 | A read, such as `GET /v1/customers/:id`       | 500, 429 rate limit, connection reset                                  |
+| Paying on the hosted Checkout page            | the same as a write, and a declined card                               |
 | Every webhook delivery                        | arrives twice, arrives 10 minutes late, forged signature, 1 hour stale |
 
 The error bodies are Stripe's, so the SDK raises `StripeAPIError` or `StripeRateLimitError` just

@@ -124,7 +124,7 @@ export function chargeIntent(
  * `succeeded`, and the card saved to the customer when the intent asked for future use. Emits
  * `payment_method.attached` (when saved), `payment_intent.succeeded` and `charge.succeeded`.
  */
-export function payIntent(
+function payIntent(
   payments: Payments,
   intent: PaymentIntent,
   method: PaymentMethod,

@@ -1,11 +1,19 @@
+/** The hosted Checkout page's Pay button, as the browser posts it. */
+const HOSTED_PAY = /^\/checkout\/[^/?]+\/complete(\?|$)/
+
 /**
  * Failures a Stripe API call can meet, as the fault matrix injects them at the proxy. Status
- * faults carry Stripe's error body so the SDK raises the error type an app would see.
+ * faults carry Stripe's error body so the SDK raises the error type an app would see. Paying on
+ * the hosted Checkout page can also meet a declined card, whatever card the test typed.
  *
  * The bodies follow Stripe's documented error shape (`{ error: { type, code?, message } }`);
  * the exact messages are approximations.
  */
-export function stripeOutboundFaults(call: { method: string }) {
+export function stripeOutboundFaults(call: {
+  readonly method: string
+  readonly host?: string
+  readonly path?: string
+}) {
   const faults = [
     {
       kind: "status",
@@ -28,5 +36,11 @@ export function stripeOutboundFaults(call: { method: string }) {
   ] as const
 
   // A dropped response after Stripe acted only matters for calls that change something.
-  return call.method === "GET" ? faults : ([...faults, { kind: "reset-after" }] as const)
+  if (call.method === "GET") return faults
+
+  const writes = [...faults, { kind: "reset-after" }] as const
+
+  return call.host === "checkout.stripe.com" && HOSTED_PAY.test(call.path ?? "")
+    ? ([...writes, { kind: "emulate", behaviour: "card_declined" }] as const)
+    : writes
 }

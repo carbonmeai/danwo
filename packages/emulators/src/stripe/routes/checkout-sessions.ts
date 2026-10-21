@@ -1,10 +1,16 @@
 import type { Context } from "../../http.ts"
 import { isOneOf } from "../../json.ts"
-import { CHECKOUT_TEST_CARD, paymentMethodFor } from "../cards.ts"
+import { checkoutCardFor, paymentMethodFor } from "../cards.ts"
 import { messagePage, renderPayPage } from "../checkout-page.ts"
 import { subscribeSession, subscriptionPlan } from "../checkout-subscription.ts"
 import type { StripeRouteContext } from "../context.ts"
-import type { CheckoutSession, Invoice, SessionLine, SessionPlan } from "../entities.ts"
+import type {
+  CheckoutSession,
+  Invoice,
+  PaymentIntent,
+  SessionLine,
+  SessionPlan,
+} from "../entities.ts"
 import { checkoutSessionObject, invoiceObject } from "../formatters.ts"
 import {
   asRecord,
@@ -22,13 +28,19 @@ import {
   textOrNull,
   unix,
 } from "../helpers.ts"
-import { createIntent, payIntent } from "../payments.ts"
+import { chargeIntent, createIntent } from "../payments.ts"
 import { createPrice } from "./prices.ts"
 
 type Mode = "payment" | "setup" | "subscription"
 type Params = Record<string, unknown>
 
 const DAY_SECONDS = 24 * 60 * 60
+
+/** The header through which `danwo matrix` asks a route to misbehave in a way only it can. */
+const EMULATE_HEADER = "x-danwo-emulate"
+
+/** The behaviour that has the hosted page decline the card, whatever was typed. */
+const CARD_DECLINED = "card_declined"
 const MODES: readonly Mode[] = ["payment", "setup", "subscription"]
 
 /** Session fields taken as given from the create request, by parameter name. */
@@ -268,14 +280,28 @@ function payerEmail(
   return typed || session.customer_email || customer?.email || null
 }
 
-/** Charges the test card for the session's total; returns the intent and invoice it made. */
-function chargeSession(
+/** A payment the hosted page could not take, and what the payer is told. */
+interface Declined {
+  readonly declined: string
+}
+
+/**
+ * The PaymentIntent a payment session charges: the one an earlier, declined attempt left
+ * waiting for a payment method, as Checkout retries on the same intent, or a new one.
+ */
+function intentFor(
   context: StripeRouteContext,
   session: CheckoutSession,
   plan: SessionPlan,
-  email: string | null,
-): Partial<CheckoutSession> {
-  const intent = createIntent(context, {
+): PaymentIntent {
+  const earlier =
+    typeof session.payment_intent === "string"
+      ? context.objects.paymentIntents.get(session.payment_intent)
+      : undefined
+
+  if (earlier?.status === "requires_payment_method") return earlier
+
+  return createIntent(context, {
     amount: session.amount_total ?? 0,
     currency: session.currency ?? "usd",
     customer: typeof session.customer === "string" ? session.customer : null,
@@ -285,39 +311,62 @@ function chargeSession(
     setupFutureUsage: plan.intent.setupFutureUsage,
     receiptEmail: null,
   })
-  const paid = payIntent(
-    context,
-    intent,
-    paymentMethodFor(context.objects, CHECKOUT_TEST_CARD, context.clock()) ?? orThrow(),
-  )
+}
+
+/**
+ * Charges `card` for the session's total; returns the intent and invoice it made, or the
+ * decline, which leaves the session open and its intent waiting for another card.
+ */
+function chargeSession(
+  context: StripeRouteContext,
+  session: CheckoutSession,
+  plan: SessionPlan,
+  payment: { readonly email: string | null; readonly card: string },
+): Partial<CheckoutSession> | Declined {
+  const intent = intentFor(context, session, plan)
+  const method = paymentMethodFor(context.objects, payment.card, context.clock()) ?? orThrow()
+  const charged = chargeIntent(context, intent, method)
+
+  if (charged.status !== "succeeded") {
+    context.objects.checkoutSessions.change(session.id, { payment_intent: charged.id })
+
+    return { declined: charged.last_payment_error?.message ?? "Your card was declined." }
+  }
+
   const invoice = invoiceFor(
     context,
-    { ...session, customer_details: { ...emptyDetails(), email } },
+    { ...session, customer_details: { ...emptyDetails(), email: payment.email } },
     plan,
-    paid.id,
+    charged.id,
   )
 
-  return { payment_status: "paid", payment_intent: paid.id, invoice: invoice?.id ?? null }
+  return { payment_status: "paid", payment_intent: charged.id, invoice: invoice?.id ?? null }
 }
 
 function orThrow(): never {
   throw new Error("the Checkout test card is missing")
 }
 
-/** Takes the payment for an open session, as the hosted page's Pay button does. */
+/**
+ * Takes the payment for an open session with the card the payer typed, as the hosted page's Pay
+ * button does. Returns the completed session, or the decline.
+ */
 function paySession(
   context: StripeRouteContext,
   session: CheckoutSession,
-  typed: string | null,
-): CheckoutSession {
+  typed: { readonly email: string | null; readonly card: string },
+): CheckoutSession | Declined {
   const plan = context.objects.checkoutSessions.extra(session.id)
-  const email = payerEmail(context, session, typed)
+  const email = payerEmail(context, session, typed.email)
   const payment =
     plan && session.mode === "subscription"
       ? subscribeSession(context, session, plan, email)
       : plan && session.mode !== "setup"
-        ? chargeSession(context, session, plan, email)
+        ? chargeSession(context, session, plan, { email, card: typed.card })
         : { payment_status: "no_payment_required" as const }
+
+  if ("declined" in payment) return payment
+
   const completed = context.objects.checkoutSessions.change(session.id, {
     ...payment,
     status: "complete",
@@ -383,6 +432,29 @@ function payableCheckout(
   return session
 }
 
+/** The hosted payment page for an open session; after a decline, `after` says why. */
+function payPage(
+  context: StripeRouteContext,
+  session: CheckoutSession,
+  after: { readonly error?: string; readonly card?: string } = {},
+): string {
+  const lines = context.objects.checkoutSessions.extra(session.id)?.lines ?? []
+
+  return renderPayPage({
+    sessionId: session.id,
+    lines: lines.map((line) => ({
+      description: line.description,
+      quantity: line.quantity,
+      amount: line.unitAmount * line.quantity,
+    })),
+    total: session.amount_total ?? 0,
+    currency: session.currency ?? "usd",
+    email: session.customer_email,
+    cancelUrl: session.cancel_url,
+    ...after,
+  })
+}
+
 /** Checkout Sessions over the API, plus the hosted payment page they send customers to. */
 export function checkoutSessionRoutes(context: StripeRouteContext): void {
   const { app, objects, events } = context
@@ -437,22 +509,7 @@ export function checkoutSessionRoutes(context: StripeRouteContext): void {
     if (session.status === "complete")
       return c.html(messagePage("Already paid", "This checkout is complete."))
 
-    const lines = sessions.extra(session.id)?.lines ?? []
-
-    return c.html(
-      renderPayPage({
-        sessionId: session.id,
-        lines: lines.map((line) => ({
-          description: line.description,
-          quantity: line.quantity,
-          amount: line.unitAmount * line.quantity,
-        })),
-        total: session.amount_total ?? 0,
-        currency: session.currency ?? "usd",
-        email: session.customer_email,
-        cancelUrl: session.cancel_url,
-      }),
-    )
+    return c.html(payPage(context, session))
   })
 
   app.post("/checkout/:id/complete", async (c) => {
@@ -463,7 +520,20 @@ export function checkoutSessionRoutes(context: StripeRouteContext): void {
 
     const form = await c.req.parseBody()
     const email = typeof form.email === "string" ? form.email : null
+    const typed = typeof form.card === "string" ? form.card : null
+    /* `danwo matrix` asks for a decline whatever card was typed. */
+    const card =
+      c.req.header(EMULATE_HEADER) === CARD_DECLINED
+        ? "pm_card_chargeDeclined"
+        : checkoutCardFor(typed)
+    const paid = paySession(context, session, { email, card })
 
-    return successRedirect(c, paySession(context, session, email))
+    if ("declined" in paid)
+      return c.html(
+        payPage(context, session, { error: paid.declined, ...(typed !== null && { card: typed }) }),
+        402,
+      )
+
+    return successRedirect(c, paid)
   })
 }
