@@ -98,6 +98,7 @@ const Gql = z.object({
   query: z.string(),
   variables: z
     .object({
+      id: z.string().optional(),
       slug: z.string().optional(),
       from: z.string().optional(),
       functions: z.array(z.string()).optional(),
@@ -244,6 +245,84 @@ async function failingDevServer(runMs: number, lagMs: number) {
 
   return { server, url: `http://127.0.0.1:${port}` }
 }
+
+/**
+ * A stand-in dev server whose REST API answers from a cache, as the real one does for 15 seconds,
+ * so it never shows a run finishing; its GraphQL says how each run is at that moment.
+ */
+async function cachingDevServer(runMs: number) {
+  const sent: Started[] = []
+  const server = createServer((req, res) => {
+    void bodyOf(req).then((body) => {
+      if (req.method === "POST" && req.url?.startsWith("/e/")) {
+        const event = `evt_${sent.length + 1}`
+
+        sent.push({ event, functionId: "fn-send", at: Date.now() })
+
+        return json(res, { ids: [event] })
+      }
+
+      if (req.url === "/v0/gql") {
+        const { query, variables } = Gql.parse(JSON.parse(body))
+
+        if (!query.includes("eventV2")) return json(res, { data: { functions: [] } })
+
+        const entry = sent.find((e) => e.event === variables.id)
+
+        if (!entry)
+          return json(res, {
+            errors: [{ message: `event not found: ${variables.id}` }],
+            data: null,
+          })
+
+        const done = Date.now() - entry.at >= runMs
+        const runs = [
+          {
+            id: `run_${entry.event}`,
+            functionID: entry.functionId,
+            status: done ? "COMPLETED" : "RUNNING",
+            startedAt: new Date(entry.at).toISOString(),
+            endedAt: new Date(done ? entry.at + runMs : entry.at).toISOString(),
+          },
+        ]
+
+        return json(res, { data: { eventV2: { runs } } })
+      }
+
+      /* The cache still holds the first answer: the run queued, never started. */
+      json(res, { data: [{ run_id: "run_cached", function_id: "fn-send", status: "Scheduled" }] })
+    })
+  })
+
+  server.listen(0, "127.0.0.1")
+  await once(server, "listening")
+
+  const address = server.address()
+  const port = typeof address === "object" && address !== null ? address.port : 0
+
+  return { server, url: `http://127.0.0.1:${port}` }
+}
+
+describe("Inngest runs", () => {
+  it("reads how a run is now from GraphQL, not from the REST API's cache", async () => {
+    const dev = await cachingDevServer(400)
+    const inngest = await inngestService({ url: dev.url, settleTimeoutMs: 5_000 })
+    const services = await startServices([inngest])
+
+    try {
+      await send(services.proxy.url, JSON.stringify({ name: "digest/send-one" }))
+
+      const began = Date.now()
+      const [line = ""] = await services.settle()
+
+      expect(Date.now() - began).toBeLessThan(2_000)
+      expect(line).toMatch(/fn-send completed in 0\.4 s$/)
+    } finally {
+      await services.close()
+      dev.server.close()
+    }
+  })
+})
 
 describe("Inngest onFailure handlers", () => {
   it("waits for the handler a failed run starts, and lists it", async () => {

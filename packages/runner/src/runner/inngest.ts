@@ -18,6 +18,8 @@ import {
 import { type OwnedChild, spawnOwned } from "../support/children.ts"
 import { cronDue } from "./cron.ts"
 import {
+  type EventRun,
+  eventRuns,
   invokeFunction,
   type RegisteredFunction,
   registeredFunctions,
@@ -172,7 +174,34 @@ function waitedFor(events: readonly string[], runs: readonly InngestRun[]): stri
   return [...ran, ...idle]
 }
 
+/** A run from the dev server's GraphQL: it has an end once it is done, and only then. */
+function listedFrom(event: string, run: EventRun): ListedRun {
+  const status = run.status.toLowerCase()
+  const started = Date.parse(run.startedAt ?? "")
+  const ended = DONE.has(status) ? Date.parse(run.endedAt ?? "") : Number.NaN
+
+  return {
+    run: {
+      event,
+      runId: run.id,
+      functionId: run.functionId,
+      status,
+      durationMs: Number.isNaN(started) || Number.isNaN(ended) ? null : ended - started,
+    },
+    ended: DONE.has(status),
+    startedAt: Number.isNaN(started) ? Date.now() : started,
+  }
+}
+
+/**
+ * The runs `event` started, from the dev server's GraphQL, which says how each run is at this
+ * moment; from its REST API when there is no GraphQL to ask.
+ */
 async function runsOf(url: string, event: string): Promise<ListedRun[]> {
+  const fresh = await eventRuns(url, event)
+
+  if (fresh !== undefined) return fresh.map((run) => listedFrom(event, run))
+
   try {
     const response = await fetch(new URL(`/v1/events/${encodeURIComponent(event)}/runs`, url))
     const body: unknown = await response.json()

@@ -26,6 +26,21 @@ const RUNS_QUERY = `query ($from: Time!, $functions: [UUID!]) {
 }`
 const INVOKE_MUTATION = "mutation ($slug: String!) { invokeFunction(functionSlug: $slug) }"
 
+const EVENT_RUNS_QUERY = `query ($id: ULID!) {
+  eventV2(id: $id) { runs { id functionID status startedAt endedAt } }
+}`
+
+/** A run one event started, as the dev server's GraphQL lists it at this moment. */
+export interface EventRun {
+  readonly id: string
+  /** The dev server's id for the function. */
+  readonly functionId: string
+  /** `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED` or `CANCELLED`. */
+  readonly status: string
+  readonly startedAt: string | null
+  readonly endedAt: string | null
+}
+
 /** `value`'s field `name`, when `value` is an object. */
 function fieldOf(value: unknown, name: string): unknown {
   return typeof value === "object" && value !== null ? Reflect.get(value, name) : undefined
@@ -39,8 +54,8 @@ function textOf(value: unknown): string {
   return typeof value === "string" ? value : ""
 }
 
-/** The `data` of a GraphQL answer from the dev server at `url`; undefined when there is none. */
-async function ask(
+/** A GraphQL answer from the dev server at `url`, `data` and `errors`; undefined when none came. */
+async function answer(
   url: string,
   query: string,
   variables: Readonly<Record<string, unknown>> = {},
@@ -53,10 +68,52 @@ async function ask(
       signal: AbortSignal.timeout(2_000),
     })
 
-    return response.ok ? fieldOf(await response.json(), "data") : undefined
+    return response.ok ? await response.json() : undefined
   } catch {
     return undefined
   }
+}
+
+/** The `data` of a GraphQL answer from the dev server at `url`; undefined when there is none. */
+async function ask(
+  url: string,
+  query: string,
+  variables: Readonly<Record<string, unknown>> = {},
+): Promise<unknown> {
+  return fieldOf(await answer(url, query, variables), "data")
+}
+
+/**
+ * The runs event `id` has started so far, as the dev server knows them at this moment (its REST
+ * API answers from a cache that lags by up to 15 seconds); none while it has not stored the event
+ * yet. Undefined when the dev server does not answer the query.
+ */
+export async function eventRuns(url: string, id: string): Promise<EventRun[] | undefined> {
+  const body = await answer(url, EVENT_RUNS_QUERY, { id })
+  const runs = fieldOf(fieldOf(fieldOf(body, "data"), "eventV2"), "runs")
+
+  if (Array.isArray(runs))
+    return runs.map((run: unknown) => {
+      const time = (name: string) => {
+        const value = fieldOf(run, name)
+
+        return typeof value === "string" ? value : null
+      }
+
+      return {
+        id: textOf(fieldOf(run, "id")),
+        functionId: textOf(fieldOf(run, "functionID")),
+        status: textOf(fieldOf(run, "status")),
+        startedAt: time("startedAt"),
+        endedAt: time("endedAt"),
+      }
+    })
+
+  const unknownEvent = listOf(fieldOf(body, "errors")).some((error) =>
+    /event not found/i.test(textOf(fieldOf(error, "message"))),
+  )
+
+  return unknownEvent ? [] : undefined
 }
 
 /** The values of `fn`'s triggers of one `type`. */
