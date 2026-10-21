@@ -62,7 +62,8 @@ the config. Without `pull-requests: write` the reporter says so once and keeps t
 - Commit the replay cache (`cache.dir`) so CI replays recorded agent steps without model calls;
   give CI a model key only if recordings may be missing.
 - Narrow the matrix in pull requests with `--faults` and run it in full on a schedule.
-- Exit codes: 1 a test failed, 2 configuration, 3 infrastructure (browser, environment, model
+- Exit codes: 1 a test failed or could not be judged (a matrix trial that is invalid or not
+  judged counts), 2 configuration, 3 infrastructure (browser, environment, model
   provider), 130 interrupted.
 
 ## CI defaults
