@@ -13,5 +13,5 @@
     "`danwo matrix` faulting the event sends, Resend, Stripe and the jobs' own SQL (58 trials), and `JOBS_BUG` switches that turn off the idempotency keys or the steps"
   ],
   "test": "tests/deterministic.danwo.ts",
-  "guide": { "title": "Background jobs", "href": "/docs/real-stacks/background-jobs" }
+  "guide": { "title": "Background jobs", "href": "/docs/background-jobs" }
 }
