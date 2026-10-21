@@ -37,7 +37,7 @@ call.
 - **Bugs you can switch on.** `JOBS_BUG` turns the idempotency keys or the steps off, and the
   matrix shows which trials go red.
 
-![danwo's dashboard on a test that retried a send: the Inngest runs settle waited for, and each run in the flight record](screenshots/dashboard.png)
+![danwo's dashboard on the test whose send fails for good: the Inngest runs settle waited for, the onFailure handler's included, and each run in the flight record](screenshots/dashboard.png)
 
 ## Run
 
@@ -51,11 +51,11 @@ npm test
 ```text
 Running 6 tests with 2 workers
   - tests/agentic.danwo.ts › the agent writes and schedules a digest 0 ms, worker 0
-  ✓ tests/deterministic.danwo.ts › sends a scheduled digest to every subscriber once 9739 ms, worker 1
-  ✓ tests/deterministic.danwo.ts › retries a send whose answer was lost, and still sends one email 8927 ms, worker 1
-  ✓ tests/deterministic.danwo.ts › bills a batch once when Stripe's answer is lost 8630 ms, worker 1
-  ✓ tests/deterministic.danwo.ts › a send that fails for good marks the copy failed and tells the owner 7219 ms, worker 1
-  ✓ tests/deterministic.danwo.ts › the digests page shows how each send went 11342 ms, worker 1
+  ✓ tests/deterministic.danwo.ts › sends a scheduled digest to every subscriber once 8668 ms, worker 1
+  ✓ tests/deterministic.danwo.ts › retries a send whose answer was lost, and still sends one email 7901 ms, worker 1
+  ✓ tests/deterministic.danwo.ts › bills a batch once when Stripe's answer is lost 7802 ms, worker 1
+  ✓ tests/deterministic.danwo.ts › a send that fails for good marks the copy failed and tells the owner 6867 ms, worker 1
+  ✓ tests/deterministic.danwo.ts › the digests page shows how each send went 9285 ms, worker 1
 
 5 passed, 1 skipped
 ```
@@ -72,7 +72,7 @@ The scripts:
 | --------------------- | ---------------------------------------------------------- |
 | `npm test`            | every test; the agent test skips without a model key       |
 | `npm run matrix:plan` | what the send's fault matrix would try, without running it |
-| `npm run matrix`      | the send's fault matrix: 58 trials, three to six minutes   |
+| `npm run matrix`      | the send's fault matrix: 58 trials, about three minutes    |
 | `npm run serve`       | danwo's dashboard over everything the runs recorded        |
 | `npm run typecheck`   | `tsc` over the API, the worker, the tests and the page     |
 
@@ -119,7 +119,8 @@ FAIL  reset-after on POST api.resend.com/emails
 ```
 
 The Stripe trials still pass: Stripe's own SDK puts a key on every POST and retries a dropped
-connection under it, so only a step that Inngest ran again would bill twice.
+connection under it, so only a step that Inngest ran again would bill twice. `npm test` catches
+the same bug: "retries a send whose answer was lost" goes red.
 
 **`JOBS_BUG=no-step npm run matrix`** sends the email from the function's body instead of inside
 `step.run`. Nothing fails: whenever Inngest runs the function again, the send goes again, but with
