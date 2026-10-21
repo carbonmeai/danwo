@@ -18,7 +18,16 @@ const COPY = /^\.work-.+-(\d+)-[a-z0-9]{6}$/
 function touched(): Set<string> {
   const out = execFileSync(
     "git",
-    ["status", "--porcelain", "--ignored", "--untracked-files=all", "--", ...WATCHED],
+    [
+      "status",
+      "--porcelain",
+      "--ignored",
+      "--untracked-files=all",
+      "--",
+      ...WATCHED,
+      /* An example installed in place has a node_modules far too big to list. */
+      ":(exclude,glob)**/node_modules/**",
+    ],
     { cwd: ROOT, encoding: "utf8" },
   )
 
