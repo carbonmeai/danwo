@@ -1,0 +1,27 @@
+# Secret scanning: the default rules, minus a few values that look like keys but are not.
+# Fake provider keys in tests are put together at runtime instead, so none needs listing here.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Installed packages and the untracked notes folder"
+paths = ['''(^|/)node_modules/''', '''^docs/''']
+
+[[allowlists]]
+description = "Analytics hostnames the proxy routes, not keys"
+condition = "AND"
+paths = ['''^packages/proxy/src/hosts\.ts$''']
+regexes = ['''^api2?\.amplitude\.com$''']
+
+[[allowlists]]
+description = "The published RFC 6238 test secret for TOTP"
+condition = "AND"
+paths = ['''^packages/runner/test/totp\.test\.ts$''']
+regexes = ['''^GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ$''']
+
+[[allowlists]]
+description = "A sample password the secret vault tests hide"
+condition = "AND"
+paths = ['''^packages/runner/test/(secrets|record)\.test\.ts$''']
+regexes = ['''^correct-horse-battery-staple-7$''']

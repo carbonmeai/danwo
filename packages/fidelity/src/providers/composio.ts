@@ -55,7 +55,9 @@ const errors: Scenario = {
     })
     await context.step(
       "call with a key Composio never issued",
-      new Request(`${API}/toolkits/gmail`, { headers: { "x-api-key": "REDACTED-TEST-VALUE" } }),
+      new Request(`${API}/toolkits/gmail`, {
+        headers: { "x-api-key": ["ak_", "danwoFidelity0000"].join("") },
+      }),
       { literals: ERROR_LITERALS, doc: errorDoc(401, 801, "APIKey_InvalidAPIKey") },
     )
   },

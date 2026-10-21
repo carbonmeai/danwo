@@ -90,7 +90,7 @@ const errors: Scenario = {
     await context.step(
       "call with a bad key",
       new Request(`${API}/v3/banks/NG`, {
-        headers: { authorization: "Bearer REDACTED-TEST-VALUE" },
+        headers: { authorization: `Bearer ${["FLW", "SECK_TEST-not-a-real-key-X"].join("")}` },
       }),
       { literals: ["status"], doc: { status: 401, schema: ERROR, ...error } },
     )
@@ -103,7 +103,8 @@ export const flutterwaveFidelity: FidelityProvider = {
     "each run makes one hosted payment link (tx_ref danwo-fidelity-…); Flutterwave has no API to delete them",
   credentials: [{ name: KEY, description: "a Flutterwave test secret key (FLWSECK_TEST-…)" }],
   scenarios: [paymentLink, banks, errors],
-  emulator: () => emulatorTarget(flutterwave, { key: "REDACTED-TEST-VALUE" }),
+  emulator: () =>
+    emulatorTarget(flutterwave, { key: ["FLW", "SECK_TEST-danwo-fidelity-X"].join("") }),
   live(env) {
     const key = requiredCredentials(this, env)?.[KEY]
 

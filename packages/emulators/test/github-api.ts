@@ -2,13 +2,14 @@ import { Octokit } from "@octokit/rest"
 
 import { createEmulator, type Emulator, type EmulatorOptions } from "../src/define.ts"
 import { github, type GithubSeedConfig, seedGithub } from "../src/github/index.ts"
+import { fakeKey } from "./fake-key.ts"
 import { fetchVia } from "./google-api.ts"
 
 /** Test helpers for the GitHub emulator: seeded people, repositories and apps, and Octokit. */
 
-export const ADA_TOKEN = "REDACTED-TEST-VALUE"
-export const BOB_TOKEN = "REDACTED-TEST-VALUE"
-export const ADA_PUBLIC_ONLY = "REDACTED-TEST-VALUE"
+export const ADA_TOKEN = fakeKey("ghp_", "adaAdaAdaAdaAdaAdaAdaAdaAdaAdaAda01")
+export const BOB_TOKEN = fakeKey("ghp_", "bobBobBobBobBobBobBobBobBobBobBob02")
+export const ADA_PUBLIC_ONLY = fakeKey("ghp_", "adaPublicPublicPublicPublicPublic3")
 
 export const OAUTH_APP = {
   clientId: "Ov23liOAuthAppClientId",

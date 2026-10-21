@@ -10,6 +10,7 @@ import {
   twilioOutboundFaults,
   twilioPhone,
 } from "../src/twilio/index.ts"
+import { fakeKey } from "./fake-key.ts"
 import { ACCOUNT, APP_NUMBER, TOKEN, twilioClient } from "./twilio-client.ts"
 
 const PERSON = "+14155550123"
@@ -51,7 +52,7 @@ beforeEach(() => {
   })
   seedTwilio(emulator.store, {
     accounts: [{ sid: ACCOUNT, authToken: TOKEN }],
-    apiKeys: [{ sid: "REDACTED-TEST-VALUE", secret: "key-secret" }],
+    apiKeys: [{ sid: fakeKey("SK", "0123456789abcdef0123456789abcdef"), secret: "key-secret" }],
     numbers: [{ number: APP_NUMBER, smsUrl: SMS_URL }],
     verifyServices: [{ friendlyName: "Acme", sid: "REDACTED-TEST-VALUE" }],
     unreachable: [{ number: UNREACHABLE }],
@@ -157,7 +158,11 @@ describe("Twilio messages", () => {
   })
 
   it("accepts an API key and secret as the account", async () => {
-    const client = twilioClient(emulator, "REDACTED-TEST-VALUE", "key-secret")
+    const client = twilioClient(
+      emulator,
+      fakeKey("SK", "0123456789abcdef0123456789abcdef"),
+      "key-secret",
+    )
 
     expect(
       (await client.messages.create({ from: APP_NUMBER, to: PERSON, body: "k" })).accountSid,

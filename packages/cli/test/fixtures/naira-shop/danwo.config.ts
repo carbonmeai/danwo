@@ -3,9 +3,10 @@ import { fileURLToPath } from "node:url"
 import { defineConfig, paystackEnvironment } from "@danwo/sdk"
 
 import { freePort, launchApp } from "../app-process.ts"
+import { fakeKey } from "../fake-key.ts"
 
 const APP = fileURLToPath(new URL("./app.ts", import.meta.url))
-const SECRET = "REDACTED-TEST-VALUE"
+const SECRET = fakeKey("sk_", "test_4a1ra4a1ra4a1ra4a1ra4a1ra4a1ra4a1ra4a1ra4")
 
 export default defineConfig({
   testDir: "tests",

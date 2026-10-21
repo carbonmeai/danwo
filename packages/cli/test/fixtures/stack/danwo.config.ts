@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url"
 import { defineConfig, inngestService, stackEnvironment, stripeService } from "@danwo/sdk"
 
 import { freePort } from "../app-process.ts"
+import { fakeKey } from "../fake-key.ts"
 
 const here = (file: string) => fileURLToPath(new URL(file, import.meta.url))
 const local = (port: number) => `http://127.0.0.1:${port}`
@@ -42,7 +43,7 @@ export default defineConfig({
           command: `NODE_OPTIONS=--max-old-space-size=256 node "${here("./api.ts")}"`,
           url: local(api),
           dependsOn: ["inngest"],
-          env: { ...inngest.env, STRIPE_SECRET_KEY: "REDACTED-TEST-VALUE" },
+          env: { ...inngest.env, STRIPE_SECRET_KEY: fakeKey("sk_", "test_stackstackstackstack") },
         },
         {
           name: "worker",

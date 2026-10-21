@@ -2,9 +2,10 @@ import Anthropic from "@anthropic-ai/sdk"
 import OpenAI from "openai"
 
 import type { Emulator } from "../src/define.ts"
+import { fakeKey } from "./fake-key.ts"
 
 export const OPENAI_KEY = "sk-test-danwo-emulated-0000000000"
-export const ANTHROPIC_KEY = "REDACTED-TEST-VALUE"
+export const ANTHROPIC_KEY = fakeKey("sk-", "ant-api03-danwo-emulated-000000")
 
 /**
  * A fetch the official clients use, answered by the emulator in-process. With `behaviour`, every

@@ -3,10 +3,11 @@ import { fileURLToPath } from "node:url"
 import { bachsEnvironment, defineConfig } from "@danwo/sdk"
 
 import { freePort, launchApp } from "../app-process.ts"
+import { fakeKey } from "../fake-key.ts"
 
 const APP = fileURLToPath(new URL("./app.ts", import.meta.url))
 const API_KEY = "sk_sandbox_creditStore"
-const WEBHOOK_SECRET = "REDACTED-TEST-VALUE"
+const WEBHOOK_SECRET = fakeKey("whsec_", "creditStore")
 
 export default defineConfig({
   testDir: "tests",

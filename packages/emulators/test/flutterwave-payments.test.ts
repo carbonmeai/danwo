@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 import { z } from "zod"
 
 import { flutterwaveLedger, flutterwaveOutboundFaults } from "../src/flutterwave/index.ts"
+import { fakeKey } from "./fake-key.ts"
 import {
   call,
   dataOf,
@@ -65,7 +66,13 @@ function chargeWebhooks() {
 describe("authorization", () => {
   it("asks for a key, and refuses keys that are not test secret keys", async () => {
     const missing = await call(fw.emulator, "GET", "/v3/transactions", undefined, null)
-    const live = await call(fw.emulator, "GET", "/v3/transactions", undefined, "REDACTED-TEST-VALUE")
+    const live = await call(
+      fw.emulator,
+      "GET",
+      "/v3/transactions",
+      undefined,
+      fakeKey("FLW", "SECK-live-X"),
+    )
 
     expect(missing).toMatchObject({ http: 401, status: "error", message: "Authorization required" })
     expect(live).toMatchObject({ http: 401, message: "Invalid authorization key" })

@@ -9,9 +9,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { createEmulator } from "../src/define.ts"
 import { llm, llmCalls, seedLlm } from "../src/llm/index.ts"
 import { listeningPort } from "../src/net.ts"
+import { fakeKey } from "./fake-key.ts"
 import { openaiClient } from "./llm-client.ts"
 
-const REAL_KEY = "REDACTED-TEST-VALUE"
+const REAL_KEY = fakeKey("sk-", "proj-USERSOWNREALKEY0123456789abcdef")
 
 /** What the stand-in for the real provider was asked. */
 interface Asked {

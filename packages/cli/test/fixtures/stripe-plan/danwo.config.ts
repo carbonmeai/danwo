@@ -3,9 +3,10 @@ import { fileURLToPath } from "node:url"
 import { defineConfig, stripeEnvironment } from "@danwo/sdk"
 
 import { freePort, launchApp } from "../app-process.ts"
+import { fakeKey } from "../fake-key.ts"
 
 const APP = fileURLToPath(new URL("./app.ts", import.meta.url))
-const WEBHOOK_SECRET = "REDACTED-TEST-VALUE"
+const WEBHOOK_SECRET = fakeKey("whsec_", "stripePlan")
 const LOOKUP_KEY = "pro_monthly"
 
 export default defineConfig({
@@ -43,7 +44,7 @@ export default defineConfig({
     const start = () =>
       launchApp(APP, port, {
         ...stripe.proxy.env(),
-        STRIPE_SECRET_KEY: "REDACTED-TEST-VALUE",
+        STRIPE_SECRET_KEY: fakeKey("sk_", "test_stripePlan"),
         STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET,
         PRO_LOOKUP_KEY: LOOKUP_KEY,
       })

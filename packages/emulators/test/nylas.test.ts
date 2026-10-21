@@ -10,6 +10,7 @@ import { createEmulator, type Emulator } from "../src/define.ts"
 import { serve } from "../src/http.ts"
 import { listeningPort } from "../src/net.ts"
 import { nylas, nylasApplication, nylasOutboundFaults, seedNylas } from "../src/nylas/index.ts"
+import { fakeKey } from "./fake-key.ts"
 
 /*
  * The package's type files read as CommonJS, so their default export sits one level deeper than
@@ -23,7 +24,7 @@ const Nylas = (
 ) as NylasClass
 const { NylasApiError, NylasOAuthError } = sdk
 
-const KEY = "REDACTED-TEST-VALUE"
+const KEY = fakeKey("nyk_", "v0_danwo_test_key")
 const SECRET = "nylas-webhook-secret"
 
 let emulator: Emulator
@@ -82,7 +83,7 @@ const GRACE = "22222222-2222-4222-8222-222222222222"
 
 describe("keys and errors", () => {
   it("refuses a key the application never issued, as the SDK reads it", async () => {
-    const error = await client("REDACTED-TEST-VALUE")
+    const error = await client(fakeKey("nyk_", "v0_unknown"))
       .grants.list()
       .catch((e: unknown) => e)
 

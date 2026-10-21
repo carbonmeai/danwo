@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest"
 
 import { environmentRecord, writeEnvironmentRecord } from "../src/runner/environment-record.ts"
 import type { WorkerEnvironment } from "../src/runner/environment.ts"
+import { fakeKey } from "./fake-key.ts"
 
 function exchange(partial: Partial<Exchange> & Pick<Exchange, "host" | "path">): Exchange {
   return {
@@ -57,7 +58,10 @@ function started(): WorkerEnvironment {
     notes: () => ["api: a Node process runs without danwo's preload"],
     logs: () => ({
       api: {
-        lines: ["listening on 4400", "using key REDACTED-TEST-VALUE"],
+        lines: [
+          "listening on 4400",
+          `using key ${fakeKey("sk_", "test_51NotARealKeyAtAll0000000000")}`,
+        ],
         written: 2,
       },
       worker: { lines: ["ready"], written: 1 },

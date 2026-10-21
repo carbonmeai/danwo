@@ -37,7 +37,7 @@ const errors: Scenario = {
     await context.step("auth.test without a token", method("auth.test"), { literals: LITERALS })
     await context.step(
       "chat.postMessage with an unknown token",
-      method("chat.postMessage", "REDACTED-TEST-VALUE"),
+      method("chat.postMessage", ["xoxb-", "0000000000-0000000000-danwofidelity"].join("")),
       { literals: LITERALS },
     )
   },

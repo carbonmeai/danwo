@@ -29,6 +29,7 @@ import { resendService } from "../src/runner/resend.ts"
 import { s3Service } from "../src/runner/s3.ts"
 import type { Service } from "../src/runner/services.ts"
 import { stripeService } from "../src/runner/stripe.ts"
+import { fakeKey } from "./fake-key.ts"
 
 /** An environment that counts what the starting point asks of it, with the slot it names. */
 function countingEnv(
@@ -410,7 +411,7 @@ const CASES: readonly Case[] = [
         seed: {
           users: [{ login: "ada" }],
           repos: [{ repo: "ada/widgets" }],
-          tokens: [{ token: "REDACTED-TEST-VALUE", login: "ada" }],
+          tokens: [{ token: fakeKey("ghp_", "adaAdaAdaAdaAdaAdaAda01"), login: "ada" }],
         },
       }),
     change: (e) =>
@@ -418,7 +419,7 @@ const CASES: readonly Case[] = [
         e,
         "https://api.github.com/repos/ada/widgets/issues",
         { title: "It broke" },
-        { authorization: "token REDACTED-TEST-VALUE" },
+        { authorization: `token ${fakeKey("ghp_", "adaAdaAdaAdaAdaAdaAda01")}` },
       ),
   },
   {
@@ -465,7 +466,7 @@ const CASES: readonly Case[] = [
           redirect_url: "https://shop.test/done",
           customer: { email: "ada@shop.test" },
         },
-        { authorization: "Bearer REDACTED-TEST-VALUE" },
+        { authorization: `Bearer ${fakeKey("FLW", "SECK_TEST-0123456789abcdef-X")}` },
       ),
   },
   {
@@ -516,7 +517,7 @@ const CASES: readonly Case[] = [
         e,
         "https://api.clerk.com/v1/users",
         { email_address: ["ada@shop.test"], password: "correct horse battery staple" },
-        { authorization: "Bearer REDACTED-TEST-VALUE" },
+        { authorization: `Bearer ${fakeKey("sk_", "test_DanwoClerkEmulatorSecretKey")}` },
       ),
   },
   {
@@ -534,7 +535,7 @@ const CASES: readonly Case[] = [
         e,
         "https://api.clerk.com/v1/users",
         { email_address: ["grace@shop.test"] },
-        { authorization: "Bearer REDACTED-TEST-VALUE" },
+        { authorization: `Bearer ${fakeKey("sk_", "test_DanwoClerkEmulatorSecretKey")}` },
       ),
   },
   {
@@ -585,7 +586,7 @@ const CASES: readonly Case[] = [
         e,
         "https://api.us.nylas.com/v3/grants/11111111-1111-4111-8111-111111111111/messages/send",
         { to: [{ email: "grace@acme.test" }], subject: "Hi", body: "Hello" },
-        { authorization: "Bearer REDACTED-TEST-VALUE" },
+        { authorization: `Bearer ${fakeKey("nyk_", "v0_danwo_test")}` },
       ),
   },
   {
@@ -712,7 +713,7 @@ describe("every emulator's reset and restore", () => {
         service.emulator,
         "https://api.clerk.com/v1/users",
         { email_address: ["grace@shop.test"] },
-        { authorization: "Bearer REDACTED-TEST-VALUE" },
+        { authorization: `Bearer ${fakeKey("sk_", "test_DanwoClerkEmulatorSecretKey")}` },
       )
       expect(service.emulator.outbox.all().map((m) => m.topic)).toEqual(["user.created"])
 

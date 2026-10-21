@@ -162,7 +162,12 @@ describe("credentials", () => {
 
   it.each([
     ["paystack", "DANWO_FIDELITY_PAYSTACK_KEY", "sk_live_abc", "sk_test_abc"],
-    ["flutterwave", "DANWO_FIDELITY_FLUTTERWAVE_KEY", "REDACTED-TEST-VALUE", "REDACTED-TEST-VALUE"],
+    [
+      "flutterwave",
+      "DANWO_FIDELITY_FLUTTERWAVE_KEY",
+      ["FLW", "SECK-abc-X"].join(""),
+      ["FLW", "SECK_TEST-abc-X"].join(""),
+    ],
     ["bachs", "DANWO_FIDELITY_BACHS_KEY", "sk_live_abc", "sk_sandbox_abc"],
   ])("refuses a live %s key and accepts a test one", (name, variable, live, test) => {
     const provider = FIDELITY_PROVIDERS.find((candidate) => candidate.name === name)

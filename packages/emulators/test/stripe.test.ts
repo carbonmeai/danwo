@@ -9,6 +9,7 @@ import { createEmulator, type Emulator } from "../src/define.ts"
 import { serve } from "../src/http.ts"
 import { listeningPort } from "../src/net.ts"
 import { STRIPE_API_VERSION, stripe, stripeSignature } from "../src/stripe/index.ts"
+import { fakeKey } from "./fake-key.ts"
 
 const fixedNow = new Date("2026-10-16T12:00:00Z")
 
@@ -64,7 +65,7 @@ describe("API keys", () => {
   })
 
   it("rejects a live key", async () => {
-    await expect(client("REDACTED-TEST-VALUE").customers.list()).rejects.toMatchObject({
+    await expect(client(fakeKey("sk_", "live_abcdefgh")).customers.list()).rejects.toMatchObject({
       type: "StripeAuthenticationError",
       message: "Invalid API Key provided: sk_live_****efgh",
     })

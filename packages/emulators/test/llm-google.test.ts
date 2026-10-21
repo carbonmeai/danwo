@@ -6,9 +6,10 @@ import { z } from "zod"
 
 import { createEmulator, type Emulator } from "../src/define.ts"
 import { llm, llmCalls, llmOutboundFaults, seedLlm } from "../src/llm/index.ts"
+import { fakeKey } from "./fake-key.ts"
 import { emulatorFetch, faultFetch } from "./llm-client.ts"
 
-const KEY = "REDACTED-TEST-VALUE"
+const KEY = fakeKey("AIza", "SyDanwoEmulatedKey00000000000000000")
 const MODEL = "gemini-2.5-flash"
 
 let emulator: Emulator

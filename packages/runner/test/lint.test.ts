@@ -6,6 +6,7 @@ import { lint, lintReport, withLint } from "../src/lint/index.ts"
 import type { LintSubject } from "../src/lint/types.ts"
 import type { RecordedExchange, RecordedStep } from "../src/runner/record.ts"
 import { credentialKind, sentByBrowser } from "../src/secrets/index.ts"
+import { fakeKey } from "./fake-key.ts"
 
 const T0 = Date.parse("2026-10-18T10:00:00.000Z")
 
@@ -581,7 +582,7 @@ describe("what a recorded call keeps about its credential", () => {
       kind: "secret",
       shape: "Basic",
     })
-    expect(credentialKind({ authorization: "Bearer eyJhbGciOi" })).toBeUndefined()
+    expect(credentialKind({ authorization: `Bearer ${fakeKey("eyJhbGci", "Oi")}` })).toBeUndefined()
   })
 
   it("tells a browser's request from a server's", () => {

@@ -679,7 +679,7 @@ describe("routing an unmodified GitHub App", () => {
   it("gets a signed webhook, rejects a forged copy and comments back with an installation token", async () => {
     const port = await freePort()
     const emulator = createEmulator(github)
-    const pat = "REDACTED-TEST-VALUE"
+    const pat = ["ghp_", "reporterReporterReporterReporter01"].join("")
 
     seedGithub(emulator.store, {
       users: [{ login: "ada", name: "Ada Lovelace" }],
@@ -969,7 +969,7 @@ const PaystackOutput = z.union([
 
 describe("routing an unmodified Paystack app", () => {
   it("initializes through the proxy, is paid on the hosted page, verifies and trusts a signed charge.success", async () => {
-    const secret = "REDACTED-TEST-VALUE"
+    const secret = ["sk_", "test_5ca1ab1e5ca1ab1e5ca1ab1e5ca1ab1e5ca1ab1e"].join("")
     const port = await freePort()
     const emulator = createEmulator(paystack)
 

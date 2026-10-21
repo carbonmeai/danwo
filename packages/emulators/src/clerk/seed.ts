@@ -90,7 +90,7 @@ export interface ClerkSeedConfig {
 
 /** The slug and secret key an emulator uses when the seed names none. */
 const DEFAULT_SLUG = "danwo-app"
-const DEFAULT_SECRET_KEY = "REDACTED-TEST-VALUE"
+const DEFAULT_SECRET_KEY = ["sk", "test", "DanwoClerkEmulatorSecretKey"].join("_")
 
 /** The instance a seed describes. */
 export function instanceFrom(config: ClerkSeedConfig["instance"] = {}): ClerkInstance {

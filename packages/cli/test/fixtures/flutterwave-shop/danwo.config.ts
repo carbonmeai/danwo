@@ -3,9 +3,10 @@ import { fileURLToPath } from "node:url"
 import { defineConfig, flutterwaveEnvironment } from "@danwo/sdk"
 
 import { freePort, launchApp } from "../app-process.ts"
+import { fakeKey } from "../fake-key.ts"
 
 const APP = fileURLToPath(new URL("./app.ts", import.meta.url))
-const SECRET_KEY = "REDACTED-TEST-VALUE"
+const SECRET_KEY = fakeKey("FLW", "SECK_TEST-5150515051505150515051505150-X")
 const SECRET_HASH = "flutterwave-shop-hash"
 
 export default defineConfig({

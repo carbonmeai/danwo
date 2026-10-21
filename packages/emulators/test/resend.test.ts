@@ -10,8 +10,9 @@ import { createEmulator, type Emulator } from "../src/define.ts"
 import { serve } from "../src/http.ts"
 import { listeningPort } from "../src/net.ts"
 import { resend, resendInbox, resendOutboundFaults, seedResend } from "../src/resend/index.ts"
+import { fakeKey } from "./fake-key.ts"
 
-const SECRET = "REDACTED-TEST-VALUE"
+const SECRET = fakeKey("whsec_", "dGVzdC1zaWduaW5nLXNlY3JldC0xMjM0NTY3OA==")
 
 let emulator: Emulator
 let server: Server
@@ -378,7 +379,13 @@ describe("webhooks", () => {
 
   it("is rejected by the verifier under the wrong secret", async () => {
     seedResend(hooked.store, {
-      webhooks: [{ endpoint: receiver.url, events: ["domain.created"], secret: "REDACTED-TEST-VALUE" }],
+      webhooks: [
+        {
+          endpoint: receiver.url,
+          events: ["domain.created"],
+          secret: fakeKey("whsec_", "d3Jvbmc="),
+        },
+      ],
     })
     await hooked.fetch(
       new Request(`${baseUrl}/domains`, {

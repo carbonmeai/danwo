@@ -33,6 +33,7 @@ import {
 import { s3Service } from "../src/runner/s3.ts"
 import { startServices } from "../src/runner/services.ts"
 import { stripeService } from "../src/runner/stripe.ts"
+import { fakeKey } from "./fake-key.ts"
 
 /** The default catalogue's faults for a POST to `host` at `path`. */
 function postFaults(host: string, path: string) {
@@ -266,7 +267,7 @@ describe("slackService and githubService", () => {
       seed: () => ({
         users: [{ login: "ada" }],
         repos: [{ repo: "ada/widgets" }],
-        tokens: [{ token: "REDACTED-TEST-VALUE", login: "ada" }],
+        tokens: [{ token: fakeKey("ghp_", "adaAdaAdaAdaAdaAdaAda01"), login: "ada" }],
         hooks: [
           {
             repo: "ada/widgets",
@@ -298,7 +299,7 @@ describe("slackService and githubService", () => {
       const opened = await github.emulator.fetch(
         new Request("https://api.github.com/repos/ada/widgets/issues", {
           method: "POST",
-          headers: { authorization: "token REDACTED-TEST-VALUE" },
+          headers: { authorization: `token ${fakeKey("ghp_", "adaAdaAdaAdaAdaAdaAda01")}` },
           body: JSON.stringify({ title: "It broke" }),
         }),
       )

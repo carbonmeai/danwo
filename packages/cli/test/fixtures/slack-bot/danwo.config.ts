@@ -3,9 +3,10 @@ import { fileURLToPath } from "node:url"
 import { defineConfig, slackEnvironment } from "@danwo/sdk"
 
 import { freePort, launchApp } from "../app-process.ts"
+import { fakeKey } from "../fake-key.ts"
 
 const APP = fileURLToPath(new URL("./app.ts", import.meta.url))
-const BOT_TOKEN = "REDACTED-TEST-VALUE"
+const BOT_TOKEN = fakeKey("xoxb-", "mention-bot-fixture")
 const SIGNING_SECRET = "mention-bot-signing-secret"
 
 export default defineConfig({

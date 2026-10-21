@@ -14,8 +14,9 @@ import {
   seedPaystack,
 } from "../src/paystack/index.ts"
 import { ManualClock } from "../src/time.ts"
+import { fakeKey } from "./fake-key.ts"
 
-const SECRET = "REDACTED-TEST-VALUE"
+const SECRET = fakeKey("sk_", "test_0123456789abcdef0123456789abcdef01234567")
 const OTHER_SECRET = "REDACTED-TEST-VALUE"
 const WEBHOOK_URL = "http://shop.test/paystack/webhook"
 const CALLBACK_URL = "http://shop.test/paystack/callback"

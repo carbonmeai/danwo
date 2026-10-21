@@ -15,7 +15,7 @@ import { z } from "zod"
 import { startProxy } from "../src/proxy.ts"
 
 const APP = fileURLToPath(new URL("./fixtures/flutterwave-app.ts", import.meta.url))
-const SECRET_KEY = "REDACTED-TEST-VALUE"
+const SECRET_KEY = ["FLW", "SECK_TEST-0123456789abcdef0123456789abcdef-X"].join("")
 const SECRET_HASH = "app-secret-hash"
 
 const Created = z.object({ status: z.string(), data: z.object({ link: z.string() }) })

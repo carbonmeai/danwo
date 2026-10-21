@@ -4,6 +4,7 @@ import { createEmulator, type Emulator } from "../src/define.ts"
 import { seedSlack, slack, slackOutboundFaults, slackWorkspace } from "../src/slack/index.ts"
 import { slackStore } from "../src/slack/store.ts"
 import { ManualClock } from "../src/time.ts"
+import { fakeKey } from "./fake-key.ts"
 import { APP, BOT_TOKEN, clientFor, postMessage, slackError, WORKSPACE } from "./slack-workspace.ts"
 
 let emulator: Emulator
@@ -71,10 +72,12 @@ describe("scopes", () => {
           bot_scopes: ["chat:write"],
         },
       ],
-      installations: [{ app: "9.9", bot_token: "REDACTED-TEST-VALUE" }],
+      installations: [{ app: "9.9", bot_token: fakeKey("xoxb-", "9-9-narrow") }],
     })
 
-    const data = await slackError(clientFor(emulator, "REDACTED-TEST-VALUE").users.list({}))
+    const data = await slackError(
+      clientFor(emulator, fakeKey("xoxb-", "9-9-narrow")).users.list({}),
+    )
 
     expect(data).toMatchObject({
       ok: false,

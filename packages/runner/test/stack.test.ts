@@ -10,6 +10,7 @@ import { liveKeyWarnings } from "../src/runner/app-checks.ts"
 import { inngestOutboundFaults, inngestService, INNGEST_HOST } from "../src/runner/inngest.ts"
 import { startServices } from "../src/runner/services.ts"
 import { startOrder } from "../src/runner/stack-environment.ts"
+import { fakeKey } from "./fake-key.ts"
 
 const app = (name: string, dependsOn?: readonly string[]) => ({
   name,
@@ -52,9 +53,9 @@ describe("live provider keys", () => {
     await writeFile(
       join(dir, ".env"),
       [
-        "STRIPE_SECRET_KEY=REDACTED-TEST-VALUE",
-        "RESEND_API_KEY=REDACTED-TEST-VALUE",
-        "export OPENAI_API_KEY='REDACTED-TEST-VALUE'",
+        `STRIPE_SECRET_KEY=${fakeKey("sk_", "live_abcdefghijklmnopqrstuvwx")}`,
+        `RESEND_API_KEY=${fakeKey("re_", "live1234567890abcdef")}`,
+        `export OPENAI_API_KEY='${fakeKey("sk-", "proj-abcdefghijklmnopqrstuvwxyz0123456789")}'`,
         "CLERK_SECRET_KEY=sk_test_fine",
       ].join("\n"),
     )
@@ -75,9 +76,9 @@ describe("live provider keys", () => {
 
   it("knows Gemini, Perplexity and Bedrock keys, emulated by the model API service", async () => {
     const env = {
-      GEMINI_API_KEY: "REDACTED-TEST-VALUE",
+      GEMINI_API_KEY: fakeKey("AIza", "SyDanwoEmulatedKey00000000000000000"),
       PERPLEXITY_API_KEY: "pplx-danwoEmulatedKey000000000000",
-      AWS_BEARER_TOKEN_BEDROCK: "REDACTED-TEST-VALUE",
+      AWS_BEARER_TOKEN_BEDROCK: fakeKey("ABSK", "ZGFud28tZW11bGF0ZWQta2V5LTAwMDAwMDAw"),
     }
     const check = {
       app: "api",
@@ -101,7 +102,7 @@ describe("live provider keys", () => {
     const warnings = await liveKeyWarnings({
       app: "api",
       cwd: undefined,
-      env: { STRIPE_SECRET_KEY: "REDACTED-TEST-VALUE" },
+      env: { STRIPE_SECRET_KEY: fakeKey("sk_", "live_abcdefghijklmnopqrstuvwx") },
       overridden: new Set(),
       services: new Set(),
       passthrough: false,

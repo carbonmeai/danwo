@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url"
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { type FakeGitHub, startFakeGitHub } from "../../github/test/fake-github.ts"
+import { fakeKey } from "./fixtures/fake-key.ts"
 import { removeWorkCopies, workCopy } from "./work-copy.ts"
 
 const BIN = fileURLToPath(new URL("../src/bin.ts", import.meta.url))
@@ -479,7 +480,9 @@ describe("danwo matrix", () => {
     const html = await readFile(join(fixture("slack-bot"), report), "utf8")
 
     expect(html).toContain("POST slack.com/api/chat.postMessage")
-    expect(html).not.toMatch(/REDACTED-TEST-VALUE|mention-bot-signing-secret/)
+    expect(html).not.toMatch(
+      new RegExp(`${fakeKey("xoxb-", "mention")}|mention-bot-signing-secret`),
+    )
   }, 300_000)
 
   it("faults Twilio Verify, messages and status callbacks, and a careful app counts each welcome once", async () => {
@@ -676,7 +679,9 @@ describe("danwo matrix", () => {
     const html = await readFile(join(fixture("bachs-store"), report), "utf8")
 
     expect(html).toContain("POST sandbox-api.bachs.io/v1/checkout-sessions")
-    expect(html).not.toMatch(/sk_sandbox_creditStore|REDACTED-TEST-VALUE/)
+    expect(html).not.toMatch(
+      new RegExp(`sk_sandbox_creditStore|${fakeKey("whsec_", "creditStore")}`),
+    )
   }, 300_000)
 
   it("faults a GitHub bot's issues webhook and a deduplicating bot comments at most once", async () => {

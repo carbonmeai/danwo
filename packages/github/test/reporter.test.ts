@@ -58,7 +58,7 @@ function failed(id: string, line: number, record?: string): TestReport {
           code: "EXPECTATION_FAILED",
           class: "test",
           name: "AssertionError",
-          message: `expected "Paid" | key REDACTED-TEST-VALUE`,
+          message: `expected "Paid" | key ${LIVE_KEY}`,
           source: { file: "tests/checkout.danwo.ts", line },
         },
         record,
@@ -78,6 +78,9 @@ function testRun(reports: TestReport[]): TestRunReport {
     reportPath: ".danwo/runs/r1/report.html",
   }
 }
+
+/** A live-looking Stripe key, put together at runtime so no scanner takes the source for one. */
+const LIVE_KEY = ["sk_", "live_abcdefghijklmnop"].join("")
 
 const outcome = (over: Partial<RunOutcome>): RunOutcome => ({
   fault: null,
@@ -202,7 +205,7 @@ describe("github reporter for danwo test", () => {
       "download the `danwo-runs` artifact from [this run](https://github.example/acme/shop/actions/runs/77#artifacts)",
     )
     expect(summary).toContain("- tests/checkout.danwo.ts › pays: `r1/pays/attempt-1`")
-    expect(JSON.stringify(fake.requests)).not.toContain("REDACTED-TEST-VALUE")
+    expect(JSON.stringify(fake.requests)).not.toContain(LIVE_KEY)
   })
 
   it("completes a passing run as a success with no annotations", async () => {

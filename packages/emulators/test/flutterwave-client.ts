@@ -11,10 +11,11 @@ import {
   seedFlutterwave,
 } from "../src/flutterwave/index.ts"
 import { ManualClock } from "../src/time.ts"
+import { fakeKey } from "./fake-key.ts"
 
 export const SECRET_HASH = "flw-secret-hash"
 
-const SECRET_KEY = "REDACTED-TEST-VALUE"
+const SECRET_KEY = fakeKey("FLW", "SECK_TEST-0123456789abcdef0123456789abcdef-X")
 
 const Envelope = z.object({
   status: z.string(),

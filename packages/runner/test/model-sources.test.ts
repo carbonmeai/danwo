@@ -18,6 +18,7 @@ import { priced } from "../src/model/priced.ts"
 import { usageOf } from "../src/record/usage.ts"
 import { openWebSession } from "../src/session.ts"
 import { type ShopEnvironment, startShopEnvironment } from "./environment.ts"
+import { fakeKey } from "./fake-key.ts"
 
 const KEY = "sk-test-danwo-model-sources"
 const BUTTON = "Buy 500 credits"
@@ -135,7 +136,7 @@ const SOURCES: readonly {
     model: (fetch) =>
       createAmazonBedrock({
         region: "us-east-1",
-        accessKeyId: "REDACTED-TEST-VALUE",
+        accessKeyId: fakeKey("AKIA", "DANWOEMULATED000"),
         secretAccessKey: "danwo-emulated-secret",
         fetch,
       })("us.anthropic.claude-sonnet-4-5-20250929-v1:0"),

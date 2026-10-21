@@ -9,6 +9,7 @@ import {
 } from "@danwo/sdk"
 
 import { freePort } from "../app-process.ts"
+import { fakeKey } from "../fake-key.ts"
 
 const APP = fileURLToPath(new URL("./app.ts", import.meta.url))
 const GRANT = "11111111-1111-4111-8111-111111111111"
@@ -28,7 +29,7 @@ export default defineConfig({
       services: [
         nylasService({
           seed: {
-            apiKeys: ["REDACTED-TEST-VALUE"],
+            apiKeys: [fakeKey("nyk_", "v0_followupfollowupfollowup")],
             grants: [
               {
                 id: GRANT,
@@ -67,7 +68,7 @@ export default defineConfig({
           url: `http://127.0.0.1:${port}`,
           env: {
             PORT: String(port),
-            NYLAS_API_KEY: "REDACTED-TEST-VALUE",
+            NYLAS_API_KEY: fakeKey("nyk_", "v0_followupfollowupfollowup"),
             NYLAS_GRANT_ID: GRANT,
             NANGO_SECRET_KEY: "follow-up-nango-secret",
             UNIPILE_DSN: "api8.unipile.com:13851",

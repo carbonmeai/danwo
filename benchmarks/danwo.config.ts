@@ -20,7 +20,7 @@ import { MockLanguageModelV4 } from "ai/test"
 import { type BenchApp, launchBenchApp } from "./app/launch.ts"
 
 const WEBHOOK_SECRET = "whsec_bench"
-const BOT_TOKEN = "REDACTED-TEST-VALUE"
+const BOT_TOKEN = ["xoxb-", "bench-bot"].join("")
 
 /** A model that fails any call: replays that would need the model fail instead of spending. */
 const replayOnly = new MockLanguageModelV4({

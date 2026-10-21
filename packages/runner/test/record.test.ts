@@ -19,8 +19,12 @@ import {
 import { createRedactor } from "../src/runner/redact.ts"
 import { finishRun, findRun } from "../src/runner/report.ts"
 import { SecretVault } from "../src/secrets/index.ts"
+import { fakeKey } from "./fake-key.ts"
 
 const PASSWORD = "correct-horse-battery-staple-7"
+/** Flutterwave's key prefixes. */
+const FLW_SECRET = fakeKey("FLW", "SECK")
+const FLW_PUBLIC = fakeKey("FLW", "PUBK")
 
 describe("flight recorder redaction", () => {
   const ledger = new SecretVault({ password: PASSWORD })
@@ -29,7 +33,7 @@ describe("flight recorder redaction", () => {
   it("blanks credential headers by name and by a telling word", () => {
     expect(
       redactor.headers({
-        authorization: "Bearer REDACTED-TEST-VALUE",
+        authorization: `Bearer ${fakeKey("sk_", "test_abc123456789")}`,
         "stripe-signature": "t=1,v1=abc",
         cookie: "session=xyz",
         "x-custom-api-key": "k-123",
@@ -69,7 +73,7 @@ describe("flight recorder redaction", () => {
 
   it("redacts known secret values and provider key shapes anywhere in text", () => {
     const text = redactor.text(
-      `pw ${PASSWORD} key REDACTED-TEST-VALUE REDACTED-TEST-VALUE re_123456789abc Basic dXNlcjpwYXNz pi_3Mtw_secret_YrKJUK REDACTED-TEST-VALUE`,
+      `pw ${PASSWORD} key ${fakeKey("sk_", "live_51Habcdef")} ${fakeKey("whsec_", "abc/def=")} re_123456789abc Basic dXNlcjpwYXNz pi_3Mtw_secret_YrKJUK ${fakeKey("AKIA", "IOSFODNN7EXAMPLE")}`,
     )
 
     expect(text).not.toContain(PASSWORD)
@@ -80,7 +84,7 @@ describe("flight recorder redaction", () => {
 
   it("redacts Gemini, Perplexity and Bedrock keys, and a Gemini key in a URL", () => {
     const text = redactor.text(
-      "REDACTED-TEST-VALUE pplx-danwoEmulatedKey000000 REDACTED-TEST-VALUE https://generativelanguage.googleapis.com/v1beta/models/m:generateContent?alt=sse&key=REDACTED-TEST-VALUE",
+      `${fakeKey("AIza", "SyDanwoEmulatedKey00000000000000000")} pplx-danwoEmulatedKey000000 ${fakeKey("ABSK", "ZGFud28tZW11bGF0ZWQta2V5LTAw")} https://generativelanguage.googleapis.com/v1beta/models/m:generateContent?alt=sse&key=${fakeKey("AIza", "SyDanwoEmulatedKey00000000000000001")}`,
     )
 
     expect(text).toBe(
@@ -89,7 +93,7 @@ describe("flight recorder redaction", () => {
   })
 
   it("redacts OAuth codes, tokens, verifiers and client secrets in URLs, forms and JSON", () => {
-    const idToken = "REDACTED-TEST-VALUE"
+    const idToken = fakeKey("eyJhbGci", "OiJSUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl")
 
     expect(
       redactor.text(
@@ -183,14 +187,14 @@ describe("flight recorder redaction", () => {
     })
     expect(
       redactor.text(
-        "bot REDACTED-TEST-VALUE user REDACTED-TEST-VALUE refresh xoxe.xoxp-1-ghi app xapp-1-A0-jkl",
+        `bot ${fakeKey("xoxb-", "111-222-abc")} user ${fakeKey("xoxp-", "333-def")} refresh xoxe.xoxp-1-ghi app xapp-1-A0-jkl`,
       ),
     ).toBe(
       "bot xoxb-[redacted] user xoxp-[redacted] refresh xoxe.xoxp-[redacted] app xapp-[redacted]",
     )
     expect(
       redactor.text(
-        "gho_aaaaaaaaaaaaaaaaaaaa ghs_bbbbbbbbbbbbbbbbbbbb ghu_cccccccccccccccccccc ghr_dddddddddddddddddddd REDACTED-TEST-VALUE github_pat_11AAAAAAAAAAAAAAAAAAAA_ffff",
+        `gho_aaaaaaaaaaaaaaaaaaaa ghs_bbbbbbbbbbbbbbbbbbbb ghu_cccccccccccccccccccc ghr_dddddddddddddddddddd ${fakeKey("ghp_", "eeeeeeeeeeeeeeeeeeee")} github_pat_11AAAAAAAAAAAAAAAAAAAA_ffff`,
       ),
     ).toBe(
       "gho_[redacted] ghs_[redacted] ghu_[redacted] ghr_[redacted] ghp_[redacted] github_pat_[redacted]",
@@ -215,7 +219,7 @@ describe("flight recorder redaction", () => {
     })
     expect(
       redactor.text(
-        'key "REDACTED-TEST-VALUE\\nMIIEow\\nIBAAK\\n-----END RSA PRIVATE KEY-----\\n" end',
+        `key "${fakeKey("-----BEGIN RSA ", "PRIVATE KEY-----")}\\nMIIEow\\nIBAAK\\n-----END RSA PRIVATE KEY-----\\n" end`,
       ),
     ).toBe('key "[redacted]\\n" end')
     expect(
@@ -264,9 +268,11 @@ describe("flight recorder redaction", () => {
     ).toBe(
       "keys sk_test_[redacted] pk_test_[redacted] dvb_[redacted] https://app.test/?__clerk_handshake_nonce=[redacted]&x=1#__clerk_ticket=[redacted]",
     )
-    expect(redactor.text("__session=REDACTED-TEST-VALUE; Path=/")).toBe(
-      "__session=[redacted]; Path=/",
-    )
+    expect(
+      redactor.text(
+        `__session=${fakeKey("eyJhbGci", "OiJSUzI1NiJ9.eyJzaWQiOiJzZXNzIn0.c2ln")}; Path=/`,
+      ),
+    ).toBe("__session=[redacted]; Path=/")
     expect(redactor.headers({ cookie: "__client_uat=1", "set-cookie": "__session=x" })).toEqual({
       cookie: "[redacted]",
       "set-cookie": "[redacted]",
@@ -276,10 +282,10 @@ describe("flight recorder redaction", () => {
   it("hides Flutterwave keys, the webhook secret hash and its signature", () => {
     expect(
       redactor.text(
-        "secret REDACTED-TEST-VALUE public REDACTED-TEST-VALUE live REDACTED-TEST-VALUE encryption REDACTED-TEST-VALUE",
+        `secret ${FLW_SECRET}_TEST-0123456789abcdef-X public ${FLW_PUBLIC}_TEST-abcdef0123-X live ${FLW_SECRET}-abc-X encryption ${FLW_SECRET}_TEST4e5f6a7b8c9d`,
       ),
     ).toBe(
-      "secret FLWSECK_TEST-[redacted] public FLWPUBK_TEST-[redacted] live FLWSECK-[redacted] encryption FLWSECK_TEST[redacted]",
+      `secret ${FLW_SECRET}_TEST-[redacted] public ${FLW_PUBLIC}_TEST-[redacted] live ${FLW_SECRET}-[redacted] encryption ${FLW_SECRET}_TEST[redacted]`,
     )
     expect(
       redactor.headers({
@@ -319,7 +325,7 @@ describe("flight recorder redaction", () => {
   it("hides Paystack secret and public keys, wherever they sit, and event signatures", () => {
     expect(
       redactor.value({
-        id: "REDACTED-TEST-VALUE",
+        id: fakeKey("sk_", "test_0123456789abcdef"),
         publicKey: "pk_test_0123456789abcdef",
         authorization: { authorization_code: "AUTH_reusable" },
         reference: "order-1",

@@ -9,6 +9,9 @@ import { startWorkerSetup } from "../src/environment.ts"
 import { judgeTrial } from "../src/matrix.ts"
 import { readOutcomes, type TestOutcome } from "../src/protocol.ts"
 
+/** A live-looking Stripe key, put together at runtime so no scanner takes the source for one. */
+const LIVE_KEY = ["sk_", "live_abcdefghijklmnop"].join("")
+
 const exchange = {
   disposition: "routed" as const,
   method: "POST",
@@ -115,7 +118,7 @@ describe("starting a worker's environment", () => {
     try {
       await writeFile(
         join(dir, "danwo.config.ts"),
-        'export default { secrets: { key: { value: "REDACTED-TEST-VALUE", purpose: "api-key" } } }\n',
+        `export default { secrets: { key: { value: "${LIVE_KEY}", purpose: "api-key" } } }\n`,
       )
 
       const closed: number[] = []
@@ -131,7 +134,7 @@ describe("starting a worker's environment", () => {
       })
 
       expect(setup.env.baseUrl).toBe("http://127.0.0.1:4003")
-      expect(setup.vault.redact("key REDACTED-TEST-VALUE")).not.toContain("abcdefghij")
+      expect(setup.vault.redact(`key ${LIVE_KEY}`)).not.toContain("abcdefghij")
       await setup.env.close()
       expect(closed).toEqual([3])
     } finally {

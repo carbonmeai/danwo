@@ -15,13 +15,14 @@ import { z } from "zod"
 
 import { createEmulator, type Emulator } from "../src/define.ts"
 import { llm, llmCalls, llmOutboundFaults, seedLlm } from "../src/llm/index.ts"
+import { fakeKey } from "./fake-key.ts"
 import { emulatorFetch } from "./llm-client.ts"
 
 const REGION = "us-east-1"
 const CLAUDE = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
 const NOVA = "amazon.nova-lite-v1:0"
 const CREDENTIALS = {
-  accessKeyId: "REDACTED-TEST-VALUE",
+  accessKeyId: fakeKey("AKIA", "DANWOEMULATED000"),
   secretAccessKey: "danwo-emulated-secret",
 }
 
@@ -113,7 +114,7 @@ describe("Bedrock through the AI SDK", () => {
   it("answers Converse signed with SigV4 and with an API key", async () => {
     const signed = await generateText({ model: bedrock()(CLAUDE), prompt: "say hi" })
     const keyed = await generateText({
-      model: bedrock({ apiKey: "REDACTED-TEST-VALUE" })(NOVA),
+      model: bedrock({ apiKey: fakeKey("ABSK", "ZGFud28tZW11bGF0ZWQta2V5LTAwMDAwMDAw") })(NOVA),
       prompt: "say hi",
     })
 

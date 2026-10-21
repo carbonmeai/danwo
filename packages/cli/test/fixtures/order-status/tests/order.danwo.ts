@@ -1,5 +1,7 @@
 import { type StripeFixtures, test as base, z } from "@danwo/sdk"
 
+import { fakeKey } from "../../fake-key.ts"
+
 const test = base.extend<StripeFixtures>()
 
 /** Each payment intent's status, as the shop reports it. */
@@ -19,7 +21,7 @@ test("pays for a lamp and sees the order paid", async ({ app, screen, expect }) 
    */
   const listed = await stripe.fetch(
     new Request("https://api.stripe.com/v1/payment_intents?limit=100", {
-      headers: { authorization: "Bearer REDACTED-TEST-VALUE" },
+      headers: { authorization: `Bearer ${fakeKey("sk_", "test_orderstatusorderstatus")}` },
     }),
   )
   const intents = Intents.parse(await listed.json()).data

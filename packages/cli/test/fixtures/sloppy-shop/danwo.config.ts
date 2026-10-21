@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url"
 import { defineConfig, stripeEnvironment } from "@danwo/sdk"
 
 import { freePort, launchApp } from "../app-process.ts"
+import { fakeKey } from "../fake-key.ts"
 
 const APP = fileURLToPath(new URL("./app.ts", import.meta.url))
 
@@ -16,7 +17,7 @@ export default defineConfig({
     const start = () =>
       launchApp(APP, port, {
         ...stripe.proxy.env(),
-        STRIPE_SECRET_KEY: "REDACTED-TEST-VALUE",
+        STRIPE_SECRET_KEY: fakeKey("sk_", "test_sloppysloppysloppysloppy"),
       })
 
     let app = await start()

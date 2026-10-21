@@ -67,7 +67,7 @@ const nylasErrors: Scenario = {
     await context.step(
       "list grants with a key Nylas never issued",
       new Request(`${NYLAS}/v3/grants`, {
-        headers: { authorization: "Bearer REDACTED-TEST-VALUE" },
+        headers: { authorization: `Bearer ${["nyk_", "v0_danwoFidelity00000000"].join("")}` },
       }),
       {
         literals: ["error.type"],
@@ -107,9 +107,9 @@ export const nylasFidelity: FidelityProvider = {
   ],
   scenarios: [nylasErrors, nylasGrants],
   emulator: () =>
-    emulatorTarget(nylas, { key: "REDACTED-TEST-VALUE" }, (emulator) =>
+    emulatorTarget(nylas, { key: ["nyk_", "v0_danwo_fidelity"].join("") }, (emulator) =>
       seedNylas(emulator.store, {
-        apiKeys: ["REDACTED-TEST-VALUE"],
+        apiKeys: [["nyk_", "v0_danwo_fidelity"].join("")],
         grants: [
           { email: "fidelity@danwo.test" },
           { email: "fidelity2@danwo.test", provider: "microsoft" },

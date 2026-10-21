@@ -2,9 +2,10 @@ import { type ChatPostMessageArguments, WebClient } from "@slack/web-api"
 
 import type { Emulator } from "../src/define.ts"
 import type { SlackSeedConfig } from "../src/slack/index.ts"
+import { fakeKey } from "./fake-key.ts"
 
 /** The seeded app's fixed bot token. */
-export const BOT_TOKEN = "REDACTED-TEST-VALUE"
+export const BOT_TOKEN = fakeKey("xoxb-", "1111111111111-2222222222222-seededbottoken0000000000")
 
 export const APP = {
   name: "Standup Bot",

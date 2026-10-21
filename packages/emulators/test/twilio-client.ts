@@ -2,9 +2,10 @@ import twilioSdk from "twilio"
 import RequestClient from "twilio/lib/base/RequestClient.js"
 
 import type { Emulator } from "../src/define.ts"
+import { fakeKey } from "./fake-key.ts"
 
 export const ACCOUNT = "REDACTED-TEST-VALUE"
-export const TOKEN = "REDACTED-TEST-VALUE"
+export const TOKEN = fakeKey("f0e1d2c3b4a59687", "78695a4b3c2d1e0f")
 export const APP_NUMBER = "+15005550006"
 
 /** A form body as the SDK sends it: one field per value, lists repeated. */

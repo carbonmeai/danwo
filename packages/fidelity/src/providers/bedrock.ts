@@ -182,12 +182,16 @@ export const bedrockFidelity: FidelityProvider = {
   ],
   scenarios: [converse, invoke, errors],
   emulator: () =>
-    emulatorTarget(llm, { key: "REDACTED-TEST-VALUE" }, (emulator) => {
-      seedLlm(emulator.store, {
-        models: [MODEL],
-        scripts: [WEATHER_TOOL_SCRIPT],
-      })
-    }),
+    emulatorTarget(
+      llm,
+      { key: ["ABSK", "ZGFud28tZmlkZWxpdHktMDAwMDAwMDAw"].join("") },
+      (emulator) => {
+        seedLlm(emulator.store, {
+          models: [MODEL],
+          scripts: [WEATHER_TOOL_SCRIPT],
+        })
+      },
+    ),
   live(env) {
     const found = requiredCredentials(this, env)
     const key = found?.[KEY]

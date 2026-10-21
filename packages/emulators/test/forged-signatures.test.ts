@@ -9,6 +9,7 @@ import { pusherWebhookHeaders } from "../src/pusher/signature.ts"
 import { resendWebhookHeaders } from "../src/resend/signature.ts"
 import { stripeWebhookHeaders } from "../src/stripe/signature.ts"
 import { forgedSecret } from "../src/webhooks.ts"
+import { fakeKey } from "./fake-key.ts"
 
 const BODY = JSON.stringify({ type: "user.updated", data: { id: "user_1" } })
 const NOW = Math.floor(Date.UTC(2026, 9, 20, 19) / 1000)
@@ -76,7 +77,7 @@ describe("forged webhook signatures", () => {
   })
 
   it("keep the secret's prefix and mark the copy", () => {
-    const forged = forgedSecret("REDACTED-TEST-VALUE")
+    const forged = forgedSecret(fakeKey("whsec_", "ZGFud28="))
 
     expect(forged).toMatch(/^whsec_.+_forged$/)
     expect(Buffer.from(forged.slice(6), "base64")).not.toEqual(Buffer.from("ZGFud28=", "base64"))

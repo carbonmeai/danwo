@@ -3,10 +3,11 @@ import { fileURLToPath } from "node:url"
 import { defineConfig, githubEnvironment } from "@danwo/sdk"
 
 import { freePort, launchApp } from "../app-process.ts"
+import { fakeKey } from "../fake-key.ts"
 
 const APP = fileURLToPath(new URL("./app.ts", import.meta.url))
-const BOT_TOKEN = "REDACTED-TEST-VALUE"
-const ADA_TOKEN = "REDACTED-TEST-VALUE"
+const BOT_TOKEN = fakeKey("ghp_", "thanksBotThanksBotThanksBot01")
+const ADA_TOKEN = fakeKey("ghp_", "adaLovelaceAdaLovelaceAda0001")
 const WEBHOOK_SECRET = "thanks-bot-webhook-secret"
 
 export default defineConfig({

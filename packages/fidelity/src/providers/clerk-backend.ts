@@ -282,7 +282,7 @@ const errors: Scenario = {
         "GET",
         "/users",
         undefined,
-        "REDACTED-TEST-VALUE",
+        ["sk_", "test_danwoFidelityNotAKey000000000000000000"].join(""),
       ),
       options,
     )

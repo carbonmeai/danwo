@@ -1,3 +1,4 @@
+import { fakeKey } from "../fake-key.ts"
 /*
  * A small local site for the runner's contract tests: plain pages, no proxy, no emulators.
  * The tests that use it go through the public API only.
@@ -62,8 +63,8 @@ const LOGIN = `<!doctype html><title>Log in</title>
 
 /** A settings page that prints credentials the session was never given. */
 const KEYS = `<!doctype html><title>API keys</title><h1>API keys</h1>
-<p>Secret key: REDACTED-TEST-VALUE</p>
-<p>Signing secret: REDACTED-TEST-VALUE</p>`
+<p>Secret key: ${fakeKey("sk_", "live_51NqA7bC9dE2fG4hJ6kL8mN0pQ")}</p>
+<p>Signing secret: ${fakeKey("whsec_", "Zx81Qv0LmT5aRk2Yp9Hs")}</p>`
 
 const HOME = `<!doctype html><title>Contract site</title><h1>Contract site</h1><a href="/form">Form</a>`
 

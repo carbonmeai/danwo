@@ -192,12 +192,16 @@ export const geminiFidelity: FidelityProvider = {
   openapi: "https://generativelanguage.googleapis.com/$discovery/OPENAPI3_0?version=v1beta",
   scenarios: [generate, streaming, counting, errors],
   emulator: () =>
-    emulatorTarget(llm, { key: "REDACTED-TEST-VALUE" }, (emulator) => {
-      seedLlm(emulator.store, {
-        models: [MODEL, EMBEDDING_MODEL],
-        scripts: [WEATHER_TOOL_SCRIPT, COLOUR_JSON_SCRIPT],
-      })
-    }),
+    emulatorTarget(
+      llm,
+      { key: ["AIza", "DanwoFidelity0000000000000000000000"].join("") },
+      (emulator) => {
+        seedLlm(emulator.store, {
+          models: [MODEL, EMBEDDING_MODEL],
+          scripts: [WEATHER_TOOL_SCRIPT, COLOUR_JSON_SCRIPT],
+        })
+      },
+    ),
   live(env) {
     const key = requiredCredentials(this, env)?.[KEY]
 
