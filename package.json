@@ -24,6 +24,7 @@
     "test:all": "vitest run",
     "fallow": "fallow --fail-on-issues",
     "plain-js": "node scripts/plain-js.ts",
+    "audit": "node scripts/audit.ts",
     "bench": "bun run --cwd benchmarks bench",
     "website:dev": "bun run --cwd website dev",
     "website:build": "bun run --cwd website build",
