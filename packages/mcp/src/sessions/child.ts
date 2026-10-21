@@ -51,6 +51,7 @@ const ACTIONS = new Set<string>([
   "check",
   "navigate",
   "upload",
+  "drag",
 ])
 const PAGE_CALLS = new Set<string>([
   "snapshot",

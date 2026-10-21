@@ -28,6 +28,7 @@ describe("the server", () => {
       "click",
       "close_session",
       "deliver_webhooks",
+      "drag",
       "emulator_state",
       "exchanges",
       "fill",

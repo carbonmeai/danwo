@@ -36,6 +36,19 @@ const PAGES: Readonly<Record<string, string>> = {
           seen.textContent = type + " button " + e.button + " " + held(e)
         })
     </script>`,
+  "/board": `<!doctype html><title>Board</title><h1>Board</h1>
+    <section aria-label="To do"><h2>To do</h2><p draggable="true" id="card">Write the invariant</p></section>
+    <section aria-label="Done" id="done"><h2>Done</h2></section>
+    <p role="status" id="count">0 done</p>
+    <script>
+      card.addEventListener("dragstart", (e) => e.dataTransfer.setData("text/plain", card.id))
+      done.addEventListener("dragover", (e) => e.preventDefault())
+      done.addEventListener("drop", (e) => {
+        e.preventDefault()
+        done.append(document.getElementById(e.dataTransfer.getData("text/plain")))
+        count.textContent = "1 done"
+      })
+    </script>`,
 }
 
 let site: DeskSite
@@ -170,5 +183,34 @@ describe("click", () => {
       'clicked screen.getByRole("button", { name: "Item" }) with the right button',
     )
     expect(right).toContain("contextmenu button 2 no keys")
+  })
+})
+
+describe("drag", () => {
+  it("drags an element onto another", async () => {
+    const { desk } = await site.open("/board")
+    const answer = await desk.act({
+      kind: "drag",
+      target: 'getByText("Write the invariant")',
+      to: 'getByRole("region", { name: "Done" })',
+    })
+
+    expect(answer).toContain(
+      'dragged screen.getByText("Write the invariant") onto screen.getByRole("region", { name: "Done" })',
+    )
+    expect(answer).toMatch(/\+ - status \[ref=e\d+\]: 1 done/)
+    expect(await desk.snapshot()).toMatch(/region "Done"[^]*heading "Done"[^]*Write the invariant/)
+  })
+
+  it("says which end of the drag it cannot find", async () => {
+    const { desk } = await site.open("/board")
+
+    await expect(
+      desk.act({
+        kind: "drag",
+        target: 'getByText("Write the invariant")',
+        to: 'getByText("Nowhere")',
+      }),
+    ).rejects.toThrow(/getByText\("Nowhere"\) matches no element/)
   })
 })

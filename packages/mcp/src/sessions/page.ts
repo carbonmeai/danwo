@@ -36,6 +36,7 @@ export type ActionCall = Extract<
       | "check"
       | "navigate"
       | "upload"
+      | "drag"
   }
 >
 
@@ -353,10 +354,7 @@ function clickedText(call: Extract<ActionCall, { kind: "click" }>, name: string)
 
 /** Each action by kind, carried out on the desk; answers with what was done. */
 const ACTIONS: {
-  readonly [K in ActionCall["kind"]]: (
-    desk: PageDesk,
-    call: Extract<ActionCall, { kind: K }>,
-  ) => Promise<string>
+  readonly [K in ActionCall["kind"]]: (desk: PageDesk, call: ActionOf<K>) => Promise<string>
 } = {
   async click(desk, call) {
     const { locator, name } = await desk.target(call.target)
@@ -415,28 +413,24 @@ const ACTIONS: {
   },
   navigate: (desk, call) => desk.navigate(call.to),
   upload: (desk, call) => desk.upload(call),
+  async drag(desk, call) {
+    const source = await desk.target(call.target)
+    const drop = await desk.target(call.to)
+
+    await source.locator.dragTo(drop.locator, { timeout: ACTION_TIMEOUT_MS })
+
+    return `dragged ${source.name} onto ${drop.name}`
+  },
 }
 
+type ActionOf<K extends ActionCall["kind"]> = Extract<ActionCall, { kind: K }>
+
 /** Carries out `call` with the action of its kind. */
-function perform(desk: PageDesk, call: ActionCall): Promise<string> {
-  switch (call.kind) {
-    case "click":
-      return ACTIONS.click(desk, call)
-    case "hover":
-      return ACTIONS.hover(desk, call)
-    case "fill":
-      return ACTIONS.fill(desk, call)
-    case "fill_secret":
-      return ACTIONS.fill_secret(desk, call)
-    case "press":
-      return ACTIONS.press(desk, call)
-    case "select":
-      return ACTIONS.select(desk, call)
-    case "check":
-      return ACTIONS.check(desk, call)
-    case "upload":
-      return ACTIONS.upload(desk, call)
-    default:
-      return ACTIONS.navigate(desk, call)
-  }
+function perform<K extends ActionCall["kind"]>(
+  desk: PageDesk,
+  call: ActionOf<K> & { readonly kind: K },
+): Promise<string> {
+  const action: (desk: PageDesk, call: ActionOf<K>) => Promise<string> = ACTIONS[call.kind]
+
+  return action(desk, call)
 }

@@ -195,6 +195,20 @@ function registerActions(server: McpServer, sessions: SessionManager): void {
     }),
   })
   register(server, sessions, {
+    name: "drag",
+    description: `Drag an element and drop it on another, e.g. a card onto a column or a file row onto a folder. ${ACTION_NOTE}`,
+    input: {
+      session,
+      target: target.describe(`what to drag: ${target.description ?? "a ref or a locator"}`),
+      to: z.string().describe("where to drop it: a ref or a locator, as target takes"),
+    },
+    call: (args) => ({
+      kind: "drag",
+      target: given(args.target, "target"),
+      to: given(args.to, "to"),
+    }),
+  })
+  register(server, sessions, {
     name: "navigate",
     description: `Go to a path of the app or a full URL, or "back", "forward", "reload". ${ACTION_NOTE}`,
     input: { session, to: z.string() },

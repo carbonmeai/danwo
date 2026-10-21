@@ -29,16 +29,17 @@ Pass `format: "md"` to `show_run` to get the same failure page `danwo show --for
 A **session** is your app opened in danwo's browser, with its emulators and proxy, for the agent
 to explore before it writes a test. Every action answers with the page as it is now:
 
-| Tool                                                 | What it does                                                                         |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `open_session`, `close_session`                      | Starts the app, emulators and browser, or stops them.                                |
-| `navigate`                                           | Goes to a path or URL, or back, forward, reload.                                     |
-| `click`, `hover`, `fill`, `press`, `select`, `check` | Acts on an element, by a ref from the last snapshot or by a locator.                 |
-| `fill_secret`                                        | Fills a field with a configured secret by name. The value never appears anywhere.    |
-| `upload`                                             | Puts files into a file input, or the file picker a button opens. Up to 10 MB a call. |
-| `snapshot`, `screenshot`                             | The page as an accessibility tree with refs, or as an image with secrets masked.     |
-| `check_locator`                                      | Checks a locator matches exactly one element, and returns the line to paste.         |
-| `start_recording`, `stop_recording`                  | Records the session's screenshots, and video when no secret was filled.              |
+| Tool                                                 | What it does                                                                              |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `open_session`, `close_session`                      | Starts the app, emulators and browser, or stops them.                                     |
+| `navigate`                                           | Goes to a path or URL, or back, forward, reload.                                          |
+| `click`, `hover`, `fill`, `press`, `select`, `check` | Acts on an element, by a ref from the last snapshot or by a locator.                      |
+| `fill_secret`                                        | Fills a field with a configured secret by name. The value never appears anywhere.         |
+| `upload`                                             | Puts files into a file input, or the file picker a button opens. Up to 10 MB a call.      |
+| `drag`                                               | Drags an element (`target`) and drops it on another (`to`), such as a card onto a column. |
+| `snapshot`, `screenshot`                             | The page as an accessibility tree with refs, or as an image with secrets masked.          |
+| `check_locator`                                      | Checks a locator matches exactly one element, and returns the line to paste.              |
+| `start_recording`, `stop_recording`                  | Records the session's screenshots, and video when no secret was filled.                   |
 
 ### Click with keys held, twice or with the right button
 
