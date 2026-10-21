@@ -29,7 +29,7 @@
     "@danwo/expo": "workspace:*",
     "@danwo/playwright": "workspace:*",
     "@danwo/sdk": "workspace:*",
-    "@playwright/test": "1.64.0",
+    "@playwright/test": "1.64.1",
     "@tailwindcss/vite": "4.3.3",
     "@types/mdx": "2.0.14",
     "@types/pg": "8.23.1",
@@ -37,7 +37,7 @@
     "@types/react-dom": "19.2.7",
     "@vitejs/plugin-react": "6.1.2",
     "pg": "8.23.1",
-    "playwright-core": "1.64.0",
+    "playwright-core": "1.64.1",
     "shiki": "4.5.0",
     "tailwindcss": "4.3.3",
     "vite": "8.2.2"
