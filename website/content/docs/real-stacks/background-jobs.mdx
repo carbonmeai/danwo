@@ -94,10 +94,11 @@ test("adds a task", async ({ app, screen, expect }) => {
 })
 ```
 
-With `readiness: { settle: true }`, each step also waits for the runs it started. A run that fails
-for good starts its function's `onFailure` handler, and `settle()` waits for that too, so an
-invariant can check what the handler did. The flight record lists every run under `inngest`, with
-its function, status and duration.
+With `readiness: { settle: true }`, each step also waits for the runs it started. The flight
+record lists every run under `inngest`, with its function, status and duration.
+
+A run that fails for good starts its function's `onFailure` handler, and settling waits for that
+too, so an invariant can check what the handler did.
 
 ## After time travel
 
@@ -109,7 +110,7 @@ its function, status and duration.
 - **Events.** An event your app sends after the jump runs at once. The SDK stamps it with the
   app's clock, days ahead, and the dev server would otherwise hold it until real time caught up.
 
-```ts title="tests/digest.danwo.ts"
+```ts title="tests/digest.danwo.ts · a time travel"
 test("sends the digest at nine", async ({ app, screen, expect, time }) => {
   await app.open("/digests/new")
   // …schedule it for tomorrow at 09:00…
@@ -124,7 +125,7 @@ danwo runs a due cron function the way the dev server's Invoke button does, so t
 `inngest/function.invoked`, with no data. The v4 SDK checks that event against the schemas of the
 function's typed event triggers, so a cron function that has one needs an `invoke()` trigger too:
 
-```ts title="worker/functions.ts"
+```ts title="worker/functions.ts · the scheduler"
 import { cron, invoke } from "inngest"
 
 inngest.createFunction(
@@ -172,7 +173,7 @@ there.
 danwo faults what crosses its proxy, so a step fails when the provider call inside it does. To
 make that happen once in a plain test, arm the fault on the `proxy` fixture:
 
-```ts title="tests/digest.danwo.ts"
+```ts title="tests/digest.danwo.ts · one step failing"
 test("a send that loses its answer is retried once", async ({ app, proxy, time, settle }) => {
   // The first email is accepted, but the step never hears back, so Inngest retries it.
   proxy.failNext((call) => call.host === "api.resend.com" && call.path === "/emails", {
