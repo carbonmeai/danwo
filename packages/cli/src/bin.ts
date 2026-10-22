@@ -16,6 +16,7 @@ import {
   junit,
   lintRun,
   mergeReports,
+  parseDuration,
   type RecordMode,
   type Reporter,
   runCache,
@@ -56,6 +57,15 @@ function reportersOf({ reporter: names, ...flags }: ReporterFlags): Reporter[] {
 
       return make(flags)
     })
+}
+
+/** `--max-duration`'s value in milliseconds. */
+function duration(value: string): number {
+  const ms = parseDuration(value)
+
+  if (ms === undefined) throw new InvalidArgumentError("expected a duration such as 20m, 90s or 1h")
+
+  return ms
 }
 
 function integerAtLeast(min: number): (value: string) => number {
@@ -131,6 +141,11 @@ withReporterOptions(withLintOptions(program.command("test")))
     "start no new test file once this many tests failed",
     integerAtLeast(1),
   )
+  .option(
+    "--max-duration <time>",
+    "start no new test file once the run has taken this long, e.g. 20m (files left out fail the run)",
+    duration,
+  )
   .option("--ci", "CI defaults even without the CI variable: 1 retry, read-only cache, no .only")
   .option(
     "--replay-only",
@@ -149,6 +164,7 @@ withReporterOptions(withLintOptions(program.command("test")))
         updateSnapshots,
         reporter,
         prComment,
+        maxDuration,
         ...options
       }: {
         workers?: number
@@ -159,6 +175,7 @@ withReporterOptions(withLintOptions(program.command("test")))
         since?: string
         shard?: string
         maxFailures?: number
+        maxDuration?: number
         ci?: boolean
         replayOnly?: boolean
         list?: boolean
@@ -175,6 +192,7 @@ withReporterOptions(withLintOptions(program.command("test")))
       process.exitCode = await runTests({
         patterns,
         ...options,
+        ...(maxDuration !== undefined && { maxDurationMs: maxDuration }),
         reporters: reportersOf({ reporter, prComment }),
         ...(updateSnapshots && { updateScreenshots: true }),
       })
@@ -342,6 +360,26 @@ program
       if (!(error instanceof InitCancelled)) throw error
       process.exitCode = 130
     }
+  })
+
+program
+  .command("doctor")
+  .description(
+    "check what a first run needs: Node, danwo's Chromium, the config and its keys, the model's key, Playwright Test's version and the agents' skill",
+  )
+  .option("--json", "the checks as JSON: { ok, checks: [{ name, status, detail }] }")
+  .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
+  .action(async (options: { json?: boolean; config?: string }) => {
+    const { doctorLines, projectDoctor } = await import("./doctor.ts")
+    const { browserInstalled } = await import("@danwo/runner")
+    const checks = await projectDoctor(
+      { cwd: process.cwd(), config: options.config },
+      { nodeVersion: process.version, env: process.env, browser: browserInstalled },
+    )
+    const ok = checks.every((check) => check.status !== "fail")
+
+    console.log(options.json ? JSON.stringify({ ok, checks }) : doctorLines(checks).join("\n"))
+    process.exitCode = ok ? 0 : 1
   })
 
 program

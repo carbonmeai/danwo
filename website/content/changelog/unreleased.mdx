@@ -18,6 +18,7 @@ date: 2026-10-20
 - Test and config files resolve `tsconfig.json` `paths` aliases, and a file that uses TypeScript Node's type stripping can't load (an `enum`, parameter properties, a `namespace`) fails with the file, the line and what to write instead.
 - A config key danwo doesn't know gets a warning naming the key it likely means (`retires` → `retries`).
 - Every `afterAll` hook runs, also after a `beforeAll` or an earlier `afterAll` threw, and the file names every failure.
+- `danwo doctor` (`--json`) checks Node, danwo's Chromium, the config and its keys, the model's key, `@playwright/test`'s version and the agents' skill before a run.
 - Every published package ships its type declarations, so `tsc` checks your tests against danwo's types.
 - The published dashboard is prebuilt: `danwo serve` runs without Vite.
 - The proxy's fix for mockttp's local port check ships with the package; a mockttp version without that check gets one warning instead of a proxy that won't start.
@@ -42,7 +43,8 @@ date: 2026-10-20
 - **The proxy:** this machine always passes, WebSockets go through and are logged, streams and page assets no longer hold readiness up, telemetry is blocked by default, and a port nothing listens on is named. An app on Node 20 to 24.4 goes through the proxy too: the preload tunnels the calls those Nodes don't proxy themselves, and each app process checks at start that its calls reach the proxy. One that misses names its Node version, and under `unmatched: "block"` or `secrets: "fail"` the run is refused. Under `unmatched: "block"` a page's images, fonts, stylesheets and media still load (`assets: "block"` refuses them), and the run names the hosts the pages were refused, by host and kind.
 - **The preload:** a `node` shim keeps it when a start script replaces `NODE_OPTIONS`, undici's agent is routed, and a process that escaped it is reported.
 - **Live keys:** a run warns, or fails with `secrets: "fail"`, when an app holds live-looking keys for providers it does not emulate.
-- **Processes:** every child danwo starts is owned and stopped on exit, on a signal or when its owner dies; `spawnOwned()` does the same for an environment's own processes.
+- **Processes:** every child danwo starts is owned and stopped on exit, on a signal or when its owner dies; `spawnOwned()` does the same for an environment's own processes. On Windows the whole process tree is ended with `taskkill /T /F`.
+- **Time budget:** `danwo test --max-duration 20m` starts no new test file once the run has taken that long, and fails the run for the files left out.
 - **Recording:** every run keeps its flight record and its video by default, for the newest 50 runs (`record.keepRuns`, `--keep-runs`). Each step records the tab it ran in, filmed pages show a pointer with a ripple on clicks, and the value checks and the wait for background work are steps of the record.
 - **Inngest settling:** a run the SDK checkpoints itself counts as going while an app's call through the proxy is still open, so a step waiting ten seconds on a provider is waited for.
 - **Inngest after time travel:** events a travelled app sends are put back on real time before they reach the dev server, so their runs start at once instead of days ahead.

@@ -82,7 +82,10 @@ SIGTERM, then SIGKILL five seconds later. The same happens when a run ends, fail
 (Ctrl-C, SIGTERM, SIGHUP) or is killed outright, since a small guardian process ends whatever a
 worker owned once the worker is gone. Have the app exit on SIGTERM. An environment that starts
 its own processes should start them with `spawnOwned()` from `@danwo/sdk`, which takes the same
-arguments as `spawn()` and returns the child with a `stop()`.
+arguments as `spawn()` and returns the child with a `stop()`. Windows has no process groups:
+there the child's whole tree is ended with `taskkill /T /F /PID <pid>` (untested on Windows by
+danwo's own suite), and there is no guardian, so a worker killed outright can leave its app
+running and holding the port.
 
 `app.ready` changes when it counts as started: `{ path: "/health" }` waits for that path, and
 `{ log: "worker ready" }` for a line in its output, for a worker that serves nothing. Its output is

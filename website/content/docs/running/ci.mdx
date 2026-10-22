@@ -106,6 +106,18 @@ cache: { dir: ".danwo-cache", replayOnly: true },
 
 Record a failing step by running it locally without the flag, then commit the cache.
 
+## Bound the run
+
+Two flags stop a run from starting new test files. Files already running finish:
+
+| Flag                 | Stops starting files                   | Exit code                |
+| -------------------- | -------------------------------------- | ------------------------ |
+| `--max-failures <n>` | once `n` tests failed                  | `1`, from the failures   |
+| `--max-duration <t>` | once the run has taken `t`, e.g. `20m` | `1`: files were left out |
+
+Run `npx @danwo/cli doctor` as a first step to see what a run would trip on: Node, Chromium, the
+config, the model's key. `--json` prints the checks for a script.
+
 ## Exit codes
 
 | Code  | Meaning                                                    |

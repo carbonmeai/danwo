@@ -83,7 +83,16 @@ commit the cache.
 With `CI` set (every hosted CI sets it), or `--ci`, `danwo test` retries a failing test once, reads
 the replay cache without writing to it, and refuses `.only` with exit 2, naming the file and line.
 The config's `retries` and `--retries` still win. `--max-failures n` starts no new test file once
-`n` tests failed.
+`n` tests failed. `--max-duration <time>` (`20m`, `90s`, `1h`, `500ms`; a bare number is seconds)
+starts no new test file once the run has taken that long; files already running finish, the run
+prints `stopped at --max-duration (…): N test files not run` and exits at least 1, since those
+files were never judged. In CI, `npx @danwo/cli install-browser --with-deps --only-shell` installs
+only the headless shell test runs use. `danwo doctor [--json]` checks, without running anything:
+Node >= 24, that danwo's Chromium starts, that the config loads and has no unknown keys, the
+model's key variable (`AI_GATEWAY_API_KEY` for a gateway id, the provider's own for an AI SDK
+model), an installed `@playwright/test` against `@danwo/playwright`'s range, and that each
+`SKILL.md` copy is this danwo's. It prints `ok|warn|fail  name: detail` lines (JSON
+`{ ok, checks: [{ name, status, detail }] }`) and exits 1 on any `fail`.
 
 ## Flaky tests and reruns
 

@@ -95,7 +95,7 @@ export type { MatrixRunReport, Reporter, RunContext, RunKind, TestRunReport } fr
 export type { AttemptReport, TestReport } from "./tasks.ts"
 export { redactCredentials } from "../secrets/credentials.ts"
 export { createRedactor, type Redactor } from "./redact.ts"
-export { runTests, type RunTestsOptions } from "./test-command.ts"
+export { parseDuration, runTests, type RunTestsOptions } from "./test-command.ts"
 export { mergeReports, type MergeReportsOptions } from "./merge-command.ts"
 export { explainImpact, type ImpactCommandOptions } from "./impact-command.ts"
 export { type ImpactConfig, type ImpactEntry, type ImpactIndex, readImpactIndex } from "./impact.ts"

@@ -69,7 +69,9 @@ Treat a likely verdict as where to look first, not as proof.
 | `CONFIG_INVALID`                            | the config or the call named in the message                                                                                                          |
 
 `danwo spec --topic errors` lists every code with its class and exit code. `danwo cache ls`,
-`stats` and `clear` show and reset recordings.
+`stats` and `clear` show and reset recordings. `danwo doctor` (`--json` for a script) checks the
+machine and the project before a run: Node, danwo's Chromium, the config and its keys, the
+model's key, `@playwright/test`'s version and the skill copies.
 
 ## Proxy noise
 

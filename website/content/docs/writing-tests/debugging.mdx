@@ -115,6 +115,9 @@ That's the bug: the app credited the account once per delivery.
 
 `danwo spec --topic errors` lists every code with its exit code.
 
+When a run fails before any test starts, `npx @danwo/cli doctor` checks the machine and the
+config.
+
 ## Connection noise
 
 A browser dropping a socket as a page closes (`ECONNRESET`, `EPIPE`, `socket hang up`) is expected,

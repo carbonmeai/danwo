@@ -151,3 +151,17 @@ test("one", async () => {})
     expect(existsSync(join(root, "cleaned.txt"))).toBe(true)
   })
 })
+
+describe("--max-duration", () => {
+  it("starts no file once the run is out of time, and fails the run for the files left out", async () => {
+    const root = await project({
+      "danwo.config.ts": 'export default { testDir: "tests" }\n',
+      "tests/a.danwo.ts": A_TEST,
+      "tests/b.danwo.ts": A_TEST,
+    })
+    const run = await danwo(root, ["test", "--max-duration", "1ms"])
+
+    expect(run.out).toContain("stopped at --max-duration (0 s): 2 test files not run")
+    expect(run.code).toBe(1)
+  })
+})

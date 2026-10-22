@@ -55,6 +55,11 @@ interface TestExecution {
   readonly retries?: number
   /** Starts no new test file once this many tests failed (`--max-failures`). */
   readonly maxFailures?: number
+  /**
+   * Starts no new test file once the run has taken this long, in milliseconds (`--max-duration`).
+   * Files already running finish; the run fails when any file was left out.
+   */
+  readonly maxDurationMs?: number
   /** Whether this is a CI run; default from the `CI` environment variable. */
   readonly ci?: boolean
   /**
@@ -67,6 +72,19 @@ interface TestExecution {
 export interface RunTestsOptions extends TestSelection, TestExecution, RunCommandOptions {}
 
 const printLine = (line: string) => process.stdout.write(`${line}\n`)
+
+const UNIT_MS: Readonly<Record<string, number>> = { ms: 1, s: 1_000, m: 60_000, h: 3_600_000 }
+
+/** A duration such as `20m`, `90s`, `1h` or `500ms` in milliseconds; a bare number is seconds. */
+export function parseDuration(text: string): number | undefined {
+  const match = /^(\d+(?:\.\d+)?)(ms|s|m|h)?$/.exec(text.trim())
+
+  if (match?.[1] === undefined) return undefined
+
+  const ms = Number(match[1]) * (UNIT_MS[match[2] ?? "s"] ?? 1_000)
+
+  return ms > 0 ? ms : undefined
+}
 
 /** The selected tests grouped into one task per file, in the order the files were found. */
 function tasksOf(
@@ -87,18 +105,18 @@ interface TaskRun {
 
 const FAILURE = new Set(["failed", "timed-out", "interrupted"])
 
-/** Runs the tasks on the crew, starting no new file once `maxFailures` tests failed. */
+/** Runs the tasks on the crew, starting no new file once `stopped()` says the run is over. */
 async function runTasks(
   crew: Crew,
   tasks: readonly TestFileTask[],
-  run: { cwd: string; write: (line: string) => void; failures: () => number; maxFailures?: number },
+  run: { cwd: string; write: (line: string) => void; stopped: () => boolean },
 ): Promise<TaskRun> {
   const broken: { file: string; error: string }[] = []
 
   let notRun = 0
 
   const work = async (task: TestFileTask) => {
-    if (run.maxFailures !== undefined && run.failures() >= run.maxFailures) {
+    if (run.stopped()) {
       notRun++
 
       return
@@ -361,13 +379,10 @@ async function runAndReport(input: RunInput, frame: RunFrame): Promise<number> {
 
   let ran: TaskRun = { brokenFiles: [], notRun: 0 }
 
+  const limits = runLimits(options, began, reports)
+
   try {
-    ran = await runTasks(crew, tasks, {
-      cwd,
-      write,
-      failures: () => reports.filter((report) => FAILURE.has(report.status)).length,
-      ...(options.maxFailures !== undefined && { maxFailures: options.maxFailures }),
-    })
+    ran = await runTasks(crew, tasks, { cwd, write, stopped: limits.stopped })
   } finally {
     await crew.disband()
   }
@@ -385,16 +400,58 @@ async function runAndReport(input: RunInput, frame: RunFrame): Promise<number> {
 
   for (const line of closingLines(results.reports, { replayOnly: replayOnly(loaded, options) }))
     write(line)
-  for (const line of [...lintReport(findings), ...blockedReport(results.reports)]) write(line)
-  if (ran.notRun > 0)
-    write(`stopped after ${options.maxFailures} failed: ${ran.notRun} test files not run`)
+  for (const line of [
+    ...lintReport(findings),
+    ...blockedReport(results.reports),
+    ...stopLines(limits.outOfFailures(), ran.notRun, options),
+  ])
+    write(line)
 
   const reportPath = await closeRecording(recording, cwd, write)
   const run = { ...context, ...results, reportPath }
 
   await tellReporters(reporters, (r) => r.testsFinished?.(run), write)
 
-  return withLint(runExitCode(results.reports, results.brokenFiles), findings, loaded.config.lint)
+  const code = withLint(
+    runExitCode(results.reports, results.brokenFiles),
+    findings,
+    loaded.config.lint,
+  )
+
+  /* Files a time budget left out were never judged: the run did not pass. */
+  return ran.notRun > 0 ? Math.max(code, 1) : code
+}
+
+/**
+ * When a run starts no more files: once `maxFailures` tests failed, or once it has taken
+ * `maxDurationMs`.
+ */
+function runLimits(
+  options: Pick<TestExecution, "maxFailures" | "maxDurationMs">,
+  began: number,
+  reports: readonly TestReport[],
+): { readonly outOfFailures: () => boolean; readonly stopped: () => boolean } {
+  const { maxFailures, maxDurationMs } = options
+  const failed = () => reports.filter((report) => FAILURE.has(report.status)).length
+  const outOfFailures = () => maxFailures !== undefined && failed() >= maxFailures
+  const outOfTime = () => maxDurationMs !== undefined && Date.now() - began >= maxDurationMs
+
+  return { outOfFailures, stopped: () => outOfFailures() || outOfTime() }
+}
+
+/** Why the run started no more files, and how many it left out; nothing when it ran them all. */
+function stopLines(
+  outOfFailures: boolean,
+  notRun: number,
+  options: Pick<TestExecution, "maxFailures" | "maxDurationMs">,
+): string[] {
+  if (notRun === 0) return []
+  if (outOfFailures)
+    return [`stopped after ${options.maxFailures} failed: ${notRun} test files not run`]
+
+  const seconds = Math.round((options.maxDurationMs ?? 0) / 1000)
+
+  return [`stopped at --max-duration (${seconds} s): ${notRun} test files not run`]
 }
 
 /**

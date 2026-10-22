@@ -5,8 +5,12 @@
  * kept in a registry: a normal exit signals what is left, a SIGINT, SIGTERM or SIGHUP with no other
  * handler stops them before the process ends, and a small guardian process ends them when the
  * owner dies without running any code at all (SIGKILL, a crash in native code).
+ *
+ * Windows has no process groups: there a child is stopped with its whole tree by `taskkill /T /F`,
+ * since signalling the `shell: true` wrapper alone leaves the server it started running. Windows
+ * has no guardian either, so a process killed outright can still leave its children behind.
  */
-import { type ChildProcess, spawn, type SpawnOptions } from "node:child_process"
+import { type ChildProcess, spawn, type SpawnOptions, spawnSync } from "node:child_process"
 import type { Socket } from "node:net"
 import { fileURLToPath } from "node:url"
 
@@ -30,10 +34,26 @@ const owned = new Map<number, ChildProcess>()
 let guardian: ChildProcess | undefined
 let hooked = false
 
-/** Sends `signal` to the child's whole group (or the child alone where there are no groups). */
+/**
+ * The command that ends `pid` and every process under it on Windows. `/F` because console
+ * programs, a Node server among them, ignore the polite close `taskkill` sends otherwise.
+ */
+export function treeKillCommand(pid: number): readonly [string, readonly string[]] {
+  return ["taskkill", ["/T", "/F", "/PID", String(pid)]]
+}
+
+/** Ends the child's process tree on Windows; synchronous, so it also works in an exit handler. */
+function killTree(pid: number): void {
+  const [command, args] = treeKillCommand(pid)
+
+  spawnSync(command, args, { stdio: "ignore", windowsHide: true })
+}
+
+/** Sends `signal` to the child's whole group (its whole tree on Windows). */
 function signalGroup(child: ChildProcess, signal: NodeJS.Signals): void {
   try {
     if (GROUPS && child.pid !== undefined) process.kill(-child.pid, signal)
+    else if (process.platform === "win32" && child.pid !== undefined) killTree(child.pid)
     else child.kill(signal)
   } catch {
     /* Already gone. */

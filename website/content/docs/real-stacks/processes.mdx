@@ -27,6 +27,10 @@ real server as its child, and stopping the group stops both:
 The same happens on Ctrl-C, `SIGTERM` or `SIGHUP`. If the worker itself is killed, a small guardian
 process notices and ends what the worker owned.
 
+Windows has no process groups, so there danwo ends the app's whole process tree with
+`taskkill /T /F`. There is no guardian on Windows: a worker killed outright can leave its app
+running.
+
 <Callout type="info">
   Have your app exit on `SIGTERM`: close its server and database pool, then exit. It will stop in
   well under five seconds.
