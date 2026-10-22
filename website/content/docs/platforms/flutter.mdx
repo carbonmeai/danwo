@@ -1,16 +1,15 @@
 ---
 title: Flutter
-description: Build a Flutter app for the iOS Simulator or the Android emulator with danwo, and what its network needs.
+description: Build and test a Flutter app on the iOS Simulator or the Android emulator with danwo, and what its network and locators need.
 icon: Bird
 ---
 
-danwo's two build commands build a Flutter app too. They find its `pubspec.yaml` and run
-Flutter's own build, and the kept build installs on a device like any other.
+danwo builds a Flutter app for the iOS Simulator and the Android emulator, and runs your tests on
+it like any other app. The app's calls go through danwo's proxy, so the matrix can fault them.
 
-<Callout type="warn">
-  Running tests on a Flutter app hasn't been checked on a device yet. The build commands are, and
-  the network needs one change in the app, below.
-</Callout>
+Use it when your app is written once in Flutter and you want the same tests, and the same faults,
+on both platforms. The [`with-flutter`](/docs/examples/with-flutter) example runs one test file on
+both.
 
 ## Build the app
 
@@ -19,23 +18,27 @@ npx @danwo/cli build-ios .
 npx @danwo/cli build-android .
 ```
 
-| Platform | What danwo runs                         | What it keeps                                            |
-| -------- | --------------------------------------- | -------------------------------------------------------- |
-| iOS      | `flutter build ios --simulator --debug` | `Runner.app`, with plain HTTP allowed, and its bundle id |
-| Android  | `flutter build apk --release`           | `app-release.apk`, and its package name                  |
+Both find the app's `pubspec.yaml` and run Flutter's own build. Each build is kept by a hash of the
+app's sources, `ios/` and `android/` included, and reused until they change.
 
-Flutter builds simulator apps in debug mode only. The Android build runs with Gradle's and
-Kotlin's daemons switched off, so nothing is left running. Both are kept by a hash of the app's
-sources, `ios/` and `android/` included.
+| Platform | What danwo runs                                                                 | What it keeps                                            |
+| -------- | ------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| iOS      | `flutter build ios --simulator --debug`                                         | `Runner.app`, with plain HTTP allowed, and its bundle id |
+| Android  | `flutter build apk --config-only`, then the project's `gradlew assembleRelease` | the release APK, and its package name                    |
 
-## Route the app's calls through the proxy
+Flutter builds simulator apps in debug mode only. On Android, danwo adds its network config to the
+APK for this build only, as it does for [native Android apps](/docs/native-android): the APK trusts
+the certificate danwo installs on the emulator. Your project's files are not changed, and no Gradle
+or Kotlin daemon is left running.
 
-Dart's own `HttpClient`, which `package:http` uses by default, connects directly: it ignores the
-device's proxy setting and the certificates the user installed. So the app's calls skip danwo's
-proxy.
+## Call through the platform's HTTP stack
+
+Dart's own `HttpClient` connects directly. It ignores the device's proxy setting and the
+certificates installed on it, so its calls skip danwo's proxy.
 
 Use the platform's own HTTP stack instead: `cupertino_http` on iOS and `cronet_http` on Android.
-Both follow the device's proxy and trust store, as a native app does.
+Both follow the device's proxy, as a native app does. Their clients work with `package:http`, so
+the rest of the app's code stays the same.
 
 ```dart title="lib/client.dart · the HTTP client"
 import 'dart:io';
@@ -51,17 +54,65 @@ Client httpClient() {
 }
 ```
 
-On Android, the APK also has to trust user-installed certificates: add the network security
-config from [Native Android apps](/docs/native-android) to `android/app/src/main`, for the build
-you test.
+<Callout type="warn">
+  A release APK needs the `INTERNET` permission in `android/app/src/main/AndroidManifest.xml`.
+  Flutter's template adds it to the debug manifest only.
+</Callout>
+
+## Find the app's elements
+
+Give an element a `Semantics` identifier, and `getByTestId` finds it on both platforms. Buttons
+and text are found by their role and label, as in any app.
+
+```dart title="lib/main.dart · a field the tests fill"
+Semantics(
+  identifier: 'email',
+  child: TextField(
+    controller: _email,
+    decoration: const InputDecoration(labelText: 'Work email'),
+  ),
+),
+```
+
+```ts title="tests/waitlist.danwo.ts · the test's side"
+await screen.getByTestId("email").fill("ada@lumen.example")
+await screen.getByRole("button", { name: "Join the waitlist" }).tap()
+```
+
+On Android, Flutter hands a text field's label to the accessibility tree only as its hint, and
+danwo can't read hints. So find text fields by their identifier: `getByLabel` finds them on iOS
+only.
+
+## Run the tests on either platform
+
+One config can hold both devices. The `with-flutter` example picks one from an environment
+variable, so the same tests run on each:
+
+```sh
+npx @danwo/cli test
+DANWO_PLATFORM=ios npx @danwo/cli test
+```
+
+```text
+  ✓ tests/deterministic.danwo.ts › shows the waitlist form 3380 ms, worker 0
+  ✓ tests/deterministic.danwo.ts › asks for a valid email 5948 ms, worker 0
+  ✓ tests/deterministic.danwo.ts › joins the waitlist 4221 ms, worker 0
+```
+
+The [fault matrix](/docs/fault-matrix) runs the same way. In the example, all 18 faults it plans pass on
+the emulator and on the simulator: the app retries a failed join, and the API keeps one row and
+one email.
 
 ## Next
 
 <Cards>
   <Card title="Native iOS apps" href="/docs/native-ios">
-    How the simulator is bound, and locators on native views.
+    How the simulator is bound to the proxy.
   </Card>
   <Card title="Native Android apps" href="/docs/native-android">
-    The network config, and locators on Compose.
+    The network config danwo adds to the build.
+  </Card>
+  <Card title="The Flutter example" href="/docs/examples/with-flutter">
+    The waitlist app, its tests and its fault matrix.
   </Card>
 </Cards>

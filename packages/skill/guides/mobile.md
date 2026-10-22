@@ -353,7 +353,8 @@ order: `pubspec.yaml` → Flutter; an `.xcworkspace` (else `.xcodeproj`) at the 
 `settings.gradle(.kts)` with `gradlew` → Gradle (no wrapper is an error); a `package.json` →
 Expo. `buildIos` / `buildAndroid` do the same from a config, and return `bundleId` / `package` read
 from the build (`plutil` on the app's Info.plist, `aapt2 dump packagename` on the APK), so the
-device options need no hard-coded id. Examples: `examples/with-swiftui`, `examples/with-compose`.
+device options need no hard-coded id. Examples: `examples/with-swiftui`, `examples/with-compose`,
+`examples/with-flutter`.
 
 **Xcode.** `pod install` first for a workspace with a `Podfile` and no `Pods/`. The scheme is
 `--scheme`, else the only one in `xcodebuild -list -json`, else the one named like the project;
@@ -389,12 +390,23 @@ the user CA. Pinned certificates still defeat it. Route the app's production API
 worker's local API with a `Service` whose route is `forwardTo(localUrl)`; the app ships unchanged.
 
 **Flutter.** `flutter build ios --simulator --debug` (Flutter builds simulators in debug only;
-`build/ios/iphonesimulator/Runner.app`) and `flutter build apk --release`
-(`build/app/outputs/flutter-apk/app-release.apk`), with `GRADLE_OPTS` switching Gradle's and
-Kotlin's daemons off. Key: the sources minus `build`, `Pods`, `ephemeral`, `Generated.xcconfig`
-and the other generated files; `ios/` and `android/` are sources. Not yet run on a device: Dart's
-`HttpClient` (the default for `package:http`) ignores the device proxy and user CAs, so the app
-needs `cupertino_http` / `cronet_http`, and the APK a network security config trusting user CAs.
+`build/ios/iphonesimulator/Runner.app`, App Transport Security opened as for Xcode). Android:
+`flutter build apk --release --config-only` (writes `local.properties` and the Gradle wrapper), then
+the project's own `android/gradlew assembleRelease` with the same `--no-daemon`, in-process Kotlin
+and `--init-script` network config as a Gradle build, `JAVA_HOME` defaulting to Android Studio's
+JDK; the APK is `build/app/outputs/flutter-apk/app-release.apk` (the template signs release with the
+debug key). Key: the sources minus `build`, `Pods`, `ephemeral`, `Generated.xcconfig` and the other
+generated files; `ios/` and `android/` are sources. Network: Dart's `HttpClient` (the default for
+`package:http`) ignores the device proxy and installed CAs; `cupertino_http`
+(`CupertinoClient.defaultSessionConfiguration()`) follows the simulator's proxy and
+`cronet_http` (`CronetClient.defaultCronetEngine()`, Play Services Cronet) follows the emulator's
+global `http_proxy`, both checked on devices. A release APK needs `android.permission.INTERNET` in
+the main manifest (the template puts it in debug and profile only). Locators: a `Semantics`
+`identifier` → `getByTestId` on both (Android resource id, iOS identifier). iOS's accessibility
+snapshot reports a text field as `Other` with role `TextInputSemanticsObject`; danwo reads it as a
+`textbox`, so `getByLabel` finds it by its `labelText`. On Android a text field's label is only its
+hint, which the driver does not read: find fields by `getByTestId`. Plain `Text` that is focusable
+reads as a `button` on Android; find text by its identifier or text.
 
 ## Live sessions over MCP
 
@@ -439,7 +451,7 @@ server's.
 
 ## Limits for now
 
-- **Flutter.** Builds only so far: tests on a Flutter app have not been run on a device, and its network needs the change above.
+- **Flutter.** Text fields are found by `getByTestId` on Android (their label is only a hint there); the app must call through `cupertino_http` / `cronet_http`.
 - **iOS: Simulator only.** Physical iPhones are not covered yet.
 - **Pinned apps.** Apps that pin certificates ignore danwo's CA.
 - **Play images.** Google Play system images cannot be rooted.
