@@ -12,7 +12,7 @@ import {
   routingRefusal,
   unroutedProblems,
 } from "./app-checks.ts"
-import { type AppCommand, type StartedApp, startApp } from "./app-environment.ts"
+import { type AppCommand, inheritedEnv, type StartedApp, startApp } from "./app-environment.ts"
 import type { WorkerEnvironment } from "./environment.ts"
 import {
   type Service,
@@ -128,7 +128,7 @@ interface StackContext {
 async function startOne(app: StackApp, context: StackContext): Promise<StartedApp> {
   const { options, services } = context
   const env = ownEnv(app, context.urls)
-  const proxyEnv = services.proxy.env(process.env, {
+  const proxyEnv = services.proxy.env(inheritedEnv(app, process.env), {
     nodeShim: options.nodeShim ?? true,
     requireProxy: strictRouting(options),
   })

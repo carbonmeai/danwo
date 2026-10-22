@@ -31,6 +31,13 @@ export interface AppCommand {
    * joined with the proxy's rather than replacing it, so the app keeps danwo's preload.
    */
   readonly env?: Readonly<Record<string, string>>
+  /**
+   * What it inherits of danwo's own environment, under the proxy's variables and `env`: all of it
+   * (`true`, the default), only what a shell needs to run a command (`false`: `PATH`, `HOME`,
+   * `TMPDIR`, the locale and the like), or that plus the names listed, where `NEXT_PUBLIC_*`
+   * matches a prefix. Off, the CI's tokens and danwo's own model key never reach the app.
+   */
+  readonly inheritEnv?: boolean | readonly string[]
   /** How long to wait for it to answer; default two minutes, for a dev server's first build. */
   readonly timeoutMs?: number
   /**
@@ -70,6 +77,67 @@ const POLL_MS = 250
 const KEPT_LINES = 30
 /** Lines of the app's output kept for the flight record. */
 const LOGGED_LINES = 2_000
+
+/**
+ * What a command needs of the environment to run at all, on any platform: where programs are,
+ * the home and temporary folders, the user, the locale and the terminal. `LC_*` is kept too.
+ */
+const ESSENTIAL_VARIABLES = [
+  "PATH",
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "SHELL",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "LANG",
+  "LANGUAGE",
+  "LC_*",
+  "TERM",
+  "TZ",
+  "SYSTEMROOT",
+  "WINDIR",
+  "COMSPEC",
+  "PATHEXT",
+  "USERPROFILE",
+  "HOMEDRIVE",
+  "HOMEPATH",
+  "APPDATA",
+  "LOCALAPPDATA",
+  "PROGRAMDATA",
+  "PROGRAMFILES",
+  "PROGRAMFILES(X86)",
+  "NUMBER_OF_PROCESSORS",
+  "PROCESSOR_ARCHITECTURE",
+]
+
+/** Whether `name` is `pattern`, or starts with its prefix for a `PREFIX_*` pattern; any case. */
+function named(name: string, pattern: string): boolean {
+  const upper = name.toUpperCase()
+  const wanted = pattern.toUpperCase()
+
+  return wanted.endsWith("*") ? upper.startsWith(wanted.slice(0, -1)) : upper === wanted
+}
+
+/**
+ * What the app inherits of `base` (danwo's own environment), by its `inheritEnv`: all of it by
+ * default, else only the essentials and the names it lists. The proxy's variables go on top.
+ */
+export function inheritedEnv(
+  app: Pick<AppCommand, "inheritEnv">,
+  base: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
+  const inherit = app.inheritEnv ?? true
+
+  if (inherit === true) return base
+
+  const patterns = [...ESSENTIAL_VARIABLES, ...(inherit === false ? [] : inherit)]
+
+  return Object.fromEntries(
+    Object.entries(base).filter(([name]) => patterns.some((pattern) => named(name, pattern))),
+  )
+}
 
 /** Whether anything answers HTTP at `url` right now, whatever the status. */
 async function answers(url: string): Promise<boolean> {
@@ -315,7 +383,10 @@ export async function appEnvironment(
 
   try {
     if (typeof app === "object")
-      started = await startApp(app, services.proxy.env(process.env, { requireProxy: strict }))
+      started = await startApp(
+        app,
+        services.proxy.env(inheritedEnv(app, process.env), { requireProxy: strict }),
+      )
   } catch (error) {
     /* An app process that exited at start because it missed the proxy: say so, not only "exited". */
     const problems = await unroutedProblems(services.proxy)

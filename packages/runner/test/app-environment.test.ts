@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { resendInbox } from "@danwo/emulators"
-import { afterAll, describe, expect, it } from "vitest"
+import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { z } from "zod"
 
 import { appEnvironment, startApp } from "../src/runner/app-environment.ts"
@@ -237,6 +237,73 @@ describe("appEnvironment", () => {
       }),
     ).rejects.toThrow("exited with code 3")
   })
+})
+
+/** The environment the app at `url` started with, read from its `/env`. */
+async function appEnv(url: string | undefined) {
+  return z.record(z.string(), z.string()).parse(await (await fetch(`${url ?? ""}/env`)).json())
+}
+
+describe("what the app inherits of danwo's environment", () => {
+  /* A runner's secrets: the CI's token and danwo's own model key. */
+  const planted = {
+    AI_GATEWAY_API_KEY: "vck_planted_for_the_test",
+    GITHUB_TOKEN: "ghp_planted_for_the_test",
+    NEXT_PUBLIC_SITE: "shop",
+  }
+
+  beforeAll(() => {
+    Object.assign(process.env, planted)
+  })
+
+  afterAll(() => {
+    for (const name of Object.keys(planted)) Reflect.deleteProperty(process.env, name)
+  })
+
+  it("is all of it by default, as before", async () => {
+    const env = await appEnvironment({ app: await appCommand() })
+
+    try {
+      expect(await appEnv(env.baseUrl)).toMatchObject(planted)
+    } finally {
+      await env.close()
+    }
+  }, 30_000)
+
+  it("is only what a command needs to run when off, with the proxy's variables and its own on top", async () => {
+    const command = await appCommand({ OWN: "yes" })
+    const env = await appEnvironment({ app: { ...command, inheritEnv: false } })
+
+    try {
+      const seen = await appEnv(env.baseUrl)
+
+      expect(seen).not.toHaveProperty("AI_GATEWAY_API_KEY")
+      expect(seen).not.toHaveProperty("GITHUB_TOKEN")
+      expect(seen).not.toHaveProperty("NEXT_PUBLIC_SITE")
+      expect(seen).toMatchObject({ OWN: "yes", PORT: new URL(command.url).port })
+      expect(seen.PATH).toContain(process.env.PATH ?? "")
+      expect(seen.HTTPS_PROXY).toMatch(/^http:\/\/127\.0\.0\.1:\d+/)
+      expect(seen.NODE_OPTIONS).toContain("--import=")
+    } finally {
+      await env.close()
+    }
+  }, 30_000)
+
+  it("keeps the names a stack app lists, a prefix with *", async () => {
+    const command = await appCommand()
+    const env = await stackEnvironment({
+      apps: [{ name: "web", ...command, inheritEnv: ["NEXT_PUBLIC_*"] }],
+    })
+
+    try {
+      const seen = await appEnv(env.baseUrl)
+
+      expect(seen.NEXT_PUBLIC_SITE).toBe("shop")
+      expect(seen).not.toHaveProperty("AI_GATEWAY_API_KEY")
+    } finally {
+      await env.close()
+    }
+  }, 30_000)
 })
 
 describe("an app process that misses the proxy", () => {

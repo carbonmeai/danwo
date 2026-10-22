@@ -103,7 +103,15 @@ lines of output, or `(it printed nothing)`. Its output is kept in each run's fli
 `stackEnvironment({ apps, services })` starts a frontend, the API it calls, a worker and a local
 dev server together, all behind one proxy. Each app has its own `command`, `cwd`, `url`, `env` and
 `ready` rule; `dependsOn` sets the start order (apps with nothing between them start together), and
-`env` can be a function of the other apps' URLs, so the frontend points at the API it started:
+`env` can be a function of the other apps' URLs, so the frontend points at the API it started.
+`inheritEnv` (on `app` and on each stack app) says what the app inherits of danwo's own
+environment under the proxy's variables and `env`: `true` (default, backward compatible)
+everything; `false` only `PATH`, `HOME`, `USER`, `SHELL`, the temp folder, the locale (`LANG`,
+`LC_*`), `TERM`, `TZ` and Windows' system variables; a list adds those names, `NAME_*` matching a
+prefix. The default lets the runner's secrets (CI tokens, cloud keys, danwo's own
+`AI_GATEWAY_API_KEY`) reach the app under test, where it may log or send them and records redact
+only values danwo knows; `inheritEnv: false` closes that, at the cost of naming every variable the
+app needs. Live-key warnings check the inherited environment, so fewer fire with it off:
 
 ```ts
 environment: async () => {

@@ -83,6 +83,37 @@ the app fails to start. Every command gets an empty stdin, so nothing waits on a
   compose says which container it was.
 </Callout>
 
+## Keep the runner's secrets from the app
+
+By default an app inherits danwo's whole environment, so its own variables (a `DATABASE_URL`, a
+`.env` you exported) just work. So do the runner's: a CI token, or danwo's own model key. Set
+`inheritEnv` to keep those out:
+
+```ts title="danwo.config.ts · what the app inherits"
+{
+  name: "web",
+  command: "pnpm dev",
+  url: "http://localhost:3000",
+  inheritEnv: ["DATABASE_URL", "NEXT_PUBLIC_*"],
+  env: { STRIPE_SECRET_KEY: "sk_test_danwo" },
+}
+```
+
+| `inheritEnv`     | The app inherits                                                     |
+| ---------------- | -------------------------------------------------------------------- |
+| `true` (default) | everything danwo's process has                                       |
+| `false`          | only what a shell needs: `PATH`, `HOME`, the temp folder, the locale |
+| a list of names  | that, plus the names listed; `NEXT_PUBLIC_*` matches a prefix        |
+
+danwo's proxy variables and the app's own `env` always go on top.
+
+<Callout type="info">
+  The default is convenient, and it is a trade-off. Whatever your CI exports (`GITHUB_TOKEN`, cloud
+  keys, `AI_GATEWAY_API_KEY`) reaches the app under test, which may log it or send it on. Records
+  hide only the secrets danwo knows. On shared CI, prefer `inheritEnv: false` and name what the app
+  needs.
+</Callout>
+
 ## Wire one app to another
 
 `env` adds variables to an app's environment. Make it a function and it receives every app's
