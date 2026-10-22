@@ -27,6 +27,7 @@ import { type AndroidTools, androidTools } from "../toolchain.ts"
 import { deviceNodes } from "../tree.ts"
 import { AndroidApp, type AppOptions } from "./app.ts"
 import { AndroidBinder } from "./binder.ts"
+import { composeNodes } from "./compose.ts"
 import { type EmulatorOptions, type RunningEmulator, useEmulator } from "./emulator.ts"
 import { filmScreen } from "./screen-film.ts"
 
@@ -200,7 +201,7 @@ export class AndroidDevice implements DeviceTarget {
 
     for (;;) {
       try {
-        return { nodes: deviceNodes(await this.driver.snapshot()) }
+        return { nodes: deviceNodes(composeNodes(await this.driver.snapshot())) }
       } catch (error) {
         if (Date.now() >= deadline) throw error
 
