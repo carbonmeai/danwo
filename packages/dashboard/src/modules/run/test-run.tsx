@@ -242,7 +242,7 @@ export function TestRunSkeleton({
         <StatCardSkeleton label="Time" icon={<Icons.clock size={13} />} />
         <StatCardSkeleton label="Model spend" icon={<Icons.dollar size={13} />} />
       </StatCards>
-      <PanelTable label="Tests in this run" columns={TEST_RUN_COLUMNS}>
+      <PanelTable label="Tests in this run" layout={TEST_RUN_COLUMNS}>
         <Repeat count={SKELETON_ROWS}>{(i) => <TestLineSkeleton key={i} i={i} />}</Repeat>
       </PanelTable>
     </Page>
@@ -308,7 +308,7 @@ export function TestRun({
         />
       </StatCards>
       <BrokenFiles run={run} />
-      <PanelTable label="Tests in this run" columns={TEST_RUN_COLUMNS} bodyRef={list}>
+      <PanelTable label="Tests in this run" layout={TEST_RUN_COLUMNS} bodyRef={list}>
         {tests.map((test, i) => (
           <TestLine
             key={`${test.id} ${test.browser ?? ""}`}

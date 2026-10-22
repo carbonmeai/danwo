@@ -24,7 +24,7 @@ export function RunsSkeleton({ kind }: { readonly kind?: RunKind | undefined }) 
         filters={<Repeat count={4}>{(i) => <ChoiceSkeleton key={i} />}</Repeat>}
         count={<Bone w="5rem" />}
       />
-      <PanelTable label="Runs" columns={RUN_COLUMNS}>
+      <PanelTable label="Runs" layout={RUN_COLUMNS}>
         <Repeat count={ROWS}>{(i) => <RunLineSkeleton key={i} i={i} />}</Repeat>
       </PanelTable>
     </Page>

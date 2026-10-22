@@ -310,7 +310,7 @@ function TestsTable({
   return (
     <PanelTable
       label="Tests"
-      columns={testColumns(shown.length > 0 && shown.every((row) => picked.has(row.id)), (on) =>
+      layout={testColumns(shown.length > 0 && shown.every((row) => picked.has(row.id)), (on) =>
         setPicked(on ? new Set(shown.map((row) => row.id)) : new Set()),
       )}
     >

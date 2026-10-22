@@ -195,7 +195,7 @@ const SKELETON_ROWS = 8
 /** {@link TestTable} while the tests load: the same headings, the rows as bones. */
 export function TestTableSkeleton({ sorting }: { readonly sorting: TableOrder }) {
   return (
-    <PanelTable label="Tests" columns={testTableColumns(sorting)}>
+    <PanelTable label="Tests" layout={testTableColumns(sorting)}>
       <Repeat count={SKELETON_ROWS}>
         {(i) => (
           <BoneRow key={i}>
@@ -245,7 +245,7 @@ export function TestTable({
   const current = useListKeys(list, sorted.length)
 
   return (
-    <PanelTable label="Tests" columns={testTableColumns(sorting)} bodyRef={list}>
+    <PanelTable label="Tests" layout={testTableColumns(sorting)} bodyRef={list}>
       {sorted.map((row, i) => (
         <BreakdownLine key={row.id} row={row} current={i === current} />
       ))}

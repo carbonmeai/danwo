@@ -73,13 +73,14 @@ function minWidths(columns: readonly TableColumn[]): CSSProperties {
  */
 export function PanelTable({
   label,
-  columns,
+  layout: columns,
   bodyRef,
   after,
   children,
 }: {
   readonly label: string
-  readonly columns: readonly TableColumn[]
+  /** Each column's heading and width, named apart from the CSS `columns` property. */
+  readonly layout: readonly TableColumn[]
   readonly bodyRef?: RefObject<HTMLTableSectionElement | null>
   /** What sits on the panel under the table, such as a note that nothing matched. */
   readonly after?: ReactNode

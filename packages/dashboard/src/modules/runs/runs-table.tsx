@@ -181,7 +181,7 @@ export function RunsTable({
   return (
     <PanelTable
       label="Runs"
-      columns={RUN_COLUMNS}
+      layout={RUN_COLUMNS}
       bodyRef={list}
       after={
         shown.length === 0 ? (

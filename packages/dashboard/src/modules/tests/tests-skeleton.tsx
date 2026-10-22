@@ -47,7 +47,7 @@ export function TestsSkeleton() {
       loading="Loading the tests"
     >
       <TestsLayout side={<GroupsSkeleton />}>
-        <PanelTable label="Tests" columns={testColumns(false)}>
+        <PanelTable label="Tests" layout={testColumns(false)}>
           <Repeat count={ROWS}>{(i) => <TestRowSkeleton key={i} i={i} />}</Repeat>
         </PanelTable>
       </TestsLayout>

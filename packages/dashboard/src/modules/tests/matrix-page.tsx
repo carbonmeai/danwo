@@ -74,7 +74,7 @@ const MATRIX_DETAIL =
 export function MatrixPageSkeleton() {
   return (
     <Page crumbs={["Matrix"]} title="Matrix" detail={MATRIX_DETAIL} loading="Loading the matrix">
-      <PanelTable label="Tests under the matrix" columns={MATRIX_COLUMNS}>
+      <PanelTable label="Tests under the matrix" layout={MATRIX_COLUMNS}>
         <Repeat count={SKELETON_ROWS}>
           {(i) => (
             <BoneRow key={i}>
@@ -115,7 +115,7 @@ export function MatrixPage({ rows }: { readonly rows: readonly TestRow[] }) {
           command="danwo matrix <test file>"
         />
       ) : (
-        <PanelTable label="Tests under the matrix" columns={MATRIX_COLUMNS}>
+        <PanelTable label="Tests under the matrix" layout={MATRIX_COLUMNS}>
           {sorted.map((row) => (
             <TableRow key={row.id} data-row>
               <TableCell minW="16rem" px="3" whiteSpace="normal">
