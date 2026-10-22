@@ -1,0 +1,21 @@
+# Every text file checks out with LF on every platform, Windows included: tests, goldens and
+# fixtures compare exact text, and the formatter writes LF.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.mp3 binary
+*.mp4 binary
+*.webm binary
+*.woff binary
+*.woff2 binary
+*.zip binary
+*.tgz binary
+*.sqlite binary
+*.db binary
+*.wasm binary
+*.pdf binary
