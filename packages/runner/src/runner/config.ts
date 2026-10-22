@@ -179,8 +179,8 @@ export interface DanwoConfig {
     readonly workers?: number
     /**
      * How long a faulted run's checks wait: at most `factor` times (default 3) as long as the same
-     * check took in the clean run, and at least `floorMs` (default 1000, and 6000 on a device). `false` keeps every
-     * check's normal timeout.
+     * check took in the clean run, and at least `floorMs` (default 1000; 6000 on a device, where
+     * pacing starts once the trial's fault has fired). `false` keeps every check's normal timeout.
      */
     readonly checkPace?: false | { readonly factor?: number; readonly floorMs?: number }
     /**

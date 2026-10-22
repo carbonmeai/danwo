@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
 
 import { type CheckPace, checkKey, pacedTimeout } from "../src/assert/pace.ts"
+import type { Backend, BackendEvent } from "../src/browser/readiness.ts"
 import { DeviceLocator } from "../src/device/locator.ts"
 import { resolveChain, textMatches } from "../src/device/match.ts"
 import { devicePace, type DeviceSession, openDeviceSession } from "../src/device/session.ts"
@@ -131,7 +132,12 @@ afterEach(async () => {
 
 async function open(
   device: FakeDevice,
-  extra: { artifactsDir?: string; assertionTimeout?: number; checkPace?: CheckPace } = {},
+  extra: {
+    artifactsDir?: string
+    assertionTimeout?: number
+    checkPace?: CheckPace
+    backend?: Backend
+  } = {},
 ): Promise<DeviceSession> {
   return openDeviceSession(device, {
     baseUrl: "http://127.0.0.1:1",
@@ -447,6 +453,34 @@ describe("expect on a device", () => {
     await expect(check(screen.getByTestId("credits")).toHaveText("Credits: 1000")).rejects.toThrow(
       "failed after 650 ms",
     )
+  })
+
+  it("paces a check only once the attempt's own fault has fired", async () => {
+    const label = 'getByTestId("credits") toHaveText("Credits: 1000")'
+    /* A fault from an earlier trial on the same worker is already in the history. */
+    const calls: BackendEvent[] = [
+      { signature: "POST api.stripe.com/v1/refunds", fault: "status 500" },
+    ]
+    const backend: Backend = {
+      quiet: async () => undefined,
+      activity: () => ({ calls, deliveries: [] }),
+    }
+    const { screen, expect: check } = await open(new FakeDevice(), {
+      assertionTimeout: 1_500,
+      backend,
+      checkPace: {
+        took: {
+          [checkKey(1, "expect.toHaveText", label)]: 50,
+          [checkKey(2, "expect.toHaveText", label)]: 50,
+        },
+        floorMs: 100,
+      },
+    })
+    const credits = () => check(screen.getByTestId("credits")).toHaveText("Credits: 1000")
+
+    await expect(credits()).rejects.toThrow("failed after 1500 ms")
+    calls.push({ signature: "webhook checkout.session.completed", fault: "duplicate" })
+    await expect(credits()).rejects.toThrow("failed after 650 ms")
   })
 
   it("waits at least six seconds for a paced check on a device, unless the config sets a floor", () => {

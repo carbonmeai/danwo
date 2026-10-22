@@ -311,6 +311,35 @@ export function devicePace(pace: CheckPace): CheckPace {
   return { ...pace, floorMs: pace.floorMs ?? DEVICE_PACE_FLOOR_MS }
 }
 
+/** How many of the backend's calls and deliveries so far carried an injected fault. */
+function faultsSoFar(backend: Backend | undefined): number {
+  const activity = backend?.activity?.()
+
+  if (activity === undefined) return 0
+
+  return [...activity.calls, ...activity.deliveries].filter((event) => event.fault !== null).length
+}
+
+/**
+ * A device's paced check timeouts. Pacing cuts short a check that waits for what a fault made
+ * impossible, so it starts once this attempt's fault has fired: until then the app runs as in the
+ * clean run, and a check waits its whole timeout however slowly the device gets there. A backend
+ * that does not say what it did is paced throughout.
+ */
+function devicePacer(
+  pace: CheckPace,
+  steps: StepRecorder,
+  redact: (text: string) => string,
+  backend: Backend | undefined,
+): (api: string, label: string, fallback: number) => number {
+  const paced = pacer(devicePace(pace), steps, redact)
+  const before = faultsSoFar(backend)
+  const known = backend?.activity !== undefined
+
+  return (api, label, fallback) =>
+    !known || faultsSoFar(backend) > before ? paced(api, label, fallback) : fallback
+}
+
 /** Opens an attempt on `target`: the app is reset and launched first. */
 export async function openDeviceSession(
   target: DeviceTarget,
@@ -337,7 +366,7 @@ export async function openDeviceSession(
     assertionTimeout: options.assertionTimeout ?? DEFAULT_ASSERTION_MS,
     ready,
     ...(options.checkPace && {
-      checkTimeout: pacer(devicePace(options.checkPace), steps, vault.redact),
+      checkTimeout: devicePacer(options.checkPace, steps, vault.redact, options.backend),
     }),
     shots: shotsOf(options, steps),
   }

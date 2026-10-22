@@ -197,9 +197,9 @@ Replay follows the web's rules:
 - **Relocation.** With `similar-v1` (the default) a renamed element is found by role and likeness
   of its name; with `exact`, never.
 - **Strict stop.** `danwo matrix` replays only: a step that no longer replays stops the agent there,
-  and the invariant judges the state. A step with no recording fails. A paced check waits at least
-  6 s on a device (`matrix.checkPace.floorMs` sets another floor): an in-app browser can take
-  seconds longer to open than it did in the clean run.
+  and the invariant judges the state. A step with no recording fails. On a device a trial's checks
+  are paced only once its fault has fired, and wait at least 6 s (`matrix.checkPace.floorMs` sets
+  another floor): an in-app browser can take seconds longer to open than in the clean run.
 - **Effects.** A replay must change the screen and the services behind it as its recording did.
   Calls the proxy blocked (the device's background traffic, `ANDROID_BACKGROUND_HOSTS` with Chrome's
   notification and the Google apps' ad pings) are not effects.
