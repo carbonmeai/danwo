@@ -84,7 +84,7 @@ Over it, the plan is narrowed step by step, the same way every time, until it fi
 4. what is still over the budget is cut: races and webhooks first, then writes, then sockets,
    then reads.
 
-The run says what it left out, e.g. `1999 of 2039 faults left out: 1608 on setup, 278 on repeats
+The run says what it left out, e.g. `1999 of 2039 possible faults left out: 1608 on setup, 278 on repeats
 of a route or statement, 71 lesser fault kinds, 42 over the budget`, and the dashboard's matrix
 page shows the same counts. `--all` runs every fault on the body, `--thorough` keeps every fault
 kind, `--every-occurrence` faults every repeat.

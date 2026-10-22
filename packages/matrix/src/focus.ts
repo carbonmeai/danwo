@@ -379,6 +379,6 @@ export function focusLines(focused: FocusedPlan): string[] {
   return parts.length === 0
     ? []
     : [
-        `${focused.total - focused.trials.length} of ${focused.total} faults left out: ${parts.join(", ")}`,
+        `${focused.total - focused.trials.length} of ${focused.total} possible faults left out: ${parts.join(", ")}`,
       ]
 }

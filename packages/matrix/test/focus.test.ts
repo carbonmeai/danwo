@@ -205,7 +205,7 @@ describe("focusPlan", () => {
       focused.trials.some((fault) => fault.label.includes("POST api.stripe.com/v1/customers")),
     ).toBe(true)
     expect(focused.trials.every((fault) => !fault.label.includes("#"))).toBe(true)
-    expect(focusLines(focused)[0]).toMatch(/^\d+ of \d+ faults left out: \d+ on setup, /)
+    expect(focusLines(focused)[0]).toMatch(/^\d+ of \d+ possible faults left out: \d+ on setup, /)
   })
 
   it("keeps a decline and a 5xx ahead of a lost connection when it thins a write's faults", () => {

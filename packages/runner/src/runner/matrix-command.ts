@@ -261,7 +261,7 @@ function selectFaults(plan: readonly PlannedFault[], filter: string | undefined)
 function planLine(kept: number, of: number, filter: string | undefined): string {
   return filter === undefined
     ? `clean run passed; ${kept} faults planned`
-    : `clean run passed; ${kept} of ${of} planned faults match /${filter}/`
+    : `clean run passed; ${kept} faults planned from the ${of} possible, narrowed to /${filter}/`
 }
 
 /** How the faulted trials are handed out. */

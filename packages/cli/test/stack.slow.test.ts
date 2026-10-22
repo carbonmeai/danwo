@@ -129,7 +129,9 @@ describe("a stack of apps behind one proxy", () => {
   it("plans socket and event faults from the clean run", async () => {
     const { out } = await danwo(["matrix", "tests/stack.danwo.ts", "--faults", "WS |inngest"])
 
-    expect(out).toContain("clean run passed; 5 of 9 planned faults match /WS |inngest/")
+    expect(out).toContain(
+      "clean run passed; 5 faults planned from the 9 possible, narrowed to /WS |inngest/",
+    )
     expect(out).toContain("upgrade refused on WS 127.0.0.1/live")
     expect(out).toContain("connection dropped on WS 127.0.0.1/live")
     expect(out).toContain("status 500 on POST inngest.danwo.test/e/dev")
@@ -147,7 +149,7 @@ describe("a stack of apps behind one proxy", () => {
     /* The setup added a task first, yet the body's own Stripe call is its first occurrence. */
     expect(out).toContain("status 500 on POST api.stripe.com/v1/customers\n")
     expect(out).not.toMatch(/on POST api\.stripe\.com\/v1\/customers #2/)
-    expect(out).toMatch(/\d+ of \d+ faults left out: \d+ on setup/)
+    expect(out).toMatch(/\d+ of \d+ possible faults left out: \d+ on setup/)
     expect(out).toMatch(/about \d+(–\d+)? (s|min) for \d+ trials on \d+ workers/)
     expect(out).not.toContain("faulted runs stop")
   }, 300_000)

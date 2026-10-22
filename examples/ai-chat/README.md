@@ -129,7 +129,7 @@ npm run matrix
 
 ```text
 clean run passed; 49 faults planned
-38 of 87 faults left out: 38 on repeats of a route or statement
+38 of 87 possible faults left out: 38 on repeats of a route or statement
 PASS  status 429 on POST ai-gateway.vercel.sh/v4/ai/language-model
 PASS  status 500 on POST ai-gateway.vercel.sh/v4/ai/language-model
 PASS  reset-after on POST ai-gateway.vercel.sh/v4/ai/language-model
