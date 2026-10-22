@@ -1,4 +1,5 @@
-import { mkdtemp, rm } from "node:fs/promises"
+import { spawn } from "node:child_process"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -43,7 +44,7 @@ vi.mock("agent-device", () => ({
   }),
 }))
 
-const { AgentDeviceDriver } = await import("../src/agent-device.ts")
+const { AgentDeviceDriver, stopDaemon } = await import("../src/agent-device.ts")
 
 let dir: string | undefined
 
@@ -112,5 +113,30 @@ describe("the agent-device driver", () => {
     await expect(opened.screenshot("/nonexistent/x.png")).resolves.toBe(true)
     await opened.close()
     expect(calls).toEqual(["open com.danwo.shopmobile", "press", "close shutdown=false"])
+  })
+})
+
+describe("the driver's daemon", () => {
+  it("is stopped when it keeps its state in the driver's directory, and only then", async () => {
+    dir = await mkdtemp(join(tmpdir(), "danwo-daemon-"))
+
+    const daemon = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+      stdio: "ignore",
+    })
+    const exited = new Promise((resolve) => daemon.once("exit", resolve))
+    const pid = daemon.pid ?? 0
+
+    try {
+      await writeFile(join(dir, "daemon.json"), JSON.stringify({ pid, stateDir: "/elsewhere" }))
+      await stopDaemon(dir)
+      expect(daemon.exitCode).toBeNull()
+
+      await writeFile(join(dir, "daemon.json"), JSON.stringify({ pid, stateDir: dir }))
+      await stopDaemon(dir)
+      await expect(exited).resolves.toBeNull()
+      expect(daemon.signalCode).toBe("SIGTERM")
+    } finally {
+      daemon.kill()
+    }
   })
 })

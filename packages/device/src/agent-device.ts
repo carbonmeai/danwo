@@ -3,8 +3,10 @@
  * the run's own directory (never `~/.agent-device`), so a stray daemon can never take the session;
  * its update check is off, so a run makes no network calls of its own. Actions skip the driver's own
  * wait for the screen to settle: the runner waits for the app and its services after every action.
+ * Closing the driver stops that daemon, so a run leaves nothing running.
  */
-import { mkdir } from "node:fs/promises"
+import { mkdir, readFile } from "node:fs/promises"
+import { join } from "node:path"
 
 import { type AgentDeviceClient, createAgentDeviceClient } from "agent-device"
 
@@ -189,8 +191,43 @@ export class AgentDeviceDriver implements DeviceDriver {
     }
   }
 
+  /** Ends the session, then the run's own daemon, which would otherwise idle on for minutes. */
   async close(): Promise<void> {
     await this.client?.sessions.close({ shutdown: false }).catch(() => undefined)
     this.client = undefined
+    await stopDaemon(this.options.stateDir)
   }
+}
+
+/** How long a stopped daemon may take to release its claims and exit. */
+const DAEMON_EXIT_MS = 5_000
+
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Stops the daemon that keeps its state in `stateDir`, the one this driver started: it writes its
+ * pid there and exits cleanly on SIGTERM. A daemon for another directory is never touched.
+ */
+export async function stopDaemon(stateDir: string): Promise<void> {
+  const info: unknown = await readFile(join(stateDir, "daemon.json"), "utf8")
+    .then((text): unknown => JSON.parse(text))
+    .catch(() => undefined)
+  const pid = typeof info === "object" && info !== null ? Reflect.get(info, "pid") : undefined
+  const dir = typeof info === "object" && info !== null ? Reflect.get(info, "stateDir") : undefined
+
+  if (typeof pid !== "number" || dir !== stateDir || !alive(pid)) return
+
+  process.kill(pid, "SIGTERM")
+
+  const deadline = Date.now() + DAEMON_EXIT_MS
+
+  while (alive(pid) && Date.now() < deadline) await sleep(100)
 }
