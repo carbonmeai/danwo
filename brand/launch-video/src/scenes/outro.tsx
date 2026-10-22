@@ -83,7 +83,7 @@ export function Outro() {
         }}
       >
         danwo.dev <span style={{ color: C.faint, margin: "0 18px" }}>·</span>
-        <span style={{ color: C.muted }}>Open source, Apache-2.0</span>
+        <span style={{ color: C.muted }}>Open-source e2e testing for web and mobile apps</span>
       </div>
       <div
         style={{

@@ -1,6 +1,6 @@
 import { AbsoluteFill, Img, interpolate, staticFile, useCurrentFrame } from "remotion"
 
-import { clamp, ease, Exit, Sfx, Words } from "../kit.tsx"
+import { clamp, ease, Exit, Mono, Sfx, Words } from "../kit.tsx"
 import { C } from "../theme.ts"
 
 /** The frame the music drops on, and the mark lands. */
@@ -73,6 +73,7 @@ export function Reveal() {
   const solid = interpolate(frame, [DROP - 1, DROP], [0, 1], clamp)
   const settle = ease(frame, DROP + 2, 26)
   const wipe = ease(frame, DROP + 10, 30)
+  const kicker = ease(frame, DROP + 16, 20)
   const burst = interpolate(frame, [DROP, DROP + 34], [0, 1], {
     ...clamp,
     easing: (t) => 1 - (1 - t) ** 3,
@@ -132,7 +133,26 @@ export function Reveal() {
             style={{ width: "100%", display: "block" }}
           />
         </div>
-        <div style={{ position: "absolute", top: 640, left: 0, right: 0, textAlign: "center" }}>
+        <div
+          style={{
+            position: "absolute",
+            top: 600,
+            left: 0,
+            right: 0,
+            textAlign: "center",
+            opacity: kicker,
+            transform: `translateY(${(1 - kicker) * 12}px)`,
+          }}
+        >
+          <Mono
+            size={26}
+            color={C.muted}
+            style={{ textTransform: "uppercase", letterSpacing: "0.12em" }}
+          >
+            Open-source e2e testing for web and mobile apps
+          </Mono>
+        </div>
+        <div style={{ position: "absolute", top: 670, left: 0, right: 0, textAlign: "center" }}>
           <Words text="Drive the UI." start={DROP + 22} size={84} />
           <Words text="Judge everything behind it." start={DROP + 32} size={84} color={C.muted} />
         </div>
