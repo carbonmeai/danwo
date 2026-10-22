@@ -46,11 +46,11 @@
     "express-openid-connect": "3.4.0",
     "google-auth-library": "11.3.1",
     "https-proxy-agent": "7.0.6",
-    "openai": "7.38.0",
+    "openai": "7.39.0",
     "resend": "6.34.1",
     "stripe": "23.0.0",
     "twilio": "6.2.0",
-    "undici": "8.12.2",
+    "undici": "8.12.3",
     "ws": "8.22.0",
     "zod": "4.6.7"
   },

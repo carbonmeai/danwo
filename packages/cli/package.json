@@ -53,7 +53,7 @@
     "express": "5.3.0",
     "ioredis": "6.0.0",
     "nylas": "8.4.0",
-    "openai": "7.38.0",
+    "openai": "7.39.0",
     "openid-client": "6.8.8",
     "pg": "8.23.1",
     "pusher": "5.3.4",

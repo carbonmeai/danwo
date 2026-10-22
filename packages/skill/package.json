@@ -36,7 +36,7 @@
     "@danwo/proxy": "workspace:*",
     "@danwo/runner": "workspace:*",
     "@danwo/sdk": "workspace:*",
-    "oxc-parser": "0.154.0"
+    "oxc-parser": "0.155.0"
   },
   "engines": {
     "node": "^22.22.3 || >=24.11.1"
