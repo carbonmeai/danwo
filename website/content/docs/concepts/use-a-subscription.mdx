@@ -92,9 +92,9 @@ credentials.
 
 ## Claude plans through their API credits
 
-If your Claude Max or Team plan includes monthly API credits, use them as an Anthropic API key.
-Create a key in the Claude Console and set it as `ANTHROPIC_API_KEY`. No new code is needed: the
-Anthropic model source reads that variable.
+Claude Max and Team plans come with monthly API credits, and an Anthropic API key spends them.
+Link a Claude Console organization to your plan, create a key in it and set it as
+`ANTHROPIC_API_KEY`. No new code is needed: the Anthropic model source reads that variable.
 
 ```ts title="danwo.config.ts · the model"
 import { anthropic } from "@ai-sdk/anthropic"
