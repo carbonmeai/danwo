@@ -7,7 +7,7 @@ import { locatorCode, parseLocator } from "@danwo/recorder"
 import { parseFault } from "@danwo/runner/runner"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
-import { initProject, initReport } from "../src/init.ts"
+import { clientCommand, initProject, initReport } from "../src/init.ts"
 import { snapshotChange } from "../src/sessions/diff.ts"
 
 describe("locator expressions", () => {
@@ -121,11 +121,11 @@ describe("danwo init", () => {
   })
 
   afterEach(async () => {
-    await rm(dir, { recursive: true, force: true })
+    await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   })
 
   it("creates the three client configs, then leaves them alone", async () => {
-    const first = await initProject({ cwd: dir, skill: false })
+    const first = await initProject({ cwd: dir, skill: false, platform: "linux" })
 
     expect(first.map((change) => change.outcome)).toEqual(["created", "created", "created"])
     expect(JSON.parse(await readFile(join(dir, ".mcp.json"), "utf8"))).toEqual({
@@ -134,9 +134,21 @@ describe("danwo init", () => {
     expect(await readFile(join(dir, ".codex/config.toml"), "utf8")).toBe(
       '[mcp_servers.danwo]\ncommand = "npx"\nargs = ["@danwo/cli","mcp"]\n',
     )
-    expect(initReport(await initProject({ cwd: dir, skill: false }))).toBe(
+    expect(initReport(await initProject({ cwd: dir, skill: false, platform: "linux" }))).toBe(
       "unchanged .mcp.json\nunchanged .cursor/mcp.json\nunchanged .codex/config.toml",
     )
+  })
+
+  it("starts npx through cmd /c on Windows, where clients start a server without a shell", async () => {
+    await initProject({ cwd: dir, skill: false, platform: "win32" })
+
+    expect(JSON.parse(await readFile(join(dir, ".mcp.json"), "utf8"))).toEqual({
+      mcpServers: { danwo: { command: "cmd", args: ["/c", "npx", "@danwo/cli", "mcp"] } },
+    })
+    expect(await readFile(join(dir, ".codex/config.toml"), "utf8")).toBe(
+      '[mcp_servers.danwo]\ncommand = "cmd"\nargs = ["/c","npx","@danwo/cli","mcp"]\n',
+    )
+    expect(clientCommand(["node", "server.js"], "win32")).toEqual(["node", "server.js"])
   })
 
   it("merges into existing configs, keeping their other servers", async () => {
@@ -150,7 +162,12 @@ describe("danwo init", () => {
       'model = "o5"\n\n[mcp_servers.danwo]\ncommand = "old"\n\n[mcp_servers.other]\ncommand = "other"\n',
     )
 
-    const changes = await initProject({ cwd: dir, starterConfig: true, skill: false })
+    const changes = await initProject({
+      cwd: dir,
+      starterConfig: true,
+      skill: false,
+      platform: "linux",
+    })
 
     expect(changes.map((change) => `${change.outcome} ${change.file}`)).toEqual([
       "updated .mcp.json",
@@ -191,7 +208,12 @@ describe("danwo init", () => {
       JSON.stringify({ servers: { other: { type: "http", url: "http://x.test" } } }),
     )
 
-    const changes = await initProject({ cwd: dir, clients: [".vscode/mcp.json"], skill: false })
+    const changes = await initProject({
+      cwd: dir,
+      clients: [".vscode/mcp.json"],
+      skill: false,
+      platform: "linux",
+    })
 
     expect(changes.map((change) => `${change.outcome} ${change.file}`)).toEqual([
       "updated .vscode/mcp.json",

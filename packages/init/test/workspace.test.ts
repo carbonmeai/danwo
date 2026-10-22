@@ -2,6 +2,7 @@ import { existsSync } from "node:fs"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 
+import { clientCommand } from "@danwo/mcp"
 import { describe, expect, it } from "vitest"
 
 import { detectProject } from "../src/detect.ts"
@@ -172,10 +173,11 @@ describe("danwo init in a workspace package", () => {
     expect(existsSync(join(app, "package-lock.json"))).toBe(false)
     expect(existsSync(join(root, ".claude/skills/danwo/SKILL.md"))).toBe(true)
     expect(existsSync(join(app, ".claude"))).toBe(false)
+    /* Through `cmd /c` on Windows, where pnpm is a `.cmd` script. */
+    const [command, ...args] = clientCommand(["pnpm", "--dir", "apps/web", "exec", "danwo", "mcp"])
+
     expect(JSON.parse(await readFile(join(root, ".mcp.json"), "utf8"))).toMatchObject({
-      mcpServers: {
-        danwo: { command: "pnpm", args: ["--dir", "apps/web", "exec", "danwo", "mcp"] },
-      },
+      mcpServers: { danwo: { command, args } },
     })
     expect(summary).toContain("../../.mcp.json")
     expect(existsSync(join(app, "danwo.config.ts"))).toBe(true)

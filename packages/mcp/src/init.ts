@@ -27,6 +27,8 @@ export interface InitOptions {
    * `.codex/config.toml` and `.vscode/mcp.json`. Default the first three.
    */
   readonly clients?: readonly string[]
+  /** The platform the clients run on; default this one. */
+  readonly platform?: NodeJS.Platform
 }
 
 export interface InitChange {
@@ -150,8 +152,24 @@ async function apply(
   return { file, outcome }
 }
 
+/** The launchers that are `.cmd` scripts on Windows. */
+const CMD_SCRIPTS = new Set(["npx", "npm", "pnpm", "yarn"])
+
+/**
+ * `command` as an MCP client starts it on `platform`. Clients on Windows start a server without
+ * a shell, and `npx` there is `npx.cmd`, which only `cmd.exe` runs: so it goes through `cmd /c`.
+ */
+export function clientCommand(
+  command: readonly string[],
+  platform: NodeJS.Platform = process.platform,
+): readonly string[] {
+  return platform === "win32" && CMD_SCRIPTS.has(command[0] ?? "")
+    ? ["cmd", "/c", ...command]
+    : command
+}
+
 export async function initProject(options: InitOptions): Promise<InitChange[]> {
-  const command = options.command ?? ["npx", "@danwo/cli", "mcp"]
+  const command = clientCommand(options.command ?? ["npx", "@danwo/cli", "mcp"], options.platform)
   const [program, ...args] = command
   const changes: InitChange[] = []
   const clients = new Set(options.clients ?? DEFAULT_CLIENTS)
