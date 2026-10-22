@@ -8,8 +8,8 @@
 <h3 align="center">dánwò</h3>
 
 <p align="center">
-  The open-source testing framework that drives your app through its UI like a user,<br>
-  and then checks everything that happened behind it.
+  The open-source end-to-end testing framework for web and mobile apps.<br>
+  Drive your app through its UI like a user, and check what happened behind it when you need to.
   <br>
   <a href="https://danwo.dev"><strong>Learn more »</strong></a>
 </p>
@@ -17,6 +17,7 @@
 <p align="center">
   <a href="https://danwo.dev/docs/quickstart">Quickstart</a> ·
   <a href="https://danwo.dev/docs">Docs</a> ·
+  <a href="https://danwo.dev/docs/what-you-can-test">What you can test</a> ·
   <a href="https://danwo.dev/docs/fault-matrix">Fault matrix</a> ·
   <a href="https://danwo.dev/docs/coding-agents">Coding agents</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
@@ -31,16 +32,33 @@
 
 <br>
 
-A test that clicks "Pay" and sees "Thank you" proves little. Was the card charged once? Did the
-webhook arrive? Was one email sent? danwo checks all of it, then breaks the run on purpose to see
-what your app does when a provider fails.
+danwo is a complete UI testing framework on its own: locators, plain-English agent steps that
+replay with no model calls, and screenshot comparison, in a browser, on Android or on iOS. When
+your app takes payments, sends email or handles webhooks, turn on the backend layer: emulated
+providers, invariants and a fault matrix.
 
-|                            |                                                                                                                                       |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| **Drives your app**        | In a browser, on Android or on iOS, with locators, plain-English agent steps, or both. Agent steps replay later with no model calls.  |
-| **Emulates the providers** | Stripe, Clerk, Resend, Google, Slack and 20 more answer from local emulators behind a proxy. No sandbox keys, no code changes.        |
-| **Breaks it on purpose**   | `danwo matrix` reruns a test once per fault: 500s, declines, duplicate webhooks, lost database commits. An invariant judges each run. |
-| **Explains every run**     | A flight record with video, steps, calls, webhooks and database statements, in a dashboard, a PR comment and over MCP.                |
+## A test
+
+```ts
+import { test } from "@danwo/sdk"
+
+test("signs up", async ({ app, screen, expect }) => {
+  await app.open("/sign-up")
+  await screen.getByLabel("Email").fill("ada@example.com")
+  await screen.getByLabel("Password").fill("correct horse battery staple")
+  await screen.getByRole("button", { name: "Create account" }).click()
+
+  await expect(screen.getByRole("heading", { name: "Welcome, Ada" })).toBeVisible()
+})
+```
+
+No providers, keys or model. Steps can also be plain English, recorded once and replayed after:
+
+```ts
+await agent.act("add two blue mugs to the basket and go to checkout")
+await agent.assert("the basket shows two blue mugs")
+await expect(screen).toHaveScreenshot("checkout")
+```
 
 ## Quickstart
 
@@ -48,18 +66,22 @@ You need Node.js 22.22.3 or a later 22, or 24.11.1 or newer. In your app's folde
 
 ```sh
 npx @danwo/cli init
-npx @danwo/cli install-browser
 npm run test:danwo
 ```
 
-`init` asks what to test, which providers to emulate and which coding agents to set up, then
-writes a config and a first test that passes. See the [quickstart](https://danwo.dev/docs/quickstart).
+`init` asks what to test, which model and providers to use (pick none for a UI-only start) and
+which coding agents to set up. It writes a config and a first test that passes, and installs the
+browser. See the [quickstart](https://danwo.dev/docs/quickstart).
 
-## A test
+## Add the backend layer when you need it
+
+|                            |                                                                                                                                        |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Emulates the providers** | Stripe, Clerk, Resend, Google, Slack and 20 more answer from local emulators behind a proxy. No sandbox keys, no code changes.         |
+| **Judges the backend**     | An invariant reads your database and the provider after the test: one row, one charge, one email.                                      |
+| **Breaks it on purpose**   | `danwo matrix` reruns a test once per fault: 500s, declines, duplicate webhooks, lost database commits. The invariant judges each run. |
 
 ```ts
-const EMAIL = "ada@lumen.example"
-
 test("joins the waitlist", async ({ app, screen, expect }) => {
   await app.open("/")
   await screen.getByLabel("Work email").fill(EMAIL)
@@ -72,8 +94,6 @@ test("joins the waitlist", async ({ app, screen, expect }) => {
   expect(resendInbox(resend).list(EMAIL)).toHaveLength(1)
 })
 ```
-
-## Break it on purpose
 
 ```sh
 npx @danwo/cli matrix tests/waitlist.danwo.ts
@@ -90,6 +110,9 @@ faults: 16 passed
 
 Remove the app's idempotency key and two trials turn red: a second welcome email went out.
 See [the fault matrix](https://danwo.dev/docs/fault-matrix).
+
+Every run, with or without the backend layer, leaves a flight record: video, steps, and the calls
+behind them, in a dashboard, a PR comment and over MCP.
 
 ## Examples
 
