@@ -129,9 +129,9 @@ function durable(target: Target | undefined, context: PerformContext): Target | 
   return findable(kept) ? kept : undefined
 }
 
-/** Whether a target still says which element it is: by test id, name or text. */
+/** Whether a target still says which element it is: by test id, name, text or icon. */
 function findable(target: Target): boolean {
-  return [target.testId, target.name, target.text].some((part) => part !== undefined)
+  return [target.testId, target.name, target.text, target.icon].some((part) => part !== undefined)
 }
 
 /** An address as recorded: the param it came from, or as written. */

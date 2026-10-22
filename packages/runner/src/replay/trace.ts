@@ -13,6 +13,8 @@ const target = z.object({
   role: z.string().optional(),
   name: z.string().optional(),
   text: z.string().optional(),
+  /** The icon of a control with no name or text, as its markup names it, e.g. `trash`. */
+  icon: z.string().optional(),
   nth: z.number().int().nonnegative().optional(),
   /** The part of the page it sat in, e.g. `form "Billing"`; helps find it again if it moved. */
   section: z.string().optional(),

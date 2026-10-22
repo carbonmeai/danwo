@@ -35,6 +35,7 @@ import { failureReason } from "./record/missing.ts"
 import { type CacheMode, ReplayStore } from "./replay/index.ts"
 import { type RelocationPolicy, relocationOf } from "./replay/policy.ts"
 import { type Secret, SecretVault, type SessionSecret } from "./secrets/index.ts"
+import { registerIconEngine } from "./snapshot/icons.ts"
 import { DanwoError } from "./support/codes.ts"
 import {
   type SessionTime,
@@ -340,6 +341,7 @@ async function openBrowser(
   artifactsDir: string,
 ): Promise<Opened & { readonly own: boolean }> {
   await registerValueEngine()
+  await registerIconEngine()
 
   const own = options.browser === undefined
   const browser = await browserOf(options)

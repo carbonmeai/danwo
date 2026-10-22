@@ -130,8 +130,18 @@ recorded by where they came from, not as text.
 
 ## What only an image shows
 
-Some of a page is not in the text the agent reads: a canvas or chart, an icon button with no name,
-a widget in a frame the view cannot list. With `vision` on (`auto` by default) the agent is told
+A control with no name (a clickable `div` or a button holding only an SVG) shows in the view as
+`generic [ref=e4] [cursor=pointer]` or a bare `button`. When its markup names its icon, the view
+adds it: `[icon="trash"]`, read from an icon-library class (`lucide-trash`, `fa-trash`, `bi-`,
+`mdi-`, `ri-`, `ti-`, `ph-`, `icon-*`, `*-icon`), `data-icon`, `<use href="#trash">`, an
+`<iconify-icon>` or an image file such as `trash.svg`. The agent clicks it by ref, and the
+recording finds it again by icon (with `nth` among same-icon controls), with no model. Up to 60
+unnamed controls a view get the word, about 15 characters each; a page with none reads exactly as
+its accessibility tree. Prefer `aria-label` in the app: it names the control for people, locators
+and the agent alike.
+
+Some of a page is not in the text the agent reads at all: a canvas or chart, a control with neither
+a name nor an icon its markup names, a widget in a frame the view cannot list. With `vision` on (`auto` by default) the agent is told
 when a page has such parts and can `look` at a screenshot with numbered marks, then click, type,
 drag or scroll at a mark or at coordinates. Those actions replay with no model call: each place is
 found again by how it looks, at the same spot of the same element, and searched for when it moved

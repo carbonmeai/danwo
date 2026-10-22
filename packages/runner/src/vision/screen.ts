@@ -7,6 +7,7 @@
 import type { Locator, Page } from "playwright-core"
 
 import { HIDE_POINTER } from "../browser/pointer.ts"
+import { iconSelector } from "../snapshot/icons.ts"
 import type { Box } from "./image.ts"
 
 /** A numbered region of the screenshot, and what the page says it is. */
@@ -202,40 +203,38 @@ export interface VisualGaps {
   readonly frames: number
 }
 
-/**
- * Canvases and clickable elements with their boxes, each with whether it has a name (a canvas
- * never has one the text view shows); runs in the page.
- */
-function gapCandidates() {
-  const candidates = [
-    ...document.querySelectorAll("canvas,button,a[href],[role=button],[onclick]"),
-  ].map((element) => {
+/** The boxes of `elements`, with the viewport's size; runs in the page. */
+function boxesOf(elements: Element[]) {
+  const boxes = elements.map((element) => {
     const rect = element.getBoundingClientRect()
-    const label = element.getAttribute("aria-label") ?? element.getAttribute("title") ?? ""
-    const canvas = element.tagName === "CANVAS"
-    const named =
-      label.trim() !== "" ||
-      (element.textContent ?? "").trim() !== "" ||
-      element.querySelector("img[alt]:not([alt=''])") !== null
 
-    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, canvas, named }
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
   })
 
-  return { candidates, viewport: { width: innerWidth, height: innerHeight } }
+  return { boxes, viewport: { width: innerWidth, height: innerHeight } }
 }
 
-/** Counts what of the page only an image shows: canvases and unnamed clickables in view. */
+/** How many of what `selector` finds are in view; 0 when the page cannot be read. */
+async function shownCount(page: Page, selector: string): Promise<number> {
+  const found = await page
+    .locator(selector)
+    .evaluateAll(boxesOf)
+    .catch(() => undefined)
+
+  return found === undefined ? 0 : found.boxes.filter((box) => inView(box, found.viewport)).length
+}
+
+/**
+ * Counts what of the page only an image shows: canvases, and clickable elements in view with no
+ * name and no icon the text view could show them by (see snapshot/icons.ts).
+ */
 async function countGaps(page: Page): Promise<{ canvases: number; unnamed: number }> {
-  const found = await page.evaluate(gapCandidates).catch(() => undefined)
+  const [canvases, unnamed] = await Promise.all([
+    shownCount(page, "canvas"),
+    shownCount(page, iconSelector({ unnamed: true })),
+  ])
 
-  if (found === undefined) return { canvases: 0, unnamed: 0 }
-
-  const shown = found.candidates.filter((one) => inView(one, found.viewport))
-
-  return {
-    canvases: shown.filter((one) => one.canvas).length,
-    unnamed: shown.filter((one) => !one.canvas && !one.named).length,
-  }
+  return { canvases, unnamed }
 }
 
 /**

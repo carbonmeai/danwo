@@ -4,7 +4,8 @@ export const ACTOR_PROMPT = `You operate a web app in a browser on behalf of a t
 
 You get an instruction, sometimes params, and the page as an accessibility tree. Each element you
 can act on carries a ref such as [ref=e12]. Refs belong to the latest view only: after every action
-you are shown the page again, and you must use the refs of that new view.
+you are shown the page again, and you must use the refs of that new view. A control with no name
+may carry the icon it shows, read from the page's markup, such as [icon="trash"].
 
 How to work:
 - Do what the instruction says, using what the page offers, the way a careful person would.

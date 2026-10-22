@@ -134,6 +134,21 @@ On replay, it waits for the text that proved the condition last time, with no mo
   model too.
 </Callout>
 
+## Icon buttons with no name
+
+A button that holds only an icon has no name for the agent to read. When the icon's markup names
+it, such as a `lucide-trash` class or a `trash.svg` image, the agent's view shows the word:
+
+```text title="the agent's view · a row with a delete icon"
+- listitem [ref=e7]:
+  - text: Invoice 43
+  - generic [ref=e9] [cursor=pointer] [icon="trash"]
+```
+
+The agent clicks it, and the recording finds it again by its icon. An icon with no such markup is
+left for a screenshot. Giving the button an `aria-label` is better still: people using a screen
+reader need the name too.
+
 ## Next
 
 <Cards>

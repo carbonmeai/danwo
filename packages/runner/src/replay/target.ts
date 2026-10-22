@@ -7,6 +7,7 @@
  */
 import type { ElementHandle, Frame, FrameLocator, Locator, Page } from "playwright-core"
 
+import { iconSelector } from "../snapshot/icons.ts"
 import { type RefLine, refLine, refSection } from "../snapshot/view.ts"
 import type { Target } from "./trace.ts"
 
@@ -42,6 +43,7 @@ function candidates(page: Page, target: Target): Locator | undefined {
   const scope = scopeOf(page, target)
 
   if (target.testId !== undefined) return scope.getByTestId(target.testId)
+  if (target.icon !== undefined) return scope.locator(iconSelector({ icon: target.icon }))
 
   if (target.role !== undefined && isRoleName(target.role)) {
     const byRole = scope.getByRole(target.role, {
@@ -140,9 +142,11 @@ function baseTarget(line: RefLine | undefined, testId: string | null, section?: 
   if (line === undefined) return { ...id, ...where }
 
   const said =
-    line.name === undefined
-      ? { role: line.role, ...(line.text !== undefined && { text: line.text }) }
-      : { role: line.role, name: line.name }
+    line.name !== undefined
+      ? { role: line.role, name: line.name }
+      : line.text !== undefined
+        ? { role: line.role, text: line.text }
+        : { role: line.role, ...(line.icon !== undefined && { icon: line.icon }) }
 
   return { ...id, ...said, ...where }
 }
@@ -291,7 +295,13 @@ export function describe(target: Target): string {
 function describeIn(target: Target): string {
   const at = target.nth === undefined ? "" : `.nth(${target.nth})`
 
-  if (target.testId !== undefined) return `getByTestId(${JSON.stringify(target.testId)})${at}`
+  return `${finderOf(target)}${at}`
+}
+
+/** The finder a target is described by, before its `nth`. */
+function finderOf(target: Target): string {
+  if (target.testId !== undefined) return `getByTestId(${JSON.stringify(target.testId)})`
+  if (target.icon !== undefined) return `icon(${JSON.stringify(target.icon)})`
 
   if (target.role !== undefined && isRoleName(target.role)) {
     const name = target.name === undefined ? "" : `, name: ${JSON.stringify(target.name)}`
@@ -300,8 +310,8 @@ function describeIn(target: Target): string {
         ? `, text: ${JSON.stringify(target.text)}`
         : ""
 
-    return `getByRole(${JSON.stringify(target.role)}${name}${text})${at}`
+    return `getByRole(${JSON.stringify(target.role)}${name}${text})`
   }
 
-  return `getByText(${JSON.stringify(target.text ?? "")})${at}`
+  return `getByText(${JSON.stringify(target.text ?? "")})`
 }

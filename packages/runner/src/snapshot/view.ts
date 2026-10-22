@@ -8,6 +8,7 @@
 import type { Page } from "playwright-core"
 
 import type { Tabs } from "../browser/tabs.ts"
+import { iconIn, withIcons } from "./icons.ts"
 import { DEFAULT_VIEW_CHARS } from "./limit.ts"
 
 const SNAPSHOT_TIMEOUT_MS = 10_000
@@ -39,7 +40,8 @@ export async function viewPage(
   limit: number = DEFAULT_VIEW_CHARS,
 ): Promise<PageView> {
   /* Redacted before it is cut: a cut through a secret would leave its first characters behind. */
-  const tree = redact(await page.ariaSnapshot({ mode: "ai", timeout: SNAPSHOT_TIMEOUT_MS }))
+  const raw = await page.ariaSnapshot({ mode: "ai", timeout: SNAPSHOT_TIMEOUT_MS })
+  const tree = redact(await withIcons(page, raw))
   const url = redact(page.url())
   const title = redact(await page.title())
 
@@ -107,6 +109,8 @@ export interface RefLine {
   readonly name?: string
   /** Text after the colon, e.g. a paragraph's content. */
   readonly text?: string
+  /** The icon an unnamed control shows, as its markup names it (see icons.ts). */
+  readonly icon?: string
 }
 
 /** `- button "Add one" [disabled] [ref=e3]: tail` → role, name, tail. */
@@ -132,11 +136,13 @@ export function refLine(tree: string, ref: string): RefLine | undefined {
 
   const rest = match[3] ?? ""
   const tail = /\]: (.+)$/.exec(rest)?.[1]
+  const icon = iconIn(rest)
 
   return {
     role: match[1],
     ...(match[2] !== undefined && { name: unquote(match[2]) }),
     ...(tail !== undefined && { text: tail.trim() }),
+    ...(icon !== undefined && { icon }),
   }
 }
 
