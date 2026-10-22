@@ -38,7 +38,9 @@ makes a release APK of an Expo app with its JavaScript bundled (no Metro at test
 
 - `expo prebuild`;
 - a network security config that also trusts user-installed CAs, where danwo puts each run's CA;
-- `gradlew assembleRelease` with `DANWO=1`, using Android Studio's JDK when `JAVA_HOME` is unset.
+- `gradlew assembleRelease --no-daemon` with `DANWO=1`, using Android Studio's JDK when
+  `JAVA_HOME` is unset. Gradle and the Kotlin compiler run inside the build's own process, so the
+  build leaves no daemon running.
 
 The APK is kept under `<project>/.danwo/builds/`, keyed by a hash of the app's sources, so an
 unchanged app is not built again. Use `--force` to rebuild. In a config, `buildAndroid({ project })`
@@ -128,9 +130,13 @@ Every attempt starts the app afresh: data cleared, permissions granted, launched
 - **`screen`:** `getByTestId` (React Native's `testID`), `getByRole`, `getByLabel`, `getByText`,
   `getByPlaceholder` and `getByDisplayValue` resolve on the accessibility tree. `click` (or `tap`),
   `fill`, `clear`, `check`, `uncheck`, `press(key)` and `selectOption(option)` (a spinner or
-  dropdown: it opens the picker and taps the option) act on the single match. Headers with
-  `accessibilityRole="header"` are headings. `getAttribute(name)` takes web names:
-  `data-testid`, `aria-label`, `aria-checked`, `aria-disabled`, `placeholder`, `value`, `role`.
+  dropdown: it opens the picker and taps the option) act on the single match. An action waits for
+  the match to be enabled (`LOCATOR_NOT_READY … is disabled` when it never is), then reads the
+  screen again and presses the element there, by that reading's ref, once two readings agree on
+  where it is; one that left the screen is looked for once more. Headers with
+  `accessibilityRole="header"` are headings. `getByRole(role, { checked, selected, disabled })`
+  filters by state. `getAttribute(name)` takes web names: `data-testid`, `aria-label`,
+  `aria-checked`, `aria-selected`, `aria-disabled`, `placeholder`, `value`, `role`.
 - **`expect`:** `toBeVisible`, `toBeHidden`, `toHaveText`, `toContainText`, `toHaveValue`,
   `toBeEnabled`, `toBeDisabled`, `toBeChecked`, `toHaveCount` and `toHaveAttribute` retry like on
   the web; in `danwo matrix` they are paced by the clean run like web checks. `toHaveCSS`,
@@ -145,7 +151,14 @@ Every attempt starts the app afresh: data cleared, permissions granted, launched
   - `back()`;
   - `openLink(url)`;
   - `rebind()`;
-  - `logs()`.
+  - `logs()`;
+  - `swipe({ direction, within?, durationMs? })` or `swipe({ from, to, durationMs? })`: one finger,
+    `direction` the way it moves (`left` turns a carousel on), across the middle half of `within`
+    or the screen, in screenshot pixels, 300 ms by default; slow swipes turn carousels and pull
+    lists to refresh;
+  - `dismissKeyboard()`, which does nothing when no keyboard shows;
+  - `longPress(ref, { durationMs? })` (800 ms by default) by a reading's ref, for the agent and
+    the MCP server.
 
 A Custom Tab is part of the screen: its web page reads through the same locators.
 
@@ -167,9 +180,14 @@ await expect(screen.getByTestId("credits")).toHaveText(`Credits: ${credits + 500
 ```
 
 The model reads the screen in the page view's format, one line per element with its ref, e.g.
-`- button "Pay $5.00" [ref=e12]`, and says which app or browser page is in front. It acts with
-device tools: `tap`, `fill`, `fill_secret`, `check`, `select`, `press_key`, `scroll` (the screen or
-a list, any direction), `back`, `open_link` and `wait_for`.
+`- button "Pay $5.00" [ref=e12]`, and says which app or browser page is in front. States show in
+brackets: `[disabled]`, `[checked]` (`[checked=false]` on a checkbox or switch) and `[selected]`
+(the active tab). It acts with device tools: `tap`, `fill`, `fill_secret`, `check`, `select`,
+`press_key`, `scroll` (the screen or a list, any direction), `swipe` (a direction, the screen or an
+element, `duration_ms`), `long_press` (`duration_ms`), `dismiss_keyboard`, `back`, `open_link` and
+`wait_for`. Every action on a ref finds the element again on the latest screen first, waiting for
+it to be enabled, so a ref from a view the screen has since changed under still presses the right
+element; swipes, long presses and keyboard dismissals replay like the rest.
 
 Replay follows the web's rules:
 
@@ -179,9 +197,12 @@ Replay follows the web's rules:
 - **Relocation.** With `similar-v1` (the default) a renamed element is found by role and likeness
   of its name; with `exact`, never.
 - **Strict stop.** `danwo matrix` replays only: a step that no longer replays stops the agent there,
-  and the invariant judges the state. A step with no recording fails.
+  and the invariant judges the state. A step with no recording fails. A paced check waits at least
+  6 s on a device (`matrix.checkPace.floorMs` sets another floor): an in-app browser can take
+  seconds longer to open than it did in the clean run.
 - **Effects.** A replay must change the screen and the services behind it as its recording did.
-  Calls the proxy blocked (the device's background traffic) are not effects.
+  Calls the proxy blocked (the device's background traffic, `ANDROID_BACKGROUND_HOSTS` with Chrome's
+  notification and the Google apps' ad pings) are not effects.
 
 **Vision.** Icons with no name and pictures of text show only on the screen. With `vision` on
 (`auto` by default) the agent may `look`: a screenshot at half size with numbered marks over what

@@ -30,6 +30,7 @@ test("buys 500 credits", async ({ screen, expect, device }) => {
 
 `getByTestId` matches React Native's `testID`, which iOS reports as the accessibility identifier.
 A tap the keyboard covers, such as **Pay** under a field just filled, puts the keyboard away first.
+As on Android, a tap waits for its element to be enabled and finds it again on the latest screen.
 
 ## Bind the simulator in the config
 
@@ -86,15 +87,16 @@ them once on each.
 
 ## What a test can do
 
-| Fixture    | On iOS                                                                             |
-| ---------- | ---------------------------------------------------------------------------------- |
-| `screen`   | `getByTestId`, `getByLabel`, `getByText`, `getByRole` (no headings); `tap`, `fill` |
-| `expect`   | the same checks as the web, including `toHaveScreenshot`                           |
-| `app.open` | opens a deep link; with no path, restarts the app                                  |
-| `device`   | `foreground()`, `back()`, `openLink(url)`, `logs()`                                |
-| `agent`    | `act`, `assert`, `extract`, `waitFor`, with device tools                           |
+| Fixture    | On iOS                                                                              |
+| ---------- | ----------------------------------------------------------------------------------- |
+| `screen`   | `getByTestId`, `getByLabel`, `getByText`, `getByRole` (no headings); `tap`, `fill`  |
+| `expect`   | the same checks as the web, including `toHaveScreenshot`                            |
+| `app.open` | opens a deep link; with no path, restarts the app                                   |
+| `device`   | `foreground()`, `back()`, `openLink(url)`, `logs()`, `swipe()`, `dismissKeyboard()` |
+| `agent`    | `act`, `assert`, `extract`, `waitFor`, with device tools                            |
 
 `back()` taps the screen's own back or close control, since an iPhone has no Back button.
+`swipe()` takes the same options as on [Android](/docs/android-tests#swipe-and-put-the-keyboard-away).
 
 ## Run the matrix on several simulators
 

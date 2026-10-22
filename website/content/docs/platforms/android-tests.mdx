@@ -31,6 +31,10 @@ test("buys 500 credits", async ({ screen, expect, device }) => {
 `getByTestId` matches React Native's `testID`. A Custom Tab, the in-app browser a checkout often
 opens, is part of the screen.
 
+Every tap waits for its element to be enabled, so a button that is greyed out while the app loads
+is tapped once it turns on. Just before it presses, danwo reads the screen again and finds the
+element there, so a form the keyboard slid up is tapped where it is now.
+
 ## Bind the emulator in the config
 
 `withAndroidDevice` wraps your environment and binds an emulator to it:
@@ -72,15 +76,48 @@ emulator's own background traffic (Chrome sync, Play services), so the matrix ne
 | `screen`   | `getByTestId`, `getByRole`, `getByLabel`, `getByText`; `tap`, `fill`, `check`, `press`, `selectOption` |
 | `expect`   | the same checks as the web, including `toHaveScreenshot`                                               |
 | `app.open` | opens a deep link; with no path, restarts the app                                                      |
-| `device`   | `foreground()`, `back()`, `openLink(url)`, `logs()`                                                    |
+| `device`   | `foreground()`, `back()`, `openLink(url)`, `logs()`, `swipe()`, `dismissKeyboard()`                    |
 | `agent`    | `act`, `assert`, `extract`, `waitFor`, with device tools                                               |
 
 Every attempt starts the app afresh: its data cleared, its permissions granted.
 
+## Swipe and put the keyboard away
+
+`device.swipe` drags one finger across the screen. A slow swipe turns a carousel's page or pulls a
+list to refresh:
+
+```ts title="tests/feed.danwo.ts"
+import type { DeviceFixtures } from "@danwo/device"
+import { test as base } from "@danwo/sdk"
+
+const test = base.extend<DeviceFixtures>()
+
+test("turns the carousel and refreshes the feed", async ({ screen, expect, device }) => {
+  /* The finger moves left, so the carousel shows its next page. */
+  await device.swipe({ direction: "left", durationMs: 600 })
+  await expect(screen.getByText("Page 2")).toBeVisible()
+
+  /* Put the keyboard away, then pull the list down to refresh it. */
+  await device.dismissKeyboard()
+  await device.swipe({ direction: "down", durationMs: 900 })
+})
+```
+
+| Option       | What it does                                              | Default          |
+| ------------ | --------------------------------------------------------- | ---------------- |
+| `direction`  | the way the finger moves: `up`, `down`, `left` or `right` |                  |
+| `within`     | the box to swipe across, in screenshot pixels             | the whole screen |
+| `from`, `to` | the two points to swipe between, in place of `direction`  |                  |
+| `durationMs` | how long the finger takes                                 | 300              |
+
+`dismissKeyboard()` does nothing when no keyboard shows. The agent has the same gestures, and
+a long press too.
+
 ## The agent on a device
 
 Plain-English steps work too. The agent reads the screen as a list of elements and acts with
-taps, typing and scrolls:
+taps, typing, scrolls, swipes and long presses. It sees which elements are disabled, checked or
+selected, such as the active tab:
 
 ```ts title="tests/agent-buy.danwo.ts"
 import { test, z } from "@danwo/sdk"

@@ -63,6 +63,14 @@ date: 2026-10-20
 - A trial whose body broke before its fault could fire is **not judged**, not invalid, and either makes `danwo matrix` exit 1.
 - Every WebSocket the clean run opened is tried with its upgrade refused and its connection dropped, and Inngest event sends get their own faults.
 
+## Mobile
+
+- **Safer taps:** a device action waits for its element to be enabled, then finds it again on the latest screen and presses it there once it stays in place. A ref from a screen that has since changed no longer presses the wrong element.
+- **The selected state:** the agent sees `[selected]` on the active tab, and locators take `getByRole(role, { selected })` and `aria-selected`.
+- **Gestures:** `device.swipe()` with a direction or two points and a duration, and `device.dismissKeyboard()`. The agent can swipe, long-press and put the keyboard away, and those steps replay with no model call.
+- **Android build:** Gradle and the Kotlin compiler leave no daemon running after `danwo build-android`.
+- **Steadier replays and matrices:** the emulator's ad and notification pings are blocked as background traffic, and a paced check on a device waits at least 6 s.
+
 ## Dashboard
 
 - A collapsible sidebar, Overview, a test library, filtered runs, the matrix across the suite, and Settings.
