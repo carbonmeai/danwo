@@ -10,7 +10,7 @@ import { stripVTControlCharacters } from "node:util"
 
 import type { ServiceDelivery } from "@danwo/matrix"
 import type { Exchange, Proxy } from "@danwo/proxy"
-import { proxyLaunchOptions } from "@danwo/runner"
+import { proxyContextOptions, proxyLaunchOptions } from "@danwo/runner"
 import { FaultBench, type NamedFault } from "@danwo/runner/runner"
 import {
   test as base,
@@ -202,14 +202,17 @@ const fixtures = base.extend<
     { scope: "worker" },
   ],
   /*
-   * The suite's own Playwright launches the browser, so its Chromium build, its tracing and its
+   * The suite's own Playwright launches the browser, so its browser builds, its tracing and its
    * screenshots all match the `@playwright/test` the project installed; danwo only adds its proxy
-   * and the flag that trusts the proxy's CA.
+   * and, for Chromium, the flag that trusts the proxy's CA.
    */
   browser: [
     async ({ danwoWorker, playwright, browserName, launchOptions }, use) => {
       const proxy = danwoWorker.env.proxy
-      const behind = proxyLaunchOptions(proxy && { url: proxy.url, caSpki: proxy.caSpki })
+      const behind = proxyLaunchOptions(
+        proxy && { url: proxy.url, caSpki: proxy.caSpki },
+        browserName,
+      )
       const browser = await playwright[browserName].launch({
         ...launchOptions,
         headless: launchOptions.headless ?? true,
@@ -225,6 +228,20 @@ const fixtures = base.extend<
     },
     { scope: "worker" },
   ],
+  /*
+   * Firefox and WebKit take no flag that trusts one CA, so their contexts behind danwo's proxy
+   * ignore certificate errors: the proxy is then their only TLS peer, and it checks each real
+   * site's certificate itself.
+   */
+  ignoreHTTPSErrors: async ({ ignoreHTTPSErrors, browserName, danwoWorker }, use) => {
+    const proxy = danwoWorker.env.proxy
+    const trust = proxyContextOptions(
+      proxy && { url: proxy.url, caSpki: proxy.caSpki },
+      browserName,
+    )
+
+    await use(trust.ignoreHTTPSErrors ?? ignoreHTTPSErrors)
+  },
   baseURL: async ({ baseURL, danwoWorker }, use) => {
     await use(danwoWorker.env.baseUrl ?? baseURL)
   },
