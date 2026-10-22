@@ -12,7 +12,7 @@ import type {
   AriaRole,
   FilterOptions,
   Locator,
-  LongPressOptions,
+  LongPressActionOptions,
   RoleOptions,
   Screen,
   SecretResolver,
@@ -316,7 +316,7 @@ export class DeviceLocator implements Locator {
    * Presses the element and holds it for `durationMs` (the device's 800 ms by default), once it is
    * enabled and in place, by the latest reading's ref.
    */
-  longPress(options?: LongPressOptions): Promise<void> {
+  longPress(options?: LongPressActionOptions): Promise<void> {
     const press = this.context.target.longPress?.bind(this.context.target)
     const hold = options?.durationMs
 

@@ -1,5 +1,11 @@
 /* How a locator is named in step labels and errors: the call a test would write to get it. */
-import type { AriaRole, LongPressOptions, RoleOptions, TextMatch, TextOptions } from "./types.ts"
+import type {
+  AriaRole,
+  LongPressActionOptions,
+  RoleOptions,
+  TextMatch,
+  TextOptions,
+} from "./types.ts"
 
 /** A text match as written in source: a quoted string or a regex literal. */
 export function shown(match: TextMatch): string {
@@ -51,7 +57,7 @@ export function filterCall(options: ShownFilter) {
 }
 
 /** A long press's arguments as a step label shows them: `durationMs: 600`, or none. */
-export function longPressArgs(options: LongPressOptions | undefined): string {
+export function longPressArgs(options: LongPressActionOptions | undefined): string {
   const shownOptions = [
     ...(options?.durationMs === undefined ? [] : [`durationMs: ${options.durationMs}`]),
     ...(options?.force === true ? ["force: true"] : []),

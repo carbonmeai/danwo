@@ -18,7 +18,7 @@ import type {
   ActionOptions,
   AriaRole,
   FilterOptions,
-  LongPressOptions,
+  LongPressActionOptions,
   ReadOptions,
   Locator,
   RoleOptions,
@@ -315,7 +315,7 @@ export class ElementLocator extends Finder implements Locator {
    * Waits for the element as `click` does, then moves the mouse to its centre, presses, holds for
    * `durationMs` and lets go. The hold counts on top of the timeout, which covers the wait alone.
    */
-  longPress(options?: LongPressOptions): Promise<void> {
+  longPress(options?: LongPressActionOptions): Promise<void> {
     const hold = options?.durationMs ?? LONG_PRESS_MS
 
     if (!Number.isFinite(hold) || hold < 0)
