@@ -108,7 +108,8 @@ export function browserCommand(
 
 /** A planned command as a person would type it, from the project's folder. */
 export function commandLine(command: PlannedCommand, from: string): string {
-  const where = relative(from, command.cwd)
+  /* Forward slashes: cmd.exe, PowerShell and every POSIX shell take them in `cd`. */
+  const where = relative(from, command.cwd).split("\\").join("/")
   const line = command.argv.join(" ")
 
   return where === "" ? line : `(cd ${where} && ${line})`

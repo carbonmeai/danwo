@@ -5,7 +5,7 @@
  */
 import { existsSync } from "node:fs"
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises"
-import { dirname, join } from "node:path"
+import { dirname, join, posix } from "node:path"
 
 import type { Answers } from "./answers.ts"
 import type { Detection } from "./detect.ts"
@@ -70,7 +70,7 @@ function engineFiles(answers: Answers, detection: Detection): Map<string, string
   if (web) {
     files.set(CONFIG_FILE, renderWebConfig(answers, dirs.web))
     files.set(
-      join(dirs.web, EXAMPLE_TEST),
+      posix.join(dirs.web, EXAMPLE_TEST),
       answers.engine === "none" ? renderApiTest(answers) : renderWebTest(answers),
     )
   }
@@ -80,7 +80,7 @@ function engineFiles(answers: Answers, detection: Detection): Map<string, string
       web ? MOBILE_CONFIG_FILE : CONFIG_FILE,
       renderMobileConfig(answers, detection, dirs.mobile),
     )
-    files.set(join(dirs.mobile, EXAMPLE_TEST), renderMobileTest(answers))
+    files.set(posix.join(dirs.mobile, EXAMPLE_TEST), renderMobileTest(answers))
   }
 
   return files
