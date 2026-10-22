@@ -6,7 +6,7 @@
  */
 import { type ChildProcess, spawn } from "node:child_process"
 import { mkdir, readdir, rm } from "node:fs/promises"
-import { join } from "node:path"
+import { join, posix } from "node:path"
 import { createInterface } from "node:readline"
 
 import type { DeviceLogLine, DeviceStart } from "@danwo/runner/runner"
@@ -125,7 +125,8 @@ export class IosApp {
         "-extract",
         "CFBundleExecutable",
         "raw",
-        join(this.options.app, "Info.plist"),
+        /* A path on the Mac the simulator runs on, so POSIX whatever runs this. */
+        posix.join(this.options.app, "Info.plist"),
       ]).catch(() => "")
     ).trim()
   }
