@@ -34,6 +34,10 @@ describe("a stack frame's file", () => {
     expect(framePath("file:///srv/my%20app/a.ts", posix)).toBe("/srv/my app/a.ts")
     expect(framePath(String.raw`C:\a.ts`, win32)).toBe(String.raw`C:\a.ts`)
   })
+
+  it("keeps a file URL with no drive as its path on Windows, rather than failing", () => {
+    expect(framePath("file:///srv/my%20app/a.ts?q=1", win32)).toBe("/srv/my app/a.ts")
+  })
 })
 
 /** An error thrown through `frame`. */

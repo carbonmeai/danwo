@@ -38,5 +38,17 @@ export function framePath(
 
   url.search = ""
 
-  return `${fileURLToPath(url, { windows: platform.sep === "\\" })}${query}`
+  return `${urlPath(url, platform)}${query}`
+}
+
+/**
+ * A `file:` URL's path on `platform`. A URL with no drive (`file:///srv/x.ts`) names no path
+ * Windows can open, so there it stays as the URL's own decoded path rather than failing.
+ */
+function urlPath(url: URL, platform: PlatformPath): string {
+  try {
+    return fileURLToPath(url, { windows: platform.sep === "\\" })
+  } catch {
+    return decodeURIComponent(url.pathname)
+  }
 }

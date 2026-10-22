@@ -11,7 +11,7 @@ import { routeOf } from "@danwo/matrix"
 
 import type { ErrorCode } from "../support/codes.ts"
 import type { TestError } from "../support/errors.ts"
-import { framePath } from "../support/paths.ts"
+import { framePath, slashed } from "../support/paths.ts"
 import type { FailureVerdict, Verdict, VerdictConfidence } from "./verdict-words.ts"
 
 /** A call through the proxy as the verdict reads it. */
@@ -358,7 +358,7 @@ function crashVerdict(error: TestError): FailureVerdict {
     return judged(
       "danwo",
       "likely",
-      `${error.name} thrown inside danwo (${top.slice(DANWO_ROOT.length) || top}); please report it to danwo with the flight record`,
+      `${error.name} thrown inside danwo (${slashed(top.slice(DANWO_ROOT.length) || top)}); please report it to danwo with the flight record`,
     )
 
   const where = error.source ? ` at ${error.source.file}:${error.source.line}` : ""
