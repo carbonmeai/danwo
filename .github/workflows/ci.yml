@@ -28,6 +28,24 @@ jobs:
           chromium: "true"
       - run: bun run check
 
+  # danwo also runs on Node 22; this holds the lowest 22 it supports to the unit tests and to an
+  # install of the packed tarballs. `check` above covers formatting, lint and types once, on 24.
+  node-22:
+    name: Node 22.22.3
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          node-version: "22.22.3"
+          chromium: "true"
+      - run: bun run ui:codegen
+      - run: bun run test
+      - run: bun run release 0.1.0-beta.0 --pack --verify
+
   gitleaks:
     name: gitleaks
     runs-on: ubuntu-latest
