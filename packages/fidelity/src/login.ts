@@ -75,7 +75,8 @@ function systemBrowser(url: string): void {
     process.platform === "darwin"
       ? ["open", [url]]
       : process.platform === "win32"
-        ? ["cmd", ["/c", "start", "", url]]
+        ? /* Not `cmd /c start`: cmd.exe would split the URL at each `&` of its query. */
+          ["explorer", [url]]
         : ["xdg-open", [url]]
 
   try {

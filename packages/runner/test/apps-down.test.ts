@@ -21,10 +21,11 @@ function freePort(): Promise<number> {
 /** A server that answers, then exits with `code` after `ms`. */
 async function shortLivedApp(code: number, ms: number) {
   const port = await freePort()
-  const script = `require("http").createServer((q, s) => s.end("ok")).listen(${port}, "127.0.0.1", () => setTimeout(() => process.exit(${code}), ${ms}))`
+  const script = `require('http').createServer((q, s) => s.end('ok')).listen(${port}, '127.0.0.1', () => setTimeout(() => process.exit(${code}), ${ms}))`
 
   return {
-    command: `"${process.execPath}" -e '${script}'`,
+    /* Double quotes around the script: cmd.exe, the shell on Windows, takes no single quotes. */
+    command: `"${process.execPath}" -e "${script}"`,
     url: `http://127.0.0.1:${port}`,
     timeoutMs: 10_000,
   }

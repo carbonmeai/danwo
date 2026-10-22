@@ -5,7 +5,13 @@ import { Client } from "pg"
 
 import { freePort } from "../../cli/test/fixtures/app-process.ts"
 
+/**
+ * Whether Docker can run the Linux images these tests use. Not on Windows: its runners' Docker
+ * runs Windows containers, so `postgres` and `redis` would fail rather than skip.
+ */
 export function dockerAvailable(): boolean {
+  if (process.platform === "win32") return false
+
   try {
     execFileSync("docker", ["info"], { stdio: "ignore", timeout: 10_000 })
 

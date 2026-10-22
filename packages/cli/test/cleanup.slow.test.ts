@@ -56,7 +56,8 @@ async function running(probe: string, count: number, ms = 60_000): Promise<void>
 
 const probe = () => Math.random().toString(36).slice(2, 10)
 
-describe("a run leaves nothing running", () => {
+/* It finds what a run left by a marker in each process's environment, which Windows keeps private. */
+describe.skipIf(process.platform === "win32")("a run leaves nothing running", () => {
   it("after danwo test exits", async () => {
     const mark = probe()
     const run = danwo(["test"], mark)

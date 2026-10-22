@@ -101,6 +101,8 @@ const ESSENTIAL_VARIABLES = [
   "COMSPEC",
   "PATHEXT",
   "USERPROFILE",
+  "USERNAME",
+  "SYSTEMDRIVE",
   "HOMEDRIVE",
   "HOMEPATH",
   "APPDATA",
@@ -159,7 +161,7 @@ function captureOutput(
   output: { lines: string[]; written: number } = { lines: [], written: 0 },
 ): { lines: string[]; written: number } {
   const keep = (chunk: Buffer) => {
-    const lines = chunk.toString().split("\n").filter(Boolean)
+    const lines = chunk.toString().split(/\r?\n/).filter(Boolean)
 
     output.written += lines.length
     output.lines.push(...lines)

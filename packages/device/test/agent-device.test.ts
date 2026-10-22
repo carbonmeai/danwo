@@ -58,7 +58,8 @@ afterEach(async () => {
   trouble.fills = 0
   trouble.busy = 0
   trouble.message = "Daemon request timed out"
-  if (dir !== undefined) await rm(dir, { recursive: true, force: true })
+  if (dir !== undefined)
+    await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 async function driver() {
@@ -157,8 +158,12 @@ describe("the driver's daemon", () => {
 
       await writeFile(join(dir, "daemon.json"), JSON.stringify({ pid, stateDir: dir }))
       await stopDaemon(dir)
-      await expect(exited).resolves.toBeNull()
-      expect(daemon.signalCode).toBe("SIGTERM")
+
+      /* Windows has no SIGTERM: it ends the daemon outright, with exit code 1 and no signal. */
+      const ended =
+        process.platform === "win32" ? { code: 1, signal: null } : { code: null, signal: "SIGTERM" }
+
+      expect({ code: await exited, signal: daemon.signalCode }).toEqual(ended)
     } finally {
       daemon.kill()
     }

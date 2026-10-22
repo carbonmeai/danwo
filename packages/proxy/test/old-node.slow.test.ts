@@ -11,7 +11,7 @@ import { existsSync, readdirSync } from "node:fs"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { stripTypeScriptTypes } from "node:module"
 import { homedir, tmpdir } from "node:os"
-import { join } from "node:path"
+import { delimiter, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
@@ -40,7 +40,7 @@ function installs(dir: string, bin: string): string[] {
 async function olderNodes(): Promise<readonly { version: string; bin: string }[]> {
   const home = homedir()
   const candidates = [
-    ...(process.env.DANWO_OLD_NODES ?? "").split(":").filter(Boolean),
+    ...(process.env.DANWO_OLD_NODES ?? "").split(delimiter).filter(Boolean),
     ...installs(join(home, ".nvm/versions/node"), "bin/node"),
     ...installs(join(home, ".volta/tools/image/node"), "bin/node"),
     ...installs(join(home, ".local/share/mise/installs/node"), "bin/node"),
@@ -90,7 +90,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await proxy.stop()
-  await rm(dir, { recursive: true, force: true })
+  await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 /** The app's output on `bin` with `env`. */

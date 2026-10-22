@@ -33,7 +33,12 @@ export function workCopy(source: string): string {
   }
 
   if (existsSync(join(source, "node_modules")))
-    symlinkSync(join(source, "node_modules"), join(copy, "node_modules"), "dir")
+    /* A junction on Windows, which needs no administrator to make, unlike a folder symlink. */
+    symlinkSync(
+      join(source, "node_modules"),
+      join(copy, "node_modules"),
+      process.platform === "win32" ? "junction" : "dir",
+    )
 
   copies.set(source, copy)
 

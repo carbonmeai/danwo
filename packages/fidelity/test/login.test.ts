@@ -29,7 +29,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await emulator?.close()
   emulator = undefined
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 /** A port nothing listens on yet. */
@@ -119,7 +119,10 @@ describe("danwo fidelity login", () => {
     expect(output).toContain("for tester@gmail.com")
     expect(output).toContain("https://www.googleapis.com/auth/drive.file")
     expect(output).not.toContain(token)
-    expect((await stat(join(root, ".env.fidelity"))).mode & 0o777).toBe(0o600)
+    /* Windows keeps no POSIX permission bits: every writable file reads as 0o666 there. */
+    expect((await stat(join(root, ".env.fidelity"))).mode & 0o777).toBe(
+      process.platform === "win32" ? 0o666 : 0o600,
+    )
   })
 
   it("signs a Microsoft account in through its tenant", async () => {

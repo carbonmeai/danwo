@@ -100,7 +100,7 @@ describe("a command that starts a service and returns, as docker compose up --wa
       /* Stopped by its test, as it should be. */
     }
 
-    rmSync(dir, { recursive: true, force: true })
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   })
 
   /** A command that is ready once it exits, with no stop command. */
@@ -135,7 +135,9 @@ describe("a command that starts a service and returns, as docker compose up --wa
   })
 
   it("reads no input, so a command that would wait on stdin goes on", async () => {
-    const app = await startApp(await returning("cat"))
+    /* `cat`, in Node, so it runs on Windows too: it waits for its input to end. */
+    const cat = `"${process.execPath}" -e "process.stdin.on('data', () => {}).on('end', () => process.exit(0))"`
+    const app = await startApp(await returning(cat))
 
     expect(app.exited()).toBeUndefined()
     await app.stop()
@@ -152,7 +154,9 @@ describe("a command that starts a service and returns, as docker compose up --wa
   })
 
   it("says when it printed nothing at all", async () => {
-    await expect(startApp(await returning("sleep 30", 1_000))).rejects.toThrow(
+    const sleep = `"${process.execPath}" -e "setTimeout(() => {}, 30000)"`
+
+    await expect(startApp(await returning(sleep, 1_000))).rejects.toThrow(
       "within 1 s; its last output:\n(it printed nothing)",
     )
   })
@@ -281,7 +285,10 @@ describe("what the app inherits of danwo's environment", () => {
       expect(seen).not.toHaveProperty("GITHUB_TOKEN")
       expect(seen).not.toHaveProperty("NEXT_PUBLIC_SITE")
       expect(seen).toMatchObject({ OWN: "yes", PORT: new URL(command.url).port })
-      expect(seen.PATH).toContain(process.env.PATH ?? "")
+      /* Windows names it `Path`, and keeps that case in the app's environment. */
+      const path = Object.entries(seen).find(([name]) => name.toUpperCase() === "PATH")?.[1]
+
+      expect(path).toContain(process.env.PATH ?? "")
       expect(seen.HTTPS_PROXY).toMatch(/^http:\/\/127\.0\.0\.1:\d+/)
       expect(seen.NODE_OPTIONS).toContain("--import=")
     } finally {

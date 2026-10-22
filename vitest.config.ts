@@ -7,6 +7,12 @@ import { uiSourceAlias } from "./packages/ui/source-alias.ts"
  * `bun run test:slow` and in CI. `ui` needs the design system's generated styles, which
  * `bun run ui:codegen` writes.
  */
+/**
+ * Windows starts processes and reads files slower (antivirus scans each one), so tests that start
+ * an app or a browser get more time there.
+ */
+const TIMEOUTS = process.platform === "win32" ? { testTimeout: 30_000, hookTimeout: 60_000 } : {}
+
 export default defineConfig({
   test: {
     // Fails a run that leaves anything behind in the examples or fixtures, or any process running.
@@ -15,6 +21,7 @@ export default defineConfig({
       {
         test: {
           name: "unit",
+          ...TIMEOUTS,
           include: [
             "packages/*/test/**/*.test.ts",
             "scripts/test/**/*.test.ts",
@@ -28,6 +35,7 @@ export default defineConfig({
         resolve: { alias: [uiSourceAlias] },
         test: {
           name: "ui",
+          ...TIMEOUTS,
           include: ["packages/ui/src/**/*.spec.ts", "packages/dashboard/src/**/*.spec.ts"],
           exclude: ["**/node_modules/**"],
         },

@@ -15,7 +15,10 @@ import { stripeService } from "../src/runner/stripe.ts"
 const run = promisify(execFile)
 const APP = fileURLToPath(new URL("./fixtures/aws-app.ts", import.meta.url))
 
+/** Whether Docker runs Linux images here; not on Windows, whose runners run Windows containers. */
 function dockerAvailable(): boolean {
+  if (process.platform === "win32") return false
+
   try {
     execFileSync("docker", ["info"], { stdio: "ignore", timeout: 10_000 })
 
