@@ -2,31 +2,18 @@
  * The guardian of one process's child groups. Its owner writes `+<pgid>` when it takes a group and
  * `-<pgid>` when it has stopped one; when the pipe closes, the owner is gone (however it ended), so
  * the guardian signals what is left with SIGTERM, then SIGKILL after the grace period, and exits.
- * It leads its own process group, so a signal to the owner's group does not reach it.
+ * It leads its own process group, so a signal to the owner's group does not reach it. On Windows
+ * each id is the pid of a tree's root instead, and the guardian ends each tree with `taskkill`.
  */
+import { signalTree, treeAlive } from "./process-tree.ts"
+
 const graceMs = Number(process.argv[2] ?? 3_000)
 const groups = new Set<number>()
 let pending = ""
 let reaping = false
 
-/** Whether anything in the group `pgid` still runs. */
-function alive(pgid: number): boolean {
-  try {
-    process.kill(-pgid, 0)
-
-    return true
-  } catch {
-    return false
-  }
-}
-
-function signal(pgid: number, name: NodeJS.Signals): void {
-  try {
-    process.kill(-pgid, name)
-  } catch {
-    /* Already gone. */
-  }
-}
+const alive = (pgid: number): boolean => treeAlive(pgid)
+const signal = (pgid: number, name: NodeJS.Signals): void => signalTree(pgid, name)
 
 async function reap(): Promise<void> {
   if (reaping) return

@@ -7,7 +7,7 @@
 import { type ChildProcess, execFile, spawn } from "node:child_process"
 import { existsSync } from "node:fs"
 
-import { own } from "@danwo/runner/children"
+import { own, signalLeader, treeLeaderOptions } from "@danwo/runner/children"
 
 import { getRun } from "../runs/runs-data.ts"
 import { type KnownTest, type Launch, launchOf, type RunRequest } from "./launch-args.ts"
@@ -132,7 +132,7 @@ function keepOutput(output: string[], chunk: Buffer): void {
   output.push(
     ...chunk
       .toString("utf8")
-      .split("\n")
+      .split(/\r?\n/)
       .filter((line) => line.trim() !== ""),
   )
   output.splice(0, Math.max(0, output.length - OUTPUT_LINES))
@@ -142,7 +142,7 @@ function keepOutput(output: string[], chunk: Buffer): void {
 function spawnRun(root: string, launch: Ready, bin: string): Started {
   const child = spawn(process.execPath, [bin, ...launch.args], {
     cwd: root,
-    detached: true,
+    ...treeLeaderOptions(),
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env, NO_COLOR: "1" },
   })
@@ -249,14 +249,11 @@ export async function startRun(root: string, request: RunRequest): Promise<Start
 
 /**
  * Stops a run's process group: the run, its workers and what they started. A run started from a
- * terminal leads its own group too; when the process leads none, it alone is stopped.
+ * terminal leads its own group too; when the process leads none, it alone is stopped. On Windows
+ * its whole process tree ends.
  */
 function stopProcess(pid: number): void {
-  try {
-    process.kill(-pid, "SIGTERM")
-  } catch {
-    process.kill(pid, "SIGTERM")
-  }
+  signalLeader(pid, "SIGTERM")
 }
 
 /**

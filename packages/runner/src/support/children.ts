@@ -7,12 +7,24 @@
  * owner dies without running any code at all (SIGKILL, a crash in native code).
  *
  * Windows has no process groups: there a child is stopped with its whole tree by `taskkill /T /F`,
- * since signalling the `shell: true` wrapper alone leaves the server it started running. Windows
- * has no guardian either, so a process killed outright can still leave its children behind.
+ * since signalling the `shell: true` wrapper alone leaves the server it started running. Its
+ * guardian works the same way, so a process killed outright leaves nothing behind there either,
+ * as long as the child it started still runs to find the rest by.
  */
-import { type ChildProcess, spawn, type SpawnOptions, spawnSync } from "node:child_process"
+import { type ChildProcess, spawn, type SpawnOptions } from "node:child_process"
 import type { Socket } from "node:net"
 import { fileURLToPath } from "node:url"
+
+import {
+  endBySignal,
+  signalTree,
+  SYSTEM,
+  treeAlive,
+  treeLeaderOptions,
+  type TreeSystem,
+} from "./process-tree.ts"
+
+export { signalLeader, signalTree, treeLeaderOptions } from "./process-tree.ts"
 
 /** How long a group gets between SIGTERM and SIGKILL. */
 const GRACE_MS = 3_000
@@ -20,8 +32,8 @@ const POLL_MS = 50
 const GUARDIAN = fileURLToPath(new URL("./guardian.ts", import.meta.url))
 /** Strips types under `node_modules`, where Node will not, so the guardian runs from an install. */
 const INSTALLED_HOOK = new URL("../../strip-types.mjs", import.meta.url).href
+/** SIGTERM never arrives on Windows, but listening for it is harmless there. */
 const SIGNALS: readonly NodeJS.Signals[] = ["SIGINT", "SIGTERM", "SIGHUP"]
-const GROUPS = process.platform !== "win32"
 
 /** A started child and how to stop it with everything it started. */
 export interface OwnedChild {
@@ -33,42 +45,25 @@ export interface OwnedChild {
 const owned = new Map<number, ChildProcess>()
 let guardian: ChildProcess | undefined
 let hooked = false
+let system: TreeSystem = SYSTEM
 
-/**
- * The command that ends `pid` and every process under it on Windows. `/F` because console
- * programs, a Node server among them, ignore the polite close `taskkill` sends otherwise.
- */
-export function treeKillCommand(pid: number): readonly [string, readonly string[]] {
-  return ["taskkill", ["/T", "/F", "/PID", String(pid)]]
-}
+/** Swaps the system calls, so a test can drive the Windows paths anywhere; returns the old ones. */
+export function useTreeSystem(next: TreeSystem): TreeSystem {
+  const previous = system
 
-/** Ends the child's process tree on Windows; synchronous, so it also works in an exit handler. */
-function killTree(pid: number): void {
-  const [command, args] = treeKillCommand(pid)
+  system = next
 
-  spawnSync(command, args, { stdio: "ignore", windowsHide: true })
+  return previous
 }
 
 /** Sends `signal` to the child's whole group (its whole tree on Windows). */
 function signalGroup(child: ChildProcess, signal: NodeJS.Signals): void {
-  try {
-    if (GROUPS && child.pid !== undefined) process.kill(-child.pid, signal)
-    else if (process.platform === "win32" && child.pid !== undefined) killTree(child.pid)
-    else child.kill(signal)
-  } catch {
-    /* Already gone. */
-  }
+  if (child.pid !== undefined) signalTree(child.pid, signal, system)
 }
 
 /** Whether anything in the group led by `pid` still runs. */
 function groupAlive(pid: number): boolean {
-  try {
-    process.kill(GROUPS ? -pid : pid, 0)
-
-    return true
-  } catch {
-    return false
-  }
+  return treeAlive(pid, system)
 }
 
 function tellGuardian(line: string): void {
@@ -77,10 +72,12 @@ function tellGuardian(line: string): void {
 
 /** Starts the guardian once: it holds a pipe from this process and reaps what is left when it closes. */
 function ensureGuardian(): void {
-  if (guardian !== undefined || !GROUPS) return
+  if (guardian !== undefined) return
 
+  /* Detached everywhere: on Windows that keeps it off this console, so closing it spares it. */
   guardian = spawn(process.execPath, ["--import", INSTALLED_HOOK, GUARDIAN, String(GRACE_MS)], {
     detached: true,
+    windowsHide: true,
     stdio: ["pipe", "ignore", "ignore"],
   })
   guardian.on("error", () => undefined)
@@ -97,7 +94,7 @@ function onSignal(signal: NodeJS.Signals): void {
 
     void stopAll().finally(() => {
       process.off(signal, handler)
-      process.kill(process.pid, signal)
+      endBySignal(signal, system)
     })
   }
 
@@ -115,7 +112,7 @@ function hook(): void {
   for (const signal of SIGNALS) onSignal(signal)
 }
 
-/** Takes ownership of `child`, which must have been started with `detached: true` where groups exist. */
+/** Takes ownership of `child`, which must have been started with `treeLeaderOptions()`. */
 export function own(child: ChildProcess): OwnedChild {
   const pid = child.pid
 
@@ -174,7 +171,7 @@ export function spawnOwned(
   args: readonly string[],
   options: SpawnOptions = {},
 ): OwnedChild {
-  return own(spawn(command, [...args], { ...options, detached: GROUPS }))
+  return own(spawn(command, [...args], { ...options, ...treeLeaderOptions(system.platform) }))
 }
 
 /** Stops every group this process still owns. */

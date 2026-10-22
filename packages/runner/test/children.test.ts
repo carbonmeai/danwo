@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url"
 
 import { afterEach, describe, expect, it } from "vitest"
 
-import { ownedCount, spawnOwned, stopAll, treeKillCommand } from "../src/support/children.ts"
+import { ownedCount, spawnOwned, stopAll } from "../src/support/children.ts"
 import { familyScript } from "./fixtures/child-family.ts"
 
 const OWNER = fileURLToPath(new URL("./fixtures/child-owner.ts", import.meta.url))
@@ -91,10 +91,4 @@ describe("owned children", () => {
       await expect(allGone([owner.pid ?? 0, ...pids])).resolves.toBeUndefined()
     },
   )
-})
-
-describe("on Windows, which has no process groups", () => {
-  it("ends a child with its whole tree, forcibly, since console programs ignore a polite close", () => {
-    expect(treeKillCommand(4242)).toEqual(["taskkill", ["/T", "/F", "/PID", "4242"]])
-  })
 })

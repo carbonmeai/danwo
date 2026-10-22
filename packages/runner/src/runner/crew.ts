@@ -7,7 +7,7 @@
 import { fork } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
-import { type OwnedChild, own } from "../support/children.ts"
+import { type OwnedChild, own, treeLeaderOptions } from "../support/children.ts"
 import type { WorkerLiveEvent } from "./live.ts"
 import type { TestFileTask, TestReport, TrialReport, TrialTask, WorkerStart } from "./tasks.ts"
 import { linkWorker, type WorkerLink } from "./wire.ts"
@@ -138,7 +138,7 @@ export class Crew {
       execArgv: ["--import", INSTALLED_HOOK, "--import", TYPESCRIPT_HOOK],
       stdio: ["ignore", "inherit", "inherit", "ipc"],
       env: process.env,
-      detached: process.platform !== "win32",
+      ...treeLeaderOptions(),
     })
     const link = linkWorker(child, (note) => {
       if (note.topic === "tested") this.options.onTested?.(note.data)

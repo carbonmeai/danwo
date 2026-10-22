@@ -6,7 +6,7 @@
  */
 import { type ChildProcess, fork } from "node:child_process"
 
-import { own } from "@danwo/runner/children"
+import { own, signalTree, treeLeaderOptions } from "@danwo/runner/children"
 
 import { isJobMessage, type Job, type JobPlace, type JobResults } from "./protocol.ts"
 
@@ -25,18 +25,19 @@ export interface JobOptions {
   readonly signal?: AbortSignal | undefined
 }
 
-/** Signals a process's whole group: its workers, browsers and apps go with it. */
+/** Signals a process's whole group (its tree on Windows): its workers, browsers and apps go with it. */
 export function stopGroup(child: ChildProcess): void {
   const signalGroup = (signal: NodeJS.Signals) => {
-    try {
-      if (child.pid !== undefined) process.kill(-child.pid, signal)
-    } catch {
-      /* The group is already gone. */
-    }
+    if (child.pid !== undefined) signalTree(child.pid, signal)
   }
 
   signalGroup("SIGTERM")
-  setTimeout(() => signalGroup("SIGKILL"), KILL_GRACE_MS).unref()
+  /* On Windows the first signal ended the tree, and an exited child's pid may be another's by now. */
+  const ended = () => child.exitCode !== null || child.signalCode !== null
+
+  setTimeout(() => {
+    if (!(process.platform === "win32" && ended())) signalGroup("SIGKILL")
+  }, KILL_GRACE_MS).unref()
 }
 
 /** Job processes still running; they lead their own groups, so the server stops them itself. */
@@ -56,7 +57,7 @@ export function forkInProject(entry: URL, place: JobPlace): ChildProcess {
     cwd: place.cwd,
     execArgv: HOOKS.flatMap((hook) => ["--import", hook]),
     stdio: ["ignore", "pipe", "pipe", "ipc"],
-    detached: true,
+    ...treeLeaderOptions(),
   })
 
   /* Owned by this server: its group ends with the server, however the server ends. */
