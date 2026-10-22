@@ -1,0 +1,33 @@
+{
+  "name": "danwo-example-with-swiftui",
+  "private": true,
+  "description": "A waitlist as a SwiftUI app on the iOS Simulator: it joins through a Hono API on Postgres that sends a welcome email through Resend.",
+  "type": "module",
+  "scripts": {
+    "build:ios": "danwo build-ios ios",
+    "api": "node api/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "danwo test",
+    "matrix": "danwo matrix tests/deterministic.danwo.ts --grep \"joins the waitlist\"",
+    "matrix:plan": "danwo matrix tests/deterministic.danwo.ts --grep \"joins the waitlist\" --plan"
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.5",
+    "hono": "4.13.13",
+    "pg": "8.23.1",
+    "resend": "6.34.1"
+  },
+  "devDependencies": {
+    "@danwo/cli": "0.1.0-beta.0",
+    "@danwo/device": "0.1.0-beta.0",
+    "@danwo/expo": "0.1.0-beta.0",
+    "@danwo/proxy": "0.1.0-beta.0",
+    "@danwo/sdk": "0.1.0-beta.0",
+    "@types/node": "^24",
+    "@types/pg": "8.23.1",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

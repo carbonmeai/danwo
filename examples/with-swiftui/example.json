@@ -1,0 +1,19 @@
+{
+  "name": "SwiftUI waitlist",
+  "summary": "A SwiftUI app on the iOS Simulator joins a waitlist through a Hono API on Postgres, which sends a welcome email through Resend.",
+  "icon": "swift.svg",
+  "stack": ["SwiftUI", "iOS Simulator", "Hono", "Postgres"],
+  "providers": ["resend"],
+  "runsOn": "A native SwiftUI app on an iOS Simulator, with Postgres in Docker",
+  "install": "npm",
+  "ci": false,
+  "shows": [
+    "`danwo build-ios` building a plain Xcode project for the simulator, unsigned, kept until its sources change",
+    "The app's HTTPS calls to its production host reaching a local API through danwo's proxy, with no change to the app",
+    "Locators on native SwiftUI views: `accessibilityLabel` for `getByLabel`, `accessibilityIdentifier` for `getByTestId`",
+    "An invariant that reads both sides: exactly one row in Postgres and exactly one welcome email",
+    "`danwo matrix` faulting the app's own API, Resend and the API's SQL"
+  ],
+  "test": "tests/deterministic.danwo.ts",
+  "guide": { "title": "Native iOS apps", "href": "/docs/native-ios" }
+}

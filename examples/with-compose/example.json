@@ -1,0 +1,19 @@
+{
+  "name": "Jetpack Compose waitlist",
+  "summary": "A Jetpack Compose app on the Android emulator joins a waitlist through a Hono API on Postgres, which sends a welcome email through Resend.",
+  "icon": "jetpack-compose.svg",
+  "stack": ["Jetpack Compose", "Android emulator", "Hono", "Postgres"],
+  "providers": ["resend"],
+  "runsOn": "A native Compose app on an Android emulator, with Postgres in Docker",
+  "install": "npm",
+  "ci": false,
+  "shows": [
+    "`danwo build-android` building a plain Gradle project, with danwo's network config added for the build only",
+    "The app's HTTPS calls to its production host reaching a local API through danwo's proxy, with no change to its code",
+    "Locators on Compose: `testTag` for `getByTestId`, and a Material `Button` found by its role and label",
+    "An invariant that reads both sides: exactly one row in Postgres and exactly one welcome email",
+    "`danwo matrix` faulting the app's own API, Resend and the API's SQL"
+  ],
+  "test": "tests/deterministic.danwo.ts",
+  "guide": { "title": "Native Android apps", "href": "/docs/native-android" }
+}

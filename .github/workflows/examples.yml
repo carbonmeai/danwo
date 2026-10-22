@@ -4,7 +4,9 @@ name: Examples
 # `examples/commerce`), installed from the release tarballs as a user would install them from npm,
 # then tested end to end: each one's tests and a small fault matrix. Nightly, by hand, and on pull
 # requests that change an example. Every example whose `example.json` says `"install": "npm"` is
-# picked up, so a new example needs no change here. The ruleset requires `examples gate` alone.
+# picked up, so a new example needs no change here, unless it says `"ci": false`: the native apps
+# need a Simulator or an emulator, which these runners lack, and run in the slow tests instead
+# (`packages/cli/test/native.slow.test.ts`). The ruleset requires `examples gate` alone.
 on:
   schedule:
     - cron: "23 3 * * *"
@@ -38,7 +40,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          all="$(for notes in examples/*/example.json; do jq -r --arg dir "$(basename "$(dirname "$notes")")" 'select(.install == "npm") | $dir' "$notes"; done | sort | jq -Rsc 'split("\n") | map(select(. != ""))')"
+          all="$(for notes in examples/*/example.json; do jq -r --arg dir "$(basename "$(dirname "$notes")")" 'select(.install == "npm" and .ci != false) | $dir' "$notes"; done | sort | jq -Rsc 'split("\n") | map(select(. != ""))')"
           if [ "$EVENT" != "pull_request" ]; then
             picked="$all"
           else

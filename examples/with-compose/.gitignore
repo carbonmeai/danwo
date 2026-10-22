@@ -1,0 +1,13 @@
+node_modules/
+*.tsbuildinfo
+package-lock.json
+
+# Gradle's and Android Studio's state and build folders.
+.gradle/
+.kotlin/
+.idea/
+build/
+local.properties
+
+# What danwo writes when it runs: the kept builds, flight records, the agent's recordings, reports.
+.danwo/

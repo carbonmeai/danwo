@@ -1,0 +1,11 @@
+node_modules/
+*.tsbuildinfo
+package-lock.json
+
+# Xcode's per-user state and build folders.
+xcuserdata/
+build/
+DerivedData/
+
+# What danwo writes when it runs: the kept builds, flight records, the agent's recordings, reports.
+.danwo/

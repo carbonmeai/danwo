@@ -29,6 +29,8 @@ const ExampleSchema = z.object({
   runsOn: z.string(),
   /** `npm`: a standalone project installed from npm; `workspace`: a workspace of this repository. */
   install: z.enum(["npm", "workspace"]),
+  /** `false`: the examples workflow leaves it out, since it needs a device the CI runners lack. */
+  ci: z.boolean().optional(),
   /** What it shows danwo doing. */
   shows: z.array(z.string()).min(1),
   /** The test file the page prints. */
