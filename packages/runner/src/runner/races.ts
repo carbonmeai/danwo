@@ -132,18 +132,34 @@ export interface TrialRace {
   report(): { readonly races?: RaceEvidence; readonly fired?: boolean; readonly notes: string[] }
 }
 
-/** Watches the clean trial's browser for the requests and returns races can be planned on. */
+/** The host of a change-making request to another site than the app (a payment, a sign-up). */
+function actionAt(request: Request, app: string): string | undefined {
+  const origin = originOf(request.url())
+
+  if (READS.has(request.method()) || origin === undefined || origin === app) return undefined
+
+  return new URL(origin).host
+}
+
+/**
+ * Watches the clean trial's browser for the requests and returns races can be planned on. Each
+ * return keeps whether the browser had done something at that site first: one from a site it
+ * only passed through set off no webhook to hold back, so it gets no race.
+ */
 function watchRaces(app: string): TrialRace {
   const submits: string[] = []
   const returns: RaceReturn[] = []
+  const actedAt = new Set<string>()
 
   return {
     onContext: async (context) => {
       context.on("request", (request) => {
         const back = returnFrom(request, app)
         const submit = submitOf(request, app)
+        const action = actionAt(request, app)
 
-        if (back !== undefined) returns.push(back)
+        if (action !== undefined) actedAt.add(action)
+        if (back !== undefined) returns.push({ ...back, acted: actedAt.has(back.site) })
         if (submit !== undefined) submits.push(submit)
       })
     },

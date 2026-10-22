@@ -28,6 +28,11 @@ export interface RaceReturn {
   readonly site: string
   /** The call whose answer redirected it back, as the matrix names routes; absent for a link. */
   readonly via?: string
+  /**
+   * Whether the browser had sent the site a request that changes something (a payment, a sign-up)
+   * before it came back. Absent when it was not watched, which counts as yes.
+   */
+  readonly acted?: boolean
 }
 
 /** A provider call `slow-then-retry` may land on, with who made it. */
@@ -87,21 +92,28 @@ function doubleSubmits(evidence: RaceEvidence): PlannedFault[] {
   })
 }
 
-/** Each return to the app from another site, with the webhooks delivered before it lands. */
+/**
+ * Each return to the app from another site after the browser did something there (paid, signed
+ * up), with the webhooks delivered before it lands. A return from a site the browser only passed
+ * through (a sign-in handshake on the first page) set nothing off to hold back, so it gets no race.
+ */
 function beforeRedirects(evidence: RaceEvidence, clean: RunOutcome): PlannedFault[] {
   if (clean.deliveries.length === 0) return []
 
   const bySite = counter()
   const byHost = counter()
 
-  return evidence.returns.map((back, index) => ({
-    target: "redirect",
-    occurrence: index,
-    ...(back.via !== undefined && {
-      via: { route: back.via, occurrence: byHost(back.via.split("/")[0] ?? back.via) },
-    }),
-    label: `webhooks before redirect from ${back.site}${nth(bySite(back.site))}`,
-  }))
+  return evidence.returns.flatMap((back, index): PlannedFault[] => {
+    const label = `webhooks before redirect from ${back.site}${nth(bySite(back.site))}`
+    const via =
+      back.via === undefined
+        ? undefined
+        : { route: back.via, occurrence: byHost(back.via.split("/")[0] ?? back.via) }
+
+    if (back.acted === false) return []
+
+    return [{ target: "redirect", occurrence: index, ...(via !== undefined && { via }), label }]
+  })
 }
 
 /** Each webhook message's first unfaulted delivery, once per message and service, in order. */

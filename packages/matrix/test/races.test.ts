@@ -85,6 +85,26 @@ describe("planRaceFaults", () => {
     ])
   })
 
+  it("plans webhooks before a redirect only on a return from a site the browser did something at", () => {
+    const evidence = {
+      submits: [],
+      returns: [
+        /* A sign-in handshake on the first page: the browser only passed through. */
+        { site: "accounts.test", acted: false },
+        /* Back after signing up there. */
+        { site: "accounts.test", acted: true },
+      ],
+    }
+
+    expect(planRaceFaults(clean([], [delivery(1, "user.created")]), { evidence })).toEqual([
+      {
+        target: "redirect",
+        occurrence: 1,
+        label: "webhooks before redirect from accounts.test #2",
+      },
+    ])
+  })
+
   it("reorders two different webhooks one endpoint got in a row, and nothing else", () => {
     const deliveries = [
       delivery(1, "payment_intent.created"),
