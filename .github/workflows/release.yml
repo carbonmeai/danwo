@@ -108,6 +108,15 @@ jobs:
           persist-credentials: false
       - name: Write the notes
         run: |
+          # A hand-written entry for this version, when there is one, is the notes: its body
+          # without the frontmatter, its site links made absolute for GitHub.
+          entry="website/content/changelog/$RELEASE_VERSION.mdx"
+          if [ -f "$entry" ]; then
+            awk 'BEGIN { fence = 0 } fence < 2 { if ($0 == "---") fence++; next } { print }' "$entry" |
+              sed 's|](/|](https://danwo.dev/|g' > notes.md
+            cat notes.md
+            exit 0
+          fi
           # The last v* tag before this commit; none means every commit so far.
           previous="$(git describe --tags --abbrev=0 --match 'v*' HEAD^ 2>/dev/null || true)"
           range="${previous:+$previous..}HEAD"
