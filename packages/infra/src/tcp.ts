@@ -152,7 +152,13 @@ class TcpDataProxy implements DataProxy {
     client.on("error", () => undefined)
     if (down !== undefined) return this.refuse(client, down)
 
-    const server = connect(this.upstream.port, this.upstream.host)
+    /*
+     * A session writes each frame as it is read, so one query can go out as several small writes.
+     * With Nagle's algorithm on, each write after the first waits for the peer's delayed ACK (40 ms
+     * on Linux), and a transaction of five statements took a fifth of a second through the proxy.
+     */
+    client.setNoDelay(true)
+    const server = connect({ port: this.upstream.port, host: this.upstream.host, noDelay: true })
     const pair: { client: Socket; server: Socket; session: Session | undefined } = {
       client,
       server,
