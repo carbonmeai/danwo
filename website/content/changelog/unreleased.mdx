@@ -69,7 +69,7 @@ date: 2026-10-20
 - **The selected state:** the agent sees `[selected]` on the active tab, and locators take `getByRole(role, { selected })` and `aria-selected`.
 - **Gestures:** `device.swipe()` with a direction or two points and a duration, and `device.dismissKeyboard()`. The agent can swipe, long-press and put the keyboard away, and those steps replay with no model call.
 - **Android build:** Gradle and the Kotlin compiler leave no daemon running after `danwo build-android`.
-- **Steadier replays and matrices:** the emulator's ad and notification pings are blocked as background traffic, and a matrix trial on a device paces its checks only once its fault has fired, waiting at least 6 s.
+- **Steadier replays and matrices:** the emulator's ad and notification pings and the simulator's Apple News calls are blocked as background traffic, and a matrix trial on a device paces its checks only once its fault has fired, waiting at least 6 s.
 
 ## Dashboard
 
