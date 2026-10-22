@@ -4,8 +4,11 @@
  * the shop to a temporary folder, runs its tests and a fault matrix with the shop's planted
  * duplicate-webhook bug, serves the dashboard on a free port and screenshots parts of it in both
  * colour schemes, then renders the pull request comment and the matrix's terminal output, and
- * finally screenshots `hero.html` with those tiles. Run it with `bun run readme-hero` (or
- * `node brand/readme-hero/render.ts`); pass `--reuse` to compose from the last run's tiles.
+ * finally screenshots `hero.html` with those tiles. It also draws the website's social card,
+ * `website/public/og.png` (1200×630), and the repository's social preview, `github-social.png`
+ * (1280×640), from the same page and tiles with a "Star on GitHub" button.
+ * Run it with `bun run readme-hero` (or `node brand/readme-hero/render.ts`); pass `--reuse` to
+ * compose from the last run's tiles.
  */
 import { type ChildProcess, spawn, spawnSync } from "node:child_process"
 import {
@@ -349,16 +352,36 @@ function terminalHtml(runs: Runs): string {
   return `<pre class="terminal"><span class="prompt">$</span> danwo matrix ${TEST_FILE}\n\n${lines.join("\n")}</pre>`
 }
 
-/** Composes the banner in `scheme` from the tiles and writes it beside this script. */
-async function compose(browser: Browser, scheme: Scheme): Promise<string> {
+/** Where each picture goes, and the size of the page it is drawn from. */
+const PICTURES = {
+  dark: { path: join(HERE, "hero-dark.png"), scheme: "dark", height: 400, scale: 2, card: "" },
+  light: { path: join(HERE, "hero-light.png"), scheme: "light", height: 400, scale: 2, card: "" },
+  og: {
+    path: join(REPO, "website", "public", "og.png"),
+    scheme: "dark",
+    height: 420,
+    scale: 1.5,
+    card: "&card=og",
+  },
+  github: {
+    path: join(HERE, "github-social.png"),
+    scheme: "dark",
+    height: 400,
+    scale: 1.6,
+    card: "&card=github",
+  },
+} as const
+
+/** Composes one picture from the tiles and writes it where `PICTURES` says. */
+async function compose(browser: Browser, picture: keyof typeof PICTURES): Promise<string> {
+  const { path, scheme, height, scale, card } = PICTURES[picture]
   const page = await browser.newPage({
-    viewport: { width: 800, height: 400 },
-    deviceScaleFactor: 2,
+    viewport: { width: 800, height },
+    deviceScaleFactor: scale,
   })
-  const path = join(HERE, `hero-${scheme}.png`)
 
   await page.goto(
-    `${pathToFileURL(join(HERE, "hero.html")).href}?theme=${scheme}&tiles=${pathToFileURL(TILES).href}`,
+    `${pathToFileURL(join(HERE, "hero.html")).href}?theme=${scheme}&tiles=${pathToFileURL(TILES).href}${card}`,
   )
   await page.evaluate(() => document.fonts.ready)
   await page.waitForLoadState("networkidle")
@@ -400,8 +423,8 @@ const browser = await chromium.launch()
 try {
   if (!(process.argv.includes("--reuse") && existsSync(TILES))) await captureTiles(browser)
 
-  for (const scheme of SCHEMES) {
-    const path = await compose(browser, scheme)
+  for (const picture of ["dark", "light", "og", "github"] as const) {
+    const path = await compose(browser, picture)
 
     optimise(path)
     console.log(`${path}: ${Math.round(statSync(path).size / 1024)} KB`)

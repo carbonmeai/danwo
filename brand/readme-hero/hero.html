@@ -2,6 +2,9 @@
 <!--
   The README's hero banner. render.ts opens it as hero.html?theme=dark|light&tiles=<folder> and
   screenshots it; each tile is a screenshot of danwo's own UI that render.ts captured into <folder>.
+  With &card=og it is the website's social card instead: 800×420, so 1200×630 at 1.5×, with a
+  "Star on GitHub" button beside the command; &card=github keeps 800×400 for the repository's
+  social preview.
 -->
 <html lang="en" data-theme="dark">
   <head>
@@ -163,9 +166,18 @@
         color: var(--muted);
       }
 
-      .pill {
+      :root[data-card="og"] body {
+        height: 420px;
+      }
+
+      .actions {
         margin-top: 26px;
-        align-self: flex-start;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .pill {
         padding: 8px 15px;
         border-radius: 999px;
         border: 1px solid var(--pill-border);
@@ -179,6 +191,29 @@
         font-weight: 400;
         color: var(--faint);
         margin-right: 8px;
+      }
+
+      .star {
+        display: none;
+        align-items: center;
+        gap: 7px;
+        padding: 8px 15px;
+        border-radius: 999px;
+        background: var(--text);
+        color: var(--bg);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+
+      :root[data-card] .star {
+        display: inline-flex;
+      }
+
+      .star svg {
+        width: 14px;
+        height: 14px;
+        fill: currentColor;
       }
 
       [data-only="dark"],
@@ -233,7 +268,17 @@
       />
       <h1>Drive the UI.<span>Judge everything behind it.</span></h1>
       <p>Emulated providers, a fault matrix and a flight record for every run.</p>
-      <div class="pill"><b>$</b>npx @danwo/cli init</div>
+      <div class="actions">
+        <div class="pill"><b>$</b>npx @danwo/cli init</div>
+        <div class="star">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path
+              d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"
+            />
+          </svg>
+          Star on GitHub
+        </div>
+      </div>
     </div>
 
     <script>
@@ -242,6 +287,8 @@
       const tiles = query.get("tiles") ?? "tiles"
 
       document.documentElement.dataset.theme = theme
+      const card = query.get("card")
+      if (card === "og" || card === "github") document.documentElement.dataset.card = card
       for (const img of document.querySelectorAll("[data-tile]"))
         img.src = `${tiles}/${theme}/${img.dataset.tile}.png`
     </script>

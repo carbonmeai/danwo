@@ -8,8 +8,7 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
-    "preview": "vite preview",
-    "og": "node scripts/og-image.ts"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@tanstack/react-router": "1.170.45",
