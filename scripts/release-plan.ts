@@ -245,18 +245,14 @@ export function summaryLines(tarballs: readonly Tarball[], out: string): string[
   ]
 }
 
-/** The processes in `ps -axo pid=,command=` output whose command line mentions `marker`. */
+/** The processes among `rows` whose command line mentions `marker`. */
 export function processesUnder(
-  table: string,
+  rows: readonly { readonly pid: number; readonly command: string }[],
   marker: string,
 ): { readonly pid: number; readonly command: string }[] {
-  return table.split("\n").flatMap((line) => {
-    const match = /^\s*(\d+)\s+(.*)$/.exec(line)
-
-    return match?.[1] !== undefined && match[2]?.includes(marker) === true
-      ? [{ pid: Number(match[1]), command: match[2] }]
-      : []
-  })
+  return rows
+    .filter((row) => row.command.includes(marker))
+    .map(({ pid, command }) => ({ pid, command }))
 }
 
 /** How a check step ended: its exit status, everything it printed, and how long it took. */
@@ -278,7 +274,7 @@ export function stepReport(
   const output = result.output.trim()
   const ok = result.status === 0 && output.includes(expected ?? "")
   const tail = output
-    .split("\n")
+    .split(/\r?\n/)
     .slice(ok ? -4 : -40)
     .filter((line) => line.trim() !== "")
   const verdict = `  ${ok ? "ok    " : "FAILED"} ${label} (${(result.ms / 1000).toFixed(1)} s)`

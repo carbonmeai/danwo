@@ -13,7 +13,7 @@
  * declarations or they import a package the user won't have.
  */
 import { execFileSync } from "node:child_process"
-import { mkdirSync, readFileSync, renameSync, rmSync } from "node:fs"
+import { cpSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -22,6 +22,23 @@ import { manifestProblems, readManifest, unresolvableImports } from "./declarati
 const ROOT = fileURLToPath(new URL("..", import.meta.url))
 const CONFIG = "tsconfig.declarations.json"
 const EMITTED = join(ROOT, ".types")
+
+/** What a rename fails with while Windows holds a file open. */
+const BUSY = new Set(["EPERM", "EBUSY"])
+
+/**
+ * Moves `from` to `to`. On Windows a scanner can hold a file `tsc` just wrote for a moment, which
+ * fails a rename with EPERM or EBUSY; a copy then reads it once it is free.
+ */
+function moveFolder(from: string, to: string): void {
+  try {
+    renameSync(from, to)
+  } catch (error) {
+    if (!BUSY.has(String(Reflect.get(Object(error), "code")))) throw error
+    cpSync(from, to, { recursive: true })
+    rmSync(from, RETRIES)
+  }
+}
 
 /** The package folders the declaration build covers, named by what its `include` lists. */
 function packagesBuilt(): string[] {
@@ -33,11 +50,19 @@ function packagesBuilt(): string[] {
   return [...new Set(names.filter((name) => name !== undefined))]
 }
 
-rmSync(EMITTED, { recursive: true, force: true })
-execFileSync(join(ROOT, "node_modules", ".bin", "tsc"), ["-p", CONFIG], {
-  cwd: ROOT,
-  stdio: "inherit",
-})
+/** Retries while Windows still holds a file in the folder open. */
+const RETRIES = { recursive: true, force: true, maxRetries: 10, retryDelay: 200 } as const
+
+rmSync(EMITTED, RETRIES)
+/* TypeScript's own script under Node: `.bin/tsc` is a `.cmd` file on Windows, which Node won't start. */
+execFileSync(
+  process.execPath,
+  [join(ROOT, "node_modules", "typescript", "bin", "tsc"), "-p", CONFIG],
+  {
+    cwd: ROOT,
+    stdio: "inherit",
+  },
+)
 
 const problems: string[] = []
 
@@ -46,13 +71,13 @@ for (const folder of packagesBuilt()) {
   const target = join(dir, "dist", "types")
   const manifest = readManifest(join(dir, "package.json"))
 
-  rmSync(target, { recursive: true, force: true })
+  rmSync(target, RETRIES)
   mkdirSync(dirname(target), { recursive: true })
-  renameSync(join(EMITTED, folder, "src"), target)
+  moveFolder(join(EMITTED, folder, "src"), target)
   problems.push(...manifestProblems(manifest), ...unresolvableImports(dir, manifest))
 }
 
-rmSync(EMITTED, { recursive: true, force: true })
+rmSync(EMITTED, RETRIES)
 
 if (problems.length > 0) {
   console.error(`The declarations would not type-check for a user:\n  ${problems.join("\n  ")}`)

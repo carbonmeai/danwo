@@ -4,10 +4,16 @@
  * those of a run in another checkout. At teardown, any marked process still alive (an app, a
  * worker, a fixture server) fails the run; it is listed and then ended so it holds no port or memory.
  * Setup also ends marked processes left by an earlier run of this checkout whose runner has died.
+ *
+ * Windows lets no process read another's environment, so there the run's processes are the ones
+ * descended from this one, found by parent ids. That misses a process whose parent has ended (its
+ * line back to the run is lost), and no earlier run's leftovers can be told apart to sweep.
  */
 import { execFileSync } from "node:child_process"
 import { readdirSync, readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
+
+import { descendantsOf, processRows } from "../packages/runner/src/support/process-table.ts"
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url))
 const RUN = "DANWO_TEST_RUN"
@@ -38,13 +44,34 @@ function variable(text: string, name: string): string | undefined {
   return new RegExp(`(?:^|[\\s\\0])${name}=(\\S+?)(?=[\\s\\0]|$)`).exec(text)?.[1]
 }
 
-/** Every process carrying a run marker, from `ps -E` on macOS or `/proc` on Linux. */
-function markedProcesses(): Marked[] {
+/**
+ * Every process carrying a run marker, from `ps -E` on macOS or `/proc` on Linux. On Windows,
+ * every process descended from this one, as `run`'s; without a run, none.
+ */
+function markedProcesses(run?: string): Marked[] {
+  if (process.platform === "win32") return run === undefined ? [] : fromTree(run)
+
   return process.platform === "linux" ? fromProc() : fromPs()
+}
+
+/** What the listing starts on Windows, or Windows starts beside a console program: not the run's. */
+const WINDOWS_ATTENDANTS = /Win32_Process|\\conhost\.exe/i
+
+/** When the run was marked: on Windows a process this one started before then is not the run's. */
+let markedAt = 0
+
+/** This process's descendants on Windows, started since the run was marked, each as `run`'s. */
+function fromTree(run: string): Marked[] {
+  return descendantsOf(processRows("win32"), process.pid)
+    .filter((row) => row.started >= markedAt && !WINDOWS_ATTENDANTS.test(row.command))
+    .map((row) => ({ pid: row.pid, run, checkout: ROOT, command: row.command.slice(0, 200) }))
 }
 
 /** The pids of the running processes whose environment holds `name=value`. */
 export function processesWith(name: string, value: string): number[] {
+  if (process.platform === "win32")
+    throw new Error("Windows does not let one process read another's environment")
+
   const environments =
     process.platform === "linux"
       ? readdirSync("/proc")
@@ -152,7 +179,7 @@ async function leftovers(run: string): Promise<Marked[]> {
   let left: Marked[] = []
 
   do {
-    left = markedProcesses().filter((process) => process.run === run && !isPool(process))
+    left = markedProcesses(run).filter((process) => process.run === run && !isPool(process))
     if (left.length === 0) return []
     await new Promise((resolve) => setTimeout(resolve, 200))
   } while (Date.now() < deadline)
@@ -165,6 +192,7 @@ export default function setup(): () => Promise<void> {
   const run = `${process.pid}-${Math.random().toString(36).slice(2, 8)}`
 
   sweepDeadRuns()
+  markedAt = Date.now()
   process.env[RUN] = run
   process.env[CHECKOUT] = ROOT
 

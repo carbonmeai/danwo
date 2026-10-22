@@ -233,14 +233,19 @@ describe("the summary", () => {
 })
 
 test("processesUnder finds the processes whose command line names the check project", () => {
-  const table = [
-    "  101 /usr/bin/node --import=file:///tmp/danwo-release-check-ab12/node_modules/x.mjs app.mts",
-    "  202 /usr/bin/node /elsewhere/app.mts",
-    "",
-    "33303 node /tmp/danwo-release-check-ab12/node_modules/.bin/danwo test",
-  ].join("\n")
+  const rows = [
+    {
+      pid: 101,
+      command: "/usr/bin/node --import=file:///tmp/danwo-release-check-ab12/node_modules/x.mjs a",
+    },
+    { pid: 202, command: "/usr/bin/node /elsewhere/app.mts" },
+    {
+      pid: 33303,
+      command: String.raw`"C:\Program Files\nodejs\node.exe" C:\Temp\danwo-release-check-ab12\x.ts`,
+    },
+  ]
 
-  expect(processesUnder(table, "danwo-release-check-ab12").map((found) => found.pid)).toEqual([
+  expect(processesUnder(rows, "danwo-release-check-ab12").map((found) => found.pid)).toEqual([
     101, 33303,
   ])
 })

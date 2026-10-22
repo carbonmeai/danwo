@@ -16,7 +16,7 @@
  * It refuses a dirty git tree, a version that is not semver, and a public package that needs a
  * private one at run time. The decisions live in `release-plan.ts`.
  */
-import { execFileSync, spawnSync } from "node:child_process"
+import { execFileSync, spawnSync, type SpawnSyncReturns } from "node:child_process"
 import {
   cpSync,
   existsSync,
@@ -32,6 +32,8 @@ import { tmpdir } from "node:os"
 import { basename, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { spawnPlan } from "../packages/runner/src/support/command-line.ts"
+import { processRows } from "../packages/runner/src/support/process-table.ts"
 import {
   distTag,
   type Manifest,
@@ -77,9 +79,49 @@ function workspacePackages(): WorkspacePackage[] {
     })
 }
 
+/**
+ * Runs `program` in `cwd`, found on PATH as a terminal would (npm is a `.cmd` script on
+ * Windows), and gives back what it printed, or prints it here with `inherit`; throws when it fails.
+ */
+function runFor(
+  program: string,
+  args: readonly string[],
+  cwd: string,
+  stdio: "inherit" | "pipe",
+): string {
+  const plan = spawnPlan(program, args)
+  const result = spawnSync(plan.command, plan.args, {
+    cwd,
+    stdio: ["ignore", stdio, "inherit"],
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+    windowsVerbatimArguments: plan.windowsVerbatimArguments,
+  })
+
+  assertRan(result, `${program} ${args.join(" ")}`)
+
+  return result.stdout
+}
+
+/** Throws when the program `what` names could not start, or did not exit 0. */
+function assertRan(result: SpawnSyncReturns<string>, what: string): void {
+  if (result.error !== undefined) throw result.error
+  if (result.status !== 0) throw new Error(`${what} exited with ${result.status ?? result.signal}`)
+}
+
 /** Runs `program` in `cwd` with its output on this terminal; throws when it fails. */
 function run(program: string, args: readonly string[], cwd: string): void {
-  execFileSync(program, args, { cwd, stdio: "inherit" })
+  runFor(program, args, cwd, "inherit")
+}
+
+/** Runs `program` in `cwd` and gives back what it printed; throws when it fails. */
+function output(program: string, args: readonly string[], cwd: string): string {
+  return runFor(program, args, cwd, "pipe")
+}
+
+/** Removes `path`, retrying while Windows still holds a file in it open. */
+function remove(path: string): void {
+  rmSync(path, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 }
 
 /** Builds what the packages ship but git does not hold: the dashboard and the declarations. */
@@ -114,10 +156,10 @@ function pack(packages: readonly WorkspacePackage[], stageDir: string, out: stri
 
     run("node", [join(stageDir, "scripts", "pack-files.ts"), "add"], cwd)
 
-    const json = execFileSync(
+    const json = output(
       "npm",
       ["pack", "--json", "--ignore-scripts", "--pack-destination", out],
-      { cwd, encoding: "utf8" },
+      cwd,
     )
 
     const tarball = packedTarball(json)
@@ -158,7 +200,14 @@ interface CheckStep {
 function step({ label, argv, expected }: CheckStep, cwd: string): boolean {
   const started = Date.now()
   const [program = "", ...args] = argv
-  const result = spawnSync(program, args, { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })
+  /* npm and npx are `.cmd` scripts on Windows, started through cmd.exe. */
+  const plan = spawnPlan(program, args)
+  const result = spawnSync(plan.command, plan.args, {
+    cwd,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+    windowsVerbatimArguments: plan.windowsVerbatimArguments,
+  })
   const report = stepReport(
     label,
     { status: result.status, output: `${result.stdout}${result.stderr}`, ms: Date.now() - started },
@@ -172,9 +221,10 @@ function step({ label, argv, expected }: CheckStep, cwd: string): boolean {
 
 /** The processes whose command line names the check project in `dir`. */
 function runningUnder(dir: string): ReturnType<typeof processesUnder> {
-  const table = execFileSync("ps", ["-axo", "pid=,command="], { encoding: "utf8" })
-
-  return processesUnder(table, basename(dir))
+  return processesUnder(
+    processRows().filter((row) => row.pid !== process.pid),
+    basename(dir),
+  )
 }
 
 /** What still runs from `dir` once danwo's guardian had its grace period to stop it. */
@@ -354,7 +404,7 @@ async function verify(packed: readonly Packed[], version: string): Promise<boole
   })
   const ok = (await nothingLeftRunning(dir)) && passed
 
-  if (ok) rmSync(dir, { recursive: true, force: true })
+  if (ok) remove(dir)
   else console.log(`\nThe check project is kept at ${dir}`)
 
   return ok
@@ -377,7 +427,7 @@ function publish(packed: readonly Packed[], manifests: readonly Manifest[], vers
 function packAll(packages: readonly WorkspacePackage[], version: string, out: string): Packed[] {
   const stageDir = mkdtempSync(join(tmpdir(), "danwo-release-stage-"))
 
-  rmSync(out, { recursive: true, force: true })
+  remove(out)
   mkdirSync(out, { recursive: true })
 
   try {
@@ -385,7 +435,7 @@ function packAll(packages: readonly WorkspacePackage[], version: string, out: st
 
     return pack(packages, stageDir, out)
   } finally {
-    rmSync(stageDir, { recursive: true, force: true })
+    remove(stageDir)
   }
 }
 

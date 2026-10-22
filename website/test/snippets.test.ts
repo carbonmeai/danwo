@@ -46,7 +46,7 @@ function snippetsOf(text: string): Map<string, string> {
 
 /** Writes each page's files under its own folder and a tsconfig over them all. */
 function writeSnippets(): number {
-  rmSync(OUT, { recursive: true, force: true })
+  rmSync(OUT, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 
   let count = 0
 
@@ -73,15 +73,18 @@ function writeSnippets(): number {
   return count
 }
 
-afterAll(() => rmSync(OUT, { recursive: true, force: true }))
+afterAll(() => rmSync(OUT, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }))
 
 describe("the code on the docs pages", () => {
   it("type-checks against @danwo/sdk", () => {
     expect(writeSnippets()).toBeGreaterThan(5)
 
-    const tsc = spawnSync(join(REPO_ROOT, "node_modules", ".bin", "tsc"), ["-p", OUT], {
-      encoding: "utf8",
-    })
+    /* TypeScript's own script under Node: `.bin/tsc` is a `.cmd` file on Windows. */
+    const tsc = spawnSync(
+      process.execPath,
+      [join(REPO_ROOT, "node_modules", "typescript", "bin", "tsc"), "-p", OUT],
+      { encoding: "utf8" },
+    )
 
     expect(`${tsc.stdout}${tsc.stderr}`.trim()).toBe("")
     expect(tsc.status).toBe(0)
