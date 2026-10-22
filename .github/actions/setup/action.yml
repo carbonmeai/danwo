@@ -6,8 +6,11 @@ inputs:
     description: The Node version to set up.
     default: "24"
   chromium:
-    description: Also install Playwright's Chromium and its system libraries.
+    description: Also install Playwright's browsers (Chromium unless `browsers` says) and their system libraries.
     default: "false"
+  browsers:
+    description: The browsers to install when `chromium` is on, space-separated, e.g. "chromium firefox webkit".
+    default: "chromium"
 
 runs:
   using: composite
@@ -47,10 +50,12 @@ runs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ steps.playwright.outputs.browsers }}
-        key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+        key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-${{ inputs.browsers }}
 
-    # Installs the system libraries every time and downloads Chromium only on a cache miss.
+    # Installs the system libraries every time and downloads the browsers only on a cache miss.
     - if: inputs.chromium == 'true'
       shell: bash
-      run: npx playwright-core install --with-deps chromium
+      run: npx playwright-core install --with-deps $BROWSERS
       working-directory: packages/runner
+      env:
+        BROWSERS: ${{ inputs.browsers }}

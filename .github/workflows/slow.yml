@@ -45,3 +45,33 @@ jobs:
           include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 14
+
+  # The shards install Chromium alone, so the engine suites skip Firefox and WebKit there; this
+  # job runs them in all three engines.
+  engines:
+    name: slow (firefox, webkit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          chromium: "true"
+          browsers: "chromium firefox webkit"
+      - run: >-
+          bunx vitest run --project slow
+          packages/runner/test/engines.slow.test.ts packages/cli/test/engines.slow.test.ts
+          --reporter=default --reporter=junit --outputFile.junit=reports/slow-engines.xml
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: slow-engines
+          path: |
+            reports/
+            **/.danwo/
+            !**/node_modules/**
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14
