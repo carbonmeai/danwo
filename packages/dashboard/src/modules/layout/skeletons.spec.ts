@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { act, createElement, type ReactNode } from "react"
 import { createRoot } from "react-dom/client"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 /**
  * The pages' server functions read the project on disk, which a skeleton never calls: each one
@@ -53,6 +53,10 @@ async function mount(element: ReturnType<typeof createElement>): Promise<HTMLDiv
 
   return at
 }
+
+beforeEach(() => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true)
+})
 
 afterEach(() => {
   host?.remove()
