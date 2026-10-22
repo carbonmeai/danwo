@@ -99,6 +99,16 @@ after it passed` (`saved` false for both). The `cache:` line counts them after t
 e.g. `cache: 3 replayed · 0 relocated · 0 handed off · 1 missed · 1 not kept: the test failed`; a
 step not kept calls the model again next run.
 
+A recording finds each element by what it is, never by where it sits, so a step whose meaning is a
+position ("open the first row", "the last order") replays as the element it found the first time:
+after a newer row moves to the top, the replay still opens the old one, and its effects match, so
+nothing hands off. Write the position as a locator (`screen.getByRole("row").nth(1).click()`, or
+`.first()`/`.last()` on a list scoped by `getBy…` or `filter`) and give the agent what follows, or
+name the item in `params` (`"open the invoice {number}"`). `agent.act` has no position option, on
+purpose: a step is a run of actions and a position belongs to one target the option could not
+name; an index among every element of a role counts header rows and other lists on the page, so it
+is no steadier than the name; and when the position is meant, a locator already says it exactly.
+
 A recording is keyed by the journey, the instruction as written and its params, not by the step's
 position, so a step inserted before it changes nothing. The same instruction with the same params
 twice in one test is two recordings: the second and later are keyed by their occurrence. A test

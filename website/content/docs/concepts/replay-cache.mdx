@@ -47,6 +47,21 @@ The other agent steps are recorded too:
 A count with no text that states it, such as the number of cards on a board, is recorded as the
 kind of element counted. The replay counts them again.
 
+## Steps that mean a position
+
+A replay finds an element by what it is, not where it sits. So "open the first invoice" is
+recorded as "open Invoice 42", and still opens Invoice 42 after a newer invoice moves to the top.
+
+When the position is the point, find it with a locator and leave the rest to the agent:
+
+```ts title="tests/invoices.danwo.ts · a position"
+await screen.getByRole("row").nth(1).click()
+await agent.act("download the invoice as a PDF")
+```
+
+When the item is the point, name it in `params`, as in `"open the invoice {number}"`. Either way,
+the test says what it means, and the replay can't quietly pick another row.
+
 ## Read the cache line
 
 Every run with agent steps prints a `cache:` line, counting what each step came to:
