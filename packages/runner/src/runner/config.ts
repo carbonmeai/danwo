@@ -34,6 +34,13 @@ export interface DanwoConfig {
   readonly baseUrl?: string
   /** Worker processes; default 1. Each runs one browser attempt at a time. */
   readonly workers?: number
+  /**
+   * Hand workers single tests instead of whole files (default false), so one slow file does not
+   * hold a worker while the others sit idle. Only a file whose tests share nothing is split: no
+   * `beforeAll` or `afterAll`, and every test on `isolation: "test"`; other files run whole. Each
+   * test loads its file afresh, so tests must not pass values to each other in module variables.
+   */
+  readonly splitFiles?: boolean
   /** Extra attempts for a failing test; default 0. */
   readonly retries?: number
   /** One test attempt's deadline in milliseconds; default 60 000. */

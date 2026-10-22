@@ -86,7 +86,13 @@ The config's `retries` and `--retries` still win. `--max-failures n` starts no n
 `n` tests failed. `--max-duration <time>` (`20m`, `90s`, `1h`, `500ms`; a bare number is seconds)
 starts no new test file once the run has taken that long; files already running finish, the run
 prints `stopped at --max-duration (…): N test files not run` and exits at least 1, since those
-files were never judged. In CI, `npx @danwo/cli install-browser --with-deps --only-shell` installs
+files were never judged. Workers take whole files by default; `--split-files` (config `splitFiles:
+true`) hands them single tests of every file whose tests share nothing (no `beforeAll`/`afterAll`
+in the file, and each test on `isolation: "test"`, so it restores the seeded state anyway), so a
+slow file no longer holds one worker. Files with file-level hooks or `isolation: "file"`/`"none"`
+still run whole, in one worker, in order. Each split test loads its file afresh (as a retry does),
+so module-level variables are not shared between its tests, and a session is signed in once per
+worker that needs it. With splitting, the stop lines count tests: `N tests not run`. In CI, `npx @danwo/cli install-browser --with-deps --only-shell` installs
 only the headless shell test runs use. `danwo doctor [--json]` checks, without running anything:
 Node >= 24, that danwo's Chromium starts, that the config loads and has no unknown keys, the
 model's key variable (`AI_GATEWAY_API_KEY` for a gateway id, the provider's own for an AI SDK

@@ -36,14 +36,24 @@ danwo: warning: unknown config key `retires` (did you mean `retries`?); danwo ig
 
 ## Finding and running tests
 
-| Option      | Default             | What it does                                    |
-| ----------- | ------------------- | ----------------------------------------------- |
-| `testDir`   | the config's folder | where test files are found                      |
-| `testMatch` | every `*.danwo.ts`  | globs relative to `testDir`                     |
-| `workers`   | `1`                 | worker processes, each with its own environment |
-| `retries`   | `0`                 | extra attempts for a failing test               |
-| `timeout`   | `60_000`            | one attempt's deadline, in milliseconds         |
-| `baseUrl`   | none                | the app's URL when no environment gives one     |
+| Option       | Default             | What it does                                                   |
+| ------------ | ------------------- | -------------------------------------------------------------- |
+| `testDir`    | the config's folder | where test files are found                                     |
+| `testMatch`  | every `*.danwo.ts`  | globs relative to `testDir`                                    |
+| `workers`    | `1`                 | worker processes, each with its own environment                |
+| `splitFiles` | `false`             | hand workers single tests, not whole files, where that is safe |
+| `retries`    | `0`                 | extra attempts for a failing test                              |
+| `timeout`    | `60_000`            | one attempt's deadline, in milliseconds                        |
+| `baseUrl`    | none                | the app's URL when no environment gives one                    |
+
+### Split slow files across workers
+
+A worker runs one test file at a time, so one long file can keep one worker busy while the others
+sit idle. `splitFiles: true` (or `danwo test --split-files`) hands out single tests instead.
+
+danwo only splits a file whose tests share nothing: no `beforeAll` or `afterAll`, and every test on
+`isolation: "test"`. Other files still run whole. Each test loads its file again, so tests can't
+pass values to each other through variables at the top of the file.
 
 ## What tests run against
 

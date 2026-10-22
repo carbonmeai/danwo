@@ -130,6 +130,10 @@ withReporterOptions(withLintOptions(program.command("test")))
   .description("run test files in worker processes")
   .argument("[patterns...]", "file paths or substrings narrowing the config's testMatch")
   .option("-w, --workers <n>", "worker processes", integerAtLeast(1))
+  .option(
+    "--split-files",
+    "hand workers single tests of the files whose tests share nothing (no beforeAll or afterAll)",
+  )
   .option("-r, --retries <n>", "retries per test", integerAtLeast(0))
   .option("-g, --grep <regexp>", "only tests whose full title matches")
   .option("--last-failed", "only the tests that failed in the latest run; merges into it")
@@ -168,6 +172,7 @@ withReporterOptions(withLintOptions(program.command("test")))
         ...options
       }: {
         workers?: number
+        splitFiles?: boolean
         retries?: number
         grep?: string
         lastFailed?: boolean

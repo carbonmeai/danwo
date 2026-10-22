@@ -7,7 +7,13 @@ import { pathToFileURL } from "node:url"
 
 import { DanwoError } from "../support/codes.ts"
 import { findTestFiles } from "../tests/discover.ts"
-import { declarationsOf, type DeclaredTest, type FileDeclarations } from "../tests/registry.ts"
+import {
+  declarationsOf,
+  type DeclaredTest,
+  type FileDeclarations,
+  isolationOf,
+  suiteHooks,
+} from "../tests/registry.ts"
 import type { LoadedConfig } from "./config.ts"
 import { explainLoadError } from "./load-errors.ts"
 
@@ -22,6 +28,18 @@ export interface CatalogEntry {
   readonly invariant: boolean
   /** Its `concurrent` option: how many people `danwo matrix` may run it by at once. */
   readonly concurrent?: number
+  /**
+   * It shares nothing with the rest of its file: the file has no `beforeAll` or `afterAll`, and
+   * the test starts from the seeded state (`isolation: "test"`). `splitFiles` may run it alone.
+   */
+  readonly standalone?: true
+}
+
+/** Whether `test` shares nothing with the rest of its file, so it can run on a worker alone. */
+function standalone(loaded: LoadedConfig, file: FileDeclarations, test: DeclaredTest): boolean {
+  const hooks = [...suiteHooks(file, "beforeAll"), ...suiteHooks(file, "afterAll")]
+
+  return hooks.length === 0 && isolationOf(file, test, loaded.config.isolation ?? "test") === "test"
 }
 
 export function testIdOf(
@@ -102,6 +120,7 @@ export async function catalogOf(
         mode: test.mode,
         invariant: test.invariant !== undefined,
         ...(test.options.concurrent !== undefined && { concurrent: test.options.concurrent }),
+        ...(standalone(loaded, declarations, test) && { standalone: true }),
       })
     }
   }

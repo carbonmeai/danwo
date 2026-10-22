@@ -52,6 +52,8 @@ interface TestSelection {
 /** How the selected tests run. */
 interface TestExecution {
   readonly workers?: number
+  /** Hand workers single tests of the files whose tests share nothing (`--split-files`). */
+  readonly splitFiles?: boolean
   /** Extra attempts for a failing test; default the config's, else 1 in CI, else 0. */
   readonly retries?: number
   /** Starts no new test file once this many tests failed (`--max-failures`). */
@@ -87,21 +89,32 @@ export function parseDuration(text: string): number | undefined {
   return ms > 0 ? ms : undefined
 }
 
-/** The selected tests grouped into one task per file, in the order the files were found. */
-function tasksOf(
+/**
+ * The selected tests grouped into one task per file, in the order the files were found. With
+ * `split`, a file whose tests are all standalone becomes one task per test, so several workers
+ * share it.
+ */
+export function tasksOf(
   entries: readonly CatalogEntry[],
   task: Omit<TestFileTask, "file" | "testIds">,
+  split = false,
 ): TestFileTask[] {
   const byFile = Map.groupBy(entries, (entry) => entry.file)
 
-  return [...byFile].map(([file, tests]) => ({ ...task, file, testIds: tests.map((t) => t.id) }))
+  return [...byFile].flatMap(([file, tests]) =>
+    split && tests.every((test) => test.standalone === true)
+      ? tests.map((test) => ({ ...task, file, testIds: [test.id] }))
+      : [{ ...task, file, testIds: tests.map((test) => test.id) }],
+  )
 }
 
 /** What the crew's run of the tasks came to. */
 interface TaskRun {
   readonly brokenFiles: TestRunReport["brokenFiles"]
-  /** Files never started because the run reached its failure limit. */
+  /** Tasks never started because the run reached its failure or time limit. */
   readonly notRun: number
+  /** The tests of those tasks. */
+  readonly testsNotRun: number
 }
 
 const FAILURE = new Set(["failed", "timed-out", "interrupted"])
@@ -115,10 +128,12 @@ async function runTasks(
   const broken: { file: string; error: string }[] = []
 
   let notRun = 0
+  let testsNotRun = 0
 
   const work = async (task: TestFileTask) => {
     if (run.stopped()) {
       notRun++
+      testsNotRun += task.testIds.length
 
       return
     }
@@ -134,7 +149,7 @@ async function runTasks(
 
   await runPool(tasks, work, () => false, { size: crew.size })
 
-  return { brokenFiles: broken, notRun }
+  return { brokenFiles: broken, notRun, testsNotRun }
 }
 
 /** Runs the tests; resolves to the process exit code. */
@@ -395,7 +410,7 @@ async function runAndReport(input: RunInput, frame: RunFrame): Promise<number> {
   write(openingLine(input.entries.length, size))
   await tellReporters(reporters, (r) => r.started?.(context), write)
 
-  let ran: TaskRun = { brokenFiles: [], notRun: 0 }
+  let ran: TaskRun = { brokenFiles: [], notRun: 0, testsNotRun: 0 }
 
   const limits = runLimits(options, began, reports)
 
@@ -422,7 +437,10 @@ async function runAndReport(input: RunInput, frame: RunFrame): Promise<number> {
     ...lintReport(findings),
     ...blockedReport(results.reports),
     ...missingReport(results.reports),
-    ...stopLines(limits.outOfFailures(), ran.notRun, options),
+    ...stopLines(limits.outOfFailures(), ran, {
+      ...options,
+      splitFiles: splitsFiles(loaded, options),
+    }),
   ])
     write(line)
 
@@ -461,16 +479,19 @@ function runLimits(
 /** Why the run started no more files, and how many it left out; nothing when it ran them all. */
 function stopLines(
   outOfFailures: boolean,
-  notRun: number,
-  options: Pick<TestExecution, "maxFailures" | "maxDurationMs">,
+  ran: Pick<TaskRun, "notRun" | "testsNotRun">,
+  options: Pick<TestExecution, "maxFailures" | "maxDurationMs" | "splitFiles">,
 ): string[] {
-  if (notRun === 0) return []
-  if (outOfFailures)
-    return [`stopped after ${options.maxFailures} failed: ${notRun} test files not run`]
+  if (ran.notRun === 0) return []
+
+  /* Split files hand out single tests, so what was left out is counted in tests. */
+  const left = options.splitFiles === true ? `${ran.testsNotRun} tests` : `${ran.notRun} test files`
+
+  if (outOfFailures) return [`stopped after ${options.maxFailures} failed: ${left} not run`]
 
   const seconds = Math.round((options.maxDurationMs ?? 0) / 1000)
 
-  return [`stopped at --max-duration (${seconds} s): ${notRun} test files not run`]
+  return [`stopped at --max-duration (${seconds} s): ${left} not run`]
 }
 
 /**
@@ -495,7 +516,15 @@ function replayOnly(loaded: LoadedConfig, options: RunTestsOptions): boolean {
   return options.replayOnly ?? loaded.config.cache?.replayOnly ?? false
 }
 
-/** One task per file, and how many workers they get: no more than there are files. */
+/** Whether workers get single tests of the files that allow it: the flag, else the config. */
+function splitsFiles(loaded: LoadedConfig, options: Pick<TestExecution, "splitFiles">): boolean {
+  return options.splitFiles ?? loaded.config.splitFiles ?? false
+}
+
+/**
+ * One task per file (or per test, for the files `splitFiles` splits), and how many workers they
+ * get: no more than there are tasks.
+ */
 function planRun(
   loaded: LoadedConfig,
   options: RunTestsOptions,
@@ -504,12 +533,13 @@ function planRun(
 ): { tasks: TestFileTask[]; size: number } {
   const { cache } = loaded.config
   const defaults = ciDefaults(ci)
-  const tasks = tasksOf(entries, {
+  const task = {
     retries: options.retries ?? loaded.config.retries ?? defaults.retries,
     cacheDir: cache && resolve(loaded.root, cache.dir),
     cacheReadOnly: defaults.cacheReadOnly,
     ...(replayOnly(loaded, options) && { replayOnly: true }),
-  })
+  }
+  const tasks = tasksOf(entries, task, splitsFiles(loaded, options))
 
   return { tasks, size: Math.min(options.workers ?? loaded.config.workers ?? 1, tasks.length) }
 }

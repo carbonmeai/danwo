@@ -11,6 +11,7 @@ const CONFIG_KEYS: Readonly<Record<keyof DanwoConfig, true>> = {
   testMatch: true,
   baseUrl: true,
   workers: true,
+  splitFiles: true,
   retries: true,
   timeout: true,
   model: true,

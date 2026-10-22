@@ -5,7 +5,7 @@
  */
 import { execFile } from "node:child_process"
 import { existsSync } from "node:fs"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -163,5 +163,53 @@ describe("--max-duration", () => {
 
     expect(run.out).toContain("stopped at --max-duration (0 s): 2 test files not run")
     expect(run.code).toBe(1)
+  })
+})
+
+/** Two tests that take a while and share nothing. */
+const SLOW_TESTS = `import { test } from "@danwo/sdk"
+
+test("one", async () => {
+  await new Promise((resolve) => setTimeout(resolve, 1_500))
+})
+
+test("two", async () => {
+  await new Promise((resolve) => setTimeout(resolve, 1_500))
+})
+`
+
+/** Two tests after a beforeAll that notes each time it runs. */
+const SHARED_TESTS = `import { appendFileSync } from "node:fs"
+
+import { test } from "@danwo/sdk"
+
+test.beforeAll(async () => {
+  appendFileSync(new URL("../setup-runs.txt", import.meta.url), "ran\\n")
+})
+
+test("signs up", async () => {})
+
+test("then pays", async () => {})
+`
+
+describe("--split-files", () => {
+  it("runs a file's tests on separate workers when they share nothing, and keeps a file with a beforeAll whole", async () => {
+    const root = await project({
+      "danwo.config.ts": 'export default { testDir: "tests", baseUrl: "http://127.0.0.1:9" }\n',
+      "tests/a-slow.danwo.ts": SLOW_TESTS,
+      "tests/b-shared.danwo.ts": SHARED_TESTS,
+    })
+    const run = await danwo(root, ["test", "--split-files", "-w", "2"])
+    const results: { reports: { id: string; status: string; workerIndex: number }[] } = JSON.parse(
+      await readFile(join(root, ".danwo", "results", "last-run.json"), "utf8"),
+    )
+    const worker = (title: string) =>
+      results.reports.find((report) => report.id.endsWith(title))?.workerIndex
+
+    expect(run.code, `${run.out}${run.err}`).toBe(0)
+    expect(results.reports.map((report) => report.status)).toEqual(Array(4).fill("passed"))
+    expect(worker("› one")).not.toBe(worker("› two"))
+    expect(worker("› signs up")).toBe(worker("› then pays"))
+    expect(await readFile(join(root, "setup-runs.txt"), "utf8")).toBe("ran\n")
   })
 })
