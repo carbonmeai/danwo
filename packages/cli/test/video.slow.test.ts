@@ -64,7 +64,7 @@ function probedMs(file: string): Promise<number | undefined> {
 }
 
 beforeAll(async () => {
-  await rm(WORK, { recursive: true, force: true })
+  await rm(WORK, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   await mkdir(join(WORK, "tests"), { recursive: true })
   await cp(join(SHOP, "src"), join(WORK, "src"), { recursive: true })
   await cp(join(SHOP, "tests"), join(WORK, "tests"), { recursive: true })
@@ -75,7 +75,7 @@ beforeAll(async () => {
 }, 60_000)
 
 afterAll(async () => {
-  await rm(WORK, { recursive: true, force: true })
+  await rm(WORK, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 const BROKEN_ID = "tests/broken.danwo.ts › shows a heading the shop does not have"

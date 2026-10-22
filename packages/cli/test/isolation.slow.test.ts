@@ -71,7 +71,7 @@ async function run(
 
     return { code, out, found, setups }
   } finally {
-    await rm(state, { recursive: true, force: true })
+    await rm(state, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   }
 }
 

@@ -79,7 +79,7 @@ beforeAll(async () => {
 afterAll(() => {
   server.closeAllConnections()
   server.close()
-  rmSync(dist, { recursive: true, force: true })
+  rmSync(dist, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 describe("the built dashboard's server", () => {

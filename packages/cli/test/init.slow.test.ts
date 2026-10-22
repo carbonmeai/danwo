@@ -66,7 +66,7 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 describe("danwo init on a fresh project", () => {

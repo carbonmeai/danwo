@@ -8,11 +8,12 @@
  * its own key can still say which recording of the same step it missed, and what changed.
  */
 import { createHash, randomBytes } from "node:crypto"
-import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises"
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import type { z } from "zod"
 
+import { renameOver } from "../support/files.ts"
 import { type Params, paramIdentity } from "./params.ts"
 import { DEFAULT_RELOCATION, type RelocationPolicy } from "./policy.ts"
 import {
@@ -260,7 +261,7 @@ export class ReplayStore {
     const partial = `${file}.${randomBytes(4).toString("hex")}.tmp`
 
     await writeFile(partial, `${JSON.stringify(value, null, 2)}\n`)
-    await rename(partial, file)
+    await renameOver(partial, file)
   }
 
   /** Holds a new recording of step `step` until a check confirms it; replaces an earlier one. */

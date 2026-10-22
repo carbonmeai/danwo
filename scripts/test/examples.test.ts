@@ -22,7 +22,8 @@ const ROOT = fileURLToPath(new URL("../..", import.meta.url))
 const made: string[] = []
 
 afterEach(() => {
-  for (const dir of made.splice(0)) rmSync(dir, { recursive: true, force: true })
+  for (const dir of made.splice(0))
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 /** A throwaway `examples/` folder with a kit and the examples named, each with a package.json. */

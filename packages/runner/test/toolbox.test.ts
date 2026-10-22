@@ -27,7 +27,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await site.close()
-  await rm(dir, { recursive: true, force: true })
+  await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 interface Scenario {

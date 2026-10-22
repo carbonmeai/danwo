@@ -73,7 +73,7 @@ function abandoned(entry: string): boolean {
 function sweepCopies(): void {
   for (const folder of copyFolders())
     for (const entry of readdirSync(folder).filter(abandoned))
-      rmSync(join(folder, entry), { recursive: true, force: true })
+      rmSync(join(folder, entry), { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 }
 
 /** Notes what is already there, then fails the run if it added to it. */

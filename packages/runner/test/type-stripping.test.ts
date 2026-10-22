@@ -16,7 +16,7 @@ const CONFIG = new URL("../src/runner/config.ts", import.meta.url).href
 const CATALOG = new URL("../src/runner/catalog.ts", import.meta.url).href
 const root = mkdtempSync(join(tmpdir(), "danwo-stripping-"))
 
-afterAll(() => rmSync(root, { recursive: true, force: true }))
+afterAll(() => rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }))
 
 let projects = 0
 

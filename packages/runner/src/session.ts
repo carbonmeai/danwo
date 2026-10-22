@@ -660,7 +660,14 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
         await closeFilmed(context, film, closedAt)
       } finally {
         if (own) await browser.close()
-        if (ownsArtifacts) await rm(artifactsDir, { recursive: true, force: true })
+        /* A folder Windows still holds open is left behind rather than failing the close. */
+        if (ownsArtifacts)
+          await rm(artifactsDir, {
+            recursive: true,
+            force: true,
+            maxRetries: 5,
+            retryDelay: 100,
+          }).catch(() => undefined)
       }
     },
   }

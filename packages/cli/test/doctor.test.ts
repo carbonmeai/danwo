@@ -10,7 +10,11 @@ import { type DoctorProbes, doctorLines, projectDoctor } from "../src/doctor.ts"
 const made: string[] = []
 
 afterEach(async () => {
-  await Promise.all(made.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(
+    made
+      .splice(0)
+      .map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })),
+  )
 })
 
 async function project(files: Readonly<Record<string, string>>): Promise<string> {

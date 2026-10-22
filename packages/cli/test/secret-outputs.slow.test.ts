@@ -16,7 +16,9 @@ const SECRET = "planted-Secret-4729-value"
 const made: string[] = []
 
 afterAll(async () => {
-  await Promise.all(made.map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(
+    made.map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })),
+  )
 })
 
 /** An app that prints the secret as it starts, then answers on `PORT`. */

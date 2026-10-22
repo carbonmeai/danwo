@@ -90,7 +90,7 @@ async function descriptionsFor(
 
     return new Map(entries)
   } finally {
-    await rm(folder, { recursive: true, force: true })
+    await rm(folder, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   }
 }
 

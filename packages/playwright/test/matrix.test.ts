@@ -138,7 +138,7 @@ describe("starting a worker's environment", () => {
       await setup.env.close()
       expect(closed).toEqual([3])
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
   })
 
@@ -150,7 +150,7 @@ describe("starting a worker's environment", () => {
         /no danwo environment: give the danwoEnvironment option/,
       )
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
   })
 })

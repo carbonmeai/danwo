@@ -31,7 +31,7 @@ describe("reading .env.fidelity", () => {
   let dir: string | undefined
 
   afterEach(() => {
-    if (dir) rmSync(dir, { recursive: true, force: true })
+    if (dir) rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     dir = undefined
   })
 

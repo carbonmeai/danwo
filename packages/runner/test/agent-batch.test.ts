@@ -48,7 +48,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  await rm(dir, { recursive: true, force: true })
+  await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 /** Opens the desk with `options`; a cache in the test's folder unless `noCache`. */

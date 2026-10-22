@@ -221,7 +221,7 @@ describe("live feeds on disk", () => {
   })
 
   afterEach(async () => {
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   })
 
   const write = (id: string, events: readonly LiveEvent[]) =>

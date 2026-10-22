@@ -34,7 +34,8 @@ function packageWith(files: Record<string, string>): string {
 }
 
 afterEach(() => {
-  for (const dir of made.splice(0)) rmSync(dir, { recursive: true, force: true })
+  for (const dir of made.splice(0))
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 describe("manifestProblems", () => {

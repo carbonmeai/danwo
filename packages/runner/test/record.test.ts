@@ -364,7 +364,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 /** A session's flight with one failed step, as `runAttempt` hands it over. */

@@ -33,7 +33,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  await rm(dir, { recursive: true, force: true })
+  await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 /** Two GitHub tokens, put together at runtime so no scanner takes the source for a key. */

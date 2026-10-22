@@ -179,7 +179,7 @@ describe("danwo test --changed", () => {
       expect(unmapped.out).toContain("unmapped: package.json (selects every test)")
       expect(unmapped.out).toContain("Running 3 tests")
     } finally {
-      await rm(work, { recursive: true, force: true })
+      await rm(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
   }, 180_000)
 

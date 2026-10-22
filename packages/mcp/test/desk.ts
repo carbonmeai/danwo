@@ -76,7 +76,7 @@ export async function deskSite(pages: Readonly<Record<string, string>>): Promise
       await Promise.all(desks.map((desk) => desk.close()))
       await browser.close()
       server.close()
-      await rm(root, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     },
   }
 }

@@ -234,7 +234,7 @@ describe("retries and discovery", () => {
 
       expect(findTestFiles(dir, ["**/*.danwo.ts"])).toEqual(["a.danwo.ts", "b/two.danwo.ts"])
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
   })
 })

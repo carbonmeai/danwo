@@ -88,7 +88,7 @@ export class AndroidBinder {
         `chown system:system ${target} && chmod 644 ${target} && restorecon ${target}`,
       )
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
   }
 

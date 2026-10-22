@@ -110,7 +110,7 @@ describe.skipIf(!ready)("an Expo app on an iOS Simulator", () => {
         expect(replayed.out).not.toMatch(/^model: /m)
         expect(replayed.code).toBe(0)
       } finally {
-        await rm(dir, { recursive: true, force: true })
+        await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
       }
     },
   )

@@ -47,7 +47,7 @@ describe("the shipped skill", () => {
   })
 
   afterEach(async () => {
-    await rm(dir, { recursive: true, force: true })
+    await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   })
 
   it("has frontmatter with a name and a description", async () => {

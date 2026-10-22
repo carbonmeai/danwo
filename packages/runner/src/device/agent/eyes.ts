@@ -237,7 +237,8 @@ export class DeviceEyes {
 
   /** Removes the session's screenshots. */
   async close(): Promise<void> {
-    if (this.dir !== undefined) await rm(this.dir, { recursive: true, force: true })
+    if (this.dir !== undefined)
+      await rm(this.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   }
 }
 

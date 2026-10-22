@@ -39,7 +39,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await server.close()
-  await rm(dir, { recursive: true, force: true })
+  await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 /** A model that fails the test if it is called. */

@@ -16,7 +16,9 @@ const FIXTURES = fileURLToPath(new URL("./fixtures", import.meta.url))
 const made: string[] = []
 
 afterAll(async () => {
-  await Promise.all(made.map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(
+    made.map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })),
+  )
 })
 
 /** A project inside the repository (so it resolves @danwo/sdk as an installed one would). */

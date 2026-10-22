@@ -287,7 +287,12 @@ describe("danwo serve", () => {
     )
     const record = `.danwo/runs/${run}/${test ?? ""}/attempt-1`
 
-    await rm(join(WORK, ".danwo", "runs", run), { recursive: true, force: true })
+    await rm(join(WORK, ".danwo", "runs", run), {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100,
+    })
     await open(`/runs/${run}`)
 
     const row = screen.getByRole("row").filter({ hasText: "shows a heading" })

@@ -9,7 +9,7 @@ import config from "../vite.config.ts"
 
 const root = mkdtempSync(join(tmpdir(), "danwo-vite-cache-"))
 
-afterAll(() => rmSync(root, { recursive: true, force: true }))
+afterAll(() => rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }))
 
 /** A dashboard folder inside a project with `lock` as its lockfile. */
 function project(name: string, lock: string): string {

@@ -158,7 +158,7 @@ describe("flight recorder", () => {
       expect([...shots.keys()]).toEqual(expect.arrayContaining([0, 1]))
       for (const path of shots.values()) expect(existsSync(join(dir, path))).toBe(true)
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
   }, 60_000)
 
@@ -203,7 +203,7 @@ describe("flight recorder", () => {
         expect(evidence?.candidates?.join("\n")).toMatch(/Apple[\s\S]*Banana[\s\S]*Cherry/)
       })
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
   }, 60_000)
 
@@ -222,7 +222,7 @@ describe("flight recorder", () => {
         expect(screen).not.toContain("Zx81Qv0LmT5aRk2Yp9Hs")
       })
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
   }, 60_000)
 })

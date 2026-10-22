@@ -126,7 +126,8 @@ class FakeDevice implements DeviceTarget {
 let dirs: string[] = []
 
 afterEach(async () => {
-  for (const dir of dirs) await rm(dir, { recursive: true, force: true })
+  for (const dir of dirs)
+    await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   dirs = []
 })
 

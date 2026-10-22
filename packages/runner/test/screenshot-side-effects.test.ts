@@ -56,7 +56,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await browser.close()
-  await rm(dir, { recursive: true, force: true })
+  await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 describe("an automatic step screenshot", () => {

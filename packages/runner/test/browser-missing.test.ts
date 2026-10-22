@@ -10,7 +10,7 @@ import { codeOf } from "../src/support/codes.ts"
 const LAUNCH = new URL("../src/browser/launch.ts", import.meta.url).href
 const noBrowsers = mkdtempSync(join(tmpdir(), "danwo-no-browsers-"))
 
-afterAll(() => rmSync(noBrowsers, { recursive: true, force: true }))
+afterAll(() => rmSync(noBrowsers, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }))
 
 /** Launches danwo's browser on a machine whose Playwright browser folder is empty; what it threw. */
 function launchWithoutBrowsers(): Promise<string> {

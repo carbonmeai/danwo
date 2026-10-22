@@ -50,7 +50,7 @@ describe("live provider keys", () => {
   let dir: string | undefined
 
   afterEach(async () => {
-    if (dir) await rm(dir, { recursive: true, force: true })
+    if (dir) await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   })
 
   it("flags live keys for providers the run does not emulate, by name, never by value", async () => {

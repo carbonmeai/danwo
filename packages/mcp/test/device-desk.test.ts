@@ -243,7 +243,7 @@ describe("a device session's desk", () => {
 
   afterEach(async () => {
     await desk.close()
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   })
 
   it("reads the screen as a tree with refs, and says what is in front", async () => {

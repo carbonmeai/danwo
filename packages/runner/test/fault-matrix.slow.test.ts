@@ -256,7 +256,8 @@ beforeAll(() => {
 })
 
 afterAll(async () => {
-  for (const dir of cacheDirs) await rm(dir, { recursive: true, force: true })
+  for (const dir of cacheDirs)
+    await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 async function cacheDir(): Promise<string> {

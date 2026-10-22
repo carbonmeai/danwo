@@ -24,7 +24,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  await rm(state, { recursive: true, force: true })
+  await rm(state, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 afterAll(removeWorkCopies)

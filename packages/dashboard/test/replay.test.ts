@@ -352,7 +352,7 @@ describe("serving a record's video", () => {
   })
 
   afterEach(async () => {
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   })
 
   const path = "20261019-100000-aaaa/tests-pay/attempt-1/video/tab-1.webm"

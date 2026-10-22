@@ -183,7 +183,7 @@ describe("secrets", () => {
       expect(replayActor.doGenerateCalls.length).toBe(0)
       expect(received).toEqual([{ email: "qa@danwo.test", password: PASSWORD }])
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
   }, 60_000)
 

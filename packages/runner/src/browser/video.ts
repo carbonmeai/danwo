@@ -160,9 +160,12 @@ export class TabFilm {
       }
     }
 
-    await rm(join(this.artifactsDir, rawDir(this.user)), { recursive: true, force: true }).catch(
-      () => undefined,
-    )
+    await rm(join(this.artifactsDir, rawDir(this.user)), {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100,
+    }).catch(() => undefined)
     this.saved = saved
     this.missed = missed
   }

@@ -22,7 +22,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  await rm(state, { recursive: true, force: true })
+  await rm(state, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 // Every run writes into its fixture's copy; the copies go when the file is done.
@@ -256,7 +256,12 @@ describe("danwo test with screenshots", () => {
       "tests/__screenshots__/badge.danwo.ts/badge-looks-right/badge.png",
     )
 
-    await rm(join(fixture("visual"), "tests", "__screenshots__"), { recursive: true, force: true })
+    await rm(join(fixture("visual"), "tests", "__screenshots__"), {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100,
+    })
 
     const first = await danwo(fixture("visual"), ["test"])
 

@@ -73,7 +73,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await browser.close()
   await server.close()
-  await rm(dir, { recursive: true, force: true })
+  await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 /** One row of a dense table, with two unnamed icon controls. */

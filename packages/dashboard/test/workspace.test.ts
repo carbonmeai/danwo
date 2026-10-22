@@ -94,7 +94,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 async function write(path: string, value: unknown): Promise<void> {

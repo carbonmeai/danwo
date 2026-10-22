@@ -272,7 +272,7 @@ describe("a test's imports", () => {
   })
 
   afterEach(async () => {
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   })
 
   it("follows relative imports through other files, leaving packages out", async () => {

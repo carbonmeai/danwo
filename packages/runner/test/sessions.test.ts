@@ -156,7 +156,7 @@ describe("saved sessions in attempts", () => {
       expect(logins).toBe(2)
       expect(idle.doGenerateCalls).toHaveLength(0)
     } finally {
-      await rm(cache, { recursive: true, force: true })
+      await rm(cache, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
   }, 60_000)
 

@@ -784,7 +784,7 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
     async stop() {
       try {
         await server.stop()
-        await rm(dir, { recursive: true, force: true })
+        await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
       } finally {
         loud()
       }

@@ -8,7 +8,11 @@ import { afterEach } from "vitest"
 const made: string[] = []
 
 afterEach(async () => {
-  await Promise.all(made.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(
+    made
+      .splice(0)
+      .map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })),
+  )
 })
 
 /** A project folder with `files` (path → text; objects are written as JSON). */

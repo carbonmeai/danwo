@@ -22,7 +22,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await fake?.close()
   fake = undefined
-  await rm(dir, { recursive: true, force: true })
+  await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 /** The environment of an Actions job on a pull request, with the project in `app/`. */

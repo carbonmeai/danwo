@@ -155,7 +155,7 @@ beforeEach(async () => {
   board.reset()
   dir = await mkdtemp(join(tmpdir(), "danwo-board-"))
 
-  return () => rm(dir, { recursive: true, force: true })
+  return () => rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 /** The agent steps' cache notes, by label. */

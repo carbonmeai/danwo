@@ -73,7 +73,7 @@ function started(): WorkerEnvironment {
 let dir: string | undefined
 
 afterEach(async () => {
-  if (dir) await rm(dir, { recursive: true, force: true })
+  if (dir) await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   dir = undefined
 })
 

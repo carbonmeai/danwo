@@ -65,7 +65,7 @@ export async function finishRun(
     const records = await loadRecords(runDir)
 
     if (records.length === 0) {
-      await rm(runDir, { recursive: true, force: true })
+      await rm(runDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 
       return undefined
     }
@@ -86,7 +86,9 @@ export async function pruneRuns(runsDir: string, keep: number): Promise<void> {
   const runs = (await children(runsDir)).toSorted().toReversed()
 
   await Promise.all(
-    runs.slice(Math.max(1, keep)).map((dir) => rm(dir, { recursive: true, force: true })),
+    runs
+      .slice(Math.max(1, keep))
+      .map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })),
   )
 }
 

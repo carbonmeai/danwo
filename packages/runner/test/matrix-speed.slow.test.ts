@@ -34,7 +34,7 @@ afterEach(async () => {
     else process.env[key] = value
   }
 
-  await rm(dir, { recursive: true, force: true })
+  await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 /** Runs the counted shop's matrix; its result and every line it printed. */

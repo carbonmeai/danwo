@@ -8,7 +8,7 @@ import { afterAll, describe, expect, it } from "vitest"
 const HOOK = new URL("../src/runner/register.ts", import.meta.url).href
 const root = mkdtempSync(join(tmpdir(), "danwo-register-"))
 
-afterAll(() => rmSync(root, { recursive: true, force: true }))
+afterAll(() => rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }))
 
 /** A project whose package.json has `type`, with a config importing a helper by an extensionless path. */
 function project(name: string, type: string | undefined): string {

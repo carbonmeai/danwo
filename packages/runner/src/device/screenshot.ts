@@ -108,7 +108,7 @@ export function deviceScreenshot(
 
       return cut(image, only.box, hidden)
     } finally {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
   }
 

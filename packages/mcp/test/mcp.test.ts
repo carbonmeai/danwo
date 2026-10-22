@@ -144,7 +144,7 @@ describe("scaffold_test", () => {
   })
 
   afterEach(async () => {
-    await rm(root, { recursive: true, force: true })
+    await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   })
 
   it("writes a new test under the testDir and never overwrites it", async () => {
@@ -225,7 +225,7 @@ describe("show_run and read_screenshot", () => {
       expect(textOf(outside)).toContain("is outside the project")
       await client.close()
     } finally {
-      await rm(root, { recursive: true, force: true })
+      await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
   })
 })

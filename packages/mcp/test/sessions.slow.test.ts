@@ -151,7 +151,12 @@ describe("live sessions on the pantry", () => {
   let client: Client
 
   beforeAll(async () => {
-    await rm(join(PANTRY, ".danwo", "sessions"), { recursive: true, force: true })
+    await rm(join(PANTRY, ".danwo", "sessions"), {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100,
+    })
     client = await connect(PANTRY, { sessions: { max: 2 } })
   })
 

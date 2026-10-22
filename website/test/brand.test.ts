@@ -31,7 +31,7 @@ function referencedPaths(): string[] {
 let out: string | undefined
 
 afterEach(() => {
-  if (out) rmSync(out, { recursive: true, force: true })
+  if (out) rmSync(out, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   out = undefined
 })
 

@@ -411,7 +411,8 @@ describe("the simulator's accessibility tree", () => {
 let dir: string | undefined
 
 afterEach(async () => {
-  if (dir !== undefined) await rm(dir, { recursive: true, force: true })
+  if (dir !== undefined)
+    await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   dir = undefined
 })
 
