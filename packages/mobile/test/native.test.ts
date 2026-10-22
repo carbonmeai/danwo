@@ -216,7 +216,7 @@ describe("the native iOS build", () => {
     const built = await buildXcode(options)
 
     expect(built).toMatchObject({ cached: false, bundleId: "dev.danwo.hello" })
-    expect(built.app).toMatch(/\.danwo\/builds\/[0-9a-f]{16}\.app$/)
+    expect(built.app).toMatch(/\.danwo[\\/]builds[\\/][0-9a-f]{16}\.app$/)
     expect(existsSync(join(built.app, "Info.plist"))).toBe(true)
     expect(steps(fake.calls)).toEqual([
       "xcodebuild -list",
