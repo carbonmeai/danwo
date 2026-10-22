@@ -135,6 +135,7 @@ works in each engine.
 | `webhookFaults`  | the defaults                                                          | the faults planned on each webhook                         |
 | `dataFaults`     | the defaults                                                          | faults on the app's database and cache calls               |
 | `rerunInvalid`   | `0`                                                                   | reruns of a trial whose fault never fired                  |
+| `warmUp`         | `false`                                                               | runs the test once before the clean run, for a warm app    |
 | `checkPace`      | 3× the clean run, at least 1 s; on a device 6 s, once the fault fired | how long a faulted run's checks wait                       |
 
 See [Planning and budget](/docs/matrix-planning) for how the budget is spent.

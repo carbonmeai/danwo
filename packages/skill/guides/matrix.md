@@ -32,6 +32,10 @@ below) and replays the clean run's recorded steps without the model.
 - PASS: the invariant held under the fault (the body may stop early; that is fine).
 - FAIL: the invariant broke; the report shows where the body stopped and why.
 - INVALID: the fault never fired (the app took another path); rerun with `matrix.rerunInvalid`.
+  A call the app makes once per process (a signing key it fetches and caches) is made in the
+  clean run only, when the app is cold: `matrix: { warmUp: true }` runs the test once, unrecorded,
+  before the clean run, so such a call gets no fault. Use it only when the environment's reset
+  puts every app's state back: the clean run starts from what the reset leaves of the warm-up.
 - NOT JUDGED: the trial was blocked, inconclusive or hit an infrastructure failure, or its body
   broke before the fault could fire (the error says where).
 
@@ -110,7 +114,8 @@ they can happen:
   `test("buys the last lamp", { concurrent: 2 }, …)`; nothing else plans it.
 - `webhooks before redirect from checkout.stripe.com`: after paying, the browser is kept from
   landing back on the app until the provider's webhooks were delivered. Planned only when the
-  clean run delivered webhooks and came back to the app from another site.
+  clean run delivered webhooks, and only on a return from a site where the browser first did
+  something (paid, signed up), not one it only passed through, such as a sign-in handshake.
 - `reorder webhooks payment_intent.created, payment_intent.succeeded`: two different webhooks one
   endpoint got in a row arrive the other way round.
 - `slow-then-retry 3000ms on POST api.stripe.com/v1/checkout/sessions`: a server-side call that

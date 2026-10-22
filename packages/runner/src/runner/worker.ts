@@ -828,6 +828,33 @@ async function restoreTime(session: string | undefined): Promise<number | undefi
 }
 
 /**
+ * Runs the test once before a matrix's clean trial when the config asks (`matrix.warmUp`),
+ * unrecorded and unjudged, so the clean trial meets the app warm, as the faulted trials do. A cold
+ * app makes some calls once per process (it fetches a signing key and caches it, say); planned
+ * from a cold clean trial, each would be a fault no later trial can fire. However the warm-up
+ * ends, the clean trial starts afresh after it.
+ */
+async function warmUp(
+  task: TrialTask,
+  declarations: FileDeclarations,
+  session: string | undefined,
+): Promise<void> {
+  if (task.warmUp !== true) return
+
+  const { start, env } = benchOrFail()
+  const replay: ReplayUse = { kind: "learn", dir: task.cacheDir }
+
+  await start?.clean(session)
+  start?.touch()
+  await attemptOnce(declarations, task.file, task.testId, replay, "warm-up", undefined, {
+    unrecorded: true,
+    skipInvariant: true,
+  }).catch(() => undefined)
+  await env?.settle?.()
+  await env?.proxy?.settled().catch(() => undefined)
+}
+
+/**
  * Puts the environment where every trial starts. The worker's first trial resets it and, when
  * the environment can, keeps a snapshot; every later trial restores that snapshot instead of
  * resetting, which skips app restarts and reseeding.
@@ -850,6 +877,7 @@ async function trial(task: TrialTask): Promise<TrialReport> {
   const declarations = await loadTestFile(task.file)
   const session = sessionOf(declarations, findDeclared(declarations, task.file, task.testId))
 
+  await warmUp(task, declarations, atBody ? session : undefined)
   await timed(timings, "prepare", async () => start?.clean(atBody ? session : undefined))
   const restoreMs =
     task.timeRestore === true ? await restoreTime(atBody ? session : undefined) : undefined

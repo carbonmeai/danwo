@@ -175,6 +175,13 @@ export interface DanwoConfig {
     readonly dataFaults?: DataFaultCatalogue
     /** Runs a faulted run again up to this many times while its fault never fires (default 0). */
     readonly rerunInvalid?: number
+    /**
+     * Runs the test once, unrecorded, before the clean trial (default false), so the clean trial
+     * meets the app warm, as the faulted trials do. For an app that makes some calls once per
+     * process (it fetches a signing key and caches it): planned from a cold clean trial, those are
+     * faults no trial can fire. Only for an environment whose reset puts every app's state back.
+     */
+    readonly warmUp?: boolean
     /** Worker processes for `danwo matrix`; default `workers`, else one per core (at most 8). */
     readonly workers?: number
     /**

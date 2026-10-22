@@ -71,6 +71,8 @@ export interface TrialTask {
   readonly includeSetup?: boolean
   /** For the clean trial of a plan preview: also times one restore of the kept starting state. */
   readonly timeRestore?: boolean
+  /** For the clean trial: runs the test once, unrecorded, before it (`matrix.warmUp`). */
+  readonly warmUp?: boolean
 }
 
 /** One attempt of a test, as the parent reports it. */

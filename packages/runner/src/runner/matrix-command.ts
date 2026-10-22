@@ -49,7 +49,7 @@ import {
   tellReporters,
   type TrialFindings,
 } from "./reporting.ts"
-import type { TrialReport } from "./tasks.ts"
+import type { TrialReport, TrialTask } from "./tasks.ts"
 import { noTimings, type TrialTimings, timingsLine } from "./timings.ts"
 import { runPool, shuffledOrder } from "./trial-pool.ts"
 
@@ -142,6 +142,14 @@ function outcomeOf(report: TrialReport, fault: PlannedFault | null): RunOutcome 
     : checkFaultFired({ ...rest, fault })
 }
 
+/** What the clean trial alone asks of its worker: a timed restore for a preview, a warm-up. */
+function cleanExtras(run: MatrixRun): Pick<TrialTask, "timeRestore" | "warmUp"> {
+  return {
+    ...(run.focus.preview && { timeRestore: true }),
+    ...(run.loaded.config.matrix?.warmUp === true && { warmUp: true }),
+  }
+}
+
 /** Runs trials on the crew; any trial that could not run at all is an environment error. */
 function trialRunner(crew: Crew, run: MatrixRun) {
   return async (fault: PlannedFault | null): Promise<RunOutcome> => {
@@ -154,7 +162,7 @@ function trialRunner(crew: Crew, run: MatrixRun) {
         cacheDir: run.cacheDir,
         ...(pace && { pace }),
         ...(run.focus.includeSetup && { includeSetup: true }),
-        ...(fault === null && run.focus.preview && { timeRestore: true }),
+        ...(fault === null && cleanExtras(run)),
       })
 
       keepTrialFacts(run, fault, report)
