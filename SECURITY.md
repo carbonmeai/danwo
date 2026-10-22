@@ -22,6 +22,12 @@ The `Security` workflow scans `bun.lock` on every pull request that changes a `p
 
 An advisory goes on the allowlist only when the vulnerable code cannot be reached from danwo and no fixed version fits the dependency's range. Each entry says why, and has a review-by date about three months out; a unit test fails once that date passes, so every exception is looked at again. Dependabot opens the security fixes it can make as one grouped pull request.
 
+## Known advisories in what you install
+
+These are advisories a scanner may report in `@danwo/*` packages installed from npm, where the vulnerable code cannot be reached from danwo and no fix fits the dependency's range yet.
+
+- **basic-ftp, [GHSA-c475-qrg2-pj4r](https://github.com/advisories/GHSA-c475-qrg2-pj4r) (high).** It arrives through `@danwo/proxy > mockttp > pac-proxy-agent > get-uri > basic-ftp`. The bug is a CPU denial of service in `Client.list()` while it parses a hostile FTP server's directory listing. basic-ftp runs only when get-uri fetches an `ftp:` URL, and get-uri is used only to fetch a PAC file for an upstream proxy. danwo's proxy never sets an upstream proxy or a PAC file, so this code never loads. The fix (basic-ftp 6.2.1 and later) is outside every get-uri 6 release's range, which is the line mockttp uses. This repository overrides basic-ftp to `^6.2.3`, but an override does not reach your install. If your own policy needs it gone, add the same override (`overrides` in npm and Bun, `pnpm.overrides` in pnpm, `resolutions` in Yarn).
+
 ## Scope
 
 In scope: the danwo CLI, runner, egress proxy, emulators, dashboard, MCP server and GitHub reporter in this repository. Examples of what we care about:
