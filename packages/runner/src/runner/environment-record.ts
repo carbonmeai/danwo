@@ -43,17 +43,24 @@ function bare(path: string): string {
   return path.split("?")[0] ?? path
 }
 
-/** What `env` has seen so far, redacted, as the environment record keeps it. */
-export function environmentRecord(env: WorkerEnvironment, worker: number): EnvironmentRecord {
-  const redactor = createRedactor((text) => text)
+/**
+ * What `env` has seen so far, redacted, as the environment record keeps it: credential shapes,
+ * and the secrets `redact` knows (the config's own values, before any test revealed more).
+ */
+export function environmentRecord(
+  env: WorkerEnvironment,
+  worker: number,
+  redact: (text: string) => string = (text) => text,
+): EnvironmentRecord {
+  const redactor = createRedactor(redact)
   const exchanges = env.proxy?.exchanges() ?? []
   const sockets = env.proxy?.sockets() ?? []
 
   return {
     worker,
     writtenAt: new Date().toISOString(),
-    notes: env.notes?.() ?? [],
-    stopped: env.stopped?.() ?? [],
+    notes: (env.notes?.() ?? []).map((note) => redactor.text(note)),
+    stopped: (env.stopped?.() ?? []).map((line) => redactor.text(line)),
     calls: exchanges
       .filter((exchange) => exchange.asset !== true)
       .map((exchange) => ({
@@ -87,12 +94,13 @@ export async function writeEnvironmentRecord(
   runDir: string,
   env: WorkerEnvironment,
   worker: number,
+  redact?: (text: string) => string,
 ): Promise<void> {
   try {
     await mkdir(runDir, { recursive: true })
     await writeFile(
       join(runDir, `environment-${worker}.json`),
-      `${JSON.stringify(environmentRecord(env, worker), null, 2)}\n`,
+      `${JSON.stringify(environmentRecord(env, worker, redact), null, 2)}\n`,
     )
   } catch {
     /* The disk may refuse: the tests still run. */

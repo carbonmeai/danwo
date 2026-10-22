@@ -36,6 +36,7 @@ import { timeMachineOf } from "../time/index.ts"
 import { backendOf } from "./backend.ts"
 import type { DanwoConfig } from "./config.ts"
 import type { WorkerEnvironment } from "./environment.ts"
+import { createRedactor } from "./redact.ts"
 import {
   type SessionContext,
   SessionKeeper,
@@ -206,13 +207,19 @@ export async function runAttempt(
   const ended = await timed(timings, "close", () =>
     endAttempt(file, test, { session, setup, fixtures, verdict: judged.verdict, call }),
   )
+  /*
+   * The error and where the body stopped reach the terminal, the results file, JUnit, the run
+   * history and the pull request comment, not only the record: redacted here, with every secret
+   * the session knows by its end.
+   */
+  const redactor = createRedactor((text) => session.flight.redact(text))
 
   return {
     status: ended.verdict.status,
-    error: reportedError(ended.verdict, setup.root),
+    error: redactor.deep(reportedError(ended.verdict, setup.root)),
     durationMs: Date.now() - started,
-    divergence: ended.divergence,
-    stopped: judged.stopped,
+    divergence: redactor.deep(ended.divergence),
+    stopped: redactor.deep(judged.stopped),
     flight: {
       session: session.flight,
       failure: ended.failure,

@@ -25,6 +25,7 @@ import type { StepRecord } from "../record/index.ts"
 import { unexpectedlyMissing } from "../record/missing.ts"
 import { usageOf } from "../record/usage.ts"
 import { keepsVideo } from "../record/video.ts"
+import { SecretVault } from "../secrets/index.ts"
 import {
   type DeclaredTest,
   type FileDeclarations,
@@ -841,7 +842,8 @@ const calls: WorkerCalls = {
     const env = await loaded.config.environment?.({ workerIndex: start.workerIndex })
     const recording = start.record?.mode === "off" ? undefined : start.record
 
-    if (env && recording) await writeEnvironmentRecord(recording.runDir, env, start.workerIndex)
+    if (env && recording)
+      await writeEnvironmentRecord(recording.runDir, env, start.workerIndex, configRedact(loaded))
     const sessions = new SessionKeeper({
       signedIn,
       holds: (name) => bench?.start?.holds(name) ?? true,
@@ -869,12 +871,25 @@ const calls: WorkerCalls = {
 
 let stopping: Promise<void> | undefined
 
+/**
+ * Replaces the config's own secret values, for what is written outside any test (the apps'
+ * startup output): a function-valued secret is known only once a test reveals it.
+ */
+function configRedact(loaded: LoadedConfig): (text: string) => string {
+  return new SecretVault(loaded.config.secrets).redact
+}
+
 /** Closes the browser and the environment, then ends the worker. */
 async function closeAndExit(): Promise<void> {
   await (await browser?.catch(() => undefined))?.close()
   /* Again at the end: an app's output between tests (a crash during a reset) is only kept here. */
   if (bench?.env && bench.recording)
-    await writeEnvironmentRecord(bench.recording.runDir, bench.env, bench.workerIndex)
+    await writeEnvironmentRecord(
+      bench.recording.runDir,
+      bench.env,
+      bench.workerIndex,
+      configRedact(bench.loaded),
+    )
   await bench?.env?.close()
   if (process.connected) process.disconnect()
   process.exit(0)

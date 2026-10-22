@@ -114,6 +114,14 @@ describe("the environment record", () => {
     expect(record.logs.api?.[1]).not.toContain("51NotARealKeyAtAll")
   })
 
+  it("removes the config's own secret values from the apps' output", () => {
+    const record = environmentRecord(started(), 1, (text) =>
+      text.replaceAll("4400", "[secret port]"),
+    )
+
+    expect(record.logs.api?.[0]).toBe("listening on [secret port]")
+  })
+
   it("is written into the run's folder, made when no record made it yet", async () => {
     dir = await mkdtemp(join(tmpdir(), "danwo-env-record-"))
     const runDir = join(dir, "runs", "20261019-000000-abcd")

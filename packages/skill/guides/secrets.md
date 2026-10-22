@@ -35,4 +35,10 @@ shaped like a credential: provider keys, bearer tokens, webhook signing secrets,
 private keys. Screenshots mask fields that hold a secret. Text cut to length (the agent's page view,
 a failed locator's candidates, a check's previewed sides) is redacted before the cut, and every
 string of a record gets a last pass when it is written, so a function-valued secret revealed late
-is caught in what was recorded before it.
+is caught in what was recorded before it. A test's error, where its body stopped and its replay
+divergence are redacted with every value the session knew at its end before they leave the
+attempt, so the terminal, `results.json`, JUnit, the run history, custom reporters, the PR comment
+and the job summary never hold one. The environment record's startup output (written before any
+test) is redacted with the config's own `secrets` values and credential shapes; a function-valued
+secret is not known there until a test reveals it. danwo keeps no browser downloads, so there is
+nothing of them to scan.
