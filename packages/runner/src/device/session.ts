@@ -299,6 +299,18 @@ function deviceMail(desk: MailDesk, timeout: number): SessionMail {
   }
 }
 
+/**
+ * The least a paced device check waits, unless the config sets its own floor. A device's screens
+ * take seconds longer from one run to the next than a page does: an in-app browser opening, or an
+ * app coming back to the front, took under a second in the clean run and four in a later one.
+ */
+const DEVICE_PACE_FLOOR_MS = 6_000
+
+/** The matrix's check pace for a device, with the device's floor when the config sets none. */
+export function devicePace(pace: CheckPace): CheckPace {
+  return { ...pace, floorMs: pace.floorMs ?? DEVICE_PACE_FLOOR_MS }
+}
+
 /** Opens an attempt on `target`: the app is reset and launched first. */
 export async function openDeviceSession(
   target: DeviceTarget,
@@ -324,7 +336,9 @@ export async function openDeviceSession(
     actionTimeout: options.actionTimeout ?? DEFAULT_ACTION_MS,
     assertionTimeout: options.assertionTimeout ?? DEFAULT_ASSERTION_MS,
     ready,
-    ...(options.checkPace && { checkTimeout: pacer(options.checkPace, steps, vault.redact) }),
+    ...(options.checkPace && {
+      checkTimeout: pacer(devicePace(options.checkPace), steps, vault.redact),
+    }),
     shots: shotsOf(options, steps),
   }
   const film =

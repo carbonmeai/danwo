@@ -4,10 +4,10 @@ import { join } from "node:path"
 
 import { afterEach, describe, expect, it } from "vitest"
 
-import { type CheckPace, checkKey } from "../src/assert/pace.ts"
+import { type CheckPace, checkKey, pacedTimeout } from "../src/assert/pace.ts"
 import { DeviceLocator } from "../src/device/locator.ts"
 import { resolveChain, textMatches } from "../src/device/match.ts"
-import { type DeviceSession, openDeviceSession } from "../src/device/session.ts"
+import { devicePace, type DeviceSession, openDeviceSession } from "../src/device/session.ts"
 import type { DeviceForeground, DeviceNode, DeviceTarget } from "../src/device/types.ts"
 import type { Locator } from "../src/locate/types.ts"
 
@@ -447,6 +447,13 @@ describe("expect on a device", () => {
     await expect(check(screen.getByTestId("credits")).toHaveText("Credits: 1000")).rejects.toThrow(
       "failed after 650 ms",
     )
+  })
+
+  it("waits at least six seconds for a paced check on a device, unless the config sets a floor", () => {
+    const took = { a: 50 }
+
+    expect(pacedTimeout(devicePace({ took }), "a", 15_000)).toBe(6_500)
+    expect(pacedTimeout(devicePace({ took, floorMs: 100 }), "a", 15_000)).toBe(650)
   })
 
   it("checks a field's value", async () => {

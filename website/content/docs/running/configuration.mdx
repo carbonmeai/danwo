@@ -105,16 +105,16 @@ pass values to each other through variables at the top of the file.
 
 `matrix` holds the matrix's own settings:
 
-| Option           | Default                                | What it does                                               |
-| ---------------- | -------------------------------------- | ---------------------------------------------------------- |
-| `budget`         | `40`                                   | most faulted trials a matrix runs                          |
-| `workers`        | `workers`, else one per core (up to 8) | matrix worker processes                                    |
-| `races`          | all on                                 | double submits, early and reordered webhooks, slow retries |
-| `outboundFaults` | each provider's own                    | the faults planned on each provider call                   |
-| `webhookFaults`  | the defaults                           | the faults planned on each webhook                         |
-| `dataFaults`     | the defaults                           | faults on the app's database and cache calls               |
-| `rerunInvalid`   | `0`                                    | reruns of a trial whose fault never fired                  |
-| `checkPace`      | 3× the clean run, at least 1 s         | how long a faulted run's checks wait                       |
+| Option           | Default                                          | What it does                                               |
+| ---------------- | ------------------------------------------------ | ---------------------------------------------------------- |
+| `budget`         | `40`                                             | most faulted trials a matrix runs                          |
+| `workers`        | `workers`, else one per core (up to 8)           | matrix worker processes                                    |
+| `races`          | all on                                           | double submits, early and reordered webhooks, slow retries |
+| `outboundFaults` | each provider's own                              | the faults planned on each provider call                   |
+| `webhookFaults`  | the defaults                                     | the faults planned on each webhook                         |
+| `dataFaults`     | the defaults                                     | faults on the app's database and cache calls               |
+| `rerunInvalid`   | `0`                                              | reruns of a trial whose fault never fired                  |
+| `checkPace`      | 3× the clean run, at least 1 s (6 s on a device) | how long a faulted run's checks wait                       |
 
 See [Planning and budget](/docs/matrix-planning) for how the budget is spent.
 
