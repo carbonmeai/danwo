@@ -68,7 +68,7 @@ export function Footer() {
               <Lockup height={26} className="on-dark" />
             </Link>
             <p style={{ margin: "14px 0 0", maxWidth: 260 }}>
-              {SITE.tagline} Testing for the agentic era.
+              {SITE.tagline} End-to-end testing for web and mobile apps.
             </p>
           </div>
           <Column

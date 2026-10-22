@@ -50,7 +50,7 @@ export const Route = createFileRoute("/")({
   loader: async () => ({ stars: await starCount() }),
   staleTime: Infinity,
   head: () =>
-    pageHead({ title: `${SITE.name}: ${SITE.tagline}`, description: SITE.description, path: "/" }),
+    pageHead({ title: `${SITE.name}: ${SITE.title}`, description: SITE.description, path: "/" }),
   component: Landing,
 })
 

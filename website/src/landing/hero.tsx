@@ -130,17 +130,18 @@ export const Hero = forwardRef<HTMLElement>(function Hero(_props, ref) {
             <ChevronIcon size={12} />
           </span>
         </Link>
+        <p className="hero-kicker">
+          {SITE.licence.openSource ? "Open-source e2e testing" : "E2E testing"} for web and mobile
+          apps
+        </p>
         <h1>
           Drive the UI. <span className="dim">Judge everything behind it.</span>
         </h1>
         <div className="hero-row">
           <p className="hero-sub">
-            danwo is {SITE.licence.openSource ? "the open-source" : "the"} testing platform for the
-            agentic era. It clicks through your web and mobile app like a user,{" "}
-            <strong>
-              while emulated Stripe, Clerk, Resend and twenty more providers record every call
-            </strong>
-            , then breaks the run on purpose, once per fault you should survive.
+            danwo clicks through your app like a user{" "}
+            <strong>while emulated Stripe, Clerk, Resend and twenty more record every call</strong>,
+            then breaks the run on purpose, once per fault.
           </p>
           <div className="hero-meta">
             <span>no app code changes</span>

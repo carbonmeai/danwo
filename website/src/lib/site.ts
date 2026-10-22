@@ -9,6 +9,8 @@ export const SITE = {
   /** The address the site is served from; canonical links and the sitemap use it. */
   url: "https://danwo.dev",
   tagline: "Drive the UI. Judge everything behind it.",
+  /** What danwo is, in the words people search for; the home page's title. */
+  title: "E2E testing framework for web and mobile apps",
   description:
     "The complete e2e testing framework for web and mobile apps, with service emulators, a fault matrix and checks on every side effect.",
   /**

@@ -8,6 +8,17 @@ export function GithubIcon() {
   )
 }
 
+export function StarIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true">
+      <path
+        d="M8 1.6l1.95 3.95 4.36.63-3.15 3.08.74 4.34L8 11.55l-3.9 2.05.74-4.34L1.7 6.18l4.36-.63L8 1.6Z"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 export function CopyIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">

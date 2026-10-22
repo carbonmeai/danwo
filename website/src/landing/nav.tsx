@@ -4,7 +4,7 @@ import { type RefObject, useEffect, useState } from "react"
 
 import { Lockup } from "../components/brand.tsx"
 import { repoUrl } from "../lib/site.ts"
-import { GithubIcon, MenuIcon, MoonIcon, SunIcon } from "./glyphs.tsx"
+import { GithubIcon, StarIcon, MenuIcon, MoonIcon, SunIcon } from "./glyphs.tsx"
 
 /** A star count as the nav shows it: 2412 → "2.4k". */
 function compact(stars: number): string {
@@ -87,7 +87,13 @@ export function Nav({
           {github && (
             <a className="stars" href={github} aria-label="danwo on GitHub">
               <GithubIcon />
-              Star{stars !== undefined && <b>{compact(stars)}</b>}
+              GitHub
+              {stars !== undefined && (
+                <b>
+                  <StarIcon />
+                  {compact(stars)}
+                </b>
+              )}
             </a>
           )}
           <ThemeButton />

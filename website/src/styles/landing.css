@@ -341,8 +341,17 @@
   }
 
   & .stars b {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 2px;
     font: 500 12px var(--mono);
     color: var(--h-muted);
+  }
+
+  & .stars b svg {
+    width: 13px;
+    height: 13px;
   }
 
   &.light .stars b {
@@ -398,10 +407,18 @@
     background: radial-gradient(closest-side, #3987e51f, transparent 72%);
   }
 
+  & .hero-kicker {
+    margin: 28px 0 0;
+    font: 500 13px/1.4 var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #a3a3a6;
+  }
+
   & h1 {
     font: 600 clamp(42px, 7.6vw, 88px)/1 var(--sans);
     letter-spacing: -0.045em;
-    margin: 28px 0 0;
+    margin: 14px 0 0;
     max-width: 1000px;
     text-wrap: balance;
   }
