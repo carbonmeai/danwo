@@ -1,5 +1,5 @@
 /*
- * Loaded into every danwo process with `--import`: Node 24 strips TypeScript types natively; this
+ * Loaded into every danwo process with `--import`: Node strips TypeScript types natively; this
  * adds the resolutions a TypeScript project expects on top: a `.js` specifier that names a `.ts`
  * file, an extensionless relative specifier, and, for the project's own files, the aliases its
  * `tsconfig.json` `paths` declare. It also loads a project's `.ts` files as ES modules when its

@@ -6,7 +6,7 @@ By taking part you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md). Se
 
 ## Setting up
 
-You need Node 24 and bun 1.3 or later. Android work also needs the Android SDK (`danwo device check` says what is missing), and the Postgres and Redis tests need Docker.
+You need Node 22.22.3 or a later 22, or 24.11.1 or later (CI runs both), and bun 1.3 or later. Android work also needs the Android SDK (`danwo device check` says what is missing), and the Postgres and Redis tests need Docker.
 
 ```bash
 bun install

@@ -8,19 +8,36 @@ import { readFileSync } from "node:fs"
 import * as nodeModule from "node:module"
 import { fileURLToPath } from "node:url"
 
-/* An older Node lacks the hooks below; say so instead of failing on a missing export. */
-if (Number(process.versions.node.split(".")[0]) < 24 || !("registerHooks" in nodeModule)) {
-  process.stderr.write(`danwo needs Node.js 24 or newer; this is Node.js ${process.version}.\n`)
+/**
+ * Whether `version` (`process.versions.node`) is one danwo runs on: `^22.22.3 || >=24.11.1`, the
+ * range every package's `engines` declares. Below it the hooks are missing, or a CommonJS package
+ * that `require`s an ES module (mockttp does) fails to load once any hook is registered.
+ */
+function supported(version) {
+  const [major, minor, patch] = version.split(".").map(Number)
+
+  if (major === 22) return minor > 22 || (minor === 22 && patch >= 3)
+  if (major === 24) return minor > 11 || (minor === 11 && patch >= 1)
+
+  return major > 24
+}
+
+/* Say so up front instead of failing later on a missing export or a module that will not link. */
+if (!supported(process.versions.node) || !("registerHooks" in nodeModule)) {
+  process.stderr.write(
+    `danwo needs Node.js 22.22.3 or a later 22, or 24.11.1 or newer; this is Node.js ${process.version}.\n`,
+  )
   process.exit(1)
 }
 
 const { registerHooks, stripTypeScriptTypes } = nodeModule
 const INSTALLED_TYPESCRIPT = /\/node_modules\/.+\.m?ts$/
 const emitWarning = process.emitWarning.bind(process)
+/** Experimental notices from APIs danwo itself uses: noise in every danwo process. */
+const QUIET = ["stripTypeScriptTypes", "SQLite is an experimental feature"]
 
-/* Node marks the stripping API experimental; that notice is noise in every danwo process. */
 process.emitWarning = (warning, ...rest) => {
-  if (String(warning).includes("stripTypeScriptTypes")) return
+  if (QUIET.some((notice) => String(warning).includes(notice))) return
 
   emitWarning(warning, ...rest)
 }

@@ -10,8 +10,9 @@ Set up a config, write one `*.danwo.ts` file, run it and read the result.
    danwo init --yes --engine web --model-source gateway --providers stripe,resend --skills claude
    ```
 
-   danwo needs Node.js 24 or newer; on an older Node every `danwo` command exits 1 with
-   `danwo needs Node.js 24 or newer; this is Node.js v…`. init installs `@danwo/cli` and
+   danwo needs Node.js 22.22.3 or a later 22, or 24.11.1 or newer; on any other Node every
+   `danwo` command exits 1 with `danwo needs Node.js 22.22.3 or a later 22, or 24.11.1 or newer;
+   this is Node.js v…`. init installs `@danwo/cli` and
    `@danwo/sdk` as dev dependencies at the version of the danwo running it (`danwo --version`
    prints it), so a beta sets up that beta, not `latest`; a TypeScript project without
    `@types/node` also gets `@types/node@^24`, since danwo's declarations use Node's types.

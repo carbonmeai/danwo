@@ -4,7 +4,7 @@ The `danwo` command. [dánwò](https://danwo.dev) is an open-source testing fram
 your app through its UI like a user, then checks everything that happened behind it: the payments,
 webhooks, emails and database writes, against local emulators of the services the app calls.
 
-Set it up in your app's folder (Node.js 24 or later):
+Set it up in your app's folder (Node.js 22.22.3 or a later 22, or 24.11.1 or later):
 
 ```sh
 npx @danwo/cli init

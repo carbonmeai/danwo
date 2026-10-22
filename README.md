@@ -44,7 +44,7 @@ what your app does when a provider fails.
 
 ## Quickstart
 
-You need Node.js 24 or newer. In your app's folder:
+You need Node.js 22.22.3 or a later 22, or 24.11.1 or newer. In your app's folder:
 
 ```sh
 npx @danwo/cli init
@@ -119,7 +119,7 @@ More in the [examples gallery](https://danwo.dev/docs/examples).
 
 ## Contributing
 
-Node 24 and bun:
+Node 22.22.3+ or 24.11.1+, and bun:
 
 ```sh
 bun install

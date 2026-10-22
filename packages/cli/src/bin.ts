@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * `danwo test` and `danwo matrix`. Runs under Node >= 24 with native type stripping; the runner
+ * `danwo test` and `danwo matrix`. Runs under Node 22 or 24 with native type stripping; the runner
  * forks its workers with its own resolve hook.
  */
 import { resolve as resolvePath } from "node:path"

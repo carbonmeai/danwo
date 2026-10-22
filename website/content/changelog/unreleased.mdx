@@ -10,7 +10,7 @@ date: 2026-10-20
 
 ## Install
 
-- Every package declares Node.js 24, and `danwo` on an older Node says so and exits instead of failing on a missing export.
+- danwo runs on Node.js 22.22.3 or a later 22, and on 24.11.1 or newer. Every package declares that range, and `danwo` on any other Node says so and exits instead of failing on a missing export.
 - `danwo --version` prints the version, and `danwo init` installs danwo's packages at that version rather than the latest. It also adds `@types/node` to a TypeScript project that lacks it.
 - `danwo init` in a monorepo package installs with the workspace's package manager (pnpm, npm, Yarn or Bun) into that package, adds `-w` at a pnpm root, and writes the skill and MCP server where the coding agent's folders are.
 - `danwo install-browser` installs the Chromium build danwo drives with danwo's own Playwright, keeping other installs' browsers. `init` runs it after the packages, and a launch that finds no browser names it.

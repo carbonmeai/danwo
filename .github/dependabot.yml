@@ -27,7 +27,7 @@ updates:
       # The proxy relies on mockttp's internals (its local port check among them); bump it by hand,
       # with the proxy's slow tests.
       - dependency-name: mockttp
-      # Node 24 is the supported runtime; its types follow it.
+      # danwo runs on Node 22 and 24; its types follow the newer one.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
       # An Expo SDK upgrade moves expo, react-native and react together; done by hand.
