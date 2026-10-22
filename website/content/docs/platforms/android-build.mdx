@@ -14,7 +14,9 @@ it trusts it.
 npx @danwo/cli build-android app
 ```
 
-`app` is the folder of your Expo project. danwo:
+`app` is the folder of your Expo project. The same command builds a Gradle project
+([Native Android apps](/docs/native-android)) or a Flutter app ([Flutter](/docs/flutter)); it
+tells them apart by what the folder holds. For an Expo app, danwo:
 
 1. runs `expo prebuild`;
 2. adds a network security config that also trusts user-installed certificates, where danwo puts

@@ -1,6 +1,6 @@
 # Mobile apps on Android and iOS
 
-Run the same tests, invariants and fault matrix against a React Native or Expo app on an Android emulator or an iOS Simulator, through danwo's proxy and emulators. Android comes first below; the iOS Simulator section says what differs.
+Run the same tests, invariants and fault matrix against an Expo, React Native or native app (SwiftUI, UIKit, Jetpack Compose, Views) on an Android emulator or an iOS Simulator, through danwo's proxy and emulators. Android comes first below; the iOS Simulator section says what differs, and the native section how native projects build.
 
 ```ts
 import type { DeviceFixtures } from "@danwo/device"
@@ -297,6 +297,56 @@ The shop on an iPhone 17 Pro simulator (iOS 26.5): both tests in about 50 s with
 replayed; the `buy-credits` matrix of 23 runs in 370 s on one simulator; the agent's matrix of 23
 runs in 298 s on two.
 
+## Native apps (SwiftUI, UIKit, Jetpack Compose, Views) and Flutter
+
+`danwo build-ios [project]` and `danwo build-android [project]` find what the folder holds, in this
+order: `pubspec.yaml` → Flutter; an `.xcworkspace` (else `.xcodeproj`) at the top → Xcode; a
+`settings.gradle(.kts)` with `gradlew` → Gradle (no wrapper is an error); a `package.json` →
+Expo. `buildIos` / `buildAndroid` do the same from a config, and return `bundleId` / `package` read
+from the build (`plutil` on the app's Info.plist, `aapt2 dump packagename` on the APK), so the
+device options need no hard-coded id. Examples: `examples/with-swiftui`, `examples/with-compose`.
+
+**Xcode.** `pod install` first for a workspace with a `Podfile` and no `Pods/`. The scheme is
+`--scheme`, else the only one in `xcodebuild -list -json`, else the one named like the project;
+it must be shared (in `xcshareddata`). `xcodebuild -project|-workspace … -configuration Release
+-sdk iphonesimulator -destination "generic/platform=iOS Simulator" -derivedDataPath
+<project>/.danwo/xcode ARCHS=<this Mac's> CODE_SIGNING_ALLOWED=NO build`; the `.app` is the
+scheme's, else the only one in `Build/Products/<configuration>-iphonesimulator`. The kept copy's
+Info.plist gets `NSAppTransportSecurity = { NSAllowsArbitraryLoads }` (plain HTTP through the
+proxy). Key: the sources minus `build`, `DerivedData`, `Pods`, `xcuserdata` and dotfiles, plus the
+scheme and configuration asked for.
+
+**Gradle.** `./gradlew assemble<Variant> --console=plain --no-daemon
+-Pkotlin.compiler.execution.strategy=in-process --init-script <…>/danwo-network.gradle` (variant
+`release` by default, `--variant`). The init script adds, through AGP's variant API
+(`variant.sources.res.addStaticSourceDirectory`, `variant.sources.manifests.addStaticManifestFile`),
+danwo's network security config (system + user CAs, cleartext) and a manifest overlay with
+`tools:replace="android:networkSecurityConfig"`: the APK trusts the run's CA with no change to the
+project. The APK is the variant's only one under `*/build/outputs/apk/<flavor>/<type>/`; an
+`-unsigned.apk` is signed with `~/.android/debug.keystore` by `apksigner` (the keystore is made
+with `keytool` when missing). Key: the sources minus `build`, `local.properties` and dotfiles.
+
+**Locators.** SwiftUI: `.accessibilityIdentifier` → `getByTestId`, `.accessibilityLabel` →
+`getByLabel` (a text field's placeholder is not its name). Compose: `Modifier.testTag` →
+`getByTestId` once the root sets `semantics { testTagsAsResourceId = true }`; a text field's
+`label` → `getByLabel`; `semantics { heading() }` → `getByRole("heading")`. Compose reports a
+`Button` as a tappable `android.view.View` holding a text and an empty `android.widget.Button`;
+danwo reads it as one `button` named by its text (also `Checkbox`, `Switch`, `RadioButton`), so
+`getByRole("button", { name })` works.
+
+**The network needs nothing from a native app**: `URLSession` follows the simulator's proxy and
+keychain; `HttpURLConnection` and OkHttp follow the emulator's proxy, and the danwo build trusts
+the user CA. Pinned certificates still defeat it. Route the app's production API host to the
+worker's local API with a `Service` whose route is `forwardTo(localUrl)`; the app ships unchanged.
+
+**Flutter.** `flutter build ios --simulator --debug` (Flutter builds simulators in debug only;
+`build/ios/iphonesimulator/Runner.app`) and `flutter build apk --release`
+(`build/app/outputs/flutter-apk/app-release.apk`), with `GRADLE_OPTS` switching Gradle's and
+Kotlin's daemons off. Key: the sources minus `build`, `Pods`, `ephemeral`, `Generated.xcconfig`
+and the other generated files; `ios/` and `android/` are sources. Not yet run on a device: Dart's
+`HttpClient` (the default for `package:http`) ignores the device proxy and user CAs, so the app
+needs `cupertino_http` / `cronet_http`, and the APK a network security config trusting user CAs.
+
 ## Live sessions over MCP
 
 `open_session` with `device: true` starts the environment as a worker would and drives its
@@ -340,8 +390,8 @@ server's.
 
 ## Limits for now
 
-- **Flutter.** Flutter apps draw their own widgets, and their accessibility tree is thin.
-- **iOS: Simulator only.** Physical iPhones and native Swift apps without React Native are not covered yet.
+- **Flutter.** Builds only so far: tests on a Flutter app have not been run on a device, and its network needs the change above.
+- **iOS: Simulator only.** Physical iPhones are not covered yet.
 - **Pinned apps.** Apps that pin certificates ignore danwo's CA.
 - **Play images.** Google Play system images cannot be rooted.
 - **Not yet.** `hover`, `setInputFiles`, `dragTo`, `mail.open`, agent steps that read mail, and

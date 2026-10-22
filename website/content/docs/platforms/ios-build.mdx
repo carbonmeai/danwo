@@ -18,7 +18,9 @@ built app/.danwo/builds/dd5eb4ac77e9aa9b.app in 111 s (log: app/.danwo/builds/bu
 ```
 
 `app` is the folder of your Expo project, which needs an `ios.bundleIdentifier` in its config.
-danwo:
+The same command builds a folder with an Xcode project ([Native iOS apps](/docs/native-ios)) or a
+`pubspec.yaml` ([Flutter](/docs/flutter)); it tells them apart by what the folder holds. For an
+Expo app, danwo:
 
 1. runs `expo prebuild --platform ios`, which also installs the CocoaPods;
 2. lets the app make plain HTTP calls, which the proxy routes to your backend;

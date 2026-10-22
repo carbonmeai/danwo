@@ -119,13 +119,15 @@ behind them, in a dashboard, a PR comment and over MCP.
 
 Each one runs with no real keys. Clone, install, test.
 
-| Example                               | What it shows                                                                |
-| ------------------------------------- | ---------------------------------------------------------------------------- |
-| [`commerce`](examples/commerce)       | A shop on Next.js, Hono, Postgres and Stripe Checkout. 86 faults held.       |
-| [`saas`](examples/saas)               | Workspaces, a trial and billing, Slack and Google, Inngest jobs, live notes. |
-| [`clerk-login`](examples/clerk-login) | The real Clerk components, Google sign-in and org invites, on the emulator.  |
-| [`better-auth`](examples/better-auth) | Self-hosted Better Auth: email codes, Google and GitHub, linked accounts.    |
-| [`with-next`](examples/with-next)     | The smallest one: a Next.js waitlist on Postgres and Resend.                 |
+| Example                                 | What it shows                                                                |
+| --------------------------------------- | ---------------------------------------------------------------------------- |
+| [`commerce`](examples/commerce)         | A shop on Next.js, Hono, Postgres and Stripe Checkout. 86 faults held.       |
+| [`saas`](examples/saas)                 | Workspaces, a trial and billing, Slack and Google, Inngest jobs, live notes. |
+| [`clerk-login`](examples/clerk-login)   | The real Clerk components, Google sign-in and org invites, on the emulator.  |
+| [`better-auth`](examples/better-auth)   | Self-hosted Better Auth: email codes, Google and GitHub, linked accounts.    |
+| [`with-next`](examples/with-next)       | The smallest one: a Next.js waitlist on Postgres and Resend.                 |
+| [`with-swiftui`](examples/with-swiftui) | The same waitlist as a native SwiftUI app on the iOS Simulator.              |
+| [`with-compose`](examples/with-compose) | The same waitlist as a native Jetpack Compose app on an Android emulator.    |
 
 More in the [examples gallery](https://danwo.dev/docs/examples).
 
@@ -134,8 +136,8 @@ More in the [examples gallery](https://danwo.dev/docs/examples).
 |                                                       |                                                                            |
 | ----------------------------------------------------- | -------------------------------------------------------------------------- |
 | [Web apps](https://danwo.dev/docs/web)                | Any framework, started by danwo or already running.                        |
-| [Android](https://danwo.dev/docs/android-tests)       | React Native and Expo on an emulator.                                      |
-| [iOS](https://danwo.dev/docs/ios-tests)               | React Native and Expo on an iOS Simulator.                                 |
+| [Android](https://danwo.dev/docs/android-tests)       | Expo, React Native, Jetpack Compose and Views apps on an emulator.         |
+| [iOS](https://danwo.dev/docs/ios-tests)               | Expo, React Native, SwiftUI and UIKit apps on an iOS Simulator.            |
 | [Playwright Test](https://danwo.dev/docs/playwright)  | Keep your tests, add emulators and the matrix.                             |
 | [Real stacks](https://danwo.dev/docs/real-stacks)     | Several apps, workers, databases and background jobs behind one proxy.     |
 | [CI](https://danwo.dev/docs/ci)                       | A GitHub Check and a PR comment that say what broke and whose fault it is. |

@@ -1,12 +1,13 @@
 ---
 title: iOS setup
-description: Get a Mac ready to test a React Native or Expo app on an iOS Simulator with danwo.
+description: Get a Mac ready to test an Expo, React Native or native iOS app on an iOS Simulator with danwo.
 icon: Smartphone
 ---
 
-danwo runs the same tests, invariants and fault matrix against a React Native or Expo app on an
-iOS Simulator. The app's calls, and the checkout page it opens, go through danwo's proxy, so
-Stripe and the rest are emulated there too. This page gets the Mac ready.
+danwo runs the same tests, invariants and fault matrix against an iOS app on a Simulator: an Expo
+or React Native app, or a native one written in SwiftUI or UIKit. The app's calls, and the checkout
+page it opens, go through danwo's proxy, so Stripe and the rest are emulated there too. This page
+gets the Mac ready.
 
 ## What you need
 
@@ -15,7 +16,7 @@ Stripe and the rest are emulated there too. This page gets the Mac ready.
 | a Mac          | the iOS Simulator only runs on macOS                            |
 | Xcode          | it brings the Simulator, `simctl` and the compiler for your app |
 | an iOS runtime | the iOS version the simulator runs; Xcode installs one          |
-| CocoaPods      | only to build an Expo app (`danwo build-ios`)                   |
+| CocoaPods      | only for an Expo app, or a workspace with a `Podfile`           |
 
 No simulator needs to exist: danwo creates its own the first time, an iPhone on the newest iOS
 you have, and keeps it for later runs.
@@ -88,7 +89,8 @@ Mac's own network settings are never touched.
 
 | Works                                         | Not yet                                             |
 | --------------------------------------------- | --------------------------------------------------- |
-| locators, `expect`, screenshots, the agent    | `getByRole("heading")`: iOS reports no heading role |
+| Expo, React Native, SwiftUI and UIKit apps    | `getByRole("heading")`: iOS reports no heading role |
+| locators, `expect`, screenshots, the agent    | tests on a Flutter app, which only builds so far    |
 | Safari views and sign-in sessions             | physical iPhones, and keys other than Enter         |
 | the fault matrix, on one simulator or several | reading mail from a test, saved sessions            |
 | films of each attempt, the app's log          | moving the device's own clock                       |
@@ -98,6 +100,9 @@ Mac's own network settings are never touched.
 <Cards>
   <Card title="iOS builds" href="/docs/ios-build">
     Build your Expo app for the Simulator.
+  </Card>
+  <Card title="Native iOS apps" href="/docs/native-ios">
+    Build and test a SwiftUI or UIKit app.
   </Card>
   <Card title="iOS tests" href="/docs/ios-tests">
     The config and what a test can do on a simulator.

@@ -1,12 +1,13 @@
 ---
 title: Android setup
-description: Get this machine ready to test a React Native or Expo app on an Android emulator with danwo.
+description: Get this machine ready to test an Expo, React Native or native Android app on an emulator with danwo.
 icon: Smartphone
 ---
 
-danwo runs the same tests, invariants and fault matrix against a React Native or Expo app on an
-Android emulator. The app's calls go through danwo's proxy, so Stripe and the rest are emulated
-there too. This page gets the machine ready.
+danwo runs the same tests, invariants and fault matrix against an Android app on an emulator: an
+Expo or React Native app, or a native one written with Jetpack Compose or Views. The app's calls go
+through danwo's proxy, so Stripe and the rest are emulated there too. This page gets the machine
+ready.
 
 ## What you need
 
@@ -72,18 +73,22 @@ proxy setting from an earlier run, and about images missing their files.
 
 ## What works on Android today
 
-| Works                                        | Not yet                                         |
-| -------------------------------------------- | ----------------------------------------------- |
-| locators, `expect`, screenshots, the agent   | `hover`, `setInputFiles`, `dragTo`              |
-| Custom Tabs (a web checkout inside the app)  | reading mail from a test, saved sessions        |
-| the fault matrix, on one emulator or several | Flutter apps (their accessibility tree is thin) |
-| time travel for your services and backend    | moving the device's own clock                   |
+| Works                                        | Not yet                                          |
+| -------------------------------------------- | ------------------------------------------------ |
+| Expo, React Native, Compose and Views apps   | tests on a Flutter app, which only builds so far |
+| locators, `expect`, screenshots, the agent   | `hover`, `setInputFiles`, `dragTo`               |
+| Custom Tabs (a web checkout inside the app)  | reading mail from a test, saved sessions         |
+| the fault matrix, on one emulator or several | moving the device's own clock                    |
+| time travel for your services and backend    |                                                  |
 
 ## Next
 
 <Cards>
   <Card title="Android builds" href="/docs/android-build">
     Build your Expo app so it trusts danwo's proxy.
+  </Card>
+  <Card title="Native Android apps" href="/docs/native-android">
+    Build and test a Jetpack Compose or Views app.
   </Card>
   <Card title="Android tests" href="/docs/android-tests">
     The config and what a test can do on a device.

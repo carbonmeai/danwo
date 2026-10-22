@@ -1,0 +1,67 @@
+---
+title: Flutter
+description: Build a Flutter app for the iOS Simulator or the Android emulator with danwo, and what its network needs.
+icon: Bird
+---
+
+danwo's two build commands build a Flutter app too. They find its `pubspec.yaml` and run
+Flutter's own build, and the kept build installs on a device like any other.
+
+<Callout type="warn">
+  Running tests on a Flutter app hasn't been checked on a device yet. The build commands are, and
+  the network needs one change in the app, below.
+</Callout>
+
+## Build the app
+
+```sh
+npx @danwo/cli build-ios .
+npx @danwo/cli build-android .
+```
+
+| Platform | What danwo runs                         | What it keeps                                            |
+| -------- | --------------------------------------- | -------------------------------------------------------- |
+| iOS      | `flutter build ios --simulator --debug` | `Runner.app`, with plain HTTP allowed, and its bundle id |
+| Android  | `flutter build apk --release`           | `app-release.apk`, and its package name                  |
+
+Flutter builds simulator apps in debug mode only. The Android build runs with Gradle's and
+Kotlin's daemons switched off, so nothing is left running. Both are kept by a hash of the app's
+sources, `ios/` and `android/` included.
+
+## Route the app's calls through the proxy
+
+Dart's own `HttpClient`, which `package:http` uses by default, connects directly: it ignores the
+device's proxy setting and the certificates the user installed. So the app's calls skip danwo's
+proxy.
+
+Use the platform's own HTTP stack instead: `cupertino_http` on iOS and `cronet_http` on Android.
+Both follow the device's proxy and trust store, as a native app does.
+
+```dart title="lib/client.dart · the HTTP client"
+import 'dart:io';
+
+import 'package:cronet_http/cronet_http.dart';
+import 'package:cupertino_http/cupertino_http.dart';
+import 'package:http/http.dart';
+
+Client httpClient() {
+  if (Platform.isIOS) return CupertinoClient.defaultSessionConfiguration();
+  if (Platform.isAndroid) return CronetClient.defaultCronetEngine();
+  return Client();
+}
+```
+
+On Android, the APK also has to trust user-installed certificates: add the network security
+config from [Native Android apps](/docs/native-android) to `android/app/src/main`, for the build
+you test.
+
+## Next
+
+<Cards>
+  <Card title="Native iOS apps" href="/docs/native-ios">
+    How the simulator is bound, and locators on native views.
+  </Card>
+  <Card title="Native Android apps" href="/docs/native-android">
+    The network config, and locators on Compose.
+  </Card>
+</Cards>

@@ -1,0 +1,133 @@
+---
+title: Native Android apps
+description: Test a Jetpack Compose or Views app on an Android emulator, built from its own Gradle project, with no change to its code.
+icon: /icons/jetpack-compose.svg
+---
+
+danwo tests a native Android app, written with Jetpack Compose or Views, the same way it tests an
+Expo app. It builds your Gradle project, routes the emulator's traffic through its proxy, and runs
+your tests, invariants and fault matrix against it.
+
+You don't change the app's code. It keeps calling its real hosts over HTTPS. Android apps trust
+only the system's certificates by default, so danwo's build adds a network security config that
+also trusts the one it installs on the emulator. Your project's files are not touched.
+
+## Build the app
+
+```sh
+npx @danwo/cli build-android android
+```
+
+```text
+built android/.danwo/builds/56bf08b42328c942.apk (dev.danwo.examples.compose) in 108 s (log: android/.danwo/builds/build-android.log)
+```
+
+`android` is the folder with your Gradle settings file and `gradlew`. danwo:
+
+1. runs your wrapper, `./gradlew assembleRelease`, with Android Studio's JDK when `JAVA_HOME` is
+   unset;
+2. hands Gradle an init script that adds danwo's network config to the app module, for this build
+   only;
+3. signs an unsigned APK with the debug key, so it installs;
+4. reads the package name from the APK.
+
+Gradle runs with `--no-daemon` and compiles Kotlin in its own process, so no daemon is left
+running. An unchanged project isn't built again: the build is keyed by a hash of its sources.
+
+| Option             | What it does                                    | Default   |
+| ------------------ | ----------------------------------------------- | --------- |
+| `--variant <name>` | the variant to assemble: `debug`, `freeRelease` | `release` |
+| `--force`          | builds again even when the sources are the same | off       |
+| `--verbose`        | prints Gradle's output                          | off       |
+
+## What the build adds
+
+The network config trusts the system's certificates and the user-installed ones, where danwo puts
+each run's, and allows plain HTTP:
+
+```xml title="the network config danwo adds"
+<network-security-config>
+  <base-config cleartextTrafficPermitted="true">
+    <trust-anchors>
+      <certificates src="system" />
+      <certificates src="user" />
+    </trust-anchors>
+  </base-config>
+</network-security-config>
+```
+
+It replaces any `networkSecurityConfig` your app sets, in danwo's build only. The init script adds
+it through the Android Gradle plugin's variant API (`sources.res` and `sources.manifests`); it is
+checked with AGP 9.4.
+
+<Callout type="warn">
+  This build trusts user-installed certificates. Use it only for testing; ship your store builds
+  from your own Gradle tasks.
+</Callout>
+
+## Bind the emulator in the config
+
+`buildAndroid` from `@danwo/expo` does the same build from your config. It returns the APK and its
+package for `withAndroidDevice`:
+
+```ts title="danwo.config.ts · the device"
+const build = await buildAndroid({ project: "android" })
+
+return withAndroidDevice(backend, {
+  avd: "danwo_spike",
+  worker: workerIndex,
+  app: { package: build.package ?? "dev.danwo.examples.compose", apk: build.apk },
+})
+```
+
+Route your API's production host to the local copy, as on iOS, so the app calls the URL it ships
+with. The full config is in [`examples/with-compose`](/docs/examples/with-compose).
+
+## Make the screen findable
+
+Compose reports a `testTag` to the accessibility tree only when the screen asks it to. Set
+`testTagsAsResourceId` once, at the root:
+
+```kotlin title="WaitlistScreen.kt · the root"
+Surface(modifier = Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
+    OutlinedTextField(
+        value = email,
+        onValueChange = { email = it },
+        label = { Text("Work email") },          // getByLabel("Work email")
+        modifier = Modifier.testTag("email"),    // getByTestId("email")
+    )
+}
+```
+
+| Compose                                         | Locator                                 |
+| ----------------------------------------------- | --------------------------------------- |
+| `Modifier.testTag`, with `testTagsAsResourceId` | `getByTestId`                           |
+| a text field's `label`                          | `getByLabel`                            |
+| `Button { Text("Join") }`                       | `getByRole("button", { name: "Join" })` |
+| `Modifier.semantics { heading() }`              | `getByRole("heading")`                  |
+| `Text("You're on the list")`                    | `getByText`                             |
+
+In Views, the view's `android:id` is its test id and `contentDescription` its label.
+
+## What reaches the proxy
+
+| What                                        | Reaches the proxy                          |
+| ------------------------------------------- | ------------------------------------------ |
+| `HttpURLConnection`, OkHttp, Ktor on OkHttp | yes: they use the device's proxy           |
+| a Custom Tab                                | yes                                        |
+| an app that pins its certificates           | no: turn pinning off in the build you test |
+| a client with its own proxy setting         | only if it follows the system's            |
+
+## Next
+
+<Cards>
+  <Card title="Android tests" href="/docs/android-tests">
+    What a test can do on an emulator.
+  </Card>
+  <Card title="Native iOS apps" href="/docs/native-ios">
+    The same for a SwiftUI app.
+  </Card>
+  <Card title="The Compose example" href="/docs/examples/with-compose">
+    A waitlist with its API, tests and matrix.
+  </Card>
+</Cards>

@@ -1,0 +1,117 @@
+---
+title: Native iOS apps
+description: Test a SwiftUI or UIKit app on an iOS Simulator, built from its own Xcode project, with no change to the app.
+icon: /icons/swift.svg
+---
+
+danwo tests a native iOS app, written in SwiftUI or UIKit, the same way it tests an Expo app. It
+builds your Xcode project for the Simulator, routes the simulator's traffic through its proxy, and
+runs your tests, invariants and fault matrix against it.
+
+You don't change the app. It keeps calling its real hosts over HTTPS; danwo trusts its own
+certificate in the simulator and points the simulator's proxy at itself, so `URLSession` reaches
+the emulators and your local backend instead.
+
+## Build the app
+
+```sh
+npx @danwo/cli build-ios ios
+```
+
+```text
+built ios/.danwo/builds/6cd4650c2c5179f7.app (dev.danwo.examples.swiftui) in 7 s (log: ios/.danwo/builds/build-ios.log)
+```
+
+`ios` is the folder that holds your `.xcodeproj` or `.xcworkspace`. danwo:
+
+1. finds the workspace, or else the project, at the top of the folder;
+2. runs `pod install` for a workspace with a `Podfile` and no `Pods/` yet;
+3. picks the scheme: `--scheme`, else the only one, else the one named like the project;
+4. runs `xcodebuild` for the Simulator, Release, for this Mac's CPU only, unsigned;
+5. lets the kept app make plain HTTP calls, and reads its bundle id.
+
+An unchanged project isn't built again: the build is keyed by a hash of its sources.
+
+| Option                   | What it does                                    | Default                             |
+| ------------------------ | ----------------------------------------------- | ----------------------------------- |
+| `--scheme <name>`        | the scheme to build                             | the only one, or the project's name |
+| `--configuration <name>` | the build configuration                         | `Release`                           |
+| `--force`                | builds again even when the sources are the same | off                                 |
+| `--verbose`              | prints `xcodebuild`'s output                    | off                                 |
+
+<Callout type="info">
+  Share your scheme (Product › Scheme › Manage Schemes › Shared) so it is in the repository. Without
+  a shared scheme, `xcodebuild` can't see it on another machine.
+</Callout>
+
+## Bind the simulator in the config
+
+`buildIos` from `@danwo/expo` does the same build from your config, so a run always has a current
+build. It returns the app and its bundle id for `withIosDevice`:
+
+```ts title="danwo.config.ts · the device"
+const build = await buildIos({ project: "ios" })
+
+return withIosDevice(backend, {
+  worker: workerIndex,
+  app: { bundleId: build.bundleId ?? "dev.danwo.examples.swiftui", app: build.app },
+})
+```
+
+`backend` is your environment with a proxy, from `appEnvironment` or `startServices`. Route your
+API's production host to the local copy with a service of its own, so the app calls the same URL
+it ships with:
+
+```ts title="danwo.config.ts · the API's route"
+const api: Service = {
+  name: "api",
+  routes: [{ hosts: ["api.lumen.example"], handler: forwardTo("http://127.0.0.1:8787") }],
+  close: async () => undefined,
+}
+```
+
+The full config, with Postgres and Resend, is in
+[`examples/with-swiftui`](/docs/examples/with-swiftui).
+
+## Make the screen findable
+
+Locators read the simulator's accessibility tree. In SwiftUI, two modifiers do the work:
+
+```swift title="ios/Lumen/WaitlistView.swift · the field"
+TextField("you@company.com", text: $email)
+    .accessibilityLabel("Work email")      // getByLabel("Work email")
+    .accessibilityIdentifier("email")      // getByTestId("email")
+```
+
+| SwiftUI                      | Locator                                 |
+| ---------------------------- | --------------------------------------- |
+| `.accessibilityIdentifier`   | `getByTestId`                           |
+| `.accessibilityLabel`        | `getByLabel`, and a button's name       |
+| `Button("Join")`             | `getByRole("button", { name: "Join" })` |
+| `Text("You're on the list")` | `getByText`                             |
+
+A text field's placeholder isn't its name, so give it an `accessibilityLabel`. In UIKit, set
+`accessibilityIdentifier` and `accessibilityLabel` on the view.
+
+## What reaches the proxy
+
+| What                                       | Reaches the proxy                                                              |
+| ------------------------------------------ | ------------------------------------------------------------------------------ |
+| `URLSession`, and libraries built on it    | yes, with no change to the app                                                 |
+| `SFSafariViewController`, sign-in sessions | yes                                                                            |
+| plain HTTP                                 | yes: the danwo build allows it, as App Transport Security otherwise refuses it |
+| an app that pins its certificates          | no: turn pinning off in the build you test                                     |
+
+## Next
+
+<Cards>
+  <Card title="iOS tests" href="/docs/ios-tests">
+    What a test can do on a simulator.
+  </Card>
+  <Card title="Native Android apps" href="/docs/native-android">
+    The same for a Jetpack Compose app.
+  </Card>
+  <Card title="The SwiftUI example" href="/docs/examples/with-swiftui">
+    A waitlist with its API, tests and matrix.
+  </Card>
+</Cards>
