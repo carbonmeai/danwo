@@ -7,6 +7,7 @@ export { ANDROID_BACKGROUND_HOSTS } from "./android/background.ts"
 export { androidCaFileName } from "./android/ca.ts"
 export { AndroidDevice, type AndroidDeviceOptions, androidDevice } from "./android/device.ts"
 export { type EmulatorOptions, useEmulator } from "./android/emulator.ts"
+export { type RemoteOptions, useRemoteDevice } from "./android/remote.ts"
 export {
   type AndroidBuild,
   type AndroidProject,

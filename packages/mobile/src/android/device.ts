@@ -1,6 +1,7 @@
 /**
- * An Android emulator ready for a worker's tests: booted (or found running), bound to the run's
- * proxy and CA, the app installed, and the driver's session open. It is the `DeviceTarget` the
+ * An Android device ready for a worker's tests: an emulator booted (or found running), or a remote
+ * device reached over adb, bound to the run's proxy and CA, the app installed, and the driver's
+ * session open. It is the `DeviceTarget` the
  * runner opens each attempt on, and the `device` fixture tests use for what only a device has.
  */
 import { join } from "node:path"
@@ -29,10 +30,14 @@ import { AndroidApp, type AppOptions } from "./app.ts"
 import { AndroidBinder } from "./binder.ts"
 import { composeNodes } from "./compose.ts"
 import { type EmulatorOptions, type RunningEmulator, useEmulator } from "./emulator.ts"
+import { type RemoteDevice, type RemoteOptions, remoteTarget, useRemoteDevice } from "./remote.ts"
 import { filmScreen } from "./screen-film.ts"
 
-/** Options of `androidDevice`. */
-export interface AndroidDeviceOptions extends EmulatorOptions {
+/**
+ * Options of `androidDevice`. With `adb` (or `DANWO_ADB_TARGET`) the device is a remote one and the
+ * emulator options (`avd`, `snapshot`, `port`) are not used.
+ */
+export interface AndroidDeviceOptions extends EmulatorOptions, RemoteOptions {
   /** The app under test. */
   readonly app: AppOptions & {
     /** Its link scheme, for `app.open(path)` (e.g. `danwoshop`). */
@@ -40,8 +45,15 @@ export interface AndroidDeviceOptions extends EmulatorOptions {
   }
   /** The run's proxy: the device's traffic goes through it, trusting its CA. */
   readonly proxy: Pick<Proxy, "url" | "caCert" | "exchanges">
+  /**
+   * Ports the app reaches on the host at the same number besides the proxy, through `adb reverse`:
+   * a dev server's (Metro's 8081), say.
+   */
+  readonly reverse?: readonly number[]
   /** Where the driver keeps its state; `.danwo/device/<serial>` under the working directory by default. */
   readonly stateDir?: string
+  /** Where `DANWO_ADB_TARGET` is read; this process's environment by default. */
+  readonly env?: NodeJS.ProcessEnv
   /** The tools to run; found from `ANDROID_HOME` by default. */
   readonly tools?: AndroidTools
   /** Runs adb and the emulator; tests pass a fake. */
@@ -153,6 +165,8 @@ export class AndroidDevice implements DeviceTarget {
   private readonly application: AndroidApp
   private readonly driver: DeviceDriver
   private readonly options: AndroidDeviceOptions
+  /** Whether the device is a remote one, which outlives the run: what the run installed comes off. */
+  private readonly remote: boolean
   /** Screenshots taken so far, for unique file names on the device. */
   private shots = 0
 
@@ -162,12 +176,14 @@ export class AndroidDevice implements DeviceTarget {
     readonly app: AndroidApp
     readonly driver: DeviceDriver
     readonly options: AndroidDeviceOptions
+    readonly remote?: boolean
   }) {
     this.emulator = parts.emulator
     this.binder = parts.binder
     this.application = parts.app
     this.driver = parts.driver
     this.options = parts.options
+    this.remote = parts.remote ?? false
   }
 
   get app(): string {
@@ -321,42 +337,80 @@ export class AndroidDevice implements DeviceTarget {
     return this.binder.rebind()
   }
 
-  /** Ends the driver's session, leaves the device's network as it was, and stops an emulator it booted. */
+  /**
+   * Ends the driver's session, leaves the device's network as it was, and stops an emulator it
+   * booted. A remote device also loses the app the run installed, and is disconnected when the run
+   * connected it.
+   */
   // fallow-ignore-next-line unused-class-member -- closed by the environment, which closes either platform's device
   async close(): Promise<void> {
     await this.driver.close()
+    if (this.remote) await this.application.uninstall()
     await this.binder.unbind()
     await this.emulator.stop()
   }
 }
 
-/** Boots (or finds) the emulator, binds it to the proxy, installs the app and opens the driver. */
-export async function androidDevice(options: AndroidDeviceOptions): Promise<AndroidDevice> {
+/** A serial as a folder name: a remote one's `host:port` has a colon Windows refuses. */
+function folderName(serial: string): string {
+  return serial.replaceAll(/[^\w.-]/g, "_")
+}
+
+/** The remote device `adb` or `DANWO_ADB_TARGET` names, or else the emulator. */
+async function useDevice(
+  options: AndroidDeviceOptions,
+): Promise<{ readonly emulator: RunningEmulator; readonly remote?: RemoteDevice }> {
   const tools = options.tools ?? androidTools()
-  const emulator = await useEmulator(tools, options, options.exec)
+  const target = remoteTarget(options, options.env)
+
+  if (target === undefined) return { emulator: await useEmulator(tools, options, options.exec) }
+
+  const remote = await useRemoteDevice(tools, target, options, options.exec)
+
+  return { emulator: remote, remote }
+}
+
+/** The driver the options give, else agent-device, with its state kept per serial. */
+function driverFor(options: AndroidDeviceOptions, serial: string): DeviceDriver {
+  const stateDir = options.stateDir ?? join(process.cwd(), ".danwo", "device", folderName(serial))
+
+  return options.driver?.(serial, stateDir) ?? new AgentDeviceDriver({ stateDir, serial })
+}
+
+/**
+ * Connects to the remote device (`adb`, or `DANWO_ADB_TARGET`) or boots (or finds) the emulator,
+ * binds it to the proxy, installs the app and opens the driver.
+ */
+export async function androidDevice(options: AndroidDeviceOptions): Promise<AndroidDevice> {
+  const { emulator, remote } = await useDevice(options)
   const { adb } = emulator
   const binder = new AndroidBinder(adb, {
     caCert: options.proxy.caCert,
     proxyPort: Number(new URL(options.proxy.url).port),
+    ...(options.reverse !== undefined && { reverse: options.reverse }),
+    ...(remote !== undefined && { restore: true, reconnect: () => remote.reconnect() }),
   })
+  const app = new AndroidApp(adb, options.app)
 
   try {
     await binder.bind()
-
-    const app = new AndroidApp(adb, options.app)
-
     await app.install()
     if (options.app.scheme !== undefined) await app.claimScheme(options.app.scheme)
 
-    const stateDir = options.stateDir ?? join(process.cwd(), ".danwo", "device", adb.serial)
-    const driver =
-      options.driver?.(adb.serial, stateDir) ??
-      new AgentDeviceDriver({ stateDir, serial: adb.serial })
+    const driver = driverFor(options, adb.serial)
 
     await driver.open(app.package)
 
-    return new AndroidDevice({ emulator, binder, app, driver, options })
+    return new AndroidDevice({
+      emulator,
+      binder,
+      app,
+      driver,
+      options,
+      remote: remote !== undefined,
+    })
   } catch (error) {
+    if (remote !== undefined) await app.uninstall()
     await binder.unbind()
     await emulator.stop()
     throw error

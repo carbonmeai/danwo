@@ -4,7 +4,8 @@
  * the network probe that would mark the proxied network broken switched off, and the device's
  * proxy pointed (through `adb reverse`) at danwo's. `rebind` redoes what an adbd restart or a
  * snapshot load loses; `unbind` leaves the device as it was, so a stale proxy setting never kills
- * its network after the run.
+ * its network after the run. A shared device (a remote one) also gets back the settings it had, an
+ * adbd that is not root, and loses the CA and Chrome flags danwo added.
  */
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -33,12 +34,41 @@ export interface BindOptions {
   readonly caCert: string
   /** The proxy's port on the host. */
   readonly proxyPort: number
+  /** More ports the device reaches on the host at the same number, e.g. a dev server's. */
+  readonly reverse?: readonly number[]
+  /**
+   * Whether the device outlives the run and others use it (a remote one): `unbind` then removes the
+   * CA and Chrome's flags and puts back the settings the binder changed.
+   */
+  readonly restore?: boolean
+  /** Connects to the device again after `adb root` restarts adbd, which drops a network connection. */
+  readonly reconnect?: () => Promise<void>
+}
+
+/** The global settings the binder changes. */
+const QUIET_SETTINGS = [
+  "window_animation_scale",
+  "transition_animation_scale",
+  "animator_duration_scale",
+  "captive_portal_mode",
+] as const
+
+/** Whether adb said this device's adbd cannot run as root at all. */
+function rootRefused(said: string): boolean {
+  return /production builds|cannot run as root/i.test(said)
 }
 
 /** Runs adb commands to bind, rebind and unbind one device. */
 export class AndroidBinder {
   private readonly adb: Adb
   private readonly options: BindOptions
+  /** The settings' values before the binder changed them, for a shared device. */
+  private saved: ReadonlyMap<string, string> | undefined
+  /** Whether the run's CA and Chrome's flags are on the device, for a shared device's unbind. */
+  private trusted = false
+  private chromePrepared = false
+  /** Whether the binder restarted adbd as root, which a shared device's unbind undoes. */
+  private rooted = false
 
   constructor(adb: Adb, options: BindOptions) {
     this.adb = adb
@@ -57,14 +87,24 @@ export class AndroidBinder {
 
     for (let attempt = 1; attempt <= ROOT_ATTEMPTS; attempt++) {
       try {
-        await this.adb.run(["root"])
+        const said = await this.adb.run(["root"])
+
+        if (rootRefused(said)) throw new Error(said.trim())
+        await this.options.reconnect?.()
         await this.adb.waitForDevice()
-        if (await this.adb.isRoot()) return
+
+        if (await this.adb.isRoot()) {
+          this.rooted = true
+
+          return
+        }
       } catch (error) {
+        if (error instanceof Error && rootRefused(error.message)) throw this.unrootable(error)
         failure = error
       }
 
       await sleep(ROOT_RETRY_MS)
+      await this.options.reconnect?.().catch(() => undefined)
       await this.adb.waitForDevice().catch(() => undefined)
     }
 
@@ -73,10 +113,23 @@ export class AndroidBinder {
     })
   }
 
+  /** The error for a device whose adbd cannot run as root (a production build). */
+  private unrootable(cause: Error): Error {
+    return new Error(
+      `${this.adb.serial} cannot run adbd as root, which danwo needs to add its CA to the device's trust store: use an emulator image or a rooted (userdebug) device, as most device clouds' virtual devices are`,
+      { cause },
+    )
+  }
+
+  /** The run's CA's path on the device. */
+  private get caPath(): string {
+    return `${CA_DIR}/${androidCaFileName(this.options.caCert)}`
+  }
+
   /** The run's CA into the user trust store, readable by the system like a CA a user added. */
   private async trustCa(): Promise<void> {
     const name = androidCaFileName(this.options.caCert)
-    const target = `${CA_DIR}/${name}`
+    const target = this.caPath
     const dir = await mkdtemp(join(tmpdir(), "danwo-ca-"))
     const local = join(dir, name)
 
@@ -87,6 +140,7 @@ export class AndroidBinder {
       await this.adb.shell(
         `chown system:system ${target} && chmod 644 ${target} && restorecon ${target}`,
       )
+      this.trusted = true
     } finally {
       await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
@@ -94,6 +148,7 @@ export class AndroidBinder {
 
   /** Chrome opens straight to the page: no welcome screens, no notification prompt. */
   private async prepareChrome(): Promise<void> {
+    this.chromePrepared = true
     await this.adb.shell(`am set-debug-app --persistent ${CHROME}`).catch(() => undefined)
     await this.adb.shell(`echo '${CHROME_FLAGS}' > /data/local/tmp/chrome-command-line`)
     await this.adb
@@ -103,20 +158,22 @@ export class AndroidBinder {
 
   /** Steady screens: no animations, and no network probe that fails on danwo's certificate. */
   private async quietDevice(): Promise<void> {
-    for (const scale of [
-      "window_animation_scale",
-      "transition_animation_scale",
-      "animator_duration_scale",
-    ]) {
-      await this.adb.shell(`settings put global ${scale} 0`)
+    if (this.options.restore === true && this.saved === undefined) {
+      const saved = new Map<string, string>()
+
+      for (const name of QUIET_SETTINGS)
+        saved.set(name, await this.adb.shell(`settings get global ${name}`))
+      this.saved = saved
     }
 
-    await this.adb.shell("settings put global captive_portal_mode 0")
+    for (const name of QUIET_SETTINGS) await this.adb.shell(`settings put global ${name} 0`)
   }
 
   /** The device's proxy setting and the reverse rule that carries it to the host. */
   private async routeThroughProxy(): Promise<void> {
     await this.adb.run(["reverse", `tcp:${DEVICE_PROXY_PORT}`, `tcp:${this.options.proxyPort}`])
+    for (const port of this.options.reverse ?? [])
+      await this.adb.run(["reverse", `tcp:${port}`, `tcp:${port}`])
     await this.adb.shell(`settings put global http_proxy 127.0.0.1:${DEVICE_PROXY_PORT}`)
   }
 
@@ -139,9 +196,43 @@ export class AndroidBinder {
     await this.routeThroughProxy()
   }
 
-  /** The device's network as it was: no proxy setting, no reverse rules. */
+  /**
+   * The device's network as it was: no proxy setting, no reverse rules. A shared device also loses
+   * the run's CA and Chrome's flags, and gets its settings back (a setting it never had is deleted).
+   */
   async unbind(): Promise<void> {
-    await this.adb.shell("settings put global http_proxy :0").catch(() => undefined)
+    const quietly = (command: string) => this.adb.shell(command).catch(() => "")
+
+    await quietly("settings put global http_proxy :0")
     await this.adb.run(["reverse", "--remove-all"]).catch(() => undefined)
+
+    if (this.options.restore !== true) return
+
+    if (this.trusted) await quietly(`rm -f ${this.caPath}`)
+
+    if (this.chromePrepared) {
+      await quietly("am clear-debug-app")
+      await quietly("rm -f /data/local/tmp/chrome-command-line")
+    }
+
+    this.trusted = false
+    this.chromePrepared = false
+
+    for (const [name, value] of this.saved ?? []) {
+      await quietly(
+        value === "" || value === "null"
+          ? `settings delete global ${name}`
+          : `settings put global ${name} ${value}`,
+      )
+    }
+
+    this.saved = undefined
+
+    if (this.rooted) {
+      /* Back to the shell user; restarting adbd drops a network connection, so connect again. */
+      await this.adb.run(["unroot"]).catch(() => undefined)
+      await this.options.reconnect?.().catch(() => undefined)
+      this.rooted = false
+    }
   }
 }

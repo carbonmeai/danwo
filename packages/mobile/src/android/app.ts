@@ -71,6 +71,10 @@ export class AndroidApp {
   private logsAfter = 0
   /** The launcher activity, found once per worker. */
   private component: string | undefined
+  /** The packages `claimScheme` disabled. */
+  private disabled: string[] = []
+  /** Whether `install` installed the APK. */
+  private installed = false
   private readonly adb: Adb
   readonly options: AppOptions
 
@@ -89,8 +93,24 @@ export class AndroidApp {
 
   /** Installs the APK (replacing what is there, permissions granted). */
   async install(): Promise<void> {
-    if (this.options.apk !== undefined)
-      await this.adb.run(["install", "-r", "-g", this.options.apk], 240_000)
+    if (this.options.apk === undefined) return
+
+    await this.adb.run(["install", "-r", "-g", this.options.apk], 240_000)
+    this.installed = true
+  }
+
+  /**
+   * Leaves a shared device without what this app put there: the packages `claimScheme` disabled
+   * are enabled again, and the APK `install` installed is uninstalled. An app that was on the
+   * device already (no `apk`) stays.
+   */
+  async uninstall(): Promise<void> {
+    for (const other of this.disabled)
+      await this.adb.shell(`pm enable --user 0 ${other}`).catch(() => "")
+    this.disabled = []
+
+    if (this.installed) await this.adb.run(["uninstall", this.package]).catch(() => "")
+    this.installed = false
   }
 
   /**
@@ -109,7 +129,10 @@ export class AndroidApp {
         .filter((name): name is string => name !== undefined && name !== this.package),
     )
 
-    for (const other of others) await this.adb.shell(`pm disable-user --user 0 ${other}`)
+    for (const other of others) {
+      await this.adb.shell(`pm disable-user --user 0 ${other}`)
+      this.disabled.push(other)
+    }
 
     return [...others]
   }
