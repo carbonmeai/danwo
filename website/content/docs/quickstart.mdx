@@ -1,13 +1,15 @@
 ---
 title: Quickstart
-description: Set danwo up in your project, run your first test, and watch it in the dashboard.
+description: Set danwo up in your project, write a UI test, run it, and watch it in the dashboard.
 icon: Rocket
 ---
 
-This page takes you from nothing to a passing test you can watch back. It takes about five
-minutes. You need Node.js 22.22.3 or a later 22, or 24.11.1 or newer, and an app you can start
-with a command, such as `npm run dev`. On any other Node, danwo stops and says which version it
-found. The app itself can run on Node 20 or later ([the app's Node](/docs/node-preload#your-apps-node-version)).
+This page takes you from nothing to a passing UI test you can watch back, in about five minutes.
+The short path is three commands and one test file, with no providers, keys or model.
+
+You need Node.js 22.22.3 or a later 22, or 24.11.1 or newer, and an app you can start with a
+command, such as `npm run dev`. On any other Node, danwo stops and says which version it found.
+The app itself can run on Node 20 or later ([the app's Node](/docs/node-preload#your-apps-node-version)).
 
 <Steps>
 <Step>
@@ -43,14 +45,20 @@ bunx @danwo/cli init
 It looks at your project first: the package manager, the framework, the command that starts
 your app, and the services your code uses. Then it asks four things:
 
-| Question                                | What it means                                                             |
-| --------------------------------------- | ------------------------------------------------------------------------- |
-| What should tests drive?                | A browser, an Android app, both, or only your app's API.                  |
-| Which model should agent steps use?     | The AI that runs plain-English steps. Pick **None** to use locators only. |
-| Which providers should danwo emulate?   | The services found in your code (Stripe, Resend…) are already ticked.     |
-| Which coding agents should learn danwo? | Claude Code, Cursor or Codex get danwo's skill and MCP server.            |
+| Question                                | For a UI-only start     | What it means                                                  |
+| --------------------------------------- | ----------------------- | -------------------------------------------------------------- |
+| What should tests drive?                | **Web** (or **Mobile**) | A browser, an Android app, both, or only your app's API.       |
+| Which model should agent steps use?     | **None**                | The AI that runs plain-English steps. You can add one later.   |
+| Which providers should danwo emulate?   | untick them all         | Services found in your code (Stripe, Resend…) come pre-ticked. |
+| Which coding agents should learn danwo? | any                     | Claude Code, Cursor or Codex get danwo's skill and MCP server. |
 
-When you've answered, it shows what it wrote:
+To skip the questions, pass the answers:
+
+```sh
+npx @danwo/cli init --yes --engine web --model-source none --providers none
+```
+
+When it's done, it shows what it wrote:
 
 ```text
 Files
@@ -58,106 +66,47 @@ Files
   created   tests/example.danwo.ts
   updated   package.json        (adds test:danwo)
   created   .gitignore          (.danwo/)
-  created   .env.example
 ```
 
-It also installs `@danwo/cli` and `@danwo/sdk` at its own version, so a beta sets up that beta. A
-TypeScript project without Node's types gets `@types/node` too, since danwo's types use them.
+It also installs `@danwo/cli` and `@danwo/sdk`, and the Chromium build danwo drives. With a model
+picked, it adds the model's key to `.env.example` too.
 
-In a monorepo, run init in the app's own folder. It finds the workspace (pnpm, npm, Yarn or Bun)
-and adds the packages to the app's `package.json` with the workspace's package manager. When your
-coding agent's folders, such as `.claude`, sit at the workspace root, the skill and MCP server go
-there too.
-
-</Step>
-<Step>
-
-### Install the browser
-
-If your tests drive a browser, danwo needs its own Chromium. init installs it for you after the
-packages. With `--skip-install`, or on a new machine, install it yourself:
+On a new machine, or after `--skip-install`, install the browser yourself:
 
 ```sh
 npx @danwo/cli install-browser
 ```
 
-This runs danwo's own Playwright, so you get the Chromium build danwo drives, whatever Playwright
-your project has. On Linux, add `--with-deps` for the system libraries.
+On Linux, add `--with-deps` for the system libraries.
+
+In a monorepo, run init in the app's own folder. It finds the workspace (pnpm, npm, Yarn or Bun)
+and adds the packages to the app's `package.json` with the workspace's package manager.
 
 </Step>
 <Step>
 
-### Read the config
+### Write a UI test
 
-`danwo.config.ts` says how to start your app and which services to emulate. Here it is in
-three parts.
+Add a test that does what a user does. Change the page, the labels and the text to match your
+app:
 
-First, **where your app is**. danwo runs your dev command itself, so it can put the app behind
-its proxy:
-
-```ts title="danwo.config.ts · the app"
-const app = process.env.APP_URL ?? {
-  command: "npm run dev",
-  url: "http://localhost:3000",
-}
-```
-
-Second, **the model** for agent steps. Leave it out if you chose **None**:
-
-```ts title="danwo.config.ts · the model"
-model: "anthropic/claude-sonnet-5",
-```
-
-Third, **the environment**: your app, started behind one proxy with the services you picked.
-When your app calls `api.stripe.com`, the Stripe emulator answers:
-
-```ts title="danwo.config.ts · the environment"
-environment: () => appEnvironment({ app, services: [stripeService(), resendService()] }),
-```
-
-Put together, the whole file is short:
-
-```ts title="danwo.config.ts"
-import { appEnvironment, defineConfig, resendService, stripeService } from "@danwo/sdk"
-
-const app = process.env.APP_URL ?? {
-  command: "npm run dev",
-  url: "http://localhost:3000",
-}
-
-export default defineConfig({
-  testDir: "tests",
-  workers: 1,
-  timeout: 60_000,
-  model: "anthropic/claude-sonnet-5",
-  readiness: { mode: "page+backend", settle: true },
-  environment: () => appEnvironment({ app, services: [stripeService(), resendService()] }),
-})
-```
-
-`readiness` tells danwo to wait after each click until the page has settled **and** the calls
-it caused have finished. You never write sleeps or waits by hand.
-
-</Step>
-<Step>
-
-### Read the example test
-
-`tests/example.danwo.ts` checks that your home page loads:
-
-```ts title="tests/example.danwo.ts"
+```ts title="tests/sign-up.danwo.ts"
 import { test } from "@danwo/sdk"
 
-test("the home page opens", async ({ app, expect }) => {
-  const response = await fetch(new URL("/", app.baseUrl))
+test("signs up", async ({ app, screen, expect }) => {
+  await app.open("/sign-up")
+  await screen.getByLabel("Email").fill("ada@example.com")
+  await screen.getByLabel("Password").fill("correct horse battery staple")
+  await screen.getByRole("button", { name: "Create account" }).click()
 
-  expect(response.status).toBeLessThan(400)
-  await app.open("/")
+  await expect(screen.getByRole("heading", { name: "Welcome, Ada" })).toBeVisible()
 })
 ```
 
 A test gets **fixtures**: ready-made objects passed in by name. `app` is your running app,
-`expect` makes assertions, and `screen` (used on the next page) finds things on the page.
+`screen` finds things on the page, and `expect` checks them. Checks wait for the page, so you
+never write sleeps. [Agent and locators](/docs/agent-and-locators) lists every way to find an
+element.
 
 </Step>
 <Step>
@@ -168,21 +117,19 @@ A test gets **fixtures**: ready-made objects passed in by name. `app` is your ru
 npm run test:danwo
 ```
 
-danwo starts your app, opens a browser and runs the test:
+danwo starts your app, opens a fresh browser and runs every test in `tests/`:
 
 ```text
-Running 1 test with 1 worker
+Running 2 tests with 1 worker
 
   ✓ tests/example.danwo.ts › the home page opens 812 ms, worker 0
+  ✓ tests/sign-up.danwo.ts › signs up 1.4 s, worker 0
 
-1 passed
+2 passed
 report: .danwo/runs/20261020-091203-ab12/report.html
 ```
 
-<Callout type="info">
-  The example makes no AI calls, so it needs no API key. You only need the key in `.env.example`
-  once you write agent steps.
-</Callout>
+`tests/example.danwo.ts` is the test init wrote: it checks that your home page answers and opens.
 
 </Step>
 <Step>
@@ -193,14 +140,63 @@ report: .danwo/runs/20261020-091203-ab12/report.html
 npx @danwo/cli serve --open
 ```
 
-The dashboard opens at `http://127.0.0.1:4310`. Click your test to open its recording:
+The dashboard opens at `http://127.0.0.1:4310`. Click a test to open its recording:
 
 - **Replay:** a video of the run, with a jump to each step.
-- **Providers:** every call your app made to an emulated service.
 - **Console** and **Network:** what the page logged and requested.
 
 </Step>
 </Steps>
+
+That's a complete end-to-end setup. Everything below is optional.
+
+## Read the config
+
+`danwo.config.ts` says how to start your app. danwo runs your dev command itself, so it can put
+the app behind its proxy:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig } from "@danwo/sdk"
+
+const app = process.env.APP_URL ?? {
+  command: "npm run dev",
+  url: "http://localhost:3000",
+}
+
+export default defineConfig({
+  testDir: "tests",
+  workers: 1,
+  timeout: 60_000,
+  readiness: { mode: "page+backend", settle: true },
+  environment: () => appEnvironment({ app, services: [] }),
+})
+```
+
+`readiness` tells danwo to wait after each click until the page has settled **and** the calls it
+caused have finished. `services` is empty: no provider is emulated yet.
+
+## Later: write steps in plain English
+
+Add a model to the config, and the `agent` fixture runs steps in plain English. Each is recorded
+the first time it passes, then replayed with no model call:
+
+```ts title="danwo.config.ts · the model"
+model: "anthropic/claude-sonnet-5",
+```
+
+The key goes in `.env`, as `.env.example` shows. See [Agent steps](/docs/agent-steps).
+
+## Later: emulate your providers
+
+When your app calls Stripe, Resend or Clerk, list them in `services`. The proxy then answers
+those hostnames with local emulators, with no sandbox keys and no code changes:
+
+```ts title="danwo.config.ts · the environment"
+environment: () => appEnvironment({ app, services: [stripeService(), resendService()] }),
+```
+
+The dashboard's **Providers** tab then shows every call your app made to them. [Test a
+provider](/docs/test-a-provider) walks through a first check behind the screen.
 
 <Callout type="warn">
   Setting `APP_URL` tests an app that's already running. That app wasn't started behind danwo's
@@ -211,13 +207,16 @@ The dashboard opens at `http://127.0.0.1:4310`. Click your test to open its reco
 ## Next
 
 <Cards>
-  <Card title="Test a provider" href="/docs/test-a-provider">
-    Pay with Stripe in a test, and check the charge happened once.
+  <Card title="What you can test" href="/docs/what-you-can-test">
+    Common journeys and deep checks, and the layer each needs.
   </Card>
   <Card title="Agent and locators" href="/docs/agent-and-locators">
-    Write steps in plain English, or with exact locators.
+    Write steps with exact locators, or in plain English.
   </Card>
-  <Card title="Dashboard" href="/docs/dashboard">
-    Everything the recording shows, tab by tab.
+  <Card title="Visual comparison" href="/docs/visual-comparison">
+    Compare a page with a baseline image.
+  </Card>
+  <Card title="Test a provider" href="/docs/test-a-provider">
+    Pay with Stripe in a test, and check the charge happened once.
   </Card>
 </Cards>
