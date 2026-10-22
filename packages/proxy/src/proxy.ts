@@ -36,6 +36,7 @@ import {
 } from "./node-env.ts"
 import { replaceLocalPortProbe } from "./port-probe.ts"
 import { quietDroppedClients } from "./quiet.ts"
+import { acceptSocketUrls } from "./socket-urls.ts"
 import { forwardTo } from "./upstream.ts"
 import {
   handleSockets,
@@ -541,6 +542,7 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   const loud = quietDroppedClients()
 
   await server.start()
+  acceptSocketUrls(server)
 
   const patterns = options.routes.flatMap((r) => r.hosts)
   const isRouted = (host: string) => patterns.some((pattern) => hostMatches(pattern, host))

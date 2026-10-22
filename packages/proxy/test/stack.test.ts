@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process"
 import { once } from "node:events"
 import { createServer, type Server } from "node:http"
+import { connect } from "node:net"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
@@ -8,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { type RawData, WebSocketServer } from "ws"
 
 import { isPageAsset, type Proxy, startProxy } from "../src/index.ts"
+import { httpSocketUrl } from "../src/socket-urls.ts"
 
 const run = promisify(execFile)
 const CLIENT = fileURLToPath(new URL("./fixtures/stack-client.ts", import.meta.url))
@@ -184,6 +186,44 @@ describe("WebSockets", () => {
         fromClient: { frames: 1, bytes: 4 },
         toClient: { frames: 1, bytes: 4 },
       })
+    } finally {
+      await proxy.stop()
+    }
+  })
+
+  it("takes a handshake written with the socket's own URL, as WebKit sends one to a proxy", async () => {
+    const proxy = await startProxy({ routes: [] })
+    const { port } = new URL(proxy.url)
+
+    try {
+      const answer = await new Promise<string>((resolve, reject) => {
+        const raw = connect(Number(port), "127.0.0.1", () => {
+          raw.write(
+            [
+              `GET ws://127.0.0.1:${app.port}/live HTTP/1.1`,
+              `Host: 127.0.0.1:${app.port}`,
+              "Upgrade: websocket",
+              "Connection: Upgrade",
+              "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==",
+              "Sec-WebSocket-Version: 13",
+              "",
+              "",
+            ].join("\r\n"),
+          )
+        })
+
+        raw.once("data", (data) => {
+          resolve(data.toString().split("\r\n")[0] ?? "")
+          raw.destroy()
+        })
+        raw.once("error", reject)
+      })
+
+      expect(answer).toBe("HTTP/1.1 101 Switching Protocols")
+      await expect.poll(() => proxy.sockets()[0]?.status).toBe(101)
+      expect(proxy.sockets()[0]).toMatchObject({ host: "127.0.0.1", path: "/live" })
+      expect(httpSocketUrl("wss://ws.pusher.test/app?x=1")).toBe("https://ws.pusher.test/app?x=1")
+      expect(httpSocketUrl("/live")).toBe("/live")
     } finally {
       await proxy.stop()
     }
