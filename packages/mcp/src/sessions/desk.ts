@@ -26,11 +26,21 @@ export type ActionCall = Extract<
       | "back"
       | "scroll"
       | "tap_at"
+      | "swipe"
+      | "long_press"
+      | "dismiss_keyboard"
   }
 >
 
 /** The actions only a device has. */
-const DEVICE_ONLY = new Set<string>(["back", "scroll", "tap_at"])
+const DEVICE_ONLY = new Set<string>([
+  "back",
+  "scroll",
+  "tap_at",
+  "swipe",
+  "long_press",
+  "dismiss_keyboard",
+])
 
 /** The actions only a browser page has. */
 const BROWSER_ONLY = new Set<string>([
@@ -43,7 +53,10 @@ const BROWSER_ONLY = new Set<string>([
   "dialog",
 ])
 
-export type DeviceOnlyCall = Extract<ActionCall, { kind: "back" | "scroll" | "tap_at" }>
+export type DeviceOnlyCall = Extract<
+  ActionCall,
+  { kind: "back" | "scroll" | "tap_at" | "swipe" | "long_press" | "dismiss_keyboard" }
+>
 
 type BrowserOnlyCall = Extract<
   ActionCall,
@@ -65,7 +78,9 @@ export function deviceOnlyText(kind: string): string {
       ? ' (on a page, navigate with to: "back")'
       : kind === "scroll"
         ? " (on a page, actions scroll their element into view by themselves)"
-        : ""
+        : kind === "dismiss_keyboard"
+          ? " (a page has no on-screen keyboard)"
+          : ""
 
   return `${kind} is for a device session, and this session drives a browser page${instead}`
 }
@@ -77,7 +92,7 @@ export function deviceName(platform: string): string {
 
 /** Why a device refuses a browser's tool. */
 export function browserOnlyText(kind: string, platform: string): string {
-  return `${kind} works on a browser page only, and this session drives an ${deviceName(platform)}: on a device use click (a tap), fill, fill_secret, press, check, navigate, back, scroll and tap_at`
+  return `${kind} works on a browser page only, and this session drives an ${deviceName(platform)}: on a device use click (a tap), fill, fill_secret, press, check, navigate, back, scroll, swipe, long_press, dismiss_keyboard and tap_at`
 }
 
 /** One session's page or device, driven one tool call at a time. Every answer is redacted. */

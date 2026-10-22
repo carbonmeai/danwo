@@ -71,6 +71,9 @@ const ACTIONS = new Set<string>([
   "back",
   "scroll",
   "tap_at",
+  "swipe",
+  "long_press",
+  "dismiss_keyboard",
 ])
 const PAGE_CALLS = new Set<string>([
   "snapshot",

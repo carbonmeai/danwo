@@ -303,12 +303,15 @@ the app's link scheme. One process per session, the same idle close and slot lim
 session; each session's environment boots its own device, so give the config room for it.
 
 - `snapshot` reads the screen as `- role "name" [testId=…] [ref=e4]` lines, nested like the page
-  tree, headed by `device:` and `in front:` (the app, or a browser it opened, with its URL).
+  tree, with `[disabled]`, `[checked]`, `[unchecked]` and `[selected]` (the active tab) states,
+  headed by `device:` and `in front:` (the app, or a browser it opened, with its URL).
 - `click` taps; `fill`, `fill_secret`, `check` (taps a switch or checkbox unless it already shows
   that state), `press` (taps the target first; iOS has Enter only), `navigate` (a path by the
   link scheme, a full URL, or `back`).
 - Device only: `back`, `scroll` (`direction`, optionally inside a list's `target`), `tap_at`
-  (`x`, `y` in screenshot pixels).
+  (`x`, `y` in screenshot pixels), `swipe` (`direction` the way the finger moves, optionally
+  across a `target`, `duration_ms`), `long_press` (`target`, `duration_ms`) and
+  `dismiss_keyboard`.
 - Browser only, refused with a message: `hover`, `select`, `upload`, `drag`, `tabs`, `switch_tab`,
   `close_tab`, `dialog`, and `click` with `modifiers`, `button` or `double`.
 - Locators take the page's grammar and chains (`getByRole`, `getByText`, `getByLabel`,

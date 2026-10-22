@@ -24,6 +24,7 @@ import {
   type ActionCall,
   browserOnlyText,
   deviceName,
+  type DeviceOnlyCall,
   isBrowserOnly,
   type SessionDesk,
 } from "./desk.ts"
@@ -374,12 +375,26 @@ export class DeviceDesk implements SessionDesk {
         return this.setChecked(call.target, call.checked)
       case "navigate":
         return this.navigate(call.to)
+      default:
+        return this.gesture(call)
+    }
+  }
+
+  /** The actions only a device has: going back, scrolls, swipes, holds, the keyboard, a point. */
+  private async gesture(call: DeviceOnlyCall): Promise<string> {
+    switch (call.kind) {
       case "back":
         await this.target.back()
 
         return "went back"
       case "scroll":
         return this.scroll(call.direction, call.target)
+      case "swipe":
+        return this.swipe(call.direction, call.target, call.durationMs)
+      case "long_press":
+        return this.longPress(call.target, call.durationMs)
+      case "dismiss_keyboard":
+        return this.dismissKeyboard()
       default:
         return this.tapAt(call.x, call.y)
     }
@@ -489,6 +504,53 @@ export class DeviceDesk implements SessionDesk {
     await this.target.scroll(direction, node.box)
 
     return `scrolled ${direction} in ${name}`
+  }
+
+  /** One finger `direction` across the screen, or across the element `target` names. */
+  private async swipe(
+    direction: "up" | "down" | "left" | "right",
+    target: string | undefined,
+    durationMs: number | undefined,
+  ): Promise<string> {
+    if (this.target.swipe === undefined)
+      throw new Error(`this ${deviceName(this.target.platform)} cannot swipe`)
+
+    const timing = durationMs === undefined ? {} : { durationMs }
+    const took = durationMs === undefined ? "" : ` over ${durationMs} ms`
+
+    if (target === undefined) {
+      await this.target.swipe({ direction, ...timing })
+
+      return `swiped ${direction}${took}`
+    }
+
+    const { node, name } = await this.targetOf(target)
+
+    if (node.box === undefined) throw new Error(`${name} has no place on the screen to swipe in`)
+
+    await this.target.swipe({ direction, within: node.box, ...timing })
+
+    return `swiped ${direction} across ${name}${took}`
+  }
+
+  private async longPress(target: string, durationMs: number | undefined): Promise<string> {
+    if (this.target.longPress === undefined)
+      throw new Error(`this ${deviceName(this.target.platform)} cannot long-press`)
+
+    const { node, name } = await this.targetOf(target)
+
+    await this.target.longPress(node.ref, durationMs === undefined ? {} : { durationMs })
+
+    return `long-pressed ${name}${durationMs === undefined ? "" : ` for ${durationMs} ms`}`
+  }
+
+  private async dismissKeyboard(): Promise<string> {
+    if (this.target.dismissKeyboard === undefined)
+      throw new Error(`this ${deviceName(this.target.platform)} cannot put the keyboard away`)
+
+    await this.target.dismissKeyboard()
+
+    return "put the keyboard away"
   }
 
   private async tapAt(x: number, y: number): Promise<string> {

@@ -13,12 +13,15 @@ import {
   type DeviceForeground,
   type DeviceNode,
   type DeviceScreenReading,
+  type DeviceSwipe,
   type DeviceTarget,
+  type LongPressOptions,
   type ScreenFilm,
 } from "@danwo/runner/runner"
 import { PNG } from "pngjs"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
+import { deviceOnlyText, isDeviceOnly } from "../src/sessions/desk.ts"
 import { DeviceDesk } from "../src/sessions/device.ts"
 
 const SECRET = "card-pin-7d6c5b4a"
@@ -59,6 +62,7 @@ class ScriptedDevice implements DeviceTarget {
   readonly fills: { id: string; text: string }[] = []
   readonly links: string[] = []
   readonly keys: string[] = []
+  readonly gestures: string[] = []
   /** What a tap on an element does to the screen, by its id. */
   onTap: Record<string, () => void> = {}
   private reads = 0
@@ -129,6 +133,27 @@ class ScriptedDevice implements DeviceTarget {
 
   pressKey(key: string) {
     this.keys.push(key)
+
+    return Promise.resolve()
+  }
+
+  swipe(swipe: DeviceSwipe) {
+    const how = "direction" in swipe ? swipe.direction : "between points"
+    const within = "within" in swipe && swipe.within !== undefined ? ` in y=${swipe.within.y}` : ""
+
+    this.gestures.push(`swipe ${how}${within} ${swipe.durationMs ?? "quick"}`)
+
+    return Promise.resolve()
+  }
+
+  longPress(ref: string, options: LongPressOptions = {}) {
+    this.gestures.push(`long-press ${this.resolve(ref)} ${options.durationMs ?? "default"}`)
+
+    return Promise.resolve()
+  }
+
+  dismissKeyboard() {
+    this.gestures.push("dismiss keyboard")
 
     return Promise.resolve()
   }
@@ -322,6 +347,50 @@ describe("a device session's desk", () => {
       `${pay} (button "Pay") is no longer on the screen`,
     )
     expect(device.taps).toEqual(["pay"])
+  })
+
+  it("swipes, long-presses by a fresh handle and puts the keyboard away", async () => {
+    const swiped = await desk.act({ kind: "swipe", direction: "left", durationMs: 700 })
+    const inList = await desk.act({ kind: "swipe", direction: "up", target: refOf(first, "Oats") })
+    const held = await desk.act({
+      kind: "long_press",
+      target: refOf(first, "Pay"),
+      durationMs: 900,
+    })
+    const away = await desk.act({ kind: "dismiss_keyboard" })
+
+    expect(device.gestures).toEqual([
+      "swipe left 700",
+      "swipe up in y=30 quick",
+      "long-press pay 900",
+      "dismiss keyboard",
+    ])
+    expect(swiped).toContain("swiped left over 700 ms")
+    expect(inList).toContain(`swiped up across ${refOf(first, "Oats")} (text "Oats")`)
+    expect(held).toContain(`long-pressed ${refOf(first, "Pay")} (button "Pay") for 900 ms`)
+    expect(away).toContain("put the keyboard away")
+  })
+
+  it("leaves gestures to devices: a browser page refuses them", () => {
+    for (const call of [
+      { kind: "swipe", direction: "left" },
+      { kind: "long_press", target: "e2" },
+      { kind: "dismiss_keyboard" },
+    ] as const)
+      expect(isDeviceOnly(call)).toBe(true)
+    expect(isDeviceOnly({ kind: "click", target: "e2" })).toBe(false)
+    expect(deviceOnlyText("dismiss_keyboard")).toBe(
+      "dismiss_keyboard is for a device session, and this session drives a browser page (a page has no on-screen keyboard)",
+    )
+  })
+
+  it("shows the selected tab", async () => {
+    device.screen = [
+      ...device.screen,
+      element("shop", "tab", "Shop", { x: 0, y: 200, width: 60, height: 40 }, { selected: true }),
+    ]
+
+    expect(await desk.snapshot()).toMatch(/^- tab "Shop" \[selected\] \[ref=e\d+\]$/m)
   })
 
   it("checks a switch by tapping it, and leaves one already in that state", async () => {

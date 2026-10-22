@@ -47,6 +47,8 @@ const button = z.enum(["left", "right", "middle"]).optional().describe('default 
 const double = z.boolean().optional().describe("a double click")
 
 const tab = z.number().int().min(1).describe("a tab's number, as tabs lists it")
+/** How long a device gesture takes, in milliseconds. */
+const durationMs = z.number().int().min(50).max(5_000).optional()
 
 function reply(result: SessionAnswer): CallToolResult {
   return {
@@ -89,6 +91,7 @@ const SessionArgs = z.object({
   direction: z.enum(["up", "down", "left", "right"]).optional(),
   x: z.number().optional(),
   y: z.number().optional(),
+  duration_ms: z.number().optional(),
 })
 
 type SessionArgs = z.infer<typeof SessionArgs>
@@ -280,6 +283,42 @@ function registerDeviceActions(server: McpServer, sessions: SessionManager): voi
       y: z.number().describe("pixels from the screenshot's top edge"),
     },
     call: (args) => ({ kind: "tap_at", x: given(args.x, "x"), y: given(args.y, "y") }),
+  })
+  register(server, sessions, {
+    name: "swipe",
+    description: `Swipe one finger across the screen, or the element target names, the way direction says: left turns a carousel to its next page. A slow swipe (duration_ms 600 or more) turns a carousel or pulls a list to refresh. ${DEVICE_ONLY} ${ACTION_NOTE}`,
+    input: {
+      session,
+      direction: z.enum(["up", "down", "left", "right"]).describe("the way the finger moves"),
+      target: target.optional(),
+      duration_ms: durationMs.describe("how long the swipe takes; 300 by default"),
+    },
+    call: (args) => ({
+      kind: "swipe",
+      direction: given(args.direction, "direction"),
+      target: args.target,
+      durationMs: args.duration_ms,
+    }),
+  })
+  register(server, sessions, {
+    name: "long_press",
+    description: `Press and hold an element, for what opens a menu or starts a drag on a long press. ${DEVICE_ONLY} ${ACTION_NOTE}`,
+    input: {
+      session,
+      target,
+      duration_ms: durationMs.describe("how long to hold; 800 by default"),
+    },
+    call: (args) => ({
+      kind: "long_press",
+      target: given(args.target, "target"),
+      durationMs: args.duration_ms,
+    }),
+  })
+  register(server, sessions, {
+    name: "dismiss_keyboard",
+    description: `Put the on-screen keyboard away, when it covers a control; nothing happens when none shows. ${DEVICE_ONLY} ${ACTION_NOTE}`,
+    input: { session },
+    call: () => ({ kind: "dismiss_keyboard" }),
   })
 }
 

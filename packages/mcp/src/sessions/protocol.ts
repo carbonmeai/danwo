@@ -53,6 +53,18 @@ export type SessionCall =
       readonly target?: Target | undefined
     }
   | { readonly kind: "tap_at"; readonly x: number; readonly y: number }
+  | {
+      readonly kind: "swipe"
+      readonly direction: "up" | "down" | "left" | "right"
+      readonly target?: Target | undefined
+      readonly durationMs?: number | undefined
+    }
+  | {
+      readonly kind: "long_press"
+      readonly target: Target
+      readonly durationMs?: number | undefined
+    }
+  | { readonly kind: "dismiss_keyboard" }
   | { readonly kind: "check_locator"; readonly locator: string }
   | {
       readonly kind: "screenshot"

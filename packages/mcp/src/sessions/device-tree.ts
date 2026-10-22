@@ -38,7 +38,7 @@ function placeholderFlag(node: DeviceNode): string[] {
   return hint === "" || (node.value ?? "") !== "" ? [] : [`[placeholder=${quoted(hint)}]`]
 }
 
-/** What else the line says about an element: its id, hint and state. */
+/** What else the line says about an element: its id, hint and states, `[selected]` among them. */
 function flagsOf(node: DeviceNode): string[] {
   const checked = node.checked === undefined ? [] : [node.checked ? "[checked]" : "[unchecked]"]
 
@@ -48,6 +48,7 @@ function flagsOf(node: DeviceNode): string[] {
     ...(node.password ? ["[password]"] : []),
     ...(node.enabled ? [] : ["[disabled]"]),
     ...checked,
+    ...(node.selected === true ? ["[selected]"] : []),
   ]
 }
 

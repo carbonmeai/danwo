@@ -153,18 +153,21 @@ in front: the app com.danwo.shopmobile
 
 The same tools work, the way a person uses a phone:
 
-| Tool                        | On a device                                                        |
-| --------------------------- | ------------------------------------------------------------------ |
-| `click`                     | Taps the element.                                                  |
-| `fill`, `fill_secret`       | Types into a field, replacing what it holds.                       |
-| `check`                     | Taps a switch or checkbox, unless it already shows that state.     |
-| `press`                     | Taps the target, then presses the key. iOS has Enter only.         |
-| `navigate`                  | Opens a path by the app's link scheme, a full URL, or goes `back`. |
-| `back`                      | Goes back: Android's Back button, or the screen's back control.    |
-| `scroll`                    | Scrolls the screen, or one list, up, down, left or right.          |
-| `tap_at`                    | Taps a point, in screenshot pixels, for what the tree can't show.  |
-| `screenshot`                | The screen, with password and secret fields painted over.          |
-| `snapshot`, `check_locator` | The screen's tree, and locators checked against it.                |
+| Tool                        | On a device                                                         |
+| --------------------------- | ------------------------------------------------------------------- |
+| `click`                     | Taps the element.                                                   |
+| `fill`, `fill_secret`       | Types into a field, replacing what it holds.                        |
+| `check`                     | Taps a switch or checkbox, unless it already shows that state.      |
+| `press`                     | Taps the target, then presses the key. iOS has Enter only.          |
+| `navigate`                  | Opens a path by the app's link scheme, a full URL, or goes `back`.  |
+| `back`                      | Goes back: Android's Back button, or the screen's back control.     |
+| `scroll`                    | Scrolls the screen, or one list, up, down, left or right.           |
+| `swipe`                     | Swipes a finger across the screen or an element, for `duration_ms`. |
+| `long_press`                | Presses and holds an element.                                       |
+| `dismiss_keyboard`          | Puts the on-screen keyboard away.                                   |
+| `tap_at`                    | Taps a point, in screenshot pixels, for what the tree can't show.   |
+| `screenshot`                | The screen, with password and secret fields painted over.           |
+| `snapshot`, `check_locator` | The screen's tree, and locators checked against it.                 |
 
 Locators take the same chains as on a page. Tools only a browser has, such as `hover` or `drag`,
 answer with an error that says so. When the app opens a browser, such as a checkout page, the
