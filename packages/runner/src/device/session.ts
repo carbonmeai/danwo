@@ -102,21 +102,39 @@ function signature(reading: DeviceScreenReading): string {
   return reading.nodes.map((node) => `${node.role}|${node.name}|${node.text}`).join("\n")
 }
 
-/** Waits for the services to go quiet, then for two readings in a row to match. */
+/** How often readiness waits on the services again after they acted while the screen settled. */
+const READY_ROUNDS = 3
+
+/** Waits for two readings of the screen in a row to match, up to `SCREEN_SETTLE_MS`. */
+async function screenSettled(target: DeviceTarget): Promise<void> {
+  const deadline = Date.now() + SCREEN_SETTLE_MS
+  let before = signature(await target.read())
+
+  while (Date.now() < deadline) {
+    await sleep(SCREEN_POLL_MS)
+
+    const now = signature(await target.read())
+
+    if (now === before) return
+    before = now
+  }
+}
+
+/**
+ * Waits for the services to go quiet, then for two readings in a row to match. A device sends
+ * what a tap set off a moment after the tap (a browser posting its form), so when the services
+ * did something while the screen was watched, they are waited for again, and the screen after
+ * them: the webhook that payment causes is played before the next step.
+ */
 function readiness(target: DeviceTarget, backend: Backend | undefined): () => Promise<void> {
   return async () => {
-    await backend?.quiet(BACKEND_QUIET_MS)
+    for (let round = 0; round < READY_ROUNDS; round++) {
+      await backend?.quiet(BACKEND_QUIET_MS)
 
-    const deadline = Date.now() + SCREEN_SETTLE_MS
-    let before = signature(await target.read())
+      const mark = backend?.pulse?.()
 
-    while (Date.now() < deadline) {
-      await sleep(SCREEN_POLL_MS)
-
-      const now = signature(await target.read())
-
-      if (now === before) return
-      before = now
+      await screenSettled(target)
+      if (mark === undefined || backend?.pulse?.() === mark) return
     }
   }
 }

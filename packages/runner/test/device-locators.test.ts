@@ -455,6 +455,31 @@ describe("expect on a device", () => {
     )
   })
 
+  it("waits on the services again when a tap set them off while the screen settled", async () => {
+    const device = new FakeDevice()
+    let pulse = 0
+    let quiets = 0
+    const backend: Backend = {
+      quiet: async () => {
+        quiets++
+      },
+      pulse: () => pulse,
+    }
+
+    /* The browser posts its form a moment after the tap: the services move once readiness began. */
+    device.onTap.set("e4", () => {
+      setTimeout(() => {
+        pulse++
+      }, 50)
+    })
+
+    const { screen } = await open(device, { backend })
+    const before = quiets
+
+    await screen.getByTestId("buy").tap()
+    expect(quiets - before).toBe(2)
+  })
+
   it("paces a check only once the attempt's own fault has fired", async () => {
     const label = 'getByTestId("credits") toHaveText("Credits: 1000")'
     /* A fault from an earlier trial on the same worker is already in the history. */

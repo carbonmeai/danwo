@@ -163,7 +163,8 @@ Every attempt starts the app afresh: data cleared, permissions granted, launched
 A Custom Tab is part of the screen: its web page reads through the same locators.
 
 Readiness after each action waits for the services behind the app (with `settle`, webhooks are
-played), then for the screen to stop changing.
+played), then for the screen to stop changing; when the services did something meanwhile (a
+browser posting its form just after the tap), it waits for them and the screen again.
 
 ## The agent
 
