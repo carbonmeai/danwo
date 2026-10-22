@@ -24,7 +24,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-Apache--2.0-blue" alt="Licence: Apache-2.0"></a>
-  <img src="https://img.shields.io/badge/node-%E2%89%A524-339933?logo=nodedotjs&logoColor=white" alt="Node ≥ 24">
+  <img src="https://img.shields.io/badge/node-22.22.3%2B%20%7C%2024.11.1%2B-339933?logo=nodedotjs&logoColor=white" alt="Node 22.22.3+ or 24.11.1+">
   <img src="https://img.shields.io/badge/npm-%40danwo%2Fcli%20%C2%B7%20beta%20soon-cb3837?logo=npm&logoColor=white" alt="npm @danwo/cli: beta soon">
   <img src="https://img.shields.io/badge/TypeScript-3178c6?logo=typescript&logoColor=white" alt="TypeScript">
 </p>

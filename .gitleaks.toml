@@ -29,5 +29,8 @@ regexes = ['''^correct-horse-battery-staple-7$''']
 [[allowlists]]
 description = "Made-up secrets the redaction tests plant to check they never show"
 condition = "AND"
-paths = ['''^packages/runner/test/redact-before-cut\.test\.ts$''', '''^packages/mcp/test/desk\.ts$''']
+paths = [
+  '''^packages/runner/test/redact-before-cut\.test\.ts$''',
+  '''^packages/mcp/test/desk\.ts$''',
+]
 regexes = ['''^tok_live_9f8e7d6c5b4a$''', '''^desk\-key\-5e4d3c2b1a09$''']
