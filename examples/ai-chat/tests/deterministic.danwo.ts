@@ -37,6 +37,8 @@ test("looks up an order", async ({ app, screen, expect, llm, databaseUrl }) => {
     "say where order 1043 is",
   ])
   expect(calls[0]?.tools).toEqual(["lookupOrder", "createTicket"])
+  /* The answer is saved as its stream ends, after its last words show: compare once it ended. */
+  await settled(screen, expect)
   expect(await shownMessages(screen)).toEqual(await storedMessages(databaseUrl))
 }).invariant(supportHeld)
 
@@ -115,6 +117,7 @@ test("shows a retry message when the model is rate-limited, and the retry works"
 
   await expect(screen.getByTestId("message-text").last()).toHaveText(/still being made/)
   await expect(screen.getByRole("alert").filter({ hasText: BUSY })).toHaveCount(0)
+  await settled(screen, expect)
   expect(await shownMessages(screen)).toEqual(await storedMessages(databaseUrl))
 }).invariant(supportHeld)
 
@@ -181,6 +184,7 @@ test("regenerates an answer", async ({ app, screen, expect, llm, databaseUrl }) 
   await screen.getByRole("button", { name: "Regenerate" }).click()
 
   await expect(screen.getByTestId("message-text").last()).toHaveText(/free within 30 days/)
+  await settled(screen, expect)
   /* The new answer took the old one's place, on the page and in Postgres. */
   expect(await shownMessages(screen)).toEqual([
     { role: "user", text: "What's your returns policy?", outcome: null },
