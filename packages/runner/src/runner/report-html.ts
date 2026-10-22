@@ -103,6 +103,23 @@ function comparison(loaded: Loaded, check: ScreenshotEvent): string {
   return `<div class="compare">${row}</div>`
 }
 
+/** The screenshot after a step, as a thumbnail, or why the record has none. */
+function stepShot(step: RecordedStep, loaded: Loaded): string {
+  if (step.screenshot) {
+    const src = escape(`${loaded.dir}/${step.screenshot}`)
+
+    return `<a href="${src}"><img class="thumb" loading="lazy" src="${src}" alt="after step ${step.index}"></a>`
+  }
+
+  const missed = loaded.record.missing?.find(
+    (each) => each.kind === "screenshot" && each.step === step.index,
+  )
+
+  return missed === undefined
+    ? ""
+    : `<span class="dim">screenshot not saved: ${escape(missed.reason)}</span>`
+}
+
 function stepRow(step: RecordedStep, loaded: Loaded): string {
   const models = step.events.filter((e) => e.kind === "model").length
   const moves = step.events.flatMap((e) =>
@@ -119,9 +136,7 @@ function stepRow(step: RecordedStep, loaded: Loaded): string {
     ...shots.facts,
     step.source && `${step.source.file}:${step.source.line}`,
   ].filter(Boolean)
-  const shot = step.screenshot
-    ? `<a href="${escape(`${loaded.dir}/${step.screenshot}`)}"><img class="thumb" loading="lazy" src="${escape(`${loaded.dir}/${step.screenshot}`)}" alt="after step ${step.index}"></a>`
-    : ""
+  const shot = stepShot(step, loaded)
 
   return `<tr class="${step.status}"><td class="dim">${offset(step.startedAt, loaded.record.startedAt)}</td><td><code>${escape(step.api)}</code> ${escape(step.label)}${step.error ? `<div class="error">${escape(step.error.message)}</div>` : ""}<div class="dim">${escape(facts.join(" · "))}</div>${shots.images}</td><td>${escape(step.status)}</td><td class="dim">${step.durationMs} ms</td><td>${shot}</td></tr>`
 }
@@ -278,11 +293,23 @@ function stateBlock(record: FlightRecord): string {
   return `<h4>State at the end</h4>${services.map(([name, state]) => `<details><summary>${escape(name)}</summary><pre>${escape(JSON.stringify(state, null, 2))}</pre></details>`).join("")}`
 }
 
-/** The run's video, one player per tab, when the record kept it. */
+/** Why each video the run filmed, or meant to, is not in the record: `Video not saved: …`. */
+function videoMissing(record: FlightRecord): string {
+  return (record.missing ?? [])
+    .filter((each) => each.kind === "video")
+    .map((each) => {
+      const tab = each.tab === undefined ? "" : ` (tab ${each.tab})`
+
+      return `<p class="${each.cause === "setting" ? "dim" : "warn"}">Video not saved${tab}: ${escape(each.reason)}</p>`
+    })
+    .join("")
+}
+
+/** The run's video, one player per tab, when the record kept it, and why any is missing. */
 function videoBlock(loaded: Loaded): string {
   const videos = loaded.record.videos ?? []
 
-  if (videos.length === 0) return ""
+  if (videos.length === 0) return videoMissing(loaded.record)
 
   const players = videos.map((video) => {
     const src = escape(`${loaded.dir}/${video.file}`)
@@ -290,7 +317,7 @@ function videoBlock(loaded: Loaded): string {
     return `<figure><video class="film" controls preload="metadata" src="${src}"></video><figcaption>${videos.length > 1 ? `Tab ${video.tab}` : "The run"}, <a href="${src}">download</a></figcaption></figure>`
   })
 
-  return `<h4>Video</h4>${players.join("")}`
+  return `<h4>Video</h4>${players.join("")}${videoMissing(loaded.record)}`
 }
 
 function section(loaded: Loaded): string {
@@ -309,7 +336,7 @@ section{border:1px solid var(--line);border-radius:8px;padding:16px;margin:16px 
 section.failed{border-left:4px solid var(--bad)}section.passed{border-left:4px solid var(--ok)}
 .badge{text-transform:uppercase;font-size:12px;padding:1px 6px;border-radius:4px;border:1px solid currentColor}
 .failed .badge{color:var(--bad)}.passed .badge{color:var(--ok)}
-.dim{color:var(--dim)}.error{color:var(--bad);white-space:pre-wrap}.fault{color:var(--warn)}
+.dim{color:var(--dim)}.error{color:var(--bad);white-space:pre-wrap}.fault,.warn{color:var(--warn)}
 table{border-collapse:collapse;width:100%}td{border-top:1px solid var(--line);padding:4px 6px;vertical-align:top}
 ul.checks{list-style:none;padding:0;margin:0}ul.checks li{border-top:1px solid var(--line);padding:4px 6px}ul.checks li.failed{color:var(--bad)}
 tr.failed td,tr.error td{color:var(--bad)}tr.blocked td,tr.inconclusive td{color:var(--warn)}

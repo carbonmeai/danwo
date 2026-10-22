@@ -22,7 +22,7 @@ import { duration } from "../../lib/format.ts"
 import { CallDetail, CallsTable, DeliveriesTable, NoneHere } from "../record/record-calls.tsx"
 import type { RecordView } from "../record/record-data.ts"
 import { RecordPlayer } from "../record/record-player.tsx"
-import { clock } from "../record/record-replay.ts"
+import { clock, videoNotSaved } from "../record/record-replay.ts"
 import { LEVEL_COLOR, SEEN } from "../record/record-values.ts"
 import { TimelineLegend, Waterfall } from "../record/record-waterfall.tsx"
 import type { Playback } from "../record/use-playback.ts"
@@ -90,10 +90,18 @@ function PaneFrame({
 
 /** The run's video full size, the scrubber under it with every step and fault marked. */
 export function ReplayPane({ view, playback }: PaneProps) {
-  if (playback === undefined) return <None>This run kept no video or screenshots to replay.</None>
+  const notSaved = videoNotSaved(view.record)
+
+  if (playback === undefined)
+    return <None>{notSaved[0] ?? "This run kept no video or screenshots to replay."}</None>
 
   return (
     <Box h="full" minH="0" overflowY="auto">
+      {notSaved.map((line) => (
+        <Text key={line} color="ink.muted" fontSize="1.5" mb="2">
+          {line}
+        </Text>
+      ))}
       <RecordPlayer dir={view.dir} replay={view.replay} playback={playback} />
     </Box>
   )

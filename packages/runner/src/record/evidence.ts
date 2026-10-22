@@ -4,6 +4,7 @@ import { join } from "node:path"
 
 import type { Page } from "playwright-core"
 
+import type { MissingCause } from "./missing.ts"
 import { takeScreenshot } from "./screenshots.ts"
 
 export interface FailureEvidence {
@@ -23,6 +24,8 @@ export interface EvidenceOptions {
   readonly redact: (text: string) => string
   readonly secrets: readonly string[]
   readonly timeout: number
+  /** Told why the screenshot was not taken, when it was not. */
+  readonly onMissed?: (cause: MissingCause, reason: string) => void
 }
 
 const SCREEN_FILE = "screen-at-failure.txt"
@@ -56,6 +59,7 @@ export async function captureEvidence(options: EvidenceOptions): Promise<Failure
           path: SCREENSHOT_FILE,
           secrets: options.secrets,
           timeout: options.timeout,
+          ...(options.onMissed && { onMissed: options.onMissed }),
         })
 
   return {

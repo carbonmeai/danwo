@@ -13,6 +13,7 @@ import type { CapturedMessage, Exchange, SocketExchange } from "@danwo/proxy"
 
 import type { LintFinding } from "../lint/index.ts"
 import type { AppLogRecord, FailureEvidence, StepRecord } from "../record/index.ts"
+import type { MissingArtifact } from "../record/missing.ts"
 import { type RecordedVideo, VIDEO_DIR, type VideoMode, videoMarks } from "../record/video.ts"
 import { type CredentialKind, credentialKind, sentByBrowser } from "../secrets/index.ts"
 import type { ReplayDivergence } from "../session.ts"
@@ -96,6 +97,11 @@ export interface FlightRecord {
   readonly lint?: readonly LintFinding[]
   /** Video of the run, one per tab (or the device's screen), each with the run on its clock. */
   readonly videos?: readonly RecordedVideo[]
+  /**
+   * Screenshots and videos the run did not keep, each with why: a failed save, a secret that
+   * showed on the page, or the `video` setting.
+   */
+  readonly missing?: readonly MissingArtifact[]
   /** Whose failure a run that did not pass was: the app's, the test's, the environment's, danwo's. */
   readonly verdict?: FailureVerdict
 }
@@ -197,6 +203,8 @@ export interface RecordInput {
   readonly mark: EvidenceMark
   /** Keep the run's video in its record; without it the record has none. */
   readonly video?: boolean
+  /** Why the `video` setting leaves the run's video out, when it does: `video is off`. */
+  readonly videoLeftOut?: string
   /** Apps of the environment that stopped during the run, for its verdict. */
   readonly appsDown?: readonly string[]
   /** Routes that answered 5xx in runs that passed, which the verdict leaves out as noise. */
@@ -284,8 +292,40 @@ export function buildRecord(input: RecordInput, extras: RecordExtras = {}): Flig
     state: environmentState(input.env, redactor),
     ...(extras.lint !== undefined && extras.lint.length > 0 && { lint: extras.lint }),
     ...videosOf(input, evidence),
+    ...missingOf(input),
     ...verdictOf(input),
   })
+}
+
+/** The videos the `video` setting left out of the record, when it left them out. */
+function leftOutVideos(input: RecordInput, lost: readonly MissingArtifact[]): MissingArtifact[] {
+  const reason = input.videoLeftOut
+  const { session } = input.flight
+
+  if (input.video === true || reason === undefined || session.videos === undefined) return []
+
+  const filmed = session.videos()
+
+  if (filmed.length === 0)
+    return lost.some((each) => each.kind === "video")
+      ? []
+      : [{ kind: "video", cause: "setting", reason }]
+
+  return filmed.map((video) => ({
+    kind: "video",
+    cause: "setting",
+    reason,
+    tab: video.tab,
+    ...(video.user !== undefined && { user: video.user }),
+  }))
+}
+
+/** The screenshots and videos the run meant to keep but did not, with why; none when it kept all. */
+export function missingOf(input: RecordInput): Pick<FlightRecord, "missing"> {
+  const lost = input.flight.session.missing?.() ?? []
+  const missing = [...lost, ...leftOutVideos(input, lost)]
+
+  return missing.length === 0 ? {} : { missing }
 }
 
 /** A run's verdict, for one that did not pass; nothing for a run that passed or was skipped. */
@@ -465,9 +505,9 @@ export async function finishRecord(
 
     const record = build()
 
-    /* A record that keeps no video drops what the session captured. */
+    /* A record that keeps no video drops what the session captured; failing to does not lose it. */
     if (record.videos === undefined)
-      await rm(join(dir, VIDEO_DIR), { recursive: true, force: true })
+      await rm(join(dir, VIDEO_DIR), { recursive: true, force: true }).catch(() => undefined)
     await writeRecord(dir, record)
 
     return relative(process.cwd(), dir)

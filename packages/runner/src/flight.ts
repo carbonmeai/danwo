@@ -15,6 +15,7 @@ import {
   type StepRecorder,
   takeScreenshot,
 } from "./record/index.ts"
+import type { MissingArtifact } from "./record/missing.ts"
 import type { CapturedVideo } from "./record/video.ts"
 import { redactCredentials, type SecretVault } from "./secrets/index.ts"
 
@@ -44,6 +45,8 @@ export interface SessionFlight {
   settle(): Promise<void>
   /** Video the session recorded, complete once it has closed; none when it recorded no video. */
   videos?(): readonly CapturedVideo[]
+  /** The screenshots and videos it meant to keep but did not, with why; complete once closed. */
+  missing?(): readonly MissingArtifact[]
 }
 
 export interface SessionFlightOptions {
@@ -56,6 +59,22 @@ export interface SessionFlightOptions {
   readonly stepScreenshots: boolean
   /** The session's videos, once it has closed. */
   readonly videos?: () => readonly CapturedVideo[]
+  /** The videos the session filmed but could not save, once it has closed. */
+  readonly lostVideos?: () => readonly MissingArtifact[]
+}
+
+/** What a video withheld because a secret showed says in the record. */
+const SECRET_IN_VIDEO = "a secret showed on the page as text, which video cannot hide"
+
+/** A video left out of the record because a secret showed while it filmed. */
+function withheld(video: CapturedVideo): MissingArtifact {
+  return {
+    kind: "video",
+    cause: "secret",
+    reason: SECRET_IN_VIDEO,
+    tab: video.tab,
+    ...(video.user !== undefined && { user: video.user }),
+  }
 }
 
 /** The session side of the flight recorder; feed `onStep` every step that ends. */
@@ -63,6 +82,7 @@ export function createSessionFlight(
   options: SessionFlightOptions,
 ): SessionFlight & { onStep(step: StepRecord): void } {
   const shots = new Map<number, string>()
+  const missed: MissingArtifact[] = []
   let queue: Promise<void> = Promise.resolve()
   /** A page showed a secret as text after some step: the video, which cannot hide it, is not kept. */
   let secretShown = false
@@ -70,7 +90,11 @@ export function createSessionFlight(
   /** One at a time, in step order. */
   const screenshot = (step: number) => {
     queue = queue.then(async () => {
-      if (options.page().isClosed()) return
+      if (options.page().isClosed()) {
+        missed.push({ kind: "screenshot", cause: "closed", reason: "its tab had closed", step })
+
+        return
+      }
 
       const path = await takeScreenshot({
         page: options.page(),
@@ -81,6 +105,7 @@ export function createSessionFlight(
         onSecretShown: () => {
           secretShown = true
         },
+        onMissed: (cause, reason) => missed.push({ kind: "screenshot", cause, reason, step }),
       })
 
       if (path !== undefined) shots.set(step, path)
@@ -111,12 +136,19 @@ export function createSessionFlight(
         redact,
         secrets: options.vault.values(),
         timeout: SCREENSHOT_TIMEOUT_MS,
+        onMissed: (cause, reason) =>
+          missed.push({ kind: "screenshot", cause, reason, atFailure: true }),
       }).catch(() => undefined)
 
       return withCandidates(evidence, error, redact)
     },
     settle: () => queue,
     videos: () => (secretShown ? [] : (options.videos?.() ?? [])),
+    missing: () => [
+      ...missed,
+      ...(secretShown ? (options.videos?.() ?? []).map(withheld) : []),
+      ...(options.lostVideos?.() ?? []),
+    ],
   }
 }
 

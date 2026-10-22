@@ -22,6 +22,7 @@ import { type CheckPace, paceOf } from "../assert/pace.ts"
 import { launchBrowser } from "../browser/index.ts"
 import { type LintConfig, type LintFinding, lint } from "../lint/index.ts"
 import type { StepRecord } from "../record/index.ts"
+import { unexpectedlyMissing } from "../record/missing.ts"
 import { usageOf } from "../record/usage.ts"
 import { keepsVideo } from "../record/video.ts"
 import {
@@ -49,6 +50,7 @@ import {
   finishRecord,
   type FlightRecord,
   markEvidence,
+  missingOf,
   recordEvidence,
   runVerdict,
   type RecordExtras,
@@ -245,11 +247,23 @@ function lintOf(extras: RecordExtras): { lint?: readonly LintFinding[] } {
   return extras.lint !== undefined && extras.lint.length > 0 ? { lint: extras.lint } : {}
 }
 
-/** Whether a run's record keeps its video, by the recording's video mode and whether it passed. */
-function videoKept(passed: boolean): boolean {
+/**
+ * Whether a run's record keeps its video, by the recording's video mode and whether it passed,
+ * and why not when the mode leaves it out.
+ */
+function videoKept(passed: boolean): Pick<RecordInput, "video" | "videoLeftOut"> {
   const mode = benchOrFail().recording?.video
 
-  return mode !== undefined && keepsVideo(mode, passed)
+  if (mode === undefined) return { video: false }
+  if (keepsVideo(mode, passed)) return { video: true }
+
+  return {
+    video: false,
+    videoLeftOut:
+      mode === "off"
+        ? 'video is off (video: "off")'
+        : 'video is kept only for runs that fail (video: "retain-on-failure")',
+  }
 }
 
 /** Keeps or drops a run's flight record; the directory relative to the cwd when kept. */
@@ -362,7 +376,7 @@ async function reportAttempt(attempt: FinishedAttempt): Promise<AttemptReport> {
     flight: result.flight,
     env,
     mark: attempt.mark,
-    video: videoKept(result.status === "passed"),
+    ...videoKept(result.status === "passed"),
     appsDown: down,
     baseline: passingErrors,
   }
@@ -371,12 +385,14 @@ async function reportAttempt(attempt: FinishedAttempt): Promise<AttemptReport> {
     buildRecord(input, inspected),
   )
   const verdict = runVerdict(input)
+  const missing = (missingOf(input).missing ?? []).filter(unexpectedlyMissing)
 
   return {
     status: result.status,
     error,
     durationMs: result.durationMs,
     record,
+    ...(missing.length > 0 && { missing }),
     usage: usageOf(result.flight.session.steps()),
     ...lintOf(inspected),
     ...(verdict !== undefined && { verdict }),
@@ -710,7 +726,7 @@ async function runTrial(
     env,
     mark,
     /* A trial that passed keeps no video, even when its record is kept to show a fault never fired. */
-    video: videoKept(verdict.status === "passed"),
+    ...videoKept(verdict.status === "passed"),
     baseline: passingErrors,
   }
   const inspected = inspect(input)

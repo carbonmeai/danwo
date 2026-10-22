@@ -354,6 +354,21 @@ export function videoName(videos: readonly ReplayVideo[], index: number): string
     : `Tab ${video.tab}`
 }
 
+/**
+ * Why the record has no video, or not every tab's: `Video not saved: saving it failed: ENOSPC …`,
+ * one line per reason. Empty when it kept every video it filmed.
+ */
+export function videoNotSaved(record: Pick<FlightRecord, "missing">): readonly string[] {
+  const lines = (record.missing ?? [])
+    .filter((each) => each.kind === "video")
+    .map(
+      (each) =>
+        `Video not saved${each.tab === undefined ? "" : ` (tab ${each.tab})`}: ${each.reason}`,
+    )
+
+  return [...new Set(lines)]
+}
+
 /** The frame showing at `ms`: the last one whose step had ended, else the first. */
 export function frameAt(frames: readonly ReplayFrame[], ms: number): ReplayFrame | undefined {
   return frames.findLast((frame) => frame.atMs <= ms) ?? frames[0]

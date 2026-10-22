@@ -9,6 +9,7 @@ import type { BlockedLoad, Exchange, SocketExchange } from "@danwo/proxy"
 
 import type { CheckPace } from "../assert/pace.ts"
 import type { LintFinding } from "../lint/index.ts"
+import type { MissingArtifact } from "../record/missing.ts"
 import type { Usage } from "../record/usage.ts"
 import type { ReplayDivergence } from "../session.ts"
 import type { ErrorClass } from "../support/codes.ts"
@@ -79,6 +80,8 @@ export interface AttemptReport {
   readonly verdict?: FailureVerdict
   /** Hosts the attempt's pages were refused, by what they asked for: what the page lost. */
   readonly blocked?: readonly BlockedLoad[]
+  /** Screenshots and videos it asked for and lost: a failed save, or a secret that showed. */
+  readonly missing?: readonly MissingArtifact[]
 }
 
 /**

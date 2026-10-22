@@ -10,6 +10,7 @@ import type { Locator, Page } from "playwright-core"
 
 import { valueSelector } from "../locate/display-value.ts"
 import { SECRET_FIELD } from "../secrets/fields.ts"
+import { failureReason, type MissingCause } from "./missing.ts"
 
 /** Answers whether the page's text shows a secret. Runs in the page and changes nothing there. */
 function showsSecret(values: readonly string[]): boolean {
@@ -44,7 +45,12 @@ export interface ShotOptions {
   readonly timeout: number
   /** Told when the page's text showed a secret, so no screenshot was taken. */
   readonly onSecretShown?: () => void
+  /** Told why no screenshot was taken, when none was. */
+  readonly onMissed?: (cause: MissingCause, reason: string) => void
 }
+
+/** What a screenshot withheld for a secret says in the record. */
+const SECRET_SHOWN = "a secret showed on the page as text"
 
 /** Takes a masked screenshot to `dir/path`; resolves with `path`, or undefined when not taken. */
 export async function takeScreenshot(options: ShotOptions): Promise<string | undefined> {
@@ -56,6 +62,7 @@ export async function takeScreenshot(options: ShotOptions): Promise<string | und
 
       if (shown) {
         options.onSecretShown?.()
+        options.onMissed?.("secret", SECRET_SHOWN)
 
         return undefined
       }
@@ -73,7 +80,9 @@ export async function takeScreenshot(options: ShotOptions): Promise<string | und
     })
 
     return options.path
-  } catch {
+  } catch (error) {
+    options.onMissed?.("failed", `taking it failed: ${failureReason(error)}`)
+
     return undefined
   }
 }

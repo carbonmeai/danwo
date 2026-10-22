@@ -31,6 +31,7 @@ import { MailDesk } from "./mail/desk.ts"
 import type { MailSource } from "./mail/index.ts"
 import { modelName } from "./model/resolve.ts"
 import { type StepRecord, StepRecorder } from "./record/index.ts"
+import { failureReason } from "./record/missing.ts"
 import { type CacheMode, ReplayStore } from "./replay/index.ts"
 import { type RelocationPolicy, relocationOf } from "./replay/policy.ts"
 import { type Secret, SecretVault, type SessionSecret } from "./secrets/index.ts"
@@ -439,8 +440,28 @@ async function closeUser(user: OpenUser, contexts: BrowserContext[]): Promise<vo
   const at = contexts.indexOf(user.context)
 
   if (at >= 0) contexts.splice(at, 1)
-  await user.context.close()
-  await user.film?.save(closedAt)
+  await closeFilmed(user.context, user.film, closedAt)
+}
+
+/**
+ * Closes a context and saves its film. A context that fails to close never finishes its videos,
+ * so they are marked lost with why, and the error goes on.
+ */
+async function closeFilmed(
+  context: BrowserContext,
+  film: TabFilm | undefined,
+  closedAt: number,
+): Promise<void> {
+  try {
+    await context.close()
+  } catch (error) {
+    film?.lose(
+      `the browser did not close, so the video was never finished: ${failureReason(error)}`,
+    )
+    throw error
+  }
+
+  await film?.save(closedAt)
 }
 
 /** What opening another person's browser needs from its session. */
@@ -571,6 +592,10 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
       ...(film?.videos() ?? []),
       ...users.flatMap((user) => user.film?.videos() ?? []),
     ],
+    lostVideos: () => [
+      ...(film?.missing() ?? []),
+      ...users.flatMap((user) => user.film?.missing() ?? []),
+    ],
   })
 
   ended.onStep = (step) => flight.onStep(step)
@@ -618,8 +643,7 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
 
       try {
         for (const user of users) await closeUser(user, shared.contexts)
-        await context.close()
-        await film?.save(closedAt)
+        await closeFilmed(context, film, closedAt)
       } finally {
         if (own) await browser.close()
         if (ownsArtifacts) await rm(artifactsDir, { recursive: true, force: true })

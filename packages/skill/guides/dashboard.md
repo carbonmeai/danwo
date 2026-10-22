@@ -114,6 +114,19 @@ screen recordings. Video shows the screen as it was: fields holding a
 secret show as dots, but a secret the app prints as text is on screen, and so is anything else the
 page shows. Turn video off (`video: "off"`) for suites that show secrets.
 
+A record's `missing` lists every screenshot and video the run did not keep, as
+`{ kind: "screenshot" | "video", cause, reason, step?, atFailure?, tab?, user? }`. `cause` is
+`failed` (the browser or the disk failed to save it; the reason is the error's first line, e.g.
+`saving it failed: ENOSPC …`, or `the browser did not close, so the video was never finished`),
+`secret` (a known secret showed on the page as text: that step's screenshot is skipped and every
+tab's video is withheld), `closed` (the tab closed before its step's screenshot) or `setting`
+(`video: "off"`, or `"retain-on-failure"` on a run that passed). The Replay pane and the HTML report
+show it as `Video not saved: …` and `screenshot not saved: …`. An attempt's report in
+`results.json` carries `missing` with the `failed` ones and the withheld videos, and `danwo test`
+ends its summary with one warning line naming them. It does not change the exit code: the run is
+judged on what the app did, and lost evidence (a full disk, a secret on screen) is reported, not
+failed on. Device recordings are not yet covered.
+
 When a test opened another person's browser (`users.open`), each person has their own video, named
 `bob · tab 1` beside `you · tab 1` in the player. A person's video marks their own steps and calls
 plus the app server's; the transcript tags each step with its person, draws a line where the test

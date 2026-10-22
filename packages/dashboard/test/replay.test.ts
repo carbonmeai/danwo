@@ -16,6 +16,7 @@ import {
   mediaUrl,
   replayOf,
   stepAt,
+  videoNotSaved,
 } from "../src/modules/record/record-replay.ts"
 import { timelineOf } from "../src/modules/record/record-timeline.ts"
 
@@ -251,6 +252,27 @@ function popupReplay() {
 
   return { replay: replayOf(DIR, record, timelineOf(RECORD)), steps }
 }
+
+describe("a record whose video was not saved", () => {
+  it("says why for each tab, once per reason, and nothing when every video was kept", () => {
+    const reason = "saving it failed: ENOSPC: no space left on device, write"
+
+    expect(
+      videoNotSaved({
+        missing: [
+          { kind: "video", cause: "failed", reason, tab: 1 },
+          { kind: "video", cause: "failed", reason, tab: 1 },
+          { kind: "screenshot", cause: "secret", reason: "a secret showed", step: 2 },
+          { kind: "video", cause: "setting", reason: 'video is off (video: "off")' },
+        ],
+      }),
+    ).toEqual([
+      `Video not saved (tab 1): ${reason}`,
+      'Video not saved: video is off (video: "off")',
+    ])
+    expect(videoNotSaved({})).toEqual([])
+  })
+})
 
 describe("the player following the action across tabs", () => {
   it("shows each step in the video of the tab it ran in, and where the popup opened and closed", () => {

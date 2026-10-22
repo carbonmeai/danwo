@@ -37,6 +37,7 @@ export {
   type ChainLink as DeviceChainLink,
   resolveChain,
 } from "../device/match.ts"
+export type { MissingArtifact, MissingCause } from "../record/missing.ts"
 export type { CapturedVideo, RecordedVideo, VideoMark, VideoMode } from "../record/video.ts"
 export {
   gmailMail,

@@ -114,6 +114,27 @@ Older runs' recordings are deleted as each run finishes. `danwo test --keep-runs
 for one run. The run summaries the dashboard lists stay longer (200 runs), so an old run's row
 reads **recording deleted** and its Watch button is turned off.
 
+## When a video or screenshot is missing
+
+A record that lacks a video or a screenshot says why, in its `missing` list. The Replay pane and
+the HTML report show it as **Video not saved: …**:
+
+| Cause     | What happened                                                         |
+| --------- | --------------------------------------------------------------------- |
+| `failed`  | the browser or the disk failed to save it (`ENOSPC`, a browser crash) |
+| `secret`  | a secret danwo knows showed on the page as text, so it wasn't kept    |
+| `closed`  | the tab had closed before its step's screenshot                       |
+| `setting` | `video: "off"` or `"retain-on-failure"` left it out                   |
+
+When a run loses a video or screenshot it asked for (`failed`, or a video withheld for a secret),
+the summary ends with one warning line:
+
+```text
+danwo: 1 video was not saved (the run's result stands): tests/pay.danwo.ts › pays, the video of tab 1: saving it failed: ENOSPC: no space left on device, write. Each record's `missing` says why.
+```
+
+The run still passes or fails on what the app did. A full disk shouldn't turn a green run red.
+
 ## How much disk it takes
 
 A browser test's video is usually 50 to 250 KB. A run's folder, with its videos, screenshots and

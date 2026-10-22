@@ -4,6 +4,7 @@ import { basename, relative, resolve } from "node:path"
 import { blockedLoadsLine, mergeBlockedLoads } from "@danwo/proxy"
 
 import { type LintFinding, lintReport, withLint } from "../lint/index.ts"
+import { missingLine } from "../record/missing.ts"
 import { DanwoError } from "../support/codes.ts"
 import { catalogOf, testFilesOf, type CatalogEntry } from "./catalog.ts"
 import { ciDefaults, inCi, parseShard, type Shard, shardFiles, shardLabel } from "./ci.ts"
@@ -314,6 +315,23 @@ function blockedReport(reports: readonly TestReport[]): string[] {
   return line === undefined ? [] : [line]
 }
 
+/**
+ * The run's one warning about the screenshots and videos its tests asked for and lost; none when
+ * nothing was. It warns rather than fails: what the app did is judged either way, and a full disk
+ * or a secret on the page should not turn a passing run red.
+ */
+function missingReport(reports: readonly TestReport[]): string[] {
+  const line = missingLine(
+    reports.flatMap((report) =>
+      report.attempts.flatMap((attempt) =>
+        (attempt.missing ?? []).map((missing) => ({ test: report.id, missing })),
+      ),
+    ),
+  )
+
+  return line === undefined ? [] : [line]
+}
+
 /** Runs the picked tests with a live feed of them; resolves to the exit code. */
 async function executeRun(input: RunInput): Promise<number> {
   const recording = openRecording(
@@ -403,6 +421,7 @@ async function runAndReport(input: RunInput, frame: RunFrame): Promise<number> {
   for (const line of [
     ...lintReport(findings),
     ...blockedReport(results.reports),
+    ...missingReport(results.reports),
     ...stopLines(limits.outOfFailures(), ran.notRun, options),
   ])
     write(line)
