@@ -91,14 +91,15 @@ AI_GATEWAY_API_KEY="your-key" npx @danwo/cli test
 
 Without the key, it skips.
 
-## Before danwo's beta is on npm
+## Against a local build of danwo
 
-This folder pins danwo's packages at `0.1.0-beta.0`. Until that version is published, from the
-root of the danwo repository:
+To run this example against danwo's source instead of the published packages, while you work
+on danwo, build the packages and install the example from them, from the root of the danwo
+repository:
 
 ```sh
 bun install
-bun run release 0.1.0-beta.0 --pack
+bun run release 0.1.0 --pack
 node examples/link.ts with-compose --here
 ```
 
@@ -117,5 +118,5 @@ node examples/link.ts with-compose --here
 
 See [Native Android apps](https://danwo.dev/docs/native-android) for your own app.
 
-Last checked with danwo 0.1.0-beta.0, AGP 9.4.1, Kotlin 2.4.20, Compose BOM 2026.09.00, an
+Last checked with danwo 0.1.0, AGP 9.4.1, Kotlin 2.4.20, Compose BOM 2026.09.00, an
 Android 14 (Google APIs) emulator, Postgres 17 and Node 24.

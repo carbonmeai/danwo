@@ -96,14 +96,15 @@ AI_GATEWAY_API_KEY="your-key" npx @danwo/cli test
 
 Without the key, it skips.
 
-## Before danwo's beta is on npm
+## Against a local build of danwo
 
-This folder pins danwo's packages at `0.1.0-beta.0`. Until that version is published, from the
-root of the danwo repository:
+To run this example against danwo's source instead of the published packages, while you work
+on danwo, build the packages and install the example from them, from the root of the danwo
+repository:
 
 ```sh
 bun install
-bun run release 0.1.0-beta.0 --pack
+bun run release 0.1.0 --pack
 node examples/link.ts with-swiftui --here
 ```
 
@@ -122,4 +123,4 @@ node examples/link.ts with-swiftui --here
 
 See [Native iOS apps](https://danwo.dev/docs/native-ios) for your own app.
 
-Last checked with danwo 0.1.0-beta.0, Xcode 26.6, iOS 26.5, Postgres 17 and Node 24.
+Last checked with danwo 0.1.0, Xcode 26.6, iOS 26.5, Postgres 17 and Node 24.

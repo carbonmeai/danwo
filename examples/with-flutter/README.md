@@ -102,14 +102,15 @@ AI_GATEWAY_API_KEY="your-key" npx @danwo/cli test
 
 Without the key, it skips.
 
-## Before danwo's beta is on npm
+## Against a local build of danwo
 
-This folder pins danwo's packages at `0.1.0-beta.0`. Until that version is published, from the
-root of the danwo repository:
+To run this example against danwo's source instead of the published packages, while you work
+on danwo, build the packages and install the example from them, from the root of the danwo
+repository:
 
 ```sh
 bun install
-bun run release 0.1.0-beta.0 --pack
+bun run release 0.1.0 --pack
 node examples/link.ts with-flutter --here
 ```
 
@@ -128,6 +129,6 @@ node examples/link.ts with-flutter --here
 
 See [Flutter](https://danwo.dev/docs/flutter) for your own app.
 
-Last checked with danwo 0.1.0-beta.0, Flutter 3.47.7, `http` 1.6.0, `cupertino_http` 3.1.0,
+Last checked with danwo 0.1.0, Flutter 3.47.7, `http` 1.6.0, `cupertino_http` 3.1.0,
 `cronet_http` 1.10.0, an Android 14 (Google APIs) emulator, an iOS 26.5 simulator, Postgres 17
 and Node 24.

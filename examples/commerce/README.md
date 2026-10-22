@@ -148,14 +148,15 @@ AI_GATEWAY_API_KEY="your-key" npm run test:agentic
 
 The first run records each step; later runs replay it with no model calls.
 
-## Before danwo's beta is on npm
+## Against a local build of danwo
 
-This folder pins `@danwo/cli` and `@danwo/sdk` at `0.1.0-beta.0`. Until that version is published,
-build the packages and install this example from them, from the root of the danwo repository:
+To run this example against danwo's source instead of the published packages, while you work
+on danwo, build the packages and install the example from them, from the root of the danwo
+repository:
 
 ```sh
 bun install
-bun run release 0.1.0-beta.0 --pack
+bun run release 0.1.0 --pack
 node examples/link.ts commerce
 ```
 
@@ -183,5 +184,5 @@ That leaves only `node_modules`, which git ignores. The package.json is put back
 | `kit/`             | the examples' shared styles, used through their Tailwind theme                |
 | `tests/`           | the tests, the invariants (`shop.ts`) and the database helpers                |
 
-Last checked with @danwo/cli 0.1.0-beta.0, Next.js 16.4, Hono 4.13, Drizzle 0.45, Postgres 17
+Last checked with @danwo/cli 0.1.0, Next.js 16.4, Hono 4.13, Drizzle 0.45, Postgres 17
 and Node 24.

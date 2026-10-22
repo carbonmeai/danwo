@@ -100,7 +100,7 @@ bun run release 0.1.0-beta.0 --pack --verify
 
 `--pack` builds the dashboard and the type declarations, stages each public package at the version (every `workspace:` range replaced) and writes one tarball per package to `dist/release`. `--verify` installs the tarballs into a fresh npm project, runs `danwo --version`, `init`, `test` and a strict `tsc` there, and fails if danwo left anything running. The script refuses a dirty tree and a version that is not semver.
 
-To publish, push a `v*` tag for the version, such as `v0.1.0-beta.0`. `release.yml` then:
+To publish, push a `v*` tag for the version, such as `v0.1.0`. `release.yml` then:
 
 1. runs `bun run check` and the same `--pack --verify`;
 2. waits in the `npm` environment until a required reviewer approves it (**Settings > Environments > npm**);

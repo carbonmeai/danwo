@@ -244,14 +244,15 @@ cache: 2 replayed · 0 relocated · 0 handed off · 0 missed
 The second run has no `model:` line: none of danwo's agent steps called a model. The app's model
 was the emulator both times.
 
-## Before danwo's beta is on npm
+## Against a local build of danwo
 
-This folder pins `@danwo/cli` and `@danwo/sdk` at `0.1.0-beta.0`. Until that version is published,
-build the packages and install this example from them, from the root of the danwo repository:
+To run this example against danwo's source instead of the published packages, while you work
+on danwo, build the packages and install the example from them, from the root of the danwo
+repository:
 
 ```sh
 bun install
-bun run release 0.1.0-beta.0 --pack
+bun run release 0.1.0 --pack
 node examples/link.ts ai-chat
 ```
 
@@ -286,4 +287,4 @@ orders (`SEED_ORDERS` in `lib/orders.ts`).
 Read more in [Scripting replies](https://danwo.dev/docs/providers/model-scripts) and
 [Model APIs](https://danwo.dev/docs/providers/model-apis).
 
-Last checked with danwo 0.1.0-beta.0, Next.js 16.4, AI SDK 7.0, Postgres 17, and Node 24.
+Last checked with danwo 0.1.0, Next.js 16.4, AI SDK 7.0, Postgres 17, and Node 24.

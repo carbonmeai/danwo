@@ -123,14 +123,15 @@ AI_GATEWAY_API_KEY="your-key" npx @danwo/cli test
 Without the key, they skip. Each agent step is paired with a check that needs no model, and danwo
 keeps the verified steps in `.danwo/cache`, so later runs replay them without calling the model.
 
-## Before danwo's beta is on npm
+## Against a local build of danwo
 
-This folder pins `@danwo/cli` and `@danwo/sdk` at `0.1.0-beta.0`. Until that version is published,
-build the packages and install this example from them, from the root of the danwo repository:
+To run this example against danwo's source instead of the published packages, while you work
+on danwo, build the packages and install the example from them, from the root of the danwo
+repository:
 
 ```sh
 bun install
-bun run release 0.1.0-beta.0 --pack
+bun run release 0.1.0 --pack
 node examples/link.ts with-next
 ```
 
@@ -160,4 +161,4 @@ That leaves only `node_modules`, which git ignores. The package.json is put back
 
 For your own app, start with the [Quickstart](https://danwo.dev/docs/quickstart).
 
-Last checked with danwo 0.1.0-beta.0, Next.js 16.4, Postgres 17, and Node 24.
+Last checked with danwo 0.1.0, Next.js 16.4, Postgres 17, and Node 24.
