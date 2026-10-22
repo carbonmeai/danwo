@@ -96,18 +96,21 @@ describe("an unmodified app on Flutterwave Standard", () => {
       const report = Report.parse(await (await fetch(`${base}/report`)).json())
 
       expect(report).toEqual({ credits: 500, rejectedHooks: 1 })
-      expect(
-        proxy
-          .exchanges()
-          .map(
-            (exchange) =>
-              `${exchange.method} ${exchange.host}${exchange.path.replace(/\/\d+\//g, "/:id/")}`,
-          ),
-      ).toEqual([
-        "POST api.flutterwave.com/v3/payments",
-        "GET api.flutterwave.com/v3/transactions/:id/verify",
-        "GET api.flutterwave.com/v3/transactions/:id/verify",
-      ])
+      /* The last exchange can still be on its way into the log when the app has answered. */
+      await expect
+        .poll(() =>
+          proxy
+            .exchanges()
+            .map(
+              (exchange) =>
+                `${exchange.method} ${exchange.host}${exchange.path.replace(/\/\d+\//g, "/:id/")}`,
+            ),
+        )
+        .toEqual([
+          "POST api.flutterwave.com/v3/payments",
+          "GET api.flutterwave.com/v3/transactions/:id/verify",
+          "GET api.flutterwave.com/v3/transactions/:id/verify",
+        ])
       expect(proxy.exchanges().every((exchange) => exchange.disposition === "routed")).toBe(true)
     } finally {
       app.stop()
