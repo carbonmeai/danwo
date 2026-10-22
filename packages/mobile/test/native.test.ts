@@ -79,7 +79,7 @@ function fakeExec(answer: (call: Call) => Promise<string> | string = () => ""): 
 
 /** The tool each call ran, by its file name, with its first argument: `xcodebuild -list`. */
 function steps(calls: readonly Call[]): string[] {
-  return calls.map(({ command, args }) => `${command.split("/").at(-1) ?? ""} ${args[0] ?? ""}`)
+  return calls.map(({ command, args }) => `${command.split(/[\\/]/).at(-1) ?? ""} ${args[0] ?? ""}`)
 }
 
 describe("finding what kind of app a folder holds", () => {
@@ -348,7 +348,7 @@ describe("the native Android build", () => {
     expect(built).toMatchObject({ cached: false, package: "dev.danwo.hello" })
     expect(await readFile(built.apk, "utf8")).toBe("signed")
 
-    const ran = fake.calls.map((call) => call.command.split("/").at(-1))
+    const ran = fake.calls.map((call) => call.command.split(/[\\/]/).at(-1))
 
     expect(ran.filter((tool) => tool !== "keytool")).toEqual(["gradlew", "apksigner", "aapt2"])
     expect(fake.calls[0]?.cwd).toBe(project)
@@ -370,7 +370,7 @@ describe("the native Android build", () => {
       apk: built.apk,
       cached: true,
     })
-    expect(fake.calls.map((call) => call.command.split("/").at(-1))).toEqual(["aapt2"])
+    expect(fake.calls.map((call) => call.command.split(/[\\/]/).at(-1))).toEqual(["aapt2"])
   })
 
   it("copies a signed debug APK as it is, and says so when the variant made none", async () => {
