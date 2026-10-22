@@ -20,7 +20,8 @@ import type { Tabs } from "../browser/tabs.ts"
 import { refusalOr, throwIfRefused } from "../model/refusal.ts"
 import { callCost, type CallCost } from "../model/resolve.ts"
 import { describe, describeKind, describeTarget, findAll, type Target } from "../replay/target.ts"
-import { viewTabs, viewText } from "../snapshot/view.ts"
+import { viewLimit } from "../snapshot/limit.ts"
+import { type PageView, type ViewCut, viewTabs, viewText } from "../snapshot/view.ts"
 import { DanwoError } from "../support/codes.ts"
 import type { VisionDesk } from "../vision/desk.ts"
 import { EXTRACT_VISION_GUIDE } from "../vision/prompts.ts"
@@ -233,6 +234,8 @@ export interface ExtractContext {
    * page has parts the text view misses.
    */
   readonly vision?: { readonly mode: "auto" | "always"; readonly desk: VisionDesk } | undefined
+  /** Told each time the extractor's view of the page was cut to fit its model. */
+  readonly onViewCut?: (cut: ViewCut) => void
 }
 
 export interface Extracted<T> {
@@ -326,8 +329,18 @@ class ExtractLoop<T> {
     this.schema = schema
   }
 
+  /** The page now, cut to fit the model; a cut is told to the step. */
+  private async look(): Promise<PageView> {
+    const { tabs, redact, model } = this.context
+    const view = await viewTabs(tabs, redact, viewLimit(model))
+
+    if (view.cut !== undefined) this.context.onViewCut?.(view.cut)
+
+    return view
+  }
+
   async run(instruction: string): Promise<Extracted<T>> {
-    let view = await viewTabs(this.context.tabs, this.context.redact)
+    let view = await this.look()
 
     this.sees = await this.wantsScreen(view.tree)
     this.messages.push({
@@ -341,7 +354,7 @@ class ExtractLoop<T> {
 
       if ("value" in outcome) return { ...outcome, modelCalls: this.modelCalls }
 
-      view = await viewTabs(this.context.tabs, this.context.redact)
+      view = await this.look()
       this.messages.push({
         role: "tool",
         content: [

@@ -44,6 +44,8 @@ export interface ExtractStepContext {
   readonly onModelCall: (cost: CallCost) => void
   /** The step's vision, when values may be read off a screenshot. */
   readonly vision?: ExtractContext["vision"]
+  /** Told each time the model's view of the page was cut to fit it. */
+  readonly onViewCut?: ExtractContext["onViewCut"]
   readonly onAction: (label: string) => void
   /** A recorded element was found somewhere else. */
   readonly onRelocated: (from: Target, to: Target) => void
@@ -161,6 +163,7 @@ export async function extractStep<T>(
     signal: context.signal,
     onModelCall: context.onModelCall,
     vision: context.vision,
+    ...(context.onViewCut !== undefined && { onViewCut: context.onViewCut }),
   })
 
   await keep(key, instruction, live.sources, context)

@@ -2,14 +2,14 @@
  * The page as the agent reads it: Playwright's accessibility snapshot in "ai" mode, where every
  * element the agent may act on carries a ref (`[ref=e12]`). Refs belong to the latest snapshot of
  * the page, so the agent acts only on what it was just shown. Secret values are replaced before
- * the text leaves the session, and very large pages are then cut to a budget.
+ * the text leaves the session, and very large pages are then cut to fit the model that reads them
+ * (see limit.ts).
  */
 import type { Page } from "playwright-core"
 
 import type { Tabs } from "../browser/tabs.ts"
+import { DEFAULT_VIEW_CHARS } from "./limit.ts"
 
-/** About 30k tokens of page text at most; the rest is cut with a note. */
-const MAX_VIEW_CHARS = 120_000
 const SNAPSHOT_TIMEOUT_MS = 10_000
 
 export interface PageView {
@@ -29,20 +29,27 @@ export interface ViewCut {
   readonly kept: number
 }
 
-/** Takes a fresh snapshot of `page`, which also makes its refs the ones actions resolve against. */
-export async function viewPage(page: Page, redact: (text: string) => string): Promise<PageView> {
+/**
+ * Takes a fresh snapshot of `page`, which also makes its refs the ones actions resolve against.
+ * A tree longer than `limit` characters is cut there, with a note.
+ */
+export async function viewPage(
+  page: Page,
+  redact: (text: string) => string,
+  limit: number = DEFAULT_VIEW_CHARS,
+): Promise<PageView> {
   /* Redacted before it is cut: a cut through a secret would leave its first characters behind. */
   const tree = redact(await page.ariaSnapshot({ mode: "ai", timeout: SNAPSHOT_TIMEOUT_MS }))
   const url = redact(page.url())
   const title = redact(await page.title())
 
-  if (tree.length <= MAX_VIEW_CHARS) return { url, title, tree }
+  if (tree.length <= limit) return { url, title, tree }
 
   return {
     url,
     title,
-    tree: `${tree.slice(0, MAX_VIEW_CHARS)}\n… (page cut at ${MAX_VIEW_CHARS} characters)`,
-    cut: { chars: tree.length, kept: MAX_VIEW_CHARS },
+    tree: `${tree.slice(0, limit)}\n… (page cut at ${limit} characters)`,
+    cut: { chars: tree.length, kept: limit },
   }
 }
 
@@ -63,9 +70,13 @@ function tabsLine(tabs: Tabs, redact: (text: string) => string): string {
 
 /**
  * What the agent sees now: the active tab's page, or, while a dialog blocks it, the dialog. With
- * several tabs open, the view starts with the list of tabs.
+ * several tabs open, the view starts with the list of tabs. The page is cut at `limit` characters.
  */
-export async function viewTabs(tabs: Tabs, redact: (text: string) => string): Promise<PageView> {
+export async function viewTabs(
+  tabs: Tabs,
+  redact: (text: string) => string,
+  limit: number = DEFAULT_VIEW_CHARS,
+): Promise<PageView> {
   const open = tabs.dialog
 
   if (open !== undefined) {
@@ -79,7 +90,7 @@ export async function viewTabs(tabs: Tabs, redact: (text: string) => string): Pr
     }
   }
 
-  const view = await viewPage(tabs.page, redact)
+  const view = await viewPage(tabs.page, redact, limit)
 
   return { ...view, tree: `${tabsLine(tabs, redact)}${view.tree}` }
 }

@@ -10,6 +10,7 @@ import type { MailDesk } from "../mail/desk.ts"
 import type { CallCost } from "../model/resolve.ts"
 import { type Params, shownParams } from "../replay/params.ts"
 import type { SecretVault } from "../secrets/index.ts"
+import { viewLimit } from "../snapshot/limit.ts"
 import { type PageView, type ViewCut, viewTabs, viewText } from "../snapshot/view.ts"
 import type { VisionDesk } from "../vision/desk.ts"
 import { VISION_GUIDE } from "../vision/prompts.ts"
@@ -142,7 +143,7 @@ class Loop extends ToolLoop<PageView, Call, Outcome> {
   }
 
   protected async look() {
-    const view = await viewTabs(this.live.tabs, this.live.vault.redact)
+    const view = await viewTabs(this.live.tabs, this.live.vault.redact, viewLimit(this.live.model))
 
     if (view.cut !== undefined && !this.cutNoted) {
       this.cutNoted = true

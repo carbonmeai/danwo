@@ -6,11 +6,13 @@
 import type { LanguageModelV4CallOptions } from "@ai-sdk/provider"
 import { MockLanguageModelV4 } from "ai/test"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { z } from "zod"
 
 import { ACTOR_PROMPT, EXTRACT_PROMPT } from "../src/agent/prompts.ts"
 import { openWebSession, type WebSession } from "../src/index.ts"
 import { serveHtml, type HtmlServer } from "./fixtures/html-server.ts"
-import { call, text } from "./fixtures/scripted.ts"
+import { judging, verdict } from "./fixtures/judging.ts"
+import { call, ref, text } from "./fixtures/scripted.ts"
 
 /** A report that shows a skeleton marked busy for a while after "Run report" is clicked. */
 const REPORT = `<!doctype html><title>Reports</title>
@@ -55,11 +57,28 @@ afterAll(async () => {
   await server.close()
 })
 
-/** A model that ends every step at once, keeping each system prompt and conversation it got. */
-function finishing() {
+/** A model that reads the page's heading as an extract's answer. */
+function reading() {
+  return new MockLanguageModelV4({
+    provider: "mock",
+    modelId: "reader",
+    doGenerate: async (options: LanguageModelV4CallOptions) => {
+      const view = text(options.prompt.filter((message) => message.role !== "system"))
+
+      return call("read", { fields: [{ path: "", ref: ref(view, "heading", "Log"), as: "text" }] })
+    },
+  })
+}
+
+/**
+ * A model that ends every step at once, keeping each system prompt and conversation it got; its
+ * id is `modelId` when given.
+ */
+function finishing(modelId?: string) {
   const systems: string[] = []
   const conversations: string[] = []
   const model = new MockLanguageModelV4({
+    ...(modelId !== undefined && { provider: "mock", modelId }),
     doGenerate: async (options: LanguageModelV4CallOptions) => {
       systems.push(text(options.prompt.filter((message) => message.role === "system")))
       conversations.push(text(options.prompt.filter((message) => message.role !== "system")))
@@ -107,6 +126,47 @@ describe("the agent's view of a long page", () => {
       expect(cuts[0]).toMatchObject({ kept: 120_000, chars: expect.any(Number) })
       expect(cuts[0]?.kind === "view-cut" && cuts[0].chars).toBeGreaterThan(120_000)
     })
+  })
+
+  it("is cut to fit a model with a small input window", async () => {
+    const model = finishing("mistral-7b-instruct")
+    const session = await openWebSession({ baseUrl: server.url, model })
+
+    try {
+      await session.app.open("/long")
+      await session.agent.act("read the log")
+
+      const step = session.flight.steps().find((entry) => entry.api === "agent.act")
+
+      expect(step?.events.find((event) => event.kind === "view-cut")).toMatchObject({
+        kept: 32_000,
+      })
+      expect(model.conversations[0]).toContain("(page cut at 32000 characters)")
+    } finally {
+      await session.close()
+    }
+  })
+
+  it("notes the cut once on an assert, a waitFor and an extract", async () => {
+    const judge = judging([verdict("holds", "entry 0")])
+    const session = await openWebSession({ baseUrl: server.url, model: reading(), judge })
+
+    try {
+      await session.app.open("/long")
+      await session.agent.assert("the log has entries", { poll: true })
+      await session.agent.waitFor("the log shows its first entry")
+      await session.agent.extract("the heading", z.string())
+    } finally {
+      await session.close()
+    }
+
+    for (const api of ["agent.assert", "agent.waitFor", "agent.extract"]) {
+      const step = session.flight.steps().find((entry) => entry.api === api)
+      const cuts = step?.events.filter((event) => event.kind === "view-cut") ?? []
+
+      expect(cuts, api).toHaveLength(1)
+      expect(cuts[0], api).toMatchObject({ kept: 120_000 })
+    }
   })
 })
 

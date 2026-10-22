@@ -14,7 +14,8 @@ import { z } from "zod"
 import type { Tabs } from "../browser/tabs.ts"
 import { throwIfRefused } from "../model/refusal.ts"
 import { callCost, type CallCost } from "../model/resolve.ts"
-import { viewTabs, viewText } from "../snapshot/view.ts"
+import { viewLimit } from "../snapshot/limit.ts"
+import { type ViewCut, viewTabs, viewText } from "../snapshot/view.ts"
 import { DanwoError } from "../support/codes.ts"
 import { hasGaps, screenshot as shoot, SecretSpots, visualGaps } from "../vision/screen.ts"
 import { JUDGE_PROMPT } from "./prompts.ts"
@@ -148,6 +149,8 @@ export interface JudgeContext extends JudgeCall {
   readonly screenshot?: boolean | "auto"
   /** Fields secrets went into, painted over in the screenshot. */
   readonly spots?: SecretSpots
+  /** Told each time the judge's view of the page was cut to fit its model. */
+  readonly onViewCut?: (cut: ViewCut) => void
 }
 
 /** Whether the judge gets a screenshot of the page `tree` describes. */
@@ -159,7 +162,9 @@ async function wantsScreenshot(context: JudgeContext, tree: string): Promise<boo
 
 /** The judge's input for `claim` on the page the session shows now. */
 async function inputFor(claim: string, context: JudgeContext): Promise<JudgeInput> {
-  const view = await viewTabs(context.tabs, context.redact)
+  const view = await viewTabs(context.tabs, context.redact, viewLimit(context.model))
+
+  if (view.cut !== undefined) context.onViewCut?.(view.cut)
   const screenshot = (await wantsScreenshot(context, view.tree))
     ? await shoot(context.tabs.page, context.spots ?? new SecretSpots()).catch(() => undefined)
     : undefined

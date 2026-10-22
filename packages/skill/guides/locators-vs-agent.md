@@ -105,9 +105,12 @@ cache note says `recorded with openai/gpt-5-mini, running anthropic/claude-sonne
 line ends with `recorded with … (n steps), running …`. Clear the cache to have the new model run
 them.
 
-The agent reads the page as an accessibility tree of at most 120 000 characters, redacted before
-it is cut; a step whose view was cut has a `view-cut` event in its record (`chars`, `kept`), so a
-step that missed something far down a long page says why. Page text is never an instruction to the
+The agent reads the page as an accessibility tree cut to fit its model: a quarter of the model's
+input window at about four characters a token, between 8 000 and 120 000 characters. Known
+families (Claude, GPT, o-series, Gemini, Llama, Mistral, DeepSeek, Qwen, Grok) are matched by model
+id; an unknown model gets 120 000 (a 128k window). The tree is redacted before it is cut. An
+`act`, `assert`, `waitFor` or `extract` step whose view was cut has one `view-cut` event in its
+record (`chars`, `kept`), so a step that missed something far down a long page says why. Page text is never an instruction to the
 agent, and its prompts say so: a page reading "ignore your instructions" changes nothing. After
 every action (a locator's or the agent's) readiness also waits, up to 3 s, while the page shows a
 loading state: an element with `aria-busy="true"`, a progress bar with no value, or a `status` that

@@ -32,6 +32,7 @@ import type { ReplayStore, StepKey } from "../replay/store.ts"
 import { describe } from "../replay/target.ts"
 import type { RecordedAction, Trace } from "../replay/trace.ts"
 import type { SecretVault } from "../secrets/index.ts"
+import type { ViewCut } from "../snapshot/view.ts"
 import { DanwoError } from "../support/codes.ts"
 import { type VisionChoice, VisionDesk, visionFor, type VisionMode } from "../vision/desk.ts"
 import { SecretSpots } from "../vision/screen.ts"
@@ -53,6 +54,7 @@ import {
   requireModel,
   passed,
   ranBefore,
+  firstViewCut,
   stepEvents,
   stepSpends,
 } from "./recording.ts"
@@ -269,6 +271,7 @@ class SessionAgent implements Agent {
         model: () => this.requireModel(this.options.model),
         onModelCall: (cost) => this.noteCall(cost),
         vision: this.visionOf(visionFor(this.visionMode, options.vision)),
+        onViewCut: firstViewCut(steps),
         onAction: (label) => steps.event({ kind: "action", at: now(), label }),
         onRelocated: (from, to) =>
           steps.event({ kind: "relocated", at: now(), from: describe(from), to: describe(to) }),
@@ -287,6 +290,7 @@ class SessionAgent implements Agent {
       timeout: this.options.assertionTimeout,
       interval: DEFAULT_INTERVAL_MS,
     })
+    const cut = firstViewCut(this.options.steps)
     /*
      * A claim is checked even under strict replay: with no evidence recorded, or evidence that is
      * no longer shown, the judge decides it as it always did.
@@ -295,7 +299,7 @@ class SessionAgent implements Agent {
       strict: false,
       poll,
       within: this.options.assertionTimeout,
-      judge: () => this.judgeContext(JUDGE_PROMPT, options.vision),
+      judge: () => this.judgeContext(JUDGE_PROMPT, cut, options.vision),
       fail: (verdict: Unheld, reason: string) => new ClaimFailed(claim, verdict, reason),
     }
 
@@ -314,11 +318,12 @@ class SessionAgent implements Agent {
       timeout: options.timeout ?? DEFAULT_WAIT_MS,
       interval: options.interval ?? DEFAULT_INTERVAL_MS,
     }
+    const cut = firstViewCut(this.options.steps)
     const judged = {
       strict: this.options.strict,
       poll,
       within: poll.timeout,
-      judge: () => this.judgeContext(WAIT_PROMPT),
+      judge: () => this.judgeContext(WAIT_PROMPT, cut),
       fail: (verdict: Unheld, reason: string) => notHeld(condition, verdict, reason, poll.timeout),
     }
     const step = { kind: "wait" as const, condition, params: options.params ?? {} }
@@ -368,8 +373,15 @@ class SessionAgent implements Agent {
     return steps.run("agent", api, vault.redact(step.condition), body, { verifies: true })
   }
 
-  /** The judge as a step calls it, told its job by `system`, seeing a screenshot as `vision` says. */
-  private judgeContext(system: string, vision?: VisionChoice): JudgeContext {
+  /**
+   * The judge as a step calls it, told its job by `system`, seeing a screenshot as `vision` says;
+   * a view cut to fit its model goes to `onViewCut`.
+   */
+  private judgeContext(
+    system: string,
+    onViewCut: (cut: ViewCut) => void,
+    vision?: VisionChoice,
+  ): JudgeContext {
     return {
       model: this.requireModel(this.options.judge ?? this.options.model),
       system,
@@ -380,6 +392,7 @@ class SessionAgent implements Agent {
       spots: this.spots,
       signal: this.options.signal,
       onModelCall: (cost) => this.noteCall(cost),
+      onViewCut,
     }
   }
 

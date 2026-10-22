@@ -29,6 +29,20 @@ model: "anthropic/claude-sonnet-5",
 [`danwo init`](/docs/quickstart) can set up Anthropic, OpenAI, Google, OpenRouter or any
 OpenAI-compatible server instead.
 
+### How much of a page the model reads
+
+The model reads the page as text. A long page is cut to fit the model, so a small model still has
+room for the instruction and its answer:
+
+| Model's input window                    | Page text it reads, at most                    |
+| --------------------------------------- | ---------------------------------------------- |
+| 128k tokens or more, or a model unknown | 120 000 characters (about 30k tokens)          |
+| Smaller, such as 32k tokens             | a quarter of it: 32 000 characters (8k tokens) |
+| The smallest windows                    | 8 000 characters                               |
+
+A step whose page was cut says so in its record, with how long the page was. If a step misses
+something far down a long page, scroll or filter the page first.
+
 ## `act`: do something
 
 `act` carries out an instruction on the page: clicks, typing, choosing, scrolling, across several

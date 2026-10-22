@@ -59,6 +59,21 @@ export function stepEvents(steps: StepRecorder) {
   }
 }
 
+/**
+ * Notes on the step's record the first time its view of the page was cut, however often the step
+ * looks again: an assert that polls, or an extract that tries a second time.
+ */
+export function firstViewCut(steps: StepRecorder): (cut: ViewCut) => void {
+  let noted = false
+
+  return (cut) => {
+    if (noted) return
+
+    noted = true
+    steps.event({ kind: "view-cut", at: now(), ...cut })
+  }
+}
+
 /** The polling an assert asked for: none, the session's defaults, or its own numbers. */
 export function pollOf(option: PollOption | undefined, defaults: Poll): Poll | undefined {
   if (option === undefined || option === false) return undefined
