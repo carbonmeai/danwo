@@ -11,6 +11,8 @@ export interface DriverNode {
   readonly ref?: string
   readonly type?: string
   readonly kind?: string
+  /** The class of the element's accessibility object, when the iOS driver reads it. */
+  readonly role?: string
   readonly label?: string
   readonly value?: string
   readonly contentDescription?: string

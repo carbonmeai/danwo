@@ -384,6 +384,26 @@ describe("the simulator's accessibility tree", () => {
     expect(mapped.find((node) => node.name === "Password")).toMatchObject({ password: true })
   })
 
+  it("reads a Flutter text field, which the snapshot reports as a plain element, as a text box", () => {
+    const [field] = deviceNodes(
+      iosNodes(
+        [
+          {
+            index: 0,
+            type: "Other",
+            role: "TextInputSemanticsObject",
+            label: "Work email",
+            identifier: "email",
+          },
+        ],
+        3,
+      ),
+    )
+
+    expect(field).toMatchObject({ role: "textbox", name: "Work email", testId: "email" })
+    expect(field).toMatchObject({ editable: true, value: "" })
+  })
+
   it("names iOS roles by element type, and a plain tappable view is no button", () => {
     expect(roleOf({ index: 0, type: "Switch" })).toBe("switch")
     expect(roleOf({ index: 0, type: "WebView" })).toBe("document")

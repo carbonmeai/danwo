@@ -9,6 +9,17 @@ import type { DriverNode } from "../tree.ts"
 /** The element types a person types into. */
 const TEXT_ENTRY = new Set(["TextField", "SecureTextField", "SearchField", "TextView"])
 
+/**
+ * The accessibility object Flutter draws a text field as. The simulator's accessibility snapshot
+ * reports it as a plain `Other` element, so its class is what says a person types into it.
+ */
+const FLUTTER_TEXT_ENTRY = "TextInputSemanticsObject"
+
+/** Whether a person types into `node`. */
+function textEntry(node: DriverNode): boolean {
+  return TEXT_ENTRY.has(node.type ?? "") || node.role === FLUTTER_TEXT_ENTRY
+}
+
 /** Identifiers of a Safari view's or sign-in session's own controls. */
 const BROWSER_PARTS = /^(BrowserView|TopBrowserBar|BottomBrowserToolbar|URL$)/
 
@@ -31,7 +42,7 @@ function repeatsParent(
 
 /** `node` with its rectangle in screenshot pixels and its text entry fields filled in. */
 function normalised(node: DriverNode, scale: number): DriverNode {
-  const editable = TEXT_ENTRY.has(node.type ?? "")
+  const editable = textEntry(node)
   /* An empty field reports its placeholder as its value. */
   const empty = editable && (node.value === undefined || node.value === node.placeholder)
 
