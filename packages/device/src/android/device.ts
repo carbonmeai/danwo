@@ -104,8 +104,10 @@ export function swipeFor(box: DeviceBox, direction: ScrollDirection): readonly n
   return moves[direction]
 }
 
-/** How long a swipe takes when it does not say, and how long a long press holds. */
+/** How long a swipe takes when it does not say. */
 const SWIPE_DEFAULT_MS = 300
+
+/** How long a long press holds when it does not say. */
 export const LONG_PRESS_MS = 800
 
 /** The scroll that a finger moving `direction` makes: moving it up scrolls down. */
