@@ -13,7 +13,8 @@ import { exited } from "../exited.ts"
 /** Starts a program and gives back its process; tests replace it. */
 export type Spawn = (file: string, args: readonly string[]) => ChildProcess
 
-const spawnProgram: Spawn = (file, args) => spawn(file, [...args], { stdio: "ignore" })
+const spawnProgram: Spawn = (file, args) =>
+  spawn(file, [...args], { stdio: "ignore", windowsHide: true })
 
 /** How long `screenrecord` may take to finish its file once interrupted. */
 const FINISH_MS = 10_000

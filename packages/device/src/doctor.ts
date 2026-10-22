@@ -11,7 +11,7 @@ import { join } from "node:path"
 import { Adb, type Exec, execProgram } from "./adb.ts"
 import { runningSerials } from "./android/emulator.ts"
 import { iosDoctor } from "./ios/doctor.ts"
-import { androidSdkRoot, javaHome } from "./toolchain.ts"
+import { androidSdkRoot, androidTools, javaHome } from "./toolchain.ts"
 
 /** One finding. */
 export interface DoctorCheck {
@@ -47,9 +47,7 @@ async function systemImages(sdk: string): Promise<string[]> {
 
 function imageChecks(sdk: string, images: readonly string[]): DoctorCheck[] {
   const usable = images.filter((image) => bootable(join(sdk, image)))
-  const rootable = usable.filter(
-    (image) => image.includes("/google_apis/") || image.includes("/default/"),
-  )
+  const rootable = usable.filter((image) => /[\\/](google_apis|default)[\\/]/.test(image))
   const stubs = images.filter((image) => !usable.includes(image))
 
   return [
@@ -87,7 +85,12 @@ async function avdChecks(sdk: string): Promise<DoctorCheck[]> {
   return Promise.all(
     configs.map(async (avd): Promise<DoctorCheck> => {
       const config = await readFile(join(dir, avd, "config.ini"), "utf8").catch(() => "")
-      const image = /image\.sysdir\.1\s*=\s*(.+)/.exec(config)?.[1]?.trim().replace(/\/$/, "") ?? ""
+      /* Windows writes the folder with backslashes, and a trailing one. */
+      const image =
+        /image\.sysdir\.1\s*=\s*(.+)/
+          .exec(config)?.[1]
+          ?.trim()
+          .replace(/[\\/]$/, "") ?? ""
       const name = avd.replace(/\.avd$/, "")
       const playStore = /PlayStore\.enabled\s*=\s*true/.test(config) || image.includes("playstore")
 
@@ -178,12 +181,12 @@ async function androidDoctor(exec: Exec): Promise<DoctorCheck[]> {
   }
 
   const java = javaHome()
-  const tools = ["platform-tools/adb", "emulator/emulator"].map((tool): DoctorCheck => ({
-    name: tool.split("/")[1] ?? tool,
-    status: existsSync(join(sdk, tool)) ? "ok" : "fail",
-    detail: existsSync(join(sdk, tool))
-      ? join(sdk, tool)
-      : `missing: install it in Android Studio's SDK Manager`,
+  /* The SDK's own paths, `adb.exe` and `emulator.exe` on Windows. */
+  const { adb, emulator } = androidTools({ ANDROID_HOME: sdk })
+  const tools = Object.entries({ adb, emulator }).map(([name, path]): DoctorCheck => ({
+    name,
+    status: existsSync(path) ? "ok" : "fail",
+    detail: existsSync(path) ? path : `missing: install it in Android Studio's SDK Manager`,
   }))
 
   return [

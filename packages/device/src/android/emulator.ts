@@ -49,7 +49,7 @@ export async function runningSerials(adbPath: string, exec: Exec): Promise<strin
   const listing = await exec(adbPath, ["devices"])
 
   return listing
-    .split("\n")
+    .split(/\r?\n/)
     .map((line) => line.trim().split(/\s+/))
     .filter(([serial, state]) => serial?.startsWith("emulator-") === true && state === "device")
     .map(([serial]) => serial ?? "")
@@ -176,6 +176,8 @@ async function boot(tools: AndroidTools, options: EmulatorOptions, exec: Exec): 
   const output = openSync(log, "w")
   const child = spawn(tools.emulator, bootArgs(options.avd, port, options.snapshot), {
     detached: true,
+    /* Detached on Windows opens a console window of its own; the emulator needs none. */
+    windowsHide: true,
     stdio: ["ignore", output, output],
   })
 
@@ -185,7 +187,7 @@ async function boot(tools: AndroidTools, options: EmulatorOptions, exec: Exec): 
     child.once("exit", (code) => {
       const said = readFileSync(log, "utf8")
       const error = said
-        .split("\n")
+        .split(/\r?\n/)
         .findLast((line) => line.includes("ERROR"))
         ?.trim()
 
