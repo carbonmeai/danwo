@@ -28,8 +28,10 @@ The same happens on Ctrl-C, `SIGTERM` or `SIGHUP`. If the worker itself is kille
 process notices and ends what the worker owned.
 
 Windows has no process groups, so there danwo ends the app's whole process tree with
-`taskkill /T /F`. There is no guardian on Windows: a worker killed outright can leave its app
-running.
+`taskkill /T /F`. That stop is immediate: Windows has no `SIGTERM` that a console program obeys,
+so the app gets no five seconds to close. The guardian works on Windows too, as long as the
+command danwo started (often `cmd.exe` running your dev command) still runs: Windows finds a tree
+through each process's parent, and a process whose parent has exited is no longer part of it.
 
 <Callout type="info">
   Have your app exit on `SIGTERM`: close its server and database pool, then exit. It will stop in

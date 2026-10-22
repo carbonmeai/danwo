@@ -71,6 +71,10 @@ That replaces danwo's value, and the preload is lost. danwo handles it for you: 
 `node` shim first on each app's `PATH`, which loads the preload whatever `NODE_OPTIONS` says. Your
 script keeps its own flags too.
 
+The shim is a shell script, so Windows has none. There, append danwo's value instead of replacing
+it (`set NODE_OPTIONS=%NODE_OPTIONS% --max-old-space-size=8192`), or set the flags in the app's
+`env` in the config, as below.
+
 A `NODE_OPTIONS` you set in an app's `env` in the config is joined with danwo's, not replaced:
 
 ```ts title="danwo.config.ts · joined flags"

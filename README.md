@@ -62,7 +62,8 @@ await expect(screen).toHaveScreenshot("checkout")
 
 ## Quickstart
 
-You need Node.js 22.22.3 or a later 22, or 24.11.1 or newer. In your app's folder:
+You need Node.js 22.22.3 or a later 22, or 24.11.1 or newer, on macOS or Linux (Windows: in
+progress). In your app's folder:
 
 ```sh
 npx @danwo/cli init

@@ -8,6 +8,8 @@ By taking part you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md). Se
 
 You need Node 22.22.3 or a later 22, or 24.11.1 or later (CI runs both), and bun 1.3 or later. Android work also needs the Android SDK (`danwo device check` says what is missing), and the Postgres and Redis tests need Docker.
 
+Windows: in progress. CI's `windows` job runs the unit and ui tests and the packed-install check there. Code that differs by platform takes the platform (or a path module, or the system calls) as a parameter, so its Windows branch has a unit test that runs on any machine. A test that can't run on Windows says why in a comment and skips itself with `skipIf(process.platform === "win32")`; never skip one silently.
+
 ```bash
 bun install
 bun run check       # format, plain-JS gate, lint, fallow, typecheck, declarations, unit tests

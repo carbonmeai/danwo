@@ -83,9 +83,9 @@ SIGTERM, then SIGKILL five seconds later. The same happens when a run ends, fail
 worker owned once the worker is gone. Have the app exit on SIGTERM. An environment that starts
 its own processes should start them with `spawnOwned()` from `@danwo/sdk`, which takes the same
 arguments as `spawn()` and returns the child with a `stop()`. Windows has no process groups:
-there the child's whole tree is ended with `taskkill /T /F /PID <pid>` (untested on Windows by
-danwo's own suite), and there is no guardian, so a worker killed outright can leave its app
-running and holding the port.
+there the child's whole tree is ended with `taskkill /T /F /PID <pid>`, at once (no SIGTERM
+grace), and the guardian does the same once its owner is gone, as long as the child it started
+still runs to find the rest of the tree by. Windows support is in progress.
 
 `app.ready` changes when it counts as started: `{ path: "/health" }` waits for that path, and
 `{ log: "worker ready" }` for a line in its output, for a worker that serves nothing, and
@@ -163,7 +163,8 @@ Two checks run as the apps start, and neither prints a value:
   nest start`) replaces it, and SDKs with their own HTTP agent (the official Stripe client) then
   call real hosts. danwo puts a `node` shim first on each app's PATH that loads the preload
   whatever `NODE_OPTIONS` says, and warns about any Node process of an app that still runs without
-  it (`nodeShim: false` turns the shim off). A `NODE_OPTIONS` in an app's own `env` is joined with
+  it (`nodeShim: false` turns the shim off; Windows has no shim, so there a script must append to
+  `NODE_OPTIONS` rather than replace it). A `NODE_OPTIONS` in an app's own `env` is joined with
   danwo's rather than replacing it. Stripe's client with its own `https.Agent`, axios with a custom
   agent and fetch with an undici `Agent` all go through the proxy.
 - **The app's Node.** danwo needs Node 24, but an app process may run another Node (a volta, mise
