@@ -64,7 +64,28 @@ pass values to each other through variables at the top of the file.
 | `sessions`    | none     | sign-ins set up once per worker and reused ([Saved sessions](/docs/sessions)) |
 | `secrets`     | none     | values the model never sees ([Secrets](/docs/secrets))                        |
 | `files`       | none     | files tests may upload, by name                                               |
-| `browser`     | none     | the browser's locale, time zone, size and more ([Web](/docs/web))             |
+| `browser`     | Chromium | the engines tests run in, and the browser's locale, time zone and size        |
+
+### Choose the browsers
+
+`browser.name` picks the engine: Chromium, Firefox or WebKit. A list runs every test once in each,
+and labels each result with its engine:
+
+```ts title="danwo.config.ts · the browsers"
+browser: {
+  name: ["chromium", "webkit"],
+  contextOptions: { locale: "en-GB" },
+},
+```
+
+| Key              | Default      | What it does                                                  |
+| ---------------- | ------------ | ------------------------------------------------------------- |
+| `name`           | `"chromium"` | one engine, or a list of them                                 |
+| `contextOptions` | none         | locale, time zone, colour scheme, size, HTTP sign-in, headers |
+
+`danwo test --browser firefox` replaces `name` for one run. Install each engine with
+`npx @danwo/cli install-browser --browser firefox,webkit`. [Web](/docs/web#browsers) shows what
+works in each engine.
 
 ## Waiting
 

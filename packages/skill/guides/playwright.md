@@ -6,8 +6,11 @@ them with `@danwo/playwright`.
 Its peer is `@playwright/test >=1.60.0 <2` (checked against 1.60.0 and 1.64.1; older releases put
 jest's matcher symbol on the global and clash with danwo's own `expect`). The `browser` fixture
 launches the suite's own Playwright (`playwright[browserName].launch`) with the project's
-`launchOptions`, plus danwo's proxy and the flag trusting the proxy's CA; so the Chromium build is
-the suite's, installed with `npx playwright install chromium` as usual, not danwo's.
+`launchOptions`, plus danwo's proxy and, for Chromium, the flag trusting the proxy's CA; so the
+browser build is the suite's, installed with `npx playwright install chromium` as usual, not
+danwo's. Firefox and WebKit projects work too: their contexts get `ignoreHTTPSErrors` behind
+danwo's proxy (the fixture overrides `ignoreHTTPSErrors`), since neither takes a flag that trusts
+one CA.
 
 ```ts
 // playwright.config.ts

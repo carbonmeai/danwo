@@ -32,7 +32,9 @@ Set up a config, write one `*.danwo.ts` file, run it and read the result.
    browser). It keeps the browsers other Playwright installs use (`--no-remove`). Not
    `npx playwright install` or `npx playwright-core install`: they run whichever Playwright the
    project resolves first, whose Chromium revision may not match. A launch that finds no browser
-   fails `BROWSER_FAILED` naming `npx @danwo/cli install-browser`.
+   fails `BROWSER_FAILED` naming `npx @danwo/cli install-browser` (with `--browser firefox` or
+   `--browser webkit` for those engines). `init --browser chromium,firefox` (or the browsers
+   prompt) writes `browser.name` and installs each engine it names.
 
    The config it writes starts the app with its dev command through danwo's proxy, with the
    chosen providers emulated (`APP_URL` set instead tests an app that already runs):
@@ -69,6 +71,29 @@ Set up a config, write one `*.danwo.ts` file, run it and read the result.
    `extraHTTPHeaders` (sent to every host, providers' too). They are checked as the config loads:
    an unknown key, a time zone or locale that does not exist, or a bad header name fails with
    `CONFIG_INVALID` naming the key (`browser.contextOptions.timezoneId`).
+
+   `browser: { name }` picks the engine: `"chromium"` (default), `"firefox"`, `"webkit"`, or a
+   list, which runs every test once per engine (all of one engine's files, then the next's).
+   `danwo test --browser firefox,webkit` replaces it for one run; `danwo matrix --browser <one>`
+   picks the matrix's single engine (default the first `name`). A run that names engines labels
+   each result `<id> [<engine>]` in the terminal, JUnit, GitHub annotations and summaries, the
+   record folder (`<test>-<engine>/attempt-1`), `record.json` (`browser`), `--list` (a
+   `browser` field per entry) and the dashboard; Chromium alone stays unlabelled. Install the
+   engines with `npx @danwo/cli install-browser --browser firefox,webkit` (`danwo doctor` checks
+   each one named). Per engine:
+
+   | Feature                                                   | chromium                                                  | firefox                                                                                   | webkit                                                                                                                                                          |
+   | --------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | locators, uploads, dialogs, popups, `time`, video+pointer | yes                                                       | yes                                                                                       | yes                                                                                                                                                             |
+   | the agent's page view (`act`, `assert`, `extract`)        | yes                                                       | yes                                                                                       | yes                                                                                                                                                             |
+   | replay cache                                              | shared: a recording from any engine replays in the others | same                                                                                      | same                                                                                                                                                            |
+   | `toHaveScreenshot` baseline folder                        | `<test>/`                                                 | `<test>-firefox/`                                                                         | `<test>-webkit/`                                                                                                                                                |
+   | proxy CA trust                                            | `--ignore-certificate-errors-spki-list`                   | `ignoreHTTPSErrors`, only behind danwo's proxy (the proxy verifies upstream certificates) | same as firefox                                                                                                                                                 |
+   | WebSockets through the proxy                              | CONNECT                                                   | CONNECT                                                                                   | sent as `GET ws://…`; the proxy takes it                                                                                                                        |
+   | matrix double submit                                      | fetch twice, fulfil one                                   | same                                                                                      | browser's request continues beside a fetched twin (WebKit cannot fulfil a 3xx)                                                                                  |
+   | requests to a `localhost`/`127.0.0.1` app                 | via the proxy                                             | via the proxy                                                                             | macOS: some (parser preloads) bypass the proxy, sent to the app as absolute URLs; each record notes it. Linux: via the proxy. A proxy-routed hostname avoids it |
+   | `channel` (installed Chrome/Edge)                         | yes                                                       | refused `CONFIG_INVALID`                                                                  | refused `CONFIG_INVALID`                                                                                                                                        |
+   | `danwo record`, the MCP server                            | yes                                                       | no (Chromium only)                                                                        | no (Chromium only)                                                                                                                                              |
 
 2. Write `tests/home.danwo.ts`:
 

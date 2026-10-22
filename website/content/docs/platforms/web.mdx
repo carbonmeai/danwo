@@ -1,12 +1,12 @@
 ---
 title: Web
-description: danwo drives your web app in a real Chromium browser, behind its proxy, with locators, an agent and a recording of every test.
+description: danwo drives your web app in a real browser (Chromium, Firefox or WebKit), behind its proxy, with locators, an agent and a recording of every test.
 icon: Globe
 ---
 
-On the web, danwo opens your app in Chromium and clicks through it like a user. The browser runs
-behind danwo's proxy, so every request the page makes, and every call your server makes, is
-recorded and can be faulted.
+On the web, danwo opens your app in a browser and clicks through it like a user: Chromium by
+default, or Firefox and WebKit. The browser runs behind danwo's proxy, so every request the page
+makes, and every call your server makes, is recorded and can be faulted.
 
 ## A web test
 
@@ -81,6 +81,89 @@ it. A time with an offset or a `Z` means the same moment anywhere.
   app alone, and read the password from the environment, not the config file.
 </Callout>
 
+## Browsers
+
+Tests run in Chromium unless you name another engine. Set `browser.name` to one engine, or to a
+list to run every test once in each:
+
+```ts title="danwo.config.ts · the browsers"
+browser: {
+  name: ["chromium", "firefox", "webkit"],
+},
+```
+
+| Engine     | What it is               |
+| ---------- | ------------------------ |
+| `chromium` | Chrome and Edge's engine |
+| `firefox`  | Firefox's engine, Gecko  |
+| `webkit`   | Safari's engine          |
+
+For one run, `--browser` replaces the config. It takes one engine or a comma-separated list:
+
+```sh
+npx @danwo/cli test --browser firefox,webkit
+```
+
+```text
+Running 6 tests (3 in each of firefox, webkit) with 2 workers
+  ✓ tests/checkout.danwo.ts › pays for a lamp [firefox] 2573 ms, worker 0
+  ✓ tests/checkout.danwo.ts › pays for a lamp [webkit] 4347 ms, worker 1
+```
+
+Each result is labelled with its engine in the terminal, the JUnit and GitHub reports, the flight
+record and the dashboard.
+
+### Install the engines
+
+danwo drives its own Playwright's builds. Install Firefox and WebKit once per machine:
+
+```sh
+npx @danwo/cli install-browser --browser firefox,webkit
+```
+
+Add `--with-deps` on Linux for the system libraries. When you set up a project, `danwo init`
+asks which browsers to run in and installs them. `danwo doctor` checks every engine the config
+names.
+
+### What works in each engine
+
+| Feature                                           | Chromium          | Firefox           | WebKit            |
+| ------------------------------------------------- | ----------------- | ----------------- | ----------------- |
+| Locators, uploads and dialogs                     | yes               | yes               | yes               |
+| The agent's view of the page, and its steps       | yes               | yes               | yes               |
+| Replaying a recording from the cache              | yes               | yes               | yes               |
+| Provider calls over HTTPS through the proxy       | yes               | yes               | yes               |
+| WebSockets through the proxy                      | yes               | yes               | yes               |
+| Video, with the pointer and secrets shown as dots | yes               | yes               | yes               |
+| A popup becoming the active tab                   | yes               | yes               | yes               |
+| Moving the page's clock with `time`               | yes               | yes               | yes               |
+| `toHaveScreenshot` baselines                      | `<test>/`         | `<test>-firefox/` | `<test>-webkit/`  |
+| Matrix races: double submit, early webhooks       | yes               | yes               | yes               |
+| How the proxy's certificates are trusted          | the CA's key      | the proxy alone   | the proxy alone   |
+| Requests to an app on `localhost`, on macOS       | through the proxy | through the proxy | some go around it |
+| `danwo record` and the MCP server                 | yes               | no                | no                |
+
+A recording made in one engine replays in the others: the agent's view of a page is the same in
+each. `danwo matrix` runs in one engine, the first `browser.name` names, or `--browser`.
+
+### How each engine trusts the proxy
+
+danwo's proxy answers HTTPS for every host with certificates from a CA it makes for each run.
+Nothing is added to your machine's certificate store:
+
+- **Chromium** gets the CA's public key on its command line, and trusts that key alone.
+- **Firefox and WebKit** have no such flag: Firefox keeps its own certificate store, and WebKit on
+  macOS reads the system keychain. Their pages ignore certificate errors instead, but only behind
+  danwo's proxy. The proxy is then the one server they talk TLS to, and it checks each real site's
+  certificate itself.
+
+<Callout type="warn">
+  WebKit on macOS sends some requests for an app on `localhost` or `127.0.0.1` straight to the app,
+  around the proxy. They are missing from the record, and the app receives the whole URL as the
+  path. Each record says so in its notes. WebKit on Linux, as in CI, sends everything through the
+  proxy. So does an app served on a hostname the proxy routes, such as `shop.test`.
+</Callout>
+
 ## The page waits for your backend
 
 After each action danwo waits for the page to settle. A page that shows it is loading doesn't
@@ -114,6 +197,9 @@ console and network, and every provider call and webhook behind it. Open it with
   </Card>
   <Card title="Playwright Test" href="/docs/playwright">
     Already have Playwright tests? Add danwo to them.
+  </Card>
+  <Card title="Configuration" href="/docs/configuration">
+    Every config option, `browser.name` among them.
   </Card>
   <Card title="Android" href="/docs/mobile">
     The same tests on a mobile app.
