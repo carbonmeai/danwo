@@ -136,8 +136,9 @@ export const PLAN: readonly PlannedTab[] = [
         title: "Get started",
         pages: [
           file("index", "Introduction", "House"),
-          file("why-danwo", "Why danwo", "Sparkles"),
           file("quickstart", "Quickstart", "Rocket"),
+          file("what-you-can-test", "What you can test", "ListChecks"),
+          file("why-danwo", "Why danwo", "Sparkles"),
           file("test-a-provider", "Test a provider", "CreditCard"),
         ],
       },
@@ -239,6 +240,12 @@ export const PLAN: readonly PlannedTab[] = [
       {
         title: "Writing tests",
         pages: [
+          file(
+            "visual-comparison",
+            "Visual comparison",
+            "Image",
+            "writing-tests/visual-comparison.mdx",
+          ),
           file("typescript", "TypeScript in tests", "FileCode", "writing-tests/typescript.mdx"),
           file("secrets", "Secrets", "KeyRound", "writing-tests/secrets.mdx"),
           file("email-and-otp", "Email and 2FA codes", "Mail", "writing-tests/email-and-otp.mdx"),

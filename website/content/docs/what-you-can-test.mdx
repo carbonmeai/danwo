@@ -1,0 +1,89 @@
+---
+title: What you can test
+description: From a log-in to a payment charged exactly once, which of danwo's layers each kind of test needs.
+icon: ListChecks
+---
+
+danwo tests the journeys every app has, and the checks behind the screen that most test suites
+can't reach. This page lists both, with the layer each one needs and where to read more.
+
+## The layers
+
+Each layer is optional and adds to the ones before it. The [Introduction](/docs) shows each in a
+few lines.
+
+| Layer                | What it adds                                                  | Needs                       |
+| -------------------- | ------------------------------------------------------------- | --------------------------- |
+| 1. Locators          | Steps that name an element: a button, a field, a heading      | nothing                     |
+| 2. Agent steps       | Steps in plain English, recorded once, replayed with no model | a model, for the first run  |
+| 3. Visual comparison | The page or an element compared with a baseline image         | nothing                     |
+| 4. Emulated services | Stripe, Clerk, Resend and more, answered locally              | a service in your config    |
+| 5. Invariants        | A rule that reads your database and the provider              | layer 4, usually            |
+| 6. Fault matrix      | The test replayed once per thing that could go wrong          | an invariant to judge it by |
+
+Layers 1 to 3 are a complete end-to-end setup on their own.
+
+## Journeys on the screen
+
+These need layers 1 to 3 only. No providers, no keys.
+
+| You want to test                                | Layer  | See                                                                |
+| ----------------------------------------------- | ------ | ------------------------------------------------------------------ |
+| Sign up and log in with a password              | 1      | [Agent and locators](/docs/agent-and-locators)                     |
+| Start every test already signed in              | 1      | [Saved sessions](/docs/sessions)                                   |
+| Navigate: menus, links, pages opened by address | 1      | [Web](/docs/web)                                                   |
+| Search and filter a list                        | 1 or 2 | [Agent and locators](/docs/agent-and-locators)                     |
+| A form: required fields, errors, a success note | 1      | [Agent and locators](/docs/agent-and-locators)                     |
+| The checkout screens: basket, totals, address   | 1 or 2 | [Agent steps](/docs/agent-steps)                                   |
+| A page that should look the same as last time   | 3      | [Visual comparison](/docs/visual-comparison)                       |
+| Two people: a chat, an invite, a shared doc     | 1      | [A second person](/docs/two-people)                                |
+| A flow on Android or iOS                        | 1 or 2 | [Android tests](/docs/android-tests), [iOS tests](/docs/ios-tests) |
+| A page you test in staging or production        | 1 or 2 | [Where danwo runs](/docs/where-danwo-runs)                         |
+| A step that is hard to pin with a locator       | 2      | [Agent steps](/docs/agent-steps)                                   |
+| An existing Playwright test                     | any    | [Playwright Test](/docs/playwright)                                |
+
+Agent steps call a model on their first run only. After that they replay from the [replay
+cache](/docs/replay-cache), and `--replay-only` makes sure CI never calls a model.
+
+## Flows that go through a provider
+
+These add an emulated service, so the test runs with no sandbox account and no real keys.
+
+| You want to test                                 | Layer | See                                            |
+| ------------------------------------------------ | ----- | ---------------------------------------------- |
+| Sign in with an emailed code or a magic link     | 4     | [Email and 2FA codes](/docs/email-and-otp)     |
+| Sign in with Clerk, Google or GitHub             | 4     | [Login with Clerk](/docs/examples/clerk-login) |
+| Pay with Stripe Checkout or card fields          | 4     | [Test a provider](/docs/test-a-provider)       |
+| A trial that ends, a subscription that renews    | 4     | [Time travel](/docs/time-travel)               |
+| Background jobs that run after a click           | 4     | [Background jobs](/docs/background-jobs)       |
+| An AI feature, with the model's answers scripted | 4     | [AI chat with tools](/docs/examples/ai-chat)   |
+| An upload that goes straight to S3               | 4     | [S3](/docs/providers/s3)                       |
+
+## Checks behind the screen
+
+These are the bugs a passing screen hides. They need an invariant, and the fault matrix to find
+the runs where it breaks.
+
+| You want to know                             | Layer | See                                                                      |
+| -------------------------------------------- | ----- | ------------------------------------------------------------------------ |
+| The card was charged once, not twice         | 5, 6  | [A payment made twice](/docs/common-findings#a-payment-made-twice)       |
+| One welcome email went out, not none or two  | 5, 6  | [Next.js waitlist](/docs/examples/with-next)                             |
+| A webhook that arrives twice is handled once | 5, 6  | [A webhook handled twice](/docs/common-findings#a-webhook-handled-twice) |
+| The app recovers when a provider answers 500 | 6     | [Fault kinds](/docs/fault-kinds)                                         |
+| A double-clicked button makes one order      | 5, 6  | [Fault kinds](/docs/fault-kinds#races)                                   |
+| Your data agrees with the provider's         | 5     | [Writing invariants](/docs/invariants)                                   |
+| A lost database commit doesn't lose an order | 5, 6  | [A lost commit](/docs/common-findings#a-lost-commit)                     |
+
+## Next
+
+<Cards>
+  <Card title="Quickstart" href="/docs/quickstart">
+    Set danwo up and run your first UI test.
+  </Card>
+  <Card title="Agent and locators" href="/docs/agent-and-locators">
+    The two ways to write a step, and when to use each.
+  </Card>
+  <Card title="Test a provider" href="/docs/test-a-provider">
+    Your first check behind the screen: one Stripe payment.
+  </Card>
+</Cards>

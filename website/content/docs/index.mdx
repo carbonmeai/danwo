@@ -1,77 +1,129 @@
 ---
 title: Introduction
-description: danwo tests your app through its UI, then checks what happened behind it.
+description: danwo is an end-to-end testing framework for web and mobile apps. Test the UI, and add the backend when you need it.
 icon: House
 ---
 
-danwo is an open-source testing framework for web and mobile apps. A test clicks through your
-app like a user. Then danwo checks what that click did behind the screen: the payment, the email,
-the database row.
+danwo is an open-source end-to-end testing framework for web and mobile apps. A test opens your
+app, clicks and types like a user, and checks what the screen shows. It runs in a browser, on
+Android and on iOS.
 
-```ts title="tests/buy-credits.danwo.ts"
-import { type StripeFixtures, test as base } from "@danwo/sdk"
+```ts title="tests/sign-up.danwo.ts"
+import { test } from "@danwo/sdk"
 
-const test = base.extend<StripeFixtures>()
+test("signs up", async ({ app, screen, expect }) => {
+  await app.open("/sign-up")
+  await screen.getByLabel("Email").fill("ada@example.com")
+  await screen.getByLabel("Password").fill("correct horse battery staple")
+  await screen.getByRole("button", { name: "Create account" }).click()
 
-test("buys 500 credits", async ({ app, screen, expect }) => {
-  await app.open("/")
-  await screen.getByRole("button", { name: "Buy 500 credits" }).click()
-  await screen.getByRole("button", { name: "Pay" }).click()
-
-  await expect(screen.getByText("Credits: 500")).toBeVisible()
+  await expect(screen.getByRole("heading", { name: "Welcome, Ada" })).toBeVisible()
 })
 ```
 
-## The problem
+That is a whole test. danwo starts your app, opens a fresh browser and waits for each click to
+settle, so there are no sleeps. It needs no providers, no API keys and no model.
 
-Most end-to-end tests stop at the screen. The page says "Thank you", so the test passes.
+## Add layers as you need them
 
-The bugs that cost money live behind that page. Did Stripe charge the card once or twice? Did the
-receipt email go out? Did the webhook that grants the credits arrive, and what happens if it
-arrives twice? A screen can't tell you.
+Everything past the first test is optional. Each layer adds to the one before, and you can stop at
+any of them.
 
-## How it works
+### 1. Locator tests
+
+A **locator** finds an element the way a user names it: a button called "Pay", a field labelled
+"Email". Locators never call a model. See [Agent and locators](/docs/agent-and-locators).
+
+```ts title="tests/search.danwo.ts · a locator step"
+await screen.getByRole("searchbox", { name: "Search" }).fill("blue mug")
+await screen.getByRole("link", { name: "Blue mug" }).click()
+await expect(screen.getByText("In stock")).toBeVisible()
+```
+
+### 2. Agent steps in plain English
+
+When a step is easier to say than to pin down, write it in English. The agent works it out once,
+then danwo replays the recording with no model call. That goes for `assert`, `waitFor` and
+`extract` too, not only actions. See [Agent steps](/docs/agent-steps).
+
+```ts title="tests/checkout.danwo.ts · agent steps"
+await agent.act("add two blue mugs to the basket and go to checkout")
+await agent.assert("the basket shows two blue mugs")
+await agent.waitFor("the delivery options have loaded")
+```
+
+### 3. Screenshots and visual comparison
+
+`toHaveScreenshot` compares the page, or one element, with a baseline image kept next to the test.
+Mask what changes on every run, like a clock. See [Visual comparison](/docs/visual-comparison).
+
+```ts title="tests/home.danwo.ts · a visual check"
+await expect(screen).toHaveScreenshot("home", { mask: [screen.getByTestId("clock")] })
+```
+
+<Callout type="info">
+  Layers 1 to 3 are a complete end-to-end setup on their own: sign-up, log-in, search, forms and
+  checkout screens, on web and mobile, with video and a dashboard. [What you can
+  test](/docs/what-you-can-test) maps common journeys to the layer each needs.
+</Callout>
+
+## When the bugs live behind the screen
+
+A screen can say "Thank you" while Stripe charged the card twice, or the receipt email never went
+out. The next three layers check what a click did behind the page.
+
+### 4. Emulated providers
+
+danwo starts your app behind an **egress proxy**, a proxy that every outgoing request goes
+through. It answers Stripe, Clerk, Resend and about twenty more with local **emulators**. No
+sandbox keys and no code changes. See [Emulators](/docs/emulators).
+
+```ts title="danwo.config.ts · the environment"
+environment: () => appEnvironment({ app, services: [stripeService(), resendService()] }),
+```
+
+### 5. Invariants
+
+An **invariant** is a rule that must hold however the test went. It reads your database and the
+emulator, and checks they agree. See [Writing invariants](/docs/invariants).
+
+```ts title="tests/waitlist.danwo.ts · an invariant"
+}).invariant(async ({ databaseUrl, resend, expect }) => {
+  expect(await sql(databaseUrl, "select id from signups where email = $1", [EMAIL])).toHaveLength(1)
+  expect(resendInbox(resend).list(EMAIL)).toHaveLength(1)
+})
+```
+
+### 6. The fault matrix
+
+The [fault matrix](/docs/fault-matrix) replays a test once per thing that could go wrong: a
+declined card, a 500, a duplicate webhook, a double-clicked button. The invariant judges each run.
+
+```sh
+npx @danwo/cli matrix tests/waitlist.danwo.ts
+```
+
+## How the backend layers fit
 
 <HowItWorks />
 
-1. **Your test drives the app**, with locators like `getByRole`, or with plain-English steps that
-   an AI agent carries out.
-2. **Your app calls Stripe, Resend, Slack and the rest as usual.** danwo starts it behind an
-   **egress proxy**: a proxy that every outgoing request goes through. The proxy answers those
-   hostnames with **emulators**, local copies of each service's API. Your app needs no code
-   changes and no sandbox keys.
-3. **Everything is recorded.** Every call, webhook and database statement the test caused goes in
-   a **flight record**, with a video of the screen.
-4. **Then danwo breaks it on purpose.** The [fault matrix](/docs/fault-matrix) replays the test
-   once per thing that could go wrong: a declined card, a 500, a duplicate webhook, a
-   double-clicked button. A rule you write, the **invariant**, says whether your app coped.
-
-## What you get
-
-|                             |                                                                                   |
-| --------------------------- | --------------------------------------------------------------------------------- |
-| **Fast, cheap reruns**      | Agent steps are recorded once, then replayed with no AI calls.                    |
-| **Real provider behaviour** | About twenty emulators, checked against the real APIs.                            |
-| **Bugs before production**  | The fault matrix finds what only breaks when something fails.                     |
-| **Clear failures**          | A dashboard with video, every call, and a prompt to paste into your coding agent. |
-| **Where you work**          | A GitHub check, a pull request comment, and an MCP server for coding agents.      |
+Every run, at any layer, leaves a **flight record**: a video of the screen, every step and, with
+the backend layers, every call, webhook and database statement. See [Flight
+records](/docs/flight-records).
 
 ## Get started
 
 <Cards>
   <Card title="Quickstart" href="/docs/quickstart">
-    Set danwo up in your project and run your first test.
+    Set danwo up and run your first UI test in a few minutes.
+  </Card>
+  <Card title="What you can test" href="/docs/what-you-can-test">
+    From a log-in to a payment charged once: which layer each needs.
   </Card>
   <Card title="Test a provider" href="/docs/test-a-provider">
-    Check that a Stripe payment happens exactly once.
-  </Card>
-  <Card title="Fault matrix" href="/docs/fault-matrix">
-    Replay a test under every fault it could meet.
+    When you're ready: check that a Stripe payment happens exactly once.
   </Card>
   <Card title="Where danwo runs" href="/docs/where-danwo-runs">
     Local, staging or production: what works in each.
-  </Card>
-  <Card title="Providers" href="/docs/providers">
-    The services danwo emulates, and what each covers.
   </Card>
 </Cards>
