@@ -27,6 +27,9 @@ can't see those calls, so it can't emulate or break them.
 
 ## What works where
 
+UI tests, agent steps, visual comparison and recordings work in every setup. The columns after
+those only matter once you add the backend layer: emulated providers, faults and invariants.
+
 | Setup                                                          | UI tests and agent | Recording and video | Server-side providers emulated | Browser-side providers emulated | Provider and webhook faults | Frontend→API faults | Database faults | Isolation and reset |
 | -------------------------------------------------------------- | :----------------: | :-----------------: | :----------------------------: | :-----------------------------: | :-------------------------: | :-----------------: | :-------------: | :-----------------: |
 | [Full-stack app, run locally](/docs/full-stack-local)          |         ✓          |          ✓          |               ✓                |                ✓                |              ✓              |          ✓          |       ✓¹        |          ✓          |

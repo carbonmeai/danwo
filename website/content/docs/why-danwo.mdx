@@ -1,20 +1,24 @@
 ---
 title: Why danwo
-description: The screen is the easy part. danwo checks what the button did, not only that it worked.
+description: danwo does everything you expect of an end-to-end test, then checks what the button did behind the screen.
 icon: Scale
 ---
 
-Most end-to-end tests, AI-driven or not, stop at the screen: the page said "Thank you", so the test
-passed. The bugs that cost money live behind that page. Did Stripe charge once or twice? Did the
-webhook that arrived twice grant the credits twice? Did the email go out after the provider timed
-out? danwo is built to answer those questions.
+danwo does what you expect of an end-to-end framework: locators, plain-English agent steps that
+replay with no model calls, and visual comparison, on web, Android and iOS. For sign-up, log-in,
+search and checkout screens, that is all you need.
+
+Where it goes further is behind the screen. A page can say "Thank you" while Stripe charged the
+card twice, or a webhook that arrived twice granted the credits twice. danwo is built to answer
+those questions too, when your app has them.
 
 ## What is different
 
-|                                          | danwo                                                                    | UI-only testing                            |
+|                                          | danwo                                                                    | Typical end-to-end tools                   |
 | ---------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------ |
 | Drives the UI with locators and an agent | Yes, on web, Android and iOS                                             | Yes                                        |
-| Replays with no model calls              | Always: verified steps are cached as locators                            | Sometimes                                  |
+| Replays with no model calls              | Yes: verified steps are cached as locators                               | Sometimes                                  |
+| Visual comparison                        | Baselines, masks and thresholds, on web and devices                      | Often                                      |
 | Third-party providers                    | Emulated, with real hostnames, state and signed webhooks                 | Real sandboxes, or mocks in the app's code |
 | Judges the backend                       | Invariants over provider calls, webhooks and data                        | Pixels and DOM                             |
 | Fault injection                          | A matrix planned from what the run called                                | No                                         |
