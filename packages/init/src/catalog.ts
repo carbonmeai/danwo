@@ -40,6 +40,7 @@ export const MODEL_SOURCES = [
   "google",
   "openrouter",
   "openai-compatible",
+  "codex-cli",
   "none",
 ] as const
 export type ModelSourceId = (typeof MODEL_SOURCES)[number]
@@ -53,6 +54,8 @@ export interface ModelSource {
   readonly package?: PackageSpec
   /** A model to start with; any model the source serves that can call tools works. */
   readonly model?: string
+  /** A coding CLI the source runs on, signed in to a plan, in place of a key. */
+  readonly cli?: { readonly sdk: string; readonly title: string; readonly login: string }
 }
 
 const OPENAI_COMPATIBLE: PackageSpec = { name: "@ai-sdk/openai-compatible", version: "3.0.71" }
@@ -97,6 +100,11 @@ export const MODEL_SOURCE_INFO: Readonly<Record<ModelSourceId, ModelSource>> = {
     hint: "Ollama, LM Studio or a server of your own",
     package: OPENAI_COMPATIBLE,
     model: "qwen3",
+  },
+  "codex-cli": {
+    label: "Codex CLI",
+    hint: "your ChatGPT plan, through the Codex CLI; no API key",
+    cli: { sdk: "codexCli", title: "the Codex CLI", login: "codex login" },
   },
   none: { label: "None", hint: "locators only; agent steps need a model" },
 }

@@ -34,7 +34,11 @@ const MODELS: Readonly<Record<Exclude<ModelSourceId, "none">, string>> = {
   google: 'model: google("gemini-2.5-pro")',
   openrouter: 'model: openrouter("anthropic/claude-sonnet-5")',
   "openai-compatible": 'model: compatible("qwen3")',
+  "codex-cli": "model: codexCli(),",
 }
+
+/** The SDK names a config for `source` imports besides the environment's. */
+const SDK_NAMES: Partial<Record<ModelSourceId, string>> = { "codex-cli": "codexCli, " }
 
 /** The web config for the model `source` suggests, emulating Stripe and Resend. */
 async function configFor(source: ModelSourceId): Promise<string> {
@@ -58,9 +62,21 @@ describe("the web config", () => {
       expect(text).toContain(MODELS[source])
       expect(text).toContain("services: [stripeService(), resendService()]")
       expect(text).toContain(
-        'import { appEnvironment, defineConfig, resendService, stripeService } from "@danwo/sdk"',
+        `import { appEnvironment, ${SDK_NAMES[source] ?? ""}defineConfig, resendService, stripeService } from "@danwo/sdk"`,
       )
     })
+
+  it("runs on the Codex CLI with no key, naming a model only when asked to", async () => {
+    const named = renderWebConfig(
+      await answers({ modelSource: "codex-cli", model: "gpt-5-codex" }),
+      "tests",
+    )
+    const plain = await configFor("codex-cli")
+
+    expect(named).toContain('model: codexCli({ model: "gpt-5-codex" }),')
+    expect(plain).toContain("signed in once with `codex login`; no API key.")
+    expect(envExampleNames({ modelSource: "codex-cli", keyEnv: undefined })).toEqual([])
+  })
 
   it("has no model, and says how to add one, with no model source", async () => {
     const text = await configFor("none")

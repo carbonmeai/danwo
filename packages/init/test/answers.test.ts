@@ -82,6 +82,7 @@ describe("flags", () => {
 
     expect(answersFromFlags(detection, { modelSource: "openai" }).model).toBe("gpt-5")
     expect(answersFromFlags(detection, { modelSource: "none", model: "x" }).model).toBeUndefined()
+    expect(answersFromFlags(detection, { modelSource: "codex-cli" }).model).toBeUndefined()
   })
 
   it("refuse values they do not take, naming the choices", async () => {

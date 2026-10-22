@@ -125,11 +125,25 @@ async function askModel(
     modelSource === "openai-compatible"
       ? await askServer(prompter, base)
       : { baseUrl: undefined, keyEnv: undefined }
-  const suggested =
-    modelSource === base.modelSource ? base.model : MODEL_SOURCE_INFO[modelSource].model
-  const model = flags.model ?? (await prompter.text("Which model?", suggested ?? ""))
+  const model = flags.model ?? (await askModelId(prompter, modelSource, base))
 
   return { modelSource, model, ...server }
+}
+
+/** The model id for `source`; a CLI picks one for its plan, so there it may be left empty. */
+async function askModelId(
+  prompter: Prompter,
+  source: ModelSourceId,
+  base: Answers,
+): Promise<string | undefined> {
+  const suggested = source === base.modelSource ? base.model : MODEL_SOURCE_INFO[source].model
+
+  if (MODEL_SOURCE_INFO[source].cli === undefined)
+    return prompter.text("Which model?", suggested ?? "")
+
+  const named = await prompter.text("Which model? (empty for the CLI's own default)", "")
+
+  return named === "" ? undefined : named
 }
 
 /** Where an OpenAI-compatible server answers, and the variable holding its key, if any. */

@@ -17,6 +17,8 @@ import type { Detection } from "./detect.ts"
 /** The model part of a config: imports, declarations before the config, and the `model` value. */
 interface ModelCode {
   readonly imports: readonly string[]
+  /** Names the config imports from `@danwo/sdk` for the model. */
+  readonly sdk?: readonly string[]
   readonly preamble: readonly string[]
   readonly expression: string
 }
@@ -92,6 +94,12 @@ const MODEL_CODE: Readonly<
     ),
     expression: `compatible(${model})`,
   }),
+  "codex-cli": (model, answers) => ({
+    imports: [],
+    preamble: [],
+    sdk: ["codexCli"],
+    expression: answers.model === undefined ? "codexCli()" : `codexCli({ model: ${model} })`,
+  }),
 }
 
 function modelCode(answers: Answers): ModelCode | undefined {
@@ -108,7 +116,13 @@ function modelLines(answers: Answers, code: ModelCode | undefined): readonly str
     ]
 
   const keyEnv = modelKeyEnv(answers)
-  const key = keyEnv === undefined ? "" : ` Its key is read from ${keyEnv}.`
+  const cli = MODEL_SOURCE_INFO[answers.modelSource].cli
+  const key =
+    cli !== undefined
+      ? ` It runs on ${cli.title}, signed in once with \`${cli.login}\`; no API key.`
+      : keyEnv === undefined
+        ? ""
+        : ` Its key is read from ${keyEnv}.`
 
   return [
     ...blockComment(
@@ -176,7 +190,7 @@ export function renderWebConfig(answers: Answers, testDir: string): string {
 
   return [
     ...(model?.imports ?? []),
-    sdkImport(["appEnvironment", "defineConfig", ...services]),
+    sdkImport(["appEnvironment", "defineConfig", ...services, ...(model?.sdk ?? [])]),
     "",
     ...(model?.preamble ?? []),
     ...appComment(answers),
@@ -249,7 +263,7 @@ export function renderMobileConfig(
   return [
     ...(model?.imports ?? []),
     'import { buildAndroid, withAndroidDevice } from "@danwo/mobile"',
-    sdkImport(["appEnvironment", "defineConfig", ...services]),
+    sdkImport(["appEnvironment", "defineConfig", ...services, ...(model?.sdk ?? [])]),
     "",
     ...(model?.preamble ?? []),
     "/** The Android Virtual Device tests boot; `danwo device doctor` lists this machine's. */",

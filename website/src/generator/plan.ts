@@ -198,6 +198,12 @@ export const PLAN: readonly PlannedTab[] = [
             "concepts/agent-and-locators.mdx",
           ),
           file("agent-steps", "Agent steps", "Sparkle", "concepts/agent-steps.mdx"),
+          file(
+            "use-a-subscription",
+            "Use a subscription",
+            "CreditCard",
+            "concepts/use-a-subscription.mdx",
+          ),
           file("replay-cache", "Replay cache", "RotateCcwClock", "concepts/replay-cache.mdx"),
           file("emulators", "Emulators", "Server", "concepts/emulators.mdx"),
           file("emulator-state", "Seeding and state", "Sprout", "concepts/emulator-state.mdx"),

@@ -1,0 +1,144 @@
+---
+title: Use a subscription
+description: Run agent steps on a ChatGPT or Claude plan you already pay for, with no API key to buy.
+icon: CreditCard
+---
+
+Agent steps can run on a model plan you already have. A ChatGPT plan works through the Codex CLI,
+and a Claude plan's API credits work as an ordinary Anthropic key.
+
+```ts title="danwo.config.ts"
+import { codexCli, defineConfig } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  model: codexCli(),
+})
+```
+
+This only matters when a step is recorded. A [replay](/docs/replay-cache) calls no model at all,
+so CI that replays recorded steps needs no plan and no key.
+
+## ChatGPT plans through the Codex CLI
+
+A ChatGPT Plus, Pro or Team plan signs in to OpenAI's Codex CLI. danwo then starts the CLI once per
+model call and reads its answer back as the agent's next action.
+
+<Steps>
+<Step>
+
+Install the Codex CLI and sign in with your ChatGPT account. The CLI opens a browser for the
+sign-in; danwo never sees it.
+
+```sh
+npm install -g @openai/codex
+codex login
+```
+
+</Step>
+<Step>
+
+Set the model to `codexCli()`, as in the config above. `danwo init` writes it for you when you pick
+the Codex CLI as the model source.
+
+</Step>
+<Step>
+
+Check the setup. `danwo doctor` asks the CLI for its version and its sign-in, using the CLI's own
+status command.
+
+```sh
+npx @danwo/cli doctor
+```
+
+```text
+ok    model: runs on the Codex CLI, signed in with a plan; no API key
+ok    Codex CLI: 0.154.0
+ok    Codex CLI sign-in: signed in with ChatGPT
+```
+
+</Step>
+</Steps>
+
+### What danwo lets Codex do
+
+Codex is a coding agent, so danwo turns everything but the answer off. Each call runs like this:
+
+| What              | How                                                          |
+| ----------------- | ------------------------------------------------------------ |
+| Folder            | an empty temporary folder, deleted after the call            |
+| Sandbox           | read-only, with approvals off                                |
+| Codex's own tools | shell, web search, apps, plugins and the rest disabled       |
+| Your Codex config | not loaded, so its MCP servers and rules stay out            |
+| Session           | not saved                                                    |
+| The page          | sent as text, with the newest two screenshots as image files |
+| The answer        | held to a JSON shape, then checked again by danwo            |
+
+danwo never reads, copies or reuses the CLI's login. The CLI signs itself in and keeps its own
+credentials.
+
+### Options
+
+`codexCli()` takes an options object:
+
+| Option            | What it does                                                 | Default            |
+| ----------------- | ------------------------------------------------------------ | ------------------ |
+| `model`           | the model Codex runs, such as `"gpt-5-codex"`                | Codex's own choice |
+| `reasoningEffort` | how hard the model reasons, from `"minimal"` to `"xhigh"`    | Codex's own        |
+| `timeoutMs`       | how long one call may run before the CLI is stopped          | `180_000`          |
+| `maxImages`       | screenshots sent per call, newest first; `0` sends text only | `2`                |
+| `command`         | the program to start, or a program and its first arguments   | `"codex"`          |
+| `env`             | variables added to the CLI's environment                     | none               |
+
+## Claude plans through their API credits
+
+If your Claude Max or Team plan includes monthly API credits, use them as an Anthropic API key.
+Create a key in the Claude Console and set it as `ANTHROPIC_API_KEY`. No new code is needed: the
+Anthropic model source reads that variable.
+
+```ts title="danwo.config.ts · the model"
+import { anthropic } from "@ai-sdk/anthropic"
+
+model: anthropic("claude-sonnet-5"),
+```
+
+Run `danwo init` and pick Anthropic to get this config and the package it imports.
+
+## What is slower
+
+A CLI is a program, not an API, so each model call starts it afresh.
+
+- Every call pays the CLI's start-up and its own instructions, a few seconds and a few thousand
+  tokens on top of the step itself.
+- A step of two calls took about 18 seconds through the Codex CLI, where an API takes a few.
+- Screenshots go as image files. Set `maxImages: 0` for text-only page views, which are faster.
+- Your plan's usage limits apply. A step that hits one fails with `MODEL_UNAVAILABLE`, and says to
+  wait for the limit to reset.
+
+Record on the plan, then replay. Replays don't start the CLI, so a recorded suite runs at full
+speed with no plan at all.
+
+## When something is wrong
+
+Each failure says what to run:
+
+| What you see                       | Code                | What to do                                |
+| ---------------------------------- | ------------------- | ----------------------------------------- |
+| `Codex CLI is not installed`       | `CONFIG_INVALID`    | install it, then run `codex login`        |
+| `Codex CLI is not signed in`       | `CONFIG_INVALID`    | run `codex login` in a terminal           |
+| `hit your ChatGPT plan's usage...` | `MODEL_UNAVAILABLE` | wait for the limit to reset, or use a key |
+| `gave no answer in 180 s`          | `MODEL_UNAVAILABLE` | run again, or raise `timeoutMs`           |
+
+An answer in the wrong shape goes back to the model with what was wrong. After a few in a row the
+step stops with `MODEL_OUTPUT_INVALID`, as on any model.
+
+## Next
+
+<Cards>
+  <Card title="Agent steps" href="/docs/agent-steps">
+    The agent's four calls and what each asks of the model.
+  </Card>
+  <Card title="Replay cache" href="/docs/replay-cache">
+    How recorded steps replay with no model call.
+  </Card>
+</Cards>

@@ -53,7 +53,11 @@ export function keyLine(
 ): string | undefined {
   const keyEnv = modelKeyEnv(answers)
 
+  const cli = MODEL_SOURCE_INFO[answers.modelSource].cli
+
   if (answers.modelSource === "none") return "No model: add one to the config to use agent steps."
+  if (cli !== undefined)
+    return `Agent steps run on ${cli.title} with your plan: run \`${cli.login}\` once, and \`danwo doctor\` checks it is signed in.`
   if (keyEnv === undefined)
     return `The model runs on ${answers.baseUrl ?? "your server"}; no key needed.`
   if (keyFound(detection, keyEnv))

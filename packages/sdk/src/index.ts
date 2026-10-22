@@ -261,6 +261,8 @@ export {
   type AppEnvironmentOptions,
   type ModelPrice,
   priced,
+  codexCli,
+  type CodexCliOptions,
   type NangoEnvironment,
   nangoEnvironment,
   type NangoOptions,

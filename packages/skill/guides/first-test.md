@@ -63,6 +63,22 @@ Set up a config, write one `*.danwo.ts` file, run it and read the result.
    `priced(model, { input, output })` (dollars per million tokens) to see spend and use dollar
    budgets.
 
+   With no API key, `model: codexCli()` (from `@danwo/sdk`; `danwo init --model-source codex-cli`)
+   runs agent steps on the user's ChatGPT plan through the OpenAI Codex CLI they installed and
+   signed in to with `codex login`. Each model call starts `codex exec` once: read-only sandbox,
+   approvals off, Codex's shell, web search and other tools disabled, no user config or rules, no
+   saved session, in an empty temporary folder. The prompt goes on stdin, the newest screenshots
+   (`maxImages`, default 2; `0` for text-only views) as `--image` files, and the answer comes back
+   through `--output-schema` as tool calls, which danwo validates. Options: `model`,
+   `reasoningEffort`, `timeoutMs` (default 180 000), `maxImages`, `command`, `env`. Token usage is
+   recorded when Codex reports it; cost is not (the plan pays). Failures: not installed or not
+   signed in is `CONFIG_INVALID` and names `codex login`; a plan usage or rate limit, a timeout or
+   a crash is `MODEL_UNAVAILABLE`. `danwo doctor` checks the CLI is found, its version, and its
+   sign-in through `codex login status`; danwo never reads the CLI's credentials. Each call is a
+   CLI start (seconds, plus Codex's own instructions in tokens), so record on the plan and replay:
+   replays call no model. A Claude Max or Team plan's monthly API credits work as
+   `ANTHROPIC_API_KEY` with `anthropic(...)`, no new code.
+
    `browser: { contextOptions: { … } }` sets every browser context the run opens (each test's,
    each saved session's setup, each `users.open` person's, the MCP server's sessions):
    `reducedMotion` (`"reduce"`), `colorScheme` (`"light" | "dark" | "no-preference"`), `locale`

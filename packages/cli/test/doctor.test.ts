@@ -1,11 +1,29 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import { SKILL_FILE } from "@danwo/skill"
 import { afterEach, describe, expect, it } from "vitest"
 
 import { type DoctorProbes, doctorLines, projectDoctor } from "../src/doctor.ts"
+
+const CODEX_MODULE = String(new URL("../../runner/src/model/cli/codex.ts", import.meta.url))
+const FAKE_CODEX = fileURLToPath(
+  new URL("../../runner/test/fixtures/fake-codex.ts", import.meta.url),
+)
+
+/** A config whose model is Codex on the stand-in CLI, in `mode`. */
+function cliConfig(mode: string): string {
+  return [
+    `import { codexCli } from ${JSON.stringify(CODEX_MODULE)}`,
+    "",
+    "export default {",
+    `  model: codexCli({ command: [process.execPath, ${JSON.stringify(FAKE_CODEX)}], env: { FAKE_CLI_MODE: ${JSON.stringify(mode)} } }),`,
+    "}",
+    "",
+  ].join("\n")
+}
 
 const made: string[] = []
 
@@ -123,6 +141,25 @@ describe("danwo doctor", () => {
     expect(named["WebKit"]?.[0]).toMatch(
       /^fail WebKit is not installed for danwo\. Run `npx @danwo\/cli install-browser --browser webkit`/,
     )
+  })
+
+  it("checks a model on a coding CLI by the CLI's own version and status commands", async () => {
+    const working = await project({ "package.json": "{}", "danwo.config.ts": cliConfig("act") })
+    const signedOut = await project({
+      "package.json": "{}",
+      "danwo.config.ts": cliConfig("signed-out"),
+    })
+    const signedIn = byName(await projectDoctor({ cwd: working }, ready))
+    const out = byName(await projectDoctor({ cwd: signedOut }, ready))
+
+    expect(signedIn["model"]).toEqual([
+      "ok runs on the Codex CLI, signed in with a plan; no API key",
+    ])
+    expect(signedIn["Codex CLI"]).toEqual(["ok 9.9.9"])
+    expect(signedIn["Codex CLI sign-in"]).toEqual(["ok signed in with ChatGPT"])
+    expect(out["Codex CLI sign-in"]).toEqual([
+      "fail not signed in; run `codex login` once in a terminal",
+    ])
   })
 
   it("fails a config that does not load, and calls this danwo's skill current", async () => {

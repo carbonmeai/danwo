@@ -291,6 +291,8 @@ export {
   resendService,
 } from "./resend.ts"
 export { type ModelPrice, priced } from "../model/priced.ts"
+export { codexCli, type CodexCliOptions } from "../model/cli/codex.ts"
+export { cliStatusOf, type CliStatus } from "../model/cli/model.ts"
 export {
   type StripeEnvironment,
   stripeEnvironment,

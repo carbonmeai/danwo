@@ -1,6 +1,6 @@
 /**
  * `danwo doctor`: what stops a first run, checked before one. Node, danwo's own Chromium (and
- * the config's other browsers, when `browser.name` names Firefox or WebKit), the config (loading, and keys danwo does not know), the model's key, the installed Playwright Test
+ * the config's other browsers, when `browser.name` names Firefox or WebKit), the config (loading, and keys danwo does not know), the model's key (or, for a model on a coding CLI, the CLI's install and sign-in), the installed Playwright Test
  * against `@danwo/playwright`'s range, and whether the coding agents' copy of the skill is this
  * danwo's. Android has its own: `danwo device doctor`.
  */
@@ -13,6 +13,7 @@ import {
   type BrowserName,
   browserNames,
   browserTitle,
+  cliStatusOf,
   type DanwoConfig,
   loadConfig,
 } from "@danwo/runner/runner"
@@ -86,6 +87,37 @@ function modelKeyOf(model: DanwoConfig["model"]): string | undefined {
   return PROVIDER_KEYS.find(([prefix]) => provider.startsWith(prefix))?.[1]
 }
 
+/**
+ * A model that runs on a coding CLI: the CLI is installed, its version, and whether its own status
+ * command says it is signed in. Nothing here reads the CLI's credentials.
+ */
+async function cliChecks(model: DanwoConfig["model"]): Promise<DoctorCheck[] | undefined> {
+  const pending = cliStatusOf(model)
+
+  if (pending === undefined) return undefined
+
+  const cli = await pending
+  const runsOn: DoctorCheck = {
+    name: "model",
+    status: "ok",
+    detail: `runs on the ${cli.title}, signed in with a plan; no API key`,
+  }
+
+  if (!cli.installed) return [runsOn, { name: cli.title, status: "fail", detail: cli.detail }]
+
+  return [
+    runsOn,
+    { name: cli.title, status: "ok", detail: cli.version ?? "installed" },
+    cli.signedIn === true
+      ? { name: `${cli.title} sign-in`, status: "ok", detail: cli.detail }
+      : {
+          name: `${cli.title} sign-in`,
+          status: "fail",
+          detail: `not signed in; run \`${cli.login}\` once in a terminal`,
+        },
+  ]
+}
+
 function modelCheck(config: DanwoConfig, env: NodeJS.ProcessEnv): DoctorCheck {
   if (config.model === undefined)
     return { name: "model", status: "ok", detail: "none set: agent steps are off" }
@@ -136,7 +168,7 @@ async function configChecks(
       checks: [
         { name: "config", status: "ok", detail: loaded.path },
         ...keys,
-        modelCheck(loaded.config, env),
+        ...((await cliChecks(loaded.config.model)) ?? [modelCheck(loaded.config, env)]),
       ],
     }
   } catch (error) {
