@@ -10,7 +10,7 @@ export const SITE = {
   url: "https://danwo.dev",
   tagline: "Drive the UI. Judge everything behind it.",
   description:
-    "danwo is a testing platform for the agentic era. It drives your web and mobile app like a user while emulated providers record every call, then breaks the run on purpose, once per fault you should survive.",
+    "The complete e2e testing framework for web and mobile apps, with service emulators, a fault matrix and checks on every side effect.",
   /**
    * The public repository, as `owner/name`. While it is unset, links to it point at the docs
    * and the star count is hidden.
