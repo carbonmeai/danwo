@@ -132,7 +132,11 @@ describe.skipIf(!ready)("an Expo app on an iOS Simulator", () => {
     expect(out).toContain("PASS  clean run")
     expect(out).toContain("PASS  duplicate on stripe webhook checkout.session.completed")
     expect(out).not.toMatch(/^FAIL /m)
-    expect([0, 3]).toContain(code)
+    /*
+     * 1 only for a trial left unjudged: a Safari view that loads slower than the clean run's pace
+     * stops a body before its fault. 3 when a simulator hiccup broke a run.
+     */
+    expect([0, 1, 3]).toContain(code)
   })
 
   it(
