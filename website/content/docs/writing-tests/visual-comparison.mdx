@@ -113,7 +113,7 @@ Device tests use the same check. `expect(screen)` pictures the whole screen with
 bar, since its clock changes on every run. An element's picture is its box cut from the screen.
 
 ```ts title="tests/wallet.danwo.ts"
-import type { DeviceFixtures } from "@danwo/device"
+import type { DeviceFixtures } from "@danwo/mobile"
 import { test as base } from "@danwo/sdk"
 
 const test = base.extend<DeviceFixtures>()

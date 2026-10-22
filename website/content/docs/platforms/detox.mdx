@@ -40,7 +40,7 @@ describe("credits", () => {
 The same test in danwo:
 
 ```ts title="tests/credits.danwo.ts"
-import type { DeviceFixtures } from "@danwo/device"
+import type { DeviceFixtures } from "@danwo/mobile"
 import { type StripeFixtures, test as base } from "@danwo/sdk"
 
 const test = base.extend<StripeFixtures & DeviceFixtures>()
@@ -171,8 +171,7 @@ app as users get it.
 ```ts title="danwo.config.ts"
 import { fileURLToPath } from "node:url"
 
-import { IOS_BACKGROUND_HOSTS, withIosDevice } from "@danwo/device"
-import { buildIos } from "@danwo/expo"
+import { buildIos, IOS_BACKGROUND_HOSTS, withIosDevice } from "@danwo/mobile"
 import { defineConfig, startServices, stripeService } from "@danwo/sdk"
 
 const APP = fileURLToPath(new URL("./app", import.meta.url))

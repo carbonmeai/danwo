@@ -62,6 +62,7 @@ date: 2026-10-20
 
 ## Mobile
 
+- **One package:** `@danwo/device` and `@danwo/expo` are now one package, `@danwo/mobile`. It builds the app so it trusts danwo and runs it on a simulator or emulator, and a config imports `withAndroidDevice`, `buildAndroid` and the rest from it.
 - **Safer taps:** a device action waits for its element to be enabled, then finds it again on the latest screen and presses it there once it stays in place. A ref from a screen that has since changed no longer presses the wrong element.
 - **The selected state:** the agent sees `[selected]` on the active tab, and locators take `getByRole(role, { selected })` and `aria-selected`.
 - **Gestures:** `device.swipe()` with a direction or two points and a duration, and `device.dismissKeyboard()`. The agent can swipe, long-press and put the keyboard away, and those steps replay with no model call. A locator's `longPress({ durationMs })` holds an element on a device, and on a web page holds the mouse down on it.

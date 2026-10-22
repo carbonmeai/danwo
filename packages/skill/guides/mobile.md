@@ -1,9 +1,9 @@
 # Mobile apps on Android and iOS
 
-Run the same tests, invariants and fault matrix against an Expo, React Native or native app (SwiftUI, UIKit, Jetpack Compose, Views) on an Android emulator or an iOS Simulator, through danwo's proxy and emulators. Android comes first below; the iOS Simulator section says what differs, and the native section how native projects build.
+Run the same tests, invariants and fault matrix against an Expo, React Native or native app (SwiftUI, UIKit, Jetpack Compose, Views) on an Android emulator or an iOS Simulator, through danwo's proxy and emulators. Android comes first below; the iOS Simulator section says what differs, and the native section how native projects build. One package, `@danwo/mobile`, builds the app so it trusts danwo, then runs it on a simulator or emulator.
 
 ```ts
-import type { DeviceFixtures } from "@danwo/device"
+import type { DeviceFixtures } from "@danwo/mobile"
 import { type StripeFixtures, test as base } from "@danwo/sdk"
 
 const test = base.extend<StripeFixtures & DeviceFixtures>()
@@ -44,13 +44,17 @@ makes a release APK of an Expo app with its JavaScript bundled (no Metro at test
 
 The APK is kept under `<project>/.danwo/builds/`, keyed by a hash of the app's sources, so an
 unchanged app is not built again. Use `--force` to rebuild. In a config, `buildAndroid({ project })`
-from `@danwo/expo` does the same. Ship store builds without it.
+from `@danwo/mobile` does the same. Ship store builds without it.
 
 ## The config
 
 ```ts
-import { ANDROID_BACKGROUND_HOSTS, androidWorkers, withAndroidDevice } from "@danwo/device"
-import { buildAndroid } from "@danwo/expo"
+import {
+  ANDROID_BACKGROUND_HOSTS,
+  androidWorkers,
+  buildAndroid,
+  withAndroidDevice,
+} from "@danwo/mobile"
 import { defineConfig, startServices, stripeService } from "@danwo/sdk"
 
 export default defineConfig({
@@ -224,8 +228,7 @@ The same tests run on an iOS Simulator on a Mac. Select it however your config l
 uses `DANWO_PLATFORM=ios`:
 
 ```ts
-import { IOS_BACKGROUND_HOSTS, iosWorkers, withIosDevice } from "@danwo/device"
-import { buildIos } from "@danwo/expo"
+import { buildIos, IOS_BACKGROUND_HOSTS, iosWorkers, withIosDevice } from "@danwo/mobile"
 
 // in defineConfig: workers: iosWorkers(),
 // in environment({ workerIndex }):

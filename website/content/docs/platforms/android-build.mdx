@@ -35,11 +35,11 @@ unchanged app isn't built again. Force a rebuild with `--force`.
 
 ## Build it from the config
 
-`buildAndroid` from `@danwo/expo` does the same inside your environment, so a test run always has
+`buildAndroid` from `@danwo/mobile` does the same inside your environment, so a test run always has
 a current build:
 
 ```ts title="build.ts"
-import { buildAndroid } from "@danwo/expo"
+import { buildAndroid } from "@danwo/mobile"
 
 export async function currentApk(): Promise<string> {
   const build = await buildAndroid({ project: "app" })

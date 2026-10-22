@@ -32,7 +32,7 @@ Keys for the live fidelity checks go in `.env.fidelity` (git-ignored). Use test 
 | `packages/fidelity`                                 | Checks of the emulators against the real APIs, with goldens in `fidelity/` |
 | `packages/dashboard`, `packages/ui`                 | `danwo serve` and the component library it is built from                   |
 | `packages/github`, `packages/mcp`, `packages/skill` | The GitHub reporter, the MCP server, the coding-agent skill and guides     |
-| `packages/device`, `packages/expo`                  | Android devices and Expo builds                                            |
+| `packages/mobile`                                   | Mobile builds, and the simulators and emulators they run on                |
 | `website/`                                          | The website: hand-written docs in `content/docs`, and the changelog        |
 | `examples/`                                         | Example apps: workspaces the tests run against, and standalone starters    |
 | `scripts/`                                          | The declarations build, the release script and repository checks           |

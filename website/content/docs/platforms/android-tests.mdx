@@ -13,7 +13,7 @@ Coming from Detox? [Coming from Detox](/docs/detox) maps each Detox call to danw
 ## A test on a device
 
 ```ts title="tests/buy-credits.danwo.ts"
-import type { DeviceFixtures } from "@danwo/device"
+import type { DeviceFixtures } from "@danwo/mobile"
 import { type StripeFixtures, test as base } from "@danwo/sdk"
 
 const test = base.extend<StripeFixtures & DeviceFixtures>()
@@ -68,7 +68,7 @@ The full file, with the backend and Stripe behind the proxy, is in
 | `permissions` | runtime permissions to grant before each launch                     |
 | `app.scheme`  | the link scheme `app.open(path)` uses, as `<scheme>://<path>`       |
 
-Pass `blocked: ANDROID_BACKGROUND_HOSTS` from `@danwo/device` to your services. It blocks the
+Pass `blocked: ANDROID_BACKGROUND_HOSTS` from `@danwo/mobile` to your services. It blocks the
 emulator's own background traffic (Chrome sync, Play services), so the matrix never faults it.
 
 ## What a test can do
@@ -89,7 +89,7 @@ Every attempt starts the app afresh: its data cleared, its permissions granted.
 list to refresh:
 
 ```ts title="tests/feed.danwo.ts"
-import type { DeviceFixtures } from "@danwo/device"
+import type { DeviceFixtures } from "@danwo/mobile"
 import { test as base } from "@danwo/sdk"
 
 const test = base.extend<DeviceFixtures>()

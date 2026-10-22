@@ -13,7 +13,7 @@ Coming from Detox? [Coming from Detox](/docs/detox) maps each Detox call to danw
 ## A test on a simulator
 
 ```ts title="tests/buy-credits.danwo.ts"
-import type { DeviceFixtures } from "@danwo/device"
+import type { DeviceFixtures } from "@danwo/mobile"
 import { type StripeFixtures, test as base } from "@danwo/sdk"
 
 const test = base.extend<StripeFixtures & DeviceFixtures>()
@@ -65,7 +65,7 @@ The full file, which runs on Android or iOS by `DANWO_PLATFORM`, is in
 | `app.env`         | environment the app is launched with                                 |
 | `app.permissions` | `simctl privacy` services to grant before each launch                |
 
-Pass `blocked: IOS_BACKGROUND_HOSTS` from `@danwo/device` to your services. It blocks the
+Pass `blocked: IOS_BACKGROUND_HOSTS` from `@danwo/mobile` to your services. It blocks the
 simulator's own background traffic (Safari's safe browsing, Apple's services), so the matrix never
 faults it.
 

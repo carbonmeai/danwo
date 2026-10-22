@@ -42,11 +42,11 @@ unchanged app isn't built again. Force a rebuild with `--force`, and see the too
 
 ## Build it from the config
 
-`buildIos` from `@danwo/expo` does the same inside your environment, so a test run always has a
+`buildIos` from `@danwo/mobile` does the same inside your environment, so a test run always has a
 current build:
 
 ```ts title="build.ts"
-import { buildIos } from "@danwo/expo"
+import { buildIos } from "@danwo/mobile"
 
 export async function currentApp(): Promise<string> {
   const build = await buildIos({ project: "app" })
