@@ -161,12 +161,37 @@ function routeApp(
   }
 }
 
-/** Sends the routed request twice at once: the browser gets the first answer, the twin is dropped. */
+/**
+ * Whether the browser behind `route` takes a fetched answer that redirects. WebKit cannot fulfil a
+ * route with a 3xx status, and a form the app answers with a redirect is the usual double submit.
+ */
+function fulfilsRedirects(route: Route): boolean {
+  try {
+    return route.request().frame().page().context().browser()?.browserType().name() !== "webkit"
+  } catch {
+    return true
+  }
+}
+
+/**
+ * Sends the routed request twice at once: the browser gets the first answer, the twin is dropped.
+ * Where the browser cannot be handed a redirect (WebKit), its own request goes on to the app while
+ * the twin is sent beside it, which reaches the app twice at once all the same.
+ */
 async function sendTwice(route: Route): Promise<string> {
   const twin = route.fetch({ maxRedirects: 0 }).then(
     (response) => String(response.status()),
     (error: unknown) => (error instanceof Error ? error.message : String(error)),
   )
+
+  if (!fulfilsRedirects(route)) {
+    await route.continue()
+
+    const answer = await route.request().response()
+
+    return `sent twice at once: ${answer === null ? "no answer" : answer.status()} and ${await twin}`
+  }
+
   const response = await route.fetch({ maxRedirects: 0 })
 
   await route.fulfill({ response })
