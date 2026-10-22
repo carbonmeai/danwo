@@ -41,6 +41,8 @@ These need layers 1 to 3 only. No providers, no keys.
 | A page you test in staging or production        | 1 or 2 | [Where danwo runs](/docs/where-danwo-runs)                         |
 | A step that is hard to pin with a locator       | 2      | [Agent steps](/docs/agent-steps)                                   |
 | An existing Playwright test                     | any    | [Playwright Test](/docs/playwright)                                |
+| An existing Cypress suite                       | any    | [Coming from Cypress](/docs/cypress)                               |
+| An existing Detox suite                         | any    | [Coming from Detox](/docs/detox)                                   |
 
 Agent steps call a model on their first run only. After that they replay from the [replay
 cache](/docs/replay-cache), and `--replay-only` makes sure CI never calls a model.

@@ -1,0 +1,295 @@
+---
+title: Coming from Detox
+description: What each Detox call becomes in danwo, a test converted line by line, the build and device setup, and how to move over one file at a time.
+icon: FlaskRound
+---
+
+This page maps a Detox suite onto danwo: each call next to its danwo equivalent, a real test
+converted line by line, the build and the device config, and a way to move over gradually.
+
+The tests read much the same. What changes is around them. danwo tests a Release build with its
+JavaScript bundled in, routes the device's traffic through its proxy, and answers Stripe and the
+other providers from emulators, so your real backend runs behind the app.
+
+## A test, before and after
+
+Here is a Detox test that buys credits in a React Native app:
+
+```ts title="detox/credits.test.ts · before"
+describe("credits", () => {
+  beforeAll(async () => {
+    await device.launchApp({ newInstance: true })
+  })
+
+  beforeEach(async () => {
+    await device.reloadReactNative()
+  })
+
+  it("buys 500 credits", async () => {
+    await element(by.id("buy")).tap()
+    await waitFor(element(by.label("Email")))
+      .toBeVisible()
+      .withTimeout(10000)
+    await element(by.label("Email")).typeText("buyer@example.com")
+    await element(by.text("Pay $5.00")).tap()
+    await expect(element(by.id("credits"))).toHaveText("Credits: 500")
+  })
+})
+```
+
+The same test in danwo:
+
+```ts title="tests/credits.danwo.ts"
+import type { DeviceFixtures } from "@danwo/device"
+import { type StripeFixtures, test as base } from "@danwo/sdk"
+
+const test = base.extend<StripeFixtures & DeviceFixtures>()
+
+test("buys 500 credits", async ({ screen, expect }) => {
+  await screen.getByTestId("buy").tap()
+  await expect(screen.getByLabel("Email")).toBeVisible({ timeout: 10_000 })
+  await screen.getByLabel("Email").fill("buyer@example.com")
+  await screen.getByRole("button", { name: "Pay $5.00" }).tap()
+  await expect(screen.getByTestId("credits")).toHaveText("Credits: 500")
+})
+```
+
+Line by line:
+
+| Detox                                          | danwo                                                  |
+| ---------------------------------------------- | ------------------------------------------------------ |
+| `device.launchApp({ newInstance: true })`      | nothing: every attempt starts the app afresh           |
+| `device.reloadReactNative()` in `beforeEach`   | nothing: the app's data is cleared before each attempt |
+| `element(by.id("buy")).tap()`                  | `screen.getByTestId("buy").tap()`                      |
+| `waitFor(…).toBeVisible().withTimeout(10000)`  | `expect(…).toBeVisible({ timeout: 10_000 })`           |
+| `element(by.label("Email")).typeText(…)`       | `screen.getByLabel("Email").fill(…)`                   |
+| `element(by.text("Pay $5.00")).tap()`          | `getByRole("button", { name: "Pay $5.00" }).tap()`     |
+| `expect(element(by.id("credits"))).toHaveText` | `expect(screen.getByTestId("credits")).toHaveText`     |
+
+**Pay** is on Stripe Checkout, in the in-app browser. The same `screen` reads it, and the
+payment goes to danwo's Stripe emulator, so no test card or sandbox key is involved.
+
+## What maps to what
+
+### Finding and acting
+
+| Detox                                 | danwo                                                             |
+| ------------------------------------- | ----------------------------------------------------------------- |
+| `element(by.id("buy"))`               | `screen.getByTestId("buy")`, React Native's `testID`              |
+| `element(by.text("Pay"))`             | `screen.getByText("Pay")`                                         |
+| `element(by.label("Email"))`          | `screen.getByLabel("Email")`, the accessibility label             |
+| `element(by.type("RCTTextInput"))`    | no native class names: `getByRole`, `getByLabel` or a test id     |
+| `.atIndex(1)`                         | `.nth(1)`                                                         |
+| `withAncestor(by.id("cart"))`         | chain: `screen.getByTestId("cart").getByText("Lamp")`             |
+| `.tap()`                              | `.tap()`                                                          |
+| `.multiTap(2)`                        | no multi-tap: call `.tap()` twice                                 |
+| `.longPress()`                        | `.longPress()`, 800 ms, or `{ durationMs }`                       |
+| `.typeText("a")`, `.replaceText("a")` | `.fill("a")`, which replaces what the field holds                 |
+| `.clearText()`                        | `.clear()`                                                        |
+| `.tapReturnKey()`                     | `.press("Enter")`                                                 |
+| `.swipe("left", "slow")`              | `device.swipe({ direction: "left", durationMs: 600 })`            |
+| `.scroll(200, "down")`                | `device.scroll("down")`                                           |
+| `.scrollTo("bottom")`                 | no scroll-until: call `device.scroll` in a loop, or an agent step |
+| `whileElement(…).scroll(…)`           | the same: scroll, then check, until the element shows             |
+
+`device.swipe` moves across the whole screen, or across a box you give it with `within`, not
+across one element. [Android tests](/docs/android-tests#swipe-and-put-the-keyboard-away) lists
+its options.
+
+### Checking and waiting
+
+| Detox                                   | danwo                                      |
+| --------------------------------------- | ------------------------------------------ |
+| `expect(el).toBeVisible()`              | `expect(locator).toBeVisible()`            |
+| `expect(el).not.toBeVisible()`          | `expect(locator).not.toBeVisible()`        |
+| `expect(el).toExist()`                  | `expect(locator).toHaveCount(1)`           |
+| `expect(el).not.toExist()`              | `expect(locator).toHaveCount(0)`           |
+| `expect(el).toHaveText("Paid")`         | `expect(locator).toHaveText("Paid")`       |
+| `expect(el).toHaveValue("5")`           | `expect(locator).toHaveValue("5")`         |
+| `waitFor(el).toBeVisible().withTimeout` | `expect(locator).toBeVisible({ timeout })` |
+| `device.takeScreenshot("paid")`         | `expect(screen).toHaveScreenshot("paid")`  |
+
+Every check waits, as `waitFor` did. Every tap waits for its element to be enabled.
+
+### The device and the config
+
+| Detox                                  | danwo                                                                 |
+| -------------------------------------- | --------------------------------------------------------------------- |
+| `device.launchApp()`                   | automatic before each attempt; `app.open()` restarts the app          |
+| `device.launchApp({ url })`, `openURL` | `app.open("/path")` with `app.scheme`, or `device.openLink(url)`      |
+| `device.reloadReactNative()`           | `app.open()`: a Release build has no JavaScript reload                |
+| `launchArgs`                           | `app.launchArgs` on iOS; Android has none                             |
+| `permissions` in `launchApp`           | `app.permissions` in the device config                                |
+| `device.pressBack()`                   | `device.back()`, which on iOS taps the screen's back or close control |
+| `device.sendToHome()`, `setLocation`   | no equivalent                                                         |
+| `device.setURLBlacklist([...])`        | `blocked` hosts on the services                                       |
+| network mocks in the app's bundle      | [emulated providers](/docs/emulators) behind the proxy                |
+| `.detoxrc.js`                          | [`danwo.config.ts`](/docs/configuration), with the device bound in it |
+| `detox build`                          | `npx @danwo/cli build-ios` or `build-android`                         |
+| `detox test`                           | `npx @danwo/cli test`                                                 |
+
+## Build the app
+
+Detox's config names a build command and a binary path. danwo builds the app itself, once, and
+keeps the build until its sources change.
+
+<Tabs items={["iOS", "Android"]}>
+  <Tab value="iOS">
+
+```sh
+npx @danwo/cli build-ios app
+```
+
+A Release build for the Simulator, unsigned, with the JavaScript bundled in. It also lets the app
+make plain HTTP calls, which the proxy routes to your backend. See [iOS builds](/docs/ios-build).
+
+  </Tab>
+  <Tab value="Android">
+
+```sh
+npx @danwo/cli build-android app
+```
+
+A release APK, with the JavaScript bundled in, that also trusts the certificate danwo installs
+for each run. See [Android builds](/docs/android-build).
+
+  </Tab>
+</Tabs>
+
+`app` is your Expo or React Native folder. No Metro server runs during tests, so a test sees the
+app as users get it.
+
+<Callout type="warn">
+  These builds trust danwo's proxy. Use them only for testing; ship your store builds without them.
+</Callout>
+
+## Configure the device
+
+`.detoxrc.js` names the simulator or AVD per configuration. In danwo, the config's
+`environment` builds the app and binds a device to the services' proxy:
+
+```ts title="danwo.config.ts"
+import { fileURLToPath } from "node:url"
+
+import { IOS_BACKGROUND_HOSTS, withIosDevice } from "@danwo/device"
+import { buildIos } from "@danwo/expo"
+import { defineConfig, startServices, stripeService } from "@danwo/sdk"
+
+const APP = fileURLToPath(new URL("./app", import.meta.url))
+
+export default defineConfig({
+  testDir: "tests",
+  timeout: 120_000,
+  readiness: { mode: "page+backend", settle: true },
+  async environment({ workerIndex }) {
+    const build = await buildIos({ project: APP })
+    const services = await startServices([stripeService()], { blocked: IOS_BACKGROUND_HOSTS })
+
+    return withIosDevice(services, {
+      worker: workerIndex,
+      deviceType: "iPhone 17 Pro",
+      app: { bundleId: "com.example.shop", app: build.app, scheme: "shop" },
+    })
+  },
+})
+```
+
+On Android, `buildAndroid` and `withAndroidDevice` take the same place:
+
+```ts title="danwo.config.ts · on Android"
+const build = await buildAndroid({ project: APP })
+
+return withAndroidDevice(services, {
+  avd: "danwo_pixel",
+  worker: workerIndex,
+  app: { package: "com.example.shop", apk: build.apk, scheme: "shop" },
+})
+```
+
+| Detox's device config         | danwo                                                         |
+| ----------------------------- | ------------------------------------------------------------- |
+| `type: "ios.simulator"`       | `withIosDevice`                                               |
+| `device: { type: "iPhone…" }` | `deviceType`, or `name` for a simulator you already have      |
+| `type: "android.emulator"`    | `withAndroidDevice`                                           |
+| `device: { avdName }`         | `avd`                                                         |
+| `binaryPath`                  | `build.app` or `build.apk`, from `buildIos` or `buildAndroid` |
+| several workers               | `worker: workerIndex`: each worker gets its own device        |
+
+The AVD needs a **Google APIs** system image, not Google Play, because danwo roots the emulator to
+trust its certificate. [Android setup](/docs/mobile) and [iOS setup](/docs/ios-setup) cover the
+machine. The full config, for both platforms, is in [`examples/shop-mobile`](/docs/examples/shop-mobile).
+
+## What you get by switching
+
+| In Detox                            | In danwo                                                                   |
+| ----------------------------------- | -------------------------------------------------------------------------- |
+| waits until the app is idle         | waits for the screen, and for the calls your backend made                  |
+| mocks in the app's bundle           | [emulated providers](/docs/emulators); the app makes its real calls        |
+| one error per test you write        | the [fault matrix](/docs/fault-matrix) replays the test under each fault   |
+| checks of the screen                | [invariants](/docs/invariants): checks of your data against the provider's |
+| none                                | [agent steps](/docs/agent-steps) in plain English, replayed with no model  |
+| artifacts: screenshots, logs, video | a [flight record](/docs/flight-records): steps, calls, webhooks and video  |
+
+## Migrate one file at a time
+
+<Steps>
+<Step>
+
+### Set danwo up beside Detox
+
+Run `danwo init` in the app's folder and pick **Mobile**. It writes a config and a test folder,
+and leaves your Detox tests and `.detoxrc.js` alone:
+
+```sh
+npx @danwo/cli init
+```
+
+danwo only runs `*.danwo.ts` files, and Jest's default pattern doesn't match them, so neither
+picks up the other's tests.
+
+</Step>
+<Step>
+
+### Give danwo its own device
+
+An AVD can't boot twice. Create a second one with a Google APIs image for danwo, so both suites
+can run on one machine. On iOS, danwo creates its own simulator, named `danwo iPhone`, so it
+never takes Detox's.
+
+</Step>
+<Step>
+
+### Build and run one file
+
+Convert one test with the tables above, then run it:
+
+```sh
+npx @danwo/cli test tests/credits.danwo.ts
+```
+
+The first run builds the app, which takes a couple of minutes. Later runs reuse the build.
+
+</Step>
+<Step>
+
+### Delete the Detox file, and repeat
+
+Once the danwo test passes, delete the Detox one. Keep both jobs in CI until no Detox test is left, then
+drop Detox and its build configurations.
+
+</Step>
+</Steps>
+
+## Next
+
+<Cards>
+  <Card title="Android tests" href="/docs/android-tests">
+    Everything a test can do on an emulator.
+  </Card>
+  <Card title="iOS tests" href="/docs/ios-tests">
+    The same tests on an iOS Simulator.
+  </Card>
+  <Card title="Fault matrix" href="/docs/fault-matrix">
+    Every error your mocks used to fake, run for you.
+  </Card>
+</Cards>

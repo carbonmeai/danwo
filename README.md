@@ -139,6 +139,8 @@ More in the [examples gallery](https://danwo.dev/docs/examples).
 | [Android](https://danwo.dev/docs/android-tests)       | Expo, React Native, Jetpack Compose and Views apps on an emulator.         |
 | [iOS](https://danwo.dev/docs/ios-tests)               | Expo, React Native, SwiftUI and UIKit apps on an iOS Simulator.            |
 | [Playwright Test](https://danwo.dev/docs/playwright)  | Keep your tests, add emulators and the matrix.                             |
+| [From Cypress](https://danwo.dev/docs/cypress)        | Move a Cypress suite over one spec at a time.                              |
+| [From Detox](https://danwo.dev/docs/detox)            | Move a Detox suite over one test file at a time.                           |
 | [Real stacks](https://danwo.dev/docs/real-stacks)     | Several apps, workers, databases and background jobs behind one proxy.     |
 | [CI](https://danwo.dev/docs/ci)                       | A GitHub Check and a PR comment that say what broke and whose fault it is. |
 | [Coding agents](https://danwo.dev/docs/coding-agents) | A skill and an MCP server for Claude Code, Cursor and Codex.               |

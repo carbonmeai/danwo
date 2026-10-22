@@ -287,6 +287,8 @@ export const PLAN: readonly PlannedTab[] = [
           ),
           file("flutter", "Flutter", "Bird", "platforms/flutter.mdx"),
           file("playwright", "Playwright Test", "FlaskConical", "platforms/playwright.mdx"),
+          file("cypress", "Coming from Cypress", "TreePine", "platforms/cypress.mdx"),
+          file("detox", "Coming from Detox", "FlaskRound", "platforms/detox.mdx"),
         ],
       },
       {

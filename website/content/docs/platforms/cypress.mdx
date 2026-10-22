@@ -1,0 +1,323 @@
+---
+title: Coming from Cypress
+description: What each Cypress command becomes in danwo, a spec converted line by line, and how to move a suite over one spec at a time.
+icon: TreePine
+---
+
+This page maps a Cypress suite onto danwo: each command next to its danwo equivalent, a real spec
+converted line by line, and a way to move over gradually while both suites run.
+
+Most of a Cypress spec carries over almost word for word. What changes most is `cy.intercept`.
+In danwo your real backend answers, and the providers behind it are emulated, so a stub that
+hid the backend from the test is no longer needed.
+
+## A spec, before and after
+
+Here is a Cypress spec that signs in, buys credits, and stubs the checkout call:
+
+```ts title="cypress/credits.cy.ts · before"
+describe("credits", () => {
+  beforeEach(() => {
+    cy.session("ada", () => {
+      cy.visit("/login")
+      cy.get("[data-testid=email]").type("ada@shop.test")
+      cy.get("[data-testid=password]").type(Cypress.env("PASSWORD"))
+      cy.contains("button", "Sign in").click()
+    })
+    cy.intercept("POST", "/api/checkout", { fixture: "paid.json" }).as("checkout")
+  })
+
+  it("buys 500 credits", () => {
+    cy.visit("/")
+    cy.contains("button", "Buy 500 credits").click()
+    cy.wait("@checkout")
+    cy.contains("Credits: 500").should("be.visible")
+  })
+})
+```
+
+The same test in danwo. The sign-in moves to the config (below), and the stub goes away: your
+`/api/checkout` runs for real, against danwo's Stripe emulator.
+
+```ts title="tests/credits.danwo.ts"
+import { type StripeFixtures, test as base } from "@danwo/sdk"
+
+const test = base.extend<StripeFixtures>()
+
+test.use({ session: "ada" })
+
+test("buys 500 credits", async ({ app, screen, expect }) => {
+  await app.open("/")
+  await screen.getByRole("button", { name: "Buy 500 credits" }).click()
+  await screen.getByTestId("checkout-pay").click()
+  await expect(screen.getByText("Credits: 500")).toBeVisible()
+})
+```
+
+Line by line:
+
+| Cypress                                    | danwo                                                        |
+| ------------------------------------------ | ------------------------------------------------------------ |
+| `cy.session("ada", …)` in `beforeEach`     | `sessions.ada` in the config, and `test.use({ session })`    |
+| `cy.intercept("POST", "/api/checkout", …)` | nothing: the real route runs, Stripe is emulated             |
+| `cy.visit("/")`                            | `app.open("/")`                                              |
+| `cy.contains("button", "Buy 500 credits")` | `screen.getByRole("button", { name: "Buy 500 credits" })`    |
+| `cy.wait("@checkout")`                     | nothing: every action waits for the calls it caused          |
+| (the stub skipped the payment page)        | `getByTestId("checkout-pay")`, the emulator's **Pay** button |
+| `cy.contains(…).should("be.visible")`      | `expect(screen.getByText(…)).toBeVisible()`                  |
+
+The config holds the app, the emulated Stripe and the sign-in:
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig, stripeService } from "@danwo/sdk"
+
+export default defineConfig({
+  testDir: "tests",
+  readiness: { mode: "page+backend", settle: true },
+  secrets: { password: { value: process.env.APP_PASSWORD ?? "", purpose: "password" } },
+  sessions: {
+    ada: {
+      async setup({ app, screen, secret }) {
+        await app.open("/login")
+        await screen.getByTestId("email").fill("ada@shop.test")
+        await screen.getByTestId("password").fill(secret("password"))
+        await screen.getByRole("button", { name: "Sign in" }).click()
+      },
+    },
+  },
+  environment: () =>
+    appEnvironment({
+      app: { command: "npm run dev", url: "http://localhost:3000" },
+      services: [stripeService()],
+    }),
+})
+```
+
+[Test a provider](/docs/test-a-provider) adds the Stripe webhook seed this shop needs to grant
+the credits.
+
+## What maps to what
+
+### Finding and acting
+
+| Cypress                              | danwo                                                    |
+| ------------------------------------ | -------------------------------------------------------- |
+| `cy.visit("/path")`                  | `app.open("/path")`                                      |
+| `cy.get("[data-testid=pay]")`        | `screen.getByTestId("pay")`                              |
+| `cy.get("#email")`, any CSS selector | no CSS selectors: `getByLabel`, `getByRole` or a test id |
+| `cy.contains("Saved")`               | `screen.getByText("Saved")`                              |
+| `cy.contains("button", "Pay")`       | `screen.getByRole("button", { name: "Pay" })`            |
+| `cy.get(…).find(…)`, `.within(…)`    | chain: `screen.getByTestId("cart").getByText("Lamp")`    |
+| `.eq(1)`, `.first()`, `.last()`      | `.nth(1)`, `.first()`, `.last()`                         |
+| `.type("ada@shop.test")`             | `.fill("ada@shop.test")`                                 |
+| `.type("{enter}")`                   | `.press("Enter")`                                        |
+| `.clear()`                           | `.clear()`                                               |
+| `.click()`, `.dblclick()`            | `.click()`; no double click, so click twice              |
+| `.check()`, `.select("Blue")`        | `.check()`, `.selectOption("Blue")`                      |
+| `.selectFile("a.png")`               | `.setInputFiles("a.png")`                                |
+| `.trigger("mouseover")`              | `.hover()`; no other synthetic events                    |
+
+`getByTestId` reads the `data-testid` attribute. A suite built on `data-cy` can rename it, or
+find elements by role and label instead, which also survive a markup change.
+
+### Checking
+
+| Cypress                              | danwo                                   |
+| ------------------------------------ | --------------------------------------- |
+| `.should("be.visible")`              | `expect(locator).toBeVisible()`         |
+| `.should("not.exist")`               | `expect(locator).toHaveCount(0)`        |
+| `.should("have.text", "Paid")`       | `expect(locator).toHaveText("Paid")`    |
+| `.should("contain", "Paid")`         | `expect(locator).toContainText(…)`      |
+| `.should("have.value", "5")`         | `expect(locator).toHaveValue("5")`      |
+| `.should("have.length", 3)`          | `expect(locator).toHaveCount(3)`        |
+| `.should("be.disabled")`             | `expect(locator).toBeDisabled()`        |
+| `.should("not.be.visible")`          | `expect(locator).not.toBeVisible()`     |
+| `defaultCommandTimeout`              | `{ timeout }` on the one check          |
+| `cy.url().should("include", "/thx")` | no URL check: check what the page shows |
+
+### Everything else
+
+| Cypress                           | danwo                                                                      |
+| --------------------------------- | -------------------------------------------------------------------------- |
+| `cy.intercept` stub of your API   | none needed: your API runs, and its providers are emulated                 |
+| `cy.intercept` stub of a host     | a provider emulator, or a small service of your own (below)                |
+| `cy.intercept` with a 500         | `proxy.failNext(…)` in the test, or the [fault matrix](/docs/fault-matrix) |
+| `cy.wait("@alias")`               | nothing: [readiness](/docs/web#the-page-waits-for-your-backend) waits      |
+| `cy.intercept` as a spy           | `proxy.exchanges()`, the calls the run made                                |
+| `cy.fixture("user.json")`         | an emulator's `seed`, or import the data in the test                       |
+| `cy.session`                      | [saved sessions](/docs/sessions): `sessions` and `test.use({ session })`   |
+| `Cypress.Commands.add`            | a plain `async` function in a helper file (below)                          |
+| `cy.task`, `cy.request`           | call your code or `fetch` directly: the test runs in Node                  |
+| `cy.clock`, `cy.tick`             | [time travel](/docs/time-travel): `time.set(…)` and `time.travel(…)`       |
+| `cypress.config.ts`               | [`danwo.config.ts`](/docs/configuration)                                   |
+| `baseUrl`                         | `app.url` in `appEnvironment`, or `baseUrl` with no environment            |
+| `specPattern`                     | `testDir` and `testMatch`; tests are `*.danwo.ts`                          |
+| `retries`                         | `retries`                                                                  |
+| `viewportWidth`, `viewportHeight` | `browser.contextOptions.viewport`                                          |
+| `cypress open`                    | `npx @danwo/cli serve --open`, the recording of every step                 |
+
+## Custom commands become functions
+
+A test gets its tools as arguments, so a custom command is an ordinary function that takes them:
+
+```ts title="tests/helpers.ts"
+import type { Screen } from "@danwo/sdk"
+
+/** What `cy.addToBasket(name)` did. */
+export async function addToBasket(screen: Screen, name: string): Promise<void> {
+  await screen.getByRole("button", { name: `Add ${name}` }).click()
+  await screen.getByRole("link", { name: "Basket" }).click()
+}
+```
+
+Import it in a test and call `await addToBasket(screen, "Lamp")`.
+
+## Replace `cy.intercept` stubs
+
+A stub in Cypress sees only the browser's requests. Your server's calls to Stripe or Resend go
+around it, so a Cypress suite stubs your own API instead, and never runs the code that talks to
+the provider.
+
+danwo puts a [proxy](/docs/emulators) in front of both the browser and your server, and answers
+each provider from an emulator:
+
+| What the stub did                      | In danwo                                                        |
+| -------------------------------------- | --------------------------------------------------------------- |
+| faked your `/api/*` routes             | let them run; list the providers they call under `services`     |
+| faked a provider (Stripe, Resend, S3…) | that provider's emulator, from the [providers](/docs/providers) |
+| faked a host danwo doesn't emulate     | a service of your own that answers it                           |
+| forced an error                        | `proxy.failNext` in one test, or the matrix for every error     |
+
+A service of your own names its hosts and answers each request:
+
+```ts title="tests/weather.ts"
+import type { Service } from "@danwo/sdk"
+
+/** Answers the weather API the app calls, as the `weather.json` fixture did. */
+export const weather: Service = {
+  name: "weather",
+  routes: [
+    {
+      hosts: ["api.weather.example"],
+      handler: async () =>
+        new Response(JSON.stringify({ city: "Lagos", celsius: 31 }), {
+          headers: { "content-type": "application/json" },
+        }),
+    },
+  ],
+  close: async () => undefined,
+}
+```
+
+List it beside the emulators. Calls to it are recorded, and the matrix faults them too:
+
+```ts title="danwo.config.ts · the services"
+appEnvironment({
+  app: { command: "npm run dev", url: "http://localhost:3000" },
+  services: [stripeService(), weather],
+  unmatched: "block",
+})
+```
+
+`unmatched: "block"` answers any other outside host with a 502, so a call you forgot to cover
+shows in the run, not on a real service. See [Outside hosts](/docs/outside-hosts).
+
+To force an error in one test, arm it on the `proxy` fixture:
+
+```ts title="tests/declined.danwo.ts"
+import { type StripeFixtures, test as base } from "@danwo/sdk"
+
+const test = base.extend<StripeFixtures>()
+
+test("says so when Stripe is down", async ({ app, screen, expect, proxy }) => {
+  proxy.failNext((call) => call.path.startsWith("/v1/checkout/sessions"), {
+    kind: "status",
+    status: 500,
+  })
+  await app.open("/")
+  await screen.getByRole("button", { name: "Buy 500 credits" }).click()
+  await expect(screen.getByRole("alert")).toContainText("try again")
+})
+```
+
+## What you get by switching
+
+| In Cypress                             | In danwo                                                                   |
+| -------------------------------------- | -------------------------------------------------------------------------- |
+| commands retry until they pass         | the same, plus each action waits for the calls your backend made           |
+| stubs that can drift from the real API | [emulated providers](/docs/emulators) your real code talks to              |
+| one stubbed error per test you write   | the [fault matrix](/docs/fault-matrix) replays the test under each fault   |
+| checks of the screen                   | [invariants](/docs/invariants): checks of your data against the provider's |
+| none                                   | [agent steps](/docs/agent-steps) in plain English, replayed with no model  |
+| screenshots and video                  | a [flight record](/docs/flight-records): steps, calls, webhooks and video  |
+
+## Migrate one spec at a time
+
+<Steps>
+<Step>
+
+### Set danwo up beside Cypress
+
+Run `danwo init` in the app's folder. It writes a config and a `tests` folder, and leaves
+`cypress/` alone:
+
+```sh
+npx @danwo/cli init
+```
+
+danwo only runs `*.danwo.ts` files, and Cypress only its `specPattern`, so neither picks up the
+other's specs.
+
+</Step>
+<Step>
+
+### Give danwo its own port
+
+`appEnvironment` starts your app itself, behind the proxy. If Cypress runs against a dev server
+on port 3000, start danwo's copy on another port, such as `PORT=3100 npm run dev`, so both suites
+can run at once.
+
+</Step>
+<Step>
+
+### Move the sign-in first
+
+Turn each `cy.session` into a [saved session](/docs/sessions) in the config. Every spec you move
+afterwards starts signed in with one line.
+
+</Step>
+<Step>
+
+### Move one spec, then delete it
+
+Pick a spec with a `cy.intercept` stub: it gains the most. Convert it with the tables above, run
+it, and delete the Cypress spec once the danwo test passes:
+
+```sh
+npx @danwo/cli test tests/credits.danwo.ts
+```
+
+</Step>
+<Step>
+
+### Run both in CI until Cypress is empty
+
+Keep both jobs until the last spec has moved. Add an invariant and the matrix to the tests that
+handle money or email as you go. [CI and GitHub](/docs/ci) sets up danwo's job.
+
+</Step>
+</Steps>
+
+## Next
+
+<Cards>
+  <Card title="Agent and locators" href="/docs/agent-and-locators">
+    Every way to find an element, and when to use plain English.
+  </Card>
+  <Card title="Emulators" href="/docs/emulators">
+    What replaces your stubs, and how close it is to the real thing.
+  </Card>
+  <Card title="Fault matrix" href="/docs/fault-matrix">
+    Every error your stubs used to fake, run for you.
+  </Card>
+</Cards>
