@@ -22,6 +22,7 @@ describe("the server", () => {
     const prompts = (await client.listPrompts()).prompts.map((p) => p.name)
 
     expect(tools).toEqual([
+      "back",
       "check",
       "check_locator",
       "clear_faults",
@@ -47,6 +48,7 @@ describe("the server", () => {
       "run_tests",
       "scaffold_test",
       "screenshot",
+      "scroll",
       "select",
       "show_run",
       "snapshot",
@@ -54,6 +56,7 @@ describe("the server", () => {
       "stop_recording",
       "switch_tab",
       "tabs",
+      "tap_at",
       "upload",
     ])
     expect(resources).toEqual([

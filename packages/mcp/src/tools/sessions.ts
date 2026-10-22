@@ -1,7 +1,8 @@
 /**
- * Live sessions: the app open in danwo's browser, behind its emulators and proxy, driven one step
- * at a time by the agent with no model on danwo's side. Actions answer with what changed on the
- * page; the emulator tools show and fault the services behind the app.
+ * Live sessions: the app open in danwo's browser, or on the environment's Android emulator or iOS
+ * Simulator, behind its emulators and proxy, driven one step at a time by the agent with no model
+ * on danwo's side. Actions answer with what changed on the page or screen; the emulator tools show
+ * and fault the services behind the app.
  */
 import { FAULT_FORMS } from "@danwo/runner/runner"
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
@@ -85,6 +86,9 @@ const SessionArgs = z.object({
   tab: z.number().optional(),
   accept: z.boolean().optional(),
   text: z.string().optional(),
+  direction: z.enum(["up", "down", "left", "right"]).optional(),
+  x: z.number().optional(),
+  y: z.number().optional(),
 })
 
 type SessionArgs = z.infer<typeof SessionArgs>
@@ -122,12 +126,14 @@ function register(server: McpServer, sessions: SessionManager, tool: SessionTool
 }
 
 const ACTION_NOTE =
-  "Answers with what changed on the page (+ new, - gone, or the whole page after a navigation) and the console errors and failed requests since the last call; when the action opens a dialog, with the dialog to answer."
+  "Answers with what changed on the page (+ new, - gone, or the whole page after a navigation) and the console errors and failed requests since the last call; when the action opens a dialog, with the dialog to answer. On a device: what is in front (the app, or a browser it opened), what changed on the screen, and the app's log warnings and errors."
+const BROWSER_ONLY = "A browser page only; a device session refuses it."
+const DEVICE_ONLY = "A device session only; a browser page refuses it."
 
 function registerActions(server: McpServer, sessions: SessionManager): void {
   register(server, sessions, {
     name: "click",
-    description: `Click an element: a left click by default; button: "right" for a context menu, double: true for a double click, modifiers to hold keys (Shift to select a range, ControlOrMeta to add to a selection or open a link in a new tab). ${ACTION_NOTE}`,
+    description: `Click an element (on a device, tap it): a left click by default; button: "right" for a context menu, double: true for a double click, modifiers to hold keys (Shift to select a range, ControlOrMeta to add to a selection or open a link in a new tab). button, double and modifiers are for a browser page only. ${ACTION_NOTE}`,
     input: { session, target, modifiers, button, double },
     call: (args) => ({
       kind: "click",
@@ -139,7 +145,7 @@ function registerActions(server: McpServer, sessions: SessionManager): void {
   })
   register(server, sessions, {
     name: "hover",
-    description: `Move the pointer over an element, e.g. to open a menu. ${ACTION_NOTE}`,
+    description: `Move the pointer over an element, e.g. to open a menu. ${BROWSER_ONLY} ${ACTION_NOTE}`,
     input: { session, target },
     call: (args) => ({ kind: "hover", target: given(args.target, "target") }),
   })
@@ -165,13 +171,13 @@ function registerActions(server: McpServer, sessions: SessionManager): void {
   })
   register(server, sessions, {
     name: "press",
-    description: `Press a key or combination (Enter, Tab, Control+A) on an element, or on the page without a target. ${ACTION_NOTE}`,
+    description: `Press a key or combination (Enter, Tab, Control+A) on an element, or on the page without a target. On a device the target is tapped first, then the key pressed: Android takes Enter, Tab, Backspace, Escape, Home and the arrows; iOS only Enter (the keyboard's return key). ${ACTION_NOTE}`,
     input: { session, key: z.string(), target: target.optional() },
     call: (args) => ({ kind: "press", key: given(args.key, "key"), target: args.target }),
   })
   register(server, sessions, {
     name: "select",
-    description: `Choose options of a select element by value or label. ${ACTION_NOTE}`,
+    description: `Choose options of a select element by value or label. ${BROWSER_ONLY} ${ACTION_NOTE}`,
     input: { session, target, values: z.array(z.string()).min(1) },
     call: (args) => ({
       kind: "select",
@@ -181,7 +187,7 @@ function registerActions(server: McpServer, sessions: SessionManager): void {
   })
   register(server, sessions, {
     name: "check",
-    description: `Tick (or with checked: false, untick) a checkbox or radio button. ${ACTION_NOTE}`,
+    description: `Tick (or with checked: false, untick) a checkbox or radio button; on a device, a checkbox or switch is tapped unless it already shows that state. ${ACTION_NOTE}`,
     input: { session, target, checked: z.boolean().optional() },
     call: (args) => ({
       kind: "check",
@@ -191,7 +197,7 @@ function registerActions(server: McpServer, sessions: SessionManager): void {
   })
   register(server, sessions, {
     name: "upload",
-    description: `Put files into a file input, or into the file chooser an element opens when clicked. Each file is a path in the project, a file the config offers by name, or bytes ({ name, text } or { name, base64 }); ${sizeText(MAX_UPLOAD_BYTES)} and ${MAX_UPLOAD_FILES} files at most per call. An empty list clears the input. ${ACTION_NOTE}`,
+    description: `Put files into a file input, or into the file chooser an element opens when clicked. Each file is a path in the project, a file the config offers by name, or bytes ({ name, text } or { name, base64 }); ${sizeText(MAX_UPLOAD_BYTES)} and ${MAX_UPLOAD_FILES} files at most per call. An empty list clears the input. ${BROWSER_ONLY} ${ACTION_NOTE}`,
     input: { session, target, files: z.array(UploadFile).max(MAX_UPLOAD_FILES) },
     call: (args) => ({
       kind: "upload",
@@ -201,7 +207,7 @@ function registerActions(server: McpServer, sessions: SessionManager): void {
   })
   register(server, sessions, {
     name: "drag",
-    description: `Drag an element and drop it on another, e.g. a card onto a column or a file row onto a folder. ${ACTION_NOTE}`,
+    description: `Drag an element and drop it on another, e.g. a card onto a column or a file row onto a folder. ${BROWSER_ONLY} ${ACTION_NOTE}`,
     input: {
       session,
       target: target.describe(`what to drag: ${target.description ?? "a ref or a locator"}`),
@@ -215,19 +221,19 @@ function registerActions(server: McpServer, sessions: SessionManager): void {
   })
   register(server, sessions, {
     name: "switch_tab",
-    description: `Make another tab the one actions go to, by its number in tabs. Answers with that tab's whole page. ${ACTION_NOTE}`,
+    description: `Make another tab the one actions go to, by its number in tabs. Answers with that tab's whole page. ${BROWSER_ONLY} ${ACTION_NOTE}`,
     input: { session, tab },
     call: (args) => ({ kind: "switch_tab", tab: given(args.tab, "tab") }),
   })
   register(server, sessions, {
     name: "close_tab",
-    description: `Close a tab by its number in tabs, or the active one without a number; the newest tab left becomes the active one. The session's only tab cannot be closed. ${ACTION_NOTE}`,
+    description: `Close a tab by its number in tabs, or the active one without a number; the newest tab left becomes the active one. The session's only tab cannot be closed. ${BROWSER_ONLY} ${ACTION_NOTE}`,
     input: { session, tab: tab.optional() },
     call: (args) => ({ kind: "close_tab", tab: args.tab }),
   })
   register(server, sessions, {
     name: "dialog",
-    description: `Answer the alert, confirm or prompt dialog the page has open: accept: true is OK, false is Cancel; text fills a prompt. While a dialog is open nothing on the page can be read or clicked, so every other page tool says it is open. The action that opened it then finishes. ${ACTION_NOTE}`,
+    description: `Answer the alert, confirm or prompt dialog the page has open: accept: true is OK, false is Cancel; text fills a prompt. While a dialog is open nothing on the page can be read or clicked, so every other page tool says it is open. The action that opened it then finishes. ${BROWSER_ONLY} ${ACTION_NOTE}`,
     input: {
       session,
       accept: z.boolean().describe("true for OK, false for Cancel"),
@@ -237,9 +243,43 @@ function registerActions(server: McpServer, sessions: SessionManager): void {
   })
   register(server, sessions, {
     name: "navigate",
-    description: `Go to a path of the app or a full URL, or "back", "forward", "reload". ${ACTION_NOTE}`,
+    description: `Go to a path of the app or a full URL, or "back", "forward", "reload". On a device a path opens by the app's link scheme (a deep link), a full URL opens with the device's handler for it, and "back" goes back. ${ACTION_NOTE}`,
     input: { session, to: z.string() },
     call: (args) => ({ kind: "navigate", to: given(args.to, "to") }),
+  })
+  registerDeviceActions(server, sessions)
+}
+
+function registerDeviceActions(server: McpServer, sessions: SessionManager): void {
+  register(server, sessions, {
+    name: "back",
+    description: `Go back the platform's way: the Back button on Android; on iOS, the screen's own back or close control. ${DEVICE_ONLY} ${ACTION_NOTE}`,
+    input: { session },
+    call: () => ({ kind: "back" }),
+  })
+  register(server, sessions, {
+    name: "scroll",
+    description: `Scroll the screen, or the element target names (a list), to show what is further that way: down swipes the finger up, as a person scrolls a list down. ${DEVICE_ONLY} ${ACTION_NOTE}`,
+    input: {
+      session,
+      direction: z.enum(["up", "down", "left", "right"]),
+      target: target.optional(),
+    },
+    call: (args) => ({
+      kind: "scroll",
+      direction: given(args.direction, "direction"),
+      target: args.target,
+    }),
+  })
+  register(server, sessions, {
+    name: "tap_at",
+    description: `Tap a point of the screen, in screenshot pixels, for what the tree does not show (a map, a canvas). Prefer a ref or a locator: they are checked before the tap. ${DEVICE_ONLY} ${ACTION_NOTE}`,
+    input: {
+      session,
+      x: z.number().describe("pixels from the screenshot's left edge"),
+      y: z.number().describe("pixels from the screenshot's top edge"),
+    },
+    call: (args) => ({ kind: "tap_at", x: given(args.x, "x"), y: given(args.y, "y") }),
   })
 }
 
@@ -247,7 +287,7 @@ function registerPageTools(server: McpServer, sessions: SessionManager): void {
   register(server, sessions, {
     name: "snapshot",
     description:
-      "The page now as an accessibility tree with refs ([ref=e12]) to act on. Refs belong to the latest snapshot or action answer.",
+      "The page now as an accessibility tree with refs ([ref=e12]) to act on. Refs belong to the latest snapshot or action answer. On a device: the screen as a tree in the same shape, and what is in front (the app, or a browser it opened); a ref keeps naming its element while it stays where it was, and one that moved or went is refused rather than tapped.",
     input: { session },
     call: () => ({ kind: "snapshot" }),
     readOnly: true,
@@ -270,7 +310,7 @@ function registerPageTools(server: McpServer, sessions: SessionManager): void {
   register(server, sessions, {
     name: "screenshot",
     description:
-      "A PNG of the page (or one element). Password fields, filled secrets and any text showing a secret are masked.",
+      "A PNG of the page (or one element). Password fields, filled secrets and any text showing a secret are masked. On a device, the screen (or one element's box), with those fields painted over.",
     input: { session, target: target.optional(), fullPage: z.boolean().optional() },
     call: (args) => ({ kind: "screenshot", target: args.target, fullPage: args.fullPage ?? false }),
     readOnly: true,
@@ -278,7 +318,7 @@ function registerPageTools(server: McpServer, sessions: SessionManager): void {
   register(server, sessions, {
     name: "tabs",
     description:
-      "The session's open tabs, numbered from 1 in the order they opened, with each one's title and URL; * marks the tab actions go to. A tab the app opens (a popup, a link to a new tab) becomes that tab by itself.",
+      "The session's open tabs, numbered from 1 in the order they opened, with each one's title and URL; * marks the tab actions go to. A tab the app opens (a popup, a link to a new tab) becomes that tab by itself. A browser page only; a device session refuses it.",
     input: { session },
     call: () => ({ kind: "tabs" }),
     readOnly: true,
@@ -348,20 +388,32 @@ function registerLifecycle(server: McpServer, sessions: SessionManager): void {
     "open_session",
     {
       description:
-        "Open the app in danwo's browser for step-by-step use: starts the project's environment (its app, emulators and proxy, as a test worker would) and answers with a session id and the page's accessibility tree. No model runs on danwo's side. Several sessions may be open at once, each with its own environment; idle sessions close by themselves.",
-      inputSchema: { path: z.string().optional().describe('a path of the app, default "/"') },
+        "Open the app in danwo's browser for step-by-step use: starts the project's environment (its app, emulators and proxy, as a test worker would) and answers with a session id and the page's accessibility tree. With device: true, drives the environment's Android emulator or iOS Simulator instead (env.device): the app starts afresh and the answer is its screen. No model runs on danwo's side. Several sessions may be open at once, each with its own environment; idle sessions close by themselves.",
+      inputSchema: {
+        path: z
+          .string()
+          .optional()
+          .describe('a path of the app, default "/"; on a device, opened by its link scheme'),
+        device: z
+          .boolean()
+          .optional()
+          .describe("drive the environment's device instead of a browser (default false)"),
+      },
     },
     (args, extra) =>
       answer(async () => {
-        progressOf(extra)("starting the environment and browser")
+        const device = args.device ?? false
 
-        return reply(await sessions.open(args.path ?? "/", extra.signal))
+        progressOf(extra)(`starting the environment and ${device ? "device" : "browser"}`)
+
+        return reply(await sessions.open(args.path ?? "/", { device, signal: extra.signal }))
       }),
   )
   server.registerTool(
     "close_session",
     {
-      description: "Close a session: its browser, app and emulators stop.",
+      description:
+        "Close a session: its browser (or its hold on the device), app and emulators stop.",
       inputSchema: { session },
     },
     (args) =>

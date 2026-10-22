@@ -37,10 +37,13 @@
     "@danwo/skill": "workspace:*",
     "@modelcontextprotocol/sdk": "1.32.1",
     "playwright-core": "1.64.1",
+    "pngjs": "7.0.0",
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@danwo/sdk": "workspace:*"
+    "@danwo/device": "workspace:*",
+    "@danwo/sdk": "workspace:*",
+    "@types/pngjs": "6.0.5"
   },
   "engines": {
     "node": ">=24"

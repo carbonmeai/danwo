@@ -32,6 +32,11 @@ export type {
   ScreenFilm,
   ScrollDirection,
 } from "../device/types.ts"
+export {
+  type Chain as DeviceChain,
+  type ChainLink as DeviceChainLink,
+  resolveChain,
+} from "../device/match.ts"
 export type { CapturedVideo, RecordedVideo, VideoMark, VideoMode } from "../record/video.ts"
 export {
   gmailMail,

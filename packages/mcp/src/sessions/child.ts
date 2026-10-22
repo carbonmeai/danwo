@@ -1,12 +1,14 @@
 /**
  * A live session's process: the MCP server forks one per open session. It starts the project's
- * environment as a worker would (app, emulators, proxy), opens a browser behind the proxy, then
- * answers the server's calls one at a time until it is closed, or the server goes away.
+ * environment as a worker would (app, emulators, proxy), then opens a browser behind the proxy, or
+ * drives the environment's own device, and answers the server's calls one at a time until it is
+ * closed, or the server goes away.
  */
 import { join } from "node:path"
 
 import { launchBrowser, SecretVault } from "@danwo/runner"
 import {
+  backendOf,
   createRedactor,
   FaultBench,
   loadConfig,
@@ -14,8 +16,10 @@ import {
 } from "@danwo/runner/runner"
 import type { Browser } from "playwright-core"
 
+import type { ActionCall, SessionDesk } from "./desk.ts"
+import { DeviceDesk } from "./device.ts"
 import { EmulatorDesk } from "./emulators.ts"
-import { type ActionCall, PageDesk } from "./page.ts"
+import { PageDesk } from "./page.ts"
 import {
   isSessionRequest,
   type OpenRequest,
@@ -26,8 +30,9 @@ import {
 
 interface Live {
   readonly env: WorkerEnvironment | undefined
-  readonly browser: Browser
-  readonly page: PageDesk
+  /** The session's browser; none when it drives a device. */
+  readonly browser: Browser | undefined
+  readonly page: SessionDesk
   readonly emulators: EmulatorDesk
   readonly faults: FaultBench
 }
@@ -63,6 +68,9 @@ const ACTIONS = new Set<string>([
   "switch_tab",
   "close_tab",
   "dialog",
+  "back",
+  "scroll",
+  "tap_at",
 ])
 const PAGE_CALLS = new Set<string>([
   "snapshot",
@@ -92,23 +100,77 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+type Loaded = Awaited<ReturnType<typeof loadConfig>>
+
+/** Where a session's recordings go, and how answers name the folder. */
+function recordDir(root: string, id: string) {
+  return { path: join(root, ".danwo", "sessions", id), shown: `.danwo/sessions/${id}/` }
+}
+
 async function open(request: OpenRequest): Promise<SessionAnswer> {
   const loaded = await loadConfig(request.place.cwd, request.place.config)
   const env = await loaded.config.environment?.({ workerIndex: request.slot })
-  const baseUrl = env?.baseUrl ?? loaded.config.baseUrl
 
-  if (baseUrl === undefined) {
-    await env?.close()
-    throw new Error("the project has no baseUrl: set one in danwo.config.ts or its environment")
+  try {
+    return request.device
+      ? await openDevice(request, loaded, env)
+      : await openBrowser(request, loaded, env)
+  } catch (error) {
+    await env?.close().catch(() => undefined)
+    throw error
+  }
+}
+
+/** Opens the session on the environment's device: the app afresh, no browser. */
+async function openDevice(
+  request: OpenRequest,
+  loaded: Loaded,
+  env: WorkerEnvironment | undefined,
+): Promise<SessionAnswer> {
+  const target = env?.device
+
+  if (target === undefined)
+    throw new Error(
+      "the project's environment has no device: device: true drives env.device, e.g. withIosDevice(…) or withAndroidDevice(…) in danwo.config.ts's environment()",
+    )
+
+  const vault = new SecretVault(loaded.config.secrets)
+  const redactor = createRedactor(vault.redact)
+  const opened = await DeviceDesk.open(
+    {
+      target,
+      vault,
+      redact: (text) => redactor.text(text),
+      backend: backendOf(env),
+      recordDir: recordDir(loaded.root, request.id),
+    },
+    request.path,
+  )
+
+  live = {
+    env,
+    browser: undefined,
+    page: opened.desk,
+    emulators: new EmulatorDesk(env, redactor),
+    faults: new FaultBench(env?.proxy, env?.webhooks),
   }
 
+  return { text: `session ${request.id} is open.\n${opened.text}` }
+}
+
+/** Opens the session in a browser behind the environment's proxy. */
+async function openBrowser(
+  request: OpenRequest,
+  loaded: Loaded,
+  env: WorkerEnvironment | undefined,
+): Promise<SessionAnswer> {
+  const baseUrl = env?.baseUrl ?? loaded.config.baseUrl
+
+  if (baseUrl === undefined)
+    throw new Error("the project has no baseUrl: set one in danwo.config.ts or its environment")
+
   const proxy = env?.proxy && { url: env.proxy.url, caSpki: env.proxy.caSpki }
-  const browser = await launchBrowser({ ...(proxy && { proxy }), headless: true }).catch(
-    async (error: unknown) => {
-      await env?.close()
-      throw error
-    },
-  )
+  const browser = await launchBrowser({ ...(proxy && { proxy }), headless: true })
 
   try {
     return await start(request, {
@@ -121,7 +183,6 @@ async function open(request: OpenRequest): Promise<SessionAnswer> {
     })
   } catch (error) {
     await browser.close().catch(() => undefined)
-    await env?.close().catch(() => undefined)
     throw error
   }
 }
@@ -147,10 +208,7 @@ async function start(request: OpenRequest, started: Started): Promise<SessionAns
       redact: (text) => redactor.text(text),
       root: started.root,
       files: started.files,
-      recordDir: {
-        path: join(started.root, ".danwo", "sessions", request.id),
-        shown: `.danwo/sessions/${request.id}/`,
-      },
+      recordDir: recordDir(started.root, request.id),
     },
     request.path,
   )
@@ -189,8 +247,8 @@ function isPageCall(call: SessionCall): call is PageCall {
   return PAGE_CALLS.has(call.kind)
 }
 
-/** The browser's own calls, beyond actions. */
-function pageCall(page: PageDesk, call: PageCall): Promise<string | SessionAnswer> {
+/** The page or device's own calls, beyond actions. */
+function pageCall(page: SessionDesk, call: PageCall): Promise<string | SessionAnswer> {
   switch (call.kind) {
     case "snapshot":
       return page.snapshot()
@@ -240,7 +298,7 @@ async function shutdown(): Promise<void> {
   if (session === undefined) return
 
   await session.page.close()
-  await session.browser.close().catch(() => undefined)
+  await session.browser?.close().catch(() => undefined)
   await session.env?.close().catch(() => undefined)
 }
 

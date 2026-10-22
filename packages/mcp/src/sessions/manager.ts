@@ -1,6 +1,6 @@
 /**
  * The server's side of live sessions: each one is a process of its own (see `child.ts`) with its
- * own environment and browser, numbered `s1`, `s2`… A session closes when the agent closes it,
+ * own environment and browser (or the environment's device), numbered `s1`, `s2`… A session closes when the agent closes it,
  * when it has had no calls for a while, or when the client goes away. Only so many may be open at
  * once; each takes a slot, which its environment gets as its worker index.
  */
@@ -23,6 +23,13 @@ export interface SessionLimits {
   readonly max?: number
   /** A session with no calls for this long closes. Default 10 minutes. */
   readonly idleMs?: number
+}
+
+/** How a session opens. */
+interface OpenOptions {
+  /** Drives the environment's device instead of a browser. */
+  readonly device?: boolean | undefined
+  readonly signal?: AbortSignal | undefined
 }
 
 interface Pending {
@@ -141,18 +148,22 @@ export class SessionManager {
     this.idleMs = limits.idleMs ?? 600_000
   }
 
-  /** Opens a session on `path`; answers with its id and first snapshot. */
-  async open(path: string, signal?: AbortSignal): Promise<SessionAnswer> {
+  /**
+   * Opens a session on `path`, in a browser or (with `device`) on the environment's device;
+   * answers with its id and first snapshot.
+   */
+  async open(path: string, options: OpenOptions = {}): Promise<SessionAnswer> {
     const slot = this.freeSlot()
     const id = `s${this.next++}`
     const session = new LiveSession(id, slot, forkInProject(SESSION_ENTRY, this.place))
 
     this.sessions.set(id, session)
 
-    const opened = session.opened(signal)
+    const opened = session.opened(options.signal)
+    const device = options.device ?? false
 
     try {
-      session.start({ type: "open", place: this.place, slot, id, path })
+      session.start({ type: "open", place: this.place, slot, id, path, device })
 
       const answer = await opened
 

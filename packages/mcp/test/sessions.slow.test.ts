@@ -208,6 +208,12 @@ describe("live sessions on the pantry", () => {
     expect(await refused(client, "snapshot", { session: a })).toContain(`session ${a} is closed`)
   })
 
+  it("refuses a device session on a project whose environment has no device", async () => {
+    expect(await refused(client, "open_session", { device: true })).toContain(
+      "the project's environment has no device",
+    )
+  })
+
   it("records screenshots of a session", async () => {
     const session = sessionOf(await call(client, "open_session", {}))
 

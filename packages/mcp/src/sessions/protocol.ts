@@ -1,6 +1,7 @@
 /**
  * What the MCP server and a live session's process say to each other. A session process owns one
- * project environment (app, emulators, proxy) and one browser for as long as the session is open;
+ * project environment (app, emulators, proxy) and one browser, or the environment's own device, for
+ * as long as the session is open;
  * the server forwards each tool call to it as one request and relays its answer. Answers are
  * already redacted and written for the agent, so secret values never leave the session process.
  * Messages are plain JSON over the child's IPC channel.
@@ -45,6 +46,13 @@ export type SessionCall =
   | { readonly kind: "switch_tab"; readonly tab: number }
   | { readonly kind: "close_tab"; readonly tab?: number | undefined }
   | { readonly kind: "upload"; readonly target: Target; readonly files: readonly UploadFile[] }
+  | { readonly kind: "back" }
+  | {
+      readonly kind: "scroll"
+      readonly direction: "up" | "down" | "left" | "right"
+      readonly target?: Target | undefined
+    }
+  | { readonly kind: "tap_at"; readonly x: number; readonly y: number }
   | { readonly kind: "check_locator"; readonly locator: string }
   | {
       readonly kind: "screenshot"
@@ -74,6 +82,8 @@ export interface OpenRequest {
   readonly slot: number
   readonly id: string
   readonly path: string
+  /** Drives the environment's device (`env.device`) instead of opening a browser. */
+  readonly device: boolean
 }
 
 export interface CallRequest {

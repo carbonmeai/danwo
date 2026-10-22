@@ -10,11 +10,18 @@ import { join } from "node:path"
 import type { SecretVault } from "@danwo/runner"
 import type { Browser, BrowserContext, Locator, Page } from "playwright-core"
 
+import {
+  type ActionCall,
+  type DeviceOnlyCall,
+  deviceOnlyText,
+  isDeviceOnly,
+  type SessionDesk,
+} from "./desk.ts"
 import { type OpenDialog, SessionDialogs } from "./dialogs.ts"
 import { snapshotChange } from "./diff.ts"
 import { chainCode, emptyLink, locateChain, parseChain } from "./locator-chain.ts"
 import { checkLocator } from "./locator-check.ts"
-import type { SessionAnswer, SessionCall } from "./protocol.ts"
+import type { SessionAnswer } from "./protocol.ts"
 import { SessionTabs } from "./tabs.ts"
 import { filePayloads, putFiles, uploadAnswer } from "./upload.ts"
 import { PageWatch } from "./watch.ts"
@@ -25,25 +32,8 @@ const ACTION_TIMEOUT_MS = 10_000
 const LOAD_TIMEOUT_MS = 30_000
 const SECRET_MARK = "data-danwo-secret"
 
-export type ActionCall = Extract<
-  SessionCall,
-  {
-    kind:
-      | "click"
-      | "hover"
-      | "fill"
-      | "fill_secret"
-      | "press"
-      | "select"
-      | "check"
-      | "navigate"
-      | "upload"
-      | "drag"
-      | "switch_tab"
-      | "close_tab"
-      | "dialog"
-  }
->
+/** The actions a page carries out: all but a device's own. */
+type PageAction = Exclude<ActionCall, DeviceOnlyCall>
 
 export interface DeskOptions {
   readonly browser: Browser
@@ -69,7 +59,7 @@ interface Targeted {
   readonly name: string
 }
 
-export class PageDesk {
+export class PageDesk implements SessionDesk {
   private tree = ""
   private secretFilled = false
   private recording: Recording | undefined
@@ -129,6 +119,7 @@ export class PageDesk {
 
   /** Carries out one action, then answers with the page's change and what it reported. */
   async act(call: ActionCall): Promise<string> {
+    if (isDeviceOnly(call)) throw new Error(deviceOnlyText(call.kind))
     if (call.kind !== "dialog") this.ready()
 
     const before = this.tree
@@ -322,7 +313,7 @@ export class PageDesk {
     return `went to ${to}`
   }
 
-  async upload(call: Extract<ActionCall, { kind: "upload" }>): Promise<string> {
+  async upload(call: Extract<PageAction, { kind: "upload" }>): Promise<string> {
     const payloads = await filePayloads(call.files, {
       root: this.options.root,
       offered: this.options.files ?? {},
@@ -490,7 +481,7 @@ function messageOf(error: unknown): string {
 }
 
 /** How a click's answer names it: `clicked X`, `double-clicked X with the right button, holding Shift`. */
-function clickedText(call: Extract<ActionCall, { kind: "click" }>, name: string): string {
+function clickedText(call: Extract<PageAction, { kind: "click" }>, name: string): string {
   const button =
     call.button === undefined || call.button === "left" ? "" : ` with the ${call.button} button`
   const held =
@@ -503,7 +494,7 @@ function clickedText(call: Extract<ActionCall, { kind: "click" }>, name: string)
 
 /** Each action by kind, carried out on the desk; answers with what was done. */
 const ACTIONS: {
-  readonly [K in ActionCall["kind"]]: (desk: PageDesk, call: ActionOf<K>) => Promise<string>
+  readonly [K in PageAction["kind"]]: (desk: PageDesk, call: ActionOf<K>) => Promise<string>
 } = {
   async click(desk, call) {
     const { locator, name } = await desk.target(call.target)
@@ -575,10 +566,10 @@ const ACTIONS: {
   close_tab: (desk, call) => desk.closeTab(call.tab),
 }
 
-type ActionOf<K extends ActionCall["kind"]> = Extract<ActionCall, { kind: K }>
+type ActionOf<K extends PageAction["kind"]> = Extract<PageAction, { kind: K }>
 
 /** Carries out `call` with the action of its kind. */
-function perform<K extends ActionCall["kind"]>(
+function perform<K extends PageAction["kind"]>(
   desk: PageDesk,
   call: ActionOf<K> & { readonly kind: K },
 ): Promise<string> {
