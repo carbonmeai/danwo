@@ -46,6 +46,24 @@ jobs:
       - run: bun run test
       - run: bun run release 0.1.0-beta.0 --pack --verify
 
+  # The unit and ui tests on Windows, and an install of the packed tarballs there that runs
+  # `danwo test` as a user would. Tests that need a POSIX shell, Linux containers or macOS say so
+  # and skip themselves.
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          chromium: "true"
+      - run: bun run ui:codegen
+      - run: bun run test
+      - run: bun run release 0.1.0-beta.0 --pack --verify
+
   gitleaks:
     name: gitleaks
     runs-on: ubuntu-latest

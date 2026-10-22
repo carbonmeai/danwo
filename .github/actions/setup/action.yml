@@ -29,17 +29,24 @@ runs:
     - run: bun install --frozen-lockfile
       shell: bash
 
-    # The browser build follows the pinned playwright-core, so its version keys the cache.
+    # The browser build follows the pinned playwright-core, so its version keys the cache. Playwright
+    # keeps its browsers in ~/.cache on Linux and in %LOCALAPPDATA% on Windows.
     - if: inputs.chromium == 'true'
       id: playwright
       shell: bash
-      run: echo "version=$(node -p 'require("playwright-core/package.json").version')" >> "$GITHUB_OUTPUT"
+      run: |
+        echo "version=$(node -p 'require("playwright-core/package.json").version')" >> "$GITHUB_OUTPUT"
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          echo "browsers=$LOCALAPPDATA\\ms-playwright" >> "$GITHUB_OUTPUT"
+        else
+          echo "browsers=$HOME/.cache/ms-playwright" >> "$GITHUB_OUTPUT"
+        fi
       working-directory: packages/runner
 
     - if: inputs.chromium == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: ~/.cache/ms-playwright
+        path: ${{ steps.playwright.outputs.browsers }}
         key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
     # Installs the system libraries every time and downloads Chromium only on a cache miss.
