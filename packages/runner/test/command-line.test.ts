@@ -17,7 +17,7 @@ describe("starting a program by name", () => {
   })
 
   it("goes through cmd.exe on Windows, where npm and npx are .cmd scripts", () => {
-    expect(spawnPlan("npx", ["--no", "--", "danwo", "test"], "win32", undefined)).toEqual({
+    expect(spawnPlan("npx", ["--no", "--", "danwo", "test"], "win32", "cmd.exe")).toEqual({
       command: "cmd.exe",
       args: ["/d", "/s", "/c", '"npx ^"--no^" ^"--^" ^"danwo^" ^"test^""'],
       windowsVerbatimArguments: true,
