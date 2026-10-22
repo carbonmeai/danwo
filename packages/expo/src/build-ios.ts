@@ -1,52 +1,40 @@
 /**
- * `danwo build-ios`: the danwo build of an Expo app for the iOS Simulator, a Release `.app` with its
- * JavaScript bundled (no Metro at test time). Runs `expo prebuild` (which installs the CocoaPods),
- * applies the danwo network config, then `xcodebuild` for the simulator with no code signing. A
- * build is kept by a hash of the app's sources, so an unchanged app is not built again.
+ * `danwo build-ios`: the danwo build of an app for the iOS Simulator, whatever the project holds. A
+ * native Xcode project and a Flutter app build with their own tools (`xcode.ts`, `flutter.ts`). An
+ * Expo app builds as a Release `.app` with its JavaScript bundled (no Metro at test time): `expo
+ * prebuild` (which installs the CocoaPods), the danwo network config, then `xcodebuild` for the
+ * simulator with no code signing. A build is kept by a hash of the app's sources, so an unchanged
+ * app is not built again.
  */
 import { cp, readdir, rm } from "node:fs/promises"
 import { join } from "node:path"
 
-import { buildSlot, sourceHash } from "./build.ts"
+import { buildFlutterIos } from "./flutter.ts"
 import { applyIosNetworkConfig } from "./ios-network.ts"
+import { iosProject } from "./project.ts"
+import { type BuildExec, buildSlot, type IosBuild, sourceHash } from "./slot.ts"
+import { buildXcode, iosBuildEnv } from "./xcode.ts"
 
 /** Options of `buildIos`. */
 export interface BuildIosOptions {
-  /** The Expo project's folder (where its package.json and app config are). */
+  /** The project's folder: an Expo app, an Xcode workspace or project, or a Flutter app. */
   readonly project: string
+  /** A native project's scheme; found from the project by default. Not used for Expo or Flutter. */
+  readonly scheme?: string
+  /** A native project's build configuration; default `Release`. */
+  readonly configuration?: string
   /** Build again even when a build of the same sources is kept. */
   readonly force?: boolean
   /** Each line the tools print; the build is quiet otherwise (the full log is kept on disk). */
   readonly onLine?: (line: string) => void
-}
-
-/** What `buildIos` produced. */
-export interface IosBuild {
-  /** The simulator app (`.app` folder), kept under the project's `.danwo/builds/`. */
-  readonly app: string
-  /** True when an earlier build of the same sources was reused. */
-  readonly cached: boolean
-  readonly durationMs: number
-  /** The build's full log. */
-  readonly log: string
+  /** Runs the tools; tests pass a fake. */
+  readonly exec?: BuildExec
+  /** The tools' environment, in place of this machine's; tests pass one. */
+  readonly env?: NodeJS.ProcessEnv
 }
 
 /** Changes whenever the build steps change, so builds made by older steps are not reused. */
 const RECIPE = "danwo-ios-2"
-
-/** The environment Expo, CocoaPods and Xcode run in, with the danwo build switched on. */
-function buildEnv(): NodeJS.ProcessEnv {
-  if (process.platform !== "darwin") throw new Error("iOS builds need a Mac with Xcode")
-
-  return {
-    ...process.env,
-    DANWO: "1",
-    CI: "1",
-    EXPO_NO_TELEMETRY: "1",
-    /* CocoaPods refuses to run in a non-UTF-8 locale. */
-    LANG: process.env.LANG ?? "en_US.UTF-8",
-  }
-}
 
 /** The Xcode workspace `expo prebuild` wrote, by name: `DanwoShop` for `DanwoShop.xcworkspace`. */
 export async function workspaceName(iosDir: string): Promise<string> {
@@ -79,14 +67,14 @@ export function xcodebuildArgs(scheme: string, derivedData: string, arch: string
 }
 
 /** Builds the danwo simulator app of the Expo app in `options.project`, or returns the kept one. */
-export async function buildIos(options: BuildIosOptions): Promise<IosBuild> {
+async function buildExpoIos(options: BuildIosOptions): Promise<IosBuild> {
   const started = Date.now()
   const { project } = options
   const slot = await buildSlot({
     ...options,
     file: `${await sourceHash(project, RECIPE)}.app`,
     logName: "build-ios.log",
-    env: buildEnv,
+    env: () => ({ ...(options.env ?? iosBuildEnv()), EXPO_NO_TELEMETRY: "1" }),
   })
   const { path: app, log, step } = slot
 
@@ -113,4 +101,17 @@ export async function buildIos(options: BuildIosOptions): Promise<IosBuild> {
   )
 
   return { app, cached: false, durationMs: Date.now() - started, log }
+}
+
+/**
+ * Builds the danwo simulator app of the app in `options.project`, or returns the kept one: a
+ * Flutter app (`pubspec.yaml`), an Xcode workspace or project, else an Expo app.
+ */
+export async function buildIos(options: BuildIosOptions): Promise<IosBuild> {
+  const project = await iosProject(options.project)
+
+  if (project.kind === "flutter") return buildFlutterIos(options)
+  if (project.kind === "xcode") return buildXcode({ ...options, container: project.container })
+
+  return buildExpoIos(options)
 }

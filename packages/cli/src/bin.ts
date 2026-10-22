@@ -664,50 +664,99 @@ interface AppBuild {
   readonly log: string
 }
 
-/** Registers `danwo <name> [project]`: `build` makes (or reuses) the build, `where` says where it is. */
+/** The options every build command takes, and the ones a platform adds (`--scheme`, `--variant`). */
+interface BuildFlags {
+  readonly force?: boolean
+  readonly verbose?: boolean
+  readonly [flag: string]: string | boolean | undefined
+}
+
+/**
+ * Registers `danwo <name> [project]`: `build` makes (or reuses) the build from the project and the
+ * flags, `where` says where it is and what it is called. `flags` adds the platform's own options.
+ */
 function buildCommand<B extends AppBuild>(
   name: string,
   description: string,
-  build: (options: {
-    readonly project: string
-    readonly force: boolean
-    readonly onLine?: (line: string) => void
-  }) => Promise<B>,
+  flags: readonly (readonly [string, string])[],
+  build: (project: string, flags: BuildFlags, onLine?: (line: string) => void) => Promise<B>,
   where: (build: B) => string,
 ): void {
-  program
+  const command = program
     .command(name)
     .description(description)
-    .argument("[project]", "the Expo project's folder", ".")
+    .argument(
+      "[project]",
+      "the app's folder: an Expo app, a native project or a Flutter app (found from what it holds)",
+      ".",
+    )
     .option("--force", "build again even when the sources are unchanged")
     .option("--verbose", "print the build tools' output")
-    .action(async (project: string, options: { force?: boolean; verbose?: boolean }) => {
-      const done = await build({
-        project: resolvePath(project),
-        force: options.force === true,
-        ...(options.verbose === true && { onLine: (line: string) => console.log(line) }),
-      })
 
-      console.log(
-        done.cached
-          ? `reused ${where(done)}`
-          : `built ${where(done)} in ${Math.round(done.durationMs / 1000)} s (log: ${done.log})`,
-      )
-    })
+  for (const [flag, about] of flags) command.option(flag, about)
+
+  command.action(async (project: string, options: BuildFlags) => {
+    const done = await build(
+      resolvePath(project),
+      options,
+      options.verbose === true ? (line: string) => console.log(line) : undefined,
+    )
+
+    console.log(
+      done.cached
+        ? `reused ${where(done)}`
+        : `built ${where(done)} in ${Math.round(done.durationMs / 1000)} s (log: ${done.log})`,
+    )
+  })
+}
+
+/** A string flag's value, if it was given. */
+function flagOf(flags: BuildFlags, name: string): string | undefined {
+  const value = flags[name]
+
+  return typeof value === "string" ? value : undefined
 }
 
 buildCommand(
   "build-android",
-  "build the danwo build of an Expo app as a release APK (trusting danwo's per-run CA); unchanged sources reuse the kept build",
-  async (options) => (await import("@danwo/expo")).buildAndroid(options),
-  (build) => build.apk,
+  "build the danwo build of an app as an APK: an Expo app (release, trusting danwo's per-run CA), a Gradle project (`./gradlew assemble<Variant>`, debug-signed, with danwo's network config added for the build) or a Flutter app (`flutter build apk`); unchanged sources reuse the kept build",
+  [["--variant <variant>", "a Gradle project's variant to assemble (default release)"]],
+  async (project, flags, onLine) => {
+    const variant = flagOf(flags, "variant")
+
+    return (await import("@danwo/expo")).buildAndroid({
+      project,
+      force: flags.force === true,
+      ...(variant !== undefined && { variant }),
+      ...(onLine !== undefined && { onLine }),
+    })
+  },
+  (build) => (build.package === undefined ? build.apk : `${build.apk} (${build.package})`),
 )
 
 buildCommand(
   "build-ios",
-  "build the danwo build of an Expo app as a Release iOS Simulator app (plain HTTP allowed for the proxy); unchanged sources reuse the kept build",
-  async (options) => (await import("@danwo/expo")).buildIos(options),
-  (build) => build.app,
+  "build the danwo build of an app for the iOS Simulator, unsigned, plain HTTP allowed for the proxy: an Expo app (Release), an Xcode workspace or project (`xcodebuild`, the scheme found or --scheme) or a Flutter app (`flutter build ios --simulator`); unchanged sources reuse the kept build",
+  [
+    [
+      "--scheme <scheme>",
+      "a native project's scheme (default: its only one, or the project's name)",
+    ],
+    ["--configuration <name>", "a native project's build configuration (default Release)"],
+  ],
+  async (project, flags, onLine) => {
+    const scheme = flagOf(flags, "scheme")
+    const configuration = flagOf(flags, "configuration")
+
+    return (await import("@danwo/expo")).buildIos({
+      project,
+      force: flags.force === true,
+      ...(scheme !== undefined && { scheme }),
+      ...(configuration !== undefined && { configuration }),
+      ...(onLine !== undefined && { onLine }),
+    })
+  },
+  (build) => (build.bundleId === undefined ? build.app : `${build.app} (${build.bundleId})`),
 )
 
 try {

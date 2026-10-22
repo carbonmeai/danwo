@@ -1,128 +1,35 @@
 /**
- * `danwo build-android`: the danwo build of an Expo app, as a release APK with its JavaScript
- * bundled (no Metro at test time). Runs `expo prebuild`, applies the danwo network config, then
- * Gradle, with Android Studio's JDK when `JAVA_HOME` is unset. A build is kept by a hash of the
- * app's sources, so an unchanged app is not built again.
+ * `danwo build-android`: the danwo build of an app as an APK, whatever the project holds. A
+ * native Gradle project and a Flutter app build with their own tools (`gradle.ts`, `flutter.ts`).
+ * An Expo app builds as a release APK with its JavaScript bundled (no Metro at test time): `expo
+ * prebuild`, the danwo network config, then Gradle, with Android Studio's JDK when `JAVA_HOME` is
+ * unset. A build is kept by a hash of the app's sources, so an unchanged app is not built again.
  */
-import { createHash } from "node:crypto"
-import { createWriteStream, existsSync } from "node:fs"
-import { copyFile, mkdir, readdir, readFile } from "node:fs/promises"
-import { join, relative } from "node:path"
+import { copyFile } from "node:fs/promises"
+import { join } from "node:path"
 
 import { androidSdkRoot, javaHome } from "@danwo/device/toolchain"
-import { spawnOwned } from "@danwo/runner/children"
-import { spawnPlan } from "@danwo/runner/command-line"
 
+import { buildFlutterAndroid } from "./flutter.ts"
+import { buildGradle } from "./gradle.ts"
 import { applyNetworkConfig } from "./network.ts"
+import { androidProject } from "./project.ts"
+import { type AndroidBuild, type BuildExec, buildSlot, sourceHash } from "./slot.ts"
 
 /** Options of `buildAndroid`. */
 export interface BuildAndroidOptions {
-  /** The Expo project's folder (where its package.json and app config are). */
+  /** The project's folder: an Expo app, a Gradle project (with `gradlew`) or a Flutter app. */
   readonly project: string
+  /** A Gradle project's variant to assemble; default `release`. Not used for Expo or Flutter. */
+  readonly variant?: string
   /** Build again even when a build of the same sources is kept. */
   readonly force?: boolean
   /** Each line the tools print; the build is quiet otherwise (the full log is kept on disk). */
   readonly onLine?: (line: string) => void
-}
-
-/** What `buildAndroid` produced. */
-export interface AndroidBuild {
-  /** The APK, kept under the project's `.danwo/builds/`. */
-  readonly apk: string
-  /** True when an earlier build of the same sources was reused. */
-  readonly cached: boolean
-  readonly durationMs: number
-  /** The build's full log. */
-  readonly log: string
-}
-
-/** Folders that are outputs or dependencies, not sources, and never part of the build's key. */
-const NOT_SOURCES = new Set(["node_modules", "android", "ios", ".expo", ".danwo", "dist", "build"])
-/** Changes whenever the build steps change, so builds made by older steps are not reused. */
-const RECIPE = "danwo-android-1"
-
-async function sourceFiles(dir: string, root: string): Promise<string[]> {
-  const entries = await readdir(dir, { withFileTypes: true })
-  const nested = await Promise.all(
-    entries
-      .filter((entry) => !NOT_SOURCES.has(entry.name) && !entry.name.startsWith("."))
-      .map(async (entry) => {
-        const path = join(dir, entry.name)
-
-        /* Forward slashes, so a build key is the same on every platform. */
-        return entry.isDirectory()
-          ? sourceFiles(path, root)
-          : [relative(root, path).split("\\").join("/")]
-      }),
-  )
-
-  return nested.flat().toSorted()
-}
-
-/** The build's key: the recipe and every source file's path and bytes. */
-export async function sourceHash(project: string, recipe: string = RECIPE): Promise<string> {
-  const hash = createHash("sha256").update(recipe)
-
-  for (const file of await sourceFiles(project, project)) {
-    hash
-      .update(file)
-      .update("\0")
-      .update(await readFile(join(project, file)))
-      .update("\0")
-  }
-
-  return hash.digest("hex").slice(0, 16)
-}
-
-/** A build tool's name on `platform`: the Gradle wrapper is a batch file on Windows. */
-export function windowsName(command: string, platform: NodeJS.Platform = process.platform): string {
-  return platform === "win32" && command === "./gradlew" ? "gradlew.bat" : command
-}
-
-/**
- * Runs a tool, appending its output to `log`; rejects with the tail of its output on failure. The
- * tool leads its own process group, so an interrupted build stops what it started too.
- */
-function run(
-  command: string,
-  args: readonly string[],
-  options: { readonly cwd: string; readonly env: NodeJS.ProcessEnv; readonly log: string },
-  onLine: ((line: string) => void) | undefined,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const log = createWriteStream(options.log, { flags: "a" })
-    const tail: string[] = []
-    /* npm and npx are `.cmd` scripts on Windows, and the Gradle wrapper is `gradlew.bat`. */
-    const plan = spawnPlan(windowsName(command), args)
-    const { child } = spawnOwned(plan.command, plan.args, {
-      cwd: options.cwd,
-      env: options.env,
-      windowsVerbatimArguments: plan.windowsVerbatimArguments,
-    })
-
-    const take = (chunk: Buffer) => {
-      log.write(chunk)
-
-      for (const line of chunk.toString("utf8").split(/\r?\n/)) {
-        if (line.trim() === "") continue
-
-        tail.push(line)
-        if (tail.length > 30) tail.shift()
-
-        onLine?.(line)
-      }
-    }
-
-    child.stdout?.on("data", take)
-    child.stderr?.on("data", take)
-    child.on("error", reject)
-    child.on("close", (code) => {
-      log.end()
-
-      if (code === 0) resolve()
-      else reject(new Error(`${command} ${args.join(" ")} exited ${code}:\n${tail.join("\n")}`))
-    })
-  })
+  /** Runs the tools; tests pass a fake. */
+  readonly exec?: BuildExec
+  /** The tools' environment, in place of the one found from this machine; tests pass one. */
+  readonly env?: NodeJS.ProcessEnv
 }
 
 /** The environment Gradle and Expo run in: the SDK, a JDK, and the danwo build switched on. */
@@ -148,55 +55,6 @@ function buildEnv(): NodeJS.ProcessEnv {
   }
 }
 
-/** Where one build is kept and logged, and how its tools run. */
-export interface BuildSlot {
-  /** The kept build: `<project>/.danwo/builds/<file>`. */
-  readonly path: string
-  readonly log: string
-  /** True when a build of the same sources is kept and no build is asked for. */
-  readonly reuse: boolean
-  /** Runs a tool in the project (or `cwd`), its output appended to the log. */
-  readonly step: (command: string, args: readonly string[], cwd?: string) => Promise<void>
-  /** Installs the project's packages when it has none yet. */
-  readonly install: () => Promise<void>
-}
-
-/** The slot for a build of `project` kept as `file`, logged to `logName`. */
-export async function buildSlot(options: {
-  readonly project: string
-  readonly file: string
-  readonly logName: string
-  readonly force?: boolean
-  readonly onLine?: (line: string) => void
-  /** The tools' environment, asked for only when a build runs. */
-  readonly env: () => NodeJS.ProcessEnv
-}): Promise<BuildSlot> {
-  const { project, onLine } = options
-  const builds = join(project, ".danwo", "builds")
-  const path = join(builds, options.file)
-  const log = join(builds, options.logName)
-  let env: NodeJS.ProcessEnv | undefined
-
-  await mkdir(builds, { recursive: true })
-
-  const step = (command: string, args: readonly string[], cwd = project) => {
-    env ??= options.env()
-
-    return run(command, args, { cwd, env, log }, onLine)
-  }
-
-  return {
-    path,
-    log,
-    reuse: options.force !== true && existsSync(path),
-    step,
-    async install() {
-      if (!existsSync(join(project, "node_modules")))
-        await step("npm", ["install", "--no-audit", "--no-fund"])
-    },
-  }
-}
-
 /**
  * Gradle's arguments for the release build. Gradle and the Kotlin compiler would each leave a
  * daemon running after the build; both run inside the build's own process instead, so nothing
@@ -210,14 +68,14 @@ export const GRADLE_ARGS: readonly string[] = [
 ]
 
 /** Builds the danwo APK of the Expo app in `options.project`, or returns the kept one. */
-export async function buildAndroid(options: BuildAndroidOptions): Promise<AndroidBuild> {
+async function buildExpoAndroid(options: BuildAndroidOptions): Promise<AndroidBuild> {
   const started = Date.now()
   const { project } = options
   const slot = await buildSlot({
     ...options,
     file: `${await sourceHash(project)}.apk`,
     logName: "build.log",
-    env: buildEnv,
+    env: () => options.env ?? buildEnv(),
   })
   const { path: apk, log, step } = slot
 
@@ -233,4 +91,17 @@ export async function buildAndroid(options: BuildAndroidOptions): Promise<Androi
   )
 
   return { apk, cached: false, durationMs: Date.now() - started, log }
+}
+
+/**
+ * Builds the danwo APK of the app in `options.project`, or returns the kept one: a Flutter app
+ * (`pubspec.yaml`), a Gradle project (`settings.gradle(.kts)` and `gradlew`), else an Expo app.
+ */
+export function buildAndroid(options: BuildAndroidOptions): Promise<AndroidBuild> {
+  const project = androidProject(options.project)
+
+  if (project.kind === "flutter") return buildFlutterAndroid(options)
+  if (project.kind === "gradle") return buildGradle(options)
+
+  return buildExpoAndroid(options)
 }
