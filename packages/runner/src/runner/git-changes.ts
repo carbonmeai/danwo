@@ -1,9 +1,10 @@
 /** The files a change touched, from git: what `danwo test --changed` starts from. */
 import { execFile } from "node:child_process"
-import { join, relative } from "node:path"
+import { join } from "node:path"
 import { promisify } from "node:util"
 
 import { DanwoError } from "../support/codes.ts"
+import { relativeSlashed } from "../support/paths.ts"
 
 const run = promisify(execFile)
 
@@ -44,7 +45,9 @@ export async function changedFiles(root: string, since: string): Promise<string[
 
   const changed = await git(root, ["diff", "--name-only", since])
   const untracked = await git(root, ["ls-files", "--others", "--exclude-standard", "--full-name"])
-  const files = new Set([...changed, ...untracked].map((file) => relative(root, join(top, file))))
+  const files = new Set(
+    [...changed, ...untracked].map((file) => relativeSlashed(root, join(top, file))),
+  )
 
   /* danwo's own output (runs, results, the impact index) is never a change to the app. */
   return [...files].filter((file) => !file.startsWith(".danwo/")).toSorted()

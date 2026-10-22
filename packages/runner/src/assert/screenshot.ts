@@ -171,7 +171,8 @@ async function keepMismatch(
   picture: Buffer,
   diff: Buffer | undefined,
 ): Promise<{ baseline: string; actual: string; diff?: string }> {
-  const prefix = join("screenshots", `compare-${comparison.index}`)
+  /* Forward slashes: the prefix lands in the flight record, which reads the same everywhere. */
+  const prefix = `screenshots/compare-${comparison.index}`
   const dir = comparison.settings.artifactsDir
 
   await mkdir(join(dir, "screenshots"), { recursive: true })

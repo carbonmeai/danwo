@@ -6,7 +6,7 @@
  */
 import { mkdtemp, rm } from "node:fs/promises"
 import { availableParallelism, tmpdir } from "node:os"
-import { basename, join, relative, resolve } from "node:path"
+import { basename, join, resolve } from "node:path"
 
 import {
   bodyOf,
@@ -30,6 +30,7 @@ import type { CheckPace } from "../assert/pace.ts"
 import { lintReport, withLint } from "../lint/index.ts"
 import { addUsage, cacheLine, modelLine, type Usage } from "../record/usage.ts"
 import { type ErrorClass, exitCodeOf, notJudged } from "../support/codes.ts"
+import { relativeSlashed } from "../support/paths.ts"
 import { type CatalogEntry, catalogOf } from "./catalog.ts"
 import { printConfigWarnings } from "./config-keys.ts"
 import { type DanwoConfig, type LoadedConfig, loadConfig } from "./config.ts"
@@ -245,7 +246,10 @@ async function trialCache(loaded: LoadedConfig): Promise<{ dir: string; done(): 
 
   const dir = await mkdtemp(join(tmpdir(), "danwo-matrix-"))
 
-  return { dir, done: () => rm(dir, { recursive: true, force: true }) }
+  return {
+    dir,
+    done: () => rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }),
+  }
 }
 
 /** The planned faults whose labels `filter` matches; every one without a filter. */
@@ -594,7 +598,7 @@ function reportMatrix(
     ...run.context,
     kind: "matrix",
     testId: run.test.id,
-    file: relative(run.loaded.root, run.file),
+    file: relativeSlashed(run.loaded.root, run.file),
     result,
     durationMs: Date.now() - run.began,
     reportPath,

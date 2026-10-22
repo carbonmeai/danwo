@@ -239,7 +239,7 @@ function deviceFlight(
         await pullLogs().catch(() => undefined)
         if (dir === undefined || options.stepScreenshots !== true) return
 
-        const path = join("screenshots", `${String(index).padStart(3, "0")}-step-${index}.png`)
+        const path = `screenshots/${String(index).padStart(3, "0")}-step-${index}.png`
 
         await mkdir(join(dir, "screenshots"), { recursive: true })
         if (await target.screenshot(join(dir, path)).catch(() => false)) shots.set(index, path)
@@ -274,7 +274,7 @@ async function failureEvidence(
   const reading = await reader.read()
   const front = await target.foreground()
   const screen = "screen-at-failure.txt"
-  const screenshot = join("screenshots", "failure.png")
+  const screenshot = "screenshots/failure.png"
 
   await mkdir(join(dir, "screenshots"), { recursive: true })
   await writeFile(join(dir, screen), redact(screenText(reading, front)))

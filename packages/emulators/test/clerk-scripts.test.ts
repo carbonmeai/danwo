@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises"
 import { createRequire } from "node:module"
-import { join } from "node:path"
+import { join, sep } from "node:path"
 
 import { describe, expect, it } from "vitest"
 
@@ -13,8 +13,10 @@ const require = createRequire(import.meta.url)
 /** A file of an installed package (found from its entry point), as the emulator should serve it. */
 function installed(name: "@clerk/clerk-js" | "@clerk/ui", file: string): Promise<string> {
   const entry = require.resolve(name)
+  /* The resolved path takes the platform's separator, `@clerk\clerk-js` on Windows. */
+  const folder = name.replaceAll("/", sep)
 
-  return readFile(join(entry.slice(0, entry.indexOf(name) + name.length), file), "utf8")
+  return readFile(join(entry.slice(0, entry.indexOf(folder) + folder.length), file), "utf8")
 }
 
 describe("Clerk's browser scripts", () => {

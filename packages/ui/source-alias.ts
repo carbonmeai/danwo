@@ -7,5 +7,6 @@ import { fileURLToPath } from "node:url"
  */
 export const uiSourceAlias = {
   find: /^@danwo\/ui\/(blocks|hooks|icons|illustrations|primitives|theme)(\/.*)?$/,
-  replacement: `${fileURLToPath(new URL("./src/", import.meta.url))}$1$2`,
+  /* Forward slashes throughout, as Vite's ids use them on Windows too. */
+  replacement: `${fileURLToPath(new URL("./src/", import.meta.url)).replaceAll("\\", "/")}$1$2`,
 }

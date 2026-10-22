@@ -9,6 +9,7 @@
  * restored. Reset those from `onRestore`, e.g. through a test-only reset endpoint.
  */
 import { rm } from "node:fs/promises"
+import { join, parse } from "node:path"
 import { backup, DatabaseSync } from "node:sqlite"
 
 import type { DatabaseSnapshot } from "./postgres.ts"
@@ -76,7 +77,9 @@ export function sqliteSnapshot(options: SqliteSnapshotOptions): DatabaseSnapshot
  * backup, so rows still in the write-ahead log are copied too.
  */
 export async function sqliteWorkerFile(file: string, workerIndex: number): Promise<string> {
-  const copy = file.replace(/(\.[^./]+)?$/, (ext) => `.w${workerIndex}${ext}`)
+  /* By the platform's separators: a dot in a folder's name (`C:\Users\jo.doe\…`) is no extension. */
+  const { dir, name, ext } = parse(file)
+  const copy = join(dir, `${name}.w${workerIndex}${ext}`)
 
   await rm(copy, { force: true })
   await backUp(file, copy, 5000)

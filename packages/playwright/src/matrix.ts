@@ -122,10 +122,10 @@ async function trial(
 
     return judgeTrial(fault, {
       ...outcome,
-      record: outcome.record === null ? null : relative(cwd, outcome.record),
+      record: outcome.record === null ? null : relative(cwd, outcome.record).split("\\").join("/"),
     })
   } finally {
-    await rm(dir, { recursive: true, force: true })
+    await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   }
 }
 

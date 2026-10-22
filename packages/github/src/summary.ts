@@ -52,9 +52,11 @@ export const seconds = (ms: number) => `${(ms / 1000).toFixed(1)} s`
 
 /** A flight record folder as it appears inside the uploaded artifact. */
 export function recordInArtifact(record: string): string {
-  const at = record.indexOf(".danwo/runs/")
+  /* A record's path on Windows may hold backslashes; the artifact's paths take forward slashes. */
+  const slashed = record.replaceAll("\\", "/")
+  const at = slashed.indexOf(".danwo/runs/")
 
-  return at === -1 ? record : record.slice(at + ".danwo/runs/".length)
+  return at === -1 ? slashed : slashed.slice(at + ".danwo/runs/".length)
 }
 
 function recordsSection(link: RecordsLink, records: readonly [string, string][]): string[] {

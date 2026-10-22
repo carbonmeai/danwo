@@ -4,12 +4,14 @@
  * act on it, read from the evidence the run left: the app's answers and page errors, where a crash
  * was thrown, and the fault a matrix trial injected.
  */
+import nodePath, { type PlatformPath } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { routeOf } from "@danwo/matrix"
 
 import type { ErrorCode } from "../support/codes.ts"
 import type { TestError } from "../support/errors.ts"
+import { framePath } from "../support/paths.ts"
 import type { FailureVerdict, Verdict, VerdictConfidence } from "./verdict-words.ts"
 
 /** A call through the proxy as the verdict reads it. */
@@ -94,14 +96,18 @@ const DANWO_ROOT = fileURLToPath(new URL("../../../", import.meta.url))
 const INSTALLED = /[\\/]node_modules[\\/]@danwo[\\/]/
 
 /** A stack frame's file, from `at fn (file:line:col)` or `at file:line:col`. */
-const FRAME = /^\s*at (?:.*? \()?(?:file:\/\/)?([^\s()]+?):\d+:\d+\)?\s*$/
+const FRAME = /^\s*at (?:.*? \()?([^\s()]+?):\d+:\d+\)?\s*$/
 
-/** The files of a stack's frames, top first, leaving out Node's own. */
-export function stackFiles(stack: string | undefined): string[] {
+/**
+ * The files of a stack's frames, top first, leaving out Node's own: paths of `platform`, a
+ * `file:` URL decoded (`file:///C:/x.ts` is `C:\x.ts` on Windows), its query kept.
+ */
+export function stackFiles(stack: string | undefined, platform: PlatformPath = nodePath): string[] {
   return (stack ?? "")
     .split("\n")
     .map((line) => FRAME.exec(line)?.[1])
     .filter((file): file is string => file !== undefined && !file.startsWith("node:"))
+    .map((file) => framePath(file, platform, true))
 }
 
 /** Whether `file` is danwo's own code rather than the project's. */

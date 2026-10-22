@@ -2,9 +2,9 @@
  * A run's flight recording as a whole: where its records go, and the report written over them when
  * the run ends. Each worker writes the records of its own attempts and trials.
  */
-import { relative } from "node:path"
 
 import { type VideoMode, videoModeOf } from "../record/video.ts"
+import { relativeSlashed } from "../support/paths.ts"
 import type { LoadedConfig } from "./config.ts"
 import { newRunDir, type RecordMode, type RecordOptions, type RecordSettings } from "./record.ts"
 import { DEFAULT_KEEP_RUNS, finishRun } from "./report.ts"
@@ -61,7 +61,7 @@ export async function closeRecording(
 
   if (report === undefined) return undefined
 
-  write(`report: ${relative(cwd, report)}`)
+  write(`report: ${relativeSlashed(cwd, report)}`)
 
-  return relative(cwd, report)
+  return relativeSlashed(cwd, report)
 }

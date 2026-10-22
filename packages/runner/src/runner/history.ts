@@ -6,13 +6,14 @@
  */
 import { randomBytes } from "node:crypto"
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises"
-import { join, relative, resolve } from "node:path"
+import { join, resolve } from "node:path"
 
 import type { PlannedFault, PlanSummary, RunOutcome } from "@danwo/matrix"
 
 import type { LintFinding, LintSeverity } from "../lint/index.ts"
 import { addUsage, type Usage } from "../record/usage.ts"
 import { redactCredentials } from "../secrets/index.ts"
+import { relativeSlashed } from "../support/paths.ts"
 import { headCommit } from "./git-changes.ts"
 import type { MatrixRunReport, Reporter, RunContext, TestRunReport } from "./reporting.ts"
 import type { AttemptReport, TestReport } from "./tasks.ts"
@@ -137,7 +138,7 @@ function line(text: string): string {
 
 /** A path the run reported relative to its cwd, made relative to the project root. */
 function fromRoot(context: RunContext, path: string | undefined): string | undefined {
-  return path === undefined ? undefined : relative(context.root, resolve(context.cwd, path))
+  return path === undefined ? undefined : relativeSlashed(context.root, resolve(context.cwd, path))
 }
 
 function attemptOf(context: RunContext, attempt: AttemptReport): HistoryAttempt {

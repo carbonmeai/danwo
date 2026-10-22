@@ -2,10 +2,11 @@
  * Finding a project's tests: which files match, what each declares, and the id that names a test
  * in every process and run (`file › describe › title`).
  */
-import { relative, resolve } from "node:path"
+import { resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 
 import { DanwoError } from "../support/codes.ts"
+import { relativeSlashed, slashed } from "../support/paths.ts"
 import { findTestFiles } from "../tests/discover.ts"
 import {
   declarationsOf,
@@ -47,7 +48,7 @@ export function testIdOf(
   file: string,
   test: Pick<DeclaredTest, "titlePath">,
 ): string {
-  return [relative(root, file), ...test.titlePath].join(" › ")
+  return [relativeSlashed(root, file), ...test.titlePath].join(" › ")
 }
 
 let loads = 0
@@ -79,7 +80,7 @@ export function testFilesOf(loaded: LoadedConfig, patterns: readonly string[] = 
 
   return patterns.length === 0
     ? files
-    : files.filter((file) => patterns.some((pattern) => file.includes(pattern)))
+    : files.filter((file) => patterns.some((pattern) => slashed(file).includes(slashed(pattern))))
 }
 
 /** Refuses a file that focuses tests with `.only`, naming where, for runs that must run everything. */
@@ -88,11 +89,13 @@ function refuseFocus(loaded: LoadedConfig, file: string, declarations: FileDecla
 
   if (!focused) return
 
-  const where = declarations.focusLines.map((line) => `${relative(loaded.root, file)}:${line}`)
+  const where = declarations.focusLines.map(
+    (line) => `${relativeSlashed(loaded.root, file)}:${line}`,
+  )
 
   throw new DanwoError(
     "CONFIG_INVALID",
-    `.only is not allowed in CI (it would skip the rest of the suite): ${where.join(", ") || relative(loaded.root, file)}`,
+    `.only is not allowed in CI (it would skip the rest of the suite): ${where.join(", ") || relativeSlashed(loaded.root, file)}`,
   )
 }
 

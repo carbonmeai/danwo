@@ -5,7 +5,7 @@
  */
 import { existsSync, readFileSync } from "node:fs"
 import { builtinModules } from "node:module"
-import { dirname, join, relative, resolve } from "node:path"
+import { dirname, join, relative, resolve, sep } from "node:path"
 
 /** The condition the repository's own tsconfig resolves first, to read the source. */
 const SOURCE_CONDITION = "danwo-source"
@@ -171,10 +171,15 @@ function importsOf(
 
     if (local !== undefined) next.push(local)
 
-    if (problem) problems.push(`${relative(dir, file)} imports ${problem}`)
+    if (problem) problems.push(`${shown(dir, file)} imports ${problem}`)
   }
 
   return { problems, next }
+}
+
+/** `file` from the package folder `dir`, with forward slashes as package.json writes paths. */
+function shown(dir: string, file: string): string {
+  return relative(dir, file).split(sep).join("/")
 }
 
 /**
@@ -189,8 +194,7 @@ export function unresolvableImports(dir: string, manifest: Manifest): string[] {
   const problems = queue
     .filter((entry) => !existsSync(entry))
     .map(
-      (entry) =>
-        `${manifest.name}: ${relative(dir, entry)}, which its exports name, was not emitted`,
+      (entry) => `${manifest.name}: ${shown(dir, entry)}, which its exports name, was not emitted`,
     )
 
   for (let file = queue.pop(); file !== undefined; file = queue.pop()) {

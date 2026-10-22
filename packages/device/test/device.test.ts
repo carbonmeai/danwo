@@ -114,7 +114,8 @@ describe("the binder", () => {
 
     const pushed = commands.find((each) => each.startsWith("push "))
 
-    expect(pushed).toMatch(/\/e0fa6ee6\.0 \/data\/misc\/user\/0\/cacerts-added\/e0fa6ee6\.0$/)
+    /* The local file is the platform's path (`…\e0fa6ee6.0` on Windows); the device's is POSIX. */
+    expect(pushed).toMatch(/[\\/]e0fa6ee6\.0 \/data\/misc\/user\/0\/cacerts-added\/e0fa6ee6\.0$/)
     expect(commands.filter((each) => !each.startsWith("push "))).toEqual([
       "shell id -u",
       "root",
@@ -544,7 +545,7 @@ describe("an Android device", () => {
       expect(acts.slice(1)).toEqual(["tap e2", "fill e2 hello"])
     } finally {
       await env.close()
-      await rm(stateDir, { recursive: true, force: true })
+      await rm(stateDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
 
     expect(acts.slice(-2)).toEqual(["close", "env closed"])
@@ -578,7 +579,7 @@ describe("an Android device", () => {
       expect(acts.slice(1)).toEqual(["long-press e2 800", "long-press e2 1500", "dismiss keyboard"])
     } finally {
       await env.close()
-      await rm(stateDir, { recursive: true, force: true })
+      await rm(stateDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
   })
 
@@ -596,7 +597,7 @@ describe("an Android device", () => {
       })
     } finally {
       await env.close()
-      await rm(stateDir, { recursive: true, force: true })
+      await rm(stateDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
   })
 
@@ -637,7 +638,7 @@ describe("device doctor", () => {
         else process.env[name] = value
       }
 
-      await rm(empty, { recursive: true, force: true })
+      await rm(empty, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
   })
 })

@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url"
+
 import { describe, expect, it } from "vitest"
 
 import { CleanupLedger, type Created } from "../src/ledger.ts"
@@ -10,7 +12,7 @@ import { asJsonObject, type Json, readJson } from "../src/shape.ts"
 import { formatSweep, sweepFidelity } from "../src/sweep.ts"
 import { formBody } from "../src/target.ts"
 
-const root = new URL("../../..", import.meta.url).pathname
+const root = fileURLToPath(new URL("../../..", import.meta.url))
 const STRIPE = "https://api.stripe.com"
 const CLERK = "https://api.clerk.com/v1"
 

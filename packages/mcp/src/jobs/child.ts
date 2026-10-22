@@ -53,7 +53,7 @@ async function summarizeConfig(place: JobPlace): Promise<JobResults["config"]> {
 
   return {
     root,
-    file: path === undefined ? undefined : relative(root, path),
+    file: path === undefined ? undefined : relative(root, path).split("\\").join("/"),
     testDir: config.testDir ?? ".",
     testMatch: config.testMatch ?? ["**/*.danwo.ts"],
     baseUrl: config.baseUrl,
@@ -72,7 +72,7 @@ async function listTests(place: JobPlace): Promise<JobResults["list"]> {
   const entries = await catalogOf(loaded, testFilesOf(loaded), undefined)
   const tests = entries.map((entry) => ({
     id: entry.id,
-    file: relative(loaded.root, entry.file),
+    file: relative(loaded.root, entry.file).split("\\").join("/"),
     mode: entry.mode,
     invariant: entry.invariant,
   }))

@@ -87,7 +87,7 @@ async function setUpAgents(detection: Detection, answers: Answers): Promise<Agen
   /* Named from the project, so a file written at the workspace's root reads as `../../.mcp.json`. */
   return [...skill, ...mcp].map((change) => ({
     ...change,
-    file: relative(detection.root, join(root, change.file)),
+    file: relative(detection.root, join(root, change.file)).split("\\").join("/"),
   }))
 }
 

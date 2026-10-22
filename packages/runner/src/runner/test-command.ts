@@ -1,11 +1,12 @@
 /** `danwo test`: run the project's tests across worker processes and report them. */
-import { basename, relative, resolve } from "node:path"
+import { basename, resolve } from "node:path"
 
 import { blockedLoadsLine, mergeBlockedLoads } from "@danwo/proxy"
 
 import { type LintFinding, lintReport, withLint } from "../lint/index.ts"
 import { missingLine } from "../record/missing.ts"
 import { DanwoError } from "../support/codes.ts"
+import { relativeSlashed } from "../support/paths.ts"
 import { catalogOf, testFilesOf, type CatalogEntry } from "./catalog.ts"
 import { ciDefaults, inCi, parseShard, type Shard, shardFiles, shardLabel } from "./ci.ts"
 import { printConfigWarnings } from "./config-keys.ts"
@@ -139,7 +140,7 @@ async function runTasks(
     }
 
     await crew.testFile(task).catch((error: unknown) => {
-      const file = relative(run.cwd, task.file)
+      const file = relativeSlashed(run.cwd, task.file)
       const message = String(error instanceof Error ? error.message : error)
 
       broken.push({ file, error: message })
@@ -192,7 +193,7 @@ function listTests(
     JSON.stringify(
       entries.map((entry) => ({
         id: entry.id,
-        file: relative(loaded.root, entry.file),
+        file: relativeSlashed(loaded.root, entry.file),
         invariant: entry.invariant,
       })),
     ),

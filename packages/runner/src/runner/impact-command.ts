@@ -1,6 +1,7 @@
 /** `danwo impact <files…>`: which tests a change to these files selects, and why. */
-import { relative, resolve } from "node:path"
+import { resolve } from "node:path"
 
+import { relativeSlashed } from "../support/paths.ts"
 import { type CatalogEntry, catalogOf, testFilesOf } from "./catalog.ts"
 import { type LoadedConfig, loadConfig } from "./config.ts"
 import { localImportsOf, readImpactIndex, selectImpacted, selectionLines } from "./impact.ts"
@@ -27,7 +28,7 @@ export async function chooseByChanges(
 ): Promise<CatalogEntry[]> {
   const tests = entries.map((entry) => ({
     id: entry.id,
-    file: relative(loaded.root, entry.file),
+    file: relativeSlashed(loaded.root, entry.file),
     imports: localImportsOf(entry.file, loaded.root),
   }))
   const selection = selectImpacted(changes, {
@@ -41,7 +42,7 @@ export async function chooseByChanges(
   const chosen = selection.all ? [...entries] : entries.filter((e) => selection.reasons.has(e.id))
 
   for (const file of new Set(chosen.filter((e) => e.invariant).map((e) => e.file))) {
-    write(`matrix: danwo matrix ${relative(loaded.root, file)}`)
+    write(`matrix: danwo matrix ${relativeSlashed(loaded.root, file)}`)
   }
 
   return chosen
@@ -52,7 +53,7 @@ export async function explainImpact(options: ImpactCommandOptions): Promise<numb
   const cwd = options.cwd ?? process.cwd()
   const loaded = await loadConfig(cwd, options.config)
   const entries = await catalogOf(loaded, testFilesOf(loaded), undefined)
-  const changes = options.files.map((file) => relative(loaded.root, resolve(cwd, file)))
+  const changes = options.files.map((file) => relativeSlashed(loaded.root, resolve(cwd, file)))
 
   await chooseByChanges(loaded, entries, changes, options.write ?? printLine)
 

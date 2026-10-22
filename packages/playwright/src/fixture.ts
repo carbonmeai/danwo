@@ -164,7 +164,7 @@ async function reportOutcome(
 
   const outcome: TestOutcome = {
     title: testInfo.titlePath.join(" › "),
-    file: relative(projectRoot(testInfo.config.configFile), testInfo.file),
+    file: relative(projectRoot(testInfo.config.configFile), testInfo.file).split("\\").join("/"),
     body: testInfo.status ?? "failed",
     bodyError: result.verdict.bodyError,
     invariant: result.declared ? { error: result.verdict.invariantError } : null,

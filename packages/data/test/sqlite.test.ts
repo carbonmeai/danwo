@@ -1,3 +1,4 @@
+import { mkdirSync } from "node:fs"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -17,7 +18,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  await rm(dir, { recursive: true, force: true })
+  await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 })
 
 /** Opens the "app's" connection: write-ahead logging and an orders table. */
@@ -106,7 +107,12 @@ describe("sqliteSnapshot", () => {
   })
 
   it("gives each worker its own copy of a seeded file, rows in the log included", async () => {
-    const file = join(dir, "seed.db")
+    /* A dot in the folder's name, as in a home folder named `jo.doe`, is not the file's extension. */
+    const folder = join(dir, "jo.doe")
+
+    mkdirSync(folder)
+
+    const file = join(folder, "seed.db")
     const seed = openApp(file)
 
     seed.exec("INSERT INTO orders (item) VALUES ('a'), ('b')")
@@ -114,7 +120,7 @@ describe("sqliteSnapshot", () => {
     const copies = await Promise.all([0, 1].map((index) => sqliteWorkerFile(file, index)))
 
     seed.close()
-    expect(copies).toEqual([join(dir, "seed.w0.db"), join(dir, "seed.w1.db")])
+    expect(copies).toEqual([join(folder, "seed.w0.db"), join(folder, "seed.w1.db")])
 
     const first = new DatabaseSync(copies[0] ?? "")
     const second = new DatabaseSync(copies[1] ?? "")

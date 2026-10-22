@@ -5,14 +5,15 @@
  * imports, or when the config's `impact` rules map it to a page, host or call the test touched.
  * A change nothing explains (a lockfile, the config, an unmapped source file) selects every test.
  */
-import { existsSync, readFileSync } from "node:fs"
+import { readFileSync, statSync } from "node:fs"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
-import { dirname, join, matchesGlob, relative, resolve } from "node:path"
+import { dirname, join, posix, resolve } from "node:path"
 
 import { routeOf, type ServiceDelivery } from "@danwo/matrix"
 import type { Exchange } from "@danwo/proxy"
 
 import type { AppLogRecord } from "../record/index.ts"
+import { relativeSlashed } from "../support/paths.ts"
 import type { TestImpact, TestReport } from "./tasks.ts"
 
 /** How a project maps its own source files to what its tests touch (`impact` in the config). */
@@ -120,7 +121,7 @@ export async function updateImpactIndex(
     const file = fileOf(report.id)
 
     if (report.impact !== undefined && file !== undefined) {
-      tests[report.id] = { file: relative(root, file), ...report.impact }
+      tests[report.id] = { file: relativeSlashed(root, file), ...report.impact }
     }
   }
 
@@ -146,12 +147,12 @@ function resolveLocal(from: string, specifier: string, root: string): string | u
 
   const base = resolve(dirname(from), specifier)
 
-  return CANDIDATE_SUFFIXES.map((suffix) => base + suffix).find(
+  /* `resolve` again, so `/index.ts` takes the platform's separator; a folder is no import. */
+  return CANDIDATE_SUFFIXES.map((suffix) => resolve(base + suffix)).find(
     (path) =>
       path.startsWith(root) &&
       !path.includes("node_modules") &&
-      existsSync(path) &&
-      !path.endsWith("/"),
+      statSync(path, { throwIfNoEntry: false })?.isFile() === true,
   )
 }
 
@@ -187,7 +188,7 @@ export function localImportsOf(file: string, root: string): string[] {
     }
   }
 
-  return [...seen].map((path) => relative(root, path)).toSorted()
+  return [...seen].map((path) => relativeSlashed(root, path)).toSorted()
 }
 
 /** A test as the selection sees it. */
@@ -267,7 +268,7 @@ function ruleReason(change: string, glob: string, targets: readonly string[], en
 function selectFor(change: string, context: ChangeContext): Map<string, string> | undefined {
   const picked = pickedBySource(change, context.tests)
   const rules = Object.entries(context.config.rules ?? {}).filter(([glob]) =>
-    matchesGlob(change, glob),
+    posix.matchesGlob(change, glob),
   )
 
   for (const [glob, targets] of rules) {
@@ -292,7 +293,7 @@ export function selectImpacted(
   const ignored: string[] = []
 
   for (const change of changes) {
-    if (ignore.some((glob) => matchesGlob(change, glob))) {
+    if (ignore.some((glob) => posix.matchesGlob(change, glob))) {
       ignored.push(change)
       continue
     }

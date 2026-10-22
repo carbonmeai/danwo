@@ -5,7 +5,7 @@
  */
 import { randomBytes } from "node:crypto"
 import { mkdir, rm, writeFile } from "node:fs/promises"
-import { join, relative } from "node:path"
+import { join } from "node:path"
 
 import type { DataCall } from "@danwo/infra"
 import { dataCallsOf, deliveriesOf, type PlannedFault, type ServiceDelivery } from "@danwo/matrix"
@@ -18,6 +18,7 @@ import { type RecordedVideo, VIDEO_DIR, type VideoMode, videoMarks } from "../re
 import { type CredentialKind, credentialKind, sentByBrowser } from "../secrets/index.ts"
 import type { ReplayDivergence } from "../session.ts"
 import type { TestError } from "../support/errors.ts"
+import { relativeSlashed } from "../support/paths.ts"
 import type { AttemptFlight } from "./attempt.ts"
 import type { WorkerEnvironment } from "./environment.ts"
 import { createRedactor, type Redactor } from "./redact.ts"
@@ -498,7 +499,7 @@ export async function finishRecord(
 ): Promise<string | undefined> {
   try {
     if (!keeps(mode, failed)) {
-      await rm(dir, { recursive: true, force: true })
+      await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 
       return undefined
     }
@@ -507,10 +508,15 @@ export async function finishRecord(
 
     /* A record that keeps no video drops what the session captured; failing to does not lose it. */
     if (record.videos === undefined)
-      await rm(join(dir, VIDEO_DIR), { recursive: true, force: true }).catch(() => undefined)
+      await rm(join(dir, VIDEO_DIR), {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 100,
+      }).catch(() => undefined)
     await writeRecord(dir, record)
 
-    return relative(process.cwd(), dir)
+    return relativeSlashed(process.cwd(), dir)
   } catch {
     return undefined
   }

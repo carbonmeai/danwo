@@ -29,7 +29,8 @@ export interface EvidenceOptions {
 }
 
 const SCREEN_FILE = "screen-at-failure.txt"
-const SCREENSHOT_FILE = join("screenshots", "failure.png")
+/** Relative to the record, with forward slashes as the record stores it on every platform. */
+const SCREENSHOT_FILE = "screenshots/failure.png"
 
 async function screenText(options: EvidenceOptions): Promise<string | undefined> {
   try {

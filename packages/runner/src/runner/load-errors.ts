@@ -4,10 +4,11 @@
  * compiling (an `enum`, a constructor's parameter properties, a `namespace`) fails with Node's raw
  * error. These name the file and line, what is not supported, and what to write instead.
  */
-import { isAbsolute, relative } from "node:path"
+import { isAbsolute } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { DanwoError } from "../support/codes.ts"
+import { relativeSlashed } from "../support/paths.ts"
 
 /** What Node's strip-only mode rejects, by its message, and what to write instead. */
 const UNSUPPORTED: readonly (readonly [RegExp, string, string])[] = [
@@ -28,7 +29,7 @@ const UNSUPPORTED: readonly (readonly [RegExp, string, string])[] = [
 
 /** `path` from the working folder when it is inside it, else as it is. */
 function shown(path: string): string {
-  const from = relative(process.cwd(), path)
+  const from = relativeSlashed(process.cwd(), path)
 
   return from === "" || from.startsWith("..") || isAbsolute(from) ? path : from
 }

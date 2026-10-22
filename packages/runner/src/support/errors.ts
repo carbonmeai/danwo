@@ -1,7 +1,8 @@
 /** A failure as plain data: what crosses from a worker to the parent and lands in a flight record. */
-import { relative } from "node:path"
+import nodePath, { type PlatformPath } from "node:path"
 
 import { classOf, codeOf, type ErrorClass, type ErrorCode } from "./codes.ts"
+import { framePath, relativeSlashed } from "./paths.ts"
 
 export interface SourceLine {
   readonly file: string
@@ -21,16 +22,26 @@ export interface TestError {
   readonly source?: SourceLine
 }
 
-/** A test module's stack frame: danwo imports test files with a `?danwo-realm=` query. */
-const TEST_FRAME = /(?:file:\/\/)?(\/[^\s()?]+)\?danwo-realm=[^:\s)]*:(\d+):\d+/
+/**
+ * A test module's stack frame: danwo imports test files with a `?danwo-realm=` query, by a
+ * `file:` URL (`file:///C:/…` on Windows).
+ */
+const TEST_FRAME = /(file:\/\/[^\s()?]+|\/[^\s()?]+)\?danwo-realm=[^:\s)]*:(\d+):\d+/
 
-/** The test file line `error` unwound through, relative to `root`. */
-export function testFileLine(error: unknown, root: string): SourceLine | undefined {
+/** The test file line `error` unwound through, relative to `root` with forward slashes. */
+export function testFileLine(
+  error: unknown,
+  root: string,
+  platform: PlatformPath = nodePath,
+): SourceLine | undefined {
   const match = error instanceof Error ? TEST_FRAME.exec(error.stack ?? "") : null
 
   if (match?.[1] === undefined || match[2] === undefined) return undefined
 
-  return { file: relative(root, match[1]), line: Number(match[2]) }
+  return {
+    file: relativeSlashed(root, framePath(match[1], platform), platform),
+    line: Number(match[2]),
+  }
 }
 
 /** The test file line that called the function calling this one, while a test file loads. */

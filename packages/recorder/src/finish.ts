@@ -219,7 +219,7 @@ export async function finishRecording(input: FinishInput): Promise<RecordedTest>
 
   await writeNewTest(path, text)
 
-  const shown = relative(input.root, path)
+  const shown = relative(input.root, path).split("\\").join("/")
 
   return { path, shown, source: text, missingSecrets: missing, next: `danwo matrix ${shown}` }
 }

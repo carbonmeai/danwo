@@ -7,7 +7,7 @@
 import { createHash } from "node:crypto"
 import { existsSync } from "node:fs"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import { join, posix } from "node:path"
 import { fileURLToPath } from "node:url"
 
 /** The skill as this package ships it. */
@@ -59,7 +59,8 @@ async function writeSkill(dir: string, text: string): Promise<void> {
 
 async function installInto(cwd: string, folder: string, shipped: string): Promise<SkillChange> {
   const dir = join(cwd, folder)
-  const file = join(folder, "SKILL.md")
+  /* As the report and the agents name it: forward slashes on every platform. */
+  const file = posix.join(folder, "SKILL.md")
   const current = await readText(join(dir, "SKILL.md"))
 
   if (current === undefined) {
