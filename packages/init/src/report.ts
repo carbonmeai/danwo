@@ -66,14 +66,18 @@ export function keyLine(
 function machineSteps(answers: Answers, detection: Detection, result: SetupResult): string[] {
   const mobile = answers.engine === "mobile" || answers.engine === "both"
   const web = answers.engine === "web" || answers.engine === "both"
-  const browser = browserCommand(detection).argv.join(" ")
+  const browser = browserCommand(detection, answers.browsers).argv.join(" ")
+  const which =
+    answers.browsers.length === 1 && answers.browsers[0] === "chromium"
+      ? "the Chromium"
+      : "the browsers"
 
   return [
     ...(mobile
       ? ["Check this machine for Android testing: danwo device doctor (danwo guide mobile)."]
       : []),
     ...(web && result.browser?.ok !== true
-      ? [`Install the Chromium danwo drives, once per machine: ${browser} (--with-deps on Linux)`]
+      ? [`Install ${which} danwo drives, once per machine: ${browser} (--with-deps on Linux)`]
       : []),
   ]
 }

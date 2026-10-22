@@ -94,14 +94,22 @@ const DANWO: Readonly<Record<PackageManager, readonly string[]>> = {
 }
 
 /**
- * The command that installs the Chromium build danwo drives, with the project's own danwo: its
- * Playwright's build, whatever other Playwright the project has.
+ * The command that installs the browser builds danwo drives (Chromium, or the `browsers` the
+ * project runs in), with the project's own danwo: its Playwright's builds, whatever other
+ * Playwright the project has.
  */
 export function browserCommand(
   detection: Pick<Detection, "root" | "packageManager">,
+  browsers: readonly string[] = ["chromium"],
 ): PlannedCommand {
+  const named = browsers.length === 1 && browsers[0] === "chromium" ? [] : browsers
+
   return {
-    argv: [...DANWO[detection.packageManager], "install-browser"],
+    argv: [
+      ...DANWO[detection.packageManager],
+      "install-browser",
+      ...(named.length > 0 ? ["--browser", named.join(",")] : []),
+    ],
     cwd: detection.root,
   }
 }

@@ -187,6 +187,7 @@ export function renderWebConfig(answers: Answers, testDir: string): string {
     "  /* One app answers at that URL, so tests run in one worker. */",
     "  workers: 1,",
     "  timeout: 60_000,",
+    ...browserLines(answers),
     ...modelLines(answers, model),
     ...READINESS,
     "  environment: () =>",
@@ -194,6 +195,23 @@ export function renderWebConfig(answers: Answers, testDir: string): string {
     "})",
     "",
   ].join("\n")
+}
+
+/** The config's `browser.name`, when the project runs in more than Chromium. */
+function browserLines(answers: Pick<Answers, "browsers">): string[] {
+  const { browsers } = answers
+
+  if (browsers.length === 1 && browsers[0] === "chromium") return []
+
+  const name =
+    browsers.length === 1
+      ? JSON.stringify(browsers[0])
+      : `[${browsers.map((b) => JSON.stringify(b)).join(", ")}]`
+
+  return [
+    "  /* Every test runs once in each browser, its result labelled with the browser. */",
+    `  browser: { name: ${name} },`,
+  ]
 }
 
 /** `{ command: "npm run dev", url: "http://localhost:3000" }`. */

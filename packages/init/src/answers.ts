@@ -5,6 +5,8 @@
 import {
   AGENTS,
   type AgentId,
+  type Browser,
+  BROWSERS,
   DEFAULT_COMPATIBLE_URL,
   type Engine,
   ENGINES,
@@ -39,6 +41,8 @@ export interface Answers {
   readonly replaceConfig: boolean
   /** The Android Virtual Device mobile tests boot, when this machine has one. */
   readonly avd: string | undefined
+  /** The browsers web tests run in, each test once in each; Chromium alone by default. */
+  readonly browsers: readonly Browser[]
 }
 
 /** `danwo init`'s flags, as the CLI parses them. */
@@ -56,6 +60,8 @@ export interface InitFlags {
   readonly devCommand?: string
   readonly appUrl?: string
   readonly force?: boolean
+  /** `--browser`: the browsers web tests run in, as `chromium,firefox`. */
+  readonly browser?: string
 }
 
 /** A flag value `danwo init` cannot use; the message says what it takes. */
@@ -96,6 +102,7 @@ export function defaultAnswers(detection: Detection): Answers {
     appUrl: detection.appUrl,
     replaceConfig: false,
     avd: undefined,
+    browsers: ["chromium"],
   }
 }
 
@@ -174,5 +181,16 @@ export function answersFromFlags(detection: Detection, flags: InitFlags): Answer
     devCommand: flags.devCommand ?? base.devCommand,
     appUrl: flags.appUrl === undefined ? base.appUrl : checkUrl("--app-url", flags.appUrl),
     replaceConfig: flags.force === true,
+    browsers: flags.browser === undefined ? base.browsers : browsersFrom(flags.browser),
   }
+}
+
+/** The browsers `--browser` names; at least one. */
+function browsersFrom(value: string): Browser[] {
+  const browsers = parseList("--browser", value, BROWSERS)
+
+  if (browsers.length === 0)
+    throw new InitUsageError(`--browser: name at least one of ${BROWSERS.join(", ")}`)
+
+  return browsers
 }

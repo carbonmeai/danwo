@@ -16,6 +16,16 @@ export const ENGINE_LABELS: Readonly<Record<Engine, { label: string; hint: strin
   none: { label: "None", hint: "the app's HTTP API only, no browser" },
 }
 
+/** The browsers web tests can run in; Chromium alone unless the project asks for more. */
+export const BROWSERS = ["chromium", "firefox", "webkit"] as const
+export type Browser = (typeof BROWSERS)[number]
+
+export const BROWSER_LABELS: Readonly<Record<Browser, { label: string; hint: string }>> = {
+  chromium: { label: "Chromium", hint: "Chrome and Edge's engine; the default" },
+  firefox: { label: "Firefox", hint: "Gecko" },
+  webkit: { label: "WebKit", hint: "Safari's engine" },
+}
+
 /** A package to add, pinned. */
 export interface PackageSpec {
   readonly name: string

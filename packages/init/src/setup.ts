@@ -34,7 +34,7 @@ export interface SetupResult {
   readonly install: InstallResult | undefined
   /** Packages to add by hand, when installing was turned off. */
   readonly notInstalled: readonly PackageSpec[]
-  /** danwo's Chromium, installed after the packages for a browser engine; undefined when not tried. */
+  /** danwo's browsers, installed after the packages for a browser engine; undefined when not tried. */
   readonly browser: InstallResult | undefined
 }
 
@@ -108,7 +108,7 @@ export async function applyAnswers(
   const web = answers.engine === "web" || answers.engine === "both"
   const browser =
     answers.install && web && install?.ok !== false
-      ? await runPlanned(browserCommand(detection), detection.root, run)
+      ? await runPlanned(browserCommand(detection, answers.browsers), detection.root, run)
       : undefined
 
   return { files, agentFiles, install, notInstalled: answers.install ? [] : packages, browser }

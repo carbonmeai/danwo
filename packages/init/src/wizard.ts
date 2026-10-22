@@ -7,6 +7,9 @@ import { type Answers, answersFromFlags, type InitFlags } from "./answers.ts"
 import {
   AGENT_INFO,
   AGENTS,
+  type Browser,
+  BROWSER_LABELS,
+  BROWSERS,
   type AgentId,
   DEFAULT_COMPATIBLE_URL,
   type Engine,
@@ -159,6 +162,28 @@ async function askProviders(prompter: Prompter, base: Answers): Promise<Provider
   return prompter.multiselect("Which providers should danwo emulate?", choices, base.providers)
 }
 
+/**
+ * The browsers web tests run in, asked when tests drive a browser and `--browser` said nothing:
+ * Chromium unless more are picked; none picked keeps Chromium.
+ */
+async function askBrowsers(
+  prompter: Prompter,
+  base: Answers,
+  engine: Answers["engine"],
+  flags: InitFlags,
+): Promise<readonly Browser[]> {
+  if ((engine !== "web" && engine !== "both") || flags.browser !== undefined) return base.browsers
+
+  const choices: Choice<Browser>[] = BROWSERS.map((value) => ({ value, ...BROWSER_LABELS[value] }))
+  const picked = await prompter.multiselect(
+    "Which browsers should web tests run in? (each test runs once in each)",
+    choices,
+    base.browsers,
+  )
+
+  return picked.length > 0 ? picked : base.browsers
+}
+
 async function askAgents(
   prompter: Prompter,
   base: Answers,
@@ -198,6 +223,7 @@ export async function askAnswers(
   const mobile = engine === "mobile" || engine === "both"
   const avd = mobile ? await askDevice(prompter, checkDevice) : undefined
   const app = engine === "mobile" ? {} : await askApp(prompter, base)
+  const browsers = await askBrowsers(prompter, base, engine, flags)
   const model = await askModel(prompter, base, flags)
   const providers =
     flags.providers === undefined ? await askProviders(prompter, base) : base.providers
@@ -212,6 +238,7 @@ export async function askAnswers(
     agents: agents.agents,
     mcp: agents.mcp,
     avd,
+    browsers,
   }
   const key = keyLine(answers, detection)
 

@@ -202,6 +202,55 @@ describe("danwo init without prompts", () => {
     )
   })
 
+  it("runs web tests in the browsers --browser names, and installs those", async () => {
+    const root = await project({ "package.json": nextApp() })
+    const run = recordingRunner()
+    const flags = { yes: true, modelSource: "none", skills: "none", browser: "firefox,webkit" }
+    const { answers } = await runInit({ cwd: root, flags, env: {}, run, checkDevice: noDevice })
+
+    expect(answers.browsers).toEqual(["firefox", "webkit"])
+    expect(await read(root, "danwo.config.ts")).toContain(
+      'browser: { name: ["firefox", "webkit"] },',
+    )
+    expect(run.calls.at(-1)).toEqual([
+      "npx",
+      "@danwo/cli",
+      "install-browser",
+      "--browser",
+      "firefox,webkit",
+    ])
+
+    const skipped = await runInit({
+      cwd: root,
+      flags: { ...flags, skipInstall: true, force: true },
+      env: {},
+      run,
+      checkDevice: noDevice,
+    })
+
+    expect(skipped.summary).toContain(
+      "Install the browsers danwo drives, once per machine: npx @danwo/cli install-browser --browser firefox,webkit",
+    )
+    await expect(
+      runInit({
+        cwd: root,
+        flags: { ...flags, browser: "none" },
+        env: {},
+        run,
+        checkDevice: noDevice,
+      }),
+    ).rejects.toThrow("--browser: name at least one of chromium, firefox, webkit")
+    await expect(
+      runInit({
+        cwd: root,
+        flags: { ...flags, browser: "safari" },
+        env: {},
+        run,
+        checkDevice: noDevice,
+      }),
+    ).rejects.toThrow("--browser: unknown safari")
+  })
+
   it("leaves Node's types alone in a project that has them or has no TypeScript", async () => {
     const typed = await project({
       "package.json": {
@@ -251,6 +300,7 @@ describe("danwo init at the prompts", () => {
       "What should tests drive?": "both",
       "How does the app start?": "bun run dev --port 4400",
       "Where does it answer": "http://localhost:4400",
+      "Which browsers": ["chromium", "firefox"],
       "Which model should agent steps use?": "openai-compatible",
       "Where does the server answer?": "http://gpu.local:8000/v1",
       "Which variable holds its key?": "GPU_KEY",
@@ -281,11 +331,15 @@ describe("danwo init at the prompts", () => {
       agents: ["cursor"],
       mcp: false,
       install: false,
+      browsers: ["chromium", "firefox"],
     })
     expect(run.calls).toEqual([])
     expect(prompter.notes.join("\n")).toContain("Android SDK: not found")
     expect(prompter.notes.join("\n")).toContain("Set GPU_KEY")
     expect(await read(root, "danwo.config.ts")).toContain('baseURL: "http://gpu.local:8000/v1"')
+    expect(await read(root, "danwo.config.ts")).toContain(
+      'browser: { name: ["chromium", "firefox"] },',
+    )
     expect(await read(root, "danwo.mobile.config.ts")).toContain("twilioService()")
     expect(existsSync(join(root, ".agents/skills/danwo/SKILL.md"))).toBe(true)
     expect(existsSync(join(root, ".cursor/mcp.json"))).toBe(false)
@@ -316,6 +370,7 @@ describe("danwo init at the prompts", () => {
     expect(prompter.asked).toEqual([
       "How does the app start?",
       "Where does it answer once started?",
+      "Which browsers should web tests run in? (each test runs once in each)",
       "Add @danwo/cli, @danwo/sdk with npm?",
       "Replace danwo.config.ts?",
     ])
