@@ -237,6 +237,23 @@ describe("matching on a device's screen", () => {
     expect(() => buttons.filter({ hasNot: {} as Locator })).toThrow("same device screen")
   })
 
+  it("joins two locators with or and and, in screen order", async () => {
+    const { screen } = await open(new FakeDevice())
+    const back = screen.getByRole("button", { name: "Back" })
+    const pay = screen.getByRole("button", { name: /^Pay/ })
+
+    expect(refs(resolveChain(CHECKOUT, chain(back.or(pay))))).toEqual(["e10", "e11"])
+    expect(refs(resolveChain(CHECKOUT, chain(back.or(screen.getByText("Nowhere")))))).toEqual([
+      "e11",
+    ])
+    expect(refs(resolveChain(CHECKOUT, chain(screen.getByRole("button").and(pay))))).toEqual([
+      "e10",
+    ])
+    expect(refs(resolveChain(CHECKOUT, chain(back.and(pay))))).toEqual([])
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a locator from somewhere else
+    expect(() => back.or({} as Locator)).toThrow("or() takes a locator from the same device screen")
+  })
+
   it("compares text as web locators do", () => {
     expect(textMatches("  Credits:   500 ", "credits: 500", false)).toBe(true)
     expect(textMatches("Credits: 500", "Credits", true)).toBe(false)
@@ -304,6 +321,16 @@ describe("acting on a device", () => {
       code: "LOCATOR_AMBIGUOUS",
     })
     await expect(screen.getByTestId("credits").fill("x")).rejects.toThrow("is not a text field")
+  })
+
+  it("says how many elements each call of a chain left", async () => {
+    const { screen } = await open(new FakeDevice())
+    const missing = screen.getByRole("button").filter({ hasText: "Sell" }).first()
+
+    await expect(missing.click({ timeout: 50 })).rejects.toMatchObject({
+      message:
+        'locator.click: getByRole("button").filter(hasText: "Sell").first() matched nothing within 50 ms; by step: getByRole("button") 1, .filter(hasText: "Sell") 0, .first() 0',
+    })
   })
 
   it("reads text, counts and state", async () => {

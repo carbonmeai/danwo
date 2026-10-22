@@ -45,6 +45,29 @@ export interface Attempted {
   readonly target: PlaywrightLocator
   /** Elements worth listing when nothing matched, e.g. everything with the asked role. */
   readonly nearby?: PlaywrightLocator
+  /** Each call of the locator's chain with what it matches so far, from the first `getBy*`. */
+  readonly chain?: readonly { readonly call: string; readonly target: PlaywrightLocator }[]
+}
+
+/**
+ * How many elements each call of a chain left, as `; by step: getByRole("listitem") 3,
+ * .filter(hasText: "Kiwi") 0`, so a failure shows which call lost the element. Empty for a
+ * locator of one call, whose count the message already gives.
+ */
+export async function stepCounts(
+  chain: readonly { readonly call: string; readonly target: PlaywrightLocator }[] | undefined,
+): Promise<string> {
+  if (chain === undefined || chain.length < 2) return ""
+
+  const counts = await Promise.all(
+    chain.map(async (step) => {
+      const count = await step.target.count().catch(() => undefined)
+
+      return `${step.call} ${count ?? "?"}`
+    }),
+  )
+
+  return `; by step: ${counts.join(", ")}`
 }
 
 /** The first line of a multi-line error message. */
@@ -97,7 +120,7 @@ export async function explain(attempt: Attempted, cause: unknown): Promise<Error
 
     return new LocatorError(
       "LOCATOR_NOT_FOUND",
-      `${api}: ${text} matched nothing${within}`,
+      `${api}: ${text} matched nothing${within}${await stepCounts(attempt.chain)}`,
       await texts(attempt.nearby),
     )
   }
@@ -105,7 +128,7 @@ export async function explain(attempt: Attempted, cause: unknown): Promise<Error
   if (count !== undefined && count > 1)
     return new LocatorError(
       "LOCATOR_AMBIGUOUS",
-      `${api}: ${text} matched ${count} elements; it needs exactly one (use first(), nth() or filter())`,
+      `${api}: ${text} matched ${count} elements; it needs exactly one (use first(), nth() or filter())${await stepCounts(attempt.chain)}`,
       await texts(target),
     )
 

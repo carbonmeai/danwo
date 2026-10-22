@@ -68,6 +68,17 @@ describe("finding elements", () => {
     expect(await items.filter({ hasText: /^C/, hasNotText: "x" }).textContent()).toBe("Cherry")
   })
 
+  it("joins two locators with or and and", async () => {
+    const { screen } = session
+    const save = screen.getByRole("button", { name: "Save" })
+    const remove = screen.getByRole("button", { name: "Delete" })
+
+    expect(await save.or(remove).allTextContents()).toEqual(["Save", "Delete"])
+    expect(await save.or(screen.getByText("Nowhere")).textContent()).toBe("Save")
+    expect(await screen.getByRole("button").and(screen.getByText("Delete")).count()).toBe(1)
+    expect(await save.and(remove).count()).toBe(0)
+  })
+
   it("reads element state", async () => {
     const { screen } = session
 
@@ -122,6 +133,17 @@ describe("failing", () => {
   it("refuses to act on a locator that matches more than one element, and says how many", async () => {
     await expect(session.screen.getByRole("listitem").click()).rejects.toThrow(
       /3[^\n]*getByRole\("listitem"\)|getByRole\("listitem"\)[^\n]*3/,
+    )
+  })
+
+  it("says how many elements each call of a chain left", async () => {
+    const kiwi = session.screen.getByRole("listitem").filter({ hasText: "Kiwi" }).first()
+
+    await expect(kiwi.click({ timeout: 300 })).rejects.toThrow(
+      'matched nothing within 300 ms; by step: getByRole("listitem") 3, .filter(hasText: "Kiwi") 0, .first() 0',
+    )
+    await expect(session.expect(kiwi).toBeVisible({ timeout: 200 })).rejects.toThrow(
+      /received: no element; by step: getByRole\("listitem"\) 3, /,
     )
   })
 

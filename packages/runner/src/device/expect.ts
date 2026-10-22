@@ -188,6 +188,7 @@ function deviceAssertions(locator: DeviceLocator, negate = false): LocatorAssert
         options,
       ),
     toHaveCSS: () => unsupported("toHaveCSS"),
+    toHaveJSProperty: () => unsupported("toHaveJSProperty"),
     toHaveScreenshot: (name, options) => {
       if (negate) throw new TypeError("expect(...).not.toHaveScreenshot is not supported")
 

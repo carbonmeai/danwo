@@ -133,8 +133,9 @@ Every attempt starts the app afresh: data cleared, permissions granted, launched
   `data-testid`, `aria-label`, `aria-checked`, `aria-disabled`, `placeholder`, `value`, `role`.
 - **`expect`:** `toBeVisible`, `toBeHidden`, `toHaveText`, `toContainText`, `toHaveValue`,
   `toBeEnabled`, `toBeDisabled`, `toBeChecked`, `toHaveCount` and `toHaveAttribute` retry like on
-  the web; in `danwo matrix` they are paced by the clean run like web checks. `toHaveCSS` and
-  `toBeInViewport` are web only: on a device they fail with `CONFIG_INVALID`.
+  the web; in `danwo matrix` they are paced by the clean run like web checks. `toHaveCSS`,
+  `toHaveJSProperty` and `toBeInViewport` are web only: on a device they fail with
+  `CONFIG_INVALID`. Locators join with `or()` and `and()` as on the web.
   `toHaveScreenshot()` compares an element's box, or `expect(screen)` the whole screen without its
   status bar, with a baseline; password fields and `mask` locators are painted over.
 - **`agent`:** see below.

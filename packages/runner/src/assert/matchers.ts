@@ -1,5 +1,6 @@
 import { HIDE_POINTER } from "../browser/pointer.ts"
 import { shown } from "../locate/describe.ts"
+import { stepCounts } from "../locate/failure.ts"
 /*
  * `expect(locator)`: checks that wait for the page to get there, each recorded as a step that
  * verifies, and failing with the matcher, the locator, what was expected and what was on screen.
@@ -43,6 +44,11 @@ export interface LocatorAssertions {
   toHaveAttribute(name: string, value?: TextMatch, options?: AssertOptions): Promise<void>
   /** The computed style's `property` (`"color"`, `"display"`) equals `value`, as the browser writes it. */
   toHaveCSS(property: string, value: TextMatch, options?: AssertOptions): Promise<void>
+  /**
+   * The DOM element's JavaScript property `name` (`"checked"`, `"value"`, `"dataset"`) equals
+   * `value`: compared deeply, so an object or array matches one with the same contents.
+   */
+  toHaveJSProperty(name: string, value: unknown, options?: AssertOptions): Promise<void>
   /**
    * The element looks like its baseline image (`__screenshots__/` next to the test), written on
    * the first run. `name` defaults to a number in order of the checks.
@@ -88,8 +94,11 @@ async function look(locator: ElementLocator, probe: Probe, deadline: number): Pr
   }
 }
 
-/** The error a check throws when time runs out, with what it last saw. */
-function failure(
+/**
+ * The error a check throws when time runs out, with what it last saw; when the locator found no
+ * element or several, how many each call of its chain left.
+ */
+async function failure(
   locator: ElementLocator,
   check: Matcher,
   negate: boolean,
@@ -98,9 +107,11 @@ function failure(
 ) {
   const call = `expect(${locator.text}).${negate ? "not." : ""}${check.name}(${check.args})`
   const expected = `${negate ? "not " : ""}${check.args || check.name.replace(/^toBe/, "").toLowerCase()}`
+  const unfound = last.ambiguous === true || last.received === "no element"
+  const steps = unfound ? await stepCounts(locator.chain(locator.session.page())) : ""
 
   return new ExpectationFailed(
-    `${call} failed after ${ms} ms\n  expected: ${expected}\n  received: ${last.received}`,
+    `${call} failed after ${ms} ms\n  expected: ${expected}\n  received: ${last.received}${steps}`,
   )
 }
 
@@ -112,7 +123,7 @@ async function settle(locator: ElementLocator, check: Matcher, negate: boolean, 
     const reading = await look(locator, check.probe, deadline)
 
     if (!reading.ambiguous && reading.pass !== negate) return
-    if (Date.now() >= deadline) throw failure(locator, check, negate, timeout, reading)
+    if (Date.now() >= deadline) throw await failure(locator, check, negate, timeout, reading)
 
     await pause(Math.min(PAUSES_MS[round] ?? 500, Math.max(0, deadline - Date.now())))
   }
@@ -166,6 +177,13 @@ export function locatorAssertions(locator: ElementLocator, negate = false): Loca
         "toHaveCSS",
         `${JSON.stringify(property)}, ${shown(value)}`,
         probes.css(property, value),
+        options,
+      ),
+    toHaveJSProperty: (name, value, options) =>
+      check(
+        "toHaveJSProperty",
+        `${JSON.stringify(name)}, ${probes.written(value)}`,
+        probes.jsProperty(name, value),
         options,
       ),
     toHaveScreenshot: (name, options) => {

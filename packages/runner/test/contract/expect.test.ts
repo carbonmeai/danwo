@@ -76,6 +76,20 @@ describe("matchers that pass", () => {
     ).rejects.toThrow(/toHaveCSS\("display", "flex"\)[\s\S]*received: "block"/)
   })
 
+  it("checks a DOM property, compared deeply", async () => {
+    const { screen } = session
+    const check = session.expect
+    const terms = screen.getByLabel("Accept terms")
+
+    await check(terms).toHaveJSProperty("checked", false)
+    await check(screen.getByLabel("Prefilled")).toHaveJSProperty("value", "already here")
+    await check(screen.getByTestId("status")).toHaveJSProperty("dataset", { testid: "status" })
+    await check(terms).not.toHaveJSProperty("checked", true)
+    await expect(check(terms).toHaveJSProperty("checked", true, { timeout: 200 })).rejects.toThrow(
+      /toHaveJSProperty\("checked", true\)[\s\S]*received: false/,
+    )
+  })
+
   it("waits for the page to catch up", async () => {
     // "Arrived late" is added 700 ms after the page loads.
     await session.expect(session.screen.getByText("Arrived late")).toBeVisible()

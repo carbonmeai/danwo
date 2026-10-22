@@ -11,13 +11,19 @@ a case-insensitive substring unless you pass `{ exact: true }`; a RegExp tests t
 Actions (`click`, `fill`, `press`, `check`, `selectOption`, `hover`, `setInputFiles`, `dragTo`)
 need exactly one match and wait for the element to be ready. Narrow with `.first()`, `.nth(i)`,
 `.filter({ hasText, hasNotText, has, hasNot })` (every option given must hold; `has` and `hasNot`
-take a locator from the same screen) or by chaining another `getBy…`.
+take a locator from the same screen) or by chaining another `getBy…`. `a.or(b)` matches what either
+finds, in page order (`save.or(screen.getByText("Saved"))` waits for whichever shows; an action
+still needs exactly one), `a.and(b)` what both find; both work on devices too. A locator that
+matches nothing or too many says how many each call of its chain left:
+`matched nothing within 10000 ms; by step: getByRole("listitem") 3, .filter(hasText: "Kiwi") 0`,
+and so does an `expect` that found no element.
 
 `expect(locator)` checks retry until they hold: `toBeVisible`, `toBeHidden`, `toBeEnabled`,
 `toBeDisabled`, `toBeChecked`, `toBeInViewport` (some of it inside the viewport as scrolled now),
 `toHaveText`, `toContainText`, `toHaveValue`, `toHaveCount`, `toHaveAttribute`,
 `toHaveCSS(property, value)` (the computed style, as the browser writes it: `"rgb(0, 0, 0)"`, not
-`"black"`) and `toHaveScreenshot`; each has a `.not` form.
+`"black"`), `toHaveJSProperty(name, value)` (the DOM element's property, `checked`, `value`,
+`dataset`, compared deeply) and `toHaveScreenshot`; each has a `.not` form.
 
 `check`/`uncheck` (and the agent's check) handle a styled checkbox or radio whose invisible
 `<input>` is covered by its own `<label>`: danwo clicks the label, then fails unless the input

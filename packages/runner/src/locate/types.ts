@@ -116,6 +116,13 @@ export interface Locator extends Screen {
   last(): Locator
   nth(index: number): Locator
   filter(options: FilterOptions): Locator
+  /**
+   * The elements either locator finds, in page order: `getByRole("button", { name: "Save" })
+   * .or(getByText("Saved"))` waits for whichever shows. An action still needs exactly one.
+   */
+  or(other: Locator): Locator
+  /** The elements both locators find: `getByRole("button").and(getByTestId("pay"))`. */
+  and(other: Locator): Locator
 }
 
 /** Turns a secret handle into its value at the moment it is typed. */

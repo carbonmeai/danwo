@@ -107,11 +107,33 @@ An action needs exactly one match. When a finder matches several, narrow it:
 | `.filter({ has })`        | the matches with this locator inside     |
 | `.filter({ hasNot })`     | the matches without this locator inside  |
 | another `getBy…` call     | elements inside the matches              |
+| `.and(other)`             | the matches the other locator finds too  |
 
 ```ts title="tests/basket.danwo.ts · narrowing"
 await screen.getByRole("listitem").filter({ hasText: "Socks" }).getByRole("button").click()
 await screen.getByRole("row").nth(2).click()
 await screen.getByRole("row").filter({ hasNotText: "Archived" }).first().click()
+```
+
+When a locator finds nothing, the error says how many elements each call left, so you can see
+which call lost it:
+
+```text
+locator.click: getByRole("listitem").filter(hasText: "Kiwi") matched nothing within 10000 ms; by step: getByRole("listitem") 3, .filter(hasText: "Kiwi") 0
+```
+
+## Match one of two
+
+`.or(other)` matches what either locator finds. Use it when the page shows one of two things,
+such as a dialog that only appears sometimes:
+
+```ts title="tests/checkout.danwo.ts · or"
+const pay = screen.getByRole("button", { name: "Pay" })
+const cookies = screen.getByRole("button", { name: "Accept cookies" })
+
+await expect(pay.or(cookies).first()).toBeVisible()
+if (await cookies.isVisible()) await cookies.click()
+await pay.click()
 ```
 
 <Callout type="info">

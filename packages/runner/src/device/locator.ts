@@ -25,6 +25,7 @@ import { attributeOf } from "./attributes.ts"
 import {
   type Chain,
   type ChainLink,
+  chainCounts,
   collapse,
   type DeviceQuery,
   resolveChain,
@@ -92,18 +93,37 @@ export class DeviceLocator implements Locator {
   readonly chain: Chain
   /** The locator as the test wrote it, e.g. `getByTestId("buy")`. */
   readonly text: string
+  /** Each link's call as the test wrote it, for a failure's count by step. */
+  private readonly calls: readonly string[]
 
-  constructor(context: DeviceContext, reader: DeviceReader, chain: Chain, text: string) {
+  constructor(
+    context: DeviceContext,
+    reader: DeviceReader,
+    chain: Chain,
+    text: string,
+    calls: readonly string[] = [],
+  ) {
     this.context = context
     this.reader = reader
     this.chain = chain
     this.text = text
+    this.calls = calls
   }
 
   private extend(link: ChainLink, call: string): DeviceLocator {
     const text = this.chain.length === 0 ? call : `${this.text}.${call}`
+    const calls = [...this.calls, this.chain.length === 0 ? call : `.${call}`]
 
-    return new DeviceLocator(this.context, this.reader, [...this.chain, link], text)
+    return new DeviceLocator(this.context, this.reader, [...this.chain, link], text, calls)
+  }
+
+  /** How many elements each call left in `reading`, as `; by step: …`; empty for a single call. */
+  private stepCounts(reading: DeviceScreenReading): string {
+    if (this.chain.length < 2) return ""
+
+    const counts = chainCounts(reading.nodes, this.chain)
+
+    return `; by step: ${this.calls.map((call, at) => `${call} ${counts[at] ?? "?"}`).join(", ")}`
   }
 
   getByRole(role: AriaRole, options: RoleOptions = {}): DeviceLocator {
@@ -150,6 +170,18 @@ export class DeviceLocator implements Locator {
 
   first(): DeviceLocator {
     return this.extend({ pick: "first" }, "first()")
+  }
+
+  or(other: Locator): DeviceLocator {
+    const either = sameDevice(other, "or")
+
+    return this.extend({ join: "or", other: either.chain }, `or(${either.text})`)
+  }
+
+  and(other: Locator): DeviceLocator {
+    const both = sameDevice(other, "and")
+
+    return this.extend({ join: "and", other: both.chain }, `and(${both.text})`)
   }
 
   last(): DeviceLocator {
@@ -208,14 +240,14 @@ export class DeviceLocator implements Locator {
     if (nodes.length === 0) {
       return new LocatorError(
         "LOCATOR_NOT_FOUND",
-        `${api}: ${this.text} matched nothing within ${timeout} ms`,
+        `${api}: ${this.text} matched nothing within ${timeout} ms${this.stepCounts(reading)}`,
         nearby(reading, this.chain),
       )
     }
 
     return new LocatorError(
       "LOCATOR_AMBIGUOUS",
-      `${api}: ${this.text} matched ${nodes.length} elements; it needs exactly one (use first(), nth() or filter())`,
+      `${api}: ${this.text} matched ${nodes.length} elements; it needs exactly one (use first(), nth() or filter())${this.stepCounts(reading)}`,
       nodes.slice(0, MAX_CANDIDATES).map((node) => textOf(reading.nodes, node)),
     )
   }
@@ -435,11 +467,17 @@ export class DeviceLocator implements Locator {
 }
 
 /** Locator methods a device does not support yet. */
-/** The locator a filter's `option` names, which must come from the same device screen. */
+/** The locator `option` names (a filter's `has`, an `or`), which must come from the same device screen. */
+function sameDevice(locator: Locator, option: string): DeviceLocator
+
+function sameDevice(locator: Locator | undefined, option: string): DeviceLocator | undefined
+
 function sameDevice(locator: Locator | undefined, option: string): DeviceLocator | undefined {
   if (locator === undefined || locator instanceof DeviceLocator) return locator
 
-  throw new TypeError(`filter({ ${option} }) takes a locator from the same device screen`)
+  const call = option === "or" || option === "and" ? `${option}()` : `filter({ ${option} })`
+
+  throw new TypeError(`${call} takes a locator from the same device screen`)
 }
 
 function unsupported(method: string): Promise<never> {

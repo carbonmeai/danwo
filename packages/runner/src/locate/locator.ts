@@ -109,19 +109,23 @@ class Finder implements Screen {
     this.prefix = prefix
   }
 
+  /** The locator a `getBy*` call searches within, when it searches within one. */
+  protected within(): ElementLocator | undefined {
+    return undefined
+  }
+
   private derive(
     text: string,
     make: (root: Root) => PlaywrightLocator,
     nearby?: (root: Root) => PlaywrightLocator,
   ): ElementLocator {
     const near = nearby && ((page: Page) => nearby(this.root(page)))
+    const parent = this.within()
 
-    return new ElementLocator(
-      this.context,
-      (page) => make(this.root(page)),
-      this.prefix + text,
-      near,
-    )
+    return new ElementLocator(this.context, (page) => make(this.root(page)), this.prefix + text, {
+      ...(near && { nearby: near }),
+      ...(parent && { parent }),
+    })
   }
 
   getByRole(role: AriaRole, options: RoleOptions = {}): Locator {
@@ -157,18 +161,46 @@ class Finder implements Screen {
   }
 }
 
+/** How a locator came about: elements worth listing when it finds none, and what it narrows. */
+interface Lineage {
+  /** Elements worth listing when nothing matched, e.g. everything with the asked role. */
+  readonly nearby?: Query
+  /** The locator it narrows or searches within: `getByRole("list")` for `….getByRole("listitem")`. */
+  readonly parent?: ElementLocator
+}
+
+/** One call of a locator's chain, with what it matches up to and including that call. */
+export interface ChainStep {
+  /** The call as the test wrote it: `getByRole("listitem")`, then `.filter(hasText: "Kiwi")`. */
+  readonly call: string
+  readonly target: PlaywrightLocator
+}
+
 /** A locator a test holds. */
 export class ElementLocator extends Finder implements Locator {
   /** The locator as the test wrote it, e.g. `getByRole("button", name: "Save")`. */
   readonly text: string
   private readonly query: Query
   private readonly nearby: Query | undefined
+  private readonly parent: ElementLocator | undefined
 
-  constructor(context: LocateContext, query: Query, text: string, nearby?: Query) {
+  constructor(context: LocateContext, query: Query, text: string, lineage: Lineage = {}) {
     super(context, query, `${text}.`)
     this.text = text
     this.query = query
-    this.nearby = nearby
+    this.nearby = lineage.nearby
+    this.parent = lineage.parent
+  }
+
+  protected override within(): ElementLocator {
+    return this
+  }
+
+  /** Every call of the chain on `page`, from the first `getBy*` to this locator's last call. */
+  chain(page: Page): ChainStep[] {
+    const own = { call: this.text.slice(this.parent?.text.length ?? 0), target: this.query(page) }
+
+    return [...(this.parent?.chain(page) ?? []), own]
   }
 
   /** The Playwright locator on the session's current page. */
@@ -219,7 +251,14 @@ export class ElementLocator extends Finder implements Locator {
       const nearby = this.nearby?.(page)
 
       throw await explain(
-        { api, text: this.text, timeout, target, ...(nearby && { nearby }) },
+        {
+          api,
+          text: this.text,
+          timeout,
+          target,
+          chain: this.chain(page),
+          ...(nearby && { nearby }),
+        },
         cause,
       )
     }
@@ -426,7 +465,20 @@ export class ElementLocator extends Finder implements Locator {
       this.context,
       (page) => make(this.query(page), page),
       `${this.text}.${text}`,
+      { parent: this },
     )
+  }
+
+  or(other: Locator): Locator {
+    const either = sameScreen(other, "or")
+
+    return this.narrow(`or(${either.text})`, (target, page) => target.or(either.query(page)))
+  }
+
+  and(other: Locator): Locator {
+    const both = sameScreen(other, "and")
+
+    return this.narrow(`and(${both.text})`, (target, page) => target.and(both.query(page)))
   }
 
   first(): Locator {
@@ -460,11 +512,17 @@ export class ElementLocator extends Finder implements Locator {
   }
 }
 
-/** The locator a filter's `option` names, which must come from the same screen. */
+/** The locator `option` names (a filter's `has`, an `or`), which must come from the same screen. */
+function sameScreen(locator: Locator, option: string): ElementLocator
+
+function sameScreen(locator: Locator | undefined, option: string): ElementLocator | undefined
+
 function sameScreen(locator: Locator | undefined, option: string): ElementLocator | undefined {
   if (locator === undefined || locator instanceof ElementLocator) return locator
 
-  throw new TypeError(`filter({ ${option} }) takes a locator from the same screen`)
+  const call = option === "or" || option === "and" ? `${option}()` : `filter({ ${option} })`
+
+  throw new TypeError(`${call} takes a locator from the same screen`)
 }
 
 /** The session's `screen`: locators resolved against the whole page, and the page itself. */

@@ -16,11 +16,15 @@ export type DeviceQuery =
     }
   | { readonly by: "testId"; readonly match: TextMatch }
 
-/** One link of a locator's chain. */
+/**
+ * One link of a locator's chain: a query, a filter, a pick, or another chain whose elements are
+ * added (`or`) or that the elements must also be among (`and`).
+ */
 export type ChainLink =
   | { readonly query: DeviceQuery }
   | DeviceFilter
   | { readonly pick: "first" | "last" | number }
+  | { readonly join: "or" | "and"; readonly other: Chain }
 
 export type Chain = readonly ChainLink[]
 
@@ -187,16 +191,54 @@ function applyPick(current: readonly DeviceNode[], pick: "first" | "last" | numb
   return node === undefined ? [] : [node]
 }
 
+/** `current` with what `other` matches added (`or`), or kept to it (`and`), in screen order. */
+function applyJoin(
+  tree: Tree,
+  current: readonly DeviceNode[],
+  join: "or" | "and",
+  other: Chain,
+): DeviceNode[] {
+  const theirs = new Set(run(tree, other, undefined))
+  const ours = new Set(current)
+
+  return tree.nodes.filter((node) =>
+    join === "or" ? ours.has(node) || theirs.has(node) : ours.has(node) && theirs.has(node),
+  )
+}
+
+/** What one link leaves of `current` (the whole screen before the first query). */
+function applyLink(
+  tree: Tree,
+  current: readonly DeviceNode[] | undefined,
+  link: ChainLink,
+): DeviceNode[] {
+  if ("query" in link) return applyQuery(tree, current, link.query)
+  if ("pick" in link) return applyPick(current ?? tree.nodes, link.pick)
+  if ("join" in link) return applyJoin(tree, current ?? tree.nodes, link.join, link.other)
+
+  return applyFilter(tree, current ?? tree.nodes, link)
+}
+
 function run(tree: Tree, chain: Chain, start: readonly DeviceNode[] | undefined): DeviceNode[] {
   let current = start
 
-  for (const link of chain) {
-    if ("query" in link) current = applyQuery(tree, current, link.query)
-    else if ("pick" in link) current = applyPick(current ?? tree.nodes, link.pick)
-    else current = applyFilter(tree, current ?? tree.nodes, link)
-  }
+  for (const link of chain) current = applyLink(tree, current, link)
 
   return [...(current ?? tree.nodes)]
+}
+
+/** How many elements of `nodes` each link of `chain` leaves, in order. */
+export function chainCounts(nodes: readonly DeviceNode[], chain: Chain): number[] {
+  const tree = new Tree(nodes)
+  const counts: number[] = []
+  let current: readonly DeviceNode[] | undefined
+
+  for (const link of chain) {
+    current = applyLink(tree, current, link)
+    counts.push(current.length)
+  }
+
+  return counts
 }
 
 /** The elements of `nodes` that `chain` matches, in screen order. */

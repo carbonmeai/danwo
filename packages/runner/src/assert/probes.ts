@@ -2,6 +2,8 @@
  * One look at a locator's state: did the check hold, and what was on screen. Probes never wait for
  * the page; the poll in matchers.ts calls them again until the check holds or time runs out.
  */
+import { isDeepStrictEqual } from "node:util"
+
 import type { Locator as PlaywrightLocator } from "playwright-core"
 
 import type { TextMatch } from "../locate/types.ts"
@@ -130,6 +132,30 @@ export function css(property: string, expected: TextMatch): Probe {
     )
 
     return { pass: textHolds(actual, expected, false), received: JSON.stringify(actual) }
+  })
+}
+
+/** A value as a failure message shows it: JSON, or what it is when JSON has no words for it. */
+export function written(held: unknown): string {
+  if (held === undefined) return "undefined"
+  if (typeof held === "bigint") return `${held}n`
+
+  return JSON.stringify(held) ?? `a ${typeof held}`
+}
+
+/**
+ * The element's property `name` deeply equals `expected`. The page hands it over as Playwright
+ * serializes values, so a DOM object it holds (a node, a style) does not compare.
+ */
+export function jsProperty(name: string, expected: unknown): Probe {
+  return single(async (target, budget) => {
+    const actual: unknown = await target.evaluate(
+      (element, key) => Reflect.get(element, key),
+      name,
+      { timeout: budget },
+    )
+
+    return { pass: isDeepStrictEqual(actual, expected), received: written(actual) }
   })
 }
 
