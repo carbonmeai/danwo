@@ -31,7 +31,7 @@ to explore before it writes a test. Every action answers with the page as it is 
 
 | Tool                                                 | What it does                                                                                  |
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `open_session`, `close_session`                      | Starts the app, emulators and browser, or stops them.                                         |
+| `open_session`, `close_session`                      | Starts the app, emulators and browser (or a device), or stops them.                           |
 | `navigate`                                           | Goes to a path or URL, or back, forward, reload.                                              |
 | `click`, `hover`, `fill`, `press`, `select`, `check` | Acts on an element, by a ref from the last snapshot or by a locator.                          |
 | `fill_secret`                                        | Fills a field with a configured secret by name. The value never appears anywhere.             |
@@ -128,6 +128,52 @@ says the dialog is open.
 
 A test uploads by name only, so a recording never holds a path. Add the file under `files` in
 `danwo.config.ts`, then call `setInputFiles("receipt")`. An empty list clears the input.
+
+## Drive a mobile app
+
+A **device session** drives your app on the Android emulator or iOS Simulator your config's
+environment sets up, in place of a browser. Open one with `device: true`:
+
+```json title="open_session · arguments"
+{ "device": true }
+```
+
+The app starts afresh, and the answer is its screen. It reads like a page's tree, with a line
+that says what is in front:
+
+```text
+session s1 is open.
+device: iOS Simulator
+in front: the app com.danwo.shopmobile
+
+- heading "Danwo Shop" [ref=e2]
+- text "Credits: 0" [testId=credits] [ref=e3]
+- button "Buy 500 credits" [testId=buy] [ref=e4]
+```
+
+The same tools work, the way a person uses a phone:
+
+| Tool                        | On a device                                                        |
+| --------------------------- | ------------------------------------------------------------------ |
+| `click`                     | Taps the element.                                                  |
+| `fill`, `fill_secret`       | Types into a field, replacing what it holds.                       |
+| `check`                     | Taps a switch or checkbox, unless it already shows that state.     |
+| `press`                     | Taps the target, then presses the key. iOS has Enter only.         |
+| `navigate`                  | Opens a path by the app's link scheme, a full URL, or goes `back`. |
+| `back`                      | Goes back: Android's Back button, or the screen's back control.    |
+| `scroll`                    | Scrolls the screen, or one list, up, down, left or right.          |
+| `tap_at`                    | Taps a point, in screenshot pixels, for what the tree can't show.  |
+| `screenshot`                | The screen, with password and secret fields painted over.          |
+| `snapshot`, `check_locator` | The screen's tree, and locators checked against it.                |
+
+Locators take the same chains as on a page. Tools only a browser has, such as `hover` or `drag`,
+answer with an error that says so. When the app opens a browser, such as a checkout page, the
+answer's `in front` line names it and its URL.
+
+<Callout type="warn">
+  Before each action, danwo reads the screen again. If the element a ref names has moved or gone,
+  nothing is tapped: the answer says so and shows the screen as it is now, with fresh refs.
+</Callout>
 
 ## Look behind the app
 

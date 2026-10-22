@@ -273,6 +273,33 @@ The shop on an iPhone 17 Pro simulator (iOS 26.5): both tests in about 50 s with
 replayed; the `buy-credits` matrix of 23 runs in 370 s on one simulator; the agent's matrix of 23
 runs in 298 s on two.
 
+## Live sessions over MCP
+
+`open_session` with `device: true` starts the environment as a worker would and drives its
+`env.device` instead of a browser: the app is started afresh, and `path` (other than `/`) opens by
+the app's link scheme. One process per session, the same idle close and slot limits as a browser
+session; each session's environment boots its own device, so give the config room for it.
+
+- `snapshot` reads the screen as `- role "name" [testId=…] [ref=e4]` lines, nested like the page
+  tree, headed by `device:` and `in front:` (the app, or a browser it opened, with its URL).
+- `click` taps; `fill`, `fill_secret`, `check` (taps a switch or checkbox unless it already shows
+  that state), `press` (taps the target first; iOS has Enter only), `navigate` (a path by the
+  link scheme, a full URL, or `back`).
+- Device only: `back`, `scroll` (`direction`, optionally inside a list's `target`), `tap_at`
+  (`x`, `y` in screenshot pixels).
+- Browser only, refused with a message: `hover`, `select`, `upload`, `drag`, `tabs`, `switch_tab`,
+  `close_tab`, `dialog`, and `click` with `modifiers`, `button` or `double`.
+- Locators take the page's grammar and chains (`getByRole`, `getByText`, `getByLabel`,
+  `getByPlaceholder`, `getByTestId`, `.filter({ hasText })`, `.first()`, `.last()`, `.nth(n)`);
+  `getByAltText` and `getByTitle` are refused. `check_locator` answers against the screen.
+- A ref keeps naming its element across readings while its role, name and id stay the same. Each
+  action reads the screen first: a ref that moved or went is refused with the screen as it is
+  now, and nothing is tapped.
+- `screenshot` paints over password fields, fields a secret was filled into and any secret's
+  value. `start_recording` keeps masked screenshots, and with `video: true` films the screen;
+  video is refused once a secret is filled. "Since the last call" lists the app's log warnings
+  and errors.
+
 ## The flight record
 
 Each attempt keeps:

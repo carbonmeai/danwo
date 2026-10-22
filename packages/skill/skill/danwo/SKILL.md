@@ -29,6 +29,9 @@ When the project has danwo's MCP server (`danwo init` registers it), work agains
      `switch_tab` and `close_tab` manage them.
    - An `alert`, `confirm` or `prompt` stays open until you answer it with `dialog` (`accept`, and
      `text` for a prompt); until then every page tool says it is open.
+   - A mobile project: `open_session` with `device: true` drives its emulator or simulator. `click`
+     taps; `back`, `scroll` and `tap_at` are added; browser-only tools refuse. Each answer says
+     what is in front; a ref that moved is refused with the fresh screen (`danwo guide mobile`).
 3. For every element a step needs, `check_locator` with the locator you would write until it
    matches exactly one element; keep the line it returns. Prefer `getByRole` with a name, then
    `getByLabel`, `getByText`, `getByTestId`. When several match, chain the query inside the part
