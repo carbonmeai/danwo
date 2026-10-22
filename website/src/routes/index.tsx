@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { Closing, Footer } from "../landing/closing.tsx"
 import { CodeSection } from "../landing/code.tsx"
@@ -30,6 +30,22 @@ async function starCount(): Promise<number | undefined> {
   return undefined
 }
 
+/**
+ * The star count: the one fetched when the page was built, then GitHub's current one once the page
+ * is open in a browser, so the count does not stay frozen at the last deploy.
+ */
+function useStars(built: number | undefined): number | undefined {
+  const [stars, setStars] = useState(built)
+
+  useEffect(() => {
+    void starCount().then((fresh) => {
+      if (fresh !== undefined) setStars(fresh)
+    })
+  }, [])
+
+  return stars
+}
+
 export const Route = createFileRoute("/")({
   loader: async () => ({ stars: await starCount() }),
   staleTime: Infinity,
@@ -39,7 +55,7 @@ export const Route = createFileRoute("/")({
 })
 
 function Landing() {
-  const { stars } = Route.useLoaderData()
+  const stars = useStars(Route.useLoaderData().stars)
   const hero = useRef<HTMLElement>(null)
 
   return (
