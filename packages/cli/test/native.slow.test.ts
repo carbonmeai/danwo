@@ -1,10 +1,11 @@
 /**
  * Native apps on real devices: the SwiftUI example on an iOS Simulator (`DANWO_IOS=1`, a Mac with
- * Xcode) and the Jetpack Compose example on an Android emulator (`DANWO_ANDROID=1`, the SDK and the
- * AVD `DANWO_AVD`, default `danwo_spike`). Each builds its native project from cold in a work copy
- * and then reuses the build; with the example installed (its `node_modules`, from
- * `node examples/link.ts <example> --here`), it also runs the example's tests and a short fault
- * matrix. Otherwise it skips at once. The simulator is this run's own and is deleted at the end.
+ * Xcode), the Jetpack Compose example on an Android emulator (`DANWO_ANDROID=1`, the SDK and the
+ * AVD `DANWO_AVD`, default `danwo_spike`), and the Flutter example on either when `flutter` is on
+ * the PATH as well. Each builds its project from cold in a work copy and then reuses the build;
+ * with the example installed (its `node_modules`, from `node examples/link.ts <example> --here`),
+ * it also runs the example's tests and a short fault matrix. Otherwise it skips at once. The
+ * simulator is this run's own and is deleted at the end.
  */
 import { execFile, execFileSync } from "node:child_process"
 import { existsSync } from "node:fs"
@@ -20,6 +21,7 @@ import { removeWorkCopies, workCopy } from "./work-copy.ts"
 const BIN = fileURLToPath(new URL("../src/bin.ts", import.meta.url))
 const SWIFTUI = fileURLToPath(new URL("../../../examples/with-swiftui", import.meta.url))
 const COMPOSE = fileURLToPath(new URL("../../../examples/with-compose", import.meta.url))
+const FLUTTER = fileURLToPath(new URL("../../../examples/with-flutter", import.meta.url))
 const AVD = process.env.DANWO_AVD ?? "danwo_spike"
 /** This run's own simulator, so no other run's device is touched. */
 const SIMULATOR = `danwo native iPhone ${process.pid}`
@@ -37,6 +39,17 @@ function hasXcode(): boolean {
   }
 }
 
+/** Whether the Flutter SDK is on the PATH. */
+function hasFlutter(): boolean {
+  try {
+    execFileSync("flutter", ["--version"], { stdio: "ignore", shell: process.platform === "win32" })
+
+    return true
+  } catch {
+    return false
+  }
+}
+
 const iosReady = process.env.DANWO_IOS === "1" && hasXcode()
 const androidReady =
   process.env.DANWO_ANDROID === "1" &&
@@ -46,15 +59,26 @@ const androidReady =
 /** Whether the example has its packages installed, which its tests need. */
 const installed = (example: string) => existsSync(join(example, "node_modules", "@danwo", "sdk"))
 
-/** Runs `danwo <args>` in a work copy of `example`; exit code and output. */
-function danwo(example: string, args: readonly string[]): Promise<{ code: number; out: string }> {
-  const env = { ...process.env, NO_COLOR: "1", DANWO_IOS_SIMULATOR: SIMULATOR }
+/**
+ * Runs `danwo <args>` in a work copy of `example`, with `extra` added to the environment; exit code
+ * and output. A build runs this checkout's danwo; `test` and `matrix` run the example's installed
+ * one, since its config and tests load the installed packages and one run may hold one copy only.
+ */
+function danwo(
+  example: string,
+  args: readonly string[],
+  extra: NodeJS.ProcessEnv = {},
+): Promise<{ code: number; out: string }> {
+  const env = { ...process.env, NO_COLOR: "1", DANWO_IOS_SIMULATOR: SIMULATOR, ...extra }
+  const cwd = workCopy(example)
+  const run = args[0] === "test" || args[0] === "matrix"
+  const bin = run ? join(cwd, "node_modules", "@danwo", "cli", "bin", "danwo.mjs") : BIN
 
   return new Promise((resolve) => {
     execFile(
       process.execPath,
-      [BIN, ...args],
-      { cwd: workCopy(example), env, maxBuffer: 64 * 1024 * 1024 },
+      [bin, ...args],
+      { cwd, env, maxBuffer: 64 * 1024 * 1024 },
       (error, stdout, stderr) => {
         const code = error === null ? 0 : typeof error.code === "number" ? error.code : 1
 
@@ -158,4 +182,63 @@ describe.skipIf(!androidReady)("a Jetpack Compose app on an Android emulator", (
       expect(matrix.code).toBe(0)
     },
   )
+})
+
+const flutterReady = (iosReady || androidReady) && hasFlutter()
+/** The platforms the Flutter example runs on here, by the `DANWO_PLATFORM` each takes. */
+const flutterPlatforms = [
+  ...(iosReady
+    ? [{ name: "an iOS Simulator", platform: "ios", build: "build-ios", kept: "app" }]
+    : []),
+  ...(androidReady
+    ? [{ name: "an Android emulator", platform: "android", build: "build-android", kept: "apk" }]
+    : []),
+]
+
+describe.skipIf(!flutterReady)("a Flutter app", () => {
+  describe.each(flutterPlatforms)("on $name", ({ platform, build, kept }) => {
+    it("builds the app with Flutter, then reuses the build", { timeout: LONG }, async () => {
+      const built = await danwo(FLUTTER, [build, "app", "--force"])
+
+      expect(built.out).toMatch(
+        new RegExp(`^built .*\\.${kept} \\(dev\\.danwo\\.examples\\.flutter\\) in`, "m"),
+      )
+      expect(built.code).toBe(0)
+
+      const reused = await danwo(FLUTTER, [build, "app"])
+
+      expect(reused.out).toMatch(
+        new RegExp(`^reused .*\\.${kept} \\(dev\\.danwo\\.examples\\.flutter\\)$`, "m"),
+      )
+    })
+
+    it.skipIf(!installed(FLUTTER))(
+      "joins the waitlist through the platform's own HTTP stack and the proxy, under the fault matrix",
+      { timeout: LONG },
+      async () => {
+        const env = { DANWO_PLATFORM: platform }
+        const tests = await danwo(FLUTTER, ["test", "--workers", "1"], env)
+
+        expect(tests.out).toMatch(/3 passed/)
+        expect(tests.code).toBe(0)
+
+        const matrix = await danwo(
+          FLUTTER,
+          [
+            "matrix",
+            "tests/deterministic.danwo.ts",
+            "--grep",
+            "joins the waitlist",
+            "--budget",
+            "8",
+          ],
+          env,
+        )
+
+        expect(matrix.out).toContain("PASS  clean run")
+        expect(matrix.out).not.toContain("FAIL ")
+        expect(matrix.code).toBe(0)
+      },
+    )
+  })
 })

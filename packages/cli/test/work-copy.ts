@@ -8,6 +8,21 @@ import { basename, dirname, join } from "node:path"
 /** What a copy leaves out: installed packages (linked instead) and what earlier runs wrote. */
 const LEFT_OUT = new Set(["node_modules", ".danwo", "test-results", "playwright-report"])
 
+/** What a copy leaves out at any depth: the state Flutter, Gradle and earlier runs keep in a project. */
+const TOOL_STATE = new Set([".danwo", ".dart_tool", ".gradle", ".kotlin"])
+
+/** Files beside a `build` folder that make it a Flutter or Gradle build's output. */
+const BUILD_OWNERS = ["pubspec.yaml", "build.gradle", "build.gradle.kts"]
+
+/** Whether a nested `path` is worth copying: not tool state, and not a Flutter or Gradle output. */
+function worthCopying(path: string): boolean {
+  const name = basename(path)
+
+  if (TOOL_STATE.has(name)) return false
+
+  return name !== "build" || !BUILD_OWNERS.some((file) => existsSync(join(dirname(path), file)))
+}
+
 const copies = new Map<string, string>()
 
 /**
@@ -29,7 +44,7 @@ export function workCopy(source: string): string {
 
   for (const entry of readdirSync(source)) {
     if (LEFT_OUT.has(entry) || entry.startsWith(".work-")) continue
-    cpSync(join(source, entry), join(copy, entry), { recursive: true })
+    cpSync(join(source, entry), join(copy, entry), { recursive: true, filter: worthCopying })
   }
 
   if (existsSync(join(source, "node_modules")))
