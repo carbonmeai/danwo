@@ -42,6 +42,45 @@ Every test, and every retry, opens a new browser context: no cookies, no storage
 the test before. To start signed in, use a [saved session](/docs/sessions), which signs in once
 per worker and reuses the browser state.
 
+## Set the browser's language, time zone and size
+
+`browser.contextOptions` in your config sets up every browser a run opens. That covers each test,
+each saved session's sign-in, each other person a test opens, and the MCP server's sessions:
+
+```ts title="danwo.config.ts · the browser"
+browser: {
+  contextOptions: {
+    locale: "de-DE",
+    timezoneId: "Europe/Berlin",
+    colorScheme: "dark",
+    reducedMotion: "reduce",
+    viewport: { width: 1440, height: 900 },
+  },
+},
+```
+
+| Option             | What it does                                                    | Default         |
+| ------------------ | --------------------------------------------------------------- | --------------- |
+| `locale`           | the browser's language: `navigator.language`, `Accept-Language` | the system's    |
+| `timezoneId`       | the page's time zone, such as `America/New_York`                | the system's    |
+| `colorScheme`      | what `prefers-color-scheme` answers: `light`, `dark`            | `light`         |
+| `reducedMotion`    | `reduce` asks the page to cut its animations                    | `no-preference` |
+| `viewport`         | the page's size in pixels; `null` uses the window's size        | 1280 × 720      |
+| `httpCredentials`  | a user name and password for a site behind HTTP sign-in         | none            |
+| `extraHTTPHeaders` | headers sent with every request, to every host                  | none            |
+
+danwo checks these when the config loads. A misspelt key or a time zone that doesn't exist fails
+the run with `CONFIG_INVALID`, naming the key.
+
+With `timezoneId` set, `time.set("2031-07-04T09:30")` means 9:30 in that zone, as the page shows
+it. A time with an offset or a `Z` means the same moment anywhere.
+
+<Callout type="warn">
+  `extraHTTPHeaders` go to every host the page calls, Stripe.js and other providers included, so put
+  nothing there those hosts shouldn't see. Give `httpCredentials` an `origin` to send them to your
+  app alone, and read the password from the environment, not the config file.
+</Callout>
+
 ## The page waits for your backend
 
 After each action danwo waits for the page to settle. A page that shows it is loading doesn't

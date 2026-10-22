@@ -7,6 +7,7 @@
 import type { BrowserContext } from "playwright-core"
 
 import { DanwoError } from "../support/codes.ts"
+import { instantIn } from "./zone.ts"
 
 /** How far to travel: milliseconds, or days, hours, minutes and seconds added up. */
 export type Span =
@@ -101,7 +102,10 @@ export interface SessionTime {
    * as usual delivers anything still pending.
    */
   travel(by: Span): Promise<void>
-  /** Moves everything forward to `to`; time never goes back. */
+  /**
+   * Moves everything forward to `to`; time never goes back. A date or date-time with no offset is
+   * read in the page's time zone (the config's `timezoneId`) when one is set.
+   */
   set(to: Date | string | number): Promise<void>
 }
 
@@ -185,13 +189,15 @@ export async function showTime(context: BrowserContext, machine: TimeMachine): P
 /**
  * The session's `time`: every travel is a step, after which the page shows the new time. Without
  * a browser `context` (a device session) only the services behind the app move. Given a list (the
- * test's browser and every other person's it opened), each of them shows the new time.
+ * test's browser and every other person's it opened), each of them shows the new time. `zone` is
+ * the page's time zone, which a wall-clock time given to `set` is read in.
  */
 export function sessionTime(
   machine: TimeMachine,
   context: BrowserContext | readonly BrowserContext[] | undefined,
   run: RunStep,
   ready: () => Promise<void>,
+  zone?: string,
 ): SessionTime {
   const contexts = context === undefined ? [] : Array.isArray(context) ? context : [context]
 
@@ -209,6 +215,6 @@ export function sessionTime(
   return {
     now: () => machine.now(),
     travel: (by) => travel(spanMs(by)),
-    set: (to) => travel(new Date(to).getTime() - machine.now().getTime()),
+    set: (to) => travel(instantIn(to, zone) - machine.now().getTime()),
   }
 }

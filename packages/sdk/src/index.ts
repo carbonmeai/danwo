@@ -388,6 +388,8 @@ export type {
   Agent,
   App,
   AssertOptions,
+  BrowserConfig,
+  ContextOptions,
   ExtractOptions,
   LocatorAssertions,
   MailMessage,

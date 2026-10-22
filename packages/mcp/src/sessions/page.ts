@@ -7,7 +7,7 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
-import type { SecretVault } from "@danwo/runner"
+import { type ContextOptions, playwrightOptions, type SecretVault } from "@danwo/runner"
 import type { Browser, BrowserContext, Locator, Page } from "playwright-core"
 
 import {
@@ -46,6 +46,8 @@ export interface DeskOptions {
   readonly files?: Readonly<Record<string, string>> | undefined
   /** Where this session's recordings go, and how to name it to the agent. */
   readonly recordDir: { readonly path: string; readonly shown: string }
+  /** The config's `browser.contextOptions`, which every context of the session opens with. */
+  readonly contextOptions?: ContextOptions | undefined
 }
 
 interface Recording {
@@ -86,7 +88,7 @@ export class PageDesk implements SessionDesk {
 
   /** A fresh browser context on `path` of the app; answers with the first snapshot. */
   static async open(options: DeskOptions, path: string): Promise<{ desk: PageDesk; text: string }> {
-    const context = await options.browser.newContext()
+    const context = await options.browser.newContext(playwrightOptions(options.contextOptions))
     const page = await context.newPage()
     const desk = new PageDesk(options, context, page)
     const loaded = await desk.dialogs.run(() =>
@@ -448,6 +450,7 @@ export class PageDesk implements SessionDesk {
     const old = this.context
     const url = this.page.url()
     const context = await this.options.browser.newContext({
+      ...playwrightOptions(this.options.contextOptions),
       storageState: await old.storageState(),
       ...(videoDir !== undefined && { recordVideo: { dir: videoDir } }),
     })

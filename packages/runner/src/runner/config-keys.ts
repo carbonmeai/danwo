@@ -10,6 +10,7 @@ const CONFIG_KEYS: Readonly<Record<keyof DanwoConfig, true>> = {
   testDir: true,
   testMatch: true,
   baseUrl: true,
+  browser: true,
   workers: true,
   splitFiles: true,
   retries: true,

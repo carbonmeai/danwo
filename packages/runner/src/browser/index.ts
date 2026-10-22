@@ -8,3 +8,4 @@ export {
   proxyLaunchOptions,
 } from "./launch.ts"
 export type { App } from "./page.ts"
+export { type BrowserConfig, type ContextOptions, playwrightOptions } from "./context-options.ts"

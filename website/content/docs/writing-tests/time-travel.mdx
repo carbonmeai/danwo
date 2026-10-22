@@ -37,6 +37,10 @@ test("a trial turns into a paid plan", async ({ app, screen, expect, time, settl
 
 Time only moves forward. Each jump is a step in the flight record.
 
+A date or time without an offset, such as `time.set("2031-07-04T09:30")`, is read in the page's
+[time zone](/docs/web) when your config sets one. Otherwise it's read in the zone of the machine
+running the tests.
+
 ## Three clocks move together
 
 | Clock            | What happens                                                                            |

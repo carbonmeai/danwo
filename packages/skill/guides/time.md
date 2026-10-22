@@ -25,7 +25,11 @@ test("a trial turns into a paid plan", async ({ app, screen, expect, time, settl
 
 Other calls:
 
-- `time.set(date)` travels to a moment.
+- `time.set(date)` travels to a moment. A string with no offset (`"2031-07-04"`,
+  `"2031-07-04T09:30"`) is the page's wall clock: read in `browser.contextOptions.timezoneId`
+  when the config sets one (a date alone is midnight there), else in the runner's zone. A `Z` or
+  an offset is read as written. Spans are exact milliseconds, so `travel({ days: 1 })` across a
+  daylight-saving change lands an hour off on the page's wall clock, as real time would.
 - `time.now()` says where everything is.
 
 Time only moves forward. Each jump is a step in the flight record. Afterwards, `settle()` delivers

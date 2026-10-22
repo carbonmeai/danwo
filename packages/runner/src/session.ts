@@ -13,6 +13,7 @@ import { type Expect, expect } from "./assert/index.ts"
 import type { CheckPace } from "./assert/pace.ts"
 import type { BaselineUpdate } from "./assert/screenshot.ts"
 import type { AppErrorOptions } from "./browser/app-errors.ts"
+import { type ContextOptions, playwrightOptions } from "./browser/context-options.ts"
 import { type App, type BrowserFlags, launchBrowser } from "./browser/index.ts"
 import { showPointer } from "./browser/pointer.ts"
 import type { Backend, ReadinessMode } from "./browser/readiness.ts"
@@ -111,6 +112,11 @@ interface BrowserOptions {
   readonly browserState?: BrowserState
   /** Called with the session's browser context before its first page opens, e.g. to route requests. */
   readonly onContext?: (context: BrowserContext) => Promise<void>
+  /**
+   * Options of every browser context the session opens, its other people's included: motion,
+   * colour scheme, locale, time zone, viewport, HTTP credentials and headers.
+   */
+  readonly contextOptions?: ContextOptions
 }
 
 /** Who carries out `agent.act` and judges `agent.assert`. */
@@ -310,6 +316,7 @@ async function newContext(
   film: string | undefined,
 ): Promise<BrowserContext> {
   const context = await browser.newContext({
+    ...playwrightOptions(options.contextOptions),
     ...(options.browserState !== undefined && { storageState: options.browserState }),
     ...(film !== undefined && videoContextOptions(film)),
   })
@@ -477,6 +484,8 @@ interface UserDesk {
   readonly filming: string | undefined
   /** Whether filmed browsers draw the pointer at each action. */
   readonly cursor: boolean
+  /** The options every browser context of the session opens with. */
+  readonly contextOptions: ContextOptions | undefined
 }
 
 /** Throws unless `name` can label a new person in this session. */
@@ -503,6 +512,7 @@ async function openUserBrowser(
 
   const { shared } = desk
   const context = await desk.browser.newContext({
+    ...playwrightOptions(desk.contextOptions),
     userAgent: taggedUserAgent(await desk.userAgent(), name),
     ...(state !== undefined && { storageState: state }),
     ...(desk.filming !== undefined && videoContextOptions(desk.filming, name)),
@@ -611,6 +621,7 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
     users,
     filming: film === undefined ? undefined : artifactsDir,
     cursor: options.record?.cursor !== false,
+    contextOptions: options.contextOptions,
   }
   let closed = false
 
@@ -630,6 +641,7 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
       shared.contexts,
       (label, act) => steps.run("app", "time.travel", label, act),
       handles.ready,
+      options.contextOptions?.timezoneId,
     ),
     openUser: (name, opened = {}) => openUserBrowser(desk, name, opened.state),
     async close() {

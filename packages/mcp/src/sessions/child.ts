@@ -6,7 +6,7 @@
  */
 import { join } from "node:path"
 
-import { launchBrowser, SecretVault } from "@danwo/runner"
+import { type BrowserConfig, launchBrowser, SecretVault } from "@danwo/runner"
 import {
   backendOf,
   createRedactor,
@@ -180,6 +180,7 @@ async function openBrowser(
       root: loaded.root,
       secrets: loaded.config.secrets,
       files: loaded.config.files,
+      browserConfig: loaded.config.browser,
     })
   } catch (error) {
     await browser.close().catch(() => undefined)
@@ -194,6 +195,8 @@ interface Started {
   readonly root: string
   readonly secrets: ConstructorParameters<typeof SecretVault>[0]
   readonly files: Readonly<Record<string, string>> | undefined
+  /** The config's `browser` key, whose context options the session's browser opens with. */
+  readonly browserConfig: BrowserConfig | undefined
 }
 
 /** Opens the session's page on the started environment and browser. */
@@ -208,6 +211,7 @@ async function start(request: OpenRequest, started: Started): Promise<SessionAns
       redact: (text) => redactor.text(text),
       root: started.root,
       files: started.files,
+      contextOptions: started.browserConfig?.contextOptions,
       recordDir: recordDir(started.root, request.id),
     },
     request.path,

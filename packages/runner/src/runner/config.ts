@@ -8,6 +8,7 @@ import type { OutboundCall, OutboundFault } from "@danwo/proxy"
 import type { LanguageModel } from "ai"
 
 import type { Budgets } from "../agent/budget.ts"
+import { type BrowserConfig, checkBrowserConfig } from "../browser/context-options.ts"
 import type { ReadinessMode } from "../browser/readiness.ts"
 import type { LintConfig } from "../lint/index.ts"
 import type { VideoSetting } from "../record/video.ts"
@@ -32,6 +33,13 @@ export interface DanwoConfig {
   readonly testMatch?: readonly string[]
   /** The app's URL when no environment provides one. */
   readonly baseUrl?: string
+  /**
+   * The browser every test runs in. `contextOptions` sets reduced motion, the colour scheme, the
+   * locale, the time zone, the viewport, HTTP credentials and headers sent with every request; they
+   * apply to every browser context the run opens, saved sessions' and the MCP server's included.
+   * A date-time `time.set` is given without an offset is read in `timezoneId`.
+   */
+  readonly browser?: BrowserConfig
   /** Worker processes; default 1. Each runs one browser attempt at a time. */
   readonly workers?: number
   /**
@@ -274,6 +282,8 @@ export async function loadConfig(cwd: string, explicit?: string): Promise<Loaded
   }
 
   const warnings = configWarnings(module.default)
+
+  checkBrowserConfig(module.default.browser)
 
   return {
     config: module.default,

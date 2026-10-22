@@ -5,7 +5,7 @@ import { locate, locatorCode } from "@danwo/recorder"
  * accessibility tree, the same view danwo's agent gets. A locator can be tried on the page too.
  * Every text that leaves is redacted: the config's secret values and credential shapes.
  */
-import { launchBrowser, redactCredentials, SecretVault } from "@danwo/runner"
+import { launchBrowser, playwrightOptions, redactCredentials, SecretVault } from "@danwo/runner"
 import { type DanwoConfig, loadConfig, type WorkerEnvironment } from "@danwo/runner/runner"
 import type { Locator, Page } from "playwright-core"
 
@@ -57,6 +57,7 @@ function redactorOf(config: DanwoConfig): (text: string) => string {
 
 async function readPage(
   baseUrl: string,
+  config: DanwoConfig,
   env: WorkerEnvironment | undefined,
   job: Extract<Job, { kind: "inspect" }>,
   redact: (text: string) => string,
@@ -65,7 +66,8 @@ async function readPage(
   const browser = await launchBrowser({ ...(proxy && { proxy }), headless: true })
 
   try {
-    const page = await (await browser.newContext()).newPage()
+    const options = playwrightOptions(config.browser?.contextOptions)
+    const page = await (await browser.newContext(options)).newPage()
 
     await page.goto(new URL(job.path, baseUrl).href, { timeout: LOAD_TIMEOUT_MS })
 
@@ -98,7 +100,7 @@ export async function inspectPage(
       throw new Error("the project has no baseUrl: set one in danwo.config.ts or its environment")
     }
 
-    return await readPage(baseUrl, env, job, redactorOf(config))
+    return await readPage(baseUrl, config, env, job, redactorOf(config))
   } finally {
     await env?.close()
   }

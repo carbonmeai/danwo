@@ -8,7 +8,7 @@ import { createServer, type Server } from "node:http"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { launchBrowser, SecretVault } from "@danwo/runner"
+import { type ContextOptions, launchBrowser, SecretVault } from "@danwo/runner"
 import { createRedactor } from "@danwo/runner/runner"
 import type { Browser } from "playwright-core"
 
@@ -21,7 +21,10 @@ export interface DeskSite {
   /** Opens a desk on `path`; answers with it and its first snapshot. */
   open(
     path: string,
-    options?: { readonly files?: Readonly<Record<string, string>> },
+    options?: {
+      readonly files?: Readonly<Record<string, string>>
+      readonly contextOptions?: ContextOptions
+    },
   ): Promise<{ desk: PageDesk; text: string }>
   /** The project folder the desks resolve upload paths against. */
   readonly root: string
@@ -59,6 +62,7 @@ export async function deskSite(pages: Readonly<Record<string, string>>): Promise
           redact: (text) => redactor.text(text),
           root,
           files: options.files ?? {},
+          contextOptions: options.contextOptions,
           recordDir: { path: join(root, "recording"), shown: "recording/" },
         },
         path,

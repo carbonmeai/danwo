@@ -412,6 +412,9 @@ function pageOptions(config: DanwoConfig): Partial<WebSessionOptions> {
     ...(config.relocation !== undefined && { relocation: config.relocation }),
     ...(config.effects !== undefined && { effects: config.effects }),
     ...(config.appErrors !== undefined && { appErrors: config.appErrors }),
+    ...(config.browser?.contextOptions !== undefined && {
+      contextOptions: config.browser.contextOptions,
+    }),
   }
 }
 

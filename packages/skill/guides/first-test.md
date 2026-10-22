@@ -60,6 +60,15 @@ Set up a config, write one `*.danwo.ts` file, run it and read the result.
    `priced(model, { input, output })` (dollars per million tokens) to see spend and use dollar
    budgets.
 
+   `browser: { contextOptions: { … } }` sets every browser context the run opens (each test's,
+   each saved session's setup, each `users.open` person's, the MCP server's sessions):
+   `reducedMotion` (`"reduce"`), `colorScheme` (`"light" | "dark" | "no-preference"`), `locale`
+   (`"de-DE"`), `timezoneId` (`"Europe/Berlin"`), `viewport` (`{ width, height }` or `null`;
+   default 1280×720), `httpCredentials` (`{ username, password, origin?, send? }`) and
+   `extraHTTPHeaders` (sent to every host, providers' too). They are checked as the config loads:
+   an unknown key, a time zone or locale that does not exist, or a bad header name fails with
+   `CONFIG_INVALID` naming the key (`browser.contextOptions.timezoneId`).
+
 2. Write `tests/home.danwo.ts`:
 
    ```ts
