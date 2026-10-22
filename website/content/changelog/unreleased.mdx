@@ -4,10 +4,6 @@ description: What is on main since the website's first build and not yet in a re
 date: 2026-10-20
 ---
 
-## Breaking
-
-- The types a test reads from the emulators are danwo's own, not the provider SDKs'. `ClerkUser` is now `ClerkUserView`, and Clerk's sessions, organizations and memberships have views named the same way. Google's Calendar events and Drive files have types of their own too.
-
 ## Install
 
 - danwo runs on Node.js 22.22.3 or a later 22, and on 24.11.1 or newer. Every package declares that range, and `danwo` on any other Node says so and exits instead of failing on a missing export.
@@ -34,6 +30,7 @@ date: 2026-10-20
 - **S3 and Tigris:** SigV4 checks for seeded keys, conditional requests, checksums, multipart listings, Tigris's own presign and rename calls, and the Tigris SDK's environment variables.
 - **Twilio:** account and number reads, and trial accounts' refusals.
 - **Pusher:** subscription counts follow the app's own setting, off by default.
+- **Emulator types:** the types a test reads from the emulators are danwo's own, not the provider SDKs'. `ClerkUser` is now `ClerkUserView`, and Clerk's sessions, organizations and memberships have views named the same way. Google's Calendar events and Drive files have types of their own too.
 - Emulators can answer WebSockets, and every emulator restores and resets completely, which a conformance test checks.
 
 ## Runner
@@ -67,8 +64,7 @@ date: 2026-10-20
 
 - **Safer taps:** a device action waits for its element to be enabled, then finds it again on the latest screen and presses it there once it stays in place. A ref from a screen that has since changed no longer presses the wrong element.
 - **The selected state:** the agent sees `[selected]` on the active tab, and locators take `getByRole(role, { selected })` and `aria-selected`.
-- **Gestures:** `device.swipe()` with a direction or two points and a duration, and `device.dismissKeyboard()`. The agent can swipe, long-press and put the keyboard away, and those steps replay with no model call.
-- **Android build:** Gradle and the Kotlin compiler leave no daemon running after `danwo build-android`.
+- **Gestures:** `device.swipe()` with a direction or two points and a duration, and `device.dismissKeyboard()`. The agent can swipe, long-press and put the keyboard away, and those steps replay with no model call.- **Android build:** Gradle and the Kotlin compiler leave no daemon running after `danwo build-android`.
 - **Steadier replays and matrices:** the emulator's ad and notification pings and the simulator's Apple News calls are blocked as background traffic, and a matrix trial on a device paces its checks only once its fault has fired, waiting at least 6 s.
 
 ## Dashboard
