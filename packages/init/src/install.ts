@@ -6,6 +6,8 @@
 import { spawn } from "node:child_process"
 import { relative } from "node:path"
 
+import { spawnPlan } from "@danwo/runner/command-line"
+
 import type { Answers } from "./answers.ts"
 import {
   DANWO_PACKAGES,
@@ -129,10 +131,13 @@ export type Runner = (
 export const runCommand: Runner = (argv, cwd) =>
   new Promise((resolve) => {
     const [program = "", ...args] = argv
-    const child = spawn(program, args, {
+    /* On Windows the package manager is a `.cmd` script, started through cmd.exe. */
+    const plan = spawnPlan(program, args)
+    const child = spawn(plan.command, [...plan.args], {
       cwd,
       stdio: ["ignore", "pipe", "pipe"],
-      shell: process.platform === "win32",
+      windowsHide: true,
+      windowsVerbatimArguments: plan.windowsVerbatimArguments,
     })
     let output = ""
 
@@ -157,7 +162,7 @@ export async function runPlanned(
   return {
     command: commandLine(command, from),
     ok,
-    output: ok ? "" : output.trim().split("\n").slice(-8).join("\n"),
+    output: ok ? "" : output.trim().split(/\r?\n/).slice(-8).join("\n"),
   }
 }
 

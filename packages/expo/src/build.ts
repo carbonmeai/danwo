@@ -11,6 +11,7 @@ import { join, relative } from "node:path"
 
 import { androidSdkRoot, javaHome } from "@danwo/device/toolchain"
 import { spawnOwned } from "@danwo/runner/children"
+import { spawnPlan } from "@danwo/runner/command-line"
 
 import { applyNetworkConfig } from "./network.ts"
 
@@ -48,7 +49,10 @@ async function sourceFiles(dir: string, root: string): Promise<string[]> {
       .map(async (entry) => {
         const path = join(dir, entry.name)
 
-        return entry.isDirectory() ? sourceFiles(path, root) : [relative(root, path)]
+        /* Forward slashes, so a build key is the same on every platform. */
+        return entry.isDirectory()
+          ? sourceFiles(path, root)
+          : [relative(root, path).split("\\").join("/")]
       }),
   )
 
@@ -70,6 +74,11 @@ export async function sourceHash(project: string, recipe: string = RECIPE): Prom
   return hash.digest("hex").slice(0, 16)
 }
 
+/** A build tool's name on `platform`: the Gradle wrapper is a batch file on Windows. */
+export function windowsName(command: string, platform: NodeJS.Platform = process.platform): string {
+  return platform === "win32" && command === "./gradlew" ? "gradlew.bat" : command
+}
+
 /**
  * Runs a tool, appending its output to `log`; rejects with the tail of its output on failure. The
  * tool leads its own process group, so an interrupted build stops what it started too.
@@ -83,12 +92,18 @@ function run(
   return new Promise((resolve, reject) => {
     const log = createWriteStream(options.log, { flags: "a" })
     const tail: string[] = []
-    const { child } = spawnOwned(command, args, { cwd: options.cwd, env: options.env })
+    /* npm and npx are `.cmd` scripts on Windows, and the Gradle wrapper is `gradlew.bat`. */
+    const plan = spawnPlan(windowsName(command), args)
+    const { child } = spawnOwned(plan.command, plan.args, {
+      cwd: options.cwd,
+      env: options.env,
+      windowsVerbatimArguments: plan.windowsVerbatimArguments,
+    })
 
     const take = (chunk: Buffer) => {
       log.write(chunk)
 
-      for (const line of chunk.toString("utf8").split("\n")) {
+      for (const line of chunk.toString("utf8").split(/\r?\n/)) {
         if (line.trim() === "") continue
 
         tail.push(line)

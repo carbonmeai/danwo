@@ -4,7 +4,7 @@ import { join } from "node:path"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
-import { GRADLE_ARGS } from "../src/build.ts"
+import { GRADLE_ARGS, windowsName } from "../src/build.ts"
 import {
   applyIosNetworkConfig,
   applyNetworkConfig,
@@ -26,7 +26,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  await rm(project, { recursive: true, force: true })
+  await rm(project, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 describe("the danwo network config", () => {
@@ -110,6 +110,12 @@ describe("the Android build", () => {
       "-Pkotlin.compiler.execution.strategy=in-process",
     ])
   })
+
+  it("runs the Gradle wrapper's batch file on Windows", () => {
+    expect(windowsName("./gradlew", "win32")).toBe("gradlew.bat")
+    expect(windowsName("./gradlew", "linux")).toBe("./gradlew")
+    expect(windowsName("npx", "win32")).toBe("npx")
+  })
 })
 
 describe("the iOS build", () => {
@@ -140,6 +146,7 @@ describe("the iOS build", () => {
     await expect(workspaceName(project)).rejects.toThrow("no Xcode workspace")
   })
 
+  /* It edits the plist with `plutil`, which only macOS has. */
   it.skipIf(process.platform !== "darwin")(
     "lets the danwo build make plain HTTP calls, with no finer key that would switch it off",
     async () => {

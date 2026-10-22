@@ -20,6 +20,8 @@ import { basename, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { parseArgs } from "node:util"
 
+import { spawnPlan } from "../packages/runner/src/support/command-line.ts"
+
 const ROOT = fileURLToPath(new URL("..", import.meta.url))
 
 /** What the copy leaves out: installs, builds and run output from a run in the example's folder. */
@@ -82,7 +84,8 @@ function readManifest(dir: string): Manifest {
  */
 export function linkedManifest(manifest: Manifest, tarballs: readonly Tarball[]): Manifest {
   const byName = new Map(tarballs.map((tarball) => [tarball.name, tarball]))
-  const spec = (tarball: Tarball) => `file:${tarball.file}`
+  /* Forward slashes in the spec, as npm writes `file:` paths on Windows too. */
+  const spec = (tarball: Tarball) => `file:${tarball.file.replaceAll("\\", "/")}`
 
   const linked = (name: string): Readonly<Record<string, string>> => {
     const own = field(manifest, name)
@@ -126,11 +129,17 @@ function install(dir: string, tarballs: readonly Tarball[], lockfile: boolean): 
   )
 
   /* npm's own output goes to stderr, so the path is the only thing on stdout. */
-  const result = spawnSync(
-    "npm",
-    ["install", "--no-audit", "--no-fund", ...(lockfile ? [] : ["--no-package-lock"])],
-    { cwd: dir, stdio: ["ignore", process.stderr, process.stderr] },
-  )
+  const npm = spawnPlan("npm", [
+    "install",
+    "--no-audit",
+    "--no-fund",
+    ...(lockfile ? [] : ["--no-package-lock"]),
+  ])
+  const result = spawnSync(npm.command, npm.args, {
+    cwd: dir,
+    stdio: ["ignore", process.stderr, process.stderr],
+    windowsVerbatimArguments: npm.windowsVerbatimArguments,
+  })
 
   if (result.status !== 0) throw new Error(`npm install failed in ${dir}`)
 }

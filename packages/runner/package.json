@@ -44,6 +44,11 @@
       "types": "./dist/types/support/children.d.ts",
       "default": "./src/support/children.ts"
     },
+    "./command-line": {
+      "danwo-source": "./src/support/command-line.ts",
+      "types": "./dist/types/support/command-line.d.ts",
+      "default": "./src/support/command-line.ts"
+    },
     "./strip-types": "./strip-types.mjs"
   },
   "scripts": {
