@@ -38,6 +38,11 @@ export default defineConfig({
    * webhooks Clerk sent, so no test waits or settles by hand.
    */
   readiness: { mode: "page+backend", settle: true },
+  /*
+   * The app reads Clerk's signing keys once per server and keeps them. The matrix runs the test
+   * once before its clean run, so that read, which no faulted trial makes, gets no fault.
+   */
+  matrix: { warmUp: true },
   sessions: {
     /** Ada, signed in with an emailed code, in her personal account. */
     "signed-in-ada": {

@@ -67,7 +67,7 @@ The scripts:
 | ----------------------- | ------------------------------------------------------------------------------------ |
 | `npm test`              | every test; the agent tests skip without a model key                                 |
 | `npm run matrix:plan`   | what the sign-up's fault matrix would try, without running it                        |
-| `npm run matrix`        | the sign-up's fault matrix: 25 trials, about 70 seconds                              |
+| `npm run matrix`        | the sign-up's fault matrix: 22 trials, about 90 seconds                              |
 | `npm run matrix:invite` | the same for creating an organization and inviting Bob: 31 trials, under two minutes |
 | `npm run serve`         | danwo's dashboard over everything the runs recorded                                  |
 | `npm run typecheck`     | `tsc` over the app and the tests                                                     |
@@ -102,14 +102,18 @@ picks her organization in the switcher.
 ### The matrix, clean
 
 ```text
-faults: 22 passed, 3 invalid (fault never fired)
-26 runs in 72 s
+faults: 22 passed
+23 runs in 87 s
 ```
 
-The three that never fire are expected here. The app checks session tokens offline with
-`CLERK_JWT_KEY`, so it reads Clerk's keys once per worker, not in the trial. The only return from
-Clerk's site is the dev-browser handshake on the first page, before any webhook is waiting. The
-invite's matrix passes 30 of 31 the same way.
+Every planned fault fires. The app checks session tokens offline with `CLERK_JWT_KEY`, so it reads
+Clerk's keys once per worker; `matrix: { warmUp: true }` in `danwo.config.ts` runs the test once
+before the clean run, so that read gets no fault. The only return from Clerk's site is the
+dev-browser handshake on the first page, where the browser did nothing at Clerk, so it gets no
+webhooks-before-redirect race.
+
+The invite's matrix passes 30 of 31. Bob comes back from Clerk's invitation link before he signs
+up, so its webhooks-before-redirect race finds no webhook waiting and is INVALID.
 
 ## Make it break
 
