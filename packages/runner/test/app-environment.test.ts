@@ -1,8 +1,11 @@
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { createServer } from "node:net"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { resendInbox } from "@danwo/emulators"
-import { describe, expect, it } from "vitest"
+import { afterAll, describe, expect, it } from "vitest"
 import { z } from "zod"
 
 import { appEnvironment, startApp } from "../src/runner/app-environment.ts"
@@ -11,6 +14,10 @@ import { resendService } from "../src/runner/resend.ts"
 import { stackEnvironment } from "../src/runner/stack-environment.ts"
 
 const APP = fileURLToPath(new URL("./fixtures/mail-app.ts", import.meta.url))
+const COMPOSE = fileURLToPath(new URL("./fixtures/compose-stand-in.ts", import.meta.url))
+
+/** The stand-in for `docker compose`, run as `mode` (`up`, `down` or `hang`). */
+const compose = (mode: string) => `"${process.execPath}" "${COMPOSE}" ${mode}`
 
 /** A port nothing listens on. */
 function freePort(): Promise<number> {
@@ -79,6 +86,75 @@ describe("startApp", () => {
     } finally {
       await running.stop()
     }
+  })
+})
+
+describe("a command that starts a service and returns, as docker compose up --wait does", () => {
+  const dir = mkdtempSync(join(tmpdir(), "danwo-compose-"))
+  const pidFile = join(dir, "server.pid")
+
+  afterAll(() => {
+    try {
+      process.kill(Number(readFileSync(pidFile, "utf8")), "SIGKILL")
+    } catch {
+      /* Stopped by its test, as it should be. */
+    }
+
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  /** A command that is ready once it exits, with no stop command. */
+  async function returning(command: string, timeoutMs = 20_000) {
+    return {
+      ...(await appCommand({ STAND_IN_PID_FILE: pidFile })),
+      command,
+      ready: { exit: true },
+      timeoutMs,
+    }
+  }
+
+  /** The stand-in for compose, run as `mode`, with `down` as its stop command. */
+  async function service(mode: string, timeoutMs = 20_000) {
+    return { ...(await returning(compose(mode), timeoutMs)), stop: compose("down") }
+  }
+
+  it("is ready once it exits 0, is not down for having exited, and its stop command runs", async () => {
+    const command = await service("up")
+    const app = await startApp(command)
+
+    try {
+      expect(await (await fetch(command.url)).text()).toBe("up")
+      expect(app.exited()).toBeUndefined()
+      expect(app.logs().lines).toContain("Container web Healthy")
+    } finally {
+      await app.stop()
+    }
+
+    expect(app.logs().lines).toContain("Container web Removed")
+    await expect(fetch(command.url)).rejects.toThrow("fetch failed")
+  })
+
+  it("reads no input, so a command that would wait on stdin goes on", async () => {
+    const app = await startApp(await returning("cat"))
+
+    expect(app.exited()).toBeUndefined()
+    await app.stop()
+  })
+
+  it("times out naming its last output, and still runs its stop command", async () => {
+    const command = await service("hang", 1_500)
+
+    await expect(startApp(command)).rejects.toThrow(
+      "the app was not ready (its command exited with code 0) within 1.5 s; its last output:\nContainer web Creating\nContainer web Waiting",
+    )
+    expect(existsSync(pidFile)).toBe(false)
+    await expect(fetch(command.url)).rejects.toThrow("fetch failed")
+  })
+
+  it("says when it printed nothing at all", async () => {
+    await expect(startApp(await returning("sleep 30", 1_000))).rejects.toThrow(
+      "within 1 s; its last output:\n(it printed nothing)",
+    )
   })
 })
 

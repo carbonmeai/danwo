@@ -5,6 +5,7 @@
  * environment. Any app a command starts works, with no code of its own.
  */
 import type { ChildProcess } from "node:child_process"
+import { once } from "node:events"
 
 import { spawnOwned } from "../support/children.ts"
 import { checkRouting, routingRefusal, unroutedProblems } from "./app-checks.ts"
@@ -34,9 +35,20 @@ export interface AppCommand {
   readonly timeoutMs?: number
   /**
    * When it counts as started: `url` answering (the default), a `path` under it answering (a
-   * health check), or a `log` line in its output, for a worker that serves nothing.
+   * health check), a `log` line in its output, for a worker that serves nothing, or `exit`: the
+   * command exiting with code 0, for one that starts a service and returns once it is up, such as
+   * `docker compose up --wait`. Such a command's exit is not the app going down.
    */
-  readonly ready?: { readonly path?: string; readonly log?: string | RegExp }
+  readonly ready?: {
+    readonly path?: string
+    readonly log?: string | RegExp
+    readonly exit?: boolean
+  }
+  /**
+   * A command that stops what `command` started, run by the shell in `cwd` when the app stops,
+   * after its own processes: e.g. `docker compose down`, since containers outlive the command.
+   */
+  readonly stop?: string
 }
 
 /** An app `startApp` started. */
@@ -70,10 +82,14 @@ async function answers(url: string): Promise<boolean> {
   }
 }
 
-/** Every line a child writes, the last `LOGGED_LINES` of them kept, and how many in all. */
-function captureOutput(child: ChildProcess): { readonly lines: string[]; written: number } {
-  const output = { lines: [] as string[], written: 0 }
-
+/**
+ * Every line a child writes, the last `LOGGED_LINES` of them kept, and how many in all: into
+ * `output` when given, so a stop command's lines follow the app's.
+ */
+function captureOutput(
+  child: ChildProcess,
+  output: { lines: string[]; written: number } = { lines: [], written: 0 },
+): { lines: string[]; written: number } {
   const keep = (chunk: Buffer) => {
     const lines = chunk.toString().split("\n").filter(Boolean)
 
@@ -112,10 +128,36 @@ function appEnv(app: AppCommand, env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   }
 }
 
-/** Whether the app has started, by its `ready` rule. */
-async function isReady(app: AppCommand, lines: readonly string[]): Promise<boolean> {
+/** How the command ended, as the errors and `exited()` say it. */
+function howItEnded(code: number | null, signal: NodeJS.Signals | null): string {
+  return signal === null ? `exited with code ${code}` : `was stopped by ${signal}`
+}
+
+/** What the app being ready means, for the errors: `http://… answered`. */
+function readiness(app: AppCommand): string {
+  if (app.ready?.exit === true) return "its command exited with code 0"
+  if (app.ready?.log !== undefined) return `it logged ${String(app.ready.log)}`
+
+  return `${app.ready?.path === undefined ? app.url : new URL(app.ready.path, app.url).href} answered`
+}
+
+/**
+ * The app's last lines of output, for an error, or that it printed nothing: a command that waits
+ * on something (a container's health, a prompt) without saying so is the likely stall then.
+ */
+function lastOutput(lines: readonly string[]): string {
+  return lines.length === 0 ? "(it printed nothing)" : lines.slice(-KEPT_LINES).join("\n")
+}
+
+/** Whether the app has started, by its `ready` rule; `exit` is how its command ended, if it has. */
+async function isReady(
+  app: AppCommand,
+  lines: readonly string[],
+  exit: string | undefined,
+): Promise<boolean> {
   const log = app.ready?.log
 
+  if (app.ready?.exit === true) return exit === howItEnded(0, null)
   if (log !== undefined)
     return lines.some((line) => (typeof log === "string" ? line.includes(log) : log.test(line)))
 
@@ -125,7 +167,14 @@ async function isReady(app: AppCommand, lines: readonly string[]): Promise<boole
 /** How long the app and what it started get to exit on SIGTERM before they are killed. */
 const STOP_GRACE_MS = 5_000
 
-/** Resolves once the app is ready; rejects when the child exits first or `timeoutMs` passes. */
+/** How long `app.stop` gets to finish before it is ended too. */
+const STOP_COMMAND_MS = 60_000
+
+/**
+ * Resolves once the app is ready; rejects when the child exits first or `timeoutMs` passes,
+ * with its last lines of output. It watches the command's exit, not its output closing: a
+ * container or daemon the command started may hold its output open long after it has returned.
+ */
 async function untilReady(
   child: ChildProcess,
   app: AppCommand,
@@ -133,27 +182,55 @@ async function untilReady(
 ): Promise<void> {
   const timeoutMs = app.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const deadline = Date.now() + timeoutMs
-  const recent = () => output.lines.slice(-KEPT_LINES).join("\n")
-  const what =
-    app.ready?.log === undefined ? `${app.url} answered` : `it logged ${String(app.ready.log)}`
+  const what = readiness(app)
   let exit: string | undefined
 
   child.once("exit", (code, signal) => {
-    exit = signal === null ? `exited with code ${code}` : `was stopped by ${signal}`
+    exit = howItEnded(code, signal)
   })
 
-  while (!(await isReady(app, output.lines))) {
-    if (exit !== undefined) throw new Error(`the app ${exit} before ${what}\n${recent()}`)
+  while (!(await isReady(app, output.lines, exit))) {
+    if (exit !== undefined)
+      throw new Error(`the app ${exit} before ${what}\n${lastOutput(output.lines)}`)
     if (Date.now() > deadline)
-      throw new Error(`the app was not ready (${what}) within ${timeoutMs / 1000} s\n${recent()}`)
+      throw new Error(
+        `the app was not ready (${what}) within ${timeoutMs / 1000} s; its last output:\n${lastOutput(output.lines)}`,
+      )
     await new Promise((resolve) => setTimeout(resolve, POLL_MS))
   }
 }
 
 /**
+ * Runs `app.stop`, if any, with its output added to the app's, and ends it if it has not
+ * finished within `STOP_COMMAND_MS`.
+ */
+async function runStop(
+  app: AppCommand,
+  env: NodeJS.ProcessEnv,
+  output: { lines: string[]; written: number },
+): Promise<void> {
+  if (app.stop === undefined) return
+
+  const owned = spawnOwned(app.stop, [], {
+    shell: true,
+    cwd: app.cwd,
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+  })
+
+  captureOutput(owned.child, output)
+  await Promise.race([
+    once(owned.child, "exit").catch(() => undefined),
+    new Promise((resolve) => setTimeout(resolve, STOP_COMMAND_MS).unref()),
+  ])
+  await owned.stop(STOP_GRACE_MS)
+}
+
+/**
  * Starts the app with `app.command` and `env` (the proxy's, from `proxy.env()`), and resolves
- * once `app.url` answers. Refuses to start when something already answers there: danwo would
- * test that server, whose calls to providers do not go through the proxy.
+ * once it is ready (`app.url` answers, by default). Refuses to start when something already
+ * answers there: danwo would test that server, whose calls to providers do not go through the
+ * proxy. The command reads no input: its stdin is empty, so nothing waits on a prompt.
  */
 export async function startApp(
   app: AppCommand,
@@ -164,27 +241,34 @@ export async function startApp(
       `something already answers at ${app.url}: stop it so danwo can start the app through its proxy, or set APP_URL to test the app that runs there (its calls to providers then reach the real ones)`,
     )
 
+  const ownEnv = appEnv(app, env)
   /* Its own process group: a dev command often runs the server as its own child, and both go. */
   const owned = spawnOwned(app.command, [], {
     shell: true,
     cwd: app.cwd,
-    env: appEnv(app, env),
+    env: ownEnv,
     stdio: ["ignore", "pipe", "pipe"],
   })
   const output = captureOutput(owned.child)
 
+  const stopAll = async () => {
+    await owned.stop(STOP_GRACE_MS)
+    await runStop(app, ownEnv, output)
+  }
+
   try {
     await untilReady(owned.child, app, output)
   } catch (error) {
-    await owned.stop(STOP_GRACE_MS)
+    await stopAll()
     throw error
   }
 
   let stopping = false
   let exit: string | undefined
 
+  /* A command that is ready once it exits has already exited, so this never fires for it. */
   owned.child.once("exit", (code, signal) => {
-    if (!stopping) exit = signal === null ? `exited with code ${code}` : `was stopped by ${signal}`
+    if (!stopping) exit = howItEnded(code, signal)
   })
 
   return {
@@ -195,7 +279,7 @@ export async function startApp(
     stop: () => {
       stopping = true
 
-      return owned.stop(STOP_GRACE_MS)
+      return stopAll()
     },
   }
 }

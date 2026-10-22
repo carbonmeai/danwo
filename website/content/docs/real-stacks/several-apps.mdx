@@ -54,8 +54,34 @@ By default an app is ready when its `url` answers. Change that with `ready`:
 | left out                  | `url` answers any HTTP request                  | most servers                 |
 | `{ path: "/health" }`     | that path answers                               | an app with a health check   |
 | `{ log: "worker ready" }` | that text (or a `RegExp`) appears in its output | a worker that serves nothing |
+| `{ exit: true }`          | its command exits with code 0                   | `docker compose up --wait`   |
 
 An app has two minutes to be ready, for a dev server's first build. Change it with `timeoutMs`.
+If it isn't ready by then, the error ends with the last lines it printed, or says it printed
+nothing.
+
+## Start containers with a command that returns
+
+`docker compose up --wait` starts its containers, waits until they are healthy and then exits.
+Give it `ready: { exit: true }`, and a `stop` command, since the containers outlive it:
+
+```ts title="danwo.config.ts · containers"
+{
+  name: "db",
+  command: "docker compose up --wait --wait-timeout 60",
+  stop: "docker compose down",
+  url: "http://localhost:5432",
+  ready: { exit: true },
+}
+```
+
+Its exit doesn't count as the app going down. danwo runs `stop` when the run ends, and also when
+the app fails to start. Every command gets an empty stdin, so nothing waits on a prompt.
+
+<Callout type="warn">
+  `--wait` alone waits forever on a container that never turns healthy. Add `--wait-timeout`, so
+  compose says which container it was.
+</Callout>
 
 ## Wire one app to another
 

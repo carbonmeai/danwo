@@ -88,8 +88,15 @@ danwo's own suite), and there is no guardian, so a worker killed outright can le
 running and holding the port.
 
 `app.ready` changes when it counts as started: `{ path: "/health" }` waits for that path, and
-`{ log: "worker ready" }` for a line in its output, for a worker that serves nothing. Its output is
-kept in each run's flight record (`processLogs`), redacted, line by line.
+`{ log: "worker ready" }` for a line in its output, for a worker that serves nothing, and
+`{ exit: true }` for the command exiting 0, for one that starts a service and returns once it is up
+(`docker compose up --wait --wait-timeout 60`); that exit is not the app going down. `app.stop` is
+a shell command run when the app stops and when it fails to start (`docker compose down`, since
+containers outlive the command), with its output added to the app's and 60 s to finish. Every
+command gets an empty stdin, and readiness watches the command's exit, not its output closing, so
+a daemon holding the pipe cannot stall it. A start that times out ends its error with the last 30
+lines of output, or `(it printed nothing)`. Its output is kept in each run's flight record
+(`processLogs`), redacted, line by line.
 
 ## Several apps
 
