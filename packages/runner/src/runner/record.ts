@@ -11,6 +11,7 @@ import type { DataCall } from "@danwo/infra"
 import { dataCallsOf, deliveriesOf, type PlannedFault, type ServiceDelivery } from "@danwo/matrix"
 import type { CapturedMessage, Exchange, SocketExchange } from "@danwo/proxy"
 
+import type { BrowserName } from "../browser/engines.ts"
 import type { LintFinding } from "../lint/index.ts"
 import type { AppLogRecord, FailureEvidence, StepRecord } from "../record/index.ts"
 import type { MissingArtifact } from "../record/missing.ts"
@@ -68,6 +69,8 @@ export type RecordedExchange = Omit<Exchange, "request" | "response"> & {
 export interface FlightRecord {
   readonly version: 1
   readonly test: string
+  /** The engine the run's browser was, for a run that named one (`browser.name`, `--browser`). */
+  readonly browser?: BrowserName
   /** Which run of the test: a `danwo test` attempt, or a matrix run with its fault (null: clean). */
   readonly run:
     | { readonly kind: "test"; readonly attempt: number }
@@ -192,6 +195,8 @@ function processLogsOf(input: RecordInput, redactor: Redactor): Pick<FlightRecor
 /** What the worker knows about one run besides what the session saw. */
 export interface RecordInput {
   readonly test: string
+  /** The engine the run's browser was, for a run that named one. */
+  readonly browser?: BrowserName
   readonly run: FlightRecord["run"]
   readonly status: string
   readonly error: TestError | undefined
@@ -277,6 +282,7 @@ export function buildRecord(input: RecordInput, extras: RecordExtras = {}): Flig
   return redactor.strings<FlightRecord>({
     version: 1,
     test: input.test,
+    ...(input.browser !== undefined && { browser: input.browser }),
     run: input.run,
     status: input.status,
     // The session redacts what it records; the recorder redacts again before anything is written.

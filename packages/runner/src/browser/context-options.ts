@@ -1,14 +1,16 @@
 /**
- * The browser context a project's tests run in: motion, colour scheme, language, time zone, window
- * size, a site's HTTP sign-in and headers sent with every request. Set once under
- * `browser.contextOptions` in the config, they apply to every browser the run opens: each test's,
- * each saved session's setup, each other person a test opens, and the MCP server's sessions. The
- * config is checked when it loads, since Node strips its types without checking them.
+ * The config's `browser` key: the engine tests run in (`browser.name`), and the browser context
+ * they run in: motion, colour scheme, language, time zone, window size, a site's HTTP sign-in and
+ * headers sent with every request. Set once under `browser.contextOptions`, the context options
+ * apply to every browser the run opens: each test's, each saved session's setup, each other person
+ * a test opens, and the MCP server's sessions. The config is checked when it loads, since Node
+ * strips its types without checking them.
  */
 import type { BrowserContextOptions } from "playwright-core"
 import { z } from "zod"
 
 import { DanwoError } from "../support/codes.ts"
+import { BROWSER_NAMES } from "./engines.ts"
 
 /** Whether `zone` is a time zone the platform knows, such as `Europe/Berlin`. */
 function knownZone(zone: string): boolean {
@@ -66,7 +68,23 @@ const contextOptions = z.strictObject({
     .optional(),
 })
 
-const browserConfig = z.strictObject({ contextOptions: contextOptions.optional() })
+const engine = z.enum(BROWSER_NAMES, {
+  error: `not a browser danwo runs; use ${BROWSER_NAMES.join(", ")}`,
+})
+
+const browserConfig = z.strictObject({
+  /**
+   * The engine tests run in: `chromium` (default), `firefox` or `webkit`. A list runs the suite
+   * once per engine, every result labelled with the engine it ran in. `danwo test --browser`
+   * replaces it for one run.
+   */
+  name: z
+    .union([engine, z.array(engine).min(1)], {
+      error: `not a browser danwo runs; use ${BROWSER_NAMES.join(", ")}, or a list of them`,
+    })
+    .optional(),
+  contextOptions: contextOptions.optional(),
+})
 
 /** The options of every browser context a run opens. */
 export type ContextOptions = z.infer<typeof contextOptions>

@@ -27,9 +27,10 @@ import {
 } from "@danwo/matrix"
 
 import type { CheckPace } from "../assert/pace.ts"
+import { type BrowserName, runBrowsers } from "../browser/engines.ts"
 import { lintReport, withLint } from "../lint/index.ts"
 import { addUsage, cacheLine, modelLine, type Usage } from "../record/usage.ts"
-import { type ErrorClass, exitCodeOf, notJudged } from "../support/codes.ts"
+import { DanwoError, type ErrorClass, exitCodeOf, notJudged } from "../support/codes.ts"
 import { relativeSlashed } from "../support/paths.ts"
 import { type CatalogEntry, catalogOf } from "./catalog.ts"
 import { printConfigWarnings } from "./config-keys.ts"
@@ -71,6 +72,8 @@ interface MatrixSelection {
   readonly everyOccurrence?: boolean
   /** Runs the clean trial, prints the plan and the time it would take, and runs no faults. */
   readonly plan?: boolean
+  /** The one engine every trial runs in (`--browser`); default the config's first `browser.name`. */
+  readonly browser?: string
 }
 
 /** How the faulted trials are handed out. */
@@ -610,6 +613,25 @@ function reportMatrix(
   return tellReporters(run.reporters, (r) => r.matrixFinished?.(report), run.write)
 }
 
+/**
+ * The engine a matrix's trials run in: `--browser`, else the config's first `browser.name`, else
+ * Chromium. Every trial replays the clean one, so the matrix takes one engine.
+ */
+function matrixBrowser(
+  loaded: LoadedConfig,
+  options: Pick<RunMatrixOptions, "browser">,
+): BrowserName {
+  const browsers = runBrowsers(loaded.config.browser?.name, options.browser)
+
+  if (options.browser !== undefined && browsers.length > 1)
+    throw new DanwoError(
+      "CONFIG_INVALID",
+      `danwo matrix runs in one browser; --browser names ${browsers.join(", ")}`,
+    )
+
+  return browsers[0] ?? "chromium"
+}
+
 /** The crew a matrix's trials go to, each worker started for this project and its recording. */
 function matrixCrew(setup: {
   readonly loaded: LoadedConfig
@@ -629,6 +651,7 @@ function matrixCrew(setup: {
       record: setup.recording,
       updateScreenshots: options.updateScreenshots ?? false,
       ...(options.lint !== undefined && { lint: options.lint }),
+      browser: matrixBrowser(setup.loaded, options),
     },
     onLive: (event) => setup.feed.write(event),
   })
@@ -645,6 +668,9 @@ export async function runMatrix(
   printConfigWarnings(loaded)
 
   const file = resolve(cwd, options.file)
+
+  matrixBrowser(loaded, options)
+
   const test = await theTest(loaded, file, options)
   const cache = await trialCache(loaded)
   const recording = openRecording(loaded, options.record, options.video, options.keepRuns)

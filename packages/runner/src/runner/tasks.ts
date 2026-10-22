@@ -8,6 +8,7 @@ import type { PlannedFault, RaceEvidence, ServiceDelivery, SetupSpan } from "@da
 import type { BlockedLoad, Exchange, SocketExchange } from "@danwo/proxy"
 
 import type { CheckPace } from "../assert/pace.ts"
+import type { BrowserName } from "../browser/engines.ts"
 import type { LintFinding } from "../lint/index.ts"
 import type { MissingArtifact } from "../record/missing.ts"
 import type { Usage } from "../record/usage.ts"
@@ -31,6 +32,8 @@ export interface WorkerStart {
   readonly updateScreenshots: boolean
   /** `--lint` / `--no-lint`; absent follows the config (on unless it says `lint: false`). */
   readonly lint?: boolean
+  /** The engine of tasks that name none (a matrix's trials); absent, the config's first. */
+  readonly browser?: BrowserName
 }
 
 /** `danwo test`: the selected tests of one file, run in declaration order. */
@@ -45,6 +48,11 @@ export interface TestFileTask {
   readonly cacheReadOnly?: boolean
   /** Replay only and call no model: a step with no recording that replays fails. */
   readonly replayOnly?: boolean
+  /**
+   * The engine the file runs in, for a run that names one (`browser.name`, `--browser`): its
+   * reports, records and baselines are labelled with it. Absent runs in the worker's default.
+   */
+  readonly browser?: BrowserName
 }
 
 /** `danwo matrix`: one run of one test. The clean trial records; a faulted one only replays. */
@@ -103,6 +111,19 @@ export interface TestReport {
   readonly workerIndex: number
   /** What its passing attempt touched; absent when no attempt passed. */
   readonly impact?: TestImpact
+  /** The engine it ran in, for a run that named one; reports label the test with it. */
+  readonly browser?: BrowserName
+}
+
+/**
+ * How a report names its test: the id, with the engine after it for a run that named one, as
+ * `tests/a.danwo.ts › signs in [firefox]`. The engine goes last, so the id's file stays first.
+ */
+export function testName(report: {
+  readonly id: string
+  readonly browser?: BrowserName | undefined
+}): string {
+  return report.browser === undefined ? report.id : `${report.id} [${report.browser}]`
 }
 
 /** A trial's outcome, with the evidence the matrix plans faults from and checks they fired. */

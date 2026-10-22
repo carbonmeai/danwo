@@ -8,7 +8,7 @@ import { dirname, join } from "node:path"
 
 import { resultOf } from "../tests/retry.ts"
 import type { TestRunReport } from "./reporting.ts"
-import type { TestReport } from "./tasks.ts"
+import { testName, type TestReport } from "./tasks.ts"
 
 /** What a results file holds: the run's report without the parts that only make sense live. */
 export interface RunResults {
@@ -98,9 +98,9 @@ export function mergeResults(runs: readonly RunResults[]): RunResults {
 
   for (const run of runs) {
     for (const report of run.reports) {
-      const earlier = byId.get(report.id)
+      const earlier = byId.get(testName(report))
 
-      byId.set(report.id, earlier === undefined ? report : foldReport(earlier, report))
+      byId.set(testName(report), earlier === undefined ? report : foldReport(earlier, report))
     }
   }
 

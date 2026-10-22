@@ -19,7 +19,7 @@ import { blockedLoads, blockedLoadsLine, type Proxy } from "@danwo/proxy"
 import type { Browser } from "playwright-core"
 
 import { type CheckPace, paceOf } from "../assert/pace.ts"
-import { launchBrowser } from "../browser/index.ts"
+import { type BrowserName, engineNotes, launchBrowser, runBrowsers } from "../browser/index.ts"
 import { type LintConfig, type LintFinding, lint } from "../lint/index.ts"
 import type { StepRecord } from "../record/index.ts"
 import { unexpectedlyMissing } from "../record/missing.ts"
@@ -61,15 +61,16 @@ import {
 import { SessionKeeper } from "./sessions.ts"
 import { type MessageMarks, messageMarks, type RunLists, setupCaused } from "./setup-causes.ts"
 import { withTeardown } from "./suite-hooks.ts"
-import type {
-  AttemptReport,
-  TestFileTask,
-  TestImpact,
-  TestReport,
-  TrialReport,
-  TrialTask,
-  WorkerCalls,
-  WorkerStart,
+import {
+  type AttemptReport,
+  type TestFileTask,
+  type TestImpact,
+  testName,
+  type TestReport,
+  type TrialReport,
+  type TrialTask,
+  type WorkerCalls,
+  type WorkerStart,
 } from "./tasks.ts"
 import { noTimings, TRIAL_PHASES, type TrialPhase, timed } from "./timings.ts"
 import { serverErrorRoutes } from "./verdict.ts"
@@ -92,6 +93,8 @@ interface Bench {
   readonly lint: LintConfig | undefined
   /** Where every test and trial starts; undefined without an environment. */
   readonly start: StartingPoint | undefined
+  /** The engine of tasks that name none: the run's, else the config's first. */
+  readonly browser: BrowserName
 }
 
 /**
@@ -113,20 +116,41 @@ function noteBaseline(env: WorkerEnvironment | undefined, mark: EvidenceMark): v
     passingErrors.add(route)
 }
 
-/** The worker's browser, launched on first use; each attempt opens its own context in it. */
-let browser: Promise<Browser> | undefined
+/** The worker's browser of each engine, launched on first use; each attempt opens its own context in it. */
+const browsers = new Map<BrowserName, Promise<Browser>>()
 
-/** The worker's browser behind its environment's proxy, launched again if it went away. */
+/**
+ * The engine the task in hand runs in, and whether its reports, records and baselines are
+ * labelled with it: a worker answers one task at a time, and each task names its engine.
+ */
+let engine: { readonly name: BrowserName; readonly labelled: boolean } | undefined
+
+/** The engine the task in hand runs in. */
+function engineName(): BrowserName {
+  return engine?.name ?? benchOrFail().browser
+}
+
+/** The worker's browser of the task's engine behind its environment's proxy, launched again if it went away. */
 async function workerBrowser(): Promise<Browser> {
-  const current = await browser?.catch(() => undefined)
+  const name = engineName()
+  const current = await browsers.get(name)?.catch(() => undefined)
 
   if (current?.isConnected()) return current
 
   const proxy = benchOrFail().env?.proxy
+  const launched = launchBrowser({
+    engine: name,
+    ...(proxy && { proxy: { url: proxy.url, caSpki: proxy.caSpki } }),
+  })
 
-  browser = launchBrowser(proxy && { proxy: { url: proxy.url, caSpki: proxy.caSpki } })
+  browsers.set(name, launched)
 
-  return browser
+  return launched
+}
+
+/** The task's engine as its reports and records name it; undefined when the run names none. */
+function labelledEngine(): BrowserName | undefined {
+  return engine?.labelled === true ? engine.name : undefined
 }
 
 function benchOrFail(): Bench {
@@ -165,7 +189,9 @@ async function attemptOnce(
   const { loaded, env, recording, updateScreenshots, sessions } = benchOrFail()
   const { unrecorded, onBodyStart, ...race } = extras
   const recordDir =
-    unrecorded === true ? undefined : recording && attemptDir(recording, id, recordAs)
+    unrecorded === true
+      ? undefined
+      : recording && attemptDir(recording, testName({ id, browser: labelledEngine() }), recordAs)
   const mark = markEvidence(env)
   let body: EvidenceMark | undefined
   let messages: MessageMarks = {}
@@ -174,8 +200,11 @@ async function attemptOnce(
   const tap =
     unrecorded === true
       ? undefined
-      : new LiveTap({ test: id, attempt: recordAs }, env, mark, (data) =>
-          sendNote({ topic: "live", data }),
+      : new LiveTap(
+          { test: testName({ id, browser: labelledEngine() }), attempt: recordAs },
+          env,
+          mark,
+          (data) => sendNote({ topic: "live", data }),
         )
   const result = await runAttempt(declarations, test, {
     id,
@@ -186,7 +215,7 @@ async function attemptOnce(
     recordDir,
     recordVideo: recording?.video !== undefined && recording.video !== "off",
     screenshots: {
-      dir: baselineDir(file, test.titlePath),
+      dir: baselineDir(file, test.titlePath, engineName()),
       update: updateScreenshots ? "all" : "missing",
     },
     sessions,
@@ -217,15 +246,24 @@ interface AttemptRun {
   readonly messages: MessageMarks
 }
 
-/** A test's baselines: `__screenshots__/<file>/<test>/` next to its file. */
-function baselineDir(file: string, titlePath: readonly string[]): string {
-  const name = titlePath
-    .join(" ")
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, "-")
-    .replaceAll(/^-+|-+$/g, "")
+/**
+ * A test's baselines: `__screenshots__/<file>/<test>/` next to its file, in Chromium. Each other
+ * engine draws text and controls its own way, so it keeps its own: `<test>-firefox/`, `<test>-webkit/`.
+ */
+function baselineDir(file: string, titlePath: readonly string[], browser: BrowserName): string {
+  const name =
+    titlePath
+      .join(" ")
+      .toLowerCase()
+      .replaceAll(/[^a-z0-9]+/g, "-")
+      .replaceAll(/^-+|-+$/g, "") || "test"
 
-  return join(dirname(file), "__screenshots__", basename(file), name || "test")
+  return join(
+    dirname(file),
+    "__screenshots__",
+    basename(file),
+    browser === "chromium" ? name : `${name}-${browser}`,
+  )
 }
 
 /**
@@ -343,7 +381,28 @@ async function runTest(
     if (!worthRetrying(result.status)) break
   }
 
-  return { id, status: resultOf(attempts), attempts, workerIndex, ...(impact && { impact }) }
+  return {
+    id,
+    status: resultOf(attempts),
+    attempts,
+    workerIndex,
+    ...(impact && { impact }),
+    ...labelOf(),
+  }
+}
+
+/** A report's `browser` field: the task's engine, for a run that names one. */
+function labelOf(): Pick<TestReport, "browser"> {
+  const browser = labelledEngine()
+
+  return browser === undefined ? {} : { browser }
+}
+
+/** What the task's engine does differently, for its records' notes. */
+function enginesNotes(): string[] {
+  const { env, loaded } = benchOrFail()
+
+  return engineNotes(engineName(), env?.baseUrl ?? loaded.config.baseUrl)
 }
 
 /** One finished attempt of a test, with the apps of its environment that are down. */
@@ -367,12 +426,18 @@ async function reportAttempt(attempt: FinishedAttempt): Promise<AttemptReport> {
   const blocked = blockedLoads((env?.proxy?.exchanges() ?? []).slice(attempt.mark.exchanges))
   const input: RecordInput = {
     test: attempt.id,
+    ...labelOf(),
     run: { kind: "test", attempt: attempt.n },
     status: result.status,
     error,
     stopped: result.stopped,
     divergence: result.divergence,
-    notes: [...result.notes, ...appsDownNotes(down), ...[blockedLoadsLine(blocked) ?? []].flat()],
+    notes: [
+      ...result.notes,
+      ...appsDownNotes(down),
+      ...[blockedLoadsLine(blocked) ?? []].flat(),
+      ...enginesNotes(),
+    ],
     durationMs: result.durationMs,
     flight: result.flight,
     env,
@@ -448,6 +513,9 @@ async function startFile(
 
 async function testFile(task: TestFileTask): Promise<TestReport[]> {
   const { loaded, workerIndex } = benchOrFail()
+
+  engine = task.browser === undefined ? undefined : { name: task.browser, labelled: true }
+
   const declarations = await loadTestFile(task.file)
   const selected = new Set(task.testIds)
   const reports: TestReport[] = []
@@ -466,7 +534,7 @@ async function testFile(task: TestFileTask): Promise<TestReport[]> {
 
       const report =
         test.mode === "skip"
-          ? { id, status: "skipped" as const, attempts: [], workerIndex }
+          ? { id, status: "skipped" as const, attempts: [], workerIndex, ...labelOf() }
           : await runTest(task, declarations, id, isolated(test))
 
       sendNote({ topic: "tested", data: report })
@@ -721,7 +789,7 @@ async function runTrial(
     error: result.error,
     stopped: result.stopped,
     divergence: result.divergence,
-    notes: [...verdict.notes, ...result.notes],
+    notes: [...verdict.notes, ...result.notes, ...enginesNotes()],
     durationMs: result.durationMs,
     flight: result.flight,
     env,
@@ -765,6 +833,8 @@ async function restoreTime(session: string | undefined): Promise<number | undefi
  * resetting, which skips app restarts and reseeding.
  */
 async function trial(task: TrialTask): Promise<TrialReport> {
+  engine = undefined
+
   const env = trialEnvironment()
   const timings = noTimings()
   const { start } = benchOrFail()
@@ -825,6 +895,11 @@ async function signedIn(name: string): Promise<void> {
   await start.keep("session", name)
 }
 
+/** The engine of tasks that name none: the run's, else the config's first, else Chromium. */
+function defaultEngine(start: WorkerStart, loaded: LoadedConfig): BrowserName {
+  return start.browser ?? runBrowsers(loaded.config.browser?.name)[0] ?? "chromium"
+}
+
 /** The lint settings a run uses: the flag wins, then the config; on by default. */
 function lintSettings(
   config: LintConfig | false | undefined,
@@ -858,6 +933,7 @@ const calls: WorkerCalls = {
       sessions,
       lint: lintSettings(loaded.config.lint, start.lint),
       start: env && new StartingPoint(env, () => sessions.invalidate()),
+      browser: defaultEngine(start, loaded),
     }
   },
   testFile,
@@ -881,7 +957,7 @@ function configRedact(loaded: LoadedConfig): (text: string) => string {
 
 /** Closes the browser and the environment, then ends the worker. */
 async function closeAndExit(): Promise<void> {
-  await (await browser?.catch(() => undefined))?.close()
+  for (const launched of browsers.values()) await (await launched.catch(() => undefined))?.close()
   /* Again at the end: an app's output between tests (a crash during a reset) is only kept here. */
   if (bench?.env && bench.recording)
     await writeEnvironmentRecord(

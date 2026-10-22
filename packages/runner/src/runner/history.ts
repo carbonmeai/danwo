@@ -10,6 +10,7 @@ import { join, resolve } from "node:path"
 
 import type { PlannedFault, PlanSummary, RunOutcome } from "@danwo/matrix"
 
+import type { BrowserName } from "../browser/engines.ts"
 import type { LintFinding, LintSeverity } from "../lint/index.ts"
 import { addUsage, type Usage } from "../record/usage.ts"
 import { redactCredentials } from "../secrets/index.ts"
@@ -53,6 +54,8 @@ export interface HistoryAttempt {
 
 export interface HistoryTest {
   readonly id: string
+  /** The engine it ran in, for a run that named one; the run then has the test once per engine. */
+  readonly browser?: BrowserName
   readonly status: string
   readonly attempts: readonly HistoryAttempt[]
 }
@@ -171,6 +174,7 @@ function redactedVerdict(verdict: FailureVerdict): FailureVerdict {
 function testOf(context: RunContext, report: TestReport): HistoryTest {
   return {
     id: report.id,
+    ...(report.browser !== undefined && { browser: report.browser }),
     status: report.status,
     attempts: report.attempts.map((attempt) => attemptOf(context, attempt)),
   }

@@ -14,7 +14,13 @@ import type { CheckPace } from "./assert/pace.ts"
 import type { BaselineUpdate } from "./assert/screenshot.ts"
 import type { AppErrorOptions } from "./browser/app-errors.ts"
 import { type ContextOptions, playwrightOptions } from "./browser/context-options.ts"
-import { type App, type BrowserFlags, launchBrowser } from "./browser/index.ts"
+import {
+  type App,
+  type BrowserFlags,
+  type BrowserName,
+  launchBrowser,
+  trustedContextOptions,
+} from "./browser/index.ts"
 import { showPointer } from "./browser/pointer.ts"
 import type { Backend, ReadinessMode } from "./browser/readiness.ts"
 import { hideSecretText, TabFilm, videoContextOptions } from "./browser/video.ts"
@@ -102,6 +108,8 @@ interface BrowserOptions {
   readonly proxy?: { readonly url: string; readonly caSpki: string }
   /** Extra launch options: `args` are added to the proxy's flags; `proxy` replaces the danwo proxy. */
   readonly launch?: BrowserFlags
+  /** The engine the session launches when it is given no `browser`: `chromium` (default), `firefox` or `webkit`. */
+  readonly engine?: BrowserName
   readonly headed?: boolean
   /**
    * An open browser to start the session's context in, launched with the same proxy settings; it
@@ -316,6 +324,7 @@ async function newContext(
   film: string | undefined,
 ): Promise<BrowserContext> {
   const context = await browser.newContext({
+    ...trustedContextOptions(browser),
     ...playwrightOptions(options.contextOptions),
     ...(options.browserState !== undefined && { storageState: options.browserState }),
     ...(film !== undefined && videoContextOptions(film)),
@@ -339,6 +348,7 @@ function browserOf(options: WebSessionOptions): Promise<Browser> {
   return launchBrowser({
     ...(options.proxy && { proxy: options.proxy }),
     ...(options.launch && { flags: options.launch }),
+    ...(options.engine && { engine: options.engine }),
     headless: !(options.headed ?? false),
   })
 }
@@ -512,6 +522,7 @@ async function openUserBrowser(
 
   const { shared } = desk
   const context = await desk.browser.newContext({
+    ...trustedContextOptions(desk.browser),
     ...playwrightOptions(desk.contextOptions),
     userAgent: taggedUserAgent(await desk.userAgent(), name),
     ...(state !== undefined && { storageState: state }),

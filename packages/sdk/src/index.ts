@@ -389,6 +389,7 @@ export type {
   App,
   AssertOptions,
   BrowserConfig,
+  BrowserName,
   ContextOptions,
   ExtractOptions,
   LocatorAssertions,

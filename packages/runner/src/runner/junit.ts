@@ -9,7 +9,7 @@ import { dirname, isAbsolute, join, relative } from "node:path"
 
 import { distinctFindings, findingPlace, type LintFinding } from "../lint/index.ts"
 import type { MatrixRunReport, Reporter, TestRunReport } from "./reporting.ts"
-import type { TestReport } from "./tasks.ts"
+import { testName, type TestReport } from "./tasks.ts"
 
 export interface JunitOptions {
   /** Where the XML goes, relative to the project root; default `.danwo/junit.xml`. */
@@ -48,7 +48,7 @@ function caseBody(report: TestReport): string {
 
 /** The element for one test: passed, skipped, failed with its last error, or flaky. */
 function testCase(report: TestReport, suite: string): string {
-  const name = escapeXml(report.id.split(" › ").slice(1).join(" › ") || report.id)
+  const name = escapeXml(testName(report).split(" › ").slice(1).join(" › ") || testName(report))
   const time = seconds(report.attempts.reduce((total, attempt) => total + attempt.durationMs, 0))
 
   return `<testcase classname="${escapeXml(suite)}" name="${name}" time="${time}">${caseBody(report)}</testcase>`

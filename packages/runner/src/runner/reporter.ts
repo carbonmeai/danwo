@@ -7,7 +7,7 @@ import pc from "picocolors"
 import { addUsage, cacheLine, dollars, modelLine, type Usage } from "../record/usage.ts"
 import { type ErrorClass, exitCodeOf } from "../support/codes.ts"
 import type { ResultStatus } from "../tests/retry.ts"
-import type { TestReport } from "./tasks.ts"
+import { testName, type TestReport } from "./tasks.ts"
 import { type FailureVerdict, VERDICT_LABELS, verdictSummary } from "./verdict-words.ts"
 
 const SYMBOL: Readonly<Record<ResultStatus, string>> = {
@@ -29,7 +29,7 @@ export function testLine(report: TestReport): string {
   const ms = report.attempts.reduce((total, attempt) => total + attempt.durationMs, 0)
   const attempts = report.attempts.length > 1 ? pc.dim(` (${report.attempts.length} attempts)`) : ""
 
-  return `  ${SYMBOL[report.status]} ${report.id}${attempts} ${pc.dim(`${ms} ms, worker ${report.workerIndex}`)}`
+  return `  ${SYMBOL[report.status]} ${testName(report)}${attempts} ${pc.dim(`${ms} ms, worker ${report.workerIndex}`)}`
 }
 
 /** A verdict as a failure's header shows it: "App bug (likely)". */
@@ -46,7 +46,7 @@ function failureLines(report: TestReport): string[] {
 
   return [
     "",
-    pc.red(pc.bold(`✗ ${report.id}`)) + tag,
+    pc.red(pc.bold(`✗ ${testName(report)}`)) + tag,
     ...(last?.error ? [`  ${last.error.code}: ${last.error.message}`] : []),
     ...(last?.verdict ? [pc.dim(`  why: ${last.verdict.reason}`)] : []),
     ...(last?.record ? [pc.dim(`  record: ${last.record}`)] : []),
@@ -76,8 +76,23 @@ function summaryLine(reports: readonly TestReport[]): string {
     .join(", ")
 }
 
-export function openingLine(tests: number, workers: number): string {
-  return pc.dim(`Running ${count(tests, "test")} with ${count(workers, "worker")}`)
+/**
+ * The run's first line: how many tests, in which engines when it names them, on how many workers.
+ * Each engine runs every test, so `browsers` multiplies the runs.
+ */
+export function openingLine(
+  tests: number,
+  workers: number,
+  browsers: readonly string[] = [],
+): string {
+  const where =
+    browsers.length === 0
+      ? count(tests, "test")
+      : browsers.length === 1
+        ? `${count(tests, "test")} in ${browsers.join("")}`
+        : `${count(tests * browsers.length, "test")} (${tests} in each of ${browsers.join(", ")})`
+
+  return pc.dim(`Running ${where} with ${count(workers, "worker")}`)
 }
 
 /** Lines of a file's error kept under its first, such as the output of an app that would not start. */
@@ -104,7 +119,7 @@ function flakyLines(report: TestReport): string[] {
 
   return [
     "",
-    pc.yellow(`~ flaky: ${report.id} (passed on attempt ${report.attempts.length})`),
+    pc.yellow(`~ flaky: ${testName(report)} (passed on attempt ${report.attempts.length})`),
     ...failed.flatMap((attempt) => [
       ...(attempt.error ? [`  ${attempt.error.code}: ${attempt.error.message}`] : []),
       ...(attempt.record ? [pc.dim(`  record: ${attempt.record}`)] : []),
@@ -143,7 +158,7 @@ function attemptUsages(reports: readonly TestReport[]): Usage[] {
               ...attempt.usage,
               steps: attempt.usage.steps.map((cost) => ({
                 ...cost,
-                step: { ...cost.step, label: `${report.id} › ${cost.step.label}` },
+                step: { ...cost.step, label: `${testName(report)} › ${cost.step.label}` },
               })),
             },
           ],

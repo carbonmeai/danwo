@@ -3,6 +3,7 @@ import { basename, resolve } from "node:path"
 
 import { blockedLoadsLine, mergeBlockedLoads } from "@danwo/proxy"
 
+import { type BrowserName, runBrowsers } from "../browser/engines.ts"
 import { type LintFinding, lintReport, withLint } from "../lint/index.ts"
 import { missingLine } from "../record/missing.ts"
 import { DanwoError } from "../support/codes.ts"
@@ -29,7 +30,7 @@ import {
   shardResultsPath,
   writeResults,
 } from "./results.ts"
-import type { TestFileTask, TestReport } from "./tasks.ts"
+import { type TestFileTask, testName, type TestReport } from "./tasks.ts"
 import { runPool } from "./trial-pool.ts"
 
 /** Which tests a run picks, beyond the config's test files. */
@@ -71,6 +72,11 @@ interface TestExecution {
    * `cache.replayOnly`): a step with no recording that replays fails with `REPLAY_MISSING`.
    */
   readonly replayOnly?: boolean
+  /**
+   * The engines to run in, as `firefox` or `chromium,webkit` (`--browser`); default the config's
+   * `browser.name`, else Chromium. Several run the suite once per engine.
+   */
+  readonly browser?: string
 }
 
 export interface RunTestsOptions extends TestSelection, TestExecution, RunCommandOptions {}
@@ -162,9 +168,10 @@ export async function runTests(options: RunTestsOptions = {}): Promise<number> {
   printConfigWarnings(loaded)
 
   const ci = options.ci ?? inCi()
+  const browsers = runBrowsers(loaded.config.browser?.name, options.browser)
   const picked = await pickTests(loaded, options, ci, write)
 
-  if (options.list) return listTests(loaded, picked.entries, write)
+  if (options.list) return listTests(loaded, picked.entries, labels(browsers), write)
 
   if (picked.entries.length === 0) {
     write(picked.empty)
@@ -180,22 +187,30 @@ export async function runTests(options: RunTestsOptions = {}): Promise<number> {
     write("replay-only: no model is called; a step with no recording that replays fails")
   }
 
-  return executeRun({ loaded, options, ci, cwd, write, ...picked })
+  return executeRun({ loaded, options, ci, cwd, write, browsers, ...picked })
 }
 
-/** `--list`: the picked tests as one JSON array of their ids and files, and nothing run. */
+/**
+ * `--list`: the picked tests as one JSON array of their ids and files, and nothing run. A run that
+ * names its engines lists each test once per engine, with the engine, in the order they run.
+ */
 function listTests(
   loaded: LoadedConfig,
   entries: readonly CatalogEntry[],
+  browsers: readonly BrowserName[],
   write: (line: string) => void,
 ): number {
+  const listed = (entry: CatalogEntry) => ({
+    id: entry.id,
+    file: relativeSlashed(loaded.root, entry.file),
+    invariant: entry.invariant,
+  })
+
   write(
     JSON.stringify(
-      entries.map((entry) => ({
-        id: entry.id,
-        file: relativeSlashed(loaded.root, entry.file),
-        invariant: entry.invariant,
-      })),
+      browsers.length === 0
+        ? entries.map(listed)
+        : browsers.flatMap((browser) => entries.map((entry) => ({ ...listed(entry), browser }))),
     ),
   )
 
@@ -275,6 +290,8 @@ async function pickChanged(
 }
 
 interface RunInput extends Picked {
+  /** The engines the run goes through, each test once in each. */
+  readonly browsers: readonly BrowserName[]
   readonly loaded: LoadedConfig
   readonly options: RunTestsOptions
   readonly ci: boolean
@@ -311,7 +328,7 @@ function testEvent(report: TestReport) {
   return {
     type: "test",
     at: new Date().toISOString(),
-    test: report.id,
+    test: testName(report),
     status: report.status,
     durationMs: report.attempts.reduce((total, attempt) => total + attempt.durationMs, 0),
   } as const
@@ -357,7 +374,7 @@ async function executeRun(input: RunInput): Promise<number> {
     input.options.keepRuns,
   )
   const id = recording === undefined ? newRunId() : basename(recording.runDir)
-  const count = input.entries.length
+  const count = input.entries.length * input.browsers.length
   const feed = await openLiveFeed(input.loaded.root, {
     id,
     kind: "test",
@@ -388,7 +405,7 @@ interface RunFrame {
 async function runAndReport(input: RunInput, frame: RunFrame): Promise<number> {
   const { loaded, options, cwd, write } = input
   const { recording, feed, began } = frame
-  const { tasks, size } = planRun(loaded, options, input.ci, input.entries)
+  const { tasks, size } = planRun(loaded, options, input)
   const reporters = [
     historyReporter(),
     ...(loaded.config.reporters ?? []),
@@ -408,7 +425,7 @@ async function runAndReport(input: RunInput, frame: RunFrame): Promise<number> {
     feed.write(testEvent(report))
   })
 
-  write(openingLine(input.entries.length, size))
+  write(openingLine(input.entries.length, size, labels(input.browsers)))
   await tellReporters(reporters, (r) => r.started?.(context), write)
 
   let ran: TaskRun = { brokenFiles: [], notRun: 0, testsNotRun: 0 }
@@ -523,16 +540,25 @@ function splitsFiles(loaded: LoadedConfig, options: Pick<TestExecution, "splitFi
 }
 
 /**
- * One task per file (or per test, for the files `splitFiles` splits), and how many workers they
- * get: no more than there are tasks.
+ * The engines a run labels its tests with: none for Chromium alone, the run every config had
+ * before engines could be named, so its output and records stay as they were.
+ */
+function labels(browsers: readonly BrowserName[]): readonly BrowserName[] {
+  return browsers.length === 1 && browsers[0] === "chromium" ? [] : browsers
+}
+
+/**
+ * One task per file (or per test, for the files `splitFiles` splits) in each engine, every
+ * engine's tasks after the one before's, and how many workers they get: no more than there are
+ * tasks.
  */
 function planRun(
   loaded: LoadedConfig,
   options: RunTestsOptions,
-  ci: boolean,
-  entries: readonly CatalogEntry[],
+  input: Pick<RunInput, "ci" | "entries" | "browsers">,
 ): { tasks: TestFileTask[]; size: number } {
   const { cache } = loaded.config
+  const { ci, entries } = input
   const defaults = ciDefaults(ci)
   const task = {
     retries: options.retries ?? loaded.config.retries ?? defaults.retries,
@@ -540,7 +566,13 @@ function planRun(
     cacheReadOnly: defaults.cacheReadOnly,
     ...(replayOnly(loaded, options) && { replayOnly: true }),
   }
-  const tasks = tasksOf(entries, task, splitsFiles(loaded, options))
+  const named = labels(input.browsers)
+  const tasks =
+    named.length === 0
+      ? tasksOf(entries, task, splitsFiles(loaded, options))
+      : named.flatMap((browser) =>
+          tasksOf(entries, { ...task, browser }, splitsFiles(loaded, options)),
+        )
 
   return { tasks, size: Math.min(options.workers ?? loaded.config.workers ?? 1, tasks.length) }
 }

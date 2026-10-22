@@ -12,6 +12,7 @@ import { dollars, type Spent, tokensText, usageOf } from "../record/usage.ts"
 import { afterBody, checkLine } from "./checks-text.ts"
 import type { FlightRecord, RecordedExchange, RecordedStep } from "./record.ts"
 import { FAVICON, LOCKUP_ON_DARK, LOCKUP_ON_LIGHT } from "./report-brand.ts"
+import { testName } from "./tasks.ts"
 
 /** One kept record, as the report reads it. */
 export interface Loaded {
@@ -324,7 +325,7 @@ function section(loaded: Loaded): string {
   const { record } = loaded
   const failed = record.status !== "passed"
 
-  return `<section id="${escape(loaded.dir)}" class="${failed ? "failed" : "passed"}"><h3><span class="badge">${escape(record.status)}</span> ${escape(record.test)} <span class="dim">— ${escape(runTitle(record))}</span></h3><p class="dim">${escape(record.startedAt)} · ${record.durationMs} ms · <code>${escape(loaded.dir)}</code></p>${errorBlock(record)}${lintBlock(record)}${failureBlock(loaded)}${videoBlock(loaded)}${stepsBlock(loaded)}${checksBlock(loaded)}${appLogBlock(loaded)}${exchangesBlock(loaded)}${deliveriesBlock(loaded)}${dataCallsBlock(loaded)}${stateBlock(record)}</section>`
+  return `<section id="${escape(loaded.dir)}" class="${failed ? "failed" : "passed"}"><h3><span class="badge">${escape(record.status)}</span> ${escape(testName({ id: record.test, browser: record.browser }))} <span class="dim">— ${escape(runTitle(record))}</span></h3><p class="dim">${escape(record.startedAt)} · ${record.durationMs} ms · <code>${escape(loaded.dir)}</code></p>${errorBlock(record)}${lintBlock(record)}${failureBlock(loaded)}${videoBlock(loaded)}${stepsBlock(loaded)}${checksBlock(loaded)}${appLogBlock(loaded)}${exchangesBlock(loaded)}${deliveriesBlock(loaded)}${dataCallsBlock(loaded)}${stateBlock(record)}</section>`
 }
 
 const STYLE = `
@@ -357,7 +358,7 @@ export function renderReport(runId: string, records: readonly Loaded[]): string 
   const index = records
     .map(
       (l) =>
-        `<li><a href="#${escape(l.dir)}">${escape(l.record.status)} · ${escape(l.record.test)} — ${escape(runTitle(l.record))}</a></li>`,
+        `<li><a href="#${escape(l.dir)}">${escape(l.record.status)} · ${escape(testName({ id: l.record.test, browser: l.record.browser }))} — ${escape(runTitle(l.record))}</a></li>`,
     )
     .join("")
 

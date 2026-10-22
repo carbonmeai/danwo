@@ -1,15 +1,20 @@
 // Runner: browser sessions driven like a user: locators, assertions and the agent.
 export {
+  BROWSER_NAMES,
   type BrowserConfig,
   browserInstalled,
+  type BrowserName,
+  browserNames,
   type BrowserProxy,
   type ContextOptions,
   INSTALL_BROWSER_COMMAND,
   installBrowser,
   type InstallBrowserOptions,
+  installCommand,
   launchBrowser,
   type LaunchOptions,
   playwrightOptions,
+  proxyContextOptions,
   proxyLaunchOptions,
 } from "./browser/index.ts"
 export {
