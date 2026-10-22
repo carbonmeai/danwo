@@ -1,0 +1,158 @@
+---
+title: Visual comparison
+description: Compare the page, or one element, with a baseline image, on web, Android and iOS. Mask what changes, set how strict, update baselines.
+icon: Image
+---
+
+`toHaveScreenshot` takes a picture of the page or of one element and compares it with a
+**baseline**: an image of how it looked last time, kept next to your tests. The first run writes
+the baseline. Every run after that fails when the picture changes.
+
+Use it for what a text check misses: a broken layout, a missing icon, the wrong colour.
+
+```ts title="tests/home.danwo.ts"
+import { test } from "@danwo/sdk"
+
+test("the home page looks right", async ({ app, screen, expect }) => {
+  await app.open("/")
+
+  await expect(screen).toHaveScreenshot("home")
+  await expect(screen.getByRole("navigation")).toHaveScreenshot("menu")
+})
+```
+
+`expect(screen)` pictures the visible page. `expect(locator)` pictures one element alone.
+
+## Where baselines live
+
+Baselines go in a `__screenshots__` folder beside the test file, one folder per test. The name you
+pass becomes the file name:
+
+```text
+tests/
+  home.danwo.ts
+  __screenshots__/
+    home.danwo.ts/
+      the-home-page-looks-right/
+        home.png
+        menu.png
+```
+
+Commit the folder with your tests. Without a name, checks are numbered in order:
+`screenshot-1.png`, `screenshot-2.png`.
+
+## The first run
+
+When a baseline is missing, danwo waits until two pictures in a row are the same, so the page has
+stopped moving, and writes it. The step passes and its record notes `baseline written: home`.
+
+On the web, danwo stops animations and hides the text caret before each picture, so the same
+page gives the same image.
+
+## When the picture changes
+
+danwo keeps taking pictures until one matches or the assertion's timeout runs out. Then the test
+fails with how much changed:
+
+```text
+✗ tests/home.danwo.ts › the home page looks right
+  SCREENSHOT_MISMATCH: expect(page).toHaveScreenshot("home") failed: 3104 pixels (0.42%) differ
+```
+
+The run's report shows three images for that step: the baseline, the new picture, and a diff that
+marks the pixels that changed. A picture of a different size always fails, with both sizes.
+
+## Update baselines
+
+When the change is the one you meant, rewrite the baselines with `--update-snapshots`, or `-u`:
+
+```sh
+npx @danwo/cli test tests/home.danwo.ts -u
+```
+
+It rewrites every baseline the picked tests check, so name a file or use `--grep` to keep it to
+the ones you changed. Then review the new images in your diff and commit them.
+
+## Mask what changes on every run
+
+A clock, an avatar or a random greeting differs on every run. `mask` paints those elements over in
+both images, so they don't count:
+
+```ts title="tests/dashboard.danwo.ts · masks"
+await expect(screen).toHaveScreenshot("dashboard", {
+  mask: [screen.getByTestId("clock"), screen.getByRole("img", { name: "Avatar" })],
+})
+```
+
+Masks are locators from the same `screen`.
+
+## Set how strict it is
+
+By default not one pixel may differ. Loosen it when the page has small rendering noise:
+
+```ts title="tests/chart.danwo.ts · a looser check"
+await expect(screen.getByTestId("chart")).toHaveScreenshot("chart", {
+  maxDiffPixelRatio: 0.01,
+  threshold: 0.3,
+})
+```
+
+| Option              | What it does                                                        | Default               |
+| ------------------- | ------------------------------------------------------------------- | --------------------- |
+| `mask`              | Elements painted over in both images                                | none                  |
+| `maxDiffPixelRatio` | Share of pixels allowed to differ, from 0 to 1                      | `0`                   |
+| `threshold`         | How different one pixel's colour may be before it counts, 0 to 1    | `0.2`                 |
+| `animations`        | `"allow"` keeps animations running while the picture is taken (web) | `"disabled"`          |
+| `timeout`           | Milliseconds to keep trying for a match                             | the assertion timeout |
+
+`expect(...).not.toHaveScreenshot` isn't supported.
+
+## On Android and iOS
+
+Device tests use the same check. `expect(screen)` pictures the whole screen without the status
+bar, since its clock changes on every run. An element's picture is its box cut from the screen.
+
+```ts title="tests/wallet.danwo.ts"
+import type { DeviceFixtures } from "@danwo/device"
+import { test as base } from "@danwo/sdk"
+
+const test = base.extend<DeviceFixtures>()
+
+test("the wallet looks right", async ({ screen, expect }) => {
+  await screen.getByText("Wallet").tap()
+
+  await expect(screen.getByTestId("balance-card")).toHaveScreenshot("balance-card")
+})
+```
+
+Password fields are always painted over, so a typed password never lands in a baseline. The
+options work as on the web, except `animations`.
+
+## In CI and with `--replay-only`
+
+A visual check never calls a model, so it runs the same under `--replay-only` and in CI as on
+your laptop. A test that mixes agent steps and visual checks replays its steps from the cache, then
+compares the pictures.
+
+Some things to know for CI:
+
+- **A missing baseline is written, not failed**, in CI too. Commit baselines, so CI compares
+  rather than writes.
+- **Take baselines where CI runs.** Fonts and anti-aliasing differ between operating systems, so
+  a baseline from a Mac can differ from a picture taken on Linux. Generate them on the same OS
+  and browser, or loosen `threshold`.
+- **A failed comparison is retried** with the rest of the test when CI's one retry is on.
+
+## Next
+
+<Cards>
+  <Card title="Agent and locators" href="/docs/agent-and-locators">
+    The locators that `mask` and element pictures take.
+  </Card>
+  <Card title="CI and GitHub" href="/docs/ci">
+    Run the suite in CI with no model calls.
+  </Card>
+  <Card title="Reading failures" href="/docs/reading-failures">
+    Find the failed step in a run's report.
+  </Card>
+</Cards>
