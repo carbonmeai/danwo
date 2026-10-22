@@ -109,7 +109,53 @@ Options:
   serial `emulator-<port>`, and its own driver state and proxy route. Every boot is read-only, so
   several instances share one AVD and its snapshots.
 - `serial` uses a running device as it is.
+- `adb` uses a remote device over adb instead; see below.
 - `permissions` lists runtime permissions to grant before each launch.
+
+## Remote devices over adb
+
+`adb: "host:port"` runs a worker on a remote Android device instead of an emulator: a device
+cloud's virtual device that exposes adb, a device farm's remote access session, a team's own farm,
+or any `adb connect host:port` target. A value without a port is taken as the serial of a device
+adb already lists (a USB phone), and is not connected or disconnected.
+
+```ts
+return withAndroidDevice(env, {
+  avd: "danwo_spike", // used only when no adb target is set
+  adb: process.env.CI === undefined ? undefined : ["10.0.4.12:5555", "10.0.4.13:5555"],
+  worker: workerIndex,
+  reverse: [8081], // a dev server the app calls on the device's 127.0.0.1:8081
+  app: { package: "com.danwo.shopmobile", apk: build.apk },
+})
+```
+
+- `DANWO_ADB_TARGET` (comma-separated) overrides `adb`, so CI points a config written for a local
+  AVD at its devices. Worker n takes the nth target; a worker past the list fails with a message
+  naming the counts, so run as many workers as targets (`--workers <n>`).
+- danwo runs `adb connect`, waits up to `connectTimeoutMs` (default 30 s) for the device to be listed
+  as `device`, and reads `ro.build.version.sdk`. It disconnects at the end only when it made the
+  connection (adb did not answer "already connected").
+- Nothing emulator-only runs on it: no boot, no `-snapshot`, no `emu` console command, no
+  `emu kill`. `avd`, `snapshot` and `port` are ignored.
+- The binding is the emulator's: `adb root` (after which danwo connects again, since restarting
+  adbd drops a network connection), the CA pushed into the user store, Chrome's flags, animations
+  and the captive-portal probe off, then `adb reverse tcp:8765 tcp:<proxy port>` and the device's
+  proxy setting `127.0.0.1:8765`. The device never needs a route to the host; the proxy's traffic
+  rides the adb connection. `reverse` adds more same-number ports.
+- Closing restores a shared device: the APK danwo installed is uninstalled, apps it disabled for
+  the link scheme are enabled again, the CA file and Chrome's flags are removed, adbd goes back to
+  the shell user when danwo made it root (`adb unroot`, then a reconnect), the global
+  settings it changed get their earlier values back (deleted when they had none), the proxy setting
+  is cleared and the reverse rules removed.
+
+Errors, each naming the target:
+
+| Message starts                              | Cause                                                                                 |
+| ------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `<target> is not reachable over adb`        | `adb connect` failed, or the device stayed offline / unlisted                         |
+| `<target> has not authorized this computer` | the device lists as `unauthorized`: accept the prompt, or add `~/.android/adbkey.pub` |
+| `<target> runs API <n>; danwo needs API 24` | older than Android 7, which has no network security config for a user CA              |
+| `<target> cannot run adbd as root`          | a production build: use a virtual device or a userdebug / rooted build                |
 
 ## Parallel emulators
 

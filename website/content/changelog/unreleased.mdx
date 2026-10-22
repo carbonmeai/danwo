@@ -68,6 +68,7 @@ date: 2026-10-20
 - **Gestures:** `device.swipe()` with a direction or two points and a duration, and `device.dismissKeyboard()`. The agent can swipe, long-press and put the keyboard away, and those steps replay with no model call. A locator's `longPress({ durationMs })` holds an element on a device, and on a web page holds the mouse down on it.
 - **Android build:** Gradle and the Kotlin compiler leave no daemon running after `danwo build-android`.
 - **Native apps:** `danwo build-ios` builds a plain Xcode project or workspace (SwiftUI, UIKit) for the Simulator, and `danwo build-android` a plain Gradle project (Compose, Views), adding the network config that trusts danwo's certificate for that build only. Both find the project's kind themselves, read the bundle id or package from the build, and build Flutter apps too. Compose buttons, checkboxes and switches are found by role and label. New examples: `with-swiftui` and `with-compose`.
+- **Remote Android devices:** `withAndroidDevice({ adb: "host:port" })` runs a worker on a device reached over adb, such as a device cloud's virtual device or a team's farm, and `DANWO_ADB_TARGET` sets it from CI. danwo connects, routes the proxy through `adb reverse`, never runs an emulator command on it, and leaves the device as it found it.
 - **Steadier replays and matrices:** the emulator's ad and notification pings and the simulator's Apple News calls are blocked as background traffic, and a matrix trial on a device paces its checks only once its fault has fired, waiting at least 6 s.
 
 ## Dashboard

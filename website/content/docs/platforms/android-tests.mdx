@@ -71,6 +71,76 @@ The full file, with the backend and Stripe behind the proxy, is in
 Pass `blocked: ANDROID_BACKGROUND_HOSTS` from `@danwo/mobile` to your services. It blocks the
 emulator's own background traffic (Chrome sync, Play services), so the matrix never faults it.
 
+## Remote devices
+
+A remote device is an Android device that your machine reaches over adb's network protocol
+instead of an emulator it boots. Use one when the machine can't run an emulator, such as a CI
+runner without hardware acceleration, or when your team keeps its devices in one place.
+
+Give `withAndroidDevice` the device's address as `adb`:
+
+```ts title="danwo.config.ts · a remote device"
+return withAndroidDevice(environment, {
+  adb: "10.0.4.12:5555",
+  worker: workerIndex,
+  app: { package: "com.danwo.shopmobile", apk: build.apk, scheme: "danwoshop" },
+})
+```
+
+Any service that hands you an `adb connect` address works:
+
+- a device cloud that exposes adb for its virtual devices;
+- a device farm's remote access session;
+- your team's own farm, or one machine's emulator shared on the network.
+
+### What danwo does with it
+
+For each worker, danwo:
+
+1. runs `adb connect` to the address and waits for the device;
+2. checks that the device runs Android 7 (API 24) or newer;
+3. puts the run's certificate in the trust store and turns off animations, as on an emulator;
+4. runs `adb reverse`, so the device reaches the proxy at 127.0.0.1 on the device itself;
+5. installs the APK.
+
+The device never needs a route to your machine. All of its traffic, and the proxy's answers,
+travel inside the adb connection. danwo never boots, wipes or snapshots a remote device, and the
+`avd` and `snapshot` options are ignored.
+
+When the run ends, danwo uninstalls the APK and removes its certificate. It puts the device's
+settings back, and it disconnects the device only when the run made the connection.
+
+### Pass the address from CI
+
+`DANWO_ADB_TARGET` overrides the config's choice. Keep `avd` for your own machine and let CI
+point the same config at its devices:
+
+```sh
+DANWO_ADB_TARGET=10.0.4.12:5555 npx danwo test --workers 1
+```
+
+For several workers, list one address per worker, separated by commas. Worker n takes the nth.
+
+| Option             | What it does                                                        | Default |
+| ------------------ | ------------------------------------------------------------------- | ------- |
+| `adb`              | the device's `host:port`, or a list with one per worker             |         |
+| `reverse`          | more ports the device reaches on your machine, such as a dev server |         |
+| `connectTimeoutMs` | how long the device may take to come online                         | 30 000  |
+
+<Callout type="warn">
+  danwo needs `adb root` to add its certificate. Most device clouds' virtual devices allow it. A
+  retail phone does not, and the run stops with an error that says so.
+</Callout>
+
+### When it can't connect
+
+| Error says                        | What to check                                                        |
+| --------------------------------- | -------------------------------------------------------------------- |
+| is not reachable over adb         | the address, that the cloud session is up, and that its port is open |
+| has not authorized this computer  | accept the prompt on the device, or add your adb key to the cloud    |
+| needs API 24 (Android 7) or newer | pick a newer device or image                                         |
+| cannot run adbd as root           | use a virtual device or a rooted build                               |
+
 ## What a test can do
 
 | Fixture    | On Android                                                                                                          |
