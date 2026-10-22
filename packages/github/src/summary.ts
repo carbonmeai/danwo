@@ -8,6 +8,7 @@ import {
   type FailureVerdict,
   type LintFinding,
   type MatrixRunReport,
+  testName,
   type TestReport,
   type TestRunReport,
   VERDICT_LABELS,
@@ -108,7 +109,7 @@ function testRow(report: TestReport): string {
   const failure = error ? `${error.code}: ${error.message}${where}` : ""
   const whose = verdictText(report.attempts.at(-1)?.verdict)
 
-  return `| ${STATUS_MARK[report.status] ?? ""} | ${cell(report.id)} | ${report.attempts.length} | ${cell(whose)} | ${cell(failure)} |`
+  return `| ${STATUS_MARK[report.status] ?? ""} | ${cell(testName(report))} | ${report.attempts.length} | ${cell(whose)} | ${cell(failure)} |`
 }
 
 /** The title line of a `danwo test` check. */
@@ -140,7 +141,7 @@ export function testSummary(run: TestRunReport, link: RecordsLink): string {
   const records = notable.flatMap((report): [string, string][] => {
     const record = report.attempts.findLast((attempt) => attempt.record)?.record
 
-    return record ? [[report.id, record]] : []
+    return record ? [[testName(report), record]] : []
   })
   const lines = [
     `### danwo test: ${testTitle(run)} in ${seconds(run.durationMs)}`,

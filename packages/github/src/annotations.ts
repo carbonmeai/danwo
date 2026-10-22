@@ -6,7 +6,7 @@ import { isAbsolute, relative, resolve, sep } from "node:path"
 
 import type { RunOutcome } from "@danwo/matrix"
 import type { LintFinding, MatrixRunReport, TestReport, TestRunReport } from "@danwo/runner/runner"
-import { redactCredentials } from "@danwo/runner/runner"
+import { redactCredentials, testName } from "@danwo/runner/runner"
 
 import type { Annotation } from "./checks.ts"
 
@@ -53,7 +53,7 @@ function testAnnotation(base: PathBase, report: TestReport): Annotation | undefi
     start_line: line,
     end_line: line,
     annotation_level: report.status === "flaky" ? "warning" : "failure",
-    title: report.status === "flaky" ? `flaky: ${report.id}` : report.id,
+    title: report.status === "flaky" ? `flaky: ${testName(report)}` : testName(report),
     message: shown(`${error.code}: ${error.message}`),
   }
 }

@@ -1,6 +1,7 @@
 import type { HistoryTest, TestHistory } from "@danwo/runner/runner"
 import { Icons } from "@danwo/ui/icons/base"
 import { HStack, Stack } from "@danwo/ui/jsx"
+import { Badge } from "@danwo/ui/primitives/badge"
 import { Button } from "@danwo/ui/primitives/button"
 import { TableCell, TableRow } from "@danwo/ui/primitives/table"
 import { Span } from "@danwo/ui/primitives/typography"
@@ -128,9 +129,16 @@ function TestLine({
       </TableCell>
       <TableCell whiteSpace="normal">
         <Stack gap="1">
-          <Span fontWeight="500" overflowWrap="anywhere">
-            {test.id}
-          </Span>
+          <HStack gap="1.5" flexWrap="wrap">
+            <Span fontWeight="500" overflowWrap="anywhere">
+              {test.id}
+            </Span>
+            {test.browser ? (
+              <Badge look="soft" size="sm" colorPalette="palette.gray">
+                {test.browser}
+              </Badge>
+            ) : null}
+          </HStack>
           {error ? (
             <Span color="verdict.failed.fg" fontSize="1" lineClamp="2">
               <Ident>{error.code}</Ident> {error.message}
@@ -302,7 +310,12 @@ export function TestRun({
       <BrokenFiles run={run} />
       <PanelTable label="Tests in this run" columns={TEST_RUN_COLUMNS} bodyRef={list}>
         {tests.map((test, i) => (
-          <TestLine key={test.id} test={test} current={i === current} picked={test.id === focus} />
+          <TestLine
+            key={`${test.id} ${test.browser ?? ""}`}
+            test={test}
+            current={i === current}
+            picked={test.id === focus}
+          />
         ))}
       </PanelTable>
     </Page>

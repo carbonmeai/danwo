@@ -374,6 +374,25 @@ function StepBody({
   )
 }
 
+/** Under the test's name: when it ran, how long, in which browser, which run it was; and a rerun. */
+function RunFacts({ record }: { readonly record: RecordView["record"] }) {
+  return (
+    <HStack gap="3" color="ink.muted" fontSize="1" flexWrap="wrap">
+      <Span>{new Date(record.startedAt).toLocaleString()}</Span>
+      <Span>{duration(record.durationMs)}</Span>
+      {record.browser ? <Span>in {record.browser}</Span> : null}
+      {record.run.kind === "matrix" ? (
+        <Span>matrix: {record.run.fault?.label ?? "clean run"}</Span>
+      ) : record.run.attempt > 1 ? (
+        <Span>retry {record.run.attempt - 1}</Span>
+      ) : null}
+      <Box ml="auto">
+        <RerunTest testId={record.test} />
+      </Box>
+    </HStack>
+  )
+}
+
 /**
  * The overlay's left pane: the test and how it went, the steps as a numbered transcript that jumps
  * the replay, and pinned at the bottom the warnings, the copy-to-fix button and feedback.
@@ -412,18 +431,7 @@ export function Transcript({
             <StatusBadge status={record.status} />
           </HStack>
         </HStack>
-        <HStack gap="3" color="ink.muted" fontSize="1" flexWrap="wrap">
-          <Span>{new Date(record.startedAt).toLocaleString()}</Span>
-          <Span>{duration(record.durationMs)}</Span>
-          {record.run.kind === "matrix" ? (
-            <Span>matrix: {record.run.fault?.label ?? "clean run"}</Span>
-          ) : record.run.attempt > 1 ? (
-            <Span>retry {record.run.attempt - 1}</Span>
-          ) : null}
-          <Box ml="auto">
-            <RerunTest testId={record.test} />
-          </Box>
-        </HStack>
+        <RunFacts record={record} />
       </Stack>
       <Box flex="1" minH="0" overflowY="auto" px="3" py="3">
         <Box role="list" display="grid" gap="0.5" aria-label="Steps">

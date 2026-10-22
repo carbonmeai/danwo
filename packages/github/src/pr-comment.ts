@@ -8,7 +8,12 @@
 import { createHash } from "node:crypto"
 
 import type { RunOutcome } from "@danwo/matrix"
-import type { MatrixRunReport, TestReport, TestRunReport } from "@danwo/runner/runner"
+import {
+  type MatrixRunReport,
+  testName,
+  type TestReport,
+  type TestRunReport,
+} from "@danwo/runner/runner"
 
 import { shown } from "./annotations.ts"
 import { type FailureDetails, failureDetails } from "./record-details.ts"
@@ -121,7 +126,7 @@ function testSpend(reports: readonly TestReport[]): string[] {
 function testRow(report: TestReport, links: CommentLinks): string {
   const mark = STATUS_MARK[report.status] ?? ""
 
-  return `| ${mark} | ${linked(cell(report.id), links)} | ${seconds(durationOf(report))} | ${report.attempts.length - 1} |`
+  return `| ${mark} | ${linked(cell(testName(report)), links)} | ${seconds(durationOf(report))} | ${report.attempts.length - 1} |`
 }
 
 /** The table of every test that is not flaky or skipped, failures first. */
@@ -164,7 +169,7 @@ function failureSummary(report: TestReport, error: TestReport["attempts"][0]["er
   const verdict = report.attempts.at(-1)?.verdict
   const whose = verdict ? ` · ${verdictText(verdict)}` : ""
 
-  return `<details><summary>${STATUS_MARK[report.status] ?? ""} ${cell(report.id)}${error ? `: ${error.code}` : ""}${whose}</summary>`
+  return `<details><summary>${STATUS_MARK[report.status] ?? ""} ${cell(testName(report))}${error ? `: ${error.code}` : ""}${whose}</summary>`
 }
 
 /** The failure's "Whose" line: its verdict and the evidence behind it. */
@@ -205,7 +210,7 @@ function flakyBlock(run: TestRunReport): string[] {
       "",
       "| Test | Attempts |",
       "|---|---|",
-      ...flaky.map((r) => `| ${cell(r.id)} | ${r.attempts.length} |`),
+      ...flaky.map((r) => `| ${cell(testName(r))} | ${r.attempts.length} |`),
       "",
       "</details>",
     ].join("\n"),
