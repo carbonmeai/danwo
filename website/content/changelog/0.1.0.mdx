@@ -1,0 +1,24 @@
+---
+title: danwo 0.1.0
+description: The first release.
+date: 2026-10-22
+---
+
+The first release. Install with `npx @danwo/cli init`; the [quickstart](/docs/quickstart) takes it from there.
+
+## What's in it
+
+- **Web tests** in Chromium, Firefox and WebKit, with locators, `expect` and [visual comparison](/docs/visual-comparison). See [Web](/docs/web).
+- **Agent steps** that [replay with no model](/docs/replay-cache) after the first run. See [Agent steps](/docs/agent-steps).
+- **Mobile tests** on the iOS Simulator and Android emulators, or a [remote device over adb](/docs/android-tests). Expo, React Native, [SwiftUI](/docs/native-ios), [Compose](/docs/native-android) and [Flutter](/docs/flutter) apps.
+- **22 emulated providers**, among them Stripe, Clerk, Resend, S3, Twilio and the model APIs. See [Providers](/docs/providers).
+- **[Invariants](/docs/invariants)** checked after every test, and a **[fault matrix](/docs/run-the-matrix)** that reruns a test under provider and database faults.
+- **[Real stacks](/docs/real-stacks)**: several apps, background jobs and Postgres behind one proxy.
+- **[Flight records](/docs/flight-records)** and a **[dashboard](/docs/dashboard)** for every run.
+- **[CI](/docs/ci)**: GitHub checks and a pull request comment. Runs on macOS, Linux and Windows, on Node 22.22.3+ or 24.11.1+.
+- **Models**: any AI SDK model, the AI Gateway, OpenRouter, a local server, or a ChatGPT plan through the Codex CLI. See [Use a subscription](/docs/use-a-subscription).
+- **[Coding agents](/docs/coding-agents)**: a skill and an MCP server for Claude Code, Cursor, Codex and Copilot.
+
+## Coming from another tool
+
+[Playwright](/docs/playwright), [Cypress](/docs/cypress) and [Detox](/docs/detox) each have a migration guide.

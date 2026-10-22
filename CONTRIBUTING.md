@@ -42,7 +42,7 @@ Keys for the live fidelity checks go in `.env.fidelity` (git-ignored). Use test 
 1. Open an issue first for anything larger than a small fix, so we can agree on the approach.
 2. Keep each pull request to one change, with tests. A bug fix comes with a test that fails without it.
 3. Run `bun run check` before pushing, and `bun run test:slow` if you touched the runner, proxy, emulators, CLI, dashboard or devices.
-4. Update the docs when behaviour changes, in both places: the guide in `packages/skill/guides` (dense, for coding agents) and the page in `website/content/docs` (written for people, following `website/DOCS_STYLE.md`). Add a line to `website/content/changelog/unreleased.mdx` for anything a user would notice.
+4. Update the docs when behaviour changes, in both places: the guide in `packages/skill/guides` (dense, for coding agents) and the page in `website/content/docs` (written for people, following `website/DOCS_STYLE.md`). For anything a user would notice, add one short line to the next release's entry in `website/content/changelog` (`<version>.mdx`), linking to its docs page rather than explaining it there.
 
 ## Conventions
 
