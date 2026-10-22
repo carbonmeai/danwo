@@ -88,12 +88,20 @@ function captureOutput(child: ChildProcess): { readonly lines: string[]; written
   return output
 }
 
-/** The app's environment: the proxy's, its port, then its own, with NODE_OPTIONS joined. */
+/**
+ * The app's environment: the proxy's, its port, then its own, with NODE_OPTIONS and BUN_OPTIONS
+ * joined. The proxy's BUN_OPTIONS stays first: its preload may be a quoted option, which Bun
+ * misreads after a bare flag such as `--smol`.
+ */
 function appEnv(app: AppCommand, env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const port = new URL(app.url).port
   const own = app.env ?? {}
-  const joined = (name: "NODE_OPTIONS" | "BUN_OPTIONS") =>
-    own[name] === undefined ? {} : { [name]: [own[name], env[name]].filter(Boolean).join(" ") }
+
+  const joined = (name: "NODE_OPTIONS" | "BUN_OPTIONS") => {
+    const parts = name === "BUN_OPTIONS" ? [env[name], own[name]] : [own[name], env[name]]
+
+    return own[name] === undefined ? {} : { [name]: parts.filter(Boolean).join(" ") }
+  }
 
   return {
     ...env,

@@ -97,7 +97,34 @@ function ownAddresses(url: string): string[] {
   return [`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`]
 }
 
-/** The proxy variables, CA and preload over `base`, as `Proxy.env()` returns them. */
+/**
+ * The `NODE_OPTIONS` entry that imports the preload at `path`. Its `file:` URL percent-encodes
+ * spaces and quotes, so a path like `/Users/Jane Doe/app` stays one option.
+ */
+export function nodeImportOption(path: string): string {
+  return `--import=${pathToFileURL(path).href}`
+}
+
+/**
+ * The `BUN_OPTIONS` entry that preloads `path`. Bun splits the variable on whitespace, so a path
+ * with a space or a quote goes in as one double-quoted option. Inside quotes Bun reads a backslash
+ * as an escape, so a quoted Windows path takes forward slashes, which Bun accepts there too.
+ */
+export function bunPreloadOption(
+  path: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  if (!/[\s"']/.test(path)) return `--preload=${path}`
+
+  const slashed = platform === "win32" ? path.replaceAll("\\", "/") : path
+
+  return `"--preload=${slashed.replaceAll('"', '\\"')}"`
+}
+
+/**
+ * The proxy variables, CA and preload over `base`, as `Proxy.env()` returns them. The preload
+ * leads `BUN_OPTIONS`: Bun misreads a quoted option that follows a bare flag such as `--smol`.
+ */
 export function proxyEnvironment(
   inputs: ProxyEnvironmentInputs,
   base: NodeJS.ProcessEnv,
@@ -119,8 +146,8 @@ export function proxyEnvironment(
     no_proxy: noProxy,
     NODE_USE_ENV_PROXY: "1",
     NODE_EXTRA_CA_CERTS: inputs.caCertPath,
-    NODE_OPTIONS: [base.NODE_OPTIONS, `--import=${preloadUrl}`].filter(Boolean).join(" "),
-    BUN_OPTIONS: [base.BUN_OPTIONS, `--preload=${PRELOAD}`].filter(Boolean).join(" "),
+    NODE_OPTIONS: [base.NODE_OPTIONS, nodeImportOption(PRELOAD)].filter(Boolean).join(" "),
+    BUN_OPTIONS: [bunPreloadOption(PRELOAD), base.BUN_OPTIONS].filter(Boolean).join(" "),
     [APP_CLOCK_VARIABLE]: inputs.clock.file,
     [PRELOAD_DIR_VARIABLE]: inputs.preloadDir,
     [PRELOAD_URL_VARIABLE]: preloadUrl,

@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url"
 
 import { resendInbox } from "@danwo/emulators"
 import { describe, expect, it } from "vitest"
+import { z } from "zod"
 
 import { appEnvironment, startApp } from "../src/runner/app-environment.ts"
 import { clerkService } from "../src/runner/clerk.ts"
@@ -47,6 +48,24 @@ describe("startApp", () => {
     await expect(startApp(await appCommand({ MAIL_APP_CRASH: "1" }))).rejects.toThrow(
       /exited with code 3 before .* answered\nmail app: missing configuration/,
     )
+  })
+
+  it("keeps the proxy's quoted Bun preload ahead of the app's own BUN_OPTIONS", async () => {
+    const command = await appCommand({ BUN_OPTIONS: "--smol" })
+    const app = await startApp(command, {
+      ...process.env,
+      BUN_OPTIONS: '"--preload=/Users/Jane Doe/preload.mjs"',
+    })
+
+    try {
+      const env = z
+        .record(z.string(), z.string())
+        .parse(await (await fetch(`${command.url}/env`)).json())
+
+      expect(env.BUN_OPTIONS).toBe('"--preload=/Users/Jane Doe/preload.mjs" --smol')
+    } finally {
+      await app.stop()
+    }
   })
 
   it("refuses to start when something already answers at the URL", async () => {
