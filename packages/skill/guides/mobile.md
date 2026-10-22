@@ -228,8 +228,8 @@ platforms and passes when either is ready.
 ios` (installs the pods), App Transport Security set to `NSAllowsArbitraryLoads` alone (iOS ignores
 it when a finer key such as `NSAllowsLocalNetworking` is present), then `xcodebuild` Release for
 the simulator, this Mac's CPU only, `CODE_SIGNING_ALLOWED=NO`. Kept under
-`<project>/.danwo/builds/<hash>.app`. The Expo config needs `ios.bundleIdentifier`. About 100 s
-after a JavaScript change on Apple silicon.
+`<project>/.danwo/builds/<hash>.app`. The Expo config needs `ios.bundleIdentifier`. About 2
+minutes from cold (pods included) and 100 s after a JavaScript change on Apple silicon.
 
 **The simulator.** `withIosDevice` finds its simulator by name (default `danwo iPhone`; worker n
 from the second on uses `danwo iPhone <n + 1>`), creates it when missing (the newest iOS runtime's
