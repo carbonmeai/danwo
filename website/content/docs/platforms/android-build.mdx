@@ -22,7 +22,9 @@ npx @danwo/cli build-android app
 3. runs `gradlew assembleRelease` with `DANWO=1`, using Android Studio's JDK when `JAVA_HOME` is
    unset.
 
-The JavaScript is bundled into the APK, so no Metro server runs during tests.
+The JavaScript is bundled into the APK, so no Metro server runs during tests. Gradle runs with
+`--no-daemon` and compiles Kotlin in its own process, so the build leaves no Gradle or Kotlin
+daemon running.
 
 ## Reuse it
 

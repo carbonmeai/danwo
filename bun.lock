@@ -227,6 +227,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@danwo/device": "workspace:*",
+        "@danwo/runner": "workspace:*",
       },
     },
     "packages/fidelity": {

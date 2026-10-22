@@ -29,7 +29,8 @@
     "postpack": "node ../../scripts/pack-files.ts remove"
   },
   "dependencies": {
-    "@danwo/device": "workspace:*"
+    "@danwo/device": "workspace:*",
+    "@danwo/runner": "workspace:*"
   },
   "engines": {
     "node": ">=24"

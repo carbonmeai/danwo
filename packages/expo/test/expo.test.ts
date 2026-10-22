@@ -4,6 +4,7 @@ import { join } from "node:path"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
+import { GRADLE_ARGS } from "../src/build.ts"
 import {
   applyIosNetworkConfig,
   applyNetworkConfig,
@@ -97,6 +98,17 @@ describe("the build's key", () => {
 
     await mkdir(kept, { recursive: true })
     expect(await buildIos({ project })).toMatchObject({ app: kept, cached: true })
+  })
+})
+
+describe("the Android build", () => {
+  it("runs Gradle and the Kotlin compiler in the build's own process, so no daemon outlives it", () => {
+    expect(GRADLE_ARGS).toEqual([
+      "assembleRelease",
+      "--console=plain",
+      "--no-daemon",
+      "-Pkotlin.compiler.execution.strategy=in-process",
+    ])
   })
 })
 

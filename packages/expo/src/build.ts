@@ -4,13 +4,13 @@
  * Gradle, with Android Studio's JDK when `JAVA_HOME` is unset. A build is kept by a hash of the
  * app's sources, so an unchanged app is not built again.
  */
-import { spawn } from "node:child_process"
 import { createHash } from "node:crypto"
 import { createWriteStream, existsSync } from "node:fs"
 import { copyFile, mkdir, readdir, readFile } from "node:fs/promises"
 import { join, relative } from "node:path"
 
 import { androidSdkRoot, javaHome } from "@danwo/device/toolchain"
+import { spawnOwned } from "@danwo/runner/children"
 
 import { applyNetworkConfig } from "./network.ts"
 
@@ -70,7 +70,10 @@ export async function sourceHash(project: string, recipe: string = RECIPE): Prom
   return hash.digest("hex").slice(0, 16)
 }
 
-/** Runs a tool, appending its output to `log`; rejects with the tail of its output on failure. */
+/**
+ * Runs a tool, appending its output to `log`; rejects with the tail of its output on failure. The
+ * tool leads its own process group, so an interrupted build stops what it started too.
+ */
 function run(
   command: string,
   args: readonly string[],
@@ -80,7 +83,7 @@ function run(
   return new Promise((resolve, reject) => {
     const log = createWriteStream(options.log, { flags: "a" })
     const tail: string[] = []
-    const child = spawn(command, args, { cwd: options.cwd, env: options.env })
+    const { child } = spawnOwned(command, args, { cwd: options.cwd, env: options.env })
 
     const take = (chunk: Buffer) => {
       log.write(chunk)
@@ -95,8 +98,8 @@ function run(
       }
     }
 
-    child.stdout.on("data", take)
-    child.stderr.on("data", take)
+    child.stdout?.on("data", take)
+    child.stderr?.on("data", take)
     child.on("error", reject)
     child.on("close", (code) => {
       log.end()
@@ -179,6 +182,18 @@ export async function buildSlot(options: {
   }
 }
 
+/**
+ * Gradle's arguments for the release build. Gradle and the Kotlin compiler would each leave a
+ * daemon running after the build; both run inside the build's own process instead, so nothing
+ * outlives it.
+ */
+export const GRADLE_ARGS: readonly string[] = [
+  "assembleRelease",
+  "--console=plain",
+  "--no-daemon",
+  "-Pkotlin.compiler.execution.strategy=in-process",
+]
+
 /** Builds the danwo APK of the Expo app in `options.project`, or returns the kept one. */
 export async function buildAndroid(options: BuildAndroidOptions): Promise<AndroidBuild> {
   const started = Date.now()
@@ -196,7 +211,7 @@ export async function buildAndroid(options: BuildAndroidOptions): Promise<Androi
   await slot.install()
   await step("npx", ["expo", "prebuild", "--platform", "android", "--no-install"])
   await applyNetworkConfig(join(project, "android"))
-  await step("./gradlew", ["assembleRelease", "--console=plain"], join(project, "android"))
+  await step("./gradlew", GRADLE_ARGS, join(project, "android"))
   await copyFile(
     join(project, "android", "app", "build", "outputs", "apk", "release", "app-release.apk"),
     apk,
