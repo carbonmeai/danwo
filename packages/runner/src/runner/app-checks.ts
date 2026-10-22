@@ -5,37 +5,12 @@
  * through the proxy (the preload's start-up probe says), and whether its environment still holds
  * real provider keys that would reach real providers. None of the checks prints a value.
  */
-import { execFile } from "node:child_process"
 import { readFile } from "node:fs/promises"
-import { basename, join } from "node:path"
-import { promisify } from "node:util"
+import { join } from "node:path"
 
 import type { Proxy } from "@danwo/proxy"
 
-const run = promisify(execFile)
-
-/** One process in the machine's process table. */
-interface ProcessRow {
-  readonly pid: number
-  readonly ppid: number
-  readonly command: string
-}
-
-async function processTable(): Promise<readonly ProcessRow[]> {
-  try {
-    const { stdout } = await run("ps", ["-A", "-o", "pid=,ppid=,command="], { maxBuffer: 8 << 20 })
-
-    return stdout.split("\n").flatMap((line) => {
-      const match = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line)
-
-      return match
-        ? [{ pid: Number(match[1]), ppid: Number(match[2]), command: match[3] ?? "" }]
-        : []
-    })
-  } catch {
-    return []
-  }
-}
+import { processRowsAsync, type ProcessRow, programName } from "../support/process-table.ts"
 
 /**
  * `root` and every process below it in `table`. The root counts: a shell that runs one command
@@ -60,11 +35,18 @@ function familyOf(table: readonly ProcessRow[], root: number): readonly ProcessR
   return below
 }
 
-/** A Node process, by the program its command line starts with. */
+/** A Node process, by the program its command line starts with (`node.exe` on Windows). */
 function isNode(command: string): boolean {
-  const program = basename(command.split(/\s+/, 1)[0] ?? "")
+  const program = programName(command)
 
   return program === "node" || program === "nodejs"
+}
+
+/** How to keep the preload in a start script that sets NODE_OPTIONS, on `platform`. */
+export function keepPreloadAdvice(platform: NodeJS.Platform = process.platform): string {
+  return platform === "win32"
+    ? `append danwo's NODE_OPTIONS to its own ("set NODE_OPTIONS=%NODE_OPTIONS% --max-old-space-size=…")`
+    : `run it through PATH's node (danwo's shim is on PATH), or append danwo's NODE_OPTIONS ("NODE_OPTIONS=\\"$NODE_OPTIONS --max-old-space-size=…\\"")`
 }
 
 /**
@@ -77,13 +59,13 @@ export async function preloadWarnings(app: string, root: number, proxy: Proxy): 
     ...(await proxy.preloaded()),
     ...(await proxy.unrouted()).map((row) => row.pid),
   ])
-  const missing = familyOf(await processTable(), root).filter(
+  const missing = familyOf(await processRowsAsync(), root).filter(
     (row) => isNode(row.command) && !accounted.has(row.pid),
   )
 
   return missing.map(
     (row) =>
-      `${app}: process ${row.pid} (${row.command.slice(0, 80)}) runs without danwo's preload, so SDKs with their own HTTP agent call real hosts. Its start script likely sets NODE_OPTIONS itself: run it through PATH's node (danwo's shim is on PATH), or append danwo's NODE_OPTIONS ("NODE_OPTIONS=\\"$NODE_OPTIONS --max-old-space-size=…\\"").`,
+      `${app}: process ${row.pid} (${row.command.slice(0, 80)}) runs without danwo's preload, so SDKs with their own HTTP agent call real hosts. Its start script likely sets NODE_OPTIONS itself: ${keepPreloadAdvice()}.`,
   )
 }
 
