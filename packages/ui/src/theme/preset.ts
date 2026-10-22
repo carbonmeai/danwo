@@ -45,7 +45,7 @@ export const danwoUi = definePreset({
       include: ["palette.*", "brand.*"],
     },
     containerNames: ["field-group"],
-    containerSizes: {
+    containers: {
       lg: "1280px",
       md: "1024px",
       sm: "768px",
