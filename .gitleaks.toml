@@ -34,3 +34,8 @@ paths = [
   '''^packages/mcp/test/desk\.ts$''',
 ]
 regexes = ['''^tok_live_9f8e7d6c5b4a$''', '''^desk\-key\-5e4d3c2b1a09$''']
+
+[[allowlists]]
+description = "A WebSocket handshake's Sec-WebSocket-Key, a random nonce the protocol sends in the clear, not a key"
+regexTarget = "line"
+regexes = ['''Sec-WebSocket-Key: [A-Za-z0-9+/]{22}==''']
