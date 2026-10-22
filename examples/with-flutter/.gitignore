@@ -1,0 +1,6 @@
+node_modules/
+*.tsbuildinfo
+package-lock.json
+
+# What danwo writes when it runs: the kept builds, flight records, the agent's recordings, reports.
+.danwo/

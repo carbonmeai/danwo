@@ -1,0 +1,19 @@
+{
+  "name": "Flutter waitlist",
+  "summary": "A Flutter app on the Android emulator or the iOS Simulator joins a waitlist through a Hono API on Postgres, which sends a welcome email through Resend.",
+  "icon": "flutter.svg",
+  "stack": ["Flutter", "Android emulator", "iOS Simulator", "Hono", "Postgres"],
+  "providers": ["resend"],
+  "runsOn": "A Flutter app on an Android emulator or an iOS Simulator, with Postgres in Docker",
+  "install": "npm",
+  "ci": false,
+  "shows": [
+    "`danwo build-android` and `danwo build-ios` building one Flutter app, with danwo's network config added to the APK for the build only",
+    "The app's HTTPS calls to its production host reaching a local API through danwo's proxy, over the platform's own HTTP stack",
+    "Locators on Flutter: a Semantics `identifier` for `getByTestId`, and a Material button found by its role and label",
+    "An invariant that reads both sides: exactly one row in Postgres and exactly one welcome email",
+    "`danwo matrix` faulting the app's own API, Resend and the API's SQL, on either platform"
+  ],
+  "test": "tests/deterministic.danwo.ts",
+  "guide": { "title": "Flutter", "href": "/docs/flutter" }
+}

@@ -128,6 +128,7 @@ Each one runs with no real keys. Clone, install, test.
 | [`with-next`](examples/with-next)       | The smallest one: a Next.js waitlist on Postgres and Resend.                 |
 | [`with-swiftui`](examples/with-swiftui) | The same waitlist as a native SwiftUI app on the iOS Simulator.              |
 | [`with-compose`](examples/with-compose) | The same waitlist as a native Jetpack Compose app on an Android emulator.    |
+| [`with-flutter`](examples/with-flutter) | The same waitlist as a Flutter app, on an Android emulator or iOS Simulator. |
 
 More in the [examples gallery](https://danwo.dev/docs/examples).
 
