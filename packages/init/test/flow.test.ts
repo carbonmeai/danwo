@@ -288,7 +288,7 @@ describe("danwo init without prompts", () => {
     expect(await read(root, "tests/example.danwo.ts")).toContain('test("the app starts"')
     expect(summary).toContain("danwo device doctor")
     expect(summary).toContain(
-      "not installed: run npm install -D @danwo/cli @danwo/sdk @danwo/device @danwo/expo",
+      "not installed: run npm install -D @danwo/cli @danwo/sdk @danwo/mobile",
     )
   })
 })

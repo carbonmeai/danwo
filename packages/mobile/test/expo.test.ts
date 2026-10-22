@@ -4,7 +4,7 @@ import { join } from "node:path"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
-import { GRADLE_ARGS } from "../src/build.ts"
+import { GRADLE_ARGS } from "../src/build/build.ts"
 import {
   applyIosNetworkConfig,
   applyNetworkConfig,
@@ -15,8 +15,8 @@ import {
   withNetworkConfig,
   workspaceName,
   xcodebuildArgs,
-} from "../src/index.ts"
-import { windowsName } from "../src/slot.ts"
+} from "../src/build/index.ts"
+import { windowsName } from "../src/build/slot.ts"
 
 let project: string
 

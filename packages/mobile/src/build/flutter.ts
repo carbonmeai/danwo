@@ -7,8 +7,7 @@
 import { copyFile, cp, rm } from "node:fs/promises"
 import { join } from "node:path"
 
-import { androidSdkRoot } from "@danwo/device/toolchain"
-
+import { androidSdkRoot } from "../toolchain.ts"
 import { buildTools, packageOf } from "./gradle.ts"
 import { type AndroidBuild, type BuildExec, buildSlot, type IosBuild, sourceHash } from "./slot.ts"
 import { openTransportSecurity, simulatorSlot } from "./xcode.ts"

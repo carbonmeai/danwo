@@ -11,8 +11,7 @@ import { copyFile, mkdir, readdir, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join, sep } from "node:path"
 
-import { androidSdkRoot, javaHome } from "@danwo/device/toolchain"
-
+import { androidSdkRoot, javaHome } from "../toolchain.ts"
 import { NETWORK_CONFIG_NAME, NETWORK_SECURITY_CONFIG } from "./network.ts"
 import { type AndroidBuild, type BuildExec, buildSlot, type BuildSlot, sourceHash } from "./slot.ts"
 

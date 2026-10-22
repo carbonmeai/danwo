@@ -2,7 +2,7 @@
  * Whether this machine can run Android tests, in the words init shows: what to fix, and the
  * first AVD danwo could boot.
  */
-import type { DoctorCheck } from "@danwo/device"
+import type { DoctorCheck } from "@danwo/mobile"
 
 export interface DeviceCheck {
   /** Each failed or doubtful check, as `name: what to do`. */
@@ -25,7 +25,7 @@ export function deviceCheckOf(checks: readonly DoctorCheck[]): DeviceCheck {
 
 /** Runs the device doctor (`danwo device doctor`) on this machine. */
 export async function checkDevice(): Promise<DeviceCheck> {
-  const { deviceDoctor } = await import("@danwo/device")
+  const { deviceDoctor } = await import("@danwo/mobile")
 
   return deviceCheckOf(await deviceDoctor(undefined, { platform: "android" }))
 }

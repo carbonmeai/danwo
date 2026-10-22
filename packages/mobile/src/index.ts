@@ -7,6 +7,30 @@ export { ANDROID_BACKGROUND_HOSTS } from "./android/background.ts"
 export { androidCaFileName } from "./android/ca.ts"
 export { AndroidDevice, type AndroidDeviceOptions, androidDevice } from "./android/device.ts"
 export { type EmulatorOptions, useEmulator } from "./android/emulator.ts"
+export {
+  type AndroidBuild,
+  type AndroidProject,
+  androidProject,
+  applyIosNetworkConfig,
+  applyNetworkConfig,
+  type BuildAndroidOptions,
+  buildAndroid,
+  type BuildExec,
+  type BuildIosOptions,
+  buildIos,
+  DANWO_TRANSPORT_SECURITY,
+  type IosBuild,
+  type IosProject,
+  iosProject,
+  NETWORK_CONFIG_NAME,
+  NETWORK_SECURITY_CONFIG,
+  sourceHash,
+  withNetworkConfig,
+  workspaceName,
+  type XcodeContainer,
+  xcodeContainer,
+  xcodebuildArgs,
+} from "./build/index.ts"
 export { type DoctorCheck, type DoctorOptions, deviceDoctor } from "./doctor.ts"
 export type { DeviceDriver, Point } from "./driver.ts"
 export { type DeviceFixtures, withAndroidDevice, withIosDevice } from "./environment.ts"

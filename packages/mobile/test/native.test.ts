@@ -10,17 +10,28 @@ import {
   buildFlutterAndroid,
   buildFlutterIos,
   flutterAndroidEnv,
-} from "../src/flutter.ts"
-import { buildGradle, gradleArgs, NETWORK_MANIFEST, networkInitScript } from "../src/gradle.ts"
-import { androidProject, buildAndroid, buildIos, iosProject, sourceHash } from "../src/index.ts"
-import type { BuildExec } from "../src/slot.ts"
+} from "../src/build/flutter.ts"
+import {
+  buildGradle,
+  gradleArgs,
+  NETWORK_MANIFEST,
+  networkInitScript,
+} from "../src/build/gradle.ts"
+import {
+  androidProject,
+  buildAndroid,
+  buildIos,
+  iosProject,
+  sourceHash,
+} from "../src/build/index.ts"
+import type { BuildExec } from "../src/build/slot.ts"
 import {
   buildXcode,
   nativeXcodebuildArgs,
   pickScheme,
   schemesOf,
   XCODE_OUTPUTS,
-} from "../src/xcode.ts"
+} from "../src/build/xcode.ts"
 
 let dir: string
 
@@ -397,7 +408,7 @@ describe("the Flutter build", () => {
   it("keeps Flutter's iOS and Android projects in the key, and the generated files out", async () => {
     await files(dir, { "pubspec.yaml": "name: app", "lib/main.dart": "void main() {}" })
 
-    const { FLUTTER_OUTPUTS } = await import("../src/flutter.ts")
+    const { FLUTTER_OUTPUTS } = await import("../src/build/flutter.ts")
     const first = await sourceHash(dir, "r", FLUTTER_OUTPUTS)
 
     await files(dir, {

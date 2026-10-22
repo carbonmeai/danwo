@@ -14,7 +14,7 @@ import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { androidSdkRoot } from "@danwo/device/toolchain"
+import { androidSdkRoot } from "@danwo/mobile/toolchain"
 import { afterAll, describe, expect, it } from "vitest"
 
 import { removeWorkCopies, workCopy } from "./work-copy.ts"

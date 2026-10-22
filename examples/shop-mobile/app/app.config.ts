@@ -1,6 +1,6 @@
 /*
  * The shop app's Expo config. `danwo build-android` builds it with DANWO=1, which adds the network
- * security config that lets the app trust danwo's per-run CA (see @danwo/expo); a store build
+ * security config that lets the app trust danwo's per-run CA (see @danwo/mobile); a store build
  * leaves it out.
  */
 import type { ConfigContext, ExpoConfig } from "expo/config"

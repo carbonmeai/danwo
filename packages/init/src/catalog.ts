@@ -358,8 +358,7 @@ export const DANWO_PACKAGES: readonly PackageSpec[] = [
 
 /** The packages a mobile config imports. */
 export const MOBILE_PACKAGES: readonly PackageSpec[] = [
-  { name: "@danwo/device", version: ADDED_VERSION },
-  { name: "@danwo/expo", version: ADDED_VERSION },
+  { name: "@danwo/mobile", version: ADDED_VERSION },
 ]
 
 /** Node's types: danwo's declarations use them, so a TypeScript project needs them to type-check. */

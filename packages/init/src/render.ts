@@ -248,8 +248,7 @@ export function renderMobileConfig(
 
   return [
     ...(model?.imports ?? []),
-    'import { withAndroidDevice } from "@danwo/device"',
-    'import { buildAndroid } from "@danwo/expo"',
+    'import { buildAndroid, withAndroidDevice } from "@danwo/mobile"',
     sdkImport(["appEnvironment", "defineConfig", ...services]),
     "",
     ...(model?.preamble ?? []),

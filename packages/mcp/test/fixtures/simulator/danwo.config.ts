@@ -7,7 +7,7 @@
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 
-import { IOS_BACKGROUND_HOSTS, withIosDevice } from "@danwo/device"
+import { IOS_BACKGROUND_HOSTS, withIosDevice } from "@danwo/mobile"
 import type { DeviceTarget } from "@danwo/runner/runner"
 import { defineConfig, startServices } from "@danwo/sdk"
 

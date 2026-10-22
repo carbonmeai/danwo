@@ -1,4 +1,4 @@
-import type { DeviceFixtures } from "@danwo/device"
+import type { DeviceFixtures } from "@danwo/mobile"
 import { type StripeFixtures, test as base } from "@danwo/sdk"
 
 import { grantedCredits, paidCredits } from "../../shop/src/ledger.ts"

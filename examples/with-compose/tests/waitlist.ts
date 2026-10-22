@@ -1,5 +1,5 @@
 /** What the waitlist's tests share: their fixtures, and the invariant every join must keep. */
-import type { DeviceFixtures } from "@danwo/device"
+import type { DeviceFixtures } from "@danwo/mobile"
 import { type DanwoFixtures, type ResendFixtures, resendInbox, test as base } from "@danwo/sdk"
 
 import { WELCOME_SUBJECT } from "../api/mail.ts"

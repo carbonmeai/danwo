@@ -26,11 +26,10 @@
   },
   "dependencies": {
     "@danwo/dashboard": "workspace:*",
-    "@danwo/device": "workspace:*",
-    "@danwo/expo": "workspace:*",
     "@danwo/github": "workspace:*",
     "@danwo/init": "workspace:*",
     "@danwo/mcp": "workspace:*",
+    "@danwo/mobile": "workspace:*",
     "@danwo/recorder": "workspace:*",
     "@danwo/runner": "workspace:*",
     "@danwo/skill": "workspace:*",

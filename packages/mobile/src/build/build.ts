@@ -8,8 +8,7 @@
 import { copyFile } from "node:fs/promises"
 import { join } from "node:path"
 
-import { androidSdkRoot, javaHome } from "@danwo/device/toolchain"
-
+import { androidSdkRoot, javaHome } from "../toolchain.ts"
 import { buildFlutterAndroid } from "./flutter.ts"
 import { buildGradle } from "./gradle.ts"
 import { applyNetworkConfig } from "./network.ts"

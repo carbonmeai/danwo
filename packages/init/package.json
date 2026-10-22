@@ -35,8 +35,8 @@
   },
   "dependencies": {
     "@clack/prompts": "1.8.1",
-    "@danwo/device": "workspace:*",
     "@danwo/mcp": "workspace:*",
+    "@danwo/mobile": "workspace:*",
     "@danwo/runner": "workspace:*",
     "@danwo/skill": "workspace:*"
   },

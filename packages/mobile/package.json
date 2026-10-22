@@ -1,15 +1,15 @@
 {
-  "name": "@danwo/device",
+  "name": "@danwo/mobile",
   "version": "0.0.0",
   "private": true,
-  "description": "Mobile devices for danwo tests: an Android emulator or an iOS Simulator bound to danwo's proxy and CA, driven through agent-device.",
+  "description": "Mobile apps for danwo tests: builds an Expo, Xcode, Gradle or Flutter app to trust danwo's proxy, and runs it on an iOS Simulator or Android emulator bound to that proxy, driven through agent-device.",
   "homepage": "https://danwo.dev",
   "bugs": "https://github.com/carbonmeai/danwo/issues",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/carbonmeai/danwo.git",
-    "directory": "packages/device"
+    "directory": "packages/mobile"
   },
   "files": [
     "src",
@@ -22,6 +22,11 @@
       "danwo-source": "./src/index.ts",
       "types": "./dist/types/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./build": {
+      "danwo-source": "./src/build/index.ts",
+      "types": "./dist/types/build/index.d.ts",
+      "default": "./src/build/index.ts"
     },
     "./toolchain": {
       "danwo-source": "./src/toolchain.ts",

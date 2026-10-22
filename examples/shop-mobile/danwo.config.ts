@@ -3,12 +3,13 @@ import { fileURLToPath } from "node:url"
 import {
   ANDROID_BACKGROUND_HOSTS,
   androidWorkers,
+  buildAndroid,
+  buildIos,
   IOS_BACKGROUND_HOSTS,
   iosWorkers,
   withAndroidDevice,
   withIosDevice,
-} from "@danwo/device"
-import { buildAndroid, buildIos } from "@danwo/expo"
+} from "@danwo/mobile"
 import { forwardTo } from "@danwo/proxy"
 import {
   defineConfig,

@@ -1,7 +1,6 @@
 import { fileURLToPath } from "node:url"
 
-import { IOS_BACKGROUND_HOSTS, iosWorkers, withIosDevice } from "@danwo/device"
-import { buildIos } from "@danwo/expo"
+import { buildIos, IOS_BACKGROUND_HOSTS, iosWorkers, withIosDevice } from "@danwo/mobile"
 import { defineConfig } from "@danwo/sdk"
 
 import { waitlistBackend } from "./tests/stack/api.ts"

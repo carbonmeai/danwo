@@ -1,5 +1,5 @@
 /**
- * What a mobile device gives a test in place of a browser. @danwo/device implements `DeviceTarget`
+ * What a mobile device gives a test in place of a browser. @danwo/mobile implements `DeviceTarget`
  * for an Android emulator and an iOS Simulator; the runner turns it into the same `screen`, `app` and `expect` a web test
  * gets, with locators resolved here on the device's accessibility tree.
  */

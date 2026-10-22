@@ -1,7 +1,11 @@
 import { fileURLToPath } from "node:url"
 
-import { ANDROID_BACKGROUND_HOSTS, androidWorkers, withAndroidDevice } from "@danwo/device"
-import { buildAndroid } from "@danwo/expo"
+import {
+  ANDROID_BACKGROUND_HOSTS,
+  androidWorkers,
+  buildAndroid,
+  withAndroidDevice,
+} from "@danwo/mobile"
 import { defineConfig } from "@danwo/sdk"
 
 import { waitlistBackend } from "./tests/stack/api.ts"

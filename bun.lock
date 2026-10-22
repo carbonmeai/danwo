@@ -53,8 +53,7 @@
       },
       "devDependencies": {
         "@danwo/cli": "workspace:*",
-        "@danwo/device": "workspace:*",
-        "@danwo/expo": "workspace:*",
+        "@danwo/mobile": "workspace:*",
         "@danwo/proxy": "workspace:*",
         "@danwo/sdk": "workspace:*",
       },
@@ -76,11 +75,10 @@
       },
       "dependencies": {
         "@danwo/dashboard": "workspace:*",
-        "@danwo/device": "workspace:*",
-        "@danwo/expo": "workspace:*",
         "@danwo/github": "workspace:*",
         "@danwo/init": "workspace:*",
         "@danwo/mcp": "workspace:*",
+        "@danwo/mobile": "workspace:*",
         "@danwo/recorder": "workspace:*",
         "@danwo/runner": "workspace:*",
         "@danwo/skill": "workspace:*",
@@ -152,15 +150,6 @@
         "pg",
       ],
     },
-    "packages/device": {
-      "name": "@danwo/device",
-      "version": "0.0.0",
-      "dependencies": {
-        "@danwo/proxy": "workspace:*",
-        "@danwo/runner": "workspace:*",
-        "agent-device": "0.21.28",
-      },
-    },
     "packages/emulators": {
       "name": "@danwo/emulators",
       "version": "0.0.0",
@@ -222,14 +211,6 @@
         "zod": "4.6.7",
       },
     },
-    "packages/expo": {
-      "name": "@danwo/expo",
-      "version": "0.0.0",
-      "dependencies": {
-        "@danwo/device": "workspace:*",
-        "@danwo/runner": "workspace:*",
-      },
-    },
     "packages/fidelity": {
       "name": "@danwo/fidelity",
       "version": "0.0.0",
@@ -273,8 +254,8 @@
       "version": "0.0.0",
       "dependencies": {
         "@clack/prompts": "1.8.1",
-        "@danwo/device": "workspace:*",
         "@danwo/mcp": "workspace:*",
+        "@danwo/mobile": "workspace:*",
         "@danwo/runner": "workspace:*",
         "@danwo/skill": "workspace:*",
       },
@@ -312,9 +293,18 @@
         "zod": "4.6.7",
       },
       "devDependencies": {
-        "@danwo/device": "workspace:*",
+        "@danwo/mobile": "workspace:*",
         "@danwo/sdk": "workspace:*",
         "@types/pngjs": "6.0.5",
+      },
+    },
+    "packages/mobile": {
+      "name": "@danwo/mobile",
+      "version": "0.0.0",
+      "dependencies": {
+        "@danwo/proxy": "workspace:*",
+        "@danwo/runner": "workspace:*",
+        "agent-device": "0.21.28",
       },
     },
     "packages/playwright": {
@@ -496,8 +486,7 @@
       },
       "devDependencies": {
         "@danwo/cli": "workspace:*",
-        "@danwo/device": "workspace:*",
-        "@danwo/expo": "workspace:*",
+        "@danwo/mobile": "workspace:*",
         "@danwo/playwright": "workspace:*",
         "@danwo/sdk": "workspace:*",
         "@playwright/test": "1.64.1",
@@ -685,8 +674,6 @@
 
     "@danwo/data": ["@danwo/data@workspace:packages/data"],
 
-    "@danwo/device": ["@danwo/device@workspace:packages/device"],
-
     "@danwo/emulators": ["@danwo/emulators@workspace:packages/emulators"],
 
     "@danwo/example-shop": ["@danwo/example-shop@workspace:examples/shop"],
@@ -694,8 +681,6 @@
     "@danwo/example-shop-mobile": ["@danwo/example-shop-mobile@workspace:examples/shop-mobile"],
 
     "@danwo/example-shop-playwright": ["@danwo/example-shop-playwright@workspace:examples/shop-playwright"],
-
-    "@danwo/expo": ["@danwo/expo@workspace:packages/expo"],
 
     "@danwo/fidelity": ["@danwo/fidelity@workspace:packages/fidelity"],
 
@@ -708,6 +693,8 @@
     "@danwo/matrix": ["@danwo/matrix@workspace:packages/matrix"],
 
     "@danwo/mcp": ["@danwo/mcp@workspace:packages/mcp"],
+
+    "@danwo/mobile": ["@danwo/mobile@workspace:packages/mobile"],
 
     "@danwo/playwright": ["@danwo/playwright@workspace:packages/playwright"],
 

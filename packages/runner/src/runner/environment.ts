@@ -29,7 +29,7 @@ export interface WorkerEnvironment {
   readonly data?: readonly DataProxy[] | undefined
   /**
    * A mobile device the worker's tests run on instead of a browser, e.g. `androidDevice()` from
-   * @danwo/device: each attempt resets and launches the app on it, and `screen`, `app` and `expect`
+   * @danwo/mobile: each attempt resets and launches the app on it, and `screen`, `app` and `expect`
    * act on the device.
    */
   readonly device?: DeviceTarget

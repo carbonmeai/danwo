@@ -668,7 +668,7 @@ program
     new Option("--platform <platform>", "check one platform only").choices(["android", "ios"]),
   )
   .action(async (_action: string, options: { platform?: "android" | "ios" }) => {
-    const { deviceDoctor } = await import("@danwo/device")
+    const { deviceDoctor } = await import("@danwo/mobile")
     const checks = await deviceDoctor(undefined, {
       ...(options.platform !== undefined && { platform: options.platform }),
     })
@@ -755,7 +755,7 @@ buildCommand(
   async (project, flags, onLine) => {
     const variant = flagOf(flags, "variant")
 
-    return (await import("@danwo/expo")).buildAndroid({
+    return (await import("@danwo/mobile/build")).buildAndroid({
       project,
       force: flags.force === true,
       ...(variant !== undefined && { variant }),
@@ -779,7 +779,7 @@ buildCommand(
     const scheme = flagOf(flags, "scheme")
     const configuration = flagOf(flags, "configuration")
 
-    return (await import("@danwo/expo")).buildIos({
+    return (await import("@danwo/mobile/build")).buildIos({
       project,
       force: flags.force === true,
       ...(scheme !== undefined && { scheme }),

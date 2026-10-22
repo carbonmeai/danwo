@@ -3,7 +3,7 @@
  * duration, a long press by a locator and one by a reading's ref, and the keyboard put away,
  * twice, so the second call (with no keyboard showing) is seen to leave the screen where it was.
  */
-import type { DeviceFixtures } from "@danwo/device"
+import type { DeviceFixtures } from "@danwo/mobile"
 import { test as base } from "@danwo/sdk"
 
 const test = base.extend<DeviceFixtures>()
