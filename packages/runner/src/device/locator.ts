@@ -1,7 +1,8 @@
 /**
  * `screen` on a device: the same locators a web test writes (`getByTestId`, `getByRole`,
  * `getByText`…), resolved on the device's accessibility tree instead of a page. Each action waits
- * for exactly one match, acts on it through the device driver by ref, and records a step.
+ * for exactly one match, enabled and in place on the latest screen, acts on it through the device
+ * driver by that screen's ref, and records a step.
  */
 import type { ScreenshotEvent, ScreenshotSettings } from "../assert/screenshot.ts"
 import { filterCall, roleCall, shown, textCall } from "../locate/describe.ts"
@@ -22,6 +23,7 @@ import type { StepRecorder } from "../record/index.ts"
 import { isSecret, type Secret } from "../secrets/index.ts"
 import { DanwoError } from "../support/codes.ts"
 import { attributeOf } from "./attributes.ts"
+import { currentNode, currentProblem } from "./current.ts"
 import {
   type Chain,
   type ChainLink,
@@ -56,6 +58,8 @@ export interface DeviceContext {
 const POLL_MS = 150
 /** At most this many candidates are listed when a locator matches nothing. */
 const MAX_CANDIDATES = 5
+/** The least time a match gets to settle in place, however little of the timeout is left. */
+const SETTLE_MIN_MS = 1_000
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -256,7 +260,34 @@ export class DeviceLocator implements Locator {
     return options?.timeout ?? this.context.actionTimeout
   }
 
-  /** An action on the single match, recorded as a step and followed by readiness. */
+  /**
+   * The single match as the latest reading has it, ready to press: in place and enabled (see
+   * current.ts). One that went from the screen is looked for again, once.
+   */
+  private async actionable(api: string, timeout: number): Promise<DeviceNode> {
+    const deadline = Date.now() + timeout
+    const left = () => Math.max(deadline - Date.now(), SETTLE_MIN_MS)
+
+    for (let tries = 0; ; tries++) {
+      const match = await this.one(api, tries === 0 ? timeout : left())
+      const found = await currentNode(this.context.target, match, {
+        timeout: left(),
+        enabled: true,
+      })
+
+      if ("node" in found) return found.node
+      if (found.problem !== "gone" || tries > 0)
+        throw new LocatorError(
+          "LOCATOR_NOT_READY",
+          `${api}: ${this.text} ${currentProblem(found.problem)}`,
+        )
+    }
+  }
+
+  /**
+   * An action on the single match, recorded as a step and followed by readiness. The match is
+   * found again on the latest screen first, and waited for until it is enabled.
+   */
   private act(
     action: string,
     args: string,
@@ -266,7 +297,7 @@ export class DeviceLocator implements Locator {
     const api = `locator.${action}`
 
     return this.context.steps.run("locator", api, `${this.text}.${action}(${args})`, async () => {
-      await perform(await this.one(api, this.timeout(options)))
+      await perform(await this.actionable(api, this.timeout(options)))
       await this.context.ready()
     })
   }

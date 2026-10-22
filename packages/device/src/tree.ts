@@ -19,6 +19,7 @@ export interface DriverNode {
   readonly hintShowing?: boolean
   readonly enabled?: boolean
   readonly checked?: boolean
+  readonly selected?: boolean
   readonly editable?: boolean
   readonly password?: boolean
   readonly heading?: boolean
@@ -120,6 +121,7 @@ function optionalFields(node: DriverNode, value: string | undefined, parent: str
     ...(testId !== undefined && { testId }),
     ...(node.placeholder !== undefined && { placeholder: node.placeholder }),
     ...(node.checked !== undefined && { checked: node.checked }),
+    ...(node.selected === true && { selected: true }),
     ...(parent !== undefined && { parent }),
     ...(node.rect !== undefined && {
       box: { x: node.rect.x, y: node.rect.y, width: node.rect.width, height: node.rect.height },

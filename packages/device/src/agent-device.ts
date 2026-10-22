@@ -169,8 +169,30 @@ export class AgentDeviceDriver implements DeviceDriver {
     )
   }
 
-  async swipe(from: Point, to: Point): Promise<void> {
-    await this.recovering((signal) => this.session.interactions.swipe({ from, to, signal }))
+  /** A swipe; one with a duration is a pan, the gesture whose speed the driver lets us set. */
+  async swipe(from: Point, to: Point, durationMs?: number): Promise<void> {
+    if (durationMs === undefined) {
+      await this.recovering((signal) => this.session.interactions.swipe({ from, to, signal }))
+
+      return
+    }
+
+    await this.recovering((signal) =>
+      this.session.interactions.pan({
+        x: from.x,
+        y: from.y,
+        dx: to.x - from.x,
+        dy: to.y - from.y,
+        durationMs,
+        signal,
+      }),
+    )
+  }
+
+  async longPress(ref: string, durationMs: number): Promise<void> {
+    await this.recovering((signal) =>
+      this.session.interactions.longPress({ ...target(ref), durationMs, settle: false, signal }),
+    )
   }
 
   async back(): Promise<void> {

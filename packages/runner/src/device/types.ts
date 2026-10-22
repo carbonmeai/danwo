@@ -24,6 +24,8 @@ export interface DeviceNode {
   readonly password: boolean
   readonly enabled: boolean
   readonly checked?: boolean
+  /** Whether the element is the selected one of its group: the active tab, the picked list row. */
+  readonly selected?: boolean
   /** The ref of the element that contains this one. */
   readonly parent?: string
   /** Where it is on the screen, in screenshot pixels. */
@@ -40,6 +42,35 @@ export interface DeviceBox {
 
 /** A way to swipe: the direction the finger moves is the opposite of where the content goes. */
 export type ScrollDirection = "up" | "down" | "left" | "right"
+
+/** A point on the screen, in screenshot pixels. */
+export interface DevicePoint {
+  readonly x: number
+  readonly y: number
+}
+
+/**
+ * A swipe: one finger dragged `direction` across the middle half of a box (the whole screen
+ * without `within`), or from one point to another, taking `durationMs`. A slow swipe turns a
+ * carousel's page or pulls a list to refresh; a quick one flings.
+ */
+export type DeviceSwipe = {
+  /** How long the finger takes, in milliseconds; 300 by default. */
+  readonly durationMs?: number
+} & (
+  | {
+      /** The way the finger moves: `left` turns a carousel to its next page. */
+      readonly direction: ScrollDirection
+      readonly within?: DeviceBox
+    }
+  | { readonly from: DevicePoint; readonly to: DevicePoint }
+)
+
+/** How long a long press holds the element. */
+export interface LongPressOptions {
+  /** Milliseconds; 800 by default. */
+  readonly durationMs?: number
+}
 
 /** What is in front on the device. */
 export interface DeviceForeground {
@@ -108,6 +139,12 @@ export interface DeviceTarget {
   tapAt?(x: number, y: number): Promise<void>
   /** Types `text` into whatever has focus. */
   typeText?(text: string): Promise<void>
+  /** Drags one finger across the screen; see `DeviceSwipe`. */
+  swipe?(swipe: DeviceSwipe): Promise<void>
+  /** Presses the element with this ref, from the latest reading, and holds it. */
+  longPress?(ref: string, options?: LongPressOptions): Promise<void>
+  /** Puts the on-screen keyboard away; nothing happens when none shows. */
+  dismissKeyboard?(): Promise<void>
   /** Saves a PNG of the screen to `path`; false when none could be taken. */
   screenshot(path: string): Promise<boolean>
   /** The app's log lines since the last call, oldest first. */

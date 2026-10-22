@@ -9,9 +9,12 @@ import type { Proxy } from "@danwo/proxy"
 import type {
   DeviceBox,
   DeviceForeground,
+  DevicePoint,
   DeviceScreenReading,
   DeviceStart,
+  DeviceSwipe,
   DeviceTarget,
+  LongPressOptions,
   ScreenFilm,
   ScrollDirection,
 } from "@danwo/runner/runner"
@@ -99,6 +102,39 @@ export function swipeFor(box: DeviceBox, direction: ScrollDirection): readonly n
   }
 
   return moves[direction]
+}
+
+/** How long a swipe takes when it does not say, and how long a long press holds. */
+const SWIPE_DEFAULT_MS = 300
+export const LONG_PRESS_MS = 800
+
+/** The scroll that a finger moving `direction` makes: moving it up scrolls down. */
+const SCROLLED_BY: Record<ScrollDirection, ScrollDirection> = {
+  up: "down",
+  down: "up",
+  left: "right",
+  right: "left",
+}
+
+/**
+ * Where a swipe's finger starts and ends, in screenshot pixels: its own points, or across the
+ * middle half of its box (`screen` without one) the way its direction says.
+ */
+export function swipePath(
+  swipe: DeviceSwipe,
+  screen: DeviceBox,
+): readonly [DevicePoint, DevicePoint] {
+  if ("from" in swipe) return [swipe.from, swipe.to]
+
+  const [x1 = 0, y1 = 0, x2 = 0, y2 = 0] = swipeFor(
+    swipe.within ?? screen,
+    SCROLLED_BY[swipe.direction],
+  )
+
+  return [
+    { x: x1, y: y1 },
+    { x: x2, y: y2 },
+  ]
 }
 
 /** `text` as `adb shell input text` takes it: spaces as %s, the shell's own characters escaped. */
@@ -194,6 +230,30 @@ export class AndroidDevice implements DeviceTarget {
     const box = within ?? (await this.screenBox())
 
     await this.emulator.adb.shell(`input swipe ${swipeFor(box, direction).join(" ")} ${SWIPE_MS}`)
+  }
+
+  /** A swipe by adb, which takes its duration as given. */
+  async swipe(swipe: DeviceSwipe): Promise<void> {
+    const whole = "from" in swipe || swipe.within !== undefined ? undefined : await this.screenBox()
+    const [from, to] = swipePath(swipe, whole ?? { x: 0, y: 0, width: 0, height: 0 })
+    const points = [from.x, from.y, to.x, to.y].map(Math.round).join(" ")
+
+    await this.emulator.adb.shell(`input swipe ${points} ${swipe.durationMs ?? SWIPE_DEFAULT_MS}`)
+  }
+
+  async longPress(ref: string, options: LongPressOptions = {}): Promise<void> {
+    if (this.driver.longPress === undefined)
+      throw new Error("this Android driver cannot long-press")
+
+    await this.driver.longPress(ref, options.durationMs ?? LONG_PRESS_MS)
+  }
+
+  /** Puts the keyboard away when it shows; the driver checks first, so nothing goes back. */
+  async dismissKeyboard(): Promise<void> {
+    if (this.driver.dismissKeyboard === undefined)
+      throw new Error("this Android driver cannot put the keyboard away")
+
+    await this.driver.dismissKeyboard()
   }
 
   async pressKey(key: string): Promise<void> {

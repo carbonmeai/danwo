@@ -27,6 +27,11 @@ vi.mock("agent-device", () => ({
         if (trouble.fills-- > 0) throw new Error(trouble.message)
       },
       press: async () => void calls.push("press"),
+      swipe: async () => void calls.push("swipe"),
+      pan: async ({ x, y, dx, dy, durationMs }: Record<string, number>) =>
+        void calls.push(`pan ${x},${y} by ${dx},${dy} in ${durationMs}`),
+      longPress: async ({ ref, durationMs }: { ref: string; durationMs: number }) =>
+        void calls.push(`longpress ${ref} ${durationMs}`),
     },
     capture: {
       snapshot: async () => {
@@ -114,6 +119,15 @@ describe("the agent-device driver", () => {
 
     trouble.fills = 2
     await expect(opened.fill("e5", "x")).rejects.toThrow("Daemon request timed out")
+  })
+
+  it("swipes for a duration as a pan, and long-presses by ref", async () => {
+    const opened = await driver()
+
+    await opened.swipe({ x: 10, y: 20 }, { x: 10, y: 220 })
+    await opened.swipe({ x: 10, y: 20 }, { x: 110, y: 20 }, 600)
+    await opened.longPress("e4", 900)
+    expect(calls.slice(1)).toEqual(["swipe", "pan 10,20 by 100,0 in 600", "longpress @e4 900"])
   })
 
   it("leaves other failures alone", async () => {

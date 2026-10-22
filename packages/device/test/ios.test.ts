@@ -521,7 +521,11 @@ function scriptedDriver(screens: readonly (readonly DriverNode[])[], failTap?: E
     },
     fill: async (ref, text) => void acts.push(`fill ${ref} ${text}`),
     tapAt: async (x, y) => void acts.push(`tapAt ${x} ${y}`),
-    swipe: async (from, to) => void acts.push(`swipe ${from.x},${from.y} ${to.x},${to.y}`),
+    swipe: async (from, to, durationMs) =>
+      void acts.push(
+        `swipe ${from.x},${from.y} ${to.x},${to.y}${durationMs === undefined ? "" : ` ${durationMs}`}`,
+      ),
+    longPress: async (ref, durationMs) => void acts.push(`long-press ${ref} ${durationMs}`),
     back: async () => void acts.push("back"),
     pressEnter: async () => void acts.push("enter"),
     dismissKeyboard: async () => void acts.push("dismiss keyboard"),
@@ -589,6 +593,23 @@ describe("an iOS device", () => {
     await opened.close()
     expect(acts.at(-1)).toBe("close")
     expect(fake.store()).toEqual({ ExceptionsList: ["*.local"], FTPPassive: 1 })
+  })
+
+  it("swipes in points for as long as asked, long-presses and puts the keyboard away", async () => {
+    const { acts, opened } = await device([SCREEN])
+
+    await opened.swipe({ direction: "left", durationMs: 700 })
+    await opened.swipe({ from: { x: 300, y: 300 }, to: { x: 300, y: 1500 } })
+    await opened.longPress("e2", { durationMs: 1200 })
+    await opened.longPress("e2")
+    await opened.dismissKeyboard()
+    expect(acts.slice(1)).toEqual([
+      "swipe 300,400 100,400 700",
+      "swipe 100,100 100,500",
+      "long-press e2 1200",
+      "long-press e2 800",
+      "dismiss keyboard",
+    ])
   })
 
   it("puts the keyboard away and taps the same element again when the keyboard covers it", async () => {

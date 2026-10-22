@@ -1,11 +1,19 @@
 /**
  * What the agent does on a device, the same whether the model chose the action or a recording
- * replays it: tap, type, pick, press, scroll, wait. Each waits for the app afterwards, as a
- * locator action does.
+ * replays it: tap, type, pick, press, hold, swipe, scroll, wait. An element is found again on the
+ * latest screen before it is pressed, and waited for until it is enabled (see current.ts), as a
+ * locator action does; each action waits for the app afterwards.
  */
 import { DanwoError } from "../../support/codes.ts"
+import { currentNode, currentProblem } from "../current.ts"
 import { textMatches } from "../match.ts"
-import type { DeviceNode, DeviceScreenReading, DeviceTarget, ScrollDirection } from "../types.ts"
+import type {
+  DeviceNode,
+  DeviceScreenReading,
+  DeviceTarget,
+  LongPressOptions,
+  ScrollDirection,
+} from "../types.ts"
 
 const POLL_MS = 150
 
@@ -46,15 +54,32 @@ function shows(node: DeviceNode, text: string): boolean {
   return [node.text, node.name].some((said) => said !== "" && textMatches(said, text, false))
 }
 
+/** How an element is named in an error: its role and name. */
+function named(node: DeviceNode): string {
+  return `${node.role} "${node.name || node.text}"`
+}
+
+/**
+ * `node` as the latest reading has it: in place and, unless `enabled` is false, enabled. Its ref
+ * is the one to press, whatever reading `node` came from.
+ */
+async function fresh(context: ActContext, node: DeviceNode, enabled = true): Promise<DeviceNode> {
+  const found = await currentNode(context.target, node, { timeout: context.timeout, enabled })
+
+  if ("node" in found) return found.node
+
+  throw new Error(`${named(node)} ${currentProblem(found.problem)}`)
+}
+
 export async function tapNode(context: ActContext, node: DeviceNode): Promise<void> {
-  await context.target.tap(node.ref)
+  await context.target.tap((await fresh(context, node)).ref)
   await context.ready()
 }
 
 export async function fillNode(context: ActContext, node: DeviceNode, text: string): Promise<void> {
-  if (!node.editable) throw new Error(`${node.role} "${node.name}" is not a text field`)
+  if (!node.editable) throw new Error(`${named(node)} is not a text field`)
 
-  await context.target.fill(node.ref, text)
+  await context.target.fill((await fresh(context, node)).ref, text)
   await context.ready()
 }
 
@@ -64,7 +89,24 @@ export async function checkNode(
   node: DeviceNode,
   checked: boolean,
 ): Promise<void> {
-  if ((node.checked === true) !== checked) await tapNode(context, node)
+  const now = await fresh(context, node)
+
+  if ((now.checked === true) !== checked) {
+    await context.target.tap(now.ref)
+    await context.ready()
+  }
+}
+
+/** Presses `node` and holds it, for what opens a menu on a long press. */
+export async function longPressNode(
+  context: ActContext,
+  node: DeviceNode,
+  options: LongPressOptions = {},
+): Promise<void> {
+  if (context.target.longPress === undefined) throw lacks("long-press")
+
+  await context.target.longPress((await fresh(context, node)).ref, options)
+  await context.ready()
 }
 
 /**
@@ -96,7 +138,7 @@ export async function pressKey(
   node: DeviceNode | undefined,
 ): Promise<void> {
   if (context.target.pressKey === undefined) throw lacks("press keys")
-  if (node !== undefined) await context.target.tap(node.ref)
+  if (node !== undefined) await context.target.tap((await fresh(context, node)).ref)
 
   await context.target.pressKey(key)
   await context.ready()
@@ -110,7 +152,39 @@ export async function scrollTo(
 ): Promise<void> {
   if (context.target.scroll === undefined) throw lacks("scroll")
 
-  await context.target.scroll(direction, node?.box)
+  const box = node === undefined ? undefined : (await fresh(context, node, false)).box
+
+  await context.target.scroll(direction, box)
+  await context.ready()
+}
+
+/**
+ * Swipes one finger `direction` across `node` (the whole screen without it), taking `durationMs`:
+ * slowly, a carousel turns its page or a list pulls to refresh.
+ */
+export async function swipeOn(
+  context: ActContext,
+  direction: ScrollDirection,
+  node: DeviceNode | undefined,
+  durationMs: number | undefined,
+): Promise<void> {
+  if (context.target.swipe === undefined) throw lacks("swipe")
+
+  const box = node === undefined ? undefined : (await fresh(context, node, false)).box
+
+  await context.target.swipe({
+    direction,
+    ...(box !== undefined && { within: box }),
+    ...(durationMs !== undefined && { durationMs }),
+  })
+  await context.ready()
+}
+
+/** Puts the on-screen keyboard away. */
+export async function dismissKeyboard(context: ActContext): Promise<void> {
+  if (context.target.dismissKeyboard === undefined) throw lacks("put the keyboard away")
+
+  await context.target.dismissKeyboard()
   await context.ready()
 }
 

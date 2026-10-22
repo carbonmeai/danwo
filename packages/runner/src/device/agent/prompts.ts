@@ -14,9 +14,13 @@ How to work:
   with that name. You never see secret values and must not guess them.
 - Do not do more than the instruction asks. When it is carried out, call done with status
   "passed" and a one-line summary of what you did.
+- An element's states show in brackets: [disabled] cannot be used yet, [checked] is on, and
+  [selected] is the chosen one of a group, such as the active tab.
 - What is below the fold is not in the view until you scroll; content that loads late shows after
-  wait_for. A keyboard can cover the bottom of the screen; press Back once (Android) or Enter
-  (iOS) to close it if a control you need is hidden behind it.
+  wait_for. A keyboard can cover the bottom of the screen; call dismiss_keyboard if a control you
+  need is hidden behind it.
+- Swipe (slowly, with duration_ms) to turn a carousel's page or pull a list to refresh; long_press
+  what opens a menu when pressed and held.
 - A page in the browser is part of the app's flow: act on it like any screen. When it sends you
   back to the app, carry on there.
 - If the screen makes the instruction impossible (an error, a missing control), call done with

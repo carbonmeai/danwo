@@ -21,13 +21,16 @@ import type { DeviceNode } from "../types.ts"
 import {
   type ActContext,
   checkNode,
+  dismissKeyboard,
   fillNode,
   goBack,
+  longPressNode,
   openLink,
   pressKey,
   readUntil,
   scrollTo,
   selectOption,
+  swipeOn,
   tapNode,
   tapPoint,
   typeAtPoint,
@@ -173,6 +176,25 @@ const REPLAYS: { readonly [Kind in RecordedAction["kind"]]?: Replay<Kind> } = {
     await scrollTo(context, action.direction ?? "down", node)
 
     return moved
+  },
+  swipe: async (action, index, context) => {
+    const { node, moved } = await aimed(context, action.target, index)
+
+    await swipeOn(context, action.direction, node, action.ms)
+
+    return moved
+  },
+  long_press: async (action, index, context) => {
+    const { node, moved } = await locate(context, action.target, index)
+
+    await longPressNode(context, node, action.ms === undefined ? {} : { durationMs: action.ms })
+
+    return moved
+  },
+  dismiss_keyboard: async (_action, _index, context) => {
+    await dismissKeyboard(context)
+
+    return undefined
   },
   back: async (_action, _index, context) => {
     await goBack(context)

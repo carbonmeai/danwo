@@ -8,6 +8,7 @@ import { z } from "zod"
 import { parseToolCall, toolInputs } from "../../agent/tools.ts"
 
 const ref = z.string().describe('The element\'s ref from the latest view, e.g. "e12".')
+const durationMs = z.number().int().min(50).max(5_000)
 
 /** What each tool takes; the runner parses every call against these. Shared ones are the web's. */
 const deviceToolInputs = {
@@ -26,6 +27,18 @@ const deviceToolInputs = {
       .optional()
       .describe("A list or other scrollable element; the whole screen without it."),
   }),
+  swipe: z.object({
+    direction: z
+      .enum(["up", "down", "left", "right"])
+      .describe("The way the finger moves: left turns a carousel to its next page."),
+    ref: ref.optional().describe("The element to swipe across; the whole screen without it."),
+    duration_ms: durationMs.optional().describe("How long the swipe takes; 300 without it."),
+  }),
+  long_press: z.object({
+    ref,
+    duration_ms: durationMs.optional().describe("How long to hold; 800 without it."),
+  }),
+  dismiss_keyboard: z.object({}),
   back: toolInputs.back,
   open_link: z.object({ url: z.string().describe("A deep link of the app or a web URL.") }),
   wait_for: z.object({
@@ -53,6 +66,10 @@ const descriptions: Record<DeviceToolName, string> = {
   press_key: "Press a key, e.g. Enter to submit a field; with `ref`, that field gets it.",
   scroll:
     "Scroll the screen, or the element `ref`, to show what is further up, down, left or right.",
+  swipe:
+    "Swipe a finger across the element `ref` (or the screen) the way `direction` says. Slowly (duration_ms 600 or more) turns a carousel or pulls a list to refresh.",
+  long_press: "Press and hold an element, for what opens a menu or starts a drag on a long press.",
+  dismiss_keyboard: "Put the on-screen keyboard away, when it hides a control you need.",
   back: "Press the device's Back button.",
   open_link:
     "Open a link: the app's own deep link, or a web page in the device's browser. Prefer tapping what the screen offers.",
@@ -79,6 +96,9 @@ const tools = {
   select: offer("select", deviceToolInputs.select),
   press_key: offer("press_key", deviceToolInputs.press_key),
   scroll: offer("scroll", deviceToolInputs.scroll),
+  swipe: offer("swipe", deviceToolInputs.swipe),
+  long_press: offer("long_press", deviceToolInputs.long_press),
+  dismiss_keyboard: offer("dismiss_keyboard", deviceToolInputs.dismiss_keyboard),
   back: offer("back", deviceToolInputs.back),
   open_link: offer("open_link", deviceToolInputs.open_link),
   wait_for: offer("wait_for", deviceToolInputs.wait_for),

@@ -24,8 +24,13 @@ export interface DeviceDriver {
   type?(text: string): Promise<void>
   /** Taps a point, in the driver's own units (those of the snapshot's rectangles). */
   tapAt?(x: number, y: number): Promise<void>
-  /** Drags one finger from `from` to `to`, in the driver's own units. */
-  swipe?(from: Point, to: Point): Promise<void>
+  /**
+   * Drags one finger from `from` to `to`, in the driver's own units, over `durationMs` when given
+   * (the driver's own quick swipe otherwise).
+   */
+  swipe?(from: Point, to: Point, durationMs?: number): Promise<void>
+  /** Presses the element with `ref` and holds it for `durationMs`. */
+  longPress?(ref: string, durationMs: number): Promise<void>
   /** Goes back the platform's way: on iOS, the screen's back or close control, or an edge swipe. */
   back?(): Promise<void>
   /** Presses the on-screen keyboard's return key. */

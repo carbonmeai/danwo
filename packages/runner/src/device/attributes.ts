@@ -1,7 +1,8 @@
 /**
  * Attributes of a device element, by the names a web test already uses: `getAttribute("aria-label")`
  * reads the accessible name, `"data-testid"` React Native's `testID`, `"aria-checked"` a switch's
- * state. A name the device has no counterpart for reads as null, as a missing attribute does.
+ * state and `"aria-selected"` a tab's. A name the device has no counterpart for reads as null, as
+ * a missing attribute does.
  */
 import type { DeviceNode } from "./types.ts"
 
@@ -31,6 +32,8 @@ const READERS: Readonly<Record<string, (node: DeviceNode) => string | null>> = {
   enabled: (node) => String(node.enabled),
   checked: (node) => flag(node.checked),
   ariachecked: (node) => flag(node.checked),
+  selected: (node) => flag(node.selected),
+  ariaselected: (node) => flag(node.selected),
   editable: (node) => String(node.editable),
   password: (node) => String(node.password),
 }

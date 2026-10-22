@@ -15,14 +15,16 @@ import type {
   DeviceForeground,
   DeviceScreenReading,
   DeviceStart,
+  DeviceSwipe,
   DeviceTarget,
+  LongPressOptions,
   ScreenFilm,
   ScrollDirection,
 } from "@danwo/runner/runner"
 
 import { type Exec, execProgram } from "../adb.ts"
 import { AgentDeviceDriver } from "../agent-device.ts"
-import { swipeFor } from "../android/device.ts"
+import { LONG_PRESS_MS, swipeFor, swipePath } from "../android/device.ts"
 import { browserPage } from "../browser-page.ts"
 import type { DeviceDriver } from "../driver.ts"
 import { deviceNodes, type DriverNode } from "../tree.ts"
@@ -219,6 +221,41 @@ export class IosDevice implements DeviceTarget {
     )
 
     await this.driver.swipe({ x: x1, y: y1 }, { x: x2, y: y2 })
+  }
+
+  /** A swipe in points; one with a duration takes that long, the driver's quick swipe otherwise. */
+  async swipe(swipe: DeviceSwipe): Promise<void> {
+    if (this.driver.swipe === undefined) throw new Error("this iOS driver cannot swipe")
+
+    const whole = "from" in swipe || swipe.within !== undefined ? undefined : await this.screenBox()
+    const [from, to] = swipePath(swipe, whole ?? { x: 0, y: 0, width: 0, height: 0 })
+    const points = (point: { readonly x: number; readonly y: number }) => ({
+      x: point.x / this.scale,
+      y: point.y / this.scale,
+    })
+
+    await this.driver.swipe(points(from), points(to), swipe.durationMs)
+  }
+
+  async longPress(ref: string, options: LongPressOptions = {}): Promise<void> {
+    if (this.driver.longPress === undefined) throw new Error("this iOS driver cannot long-press")
+
+    await this.driver.longPress(ref, options.durationMs ?? LONG_PRESS_MS)
+  }
+
+  async dismissKeyboard(): Promise<void> {
+    if (this.driver.dismissKeyboard === undefined)
+      throw new Error("this iOS driver cannot put the keyboard away")
+
+    await this.driver.dismissKeyboard()
+  }
+
+  /** The whole screen in pixels, from the latest reading (read now when there is none). */
+  private async screenBox(): Promise<DeviceBox> {
+    if (this.screen === undefined) await this.read()
+    if (this.screen === undefined) throw new Error("the simulator's screen size is not known yet")
+
+    return this.screen
   }
 
   /** Enter (or Return) presses the keyboard's return key; iOS has no other keys to press. */

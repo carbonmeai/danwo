@@ -80,6 +80,17 @@ const action = z.discriminatedUnion("kind", [
     direction: z.enum(["up", "down", "left", "right"]).optional(),
     target: target.optional(),
   }),
+  /** A device's swipe: the way the finger moved, across what, and for how long. */
+  z.object({
+    kind: z.literal("swipe"),
+    direction: z.enum(["up", "down", "left", "right"]),
+    target: target.optional(),
+    ms: z.number().nonnegative().optional(),
+  }),
+  /** A device's press and hold. */
+  z.object({ kind: z.literal("long_press"), target, ms: z.number().nonnegative().optional() }),
+  /** A device's on-screen keyboard put away. */
+  z.object({ kind: z.literal("dismiss_keyboard") }),
   /** A navigation; `mail` when the URL was a link from an email, read again on replay. */
   z.object({ kind: z.literal("navigate"), url: z.string(), mail: fromMail.optional() }),
   /** The newest mail to an address, shown in the active tab. */

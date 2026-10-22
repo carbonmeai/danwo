@@ -11,12 +11,15 @@ import type { DeviceNode } from "../types.ts"
 import {
   type ActContext,
   checkNode,
+  dismissKeyboard,
   fillNode,
   goBack,
+  longPressNode,
   openLink,
   pressKey,
   scrollTo,
   selectOption,
+  swipeOn,
   tapNode,
   tapPoint,
   typeAtPoint,
@@ -250,6 +253,28 @@ function scrollOn(
   )
 }
 
+/** Swipes across the element `ref` when given, else the screen. */
+function swipeOver(
+  context: DevicePerformContext,
+  input: DeviceToolInput<"swipe">,
+): Promise<DevicePerformed> {
+  const { direction, ref, duration_ms: ms } = input
+  const timing = ms === undefined ? {} : { ms }
+
+  if (ref === undefined)
+    return swipeOn(context, direction, undefined, ms).then(() => ({
+      outcome: "done",
+      recorded: { kind: "swipe", direction, ...timing },
+    }))
+
+  return onNode(
+    context,
+    ref,
+    (node) => swipeOn(context, direction, node, ms),
+    (target) => ({ kind: "swipe", direction, target, ...timing }),
+  )
+}
+
 async function openOn(
   context: DevicePerformContext,
   input: DeviceToolInput<"open_link">,
@@ -300,6 +325,28 @@ const PERFORMS: { readonly [Name in DeviceCall["name"]]: Perform<Name> } = {
     ),
   press_key: pressOn,
   scroll: scrollOn,
+  swipe: swipeOver,
+  long_press: (context, input) =>
+    onNode(
+      context,
+      input.ref,
+      (node) =>
+        longPressNode(
+          context,
+          node,
+          input.duration_ms === undefined ? {} : { durationMs: input.duration_ms },
+        ),
+      (target) => ({
+        kind: "long_press",
+        target,
+        ...(input.duration_ms !== undefined && { ms: input.duration_ms }),
+      }),
+    ),
+  dismiss_keyboard: async (context) => {
+    await dismissKeyboard(context)
+
+    return { outcome: "done", recorded: { kind: "dismiss_keyboard" } }
+  },
   back: async (context) => {
     await goBack(context)
 

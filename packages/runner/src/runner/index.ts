@@ -26,9 +26,12 @@ export type {
   DeviceLogLine,
   DeviceNode,
   DevicePlatform,
+  DevicePoint,
   DeviceScreenReading,
   DeviceStart,
+  DeviceSwipe,
   DeviceTarget,
+  LongPressOptions,
   ScreenFilm,
   ScrollDirection,
 } from "../device/types.ts"

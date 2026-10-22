@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest"
 
 import { AndroidApp, parseLogcat, topActivity } from "../src/android/app.ts"
 import { androidCaFileName, subjectDer } from "../src/android/ca.ts"
-import { inputText, keyCode, swipeFor } from "../src/android/device.ts"
+import { inputText, keyCode, swipeFor, swipePath } from "../src/android/device.ts"
 import { bootArgs, useEmulator } from "../src/android/emulator.ts"
 import {
   Adb,
@@ -58,6 +58,8 @@ function scriptedDriver(screens: readonly (readonly DriverNode[] | Error)[]) {
     },
     tap: async (ref) => void acts.push(`tap ${ref}`),
     fill: async (ref, text) => void acts.push(`fill ${ref} ${text}`),
+    longPress: async (ref, durationMs) => void acts.push(`long-press ${ref} ${durationMs}`),
+    dismissKeyboard: async () => void acts.push("dismiss keyboard"),
     screenshot: async () => false,
     close: async () => void acts.push("close"),
   }
@@ -295,6 +297,25 @@ describe("gestures and keys", () => {
     expect(swipeFor(box, "right")).toEqual([600, 600, 200, 600])
   })
 
+  it("swipes the finger the way a swipe says, across a box or between two points", () => {
+    const screen = { x: 0, y: 0, width: 1000, height: 2000 }
+
+    expect(swipePath({ direction: "up" }, screen)).toEqual([
+      { x: 500, y: 1500 },
+      { x: 500, y: 500 },
+    ])
+    expect(
+      swipePath({ direction: "left", within: { x: 0, y: 400, width: 800, height: 400 } }, screen),
+    ).toEqual([
+      { x: 600, y: 600 },
+      { x: 200, y: 600 },
+    ])
+    expect(swipePath({ from: { x: 1, y: 2 }, to: { x: 3, y: 4 } }, screen)).toEqual([
+      { x: 1, y: 2 },
+      { x: 3, y: 4 },
+    ])
+  })
+
   it("types text through adb with spaces and shell characters kept", () => {
     expect(inputText("buyer@example.com")).toBe("buyer@example.com")
     expect(inputText("a b&c's")).toBe("a%sb\\&c\\'s")
@@ -409,6 +430,16 @@ describe("the accessibility tree", () => {
     },
   ]
 
+  it("keeps an element's selected state, and leaves it out when it is not selected", () => {
+    const [orders, shop] = deviceNodes([
+      { index: 0, type: "android.widget.TextView", label: "Orders", selected: true },
+      { index: 1, type: "android.widget.TextView", label: "Shop", selected: false },
+    ])
+
+    expect(orders).toMatchObject({ name: "Orders", selected: true })
+    expect(shop).not.toHaveProperty("selected")
+  })
+
   it("maps roles, names, test ids and field values the way locators read them", () => {
     const mapped = deviceNodes(nodes)
 
@@ -521,6 +552,34 @@ describe("an Android device", () => {
       "shell settings put global http_proxy :0",
       "reverse --remove-all",
     ])
+  })
+
+  it("swipes by adb for as long as asked, long-presses and puts the keyboard away", async () => {
+    const { env, commands, acts, stateDir } = await device([screen], {
+      "wm size": "Physical size: 1080x2400",
+    })
+
+    try {
+      await env.device.swipe({ direction: "down", durationMs: 900 })
+      await env.device.swipe({
+        direction: "left",
+        within: { x: 0, y: 400, width: 800, height: 400 },
+      })
+      await env.device.swipe({ from: { x: 10.4, y: 20 }, to: { x: 30, y: 40.6 }, durationMs: 50 })
+      await env.device.longPress("e2")
+      await env.device.longPress("e2", { durationMs: 1500 })
+      await env.device.dismissKeyboard()
+
+      expect(commands.filter((command) => command.includes("input swipe"))).toEqual([
+        "shell input swipe 540 600 540 1800 900",
+        "shell input swipe 600 600 200 600 300",
+        "shell input swipe 10 20 30 41 50",
+      ])
+      expect(acts.slice(1)).toEqual(["long-press e2 800", "long-press e2 1500", "dismiss keyboard"])
+    } finally {
+      await env.close()
+      await rm(stateDir, { recursive: true, force: true })
+    }
   })
 
   it("knows a Custom Tab in front, and the page it shows from the proxy's exchanges", async () => {

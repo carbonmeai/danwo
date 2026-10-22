@@ -26,12 +26,17 @@ function silent(node: DeviceNode): boolean {
   return node.role === "generic" && node.name === "" && node.text === ""
 }
 
-/** The bracketed states of a node, e.g. ` [disabled] [checked]`. */
+/**
+ * The bracketed states of a node, e.g. ` [disabled] [checked]`: a checkbox's either way, any other
+ * element's checked or selected state only when it has it (the active tab is `[selected]`).
+ */
 function states(node: DeviceNode): string {
   const parts: string[] = []
 
   if (!node.enabled) parts.push("[disabled]")
   if (CHECKABLE.has(node.role)) parts.push(node.checked === true ? "[checked]" : "[checked=false]")
+  else if (node.checked === true) parts.push("[checked]")
+  if (node.selected === true) parts.push("[selected]")
 
   return parts.map((part) => ` ${part}`).join("")
 }

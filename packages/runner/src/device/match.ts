@@ -122,6 +122,7 @@ function roleMatches(tree: Tree, node: DeviceNode, role: string, options: RoleOp
 
   if (name !== undefined && !textMatches(nameOf(tree, node), name, exact === true)) return false
   if (options.checked !== undefined && node.checked !== options.checked) return false
+  if (options.selected !== undefined && (node.selected === true) !== options.selected) return false
 
   return options.disabled === undefined || node.enabled === !options.disabled
 }
