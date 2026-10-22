@@ -26,7 +26,8 @@ and so does an `expect` that found no element.
 `toHaveText`, `toContainText`, `toHaveValue`, `toHaveCount`, `toHaveAttribute`,
 `toHaveCSS(property, value)` (the computed style, as the browser writes it: `"rgb(0, 0, 0)"`, not
 `"black"`), `toHaveJSProperty(name, value)` (the DOM element's property, `checked`, `value`,
-`dataset`, compared deeply) and `toHaveScreenshot`; each has a `.not` form.
+`dataset`, compared deeply) and `toHaveScreenshot`. Each has a `.not` form except `toHaveScreenshot`,
+which throws if negated.
 
 `check`/`uncheck` (and the agent's check) handle a styled checkbox or radio whose invisible
 `<input>` is covered by its own `<label>`: danwo clicks the label, then fails unless the input
