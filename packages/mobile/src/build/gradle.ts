@@ -248,7 +248,7 @@ async function signWithDebugKey(
 }
 
 /** Writes danwo's network config and the init script that adds it; the script's path. */
-async function writeNetworkConfig(slot: Pick<BuildSlot, "dir">): Promise<string> {
+export async function writeNetworkConfig(slot: Pick<BuildSlot, "dir">): Promise<string> {
   const dir = join(slot.dir, "android-network")
   const script = join(dir, "danwo-network.gradle")
 

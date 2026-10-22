@@ -27,6 +27,7 @@ import {
 import type { BuildExec } from "../src/build/slot.ts"
 import {
   buildXcode,
+  interfaceBuilderDaemons,
   nativeXcodebuildArgs,
   pickScheme,
   schemesOf,
@@ -396,13 +397,60 @@ describe("the native Android build", () => {
   })
 })
 
+describe("Interface Builder's daemons", () => {
+  it("finds the ones this build started by the mark in their command line", () => {
+    const listing = [
+      "  101 /Applications/Xcode.app/Contents/Developer/usr/bin/ibtoold --persona ibtool HOME=/u DANWO_IOS_BUILD=b1",
+      "  102 /Applications/Xcode.app/Contents/Developer/usr/bin/ibtoold --sending-client-environment DANWO_IOS_BUILD=b2",
+      "  103 /usr/bin/grep DANWO_IOS_BUILD=b1",
+      "  104 /Applications/Xcode.app/Contents/Developer/usr/bin/ibtoold --persona ibtool",
+    ].join("\n")
+
+    expect(interfaceBuilderDaemons(listing, "b1")).toEqual([101])
+    expect(interfaceBuilderDaemons(listing, "b3")).toEqual([])
+  })
+})
+
 describe("the Flutter build", () => {
-  it("builds for the simulator and as an APK, with Gradle's daemons switched off", async () => {
+  it("builds for the simulator, and only configures Gradle for the APK, with its daemons switched off", async () => {
     expect(FLUTTER_ARGS.ios).toEqual(["build", "ios", "--simulator", "--debug"])
-    expect(FLUTTER_ARGS.android).toEqual(["build", "apk", "--release"])
+    expect(FLUTTER_ARGS.android).toEqual(["build", "apk", "--release", "--config-only"])
     expect(flutterAndroidEnv({ GRADLE_OPTS: "-Xmx1g" }).GRADLE_OPTS).toBe(
       "-Xmx1g -Dorg.gradle.daemon=false -Dkotlin.compiler.execution.strategy=in-process",
     )
+  })
+
+  it("hands Gradle the JDK in JAVA_HOME", async () => {
+    await files(dir, { "jdk/bin/java": "" })
+
+    expect(flutterAndroidEnv({ JAVA_HOME: join(dir, "jdk") }).JAVA_HOME).toBe(join(dir, "jdk"))
+  })
+
+  it("assembles the APK with the project's own wrapper and danwo's network config", async () => {
+    await files(dir, { "pubspec.yaml": "name: app", "sdk/build-tools/35.0.0/aapt2": "" })
+
+    const fake = fakeExec(async ({ command }) => {
+      if (command === "./gradlew")
+        await files(dir, { "build/app/outputs/flutter-apk/app-release.apk": "apk" })
+
+      return "dev.danwo.flutter"
+    })
+
+    await buildFlutterAndroid({
+      project: dir,
+      exec: fake.exec,
+      env: { ANDROID_HOME: join(dir, "sdk") },
+    })
+
+    const gradle = fake.calls.find((call) => call.command === "./gradlew")
+    const script = gradle?.args[gradle.args.indexOf("--init-script") + 1] ?? ""
+
+    expect(gradle?.cwd).toBe(join(dir, "android"))
+    expect(gradle?.args.slice(0, 3)).toEqual(["assembleRelease", "--console=plain", "--no-daemon"])
+    expect(await readFile(script, "utf8")).toBe(networkInitScript(dirname(script)))
+    expect(
+      existsSync(join(dirname(script), "res", "xml", "danwo_network_security_config.xml")),
+    ).toBe(true)
   })
 
   it("keeps Flutter's iOS and Android projects in the key, and the generated files out", async () => {
@@ -431,7 +479,7 @@ describe("the Flutter build", () => {
     const fake = fakeExec(async ({ args }) => {
       if (args[1] === "ios")
         await files(dir, { "build/ios/iphonesimulator/Runner.app/Info.plist": "" })
-      if (args[1] === "apk")
+      if (args[0] === "assembleRelease")
         await files(dir, { "build/app/outputs/flutter-apk/app-release.apk": "apk" })
 
       return "dev.danwo.flutter"
@@ -450,6 +498,7 @@ describe("the Flutter build", () => {
       "plutil -replace",
       "plutil -extract",
       "flutter build",
+      "gradlew assembleRelease",
       "aapt2 dump",
     ])
   })

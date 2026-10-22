@@ -4,6 +4,8 @@
  * by a hash of the project's sources. The kept app's App Transport Security is opened for plain
  * HTTP, as the Expo build's is; HTTPS needs nothing, since danwo trusts its CA in the simulator.
  */
+import { execFile } from "node:child_process"
+import { randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
 import { cp, readdir, rm } from "node:fs/promises"
 import { join } from "node:path"
@@ -155,6 +157,7 @@ export async function simulatorSlot(
   key: string,
   started: number,
 ): Promise<{ readonly slot: BuildSlot; readonly done: (cached: boolean) => Promise<IosBuild> }> {
+  const mark = randomUUID()
   const slot = await buildSlot({
     project: options.project,
     force: options.force,
@@ -162,18 +165,69 @@ export async function simulatorSlot(
     exec: options.exec,
     file: `${key}.app`,
     logName: "build-ios.log",
-    env: () => options.env ?? iosBuildEnv(),
+    env: () => ({ ...(options.env ?? iosBuildEnv()), [BUILD_MARK]: mark }),
   })
 
   return {
     slot,
-    done: async (cached) => ({
-      app: slot.path,
-      bundleId: await bundleIdOf(slot, slot.path),
-      cached,
-      durationMs: Date.now() - started,
-      log: slot.log,
-    }),
+    done: async (cached) => {
+      if (!cached && options.exec === undefined) await stopInterfaceBuilder(mark)
+
+      return {
+        app: slot.path,
+        bundleId: await bundleIdOf(slot, slot.path),
+        cached,
+        durationMs: Date.now() - started,
+        log: slot.log,
+      }
+    },
+  }
+}
+
+/**
+ * The variable that marks one build's environment. Interface Builder's daemons, which compile an
+ * app's storyboards, inherit the environment of the build that started them.
+ */
+const BUILD_MARK = "DANWO_IOS_BUILD"
+
+/**
+ * The Interface Builder daemons in a `ps -E -A -ww -o pid=,command=` listing (each command followed
+ * by its environment) that the build marked `mark` started. They lead process groups of their own,
+ * so ending the build does not end them.
+ */
+export function interfaceBuilderDaemons(listing: string, mark: string): number[] {
+  return listing.split("\n").flatMap((line) => {
+    const match = /^\s*(\d+)\s+(.*)$/.exec(line)
+
+    if (match?.[1] === undefined || match[2] === undefined) return []
+
+    const command = match[2]
+    const daemon = /\/ibtoold(\s|$)/.test(command) && command.includes(`${BUILD_MARK}=${mark}`)
+
+    return daemon ? [Number(match[1])] : []
+  })
+}
+
+/**
+ * Ends the Interface Builder daemons the build marked `mark` left behind: they would idle for
+ * minutes after the build, and danwo leaves nothing running.
+ */
+async function stopInterfaceBuilder(mark: string): Promise<void> {
+  const listing = await new Promise<string>((resolve) => {
+    execFile(
+      "ps",
+      ["-E", "-A", "-ww", "-o", "pid=,command="],
+      { maxBuffer: 64 * 1024 * 1024 },
+      (error, stdout) => resolve(error ? "" : stdout),
+    )
+  })
+
+  for (const pid of interfaceBuilderDaemons(listing, mark)) {
+    try {
+      process.kill(pid, "SIGTERM")
+    } catch {
+      /* It ended on its own meanwhile. */
+    }
   }
 }
 

@@ -1,19 +1,20 @@
 /**
  * The danwo build of a Flutter app: `flutter build ios --simulator` for the iOS Simulator (Flutter
- * builds simulators in debug mode only) and `flutter build apk` for Android (release, signed with
- * the debug key as Flutter's template does). Each is kept by a hash of the app's sources, where
- * `ios/` and `android/` are sources, not outputs.
+ * builds simulators in debug mode only), and for Android the release APK (signed with the debug
+ * key, as Flutter's template does) with danwo's network config added through the same Gradle init
+ * script a native build gets. Each is kept by a hash of the app's sources, where `ios/` and
+ * `android/` are sources, not outputs.
  */
 import { copyFile, cp, rm } from "node:fs/promises"
 import { join } from "node:path"
 
-import { androidSdkRoot } from "../toolchain.ts"
-import { buildTools, packageOf } from "./gradle.ts"
+import { androidSdkRoot, javaHome } from "../toolchain.ts"
+import { buildTools, gradleArgs, packageOf, writeNetworkConfig } from "./gradle.ts"
 import { type AndroidBuild, type BuildExec, buildSlot, type IosBuild, sourceHash } from "./slot.ts"
 import { openTransportSecurity, simulatorSlot } from "./xcode.ts"
 
 /** Changes whenever the build steps change, so builds made by older steps are not reused. */
-const RECIPE = "danwo-flutter-1"
+const RECIPE = "danwo-flutter-2"
 
 /**
  * What `flutter build`, `pub get` and CocoaPods write, never part of the key: the build folder,
@@ -42,22 +43,28 @@ export interface FlutterBuildOptions {
   readonly env?: NodeJS.ProcessEnv | undefined
 }
 
-/** `flutter build`'s arguments for each platform. */
+/**
+ * `flutter build`'s arguments for each platform. On Android, Flutter only writes the Gradle
+ * project's configuration (`local.properties`, the wrapper); the project's own wrapper then builds
+ * the APK, so danwo's init script joins the build.
+ */
 export const FLUTTER_ARGS = {
   ios: ["build", "ios", "--simulator", "--debug"],
-  android: ["build", "apk", "--release"],
+  android: ["build", "apk", "--release", "--config-only"],
 } as const
 
 /**
- * The environment `flutter build apk` runs in. Flutter runs Gradle with its daemon, which would
- * outlive the build; Gradle's and the Kotlin compiler's daemons are switched off through the
- * properties Gradle reads from `GRADLE_OPTS`, so nothing is left running.
+ * The environment the Android build runs in: a JDK for Gradle (`JAVA_HOME`, else Android Studio's
+ * own), and Gradle's and the Kotlin compiler's daemons switched off through the properties Gradle
+ * reads from `GRADLE_OPTS`, so nothing outlives the build.
  */
 export function flutterAndroidEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const off = "-Dorg.gradle.daemon=false -Dkotlin.compiler.execution.strategy=in-process"
+  const java = javaHome(base)
 
   return {
     ...base,
+    ...(java !== undefined && { JAVA_HOME: java }),
     CI: "1",
     GRADLE_OPTS: base.GRADLE_OPTS === undefined ? off : `${base.GRADLE_OPTS} ${off}`,
   }
@@ -118,6 +125,11 @@ export async function buildFlutterAndroid(options: FlutterBuildOptions): Promise
   if (slot.reuse) return done(true)
 
   await slot.step("flutter", FLUTTER_ARGS.android)
+  await slot.step(
+    "./gradlew",
+    gradleArgs("release", await writeNetworkConfig(slot)),
+    join(project, "android"),
+  )
   await copyFile(join(project, "build", "app", "outputs", "flutter-apk", "app-release.apk"), apk)
 
   return done(false)
