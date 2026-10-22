@@ -50,10 +50,15 @@ echo "danwo: no node on PATH besides its shim" >&2
 exit 127
 `
 
-/** Writes the `node` shim into `<dir>/bin` and returns that folder. */
-export async function writeNodeShim(dir: string): Promise<string> {
+/** Writes the `node` shim into `<dir>/bin` and returns that folder; Windows, with no shell, gets none. */
+export async function writeNodeShim(
+  dir: string,
+  platform: NodeJS.Platform = process.platform,
+): Promise<string> {
   const bin = join(dir, "bin")
   const shim = join(bin, "node")
+
+  if (platform === "win32") return bin
 
   await mkdir(bin, { recursive: true })
   await writeFile(shim, SHIM)
@@ -107,16 +112,16 @@ export function nodeImportOption(path: string): string {
 
 /**
  * The `BUN_OPTIONS` entry that preloads `path`. Bun splits the variable on whitespace, so a path
- * with a space or a quote goes in as one double-quoted option. Inside quotes Bun reads a backslash
- * as an escape, so a quoted Windows path takes forward slashes, which Bun accepts there too.
+ * with a space or a quote goes in as one double-quoted option. Bun reads a backslash as an escape
+ * inside quotes, so a Windows path always takes forward slashes, which Bun accepts as well.
  */
 export function bunPreloadOption(
   path: string,
   platform: NodeJS.Platform = process.platform,
 ): string {
-  if (!/[\s"']/.test(path)) return `--preload=${path}`
-
   const slashed = platform === "win32" ? path.replaceAll("\\", "/") : path
+
+  if (!/[\s"']/.test(slashed)) return `--preload=${slashed}`
 
   return `"--preload=${slashed.replaceAll('"', '\\"')}"`
 }
@@ -129,9 +134,10 @@ export function proxyEnvironment(
   inputs: ProxyEnvironmentInputs,
   base: NodeJS.ProcessEnv,
   options: EnvOptions = {},
+  platform: NodeJS.Platform = process.platform,
 ): NodeJS.ProcessEnv {
   const preloadUrl = pathToFileURL(PRELOAD).href
-  const shim = (options.nodeShim ?? true) && process.platform !== "win32"
+  const shim = (options.nodeShim ?? true) && platform !== "win32"
   const noProxy = [base.NO_PROXY ?? base.no_proxy, ...ownAddresses(inputs.url)]
     .filter(Boolean)
     .join(",")
@@ -147,12 +153,13 @@ export function proxyEnvironment(
     NODE_USE_ENV_PROXY: "1",
     NODE_EXTRA_CA_CERTS: inputs.caCertPath,
     NODE_OPTIONS: [base.NODE_OPTIONS, nodeImportOption(PRELOAD)].filter(Boolean).join(" "),
-    BUN_OPTIONS: [bunPreloadOption(PRELOAD), base.BUN_OPTIONS].filter(Boolean).join(" "),
+    BUN_OPTIONS: [bunPreloadOption(PRELOAD, platform), base.BUN_OPTIONS].filter(Boolean).join(" "),
     [APP_CLOCK_VARIABLE]: inputs.clock.file,
     [PRELOAD_DIR_VARIABLE]: inputs.preloadDir,
     [PRELOAD_URL_VARIABLE]: preloadUrl,
     [PROBE_VARIABLE]: `https://${PROBE_HOST}/`,
     ...(options.requireProxy === true && { [REQUIRE_VARIABLE]: "1" }),
+    /* The shim is a shell script, so only a POSIX PATH, `:`-separated, ever takes it. */
     ...(shim && { PATH: [inputs.shimDir, base.PATH].filter(Boolean).join(":") }),
   }
 }

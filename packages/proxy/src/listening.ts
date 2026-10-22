@@ -8,6 +8,20 @@ import { connect } from "node:net"
 const PROBE_TIMEOUT_MS = 500
 /** How long an answer is reused: a port that starts listening is seen within a quarter second. */
 const REMEMBER_MS = 250
+/**
+ * How long Windows' "nothing listens" is reused. Windows retries a refused loopback connection
+ * instead of failing it, so each probe of a closed port (`::1` for an app on 127.0.0.1 only) waits
+ * out the whole timeout; asking less often keeps that off most requests.
+ */
+const WINDOWS_CLOSED_MS = 2_000
+
+/** How long an answer about a port is reused on `platform`. */
+export function rememberFor(
+  listening: boolean,
+  platform: NodeJS.Platform = process.platform,
+): number {
+  return !listening && platform === "win32" ? WINDOWS_CLOSED_MS : REMEMBER_MS
+}
 
 const remembered = new Map<string, { readonly listening: boolean; readonly at: number }>()
 
@@ -33,7 +47,7 @@ export async function isListening(host: string, port: number): Promise<boolean> 
   const key = `${bare}:${port}`
   const known = remembered.get(key)
 
-  if (known && Date.now() - known.at < REMEMBER_MS) return known.listening
+  if (known && Date.now() - known.at < rememberFor(known.listening)) return known.listening
 
   const listening = await probe(bare, port)
 

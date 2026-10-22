@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
-import { bunPreloadOption, nodeImportOption } from "../src/node-env.ts"
+import { bunPreloadOption, nodeImportOption, proxyEnvironment } from "../src/node-env.ts"
 
 let root: string
 let preload: string
@@ -21,7 +21,7 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 function hasBun(): boolean {
@@ -64,9 +64,39 @@ describe("the preload under a path with spaces", () => {
     )
   })
 
+  it("gives an unquoted Windows path forward slashes too", () => {
+    expect(bunPreloadOption(String.raw`C:\srv\preload.mjs`, "win32")).toBe(
+      "--preload=C:/srv/preload.mjs",
+    )
+  })
+
   it("escapes a double quote in a POSIX path", () => {
     expect(bunPreloadOption('/srv/a "b"/p.mjs', "linux")).toBe(
       String.raw`"--preload=/srv/a \"b\"/p.mjs"`,
     )
+  })
+})
+
+describe("the proxy environment on each platform", () => {
+  const inputs = {
+    url: "http://127.0.0.1:4100",
+    caCertPath: "ca.pem",
+    clock: { file: "clock.json", offset: () => 0, setOffset: async () => undefined },
+    preloadDir: "preloaded",
+    shimDir: "shim",
+  }
+
+  it("puts the node shim first on PATH where a shell script can stand in for node", () => {
+    const env = proxyEnvironment(inputs, { PATH: "/usr/bin" }, {}, "linux")
+
+    expect(env.PATH).toBe("shim:/usr/bin")
+  })
+
+  it("leaves PATH alone on Windows, which runs no shell scripts as node", () => {
+    const env = proxyEnvironment(inputs, { PATH: String.raw`C:\Windows` }, {}, "win32")
+
+    expect(env.PATH).toBe(String.raw`C:\Windows`)
+    expect(env.BUN_OPTIONS).not.toContain("\\")
+    expect(env.NODE_OPTIONS).toMatch(/^--import=file:\/\//)
   })
 })

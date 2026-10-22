@@ -69,15 +69,27 @@ describe("SDKs with their own transport", () => {
     expect(out.undici).toBe("undici")
   })
 
-  it("keeps the preload when a start script replaces NODE_OPTIONS, through the node shim", async () => {
-    const out = await runScript(proxy.env())
+  it.skipIf(process.platform === "win32")(
+    "keeps the preload when a start script replaces NODE_OPTIONS, through the node shim (not on Windows: the shim is a shell script, so Windows has none)",
+    async () => {
+      const out = await runScript(proxy.env())
 
-    expect(out).toMatchObject({ axios: "axios", undici: "undici" })
-    expect(out.stripe).toMatch(/^cus_/)
-  })
+      expect(out).toMatchObject({ axios: "axios", undici: "undici" })
+      expect(out.stripe).toMatch(/^cus_/)
+    },
+  )
 
   it("loses the agents without the shim, which is what the heartbeat is there to catch", async () => {
-    const out = await runScript(proxy.env(process.env, { nodeShim: false }))
+    /* What `NODE_OPTIONS=… node app` does, without a POSIX shell, so it runs on Windows too. */
+    const { stdout } = await run(process.execPath, [APP], {
+      env: {
+        ...proxy.env(process.env, { nodeShim: false }),
+        NODE_OPTIONS: "--max-old-space-size=256",
+      },
+      cwd: fileURLToPath(new URL("..", import.meta.url)),
+      timeout: 30_000,
+    })
+    const out = Out.parse(JSON.parse(stdout))
 
     expect(out.axios).toMatch(/^error /)
     expect(out.undici).toMatch(/^error /)
