@@ -31,6 +31,12 @@ export interface ActionOptions extends ReadOptions {
   readonly force?: boolean
 }
 
+/** Options of `longPress`. */
+export interface LongPressOptions extends ActionOptions {
+  /** Milliseconds between pressing the element and letting it go; 800 by default. */
+  readonly durationMs?: number
+}
+
 /** An action on the single matched element. */
 type Action = (options?: ActionOptions) => Promise<void>
 
@@ -79,6 +85,11 @@ export interface Locator extends Screen {
   readonly check: Action
   readonly uncheck: Action
   readonly hover: Action
+  /**
+   * Presses the element and holds it for `durationMs` before letting go, for what opens a menu or
+   * starts a drag on a long press. On a web page the mouse goes down on the element's centre.
+   */
+  longPress(options?: LongPressOptions): Promise<void>
   /** Types `value` in place of what the field holds; a secret's value never reaches a record. */
   fill(value: string | Secret, options?: ActionOptions): Promise<void>
   /** Presses a key such as `"Enter"` or `"Control+A"` with the element focused. */

@@ -87,13 +87,13 @@ them once on each.
 
 ## What a test can do
 
-| Fixture    | On iOS                                                                              |
-| ---------- | ----------------------------------------------------------------------------------- |
-| `screen`   | `getByTestId`, `getByLabel`, `getByText`, `getByRole` (no headings); `tap`, `fill`  |
-| `expect`   | the same checks as the web, including `toHaveScreenshot`                            |
-| `app.open` | opens a deep link; with no path, restarts the app                                   |
-| `device`   | `foreground()`, `back()`, `openLink(url)`, `logs()`, `swipe()`, `dismissKeyboard()` |
-| `agent`    | `act`, `assert`, `extract`, `waitFor`, with device tools                            |
+| Fixture    | On iOS                                                                                          |
+| ---------- | ----------------------------------------------------------------------------------------------- |
+| `screen`   | `getByTestId`, `getByLabel`, `getByText`, `getByRole` (no headings); `tap`, `fill`, `longPress` |
+| `expect`   | the same checks as the web, including `toHaveScreenshot`                                        |
+| `app.open` | opens a deep link; with no path, restarts the app                                               |
+| `device`   | `foreground()`, `back()`, `openLink(url)`, `logs()`, `swipe()`, `dismissKeyboard()`             |
+| `agent`    | `act`, `assert`, `extract`, `waitFor`, with device tools                                        |
 
 `back()` taps the screen's own back or close control, since an iPhone has no Back button.
 `swipe()` takes the same options as on [Android](/docs/android-tests#swipe-and-put-the-keyboard-away).

@@ -1,8 +1,8 @@
 /**
  * Pressing safely on a device: an element is found again on the latest screen before it is
  * pressed (its ref from that reading, once it is in place), an action waits for it to be enabled,
- * the selected state reaches locators and the agent, and the agent can long-press, swipe and put
- * the keyboard away, in a live step and in its replay.
+ * the selected state reaches locators and the agent, a locator can long-press, and the agent can
+ * long-press, swipe and put the keyboard away, in a live step and in its replay.
  */
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -215,6 +215,46 @@ describe("a locator's action on a device", () => {
 
     expect(findAgain(rows, earlier)?.ref).toBe("e8")
     expect(findAgain(rows, node("e4", { role: "button", name: "Buy" }))).toBeUndefined()
+  })
+})
+
+describe("a locator's long press on a device", () => {
+  it("waits for the element to be enabled, then holds it by the latest reading's ref", async () => {
+    /* Buy starts disabled as e2; once enabled, a banner shows and Buy is e3. */
+    const device = new ScriptedDevice(screenWith({ enabled: false }))
+    const session = await open(device)
+
+    setTimeout(() => device.show(screenWith({ banner: true })), 200)
+    await session.screen.getByTestId("buy").longPress({ durationMs: 1_200 })
+    await session.screen.getByTestId("buy").longPress()
+    expect(device.acts).toEqual(["long-press e3 1200", "long-press e3 -"])
+    expect(session.flight.steps().map((step) => [step.api, step.label])).toEqual(
+      expect.arrayContaining([
+        ["locator.longPress", 'getByTestId("buy").longPress(durationMs: 1200)'],
+        ["locator.longPress", 'getByTestId("buy").longPress()'],
+      ]),
+    )
+  })
+
+  it("fails an element that stays disabled, without pressing it", async () => {
+    const device = new ScriptedDevice(screenWith({ enabled: false }))
+    const { screen } = await open(device)
+
+    await expect(screen.getByTestId("buy").longPress()).rejects.toMatchObject({
+      code: "LOCATOR_NOT_READY",
+      message: 'locator.longPress: getByTestId("buy") is disabled',
+    })
+    expect(device.acts).toEqual([])
+  })
+
+  it("says so on a device that cannot long-press", async () => {
+    const device = new ScriptedDevice()
+    const { screen } = await open(Object.assign(device, { longPress: undefined }))
+
+    await expect(screen.getByTestId("buy").longPress()).rejects.toMatchObject({
+      code: "CONFIG_INVALID",
+      message: "locator.longPress is not supported on devices yet",
+    })
   })
 })
 

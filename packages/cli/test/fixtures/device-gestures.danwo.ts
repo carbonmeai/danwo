@@ -1,7 +1,7 @@
 /**
  * Gestures on a real device, copied into the mobile shop by its slow tests: swipes that take a
- * duration, a long press by a reading's ref, and the keyboard put away, twice, so the second call
- * (with no keyboard showing) is seen to leave the screen where it was.
+ * duration, a long press by a locator and one by a reading's ref, and the keyboard put away,
+ * twice, so the second call (with no keyboard showing) is seen to leave the screen where it was.
  */
 import type { DeviceFixtures } from "@danwo/device"
 import { test as base } from "@danwo/sdk"
@@ -11,6 +11,10 @@ const test = base.extend<DeviceFixtures>()
 test("swipes, long-presses and puts the keyboard away", async ({ screen, expect, device }) => {
   await expect(screen.getByText("Danwo Shop")).toBeVisible()
   await device.swipe({ direction: "down", durationMs: 600 })
+
+  /* The title has no long-press action: holding it leaves the shop where it was. */
+  await screen.getByText("Danwo Shop").longPress({ durationMs: 600 })
+  await expect(screen.getByText("Danwo Shop")).toBeVisible()
 
   /* No keyboard shows: putting it away leaves the app in front. */
   await device.dismissKeyboard()

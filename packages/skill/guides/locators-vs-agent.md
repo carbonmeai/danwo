@@ -8,8 +8,11 @@ to pin down. Both can live in one test.
 `screen.getByRole("button", { name: "Pay" })`, `getByLabel`, `getByText`, `getByPlaceholder`,
 `getByDisplayValue` and `getByTestId` find elements the way a user names them. A string matches as
 a case-insensitive substring unless you pass `{ exact: true }`; a RegExp tests the whole name.
-Actions (`click`, `fill`, `press`, `check`, `selectOption`, `hover`, `setInputFiles`, `dragTo`)
-need exactly one match and wait for the element to be ready. Narrow with `.first()`, `.nth(i)`,
+Actions (`click`, `longPress`, `fill`, `press`, `check`, `selectOption`, `hover`, `setInputFiles`,
+`dragTo`) need exactly one match and wait for the element to be ready. `longPress({ durationMs })`
+(800 ms by default) waits as `click` does, then on a web page moves the mouse to the element's
+centre, presses, holds and lets go; on a device it holds the element by the latest reading's ref.
+Its step label reads `….longPress(durationMs: 600)`. Narrow with `.first()`, `.nth(i)`,
 `.filter({ hasText, hasNotText, has, hasNot })` (every option given must hold; `has` and `hasNot`
 take a locator from the same screen) or by chaining another `getBy…`. `a.or(b)` matches what either
 finds, in page order (`save.or(screen.getByText("Saved"))` waits for whichever shows; an action

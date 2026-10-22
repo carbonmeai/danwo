@@ -5,13 +5,14 @@
  * driver by that screen's ref, and records a step.
  */
 import type { ScreenshotEvent, ScreenshotSettings } from "../assert/screenshot.ts"
-import { filterCall, roleCall, shown, textCall } from "../locate/describe.ts"
+import { filterCall, longPressArgs, roleCall, shown, textCall } from "../locate/describe.ts"
 import { LocatorError } from "../locate/failure.ts"
 import type {
   ActionOptions,
   AriaRole,
   FilterOptions,
   Locator,
+  LongPressOptions,
   RoleOptions,
   Screen,
   SecretResolver,
@@ -309,6 +310,25 @@ export class DeviceLocator implements Locator {
   /** `click` by its mobile name. */
   tap(options?: ActionOptions): Promise<void> {
     return this.click(options)
+  }
+
+  /**
+   * Presses the element and holds it for `durationMs` (the device's 800 ms by default), once it is
+   * enabled and in place, by the latest reading's ref.
+   */
+  longPress(options?: LongPressOptions): Promise<void> {
+    const press = this.context.target.longPress?.bind(this.context.target)
+    const hold = options?.durationMs
+
+    if (press === undefined) return unsupported("longPress")
+    if (hold !== undefined && (!Number.isFinite(hold) || hold < 0))
+      return Promise.reject(
+        new TypeError(`longPress takes a durationMs of 0 or more, not ${String(hold)}`),
+      )
+
+    return this.act("longPress", longPressArgs(options), options, (node) =>
+      press(node.ref, hold === undefined ? {} : { durationMs: hold }),
+    )
   }
 
   fill(value: string | Secret, options?: ActionOptions): Promise<void> {

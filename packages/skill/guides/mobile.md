@@ -129,8 +129,9 @@ Every attempt starts the app afresh: data cleared, permissions granted, launched
 
 - **`screen`:** `getByTestId` (React Native's `testID`), `getByRole`, `getByLabel`, `getByText`,
   `getByPlaceholder` and `getByDisplayValue` resolve on the accessibility tree. `click` (or `tap`),
-  `fill`, `clear`, `check`, `uncheck`, `press(key)` and `selectOption(option)` (a spinner or
-  dropdown: it opens the picker and taps the option) act on the single match. An action waits for
+  `fill`, `clear`, `check`, `uncheck`, `press(key)`, `longPress({ durationMs? })` (800 ms by
+  default) and `selectOption(option)` (a spinner or dropdown: it opens the picker and taps the
+  option) act on the single match. An action waits for
   the match to be enabled (`LOCATOR_NOT_READY … is disabled` when it never is), then reads the
   screen again and presses the element there, by that reading's ref, once two readings agree on
   where it is; one that left the screen is looked for once more. Headers with
@@ -157,8 +158,8 @@ Every attempt starts the app afresh: data cleared, permissions granted, launched
     or the screen, in screenshot pixels, 300 ms by default; slow swipes turn carousels and pull
     lists to refresh;
   - `dismissKeyboard()`, which does nothing when no keyboard shows;
-  - `longPress(ref, { durationMs? })` (800 ms by default) by a reading's ref, for the agent and
-    the MCP server.
+  - `longPress(ref, { durationMs? })` (800 ms by default) by a reading's ref, under the agent,
+    the MCP server and a locator's `longPress`.
 
 A Custom Tab is part of the screen: its web page reads through the same locators.
 

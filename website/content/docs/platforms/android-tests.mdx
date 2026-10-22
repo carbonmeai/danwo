@@ -71,13 +71,13 @@ emulator's own background traffic (Chrome sync, Play services), so the matrix ne
 
 ## What a test can do
 
-| Fixture    | On Android                                                                                             |
-| ---------- | ------------------------------------------------------------------------------------------------------ |
-| `screen`   | `getByTestId`, `getByRole`, `getByLabel`, `getByText`; `tap`, `fill`, `check`, `press`, `selectOption` |
-| `expect`   | the same checks as the web, including `toHaveScreenshot`                                               |
-| `app.open` | opens a deep link; with no path, restarts the app                                                      |
-| `device`   | `foreground()`, `back()`, `openLink(url)`, `logs()`, `swipe()`, `dismissKeyboard()`                    |
-| `agent`    | `act`, `assert`, `extract`, `waitFor`, with device tools                                               |
+| Fixture    | On Android                                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------------------- |
+| `screen`   | `getByTestId`, `getByRole`, `getByLabel`, `getByText`; `tap`, `fill`, `check`, `press`, `selectOption`, `longPress` |
+| `expect`   | the same checks as the web, including `toHaveScreenshot`                                                            |
+| `app.open` | opens a deep link; with no path, restarts the app                                                                   |
+| `device`   | `foreground()`, `back()`, `openLink(url)`, `logs()`, `swipe()`, `dismissKeyboard()`                                 |
+| `agent`    | `act`, `assert`, `extract`, `waitFor`, with device tools                                                            |
 
 Every attempt starts the app afresh: its data cleared, its permissions granted.
 
@@ -110,8 +110,15 @@ test("turns the carousel and refreshes the feed", async ({ screen, expect, devic
 | `from`, `to` | the two points to swipe between, in place of `direction`  |                  |
 | `durationMs` | how long the finger takes                                 | 300              |
 
-`dismissKeyboard()` does nothing when no keyboard shows. The agent has the same gestures, and
-a long press too.
+`dismissKeyboard()` does nothing when no keyboard shows. To hold an element, call `longPress()`
+on its locator, as on the web:
+
+```ts title="tests/feed.danwo.ts · long press"
+await screen.getByTestId("post").longPress({ durationMs: 900 })
+```
+
+It waits for the element to be enabled, like `tap()`, and holds for 800 ms by default. The agent
+has the same gestures.
 
 ## The agent on a device
 

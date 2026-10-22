@@ -11,13 +11,14 @@ import { setChecked } from "../browser/check.ts"
 import { pointAt, type PointerKind } from "../browser/pointer.ts"
 import { checkSecretField, markSecretField } from "../secrets/fields.ts"
 import { isSecret, type Secret } from "../secrets/index.ts"
-import { filterCall, roleCall, shown, textCall } from "./describe.ts"
+import { filterCall, longPressArgs, roleCall, shown, textCall } from "./describe.ts"
 import { valueSelector } from "./display-value.ts"
 import { explain, LocatorError } from "./failure.ts"
 import type {
   ActionOptions,
   AriaRole,
   FilterOptions,
+  LongPressOptions,
   ReadOptions,
   Locator,
   RoleOptions,
@@ -67,6 +68,7 @@ export interface LocateContext {
 /** The pointer each action shows; actions not listed show none. */
 const POINTER_OF: Readonly<Record<string, PointerKind>> = {
   click: "click",
+  longPress: "click",
   check: "click",
   uncheck: "click",
   selectOption: "click",
@@ -77,6 +79,9 @@ const POINTER_OF: Readonly<Record<string, PointerKind>> = {
   press: "type",
   hover: "hover",
 }
+
+/** How long a long press holds by default, in milliseconds. */
+const LONG_PRESS_MS = 800
 
 /** Playwright's `force` for an action whose options ask for it, so actionability checks are skipped. */
 function forced(options: ActionOptions | undefined): { readonly force?: true } {
@@ -304,6 +309,23 @@ export class ElementLocator extends Finder implements Locator {
 
   tap(options?: ActionOptions): Promise<void> {
     return this.click(options)
+  }
+
+  /**
+   * Waits for the element as `click` does, then moves the mouse to its centre, presses, holds for
+   * `durationMs` and lets go. The hold counts on top of the timeout, which covers the wait alone.
+   */
+  longPress(options?: LongPressOptions): Promise<void> {
+    const hold = options?.durationMs ?? LONG_PRESS_MS
+
+    if (!Number.isFinite(hold) || hold < 0)
+      return Promise.reject(
+        new TypeError(`longPress takes a durationMs of 0 or more, not ${String(hold)}`),
+      )
+
+    return this.act("longPress", longPressArgs(options), options, (target, timeout) =>
+      target.click({ timeout: timeout + hold, delay: hold, ...forced(options) }),
+    )
   }
 
   fill(value: string | Secret, options?: ActionOptions): Promise<void> {

@@ -64,16 +64,41 @@ regular expression.
 Once a finder has one element, call an action on it. Each action waits for the element to be ready
 first.
 
-| Action                | What it does                     |
-| --------------------- | -------------------------------- |
-| `click()`             | clicks the element               |
-| `fill(text)`          | types into a field, replacing it |
-| `press(key)`          | presses a key, like `"Enter"`    |
-| `check()`             | ticks a checkbox or radio        |
-| `selectOption(value)` | picks an option in a select      |
-| `hover()`             | moves the pointer over it        |
-| `setInputFiles(path)` | attaches a file to a file input  |
-| `dragTo(target)`      | drags it onto another element    |
+| Action                | What it does                       |
+| --------------------- | ---------------------------------- |
+| `click()`             | clicks the element                 |
+| `longPress()`         | presses it and holds, then lets go |
+| `fill(text)`          | types into a field, replacing it   |
+| `press(key)`          | presses a key, like `"Enter"`      |
+| `check()`             | ticks a checkbox or radio          |
+| `selectOption(value)` | picks an option in a select        |
+| `hover()`             | moves the pointer over it          |
+| `setInputFiles(path)` | attaches a file to a file input    |
+| `dragTo(target)`      | drags it onto another element      |
+
+## Hold a press
+
+Some controls do something else when you hold them: a message that opens a menu, a card you
+start dragging. `longPress()` presses the element, holds it, then lets go. It waits for the element
+like `click()` does.
+
+```ts title="tests/messages.danwo.ts"
+import { test } from "@danwo/sdk"
+
+test("opens a message's menu", async ({ app, screen, expect }) => {
+  await app.open("/messages")
+  await screen.getByText("See you at noon").longPress({ durationMs: 600 })
+  await expect(screen.getByRole("menuitem", { name: "Reply" })).toBeVisible()
+})
+```
+
+| Option       | What it does                                | Default                      |
+| ------------ | ------------------------------------------- | ---------------------------- |
+| `durationMs` | how long the press is held, in milliseconds | 800                          |
+| `force`      | skips the readiness checks (web only)       | `false`                      |
+| `timeout`    | how long to wait for the element            | the session's action timeout |
+
+On a web page the mouse goes down on the middle of the element. On a phone the finger does.
 
 ## When an action keeps waiting
 
