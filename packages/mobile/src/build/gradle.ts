@@ -54,8 +54,9 @@ export const NETWORK_MANIFEST = `<?xml version="1.0" encoding="utf-8"?>
  * folder and the manifest overlay in `dir`, through the Android Gradle plugin's variant API.
  */
 export function networkInitScript(dir: string): string {
-  const res = JSON.stringify(join(dir, "res"))
-  const manifest = JSON.stringify(join(dir, "AndroidManifest.xml"))
+  /* Forward slashes: Gradle takes them on Windows too, and a backslash would start an escape. */
+  const res = JSON.stringify(join(dir, "res").replaceAll("\\", "/"))
+  const manifest = JSON.stringify(join(dir, "AndroidManifest.xml").replaceAll("\\", "/"))
 
   return `// Written by danwo for its own build of this app; the project's files are not changed.
 allprojects {
