@@ -11,7 +11,7 @@ export type Engine = (typeof ENGINES)[number]
 
 export const ENGINE_LABELS: Readonly<Record<Engine, { label: string; hint: string }>> = {
   web: { label: "Web", hint: "a browser, through Playwright" },
-  mobile: { label: "Mobile", hint: "Android, for Expo and React Native apps" },
+  mobile: { label: "Mobile", hint: "Android and iOS: Expo, React Native, native or Flutter" },
   both: { label: "Web and mobile", hint: "one config for each" },
   none: { label: "None", hint: "the app's HTTP API only, no browser" },
 }
