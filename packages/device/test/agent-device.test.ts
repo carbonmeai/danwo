@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 /** What the mocked agent-device client did, in order. */
 const calls: string[] = []
 /** How many of the next fills fail as a daemon that stopped answering does. */
-const trouble = { fills: 0, busy: 0 }
+const trouble = { fills: 0, busy: 0, message: "Daemon request timed out" }
 
 vi.mock("agent-device", () => ({
   createAgentDeviceClient: () => ({
@@ -24,7 +24,7 @@ vi.mock("agent-device", () => ({
       fill: async () => {
         calls.push("fill")
 
-        if (trouble.fills-- > 0) throw new Error("Daemon request timed out")
+        if (trouble.fills-- > 0) throw new Error(trouble.message)
       },
       press: async () => void calls.push("press"),
     },
@@ -52,6 +52,7 @@ afterEach(async () => {
   calls.length = 0
   trouble.fills = 0
   trouble.busy = 0
+  trouble.message = "Daemon request timed out"
   if (dir !== undefined) await rm(dir, { recursive: true, force: true })
 })
 
@@ -97,6 +98,15 @@ describe("the agent-device driver", () => {
       "snapshot",
     ])
     expect(opened.recoveries).toBe(0)
+  })
+
+  it("restarts the session when the iOS runner's main-thread watchdog fired", async () => {
+    const opened = await driver()
+
+    trouble.fills = 1
+    trouble.message = "main thread execution timed out"
+    await opened.fill("e5", "x")
+    expect(opened.recoveries).toBe(1)
   })
 
   it("gives up when the retried call is stuck too", async () => {

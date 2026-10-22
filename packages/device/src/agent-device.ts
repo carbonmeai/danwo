@@ -33,14 +33,18 @@ const OPEN_MS = 120_000
 const CALL_MS = 60_000
 const CLOSE_MS = 10_000
 
-/** Whether `error` says the daemon stopped answering: its own timeout, or our deadline. */
+/**
+ * Whether `error` says the driver stopped answering: the daemon's own timeout, our deadline, or the
+ * iOS runner's watchdog on the app's main thread, after which the runner stays wedged until its
+ * session is closed (which restarts it).
+ */
 function stuck(error: unknown): boolean {
   if (!(error instanceof Error)) return false
 
   return (
     error.name === "TimeoutError" ||
     error.name === "AbortError" ||
-    /Daemon request timed out|request_canceled/.test(error.message)
+    /Daemon request timed out|request_canceled|main thread execution timed out/.test(error.message)
   )
 }
 
