@@ -2,12 +2,13 @@
  * The mobile shop on a real iOS Simulator: build (or reuse) its simulator app, run its tests,
  * record its agent steps with a scripted model and replay them with none, then the fault matrix
  * for a careful app (on two simulators for the agent's test) and for one that grants a duplicated
- * webhook twice. Runs only when asked (`DANWO_IOS=1`) on a Mac with Xcode; otherwise it skips at
- * once. The simulators are danwo's own (`danwo iPhone`, `danwo iPhone 2`), created on first use
+ * webhook twice, and last the device's gestures: swipes for a duration, a long press and the
+ * keyboard put away. Runs only when asked (`DANWO_IOS=1`) on a Mac with Xcode; otherwise it skips
+ * at once. The simulators are danwo's own (`danwo iPhone`, `danwo iPhone 2`), created on first use
  * and shut down after each run.
  */
 import { execFile, execFileSync } from "node:child_process"
-import { mkdtemp, rm } from "node:fs/promises"
+import { copyFile, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -20,6 +21,8 @@ const BIN = fileURLToPath(new URL("../src/bin.ts", import.meta.url))
 const SOURCE = fileURLToPath(new URL("../../../examples/shop-mobile", import.meta.url))
 const TEST = "tests/buy-credits.danwo.ts"
 const AGENT_TEST = "tests/agent-buy.danwo.ts"
+/** A test of the device's gestures, copied into the shop for the last run. */
+const GESTURES = fileURLToPath(new URL("./fixtures/device-gestures.danwo.ts", import.meta.url))
 /** A build, a boot and a matrix of about twenty trials on one simulator take minutes. */
 const LONG = 1_800_000
 
@@ -150,6 +153,19 @@ describe.skipIf(!ready)("an Expo app on an iOS Simulator", () => {
       expect(out).toContain("invariant: expected 1000 to be 500")
       /* 1 for the failed run; 3 when a simulator hiccup also left a run unjudged. */
       expect([1, 3]).toContain(code)
+    },
+  )
+
+  it(
+    "swipes for a duration, long-presses and puts the keyboard away",
+    { timeout: LONG },
+    async () => {
+      await copyFile(GESTURES, join(workCopy(SOURCE), "tests", "gestures.danwo.ts"))
+
+      const { code, out } = await danwo(["test", "tests/gestures.danwo.ts"])
+
+      expect(out).toContain("1 passed")
+      expect(code).toBe(0)
     },
   )
 })
