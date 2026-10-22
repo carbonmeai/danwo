@@ -92,6 +92,39 @@ describe("danwo doctor", () => {
     expect(named["skill"]?.[0]).toMatch(/^warn \.claude\/skills\/danwo differs from danwo/)
   })
 
+  it("checks every browser the config runs in, and Chromium for record and the MCP server", async () => {
+    const root = await project({
+      "package.json": "{}",
+      "danwo.config.ts": 'export default { browser: { name: ["webkit", "firefox"] } }\n',
+    })
+    const asked: string[] = []
+    const checks = await projectDoctor(
+      { cwd: root },
+      {
+        ...ready,
+        browser: async (engine) => {
+          asked.push(engine)
+
+          return engine === "webkit"
+            ? {
+                ok: false,
+                detail:
+                  "browserType.launch: WebKit is not installed for danwo. Run `npx @danwo/cli install-browser --browser webkit`",
+              }
+            : { ok: true, detail: `${engine} 1.0` }
+        },
+      },
+    )
+    const named = byName(checks)
+
+    expect(asked).toEqual(["chromium", "webkit", "firefox"])
+    expect(named["Chromium"]).toEqual(["ok chromium 1.0"])
+    expect(named["Firefox"]).toEqual(["ok firefox 1.0"])
+    expect(named["WebKit"]?.[0]).toMatch(
+      /^fail WebKit is not installed for danwo\. Run `npx @danwo\/cli install-browser --browser webkit`/,
+    )
+  })
+
   it("fails a config that does not load, and calls this danwo's skill current", async () => {
     const root = await project({
       "package.json": "{}",

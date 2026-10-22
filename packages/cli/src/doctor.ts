@@ -1,6 +1,6 @@
 /**
- * `danwo doctor`: what stops a first run, checked before one. Node, danwo's own Chromium, the
- * config (loading, and keys danwo does not know), the model's key, the installed Playwright Test
+ * `danwo doctor`: what stops a first run, checked before one. Node, danwo's own Chromium (and
+ * the config's other browsers, when `browser.name` names Firefox or WebKit), the config (loading, and keys danwo does not know), the model's key, the installed Playwright Test
  * against `@danwo/playwright`'s range, and whether the coding agents' copy of the skill is this
  * danwo's. Android has its own: `danwo device doctor`.
  */
@@ -9,7 +9,13 @@ import { createRequire } from "node:module"
 import { join } from "node:path"
 
 import { DANWO_VERSION } from "@danwo/init/catalog"
-import { type DanwoConfig, loadConfig } from "@danwo/runner/runner"
+import {
+  type BrowserName,
+  browserNames,
+  browserTitle,
+  type DanwoConfig,
+  loadConfig,
+} from "@danwo/runner/runner"
 import { SKILL_DIRS, SKILL_FILE } from "@danwo/skill"
 
 export interface DoctorCheck {
@@ -22,8 +28,10 @@ export interface DoctorCheck {
 export interface DoctorProbes {
   readonly nodeVersion: string
   readonly env: NodeJS.ProcessEnv
-  /** Starts danwo's Chromium headless; its version or why it did not start. */
-  readonly browser: () => Promise<{ readonly ok: boolean; readonly detail: string }>
+  /** Starts danwo's build of `engine` headless; its version or why it did not start. */
+  readonly browser: (
+    engine: BrowserName,
+  ) => Promise<{ readonly ok: boolean; readonly detail: string }>
 }
 
 /** The oldest Playwright Test `@danwo/playwright` takes. */
@@ -45,16 +53,27 @@ function nodeCheck(version: string): DoctorCheck {
     : { name: "Node.js", status: "fail", detail: `${version}; danwo needs Node.js 24 or newer` }
 }
 
-async function browserCheck(probes: DoctorProbes): Promise<DoctorCheck> {
-  const found = await probes.browser()
+async function browserCheck(probes: DoctorProbes, engine: BrowserName): Promise<DoctorCheck> {
+  const found = await probes.browser(engine)
+  const name = browserTitle(engine)
 
   return found.ok
-    ? { name: "Chromium", status: "ok", detail: found.detail }
-    : {
-        name: "Chromium",
-        status: "fail",
-        detail: found.detail.replace(/^browserType\.launch: /, ""),
-      }
+    ? { name, status: "ok", detail: found.detail }
+    : { name, status: "fail", detail: found.detail.replace(/^browserType\.launch: /, "") }
+}
+
+/** The engines a project needs: Chromium always (`danwo record` and the MCP server run on it), then the config's others. */
+function enginesOf(config: DanwoConfig | undefined): BrowserName[] {
+  const named = config?.browser?.name
+
+  return [
+    ...new Set<BrowserName>([
+      "chromium",
+      ...(named === undefined
+        ? []
+        : browserNames(typeof named === "string" ? [named] : named, "browser.name")),
+    ]),
+  ]
 }
 
 /** The key variable a model needs, by its provider, when danwo can tell. */
@@ -89,7 +108,7 @@ async function configChecks(
   cwd: string,
   explicit: string | undefined,
   env: NodeJS.ProcessEnv,
-): Promise<{ checks: DoctorCheck[]; root: string }> {
+): Promise<{ checks: DoctorCheck[]; root: string; config?: DanwoConfig }> {
   try {
     const loaded = await loadConfig(cwd, explicit)
 
@@ -113,6 +132,7 @@ async function configChecks(
 
     return {
       root: loaded.root,
+      config: loaded.config,
       checks: [
         { name: "config", status: "ok", detail: loaded.path },
         ...keys,
@@ -182,11 +202,14 @@ export async function projectDoctor(
   probes: DoctorProbes,
 ): Promise<DoctorCheck[]> {
   const config = await configChecks(options.cwd, options.config, probes.env)
+  const browsers: DoctorCheck[] = []
+
+  for (const engine of enginesOf(config.config)) browsers.push(await browserCheck(probes, engine))
 
   return [
     nodeCheck(probes.nodeVersion),
     { name: "danwo", status: "ok", detail: DANWO_VERSION },
-    await browserCheck(probes),
+    ...browsers,
     ...config.checks,
     ...playwrightCheck(config.root),
     ...skillChecks(config.root),

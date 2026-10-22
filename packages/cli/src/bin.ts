@@ -155,6 +155,10 @@ withReporterOptions(withLintOptions(program.command("test")))
     "--replay-only",
     "replay recorded agent steps and call no model: a step with no recording that replays fails",
   )
+  .option(
+    "--browser <names>",
+    "the browsers to run in: chromium, firefox or webkit, or several as chromium,firefox to run every test in each (default: the config's browser.name, else chromium)",
+  )
   .option("--list", "print the picked tests as JSON (id, file) instead of running them")
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .addOption(recordOption())
@@ -183,6 +187,7 @@ withReporterOptions(withLintOptions(program.command("test")))
         maxDuration?: number
         ci?: boolean
         replayOnly?: boolean
+        browser?: string
         list?: boolean
         config?: string
         record?: RecordMode
@@ -235,6 +240,10 @@ withReporterOptions(withLintOptions(program.command("matrix")))
     "--include-setup",
     "fault the test's setup too: its saved session signing in, fixtures and beforeEach",
   )
+  .option(
+    "--browser <name>",
+    "the one browser every run is in: chromium, firefox or webkit (default: the config's first browser.name, else chromium)",
+  )
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .addOption(recordOption())
   .addOption(videoOption())
@@ -260,6 +269,7 @@ withReporterOptions(withLintOptions(program.command("matrix")))
         thorough?: boolean
         everyOccurrence?: boolean
         includeSetup?: boolean
+        browser?: string
         config?: string
         record?: RecordMode
         video?: VideoMode
@@ -349,6 +359,10 @@ program
   .option("--app-url <url>", "where the app answers once started")
   .option("--skip-install", "write the files but install no packages")
   .option("--force", "replace a danwo.config.ts that differs from the one init writes")
+  .option(
+    "--browser <names>",
+    "the browsers web tests run in: chromium, firefox, webkit, or several as chromium,firefox (default: chromium)",
+  )
   .action(async (options: InitFlags) => {
     const { InitCancelled, runInit, terminalPrompter } = await import("@danwo/init")
     const interactive = options.yes !== true && process.stdin.isTTY && process.stdout.isTTY
@@ -370,7 +384,7 @@ program
 program
   .command("doctor")
   .description(
-    "check what a first run needs: Node, danwo's Chromium, the config and its keys, the model's key, Playwright Test's version and the agents' skill",
+    "check what a first run needs: Node, danwo's Chromium and the config's other browsers, the config and its keys, the model's key, Playwright Test's version and the agents' skill",
   )
   .option("--json", "the checks as JSON: { ok, checks: [{ name, status, detail }] }")
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
@@ -390,19 +404,36 @@ program
 program
   .command("install-browser")
   .description(
-    "install the Chromium build danwo drives, with danwo's own Playwright, once per machine; other Playwright installs' browsers are kept",
+    "install the browser builds danwo drives (Chromium, or the ones --browser names), with danwo's own Playwright, once per machine; other Playwright installs' browsers are kept",
   )
-  .option("--with-deps", "also install the system libraries Chromium needs (Linux)")
+  .option(
+    "--browser <names>",
+    "the browsers to install: chromium, firefox, webkit, or several as firefox,webkit (default: chromium)",
+  )
+  .option("--with-deps", "also install the system libraries the browsers need (Linux)")
   .option(
     "--only-shell",
     "only the headless shell test runs use (smaller, for CI); not for danwo record",
   )
   .option("--dry-run", "say what would be installed, and install nothing")
-  .action(async (options: { withDeps?: boolean; onlyShell?: boolean; dryRun?: boolean }) => {
-    const { installBrowser } = await import("@danwo/runner")
+  .action(
+    async ({
+      browser,
+      ...options
+    }: {
+      browser?: string
+      withDeps?: boolean
+      onlyShell?: boolean
+      dryRun?: boolean
+    }) => {
+      const { browserNames, installBrowser } = await import("@danwo/runner")
 
-    process.exitCode = await installBrowser(options)
-  })
+      process.exitCode = await installBrowser({
+        ...options,
+        ...(browser !== undefined && { browsers: browserNames(browser, "--browser") }),
+      })
+    },
+  )
 
 program
   .command("record")
