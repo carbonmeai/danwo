@@ -8,6 +8,7 @@
 import {
   checkRouting,
   liveKeyWarnings,
+  outsideNodeNotes,
   preloadWarnings,
   routingRefusal,
   unroutedProblems,
@@ -155,20 +156,26 @@ async function startOne(app: StackApp, context: StackContext): Promise<StartedAp
   }
 }
 
-/** Warns about every started app's Node processes that run without the preload. */
+/**
+ * Warns about every started app's Node processes that run without the preload, and notes each app
+ * that runs no Node at all, which the preload's check cannot cover. Only the warnings are printed.
+ */
 async function preloadCheck(
   started: ReadonlyMap<string, StartedApp>,
   services: Services,
 ): Promise<string[]> {
   const warnings: string[] = []
+  const notes: string[] = []
 
   for (const [name, app] of started)
-    if (app.pid !== undefined)
+    if (app.pid !== undefined) {
       warnings.push(...(await preloadWarnings(name, app.pid, services.proxy)))
+      notes.push(...(await outsideNodeNotes(name, app.pid, services.proxy)))
+    }
 
   for (const warning of warnings) process.stderr.write(`danwo: ${warning}\n`)
 
-  return warnings
+  return [...warnings, ...notes]
 }
 
 /** The started apps that have stopped on their own, e.g. `api exited with code 1`. */

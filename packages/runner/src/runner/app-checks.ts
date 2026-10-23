@@ -3,7 +3,9 @@
  * processes loaded danwo's preload (a start script that sets its own NODE_OPTIONS drops it, and
  * then SDKs with their own agents skip the proxy), whether the processes that loaded it really go
  * through the proxy (the preload's start-up probe says), and whether its environment still holds
- * real provider keys that would reach real providers. None of the checks prints a value.
+ * real provider keys that would reach real providers. None of the checks prints a value. An app
+ * that runs no Node at all (Python, Go, Ruby) has no preload to probe from, so it gets a note
+ * that the check did not run for it instead of a verdict.
  */
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -67,6 +69,30 @@ export async function preloadWarnings(app: string, root: number, proxy: Proxy): 
     (row) =>
       `${app}: process ${row.pid} (${row.command.slice(0, 80)}) runs without danwo's preload, so SDKs with their own HTTP agent call real hosts. Its start script likely sets NODE_OPTIONS itself: ${keepPreloadAdvice()}.`,
   )
+}
+
+/**
+ * A note for an app that runs no Node process and no process that loaded the preload (a Python or
+ * Go server): the start-up check that its calls reach the proxy runs inside the preload, so it
+ * does not run for this app, which is neither a pass nor a failure. Empty for an app with any
+ * Node or preloaded process, or with none left running (a command that started a service and
+ * exited).
+ */
+export async function outsideNodeNotes(app: string, root: number, proxy: Proxy): Promise<string[]> {
+  const family = familyOf(await processRowsAsync(), root)
+  const preloaded = new Set([
+    ...(await proxy.preloaded()),
+    ...(await proxy.unrouted()).map((row) => row.pid),
+  ])
+
+  if (family.length === 0 || family.some((row) => isNode(row.command) || preloaded.has(row.pid)))
+    return []
+
+  const programs = [...new Set(family.map((row) => programName(row.command)))].join(", ")
+
+  return [
+    `${app} runs no Node process (${programs}), so danwo's check at start that its calls reach the proxy, which runs inside Node, does not run for it. Its calls go through the proxy when its HTTP clients read HTTPS_PROXY and trust the CA bundle in SSL_CERT_FILE, REQUESTS_CA_BUNDLE or CURL_CA_BUNDLE, which danwo sets.`,
+  ]
 }
 
 /**

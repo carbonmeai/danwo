@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process"
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { createServer } from "node:net"
 import { tmpdir } from "node:os"
@@ -15,6 +16,19 @@ import { stackEnvironment } from "../src/runner/stack-environment.ts"
 import { freePort } from "../src/support/ports.ts"
 
 const APP = fileURLToPath(new URL("./fixtures/mail-app.ts", import.meta.url))
+const PYTHON_APP = fileURLToPath(new URL("./fixtures/mail_app.py", import.meta.url))
+
+/** Whether `python3` runs here, for the app outside Node. */
+function hasPython(): boolean {
+  try {
+    execFileSync("python3", ["--version"], { stdio: "ignore" })
+
+    return true
+  } catch {
+    return false
+  }
+}
+
 const COMPOSE = fileURLToPath(new URL("./fixtures/compose-stand-in.ts", import.meta.url))
 
 /** The stand-in for `docker compose`, run as `mode` (`up`, `down` or `hang`). */
@@ -179,6 +193,8 @@ describe("appEnvironment", () => {
       expect(await (await fetch(command.url)).text()).toBe("proxied: yes")
       expect((await fetch(`${command.url}/signup`, { method: "POST" })).status).toBe(200)
       expect(inbox.latest("ada@example.com")).toMatchObject({ subject: "Welcome" })
+      /* A Node app's own check ran in its preload: nothing to note. */
+      expect(env.notes?.()).toEqual([])
 
       await env.reset?.()
       expect(inbox.list()).toEqual([])
@@ -274,6 +290,35 @@ describe("appEnvironment", () => {
       }),
     ).rejects.toThrow("exited with code 3")
   })
+})
+
+describe.runIf(hasPython())("an app outside Node", () => {
+  it("reaches the emulators through the standard variables, under block and secrets: fail", async () => {
+    const url = `http://127.0.0.1:${await freePort()}`
+    const resend = resendService()
+    const env = await stackEnvironment({
+      unmatched: "block",
+      secrets: "fail",
+      services: [resend],
+      apps: [{ name: "mailer", command: `python3 "${PYTHON_APP}"`, url, timeoutMs: 20_000 }],
+    })
+
+    try {
+      expect(await (await fetch(url)).text()).toBe("proxied: yes")
+      expect((await fetch(`${url}/signup`, { method: "POST" })).status).toBe(200)
+      expect(resendInbox(resend.emulator).latest("ada@example.com")).toMatchObject({
+        subject: "Welcome",
+      })
+      /* A host no route answers is refused at the proxy, Python or not. */
+      expect(await (await fetch(`${url}/outside`)).text()).toBe("502")
+      /* No preload ran in it, so its routing check is a note, never a refusal. */
+      expect(env.notes?.()).toEqual([
+        expect.stringMatching(/^mailer runs no Node process \(.*python.*\), so danwo's check/i),
+      ])
+    } finally {
+      await env.close()
+    }
+  }, 30_000)
 })
 
 /** The environment the app at `url` started with, read from its `/env`. */
