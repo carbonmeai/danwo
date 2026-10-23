@@ -2,7 +2,9 @@
  * The project the dashboard shows: the example shop copied beside this suite, with one test it
  * cannot pass, after three runs. A run of the failing test alone comes first, so a test can delete
  * its recordings without touching the others; then a run of every test, and a matrix of the
- * purchase with the shop's webhook handler made to grant credits twice.
+ * purchase with the shop's webhook handler made to grant credits twice. The runs are the suite's
+ * data, not a CI run of their own, so they take `--no-ci` and come out the same on a laptop and in
+ * a CI job: no retry of the failing test, and a writable cache.
  */
 import { execFile } from "node:child_process"
 import { cp, mkdir, readdir, rm, symlink } from "node:fs/promises"
@@ -47,8 +49,8 @@ export async function prepareProject(): Promise<void> {
   await cp(BROKEN, join(PROJECT, "tests", "broken.danwo.ts"))
 
   const output = [
-    await danwo(["test", "tests/broken.danwo.ts"]),
-    await danwo(["test"]),
+    await danwo(["test", "tests/broken.danwo.ts", "--no-ci"]),
+    await danwo(["test", "--no-ci"]),
     await danwo(
       ["matrix", "tests/buy-credits.danwo.ts", "--faults", "duplicate|status 500 on POST"],
       {

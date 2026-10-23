@@ -70,6 +70,15 @@ With `CI` set (every hosted CI sets it), or with `--ci`, `danwo test`:
 
 Your config's `retries` and `--retries` still win.
 
+A `danwo test` that a test or fixture starts inherits the job's `CI=true` too. When that run is
+test data rather than a CI run of its own, pass `--no-ci` to give it the local defaults:
+
+```sh
+npx @danwo/cli test --no-ci
+```
+
+Setting `CI=false` in the child's environment does the same.
+
 ## Make no model calls
 
 A read-only cache still calls the model when a step has no recording. To make sure CI spends

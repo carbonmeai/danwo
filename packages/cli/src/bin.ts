@@ -152,6 +152,10 @@ withReporterOptions(withLintOptions(program.command("test")))
   )
   .option("--ci", "CI defaults even without the CI variable: 1 retry, read-only cache, no .only")
   .option(
+    "--no-ci",
+    "local defaults even with CI set (no retry, a writable cache, .only allowed), e.g. for a run started from inside another",
+  )
+  .option(
     "--replay-only",
     "replay recorded agent steps and call no model: a step with no recording that replays fails",
   )

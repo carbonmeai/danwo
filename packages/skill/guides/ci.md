@@ -82,7 +82,10 @@ commit the cache.
 
 With `CI` set (every hosted CI sets it), or `--ci`, `danwo test` retries a failing test once, reads
 the replay cache without writing to it, and refuses `.only` with exit 2, naming the file and line.
-The config's `retries` and `--retries` still win. `--max-failures n` starts no new test file once
+The config's `retries` and `--retries` still win. `--no-ci` (or `CI=false`/`CI=0` in its
+environment) keeps the local defaults with `CI` set: for a `danwo test` started from inside
+another run, such as a fixture that makes runs for a dashboard to show, which would otherwise
+inherit the job's `CI=true`. `--max-failures n` starts no new test file once
 `n` tests failed. `--max-duration <time>` (`20m`, `90s`, `1h`, `500ms`; a bare number is seconds)
 starts no new test file once the run has taken that long; files already running finish, the run
 prints `stopped at --max-duration (…): N test files not run` and exits at least 1, since those
