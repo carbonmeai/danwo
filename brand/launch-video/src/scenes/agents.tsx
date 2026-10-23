@@ -1,4 +1,4 @@
-import { AbsoluteFill, useCurrentFrame } from "remotion"
+import { AbsoluteFill, Img, staticFile, useCurrentFrame } from "remotion"
 
 import { Card, Chip, ease, Exit, Mono, Sfx, typed } from "../kit.tsx"
 import { C } from "../theme.ts"
@@ -16,7 +16,13 @@ const CREATED: readonly (readonly [string, string])[] = [
   [".codex/config.toml", "MCP"],
 ]
 
-const AGENTS = ["Claude Code", "Cursor", "Codex", "Copilot"] as const
+/** The agents `danwo init` sets up, with their marks from thesvg (github.com/GLINCKER/thesvg). */
+const AGENTS = [
+  ["claude-code.svg", "Claude Code"],
+  ["cursor-on-dark.svg", "Cursor"],
+  ["codex-on-dark.svg", "Codex"],
+  ["copilot-on-dark.svg", "Copilot"],
+] as const
 
 /** Feature five: a coding agent gets danwo's skill and MCP server, so it checks its own work. */
 export function Agents() {
@@ -38,13 +44,16 @@ export function Agents() {
           sub="A skill that teaches it danwo, and an MCP server to run tests, drive the app and read every flight record."
           top={250}
         >
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginTop: 40 }}>
-            {AGENTS.map((agent, i) => {
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 40 }}>
+            {AGENTS.map(([icon, agent], i) => {
               const p = ease(frame, 34 + i * 6, 18)
 
               return (
                 <div key={agent} style={{ opacity: p, transform: `translateY(${(1 - p) * 14}px)` }}>
-                  <Chip>{agent}</Chip>
+                  <Chip style={{ fontSize: 23, padding: "10px 16px", gap: 10 }}>
+                    <Img src={staticFile(`icons/${icon}`)} style={{ height: 24, width: "auto" }} />
+                    {agent}
+                  </Chip>
                 </div>
               )
             })}
