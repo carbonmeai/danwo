@@ -11,7 +11,7 @@ tags each one and removes it when the scenario ends, so your sandbox stays as it
 
 Everything a run makes carries `danwo-fidelity-<run>`: in Stripe customer emails and product
 names, Clerk addresses and organization names, Novu subscriber ids, Tiptap document names, Pusher
-channels, Resend subjects and the payment references.
+channels, Resend subjects, GitHub issue titles and branch names, and the payment references.
 
 ## Undone after each scenario
 
@@ -36,19 +36,20 @@ never touched.
 
 ## By provider
 
-| Provider    | Undone after each scenario                                                     | Stays behind                                     | Sweep                          |
-| ----------- | ------------------------------------------------------------------------------ | ------------------------------------------------ | ------------------------------ |
-| Stripe      | customers deleted, subscriptions canceled, products archived, sessions expired | payment intents and refunds stay in test history | tagged customers and products  |
-| Clerk       | users and organizations deleted, invitations and sessions revoked              | nothing                                          | tagged users and organizations |
-| Novu        | subscribers deleted                                                            | nothing                                          | tagged subscribers             |
-| Tiptap      | documents deleted                                                              | nothing                                          | tagged documents               |
-| Paystack    | nothing to undo                                                                | one abandoned test transaction per run           | none                           |
-| Flutterwave | nothing to undo                                                                | one tagged test payment link per run             | none                           |
-| Bachs       | nothing to undo                                                                | one sandbox customer per run                     | none                           |
-| Resend      | nothing to undo                                                                | sent emails, all to `delivered@resend.dev`       | none                           |
-| Twilio      | a full account's one real send, deleted once it settles                        | a trial account's send                           | none                           |
-| S3 (Tigris) | every object under the run's prefix deleted, uploads aborted                   | nothing                                          | none                           |
-| Others      | they only read                                                                 | nothing                                          | none                           |
+| Provider    | Undone after each scenario                                                     | Stays behind                                                                     | Sweep                                                                    |
+| ----------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Stripe      | customers deleted, subscriptions canceled, products archived, sessions expired | payment intents and refunds stay in test history                                 | tagged customers and products                                            |
+| Clerk       | users and organizations deleted, invitations and sessions revoked              | nothing                                                                          | tagged users and organizations                                           |
+| Novu        | subscribers deleted                                                            | nothing                                                                          | tagged subscribers                                                       |
+| Tiptap      | documents deleted                                                              | nothing                                                                          | tagged documents                                                         |
+| Paystack    | nothing to undo                                                                | one abandoned test transaction per run                                           | none                                                                     |
+| Flutterwave | nothing to undo                                                                | one tagged test payment link per run                                             | none                                                                     |
+| Bachs       | nothing to undo                                                                | one sandbox customer per run                                                     | none                                                                     |
+| Resend      | nothing to undo                                                                | sent emails, all to `delivered@resend.dev`                                       | none                                                                     |
+| Twilio      | a full account's one real send, deleted once it settles                        | a trial account's send                                                           | none                                                                     |
+| S3 (Tigris) | every object under the run's prefix deleted, uploads aborted                   | nothing                                                                          | none                                                                     |
+| GitHub      | issues and pull requests closed, labels and branches deleted, tokens revoked   | closed, tagged issues and pull requests; check runs on deleted branches' commits | tagged open issues and pull requests closed, branches and labels deleted |
+| Others      | they only read                                                                 | nothing                                                                          | none                                                                     |
 
 ## Next
 

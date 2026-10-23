@@ -1,12 +1,15 @@
 ---
 title: Fidelity test accounts
-description: Sign a test account in once, so the Gmail, Calendar, Drive and Microsoft Graph fidelity suites can run against the real APIs.
+description: Sign a test account in once, or install a GitHub App on a sandbox repository, so the Gmail, Calendar, Drive, Microsoft Graph and GitHub fidelity suites can run against the real APIs.
 icon: UserCheck
 ---
 
 The Google and Microsoft suites act as a person's account: they send mail, make events and upload
 files. To run them live, you sign a test account in once with `danwo fidelity login`, and danwo
 keeps its refresh token in `.env.fidelity`.
+
+The GitHub suite acts as a GitHub App instead, installed on one sandbox repository. You make the
+App once, as [below](#make-a-github-app).
 
 Offline, nothing is needed. The emulator plays the account, and the goldens come from what Google
 and Microsoft publish: the Discovery documents for Gmail, Calendar and Drive, and Microsoft Graph's
@@ -106,6 +109,89 @@ login asks for.
 | no answer from the consent page             | the browser never came back; check the redirect URI is registered |
 | the sign-in was cancelled                   | you chose Cancel; run it again                                    |
 | gave no refresh token                       | remove the app's access from the account, then sign in again      |
+
+## Make a GitHub App
+
+The GitHub suite reads public data with only `DANWO_FIDELITY_PUBLIC=1`. Everything else it checks,
+such as the check runs and pull request comments danwo's reporter posts, needs a GitHub App on a
+sandbox repository.
+
+1. Create a private repository for the suite, with one README commit on `main`. Keep nothing else
+   in it.
+2. Under **Settings → Developer settings → GitHub Apps**, create a new App. Turn **Webhook** off.
+3. Give it the repository permissions below, and no others.
+4. Under **Private keys**, generate a key. Save the `.pem` file outside your repositories.
+5. Choose **Install App**, pick **Only select repositories**, and select the sandbox.
+
+| Permission    | Access                         |
+| ------------- | ------------------------------ |
+| Checks        | Read and write                 |
+| Contents      | Read and write                 |
+| Issues        | Read and write                 |
+| Pull requests | Read and write                 |
+| Metadata      | Read-only (GitHub turns it on) |
+
+The App's id is on its settings page. The installation id is the number at the end of the
+installation's settings URL. Put them in `.env.fidelity` with the key's path and the repository:
+
+```sh title=".env.fidelity"
+DANWO_FIDELITY_GITHUB_APP_ID=123456
+DANWO_FIDELITY_GITHUB_APP_PRIVATE_KEY_PATH=/Users/you/keys/danwo-fidelity.pem
+DANWO_FIDELITY_GITHUB_INSTALLATION_ID=12345678
+DANWO_FIDELITY_GITHUB_REPO=you/danwo-fidelity
+```
+
+In place of the path, `DANWO_FIDELITY_GITHUB_APP_PRIVATE_KEY` can hold the key itself on one line,
+with its line breaks written as `\n`. Then run the suite:
+
+```sh
+npx @danwo/cli fidelity github
+```
+
+```text
+github (live): 9 of 9 scenarios match
+  ✓ repos: public repository (1 known)
+  ✓ errors: unknown repository
+  ✓ app: JWT, installation and installation token
+  ✓ installation: its repositories and the sandbox repository
+  ✓ issues: comment, edit, label and close
+  ✓ contents: a branch, a file on it, read back
+  ✓ pull request: open, the report comment edited in place, close
+  ✓ check runs: in progress, more than 50 annotations, completed
+  ✓ errors: missing issue, bad conclusion, a token without access
+
+cleaned up: 15 object(s) undone, nothing left behind
+```
+
+| Variable                                     | What it is                             |
+| -------------------------------------------- | -------------------------------------- |
+| `DANWO_FIDELITY_GITHUB_APP_ID`               | the App's id                           |
+| `DANWO_FIDELITY_GITHUB_APP_PRIVATE_KEY_PATH` | the path to its `.pem` key             |
+| `DANWO_FIDELITY_GITHUB_APP_PRIVATE_KEY`      | or the key itself, line breaks as `\n` |
+| `DANWO_FIDELITY_GITHUB_INSTALLATION_ID`      | its installation on the sandbox        |
+| `DANWO_FIDELITY_GITHUB_REPO`                 | the sandbox, as `owner/name`           |
+
+Without all of them, the App scenarios are skipped and the public ones still run.
+
+### What a run leaves in the sandbox
+
+Each scenario makes what it needs with a token limited to the sandbox repository, and undoes it
+when it ends. The token is revoked last.
+
+| Scenario     | Makes                                  | Afterwards                                  |
+| ------------ | -------------------------------------- | ------------------------------------------- |
+| issues       | an issue, a comment and a label        | the issue closed, the label deleted         |
+| contents     | a branch with one file                 | the branch deleted                          |
+| pull request | a branch, a pull request and a comment | the pull request closed, the branch deleted |
+| check runs   | a branch and a check run               | the branch deleted                          |
+
+An App can't delete issues, so closed issues and pull requests titled `danwo-fidelity-<run>` stay.
+Check runs stay on the commits of the deleted branches. If a run is cut short, `--sweep github --yes`
+closes its open issues and pull requests, and deletes its branches and labels.
+
+<Callout type="warn">
+  Install the App on the sandbox only. The suite writes to whatever repository the variables name.
+</Callout>
 
 ## Live runs stay in their lane
 

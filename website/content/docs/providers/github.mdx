@@ -112,8 +112,13 @@ Deliveries carry `X-GitHub-Event` and `X-Hub-Signature-256`, made with the webho
 
 ## Fidelity
 
-**Public endpoints only.** `danwo fidelity github` reads a public repository and an unknown one
-from GitHub's API. Both match.
+**Public endpoints, and a GitHub App.** `danwo fidelity github` reads a public repository and an
+unknown one from GitHub's API. Both match.
+
+With a GitHub App installed on a sandbox repository, it also runs what danwo's own reporter and an
+App-backed integration do: issues and comments, labels, branches and files, a pull request comment
+edited in place, and a check run with more annotations than one request takes. All seven match.
+To run them yourself, [set up the App](/docs/fidelity-accounts#make-a-github-app).
 
 ## Not covered yet
 
