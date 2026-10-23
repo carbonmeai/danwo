@@ -171,6 +171,9 @@ function outcomes(steps: readonly StepRecord[]): Record<string, string | undefin
   )
 }
 
+/** How long a check waits; on the slower Windows runner, 2 s once missed an assignment that landed. */
+const ASSERTION_MS = process.platform === "win32" ? 8_000 : 2_000
+
 /** Runs `journey` in a session on a fresh board that keeps its recordings in the test's folder. */
 async function run<T>(
   model: MockLanguageModelV4,
@@ -187,7 +190,7 @@ async function run<T>(
     baseUrl: board.url,
     model,
     cache,
-    assertionTimeout: 2_000,
+    assertionTimeout: ASSERTION_MS,
     ...options,
   })
 
@@ -289,7 +292,7 @@ describe("a replay of a page that really changed", () => {
     })
     expect(seen[`Bob is assigned to ${TITLE}`]).toEqual({
       mode: "handed-off",
-      reason: `"Assigned: Bob Babbage" was not shown within 2000 ms`,
+      reason: `"Assigned: Bob Babbage" was not shown within ${ASSERTION_MS} ms`,
       saved: true,
     })
     expect(second.doGenerateCalls.length).toBeGreaterThan(0)
