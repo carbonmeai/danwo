@@ -85,7 +85,7 @@ its own processes should start them with `spawnOwned()` from `@danwo/sdk`, which
 arguments as `spawn()` and returns the child with a `stop()`. Windows has no process groups:
 there the child's whole tree is ended with `taskkill /T /F /PID <pid>`, at once (no SIGTERM
 grace), and the guardian does the same once its owner is gone, as long as the child it started
-still runs to find the rest of the tree by. Windows support is in progress.
+still runs to find the rest of the tree by.
 
 `app.ready` changes when it counts as started: `{ path: "/health" }` waits for that path, and
 `{ log: "worker ready" }` for a line in its output, for a worker that serves nothing, and
