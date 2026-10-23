@@ -89,7 +89,11 @@ inherit the job's `CI=true`. `--max-failures n` starts no new test file once
 `n` tests failed. `--max-duration <time>` (`20m`, `90s`, `1h`, `500ms`; a bare number is seconds)
 starts no new test file once the run has taken that long; files already running finish, the run
 prints `stopped at --max-duration (…): N test files not run` and exits at least 1, since those
-files were never judged. Workers take whole files by default; `--split-files` (config `splitFiles:
+files were never judged. The order is a guarantee a suite may rely on: files start in the order
+of their paths under `testDir`, compared character by character (`10-` before `2-`, capitals
+before lower case), each engine's files after the one before's; a file's tests run in declaration
+order in one worker, each test's retries straight after it; with `workers: 1` one file finishes
+before the next starts. Workers take whole files by default; `--split-files` (config `splitFiles:
 true`) hands them single tests of every file whose tests share nothing (no `beforeAll`/`afterAll`
 in the file, and each test on `isolation: "test"`, so it restores the seeded state anyway), so a
 slow file no longer holds one worker. Files with file-level hooks or `isolation: "file"`/`"none"`

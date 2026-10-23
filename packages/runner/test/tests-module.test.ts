@@ -237,4 +237,26 @@ describe("retries and discovery", () => {
       await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
   })
+
+  /* The documented order a suite may rely on: paths compared character by character. */
+  it("orders files by path character by character, capitals first and numbers unpadded", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "danwo-order-"))
+    const names = ["b.danwo.ts", "a/z.danwo.ts", "a.danwo.ts", "Z.danwo.ts", "10-x.danwo.ts"]
+
+    try {
+      await mkdir(join(dir, "a"))
+      for (const name of [...names, "2-x.danwo.ts"]) await writeFile(join(dir, name), "")
+
+      expect(findTestFiles(dir, ["**/*.danwo.ts"])).toEqual([
+        "10-x.danwo.ts",
+        "2-x.danwo.ts",
+        "Z.danwo.ts",
+        "a.danwo.ts",
+        "a/z.danwo.ts",
+        "b.danwo.ts",
+      ])
+    } finally {
+      await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+    }
+  })
 })

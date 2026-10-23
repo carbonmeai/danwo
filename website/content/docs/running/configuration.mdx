@@ -55,6 +55,19 @@ danwo only splits a file whose tests share nothing: no `beforeAll` or `afterAll`
 `isolation: "test"`. Other files still run whole. Each test loads its file again, so tests can't
 pass values to each other through variables at the top of the file.
 
+### The order tests run in
+
+danwo promises an order, so a suite whose tests build on each other can rely on it:
+
+- Files start in path order, compared character by character: `10-` sorts before `2-`, so pad
+  numbers, and capitals sort before lower case.
+- A file's tests run in the order they're declared, one after another in one worker. A retry
+  runs straight after the attempt it repeats.
+- With `workers: 1`, each file finishes before the next one starts.
+
+With more workers, files still start in that order but run side by side. Split files hand their
+tests to different workers, so keep `splitFiles` off for tests that rely on each other.
+
 ### Give each worker its own port
 
 Each worker starts its own environment, so two workers can't start the app on one fixed port.
