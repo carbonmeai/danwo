@@ -368,13 +368,15 @@ function holdBack(ms: number, gaveUp: Promise<void>): Promise<void> {
 
 /**
  * Answers a request the way `fault` says, or through its handler when there is no fault. `gaveUp`
- * resolves when the client aborts the request.
+ * resolves when the client aborts the request; `ended` says whether the run it belongs to is over
+ * (`clear()` was called since it arrived).
  */
 async function answerUnder(
   fault: OutboundFault | AnswerHold | undefined,
   handler: Handler,
   req: CompletedRequest,
   gaveUp: Promise<void>,
+  ended: () => boolean,
 ) {
   if (fault === undefined) return callHandler(handler, req)
   if (fault.kind === "status")
@@ -387,7 +389,7 @@ async function answerUnder(
     return answerReset(fault, handler, req)
   if (fault.kind === "emulate") return callHandler(handler, req, fault.behaviour)
 
-  return answerLate(fault, handler, req, gaveUp)
+  return answerLate(fault, handler, req, gaveUp, ended)
 }
 
 /** Drops the connection; `reset-after` lets the handler process the request first. */
@@ -401,18 +403,26 @@ async function answerReset(
   return "reset" as const
 }
 
-/** The faults that answer normally, only later: after a wait, a hold-up, or something else lands. */
+/**
+ * The faults that answer normally, only later: after a wait, a hold-up, or something else lands. A
+ * delayed call still reaches its handler once the client has given up, as a slow server still
+ * acts on a request; but not once its run is over, or a delay longer than the trial (and the
+ * client's own timeout) would land its write in the next trial's freshly restored emulator.
+ */
 async function answerLate(
   fault: Extract<OutboundFault, { kind: "delay" | "slow-then-retry" }> | AnswerHold,
   handler: Handler,
   req: CompletedRequest,
   gaveUp: Promise<void>,
+  ended: () => boolean,
 ) {
   if (fault.kind === "hold") return answerAfter(handler, req, fault.until)
 
   await (fault.kind === "delay"
     ? new Promise((resolve) => setTimeout(resolve, fault.ms))
     : holdBack(fault.ms, gaveUp))
+
+  if (ended()) return "reset" as const
 
   return callHandler(handler, req)
 }
@@ -561,6 +571,8 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   /** Faults `failNext` armed, each with how many more calls it meets. */
   let armed: { match: (call: OutboundCall) => boolean; fault: OutboundFault; left: number }[] = []
   let callIndex = 0
+  /** Counts `clear()` calls: a held call from an earlier run is dropped, not answered, in a later one. */
+  let runIndex = 0
 
   /** The fault `failNext` armed for `call`, spent by one; undefined when none matches. */
   const takeArmed = (call: OutboundCall): OutboundFault | undefined => {
@@ -602,8 +614,10 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
 
     if (fault) labelFault(req.id, describeOutboundFault(fault))
 
+    const run = runIndex
+
     try {
-      return await answerUnder(fault, handler, req, gaveUp(req.id))
+      return await answerUnder(fault, handler, req, gaveUp(req.id), () => runIndex !== run)
     } finally {
       giveUps.delete(req.id)
     }
@@ -775,6 +789,7 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
       sockets.setFault(rule)
     },
     clear() {
+      runIndex += 1
       armed = []
       log.clear()
       sockets.clear()

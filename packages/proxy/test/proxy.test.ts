@@ -1284,6 +1284,30 @@ describe("forwarding to an upstream", () => {
     }
   })
 
+  it("drops a delayed call whose run was cleared, so it never lands in the next one", async () => {
+    const upstream = await startUpstream()
+    const proxy = await startProxy({
+      routes: [{ hosts: ["*.svc.danwo.test"], upstream: upstream.url }],
+    })
+
+    proxy.failNext(() => true, { kind: "delay", ms: 1_500 })
+
+    try {
+      const held = fetchThrough(proxy.env(), [
+        { url: "https://q.svc.danwo.test/late", method: "POST", body: "late" },
+      ])
+
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      proxy.clear()
+
+      expect((await held)[0]?.error).toBeDefined()
+      expect(upstream.received).toEqual([])
+    } finally {
+      await proxy.stop()
+      upstream.close()
+    }
+  })
+
   it("fails the next matching calls a test names, ahead of the rule, until they are spent", async () => {
     const upstream = await startUpstream()
     const proxy = await startProxy({
