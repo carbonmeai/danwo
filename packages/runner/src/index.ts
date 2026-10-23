@@ -1,6 +1,7 @@
 // Runner: browser sessions driven like a user: locators, assertions and the agent.
 export {
   BROWSER_NAMES,
+  clickClosing,
   type BrowserConfig,
   browserInstalled,
   type BrowserName,

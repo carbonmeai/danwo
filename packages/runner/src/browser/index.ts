@@ -1,3 +1,4 @@
+export { clickClosing } from "./closed.ts"
 export { browserInstalled, installBrowser, type InstallBrowserOptions } from "./install.ts"
 export {
   BROWSER_NAMES,

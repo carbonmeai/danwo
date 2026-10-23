@@ -7,7 +7,12 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
-import { type ContextOptions, playwrightOptions, type SecretVault } from "@danwo/runner"
+import {
+  clickClosing,
+  type ContextOptions,
+  playwrightOptions,
+  type SecretVault,
+} from "@danwo/runner"
 import type { Browser, BrowserContext, Locator, Page } from "playwright-core"
 
 import {
@@ -496,6 +501,7 @@ function clickedText(call: Extract<PageAction, { kind: "click" }>, name: string)
 }
 
 /** Each action by kind, carried out on the desk; answers with what was done. */
+
 const ACTIONS: {
   readonly [K in PageAction["kind"]]: (desk: PageDesk, call: ActionOf<K>) => Promise<string>
 } = {
@@ -507,8 +513,9 @@ const ACTIONS: {
       ...(call.button !== undefined && { button: call.button }),
     }
 
-    if (call.double === true) await locator.dblclick(options)
-    else await locator.click(options)
+    await clickClosing(locator.page(), () =>
+      call.double === true ? locator.dblclick(options) : locator.click(options),
+    )
 
     return clickedText(call, name)
   },

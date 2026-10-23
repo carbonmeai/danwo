@@ -8,6 +8,7 @@ import type { Page, Locator as PlaywrightLocator } from "playwright-core"
 import { filePaths, type Files } from "../agent/files.ts"
 import type { ScreenshotEvent, ScreenshotSettings } from "../assert/screenshot.ts"
 import { setChecked } from "../browser/check.ts"
+import { clickClosing } from "../browser/closed.ts"
 import { pointAt, type PointerKind } from "../browser/pointer.ts"
 import { checkSecretField, markSecretField } from "../secrets/fields.ts"
 import { isSecret, type Secret } from "../secrets/index.ts"
@@ -305,7 +306,7 @@ export class ElementLocator extends Finder implements Locator {
 
   click(options?: ActionOptions): Promise<void> {
     return this.act("click", "", options, (target, timeout) =>
-      target.click({ timeout, ...forced(options) }),
+      clickClosing(target.page(), () => target.click({ timeout, ...forced(options) })),
     )
   }
 
@@ -326,7 +327,9 @@ export class ElementLocator extends Finder implements Locator {
       )
 
     return this.act("longPress", longPressArgs(options), options, (target, timeout) =>
-      target.click({ timeout: timeout + hold, delay: hold, ...forced(options) }),
+      clickClosing(target.page(), () =>
+        target.click({ timeout: timeout + hold, delay: hold, ...forced(options) }),
+      ),
     )
   }
 
