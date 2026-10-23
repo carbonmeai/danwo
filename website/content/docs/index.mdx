@@ -42,9 +42,10 @@ await expect(screen.getByText("In stock")).toBeVisible()
 
 ### 2. Agent steps in plain English
 
-When a step is easier to say than to pin down, write it in English. The agent works it out once,
-then danwo replays the recording with no model call. That goes for `assert`, `waitFor` and
-`extract` too, not only actions. See [Agent steps](/docs/agent-steps).
+When a step is easier to say than to pin down, write it in English. The first run needs a model
+and its API key: the agent works the step out and danwo records it. Later runs replay the
+recording with no model call. That goes for `assert`, `waitFor` and `extract` too, not only
+actions. See [Agent steps](/docs/agent-steps).
 
 ```ts title="tests/checkout.danwo.ts · agent steps"
 await agent.act("add two blue mugs to the basket and go to checkout")
