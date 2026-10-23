@@ -99,7 +99,7 @@ repository:
 
 ```sh
 bun install
-bun run release 0.1.0 --pack
+bun run release 0.1.1 --pack
 node examples/link.ts with-compose --here
 ```
 
@@ -118,5 +118,5 @@ node examples/link.ts with-compose --here
 
 See [Native Android apps](https://danwo.dev/docs/native-android) for your own app.
 
-Last checked with danwo 0.1.0, AGP 9.4.1, Kotlin 2.4.20, Compose BOM 2026.09.00, an
+Last checked with danwo 0.1.1, AGP 9.4.1, Kotlin 2.4.20, Compose BOM 2026.09.00, an
 Android 14 (Google APIs) emulator, Postgres 17 and Node 24.

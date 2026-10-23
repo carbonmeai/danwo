@@ -131,7 +131,7 @@ repository:
 
 ```sh
 bun install
-bun run release 0.1.0 --pack
+bun run release 0.1.1 --pack
 node examples/link.ts with-next
 ```
 
@@ -161,4 +161,4 @@ That leaves only `node_modules`, which git ignores. The package.json is put back
 
 For your own app, start with the [Quickstart](https://danwo.dev/docs/quickstart).
 
-Last checked with danwo 0.1.0, Next.js 16.4, Postgres 17, and Node 24.
+Last checked with danwo 0.1.1, Next.js 16.4, Postgres 17, and Node 24.

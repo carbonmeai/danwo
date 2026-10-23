@@ -25,8 +25,8 @@
   "devDependencies": {
     "@clerk/clerk-js": "6.40.0",
     "@clerk/ui": "1.41.0",
-    "@danwo/cli": "0.1.0",
-    "@danwo/sdk": "0.1.0",
+    "@danwo/cli": "0.1.1",
+    "@danwo/sdk": "0.1.1",
     "@tailwindcss/postcss": "4.3.3",
     "@types/node": "^24",
     "@types/pg": "8.23.1",

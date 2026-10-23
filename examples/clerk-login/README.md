@@ -189,7 +189,7 @@ repository:
 
 ```sh
 bun install
-bun run release 0.1.0 --pack
+bun run release 0.1.1 --pack
 node examples/link.ts clerk-login
 ```
 
@@ -221,5 +221,5 @@ That leaves only `node_modules`, which git ignores. The package.json is put back
 `@clerk/clerk-js` and `@clerk/ui` are dev dependencies only so the emulator serves the browser
 those exact builds, with no download.
 
-Last checked with @danwo/cli 0.1.0, Next.js 16.4, @clerk/nextjs 7.9, Postgres 17 and
+Last checked with @danwo/cli 0.1.1, Next.js 16.4, @clerk/nextjs 7.9, Postgres 17 and
 Node 24.

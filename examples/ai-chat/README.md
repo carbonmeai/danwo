@@ -252,7 +252,7 @@ repository:
 
 ```sh
 bun install
-bun run release 0.1.0 --pack
+bun run release 0.1.1 --pack
 node examples/link.ts ai-chat
 ```
 
@@ -287,4 +287,4 @@ orders (`SEED_ORDERS` in `lib/orders.ts`).
 Read more in [Scripting replies](https://danwo.dev/docs/providers/model-scripts) and
 [Model APIs](https://danwo.dev/docs/providers/model-apis).
 
-Last checked with danwo 0.1.0, Next.js 16.4, AI SDK 7.0, Postgres 17, and Node 24.
+Last checked with danwo 0.1.1, Next.js 16.4, AI SDK 7.0, Postgres 17, and Node 24.
