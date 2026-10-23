@@ -2,7 +2,7 @@
 import { Link } from "@tanstack/react-router"
 
 import { Lockup } from "../components/brand.tsx"
-import { repoUrl, SITE } from "../lib/site.ts"
+import { npmUrl, repoUrl, SITE } from "../lib/site.ts"
 import { CLOSING_COPY_LABEL, CopyBox } from "./copy.tsx"
 import { WordmarkBand } from "./wordmark-band.tsx"
 
@@ -93,6 +93,7 @@ export function Footer() {
             title="Project"
             links={[
               ...(github ? [["GitHub", github] as const] : []),
+              ["npm", npmUrl()],
               ["Changelog", "/changelog"],
               ["Fidelity", "/docs/fidelity"],
               ["llms.txt", "/llms.txt"],

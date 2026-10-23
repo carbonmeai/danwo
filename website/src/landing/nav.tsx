@@ -3,8 +3,8 @@ import { useTheme } from "next-themes"
 import { type RefObject, useEffect, useState } from "react"
 
 import { Lockup } from "../components/brand.tsx"
-import { repoUrl } from "../lib/site.ts"
-import { GithubIcon, StarIcon, MenuIcon, MoonIcon, SunIcon } from "./glyphs.tsx"
+import { npmUrl, repoUrl } from "../lib/site.ts"
+import { GithubIcon, MenuIcon, MoonIcon, NpmIcon, StarIcon, SunIcon } from "./glyphs.tsx"
 
 /** A star count as the nav shows it: 2412 → "2.4k". */
 function compact(stars: number): string {
@@ -96,6 +96,9 @@ export function Nav({
               )}
             </a>
           )}
+          <a className="icon-btn" href={npmUrl()} aria-label="@danwo/cli on npm">
+            <NpmIcon />
+          </a>
           <ThemeButton />
           <Link className="btn btn-solid" to="/docs/$" params={{ _splat: "quickstart" }}>
             Get started

@@ -24,3 +24,17 @@ test("the setup command's copy button puts the command on the clipboard", async 
   await screen.getByRole("button", { name: "Copy the setup command" }).click()
   expect(await app.clipboard()).toBe("npx @danwo/cli init")
 })
+
+test("the home page and the docs link the package on npm", async ({ app, screen, expect }) => {
+  const npm = "https://www.npmjs.com/package/@danwo/cli"
+
+  await app.open("/")
+  await expect(screen.getByRole("link", { name: "@danwo/cli on npm" })).toHaveAttribute("href", npm)
+  await expect(screen.getByRole("link", { name: "npm", exact: true })).toHaveAttribute("href", npm)
+
+  await app.open("/docs/quickstart")
+  await expect(screen.getByRole("link", { name: "@danwo/cli on npm" }).first()).toHaveAttribute(
+    "href",
+    npm,
+  )
+})

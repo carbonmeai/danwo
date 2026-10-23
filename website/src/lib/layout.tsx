@@ -1,9 +1,20 @@
 /** What the docs, blog and 404 layouts share: the brand and the top links. */
 import type { DocsLayoutProps } from "fumadocs-ui/layouts/notebook"
-import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared"
+import type { BaseLayoutProps, LinkItemType } from "fumadocs-ui/layouts/shared"
 
 import { Lockup } from "../components/brand.tsx"
-import { repoUrl } from "./site.ts"
+import { NpmIcon } from "../landing/glyphs.tsx"
+import { npmUrl, repoUrl } from "./site.ts"
+
+/** The package on npm, as an icon beside GitHub's in the top bar. */
+const NPM_LINK: LinkItemType = {
+  type: "icon",
+  icon: <NpmIcon />,
+  text: "npm",
+  label: "@danwo/cli on npm",
+  url: npmUrl(),
+  external: true,
+}
 
 export function baseOptions(): BaseLayoutProps {
   const github = repoUrl()
@@ -14,6 +25,7 @@ export function baseOptions(): BaseLayoutProps {
       { text: "Docs", url: "/docs", active: "nested-url" },
       { text: "Blog", url: "/blog", active: "nested-url" },
       { text: "Changelog", url: "/changelog" },
+      NPM_LINK,
     ],
     ...(github && { githubUrl: github }),
   }
@@ -32,6 +44,7 @@ export function docsOptions(): Omit<DocsLayoutProps, "tree"> {
     links: [
       { text: "Blog", url: "/blog", active: "nested-url" },
       { text: "Changelog", url: "/changelog" },
+      NPM_LINK,
     ],
     ...(github && { githubUrl: github }),
   }

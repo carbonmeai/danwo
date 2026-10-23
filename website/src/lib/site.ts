@@ -19,6 +19,8 @@ export const SITE = {
    */
   repo: "carbonmeai/danwo" as string | undefined,
   branch: "main",
+  /** The package people install to start: `npx @danwo/cli init`. */
+  npmPackage: "@danwo/cli",
   /** How the site describes the licence: danwo is open source under Apache-2.0. */
   licence: {
     openSource: true,
@@ -36,6 +38,11 @@ export const SITE = {
 /** The repository's web address, when it is public. */
 export function repoUrl(): string | undefined {
   return SITE.repo === undefined ? undefined : `https://github.com/${SITE.repo}`
+}
+
+/** The package's page on npm. */
+export function npmUrl(): string {
+  return `https://www.npmjs.com/package/${SITE.npmPackage}`
 }
 
 /** "Open source" when the licence makes danwo open source, else the agreed wording. */
