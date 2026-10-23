@@ -139,9 +139,9 @@ export const Hero = forwardRef<HTMLElement>(function Hero(_props, ref) {
         </h1>
         <div className="hero-row">
           <p className="hero-sub">
-            danwo clicks through your app like a user{" "}
-            <strong>while emulated Stripe, Clerk, Resend and twenty more record every call</strong>,
-            then breaks the run on purpose, once per fault.
+            danwo clicks through your app like a user,{" "}
+            <strong>simulates the real services it calls</strong>, then introduces faults one at a
+            time to show you what breaks.
           </p>
           <div className="hero-meta">
             <span>no app code changes</span>
