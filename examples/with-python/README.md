@@ -37,7 +37,7 @@ npm test
 
 ```text
 Running 6 tests with 2 workers
-danwo: studio runs no Node process (uv, python), so danwo's check at start that its calls reach the proxy, which runs inside Node, does not run for it. …
+danwo: studio runs no Node process (uv, python), so danwo's check at start that its calls reach the proxy, which runs inside Node, does not run for it, and nothing confirms its calls go through the proxy: …
   - tests/agentic.danwo.ts › books the cheapest class 0 ms, worker 0
   - tests/agentic.danwo.ts › finds my booking 0 ms, worker 0
   ✓ tests/deterministic.danwo.ts › browses the timetable 1250 ms, worker 1
