@@ -22,6 +22,7 @@
     "check": "bun run ui:codegen && bun run format:check && bun run plain-js && bun run lint && bun run fallow && bun run typecheck && bun run declarations && bun run test",
     "test:slow": "vitest run --project slow --maxWorkers=4",
     "test:all": "vitest run",
+    "test:e2e": "bun run --cwd packages/dashboard test:e2e && bun run --cwd website test:e2e",
     "fallow": "fallow --fail-on-issues",
     "plain-js": "node scripts/plain-js.ts",
     "audit": "node scripts/audit.ts",

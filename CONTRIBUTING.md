@@ -14,6 +14,7 @@ Windows: CI's `windows` job runs the unit and ui tests and the packed-install ch
 bun install
 bun run check       # format, plain-JS gate, lint, fallow, typecheck, declarations, unit tests
 bun run test:slow   # browser, CLI, matrix and device tests
+bun run test:e2e    # danwo's own suites for the dashboard and the website, run with `danwo test`
 ```
 
 Keys for the live fidelity checks go in `.env.fidelity` (git-ignored). Use test or sandbox keys only.
@@ -41,7 +42,7 @@ Keys for the live fidelity checks go in `.env.fidelity` (git-ignored). Use test 
 
 1. Open an issue first for anything larger than a small fix, so we can agree on the approach.
 2. Keep each pull request to one change, with tests. A bug fix comes with a test that fails without it.
-3. Run `bun run check` before pushing, and `bun run test:slow` if you touched the runner, proxy, emulators, CLI, dashboard or devices.
+3. Run `bun run check` before pushing, and `bun run test:slow` if you touched the runner, proxy, emulators, CLI, dashboard or devices. If you touched the dashboard or the website, run its danwo suite too: `bun run test:e2e` in `packages/dashboard` or `website` (the suites live in their `e2e/` folders; the website's builds the site first).
 4. Update the docs when behaviour changes, in both places: the guide in `packages/skill/guides` (dense, for coding agents) and the page in `website/content/docs` (written for people, following `website/DOCS_STYLE.md`). For anything a user would notice, add one short line to the next release's entry in `website/content/changelog` (`<version>.mdx`), linking to its docs page rather than explaining it there.
 
 ## Conventions
@@ -78,15 +79,15 @@ node examples/link.ts with-next --here     # or in place, so your editor finds t
 
 ## CI
 
-| Workflow       | What it runs                                                                                               |
-| -------------- | ---------------------------------------------------------------------------------------------------------- |
-| `ci.yml`       | `bun run check` and gitleaks, on every pull request and push to main                                       |
-| `slow.yml`     | `bun run test:slow` in four shards, nightly and by hand                                                    |
-| `dogfood.yml`  | `examples/shop`'s tests and matrix on pull requests, reported as a check and a comment                     |
-| `examples.yml` | each standalone example installed from the release tarballs: its tests, then its matrix with `--budget 10` |
-| `release.yml`  | the release, on a `v*` tag (see below)                                                                     |
-| `security.yml` | `bun audit` against the allowlist, and OSV-Scanner to the Security tab, on dependency changes and weekly   |
-| `codeql.yml`   | CodeQL over the TypeScript source, on pull requests to main, pushes to main and weekly                     |
+| Workflow       | What it runs                                                                                                      |
+| -------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `ci.yml`       | `bun run check`, the dashboard's and website's danwo suites, and gitleaks, on every pull request and push to main |
+| `slow.yml`     | `bun run test:slow` in four shards, nightly and by hand                                                           |
+| `dogfood.yml`  | `examples/shop`'s tests and matrix on pull requests, reported as a check and a comment                            |
+| `examples.yml` | each standalone example installed from the release tarballs: its tests, then its matrix with `--budget 10`        |
+| `release.yml`  | the release, on a `v*` tag (see below)                                                                            |
+| `security.yml` | `bun audit` against the allowlist, and OSV-Scanner to the Security tab, on dependency changes and weekly          |
+| `codeql.yml`   | CodeQL over the TypeScript source, on pull requests to main, pushes to main and weekly                            |
 
 `examples.yml` runs nightly and by hand on every example whose `example.json` says `"install": "npm"`, so a new example needs no change there. On a pull request it runs only the examples it changed, or all of them when it changed `examples/_kit`, `examples/link.ts` or the workflow. The ruleset requires its `examples gate` job alone, which passes when every example passed or was skipped.
 

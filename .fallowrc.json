@@ -31,12 +31,12 @@
       {
         "files": ["packages/dashboard/src/{routes,modules,components}/**/*.tsx"],
         "maxCrap": 120,
-        "reason": "Page components: their branches are conditional rendering, exercised by the dashboard's browser test rather than unit coverage; the data and values they render are unit tested in packages/dashboard/test."
+        "reason": "Page components: their branches are conditional rendering, exercised by the dashboard's danwo suite (packages/dashboard/e2e) rather than unit coverage; the data and values they render are unit tested in packages/dashboard/test."
       },
       {
         "files": ["website/src/{routes,landing,components}/**/*.tsx"],
         "maxCrap": 120,
-        "reason": "The website's pages and landing sections: their branches are conditional rendering and animation, exercised by the prerendered build and its browser screenshots rather than unit coverage; the data and text they render are unit tested in website/test."
+        "reason": "The website's pages and landing sections: their branches are conditional rendering and animation, exercised by the prerendered build and the website's danwo suite (website/e2e) rather than unit coverage; the data and text they render are unit tested in website/test."
       },
       {
         "files": ["examples/shop-mobile/src/scripted-model.ts"],
