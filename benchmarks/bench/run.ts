@@ -96,7 +96,7 @@ function outcomesOf(history: TestRun): TestOutcome[] {
 }
 
 /** Grep for exactly one test title. */
-const grepFor = (title: string) => `(^| )${title.replaceAll(/[[\]]/g, "\\$&")}$`
+const grepFor = (title: string) => `(^| )${title.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`
 
 async function hasRecordings(): Promise<boolean> {
   const dir = join(BENCH_ROOT, "recordings")
