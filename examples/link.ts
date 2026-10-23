@@ -24,9 +24,14 @@ import { spawnPlan } from "../packages/runner/src/support/command-line.ts"
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url))
 
-/** What the copy leaves out: installs, builds and run output from a run in the example's folder. */
+/**
+ * What the copy leaves out: installs (a Python example's `.venv` too, whose scripts name their own
+ * folder), builds and run output from a run in the example's folder.
+ */
 const SKIPPED = new Set([
   "node_modules",
+  ".venv",
+  "__pycache__",
   ".next",
   ".next-build-lock",
   "dist",
