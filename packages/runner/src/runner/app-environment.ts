@@ -389,15 +389,25 @@ async function unproxiedEnvironment(options: AppEnvironmentOptions): Promise<Wor
 
   return {
     ...(baseUrl !== undefined && { baseUrl }),
-    logs: (): Readonly<Record<string, ProcessLog>> =>
-      started === undefined ? {} : { app: started.logs() },
-    stopped: () => {
-      const exit = started?.exited()
-
-      return exit === undefined ? [] : [`the app ${exit}`]
-    },
+    ...watched(() => started),
     close: async () => {
       await started?.stop()
+    },
+  }
+}
+
+/** The app's output for the flight record, and how it ended if it stopped on its own. */
+function watched(app: () => StartedApp | undefined) {
+  return {
+    logs: (): Readonly<Record<string, ProcessLog>> => {
+      const started = app()
+
+      return started === undefined ? {} : { app: started.logs() }
+    },
+    stopped: () => {
+      const exit = app()?.exited()
+
+      return exit === undefined ? [] : [`the app ${exit}`]
     },
   }
 }
@@ -451,13 +461,7 @@ export async function appEnvironment(
     webhooks: services.webhooks,
     fixtures: services.fixtures,
     ...servicesLifecycle(services),
-    logs: (): Readonly<Record<string, ProcessLog>> =>
-      started === undefined ? {} : { app: started.logs() },
-    stopped: () => {
-      const exit = started?.exited()
-
-      return exit === undefined ? [] : [`the app ${exit}`]
-    },
+    ...watched(() => started),
     notes: () => notes,
     state: () => services.state(),
     async close() {

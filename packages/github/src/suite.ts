@@ -12,13 +12,13 @@ import { relative, sep } from "node:path"
 import type { RunContext, RunKind } from "@danwo/runner/runner"
 
 /** The check run's name for each command when the suite has no name. */
-export const CHECK_NAMES: Readonly<Record<RunKind, string>> = {
+const CHECK_NAMES: Readonly<Record<RunKind, string>> = {
   test: "danwo",
   matrix: "danwo matrix",
 }
 
 /** The artifact the records are in when the suite has no name. */
-export const DEFAULT_ARTIFACT = "danwo-runs"
+const DEFAULT_ARTIFACT = "danwo-runs"
 
 /** Folder names that say where tests live rather than whose they are; a name skips past them. */
 const GENERIC_FOLDERS = new Set([

@@ -12,7 +12,7 @@ import { type AssertOptions, ExpectationFailed } from "./matchers.ts"
 const PAUSES_MS = [0, 50, 100, 250, 500]
 
 /** The address `expected` stands for, `undefined` for a RegExp: a string resolved against `base`. */
-export function expectedUrl(expected: TextMatch, base: string | undefined): string | undefined {
+function expectedUrl(expected: TextMatch, base: string | undefined): string | undefined {
   if (typeof expected !== "string") return undefined
 
   try {
@@ -23,7 +23,7 @@ export function expectedUrl(expected: TextMatch, base: string | undefined): stri
 }
 
 /** Whether `href` is the address `expected` stands for. */
-export function urlHolds(href: string, expected: TextMatch, base: string | undefined): boolean {
+function urlHolds(href: string, expected: TextMatch, base: string | undefined): boolean {
   return typeof expected === "string" ? href === expectedUrl(expected, base) : expected.test(href)
 }
 
