@@ -2,6 +2,7 @@ import { defineEmulator } from "../define.ts"
 import { apiRoutes, slackErrors } from "./api.ts"
 import type { Methods, SlackRouteContext } from "./context.ts"
 import { SlackEvents } from "./events.ts"
+import { answerInteraction } from "./modals.ts"
 import { chatMethods } from "./routes/chat.ts"
 import { conversationMethods } from "./routes/conversations.ts"
 import { fileMethods, fileRoutes } from "./routes/files.ts"
@@ -56,7 +57,8 @@ function routes(context: SlackRouteContext): void {
  * token rotation), the Web API with Slack's scope checks and `{ ok: false, error }` answers,
  * incoming webhooks, `response_url`s and file uploads. Events API callbacks, slash commands and
  * interactive payloads go to each installed app through the webhook dispatcher, signed with the
- * app's signing secret.
+ * app's signing secret; an app's answer to a modal submission closes, updates, pushes or clears the
+ * modal, or shows its errors.
  */
 export const slack = defineEmulator({
   name: "slack",
@@ -70,5 +72,9 @@ export const slack = defineEmulator({
     endpoints: () => deliveryEndpoints(slackStore(store)),
     sign: slackSigner(),
     policy: SLACK_DELIVERY,
+    onAnswer: (message, _endpoint, answer) => {
+      if (message.topic.startsWith("interactivity:"))
+        answerInteraction(slackStore(store), store.clock, message.body, answer)
+    },
   }),
 })

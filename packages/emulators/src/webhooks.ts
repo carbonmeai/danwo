@@ -2,13 +2,18 @@ import type { Outbox, OutboxMessage } from "./outbox.ts"
 import type { Clock } from "./store.ts"
 import type { Timer } from "./time.ts"
 
-/** Where an emulator sends webhooks. `events` may contain `"*"` for every event. */
+/**
+ * Where an emulator sends webhooks. `events` may contain `"*"` for every event. `retries: false`
+ * sends each message once, for deliveries the provider never retries, such as a request a person
+ * is waiting on.
+ */
 export interface WebhookEndpoint {
   readonly id: string
   readonly url: string
   readonly events: readonly string[]
   readonly secret: string
   readonly enabled: boolean
+  readonly retries?: boolean
 }
 
 /** Headers for one delivery attempt: content type plus the provider's signature. */
@@ -335,7 +340,7 @@ export class WebhookDispatcher {
       const delay = this.options.policy.retryDelaysMs[attempt - 1]
       const current = generation === this.generation && this.unsubscribe !== undefined
 
-      if (!delivered && mode.retry && delay !== undefined && current)
+      if (!delivered && mode.retry && endpoint.retries !== false && delay !== undefined && current)
         this.schedule(message, endpoint, attempt + 1, delay, NORMAL)
     })
 

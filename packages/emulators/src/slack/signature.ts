@@ -13,27 +13,29 @@ export function slackSignature(secret: string, timestamp: number, body: string):
   return `v0=${createHmac("sha256", secret).update(`v0:${timestamp}:${body}`).digest("hex")}`
 }
 
-/** Where each installed app wants events, slash commands and interactions delivered. */
+/**
+ * Where each app wants events, slash commands and interactions delivered, from its configuration.
+ * Only installed apps are sent anything, but an app just uninstalled still gets told so. Slack
+ * retries a failed event, but never a slash command or an interaction: a member is waiting on
+ * those, and sees an error instead.
+ */
 export function deliveryEndpoints(slack: SlackStore): WebhookEndpoint[] {
-  return slack.installations.all().flatMap((install) => {
-    const app = slack.apps.findOneBy("appId", install.appId)
-
-    if (!app) return []
-
-    const endpoint = (id: string, url: string) => ({
+  return slack.apps.all().flatMap((app) => {
+    const endpoint = (id: string, url: string, retries: boolean) => ({
       id,
       url,
       events: [id],
       secret: app.signingSecret,
       enabled: true,
+      retries,
     })
     const targets = [
-      ...(app.eventsUrl === null ? [] : [endpoint(topics.events(app.appId), app.eventsUrl)]),
+      ...(app.eventsUrl === null ? [] : [endpoint(topics.events(app.appId), app.eventsUrl, true)]),
       ...(app.interactivityUrl === null
         ? []
-        : [endpoint(topics.interactivity(app.appId), app.interactivityUrl)]),
+        : [endpoint(topics.interactivity(app.appId), app.interactivityUrl, false)]),
       ...app.commands.map((setting) =>
-        endpoint(topics.command(app.appId, setting.command), setting.url),
+        endpoint(topics.command(app.appId, setting.command), setting.url, false),
       ),
     ]
 
@@ -81,6 +83,7 @@ function isForged(endpoint: WebhookEndpoint): boolean {
 
 /**
  * How Slack retries a failed event: soon after the failure, then after one and five minutes. An
- * app has three seconds to answer before the attempt counts as failed.
+ * app has three seconds to answer before the attempt counts as failed. Commands and interactions
+ * are sent once.
  */
 export const SLACK_DELIVERY = { retryDelaysMs: [1_000, 60_000, 300_000], timeoutMs: 3_000 }

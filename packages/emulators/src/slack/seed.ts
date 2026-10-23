@@ -2,19 +2,34 @@ import type { Store } from "../store.ts"
 import type { AppRecord, UserRecord } from "./entities.ts"
 import { secretHex, slackId, stableSlackId } from "./helpers.ts"
 import { installApp } from "./install.ts"
-import { findChannel, findUser, teamOf } from "./lookup.ts"
+import { findChannel, findUser, isExternal, teamOf } from "./lookup.ts"
 import { type SlackStore, slackStore } from "./store.ts"
 
 type Names = readonly string[]
 
-/** A member to seed; `name` is their handle. */
+/**
+ * A member to seed; `name` is their handle. `team_id` makes them a member of another workspace,
+ * reached through Slack Connect; `is_stranger` marks one the app shares no visible channel with.
+ */
 export type SlackSeedUser = { readonly name: string } & Partial<
-  Readonly<Record<"email" | "real_name", string> & { is_admin: boolean }>
+  Readonly<
+    Record<"email" | "real_name" | "team_id", string> & { is_admin: boolean; is_stranger: boolean }
+  >
 >
 
-/** A channel to seed, with its members by id, email or handle. `#general` always exists. */
+/**
+ * A channel to seed, with its members by id, email or handle. `#general` always exists. A channel
+ * with a member from another workspace is shared through Slack Connect; `is_ext_shared` makes one
+ * shared without one.
+ */
 export type SlackSeedChannel = { readonly name: string } & Partial<
-  Readonly<Record<"topic" | "purpose", string> & { is_private: boolean; members: Names }>
+  Readonly<
+    Record<"topic" | "purpose", string> & {
+      is_private: boolean
+      is_ext_shared: boolean
+      members: Names
+    }
+  >
 >
 
 /**
@@ -71,13 +86,18 @@ function seedTeam(slack: SlackStore, team: SlackSeedConfig["team"]): void {
 }
 
 function seedUser(slack: SlackStore, user: SlackSeedUser): UserRecord {
+  const home = teamOf(slack).teamId
+  const team = user.team_id === undefined || user.team_id === home ? null : user.team_id
+
   return slack.users.insert({
     userId: slackId("U"),
     name: user.name,
     realName: user.real_name ?? user.name,
     email: user.email ?? null,
+    teamId: team,
     isAdmin: user.is_admin ?? false,
     isBot: false,
+    isStranger: user.is_stranger ?? false,
     botId: null,
     appId: null,
     deleted: false,
@@ -94,15 +114,18 @@ function memberIds(slack: SlackStore, keys: readonly string[]): string[] {
 }
 
 function seedChannel(slack: SlackStore, channel: SlackSeedChannel, creator: string): void {
+  const members = memberIds(slack, channel.members ?? [])
+
   slack.channels.insert({
     channelId: slackId("C"),
     name: channel.name.replace(/^#/, ""),
     kind: channel.is_private ? "group" : "channel",
     creator,
-    members: memberIds(slack, channel.members ?? []),
+    members,
     topic: channel.topic ?? "",
     purpose: channel.purpose ?? "",
     archived: false,
+    extShared: (channel.is_ext_shared ?? false) || members.some((id) => isExternal(slack, id)),
   })
 }
 

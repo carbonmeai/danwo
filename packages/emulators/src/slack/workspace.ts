@@ -3,11 +3,12 @@ import type { SlackState } from "./context.ts"
 import type { EphemeralRecord, MessageRecord, UserRecord } from "./entities.ts"
 import { SlackEvents } from "./events.ts"
 import { SlackApiError } from "./helpers.ts"
-import { type Action, clickAction, runCommand, submitView } from "./interactions.ts"
+import { uninstallApp } from "./install.ts"
+import { type Action, clickAction, closeView, runCommand, submitView } from "./interactions.ts"
 import { appOf, findChannel, findUser, requireMessage } from "./lookup.ts"
 import { postMessage } from "./posting.ts"
 import { releaseScheduled } from "./routes/chat.ts"
-import { addMember } from "./routes/conversations.ts"
+import { addMember, convertChannel, removeMember } from "./routes/conversations.ts"
 import { applyReaction } from "./routes/reactions.ts"
 import { slackSignature } from "./signature.ts"
 import { slackStore } from "./store.ts"
@@ -48,7 +49,10 @@ export interface SlackWorkspace {
   thread(channel: string, ts: string): SlackMessage[]
   /** Ephemeral messages in a channel, for one member when given. */
   ephemeral(channel: string, user?: string): SlackEphemeral[]
-  /** The views apps opened or published, for one member when given. */
+  /**
+   * The views apps opened or published that are still open, for one member when given; a modal the
+   * app answered with block errors carries them as `errors`.
+   */
   views(user?: string): Record<string, unknown>[]
   /** An uploaded file's bytes. */
   file(fileId: string): Buffer | undefined
@@ -58,12 +62,23 @@ export interface SlackWorkspace {
   react(user: string, channel: string, ts: string, name: string): void
   /** Adds a member to a channel: `member_joined_channel`. */
   join(user: string, channel: string): void
+  /**
+   * Takes a member out of a channel, by their own choice or `by`'s: `member_left_channel`, and
+   * `channel_left` or `group_left` when the member is an app's bot user.
+   */
+  leave(user: string, channel: string, by?: string): void
+  /** An admin makes a channel private or public: the `channel_convert_to_*` message. */
+  convert(admin: string, channel: string, to: "private" | "public"): void
+  /** An admin removes an app from the workspace: its tokens go, then `app_uninstalled`. */
+  uninstall(appId?: string): void
   /** Runs a slash command as a member. */
   command(user: string, channel: string, command: string, text?: string): void
   /** Clicks a button on an app's message: `block_actions`. */
   click(user: string, channel: string, ts: string, action: Action): void
   /** Submits an open modal with its input values: `view_submission`. */
   submit(user: string, viewId: string, values: Readonly<Record<string, unknown>>): void
+  /** Closes an open modal and its stack: `view_closed` when the view asked to be told. */
+  close(user: string, viewId: string): void
   /** Sends the Events API's `url_verification` challenge to an app's request URL. */
   verifyEventsUrl(appId?: string): Promise<UrlVerification>
 }
@@ -161,8 +176,13 @@ export function slackWorkspace(emulator: Pick<Emulator, "store" | "outbox">): Sl
     views: (user) =>
       slack.views
         .all()
+        .filter((view) => !view.closed)
         .filter((view) => user === undefined || view.user === member(user).userId)
-        .map((view) => ({ ...view.view, id: view.viewId })),
+        .map((view) => ({
+          ...view.view,
+          id: view.viewId,
+          ...(view.errors !== null && { errors: view.errors }),
+        })),
     file: (fileId) => {
       const content = slack.files.findOneBy("fileId", fileId)?.content
 
@@ -186,6 +206,27 @@ export function slackWorkspace(emulator: Pick<Emulator, "store" | "outbox">): Sl
 
       if (!target.members.includes(id)) addMember(state, target, id, null)
     },
+    leave: (user, key, by) => {
+      const target = channel(key)
+      const id = member(user).userId
+
+      if (target.members.includes(id))
+        removeMember(state, target, id, by === undefined ? id : member(by).userId)
+    },
+    convert: (admin, key, to) =>
+      void convertChannel(
+        state,
+        channel(key),
+        to === "private" ? "group" : "channel",
+        member(admin).userId,
+      ),
+    uninstall: (appId) => {
+      const install =
+        appId === undefined ? slack.installations.all()[0] : appOf(slack, appId).install
+
+      if (!install) throw new SlackApiError("app_not_installed")
+      uninstallApp(slack, state.events, install.appId)
+    },
     command: (user, key, command, text = "") =>
       runCommand(state, member(user), channel(key), command, text),
     click: (user, key, ts, action) => {
@@ -198,6 +239,12 @@ export function slackWorkspace(emulator: Pick<Emulator, "store" | "outbox">): Sl
 
       if (!view) throw new SlackApiError("not_found")
       submitView(state, member(user), view, values)
+    },
+    close: (user, viewId) => {
+      const view = slack.views.findOneBy("viewId", viewId)
+
+      if (!view) throw new SlackApiError("not_found")
+      closeView(state, member(user), view)
     },
     verifyEventsUrl: (appId) => verify(state, appId),
   }

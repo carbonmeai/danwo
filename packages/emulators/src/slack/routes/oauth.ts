@@ -6,7 +6,13 @@ import { apiError, readArgs } from "../api.ts"
 import type { ApiCall, Methods, SlackRouteContext } from "../context.ts"
 import type { AppRecord, InstallCode, TokenRecord } from "../entities.ts"
 import { type Args, flagArg, HOOKS_BASE, SlackApiError, secretHex, stringArg } from "../helpers.ts"
-import { type Grant, installApp, issueToken, ROTATING_TOKEN_SECONDS } from "../install.ts"
+import {
+  type Grant,
+  installApp,
+  issueToken,
+  ROTATING_TOKEN_SECONDS,
+  uninstallApp,
+} from "../install.ts"
 import { teamOf } from "../lookup.ts"
 
 /** How long an install code stays good: ten minutes. */
@@ -272,6 +278,23 @@ function authRevoke(call: ApiCall) {
   return { revoked: true }
 }
 
+/**
+ * `apps.uninstall`: the app removes itself with a user token from its install and its own client
+ * id and secret. A bot token may not.
+ */
+function appsUninstall(call: ApiCall) {
+  const { slack, events } = call.context
+  const app = slack.apps.findOneBy("clientId", stringArg(call.args, "client_id") ?? "")
+
+  if (call.token.kind !== "user") throw new SlackApiError("no_permission")
+  if (!app || app.appId !== call.token.appId) throw new SlackApiError("invalid_client_id")
+  if (stringArg(call.args, "client_secret") !== app.clientSecret)
+    throw new SlackApiError("bad_client_secret")
+  uninstallApp(slack, events, app.appId)
+
+  return {}
+}
+
 /** The consent page and the token endpoint, on `slack.com`. */
 export function oauthRoutes(context: SlackRouteContext): void {
   context.app.get("/oauth/v2/authorize", (c) => authorize(c, context))
@@ -279,8 +302,9 @@ export function oauthRoutes(context: SlackRouteContext): void {
   context.app.post("/api/oauth.v2.access", (c) => access(c, context))
 }
 
-/** `auth.test` and `auth.revoke`. */
+/** `auth.test`, `auth.revoke` and `apps.uninstall`. */
 export const authMethods: Methods = {
   "auth.test": { scopes: [], run: authTest },
   "auth.revoke": { scopes: [], run: authRevoke },
+  "apps.uninstall": { scopes: [], run: appsUninstall },
 }

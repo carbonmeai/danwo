@@ -3,20 +3,28 @@ import type { Entity } from "../store.ts"
 /** The workspace an emulator serves. */
 export type TeamRecord = Entity & Record<"teamId" | "name" | "domain", string>
 
-/** A member of the workspace; bot users are members too, with a `botId` and their app's id. */
+/**
+ * A member of the workspace; bot users are members too, with a `botId` and their app's id. A member
+ * from another workspace through Slack Connect has that workspace's `teamId` (null means this
+ * workspace), and `isStranger` when the app shares no channel it can see with them.
+ */
 export type UserRecord = Entity &
   Record<"userId" | "name" | "realName", string> &
-  Record<"email" | "botId" | "appId", string | null> &
-  Record<"isAdmin" | "isBot" | "deleted", boolean>
+  Record<"email" | "botId" | "appId" | "teamId", string | null> &
+  Record<"isAdmin" | "isBot" | "deleted" | "isStranger", boolean>
 
 export type ChannelKind = "channel" | "group" | "im" | "mpim"
 
-/** A conversation: a public or private channel, a DM or a group DM. */
+/**
+ * A conversation: a public or private channel, a DM or a group DM. `extShared` is a Slack Connect
+ * channel, shared with another workspace; it stays shared once it has been.
+ */
 export type ChannelRecord = Entity &
   Record<"channelId" | "name" | "creator" | "topic" | "purpose", string> & {
     kind: ChannelKind
     members: string[]
     archived: boolean
+    extShared: boolean
   }
 
 export type Reaction = { name: string; users: string[] }
@@ -93,11 +101,17 @@ export type ResponseUrlRecord = Entity &
 export type TriggerRecord = Entity &
   Record<"triggerId" | "appId" | "user", string> & { expiresAt: number; used: boolean }
 
-/** A modal or App Home view an app opened or published. */
+/**
+ * A modal or App Home view an app opened or published. A pushed modal names the view it was pushed
+ * over and the first view of its stack; `errors` are the block errors the app answered a submission
+ * with, shown until the next one; a closed view is gone from the member's screen.
+ */
 export type ViewRecord = Entity &
-  Record<"viewId" | "appId" | "user" | "hash", string> & {
-    externalId: string | null
+  Record<"viewId" | "appId" | "user" | "hash", string> &
+  Record<"externalId" | "rootViewId" | "previousViewId", string | null> & {
     view: Record<string, unknown>
+    errors: Record<string, string> | null
+    closed: boolean
   }
 
 /** A file upload: reserved by `getUploadURLExternal`, filled by the upload, then shared. */

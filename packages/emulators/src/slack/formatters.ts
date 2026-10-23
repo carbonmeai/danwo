@@ -19,13 +19,17 @@ type MessageElement = NonNullable<ConversationsHistoryResponse["messages"]>[numb
 
 const seconds = (iso: string) => Math.floor(new Date(iso).getTime() / 1000)
 
-/** A member as `users.info` and `users.list` show it; the email only with `users:read.email`. */
+/**
+ * A member as `users.info` and `users.list` show it; the email only with `users:read.email`. A
+ * member from another workspace carries that workspace's id.
+ */
 export function userObject(user: UserRecord, team: TeamRecord, showEmail: boolean) {
   const [first = "", ...rest] = user.realName.split(" ")
+  const teamId = user.teamId ?? team.teamId
 
   return {
     id: user.userId,
-    team_id: team.teamId,
+    team_id: teamId,
     name: user.name,
     deleted: user.deleted,
     real_name: user.realName,
@@ -36,13 +40,14 @@ export function userObject(user: UserRecord, team: TeamRecord, showEmail: boolea
     is_owner: user.isAdmin,
     is_bot: user.isBot,
     is_app_user: false,
+    is_stranger: user.isStranger,
     updated: seconds(user.updated_at),
     profile: {
       real_name: user.realName,
       display_name: user.isBot ? "" : user.name,
       first_name: first,
       last_name: rest.join(" "),
-      team: team.teamId,
+      team: teamId,
       ...(showEmail && user.email !== null && { email: user.email }),
       ...(user.botId !== null && { bot_id: user.botId }),
       ...(user.appId !== null && { api_app_id: user.appId }),
@@ -66,8 +71,8 @@ export function channelObject(channel: ChannelRecord, viewer: string) {
     is_private: channel.kind !== "channel",
     is_archived: channel.archived,
     is_general: channel.name === "general",
-    is_shared: false,
-    is_ext_shared: false,
+    is_shared: channel.extShared,
+    is_ext_shared: channel.extShared,
     is_org_shared: false,
     is_member: channel.members.includes(viewer),
     updated: seconds(channel.updated_at),
@@ -138,6 +143,8 @@ export function viewObject(view: ViewRecord, team: string, botId: string) {
     bot_id: botId,
     hash: view.hash,
     external_id: view.externalId ?? "",
+    root_view_id: view.rootViewId ?? view.viewId,
+    previous_view_id: view.previousViewId,
     state: { values: {} },
   }
 }

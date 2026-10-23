@@ -7,8 +7,11 @@ import { asObject, jsonArg, requireArg, SlackApiError, slackId, stringArg } from
 import { appOf, requireUser, teamOf } from "../lookup.ts"
 
 /** A view's hash: changes whenever the view does, as `views.update` compares it. */
-const hashOf = (view: Record<string, unknown>, at: string) =>
+export const hashOf = (view: Record<string, unknown>, at: string) =>
   `${at.replaceAll(/\D/g, "").slice(0, 10)}.${createHash("sha1").update(JSON.stringify(view)).digest("hex").slice(0, 8)}`
+
+/** A view's place and state when it is first shown: the root of its own stack, open, no errors. */
+export const NEW_VIEW = { rootViewId: null, previousViewId: null, errors: null, closed: false }
 
 /** The `view` argument, which must be an object with a `type`. */
 function viewArg(call: ApiCall, type?: string): Record<string, unknown> {
@@ -54,6 +57,7 @@ function openMethod(call: ApiCall) {
     externalId: typeof view.external_id === "string" ? view.external_id : null,
     hash: hashOf(view, call.context.clock().toISOString()),
     view,
+    ...NEW_VIEW,
   })
 
   return answer(call, record)
@@ -112,6 +116,7 @@ function publishMethod(call: ApiCall) {
         externalId: null,
         hash,
         view,
+        ...NEW_VIEW,
       })
 
   return answer(call, record)

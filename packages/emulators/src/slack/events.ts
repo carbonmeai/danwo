@@ -8,7 +8,7 @@ import type {
   MessageRecord,
 } from "./entities.ts"
 import { slackId, unixNow } from "./helpers.ts"
-import { appOf, teamOf } from "./lookup.ts"
+import { appOf, teamIdOf, teamOf } from "./lookup.ts"
 import type { SlackStore } from "./store.ts"
 
 /** The dispatcher topics: one per app and kind of delivery. */
@@ -28,6 +28,9 @@ const EVENT_SCOPES: Readonly<Record<string, string | null>> = {
   reaction_added: "reactions:read",
   reaction_removed: "reactions:read",
   member_joined_channel: "channels:read",
+  member_left_channel: "channels:read",
+  channel_left: "channels:read",
+  group_left: "groups:read",
   tokens_revoked: null,
   app_uninstalled: null,
 }
@@ -57,8 +60,11 @@ function subscribes(subscriber: Subscriber, subscription: string): boolean {
   )
 }
 
-/** The fields a message event carries. */
-function messageEvent(message: MessageRecord, channel: ChannelRecord, team: string) {
+/**
+ * The fields a message event carries. In a channel shared through Slack Connect it also says which
+ * workspace the author is in.
+ */
+function messageEvent(message: MessageRecord, channel: ChannelRecord, team: string, from: string) {
   return {
     type: "message",
     channel: channel.channelId,
@@ -68,7 +74,9 @@ function messageEvent(message: MessageRecord, channel: ChannelRecord, team: stri
     event_ts: message.ts,
     channel_type: channel.kind,
     team,
+    ...(channel.extShared && { user_team: from, source_team: from }),
     ...(message.blocks !== null && { blocks: message.blocks }),
+    ...(message.subtype !== null && { subtype: message.subtype }),
     ...(message.threadTs !== null && { thread_ts: message.threadTs }),
     ...(message.botId !== null && { bot_id: message.botId }),
     ...(message.appId !== null && { app_id: message.appId }),
@@ -95,16 +103,20 @@ export class SlackEvents {
   /** A new message: `message.*` to members subscribed to the channel's kind, `app_mention` to mentioned bots. */
   message(message: MessageRecord, channel: ChannelRecord): void {
     const team = teamOf(this.slack).teamId
-    const event = messageEvent(message, channel, team)
+    const event = messageEvent(message, channel, team, teamIdOf(this.slack, message.user))
 
     for (const subscriber of this.inChannel(channel)) {
       if (subscribes(subscriber, MESSAGE_SUBSCRIPTION[channel.kind]))
-        this.callback(subscriber, event)
+        this.callback(subscriber, event, channel)
       if (
         subscribes(subscriber, "app_mention") &&
         message.text.includes(`<@${subscriber.install.botUserId}>`)
       )
-        this.callback(subscriber, { ...event, type: "app_mention", channel_type: undefined })
+        this.callback(
+          subscriber,
+          { ...event, type: "app_mention", channel_type: undefined },
+          channel,
+        )
     }
   }
 
@@ -117,6 +129,7 @@ export class SlackEvents {
     current: MessageRecord | null,
   ): void {
     const team = teamOf(this.slack).teamId
+    const from = teamIdOf(this.slack, previous.user)
     const event = {
       type: "message",
       subtype,
@@ -125,15 +138,15 @@ export class SlackEvents {
       channel_type: channel.kind,
       ts: current?.editedTs ?? previous.ts,
       event_ts: current?.editedTs ?? previous.ts,
-      previous_message: messageEvent(previous, channel, team),
+      previous_message: messageEvent(previous, channel, team, from),
       ...(current === null
         ? { deleted_ts: previous.ts }
-        : { message: messageEvent(current, channel, team) }),
+        : { message: messageEvent(current, channel, team, from) }),
     }
 
     for (const subscriber of this.inChannel(channel))
       if (subscribes(subscriber, MESSAGE_SUBSCRIPTION[channel.kind]))
-        this.callback(subscriber, event)
+        this.callback(subscriber, event, channel)
   }
 
   /** `reaction_added` or `reaction_removed` on a message. */
@@ -154,7 +167,7 @@ export class SlackEvents {
     }
 
     for (const subscriber of this.inChannel(channel))
-      if (subscribes(subscriber, type)) this.callback(subscriber, event)
+      if (subscribes(subscriber, type)) this.callback(subscriber, event, channel)
   }
 
   /** `member_joined_channel`, to apps in the channel (the joining bot included). */
@@ -170,11 +183,49 @@ export class SlackEvents {
     }
 
     for (const subscriber of this.inChannel(channel))
-      if (subscribes(subscriber, "member_joined_channel")) this.callback(subscriber, event)
+      if (subscribes(subscriber, "member_joined_channel")) this.callback(subscriber, event, channel)
+  }
+
+  /**
+   * A member left or was removed from `channel` (already without them): `member_left_channel` to
+   * the apps still in it and, when the member was an app's bot user, `channel_left` or `group_left`
+   * to that app, with who removed it.
+   */
+  memberLeft(user: string, channel: ChannelRecord, actor: string): void {
+    const team = teamOf(this.slack).teamId
+    const event = {
+      type: "member_left_channel",
+      user,
+      channel: channel.channelId,
+      channel_type: channel.kind === "channel" ? "C" : "G",
+      team,
+      event_ts: this.eventTs(),
+    }
+
+    for (const subscriber of this.inChannel(channel))
+      if (subscribes(subscriber, "member_left_channel")) this.callback(subscriber, event, channel)
+
+    const removed = this.slack.installations.all().find((install) => install.botUserId === user)
+    const subscriber = removed && this.subscriber(removed.appId)
+    const type = channel.kind === "channel" ? "channel_left" : "group_left"
+
+    if (subscriber && subscribes(subscriber, type))
+      this.callback(
+        subscriber,
+        { type, channel: channel.channelId, actor_id: actor, event_ts: this.eventTs() },
+        channel,
+      )
+  }
+
+  /** `app_uninstalled` to the app removed from the workspace. */
+  appUninstalled(appId: string): void {
+    const subscriber = this.subscriber(appId)
+
+    if (subscriber && subscribes(subscriber, "app_uninstalled"))
+      this.callback(subscriber, { type: "app_uninstalled", event_ts: this.eventTs() })
   }
 
   /** `tokens_revoked` to the app whose tokens went. */
-  // fallow-ignore-next-line unused-class-member -- called through a destructured route context
   tokensRevoked(appId: string, tokens: { oauth: string[]; bot: string[] }): void {
     const subscriber = this.subscriber(appId)
 
@@ -187,7 +238,7 @@ export class SlackEvents {
     this.queue.outbox.push(topics.command(appId, command), new URLSearchParams(fields).toString())
   }
 
-  /** An interactive payload (`block_actions`, `view_submission`), as the `payload` form field. */
+  /** An interactive payload (`block_actions`, `view_submission`, `view_closed`), as the `payload` form field. */
   interaction(appId: string, payload: Record<string, unknown>): void {
     const body = new URLSearchParams({ payload: JSON.stringify(payload) }).toString()
 
@@ -216,8 +267,12 @@ export class SlackEvents {
       })
   }
 
-  /** Queues an Events API `event_callback` envelope for one app. */
-  private callback(subscriber: Subscriber, event: Readonly<Record<string, unknown>>): void {
+  /** Queues an Events API `event_callback` envelope for one app, about `channel` when there is one. */
+  private callback(
+    subscriber: Subscriber,
+    event: Readonly<Record<string, unknown>>,
+    channel?: ChannelRecord,
+  ): void {
     const team = teamOf(this.slack).teamId
 
     this.queue.outbox.push(topics.events(subscriber.app.appId), {
@@ -237,7 +292,7 @@ export class SlackEvents {
           is_enterprise_install: false,
         },
       ],
-      is_ext_shared_channel: false,
+      is_ext_shared_channel: channel?.extShared ?? false,
     })
   }
 }

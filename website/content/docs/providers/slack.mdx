@@ -56,8 +56,8 @@ export default defineConfig({
 | Field           | What it seeds                                                                                          |
 | --------------- | ------------------------------------------------------------------------------------------------------ |
 | `team`          | The workspace's name, id and domain.                                                                   |
-| `users`         | Members by handle, with email, real name and admin.                                                    |
-| `channels`      | Channels, private or public, with members; `#general` always exists.                                   |
+| `users`         | Members by handle, with email, real name and admin; `team_id` for a member of another workspace.       |
+| `channels`      | Channels, private or public, with members; `#general` always exists; `is_ext_shared` to share one.     |
 | `apps`          | Your app: credentials, scopes, event subscriptions, slash commands, interactivity URL, token rotation. |
 | `installations` | Apps already installed, with fixed bot and user tokens and the channels the bot is in.                 |
 
@@ -82,14 +82,46 @@ test("announces a deploy in the channel", async ({ expect, settle, slack }) => {
 })
 ```
 
-| `slackWorkspace(slack)`           | What it's for                              |
-| --------------------------------- | ------------------------------------------ |
-| `post`, `react`, `join`           | Act as a member in a channel.              |
-| `command`                         | Run a slash command as a member.           |
-| `click`, `submit`                 | Click a button, or submit a modal.         |
-| `messages`, `thread`, `ephemeral` | Read what was posted.                      |
-| `views`, `file`                   | Read opened views and uploaded files.      |
-| `verifyEventsUrl()`               | Send Slack's challenge to your events URL. |
+| `slackWorkspace(slack)`           | What it's for                                                    |
+| --------------------------------- | ---------------------------------------------------------------- |
+| `post`, `react`, `join`, `leave`  | Act as a member in a channel; `leave` with `by` removes someone. |
+| `command`                         | Run a slash command as a member.                                 |
+| `click`, `submit`, `close`        | Click a button, submit a modal, or close it.                     |
+| `convert`                         | Make a channel private or public, as an admin.                   |
+| `uninstall`                       | Remove your app from the workspace, as an admin.                 |
+| `messages`, `thread`, `ephemeral` | Read what was posted.                                            |
+| `views`, `file`                   | Read the open views, with any errors your app showed, and files. |
+| `verifyEventsUrl()`               | Send Slack's challenge to your events URL.                       |
+
+### Modals
+
+Slack does what your app answers a submission with. An empty answer closes the modal, and a late
+or failed one leaves it open, as Slack does after its three seconds:
+
+| Your app answers            | The modal                                  |
+| --------------------------- | ------------------------------------------ |
+| Nothing (an empty 200)      | Closes.                                    |
+| `response_action: "errors"` | Stays open with the messages under blocks. |
+| `response_action: "update"` | Is replaced by the view you sent.          |
+| `response_action: "push"`   | Gets a new view on top, three at most.     |
+| `response_action: "clear"`  | Closes, with every view stacked on it.     |
+
+```ts title="tests/deploy-form.danwo.ts"
+import { type SlackFixtures, slackWorkspace, test as base } from "@danwo/sdk"
+
+const test = base.extend<SlackFixtures>()
+
+test("refuses a deploy without an environment", async ({ expect, settle, slack }) => {
+  const workspace = slackWorkspace(slack)
+  const [modal] = workspace.views("ada")
+  const values = { env: { name: { type: "plain_text_input", value: "" } } }
+
+  workspace.submit("ada", String(modal?.id), values)
+  await settle()
+
+  expect(workspace.views("ada")[0]?.errors).toEqual({ env: "Pick an environment" })
+})
+```
 
 ## What's covered
 
@@ -97,11 +129,15 @@ test("announces a deploy in the channel", async ({ expect, settle, slack }) => {
 | ----------------------- | -------------------------------------------------------------------------------- |
 | OAuth v2                | The consent page, token exchange and rotation, testing and revoking tokens.      |
 | Chat                    | Post, update, delete and schedule messages, ephemeral messages, threads, blocks. |
-| Conversations           | Create, list, read history and replies, join, invite and open DMs.               |
+| Conversations           | Create, list, read history and replies, join, invite, leave, kick and open DMs.  |
+| Admin                   | Make a channel private or public, for a workspace admin.                         |
+| Apps                    | `apps.uninstall`, and removing the app as an admin.                              |
+| Slack Connect           | Members from another workspace and the channels shared with them.                |
 | Users                   | List users, read one, look one up by email.                                      |
 | Reactions, views, files | Reactions, modals and home tabs, and external file uploads.                      |
 | Incoming                | Incoming webhooks and response URLs.                                             |
 | Sent to your app        | Events API callbacks, slash commands and interactive payloads.                   |
+| Answered by your app    | Modal submissions: close, `errors`, `update`, `push` and `clear`.                |
 
 Every method checks the token's scopes and answers `{ ok: false, error }` as Slack does, such as
 `missing_scope` or `channel_not_found`.
@@ -120,6 +156,23 @@ What Slack sends your app carries `X-Slack-Signature` and `X-Slack-Request-Times
 the app's `signing_secret`, so Bolt's request verification accepts it. A stale timestamp is one
 your app should refuse.
 
+A failed event is retried after one second, one minute and five minutes, with
+`X-Slack-Retry-Num`. A slash command or an interaction is sent once and never retried, as on Slack.
+
+Besides messages, mentions and reactions, your app hears about:
+
+| Event                                 | When                                                               |
+| ------------------------------------- | ------------------------------------------------------------------ |
+| `member_joined_channel`               | Someone joins a channel your bot is in.                            |
+| `member_left_channel`                 | Someone leaves or is removed from it.                              |
+| `channel_left`, `group_left`          | Your bot is removed from a public or private channel, and by whom. |
+| `channel_convert_to_private`/`public` | An admin changes a channel's privacy (a `message` subtype).        |
+| `app_uninstalled`, `tokens_revoked`   | Your app is removed; its tokens are already dead when these come.  |
+| `view_closed`                         | A member closes a modal that set `notify_on_close`.                |
+
+In a channel shared through Slack Connect, events carry `is_ext_shared_channel: true`, and
+messages say which workspace the author is in with `user_team` and `source_team`.
+
 ## Fidelity
 
 **Public endpoints only.** `danwo fidelity slack` checks what Slack answers without a
@@ -128,7 +181,7 @@ workspace: `api.test`, and the errors for a missing or unknown token. Both match
 ## Not covered yet
 
 - Socket Mode
-- Enterprise Grid, Slack Connect and workflow steps
+- Enterprise Grid, Slack Connect invitations and workflow steps
 - Search, pins, bookmarks and reminders
 
 ## Next

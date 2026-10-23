@@ -8,6 +8,7 @@ import type {
   TokenKind,
   TokenRecord,
 } from "./entities.ts"
+import type { SlackEvents } from "./events.ts"
 import { secretHex, SlackApiError, slackId } from "./helpers.ts"
 import { findChannel, teamOf } from "./lookup.ts"
 import type { SlackStore } from "./store.ts"
@@ -63,11 +64,18 @@ function liveToken(slack: SlackStore, appId: string, kind: TokenKind, userId: st
 /** The scopes granted so far plus the new ones: Slack's grants add up across installs. */
 const union = (a: readonly string[], b: readonly string[]) => [...new Set([...a, ...b])]
 
-/** The bot user an app posts as, created the first time the app is installed. */
+/**
+ * The bot user an app posts as, created the first time the app is installed and active again when
+ * an uninstalled app is installed anew.
+ */
 function botUserFor(slack: SlackStore, app: AppRecord): { userId: string; botId: string } {
   const existing = slack.users.all().find((user) => user.appId === app.appId && user.isBot)
 
-  if (existing?.botId) return { userId: existing.userId, botId: existing.botId }
+  if (existing?.botId) {
+    if (existing.deleted) slack.users.update(existing.id, { deleted: false })
+
+    return { userId: existing.userId, botId: existing.botId }
+  }
 
   const botId = slackId("B")
   const user = slack.users.insert({
@@ -75,8 +83,10 @@ function botUserFor(slack: SlackStore, app: AppRecord): { userId: string; botId:
     name: app.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
     realName: app.name,
     email: null,
+    teamId: null,
     isAdmin: false,
     isBot: true,
+    isStranger: false,
     botId,
     appId: app.appId,
     deleted: false,
@@ -194,4 +204,33 @@ export function installApp(slack: SlackStore, clock: Clock, request: InstallRequ
     : null
 
   return { install, bot, user, webhook }
+}
+
+/**
+ * Removes an installed app from the workspace, as an admin does from its settings or the app does
+ * with `apps.uninstall`: every token it holds is revoked before the app hears of it, its incoming
+ * webhooks stop working and its bot user is deactivated. The app gets `app_uninstalled` and
+ * `tokens_revoked`, the latter naming whose tokens went, not the tokens. Installing it again issues
+ * new tokens.
+ */
+export function uninstallApp(slack: SlackStore, events: SlackEvents, appId: string): void {
+  const install = slack.installations.findOneBy("appId", appId)
+
+  if (!install) throw new SlackApiError("app_not_installed")
+
+  const live = slack.tokens.findBy("appId", appId).filter((token) => !token.revoked)
+  const holders = (kind: TokenKind) => [
+    ...new Set(live.filter((token) => token.kind === kind).map((token) => token.userId)),
+  ]
+
+  for (const token of live) slack.tokens.update(token.id, { revoked: true, refreshToken: null })
+  events.appUninstalled(appId)
+  events.tokensRevoked(appId, { oauth: holders("user"), bot: holders("bot") })
+  for (const webhook of slack.webhooks.all().filter((hook) => hook.appId === appId))
+    slack.webhooks.delete(webhook.id)
+
+  const bot = slack.users.findOneBy("userId", install.botUserId)
+
+  if (bot) slack.users.update(bot.id, { deleted: true })
+  slack.installations.delete(install.id)
 }

@@ -11,8 +11,8 @@ import {
   slackId,
   stringArg,
 } from "../helpers.ts"
-import { requireChannel, requireMessage, requireUser, teamOf } from "../lookup.ts"
-import { isTopLevel, type PostingContext, repliesTo } from "../posting.ts"
+import { isExternal, requireChannel, requireMessage, requireUser, teamOf } from "../lookup.ts"
+import { isTopLevel, type PostingContext, postMessage, repliesTo } from "../posting.ts"
 
 const READ = ["channels:read", "groups:read", "im:read", "mpim:read"]
 const HISTORY = ["channels:history", "groups:history", "im:history", "mpim:history"]
@@ -125,7 +125,10 @@ function membersMethod(call: ApiCall) {
   return { members: page.items, response_metadata: { next_cursor: page.nextCursor } }
 }
 
-/** Adds `user` to `channel` and tells subscribed apps. */
+/**
+ * Adds `user` to `channel` and tells subscribed apps. A member from another workspace makes the
+ * channel shared through Slack Connect.
+ */
 export function addMember(
   context: PostingContext,
   channel: ChannelRecord,
@@ -134,11 +137,118 @@ export function addMember(
 ): ChannelRecord {
   const { slack, events } = context
   const updated =
-    slack.channels.update(channel.id, { members: [...channel.members, user] }) ?? channel
+    slack.channels.update(channel.id, {
+      members: [...channel.members, user],
+      extShared: channel.extShared || isExternal(slack, user),
+    }) ?? channel
 
   events.memberJoined(user, updated, inviter)
 
   return updated
+}
+
+/** Takes `user` out of `channel`, by their own choice or `actor`'s, and tells subscribed apps. */
+export function removeMember(
+  context: PostingContext,
+  channel: ChannelRecord,
+  user: string,
+  actor: string,
+): ChannelRecord {
+  const { slack, events } = context
+  const updated =
+    slack.channels.update(channel.id, {
+      members: channel.members.filter((member) => member !== user),
+    }) ?? channel
+
+  events.memberLeft(user, updated, actor)
+
+  return updated
+}
+
+/** Refuses to take anyone out of `#general` or a DM, and anyone out of an archived channel. */
+function canRemoveFrom(channel: ChannelRecord, generalError: string): void {
+  if (channel.kind === "im" || channel.kind === "mpim")
+    throw new SlackApiError("method_not_supported_for_channel_type")
+  if (channel.name === "general") throw new SlackApiError(generalError)
+  if (channel.archived) throw new SlackApiError("is_archived")
+}
+
+function leaveMethod(call: ApiCall) {
+  const channel = visibleChannel(call)
+  const user = call.token.userId
+
+  canRemoveFrom(channel, "cant_leave_general")
+  if (!channel.members.includes(user)) return { not_in_channel: true }
+  removeMember(call.context, channel, user, user)
+
+  return {}
+}
+
+function kickMethod(call: ApiCall) {
+  const { slack } = call.context
+  const channel = joinedChannel(call)
+  const actor = call.token.userId
+  const user = requireUser(slack, requireArg(call.args, "user", "user_not_found")).userId
+
+  canRemoveFrom(channel, "cant_kick_from_general")
+  if (user === actor) throw new SlackApiError("cant_kick_self")
+  if (!channel.members.includes(user)) throw new SlackApiError("not_in_channel")
+  removeMember(call.context, channel, user, actor)
+
+  return {}
+}
+
+/** The system message Slack posts when a channel changes visibility. */
+const CONVERT_SUBTYPE = {
+  group: "channel_convert_to_private",
+  channel: "channel_convert_to_public",
+}
+
+/**
+ * Makes a channel private (`group`) or public (`channel`), keeping its id, members and history,
+ * and posts the `channel_convert_to_*` message, which tells the apps in it. Only a workspace admin
+ * may, with a user token holding `admin.conversations:write`; `#general` stays public.
+ */
+export function convertChannel(
+  context: PostingContext,
+  channel: ChannelRecord,
+  to: "channel" | "group",
+  actor: string,
+): ChannelRecord {
+  if (channel.kind === "im" || channel.kind === "mpim")
+    throw new SlackApiError("method_not_supported_for_channel_type")
+  if (channel.name === "general") throw new SlackApiError("default_org_wide_channel")
+  if (channel.archived) throw new SlackApiError("is_archived")
+  if (channel.kind === to) throw new SlackApiError("could_not_convert_channel")
+
+  const updated = context.slack.channels.update(channel.id, { kind: to }) ?? channel
+  const visibility = to === "group" ? "private" : "public"
+
+  postMessage(
+    context,
+    updated,
+    { user: actor, botId: null, appId: null },
+    { text: `made this channel ${visibility}`, subtype: CONVERT_SUBTYPE[to] },
+  )
+
+  return updated
+}
+
+/** `admin.conversations.convertToPrivate` and `convertToPublic`, for a workspace admin. */
+function convertMethod(to: "channel" | "group") {
+  return (call: ApiCall) => {
+    const { slack } = call.context
+
+    if (call.token.kind !== "user") throw new SlackApiError("not_allowed_token_type")
+    requireScope(call.token, ["admin.conversations:write"])
+    if (!requireUser(slack, call.token.userId).isAdmin) throw new SlackApiError("not_an_admin")
+
+    const channel = requireChannel(slack, requireArg(call.args, "channel_id", "channel_not_found"))
+
+    convertChannel(call.context, channel, to, call.token.userId)
+
+    return {}
+  }
 }
 
 function joinMethod(call: ApiCall) {
@@ -178,6 +288,7 @@ function createMethod(call: ApiCall) {
     topic: "",
     purpose: "",
     archived: false,
+    extShared: false,
   })
 
   return { channel: channelObject(channel, call.token.userId) }
@@ -237,6 +348,7 @@ function openMethod(call: ApiCall) {
     topic: "",
     purpose: "",
     archived: false,
+    extShared: false,
   })
 
   return { channel: { id: channel.channelId } }
@@ -256,4 +368,11 @@ export const conversationMethods: Methods = {
   "conversations.create": { scopes: MANAGE, run: createMethod },
   "conversations.invite": { scopes: MANAGE, run: inviteMethod },
   "conversations.open": { scopes: ["im:write", "mpim:write"], run: openMethod },
+  "conversations.leave": {
+    scopes: ["channels:manage", "channels:write", "groups:write", "im:write", "mpim:write"],
+    run: leaveMethod,
+  },
+  "conversations.kick": { scopes: MANAGE, run: kickMethod },
+  "admin.conversations.convertToPrivate": { scopes: [], run: convertMethod("group") },
+  "admin.conversations.convertToPublic": { scopes: [], run: convertMethod("channel") },
 }

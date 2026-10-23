@@ -78,3 +78,13 @@ export function appOf(
     install: slack.installations.findOneBy("appId", appId),
   }
 }
+
+/** Whether member `userId` belongs to another workspace, reached through Slack Connect. */
+export function isExternal(slack: SlackStore, userId: string): boolean {
+  return (slack.users.findOneBy("userId", userId)?.teamId ?? null) !== null
+}
+
+/** The workspace member `userId` belongs to: theirs through Slack Connect, or this one. */
+export function teamIdOf(slack: SlackStore, userId: string): string {
+  return slack.users.findOneBy("userId", userId)?.teamId ?? teamOf(slack).teamId
+}

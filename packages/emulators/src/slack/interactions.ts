@@ -5,6 +5,7 @@ import type { AppRecord, ChannelRecord, MessageRecord, UserRecord, ViewRecord } 
 import { messageObject, viewObject } from "./formatters.ts"
 import { SlackApiError, secretHex } from "./helpers.ts"
 import { appOf, teamOf } from "./lookup.ts"
+import { closeViews, stackOf } from "./modals.ts"
 import { issueResponseUrl } from "./routes/webhooks.ts"
 
 /** How long a trigger id lets an app open a modal: three seconds. */
@@ -160,5 +161,30 @@ export function submitView(
     trigger_id: issueTrigger(context, app.appId, user.userId),
     view: { ...shown, state: { values } },
     response_urls: [],
+  })
+}
+
+/**
+ * Closes an open modal the way a member does with its close button: the whole stack goes. An app
+ * whose view set `notify_on_close` gets `view_closed`, with `is_cleared` when more than one view
+ * closed.
+ */
+export function closeView(context: SlackState, user: UserRecord, view: ViewRecord): void {
+  if (view.closed || view.view.type !== "modal" || view.user !== user.userId)
+    throw new SlackApiError("not_found")
+
+  const stack = stackOf(context.slack, view)
+  const app = appOf(context.slack, view.appId)
+
+  closeViews(context.slack, stack)
+  if (view.view.notify_on_close !== true || !app.app) return
+
+  context.events.interaction(app.app.appId, {
+    type: "view_closed",
+    ...people(context, user),
+    api_app_id: app.app.appId,
+    token: app.app.verificationToken,
+    view: viewObject(view, teamOf(context.slack).teamId, app.install?.botId ?? ""),
+    is_cleared: stack.length > 1,
   })
 }
