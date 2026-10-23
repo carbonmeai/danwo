@@ -7,6 +7,8 @@
 import type { ChildProcess } from "node:child_process"
 import { once } from "node:events"
 
+import type { Proxy } from "@danwo/proxy"
+
 import { spawnOwned } from "../support/children.ts"
 import { DanwoError } from "../support/codes.ts"
 import { checkRouting, noteOutsideNode, routingRefusal, unroutedProblems } from "./app-checks.ts"
@@ -413,6 +415,22 @@ function watched(app: () => StartedApp | undefined) {
 }
 
 /**
+ * How the started app goes through the proxy: the problems `checkRouting` finds (it throws when
+ * `strict`), and, for an app that runs no Node, the one-time note that the check could not run.
+ */
+async function routingNotes(
+  proxy: Proxy,
+  strict: boolean,
+  started: StartedApp | undefined,
+): Promise<string[]> {
+  const notes = await checkRouting(proxy, strict)
+
+  if (started?.pid !== undefined) await noteOutsideNode("the app", started.pid, proxy)
+
+  return notes
+}
+
+/**
  * A worker environment for any app: the services behind one proxy, the app started through it
  * (so its calls to Stripe, Resend and the rest reach the emulators with no code change), and the
  * lifecycle `danwo matrix` needs. The app keeps running between tests and matrix trials; resets
@@ -446,8 +464,7 @@ export async function appEnvironment(
   }
 
   try {
-    notes = await checkRouting(services.proxy, strict)
-    if (started?.pid !== undefined) await noteOutsideNode("the app", started.pid, services.proxy)
+    notes = await routingNotes(services.proxy, strict, started)
   } catch (error) {
     await started?.stop()
     await services.close()
