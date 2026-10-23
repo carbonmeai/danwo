@@ -14,6 +14,7 @@ import { createAgent } from "./agent/index.ts"
 import { type CheckPace, checkKey, pacedTimeout } from "./assert/pace.ts"
 import type { BaselineUpdate, ScreenshotEvent } from "./assert/screenshot.ts"
 import { type AppErrorOptions, AppErrors } from "./browser/app-errors.ts"
+import { readClipboard } from "./browser/clipboard.ts"
 import type { App } from "./browser/index.ts"
 import { type Backend, Readiness, type ReadinessMode } from "./browser/readiness.ts"
 import { Tabs } from "./browser/tabs.ts"
@@ -206,6 +207,8 @@ function appOf(
         await tabs.page.goto(new URL(path ?? "/", baseUrl).href, { timeout: page.loadTimeout })
         await page.ready()
       }),
+    url: () => tabs.page.url(),
+    clipboard: () => readClipboard(tabs.page),
   }
 }
 
@@ -324,6 +327,7 @@ export function handlesFor(shared: SharedDesk, browsing: Browsing): Handles {
   const agent = agentFor(shared, browsing, tabs, { ready, appErrors })
   const screen = createScreen({
     page: () => tabs.page,
+    baseUrl: options.baseUrl,
     tabOf: (page) => tabs.numberOf(page),
     steps,
     files: settings.files,

@@ -1,7 +1,7 @@
 /**
  * The config's `browser` key: the engine tests run in (`browser.name`), and the browser context
- * they run in: motion, colour scheme, language, time zone, window size, a site's HTTP sign-in and
- * headers sent with every request. Set once under `browser.contextOptions`, the context options
+ * they run in: motion, colour scheme, language, time zone, window size, a site's HTTP sign-in,
+ * headers sent with every request and the permissions pages are granted. Set once under `browser.contextOptions`, the context options
  * apply to every browser the run opens: each test's, each saved session's setup, each other person
  * a test opens, and the MCP server's sessions. The config is checked when it loads, since Node
  * strips its types without checking them.
@@ -29,6 +29,28 @@ function knownLocale(locale: string): boolean {
     return false
   }
 }
+
+/** The permissions Playwright can grant a browser context; each engine supports some of them. */
+const PERMISSIONS = [
+  "accelerometer",
+  "ambient-light-sensor",
+  "background-sync",
+  "camera",
+  "clipboard-read",
+  "clipboard-write",
+  "geolocation",
+  "gyroscope",
+  "local-fonts",
+  "local-network-access",
+  "magnetometer",
+  "microphone",
+  "midi",
+  "midi-sysex",
+  "notifications",
+  "payment-handler",
+  "screen-wake-lock",
+  "storage-access",
+] as const
 
 /** An HTTP header's name: a token, as RFC 9110 allows. */
 const HEADER_NAME = /^[!#$%&'*+.^`|~\w-]+$/
@@ -65,6 +87,18 @@ const contextOptions = z.strictObject({
   /** Headers sent with every request the browser makes, to every host. */
   extraHTTPHeaders: z
     .record(z.string().regex(HEADER_NAME, { message: "not a header name" }), z.string())
+    .optional(),
+  /**
+   * Browser permissions granted to every page, e.g. `["clipboard-read", "clipboard-write"]` so a
+   * page can copy and `app.clipboard()` can read what it copied. Engines support different ones:
+   * the clipboard's are Chromium's.
+   */
+  permissions: z
+    .array(
+      z.enum(PERMISSIONS, {
+        error: `not a browser permission; use one of ${PERMISSIONS.join(", ")}`,
+      }),
+    )
     .optional(),
 })
 

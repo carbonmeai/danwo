@@ -57,7 +57,7 @@ export interface LocatorAssertions {
 }
 
 /** A check that did not hold before its timeout. */
-class ExpectationFailed extends Error {
+export class ExpectationFailed extends Error {
   /** `LOCATOR_AMBIGUOUS` when the locator kept matching several elements: the test's to fix. */
   readonly code: "EXPECTATION_FAILED" | "LOCATOR_AMBIGUOUS"
 

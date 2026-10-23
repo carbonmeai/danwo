@@ -122,18 +122,18 @@ find elements by role and label instead, which also survive a markup change.
 
 ### Checking
 
-| Cypress                              | danwo                                   |
-| ------------------------------------ | --------------------------------------- |
-| `.should("be.visible")`              | `expect(locator).toBeVisible()`         |
-| `.should("not.exist")`               | `expect(locator).toHaveCount(0)`        |
-| `.should("have.text", "Paid")`       | `expect(locator).toHaveText("Paid")`    |
-| `.should("contain", "Paid")`         | `expect(locator).toContainText(…)`      |
-| `.should("have.value", "5")`         | `expect(locator).toHaveValue("5")`      |
-| `.should("have.length", 3)`          | `expect(locator).toHaveCount(3)`        |
-| `.should("be.disabled")`             | `expect(locator).toBeDisabled()`        |
-| `.should("not.be.visible")`          | `expect(locator).not.toBeVisible()`     |
-| `defaultCommandTimeout`              | `{ timeout }` on the one check          |
-| `cy.url().should("include", "/thx")` | no URL check: check what the page shows |
+| Cypress                              | danwo                                |
+| ------------------------------------ | ------------------------------------ |
+| `.should("be.visible")`              | `expect(locator).toBeVisible()`      |
+| `.should("not.exist")`               | `expect(locator).toHaveCount(0)`     |
+| `.should("have.text", "Paid")`       | `expect(locator).toHaveText("Paid")` |
+| `.should("contain", "Paid")`         | `expect(locator).toContainText(…)`   |
+| `.should("have.value", "5")`         | `expect(locator).toHaveValue("5")`   |
+| `.should("have.length", 3)`          | `expect(locator).toHaveCount(3)`     |
+| `.should("be.disabled")`             | `expect(locator).toBeDisabled()`     |
+| `.should("not.be.visible")`          | `expect(locator).not.toBeVisible()`  |
+| `defaultCommandTimeout`              | `{ timeout }` on the one check       |
+| `cy.url().should("include", "/thx")` | `expect(screen).toHaveURL(/\/thx/)`  |
 
 ### Everything else
 

@@ -29,7 +29,7 @@ Moving from another tool? [Playwright Test](/docs/playwright) keeps your Playwri
 
 | Fixture  | What it is                                                             |
 | -------- | ---------------------------------------------------------------------- |
-| `app`    | your app: `open(path)` and `baseUrl`                                   |
+| `app`    | your app: `open(path)`, `url()`, `clipboard()` and `baseUrl`           |
 | `screen` | finds elements: `getByRole`, `getByLabel`, `getByText`, `getByTestId`… |
 | `expect` | checks that wait: `toBeVisible`, `toHaveText`, `toHaveScreenshot`…     |
 | `agent`  | plain-English steps: `act`, `assert`, `extract`, `waitFor`             |
@@ -38,6 +38,45 @@ Moving from another tool? [Playwright Test](/docs/playwright) keeps your Playwri
 | `mail`   | reads the emails and codes your app sent                               |
 
 [Agent and locators](/docs/agent-and-locators) explains when to use each style.
+
+## Check the page's address
+
+`expect(screen).toHaveURL()` waits until the tab's address matches, like any other check:
+
+```ts title="tests/checkout.danwo.ts · the address"
+await screen.getByRole("button", { name: "Pay" }).click()
+await expect(screen).toHaveURL("/thanks")
+await expect(screen).toHaveURL(/\/orders\/\d+$/)
+await expect(screen).not.toHaveURL("/checkout")
+```
+
+| You pass   | It matches                                          |
+| ---------- | --------------------------------------------------- |
+| a path     | that path on `app.baseUrl`, query included, exactly |
+| a full URL | that address, exactly                               |
+| a RegExp   | any address the expression finds a match in         |
+
+`app.url()` reads the address once, without waiting. Both are for the web: a phone app has no
+address, so on a device they fail with a config error.
+
+## Read what the page copied
+
+A copy button writes to the clipboard, and `app.clipboard()` reads it back. The browser only lets
+a page do both once the config grants it the clipboard's permissions:
+
+```ts title="danwo.config.ts · the clipboard"
+browser: {
+  contextOptions: { permissions: ["clipboard-read", "clipboard-write"] },
+},
+```
+
+```ts title="tests/install.danwo.ts · the copy button"
+await screen.getByRole("button", { name: "Copy the setup command" }).click()
+expect(await app.clipboard()).toBe("npx @danwo/cli init")
+```
+
+Reading the clipboard works in Chromium. Firefox and WebKit ask the person to paste instead, so
+there `app.clipboard()` fails with a config error.
 
 ## Each test gets a fresh browser
 
@@ -71,6 +110,7 @@ browser: {
 | `viewport`         | the page's size in pixels; `null` uses the window's size        | 1280 × 720      |
 | `httpCredentials`  | a user name and password for a site behind HTTP sign-in         | none            |
 | `extraHTTPHeaders` | headers sent with every request, to every host                  | none            |
+| `permissions`      | what pages may do unasked, such as `clipboard-read`             | none            |
 
 danwo checks these when the config loads. A misspelt key or a time zone that doesn't exist fails
 the run with `CONFIG_INVALID`, naming the key.

@@ -391,12 +391,25 @@ describe("acting on a device", () => {
       () => buy.dragTo(buy),
       () => session.mail.open("a@b.c"),
       () => session.browserState(),
+      () => session.app.clipboard(),
     ]) {
       await expect(call()).rejects.toMatchObject({
         code: "CONFIG_INVALID",
         message: expect.stringMatching(/not supported on devices yet/),
       })
     }
+  })
+
+  it("says a device app has no address for app.url() or toHaveURL", async () => {
+    const session = await open(new FakeDevice())
+    const noAddress = expect.objectContaining({
+      code: "CONFIG_INVALID",
+      message: expect.stringContaining("a device app has none"),
+    })
+
+    expect(() => session.app.url()).toThrow(noAddress)
+    await expect(session.expect(session.screen).toHaveURL("/orders")).rejects.toEqual(noAddress)
+    await expect(session.expect(session.screen).not.toHaveURL("/")).rejects.toEqual(noAddress)
   })
 
   it("opens deep links through the app's scheme, and starts afresh without a path", async () => {

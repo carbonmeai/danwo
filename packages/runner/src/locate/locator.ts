@@ -46,6 +46,8 @@ export interface StepLog {
 export interface LocateContext {
   /** The page to resolve against, read at every use. */
   readonly page: () => Page
+  /** The app's base URL, which `expect(screen).toHaveURL(path)` resolves a path against. */
+  readonly baseUrl?: string
   /** Which tab `page` is, as its video is numbered, so a step records where it ran. */
   readonly tabOf?: (page: Page) => number | undefined
   readonly steps: StepLog

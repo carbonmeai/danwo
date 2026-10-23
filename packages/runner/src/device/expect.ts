@@ -136,7 +136,16 @@ async function hold(
 }
 
 /** The checks on a device locator; `negate` flips each one. */
-function deviceAssertions(locator: DeviceLocator, negate = false): LocatorAssertions {
+/**
+ * A device's checks: the locator checks, and `expect(screen).toHaveURL`, which a device app has
+ * no address for, so it fails saying so rather than as a missing function.
+ */
+interface DeviceAssertions extends LocatorAssertions {
+  readonly not: DeviceAssertions
+  toHaveURL(expected: TextMatch, options?: AssertOptions): Promise<void>
+}
+
+function deviceAssertions(locator: DeviceLocator, negate = false): DeviceAssertions {
   const check = (name: string, args: string, judge: Judge, options?: AssertOptions) => {
     const not = negate ? "not." : ""
     const call = `expect(${locator.text}).${not}${name}(${args})`
@@ -189,6 +198,13 @@ function deviceAssertions(locator: DeviceLocator, negate = false): LocatorAssert
       ),
     toHaveCSS: () => unsupported("toHaveCSS"),
     toHaveJSProperty: () => unsupported("toHaveJSProperty"),
+    toHaveURL: () =>
+      Promise.reject(
+        new DanwoError(
+          "CONFIG_INVALID",
+          "expect(screen).toHaveURL reads a browser tab's address, and a device app has none: check what the screen shows instead",
+        ),
+      ),
     toHaveScreenshot: (name, options) => {
       if (negate) throw new TypeError("expect(...).not.toHaveScreenshot is not supported")
 

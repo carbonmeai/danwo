@@ -452,6 +452,16 @@ export async function openDeviceSession(
             )
           await ready()
         }),
+      url: () => {
+        throw new DanwoError(
+          "CONFIG_INVALID",
+          "app.url() reads a browser tab's address, and a device app has none: check what the screen shows instead",
+        )
+      },
+      clipboard: () =>
+        Promise.reject(
+          new DanwoError("CONFIG_INVALID", "app.clipboard() is not supported on devices yet"),
+        ),
     },
     divergence: () => agent.diverged(),
     secret: (name) => vault.handle(name),

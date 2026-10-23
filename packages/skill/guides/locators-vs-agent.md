@@ -29,6 +29,14 @@ and so does an `expect` that found no element.
 `dataset`, compared deeply) and `toHaveScreenshot`. Each has a `.not` form except `toHaveScreenshot`,
 which throws if negated.
 
+`expect(screen).toHaveURL(expected)` (and `.not`) waits for the active tab's address like the
+locator checks: a RegExp tests the whole address, a string is resolved against `app.baseUrl`
+(`"/orders?tab=items"`, or a full URL) and must equal it, query and hash included. `app.url()`
+reads the address once without waiting. `app.clipboard()` returns the clipboard's text as the page
+reads it (what a copy button wrote); Chromium only, and only with `browser: { contextOptions: {
+permissions: ["clipboard-read", "clipboard-write"] } }` in the config, else `CONFIG_INVALID`
+naming that setting. All three are web only: on a device they fail with `CONFIG_INVALID`.
+
 `check`/`uncheck` (and the agent's check) handle a styled checkbox or radio whose invisible
 `<input>` is covered by its own `<label>`: danwo clicks the label, then fails unless the input
 changed. Every action but `press` and `setInputFiles` takes `{ force: true }`, which skips the

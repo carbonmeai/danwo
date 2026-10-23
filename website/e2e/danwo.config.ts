@@ -15,6 +15,8 @@ export default defineConfig({
   name: "website",
   testDir: "tests",
   workers: 2,
+  /* The copy buttons write to the clipboard, and the tests read it back. */
+  browser: { contextOptions: { permissions: ["clipboard-read", "clipboard-write"] } },
   async environment() {
     if (!existsSync(BUILT))
       throw new Error(`the website is not built (no ${BUILT}): run \`bun run build\` in website/`)

@@ -31,3 +31,10 @@ test("a docs page offers itself as markdown", async ({ app, screen, expect }) =>
   expect(response.headers.get("content-type")).toContain("text/markdown")
   expect(await response.text()).toMatch(/^# Quickstart/)
 })
+
+test("Copy Markdown puts the page's markdown on the clipboard", async ({ app, screen, expect }) => {
+  await app.open("/docs/quickstart")
+  await screen.getByRole("button", { name: "Copy Markdown" }).click()
+  await expect(screen.getByRole("button", { name: "Copied Markdown" })).toBeVisible()
+  expect(await app.clipboard()).toMatch(/^# Quickstart/)
+})
