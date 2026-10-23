@@ -1,5 +1,13 @@
 import type { Context } from "../../http.ts"
-import { type Caller, callerOf, findRepo, isMember, repoAccess, requireUser } from "../auth.ts"
+import {
+  accessTo,
+  type Caller,
+  callerOf,
+  findRepo,
+  isMember,
+  repoAccess,
+  requireUser,
+} from "../auth.ts"
 import type { GithubRouteContext } from "../context.ts"
 import type { GithubAccount, GithubRepoRecord } from "../entities.ts"
 import { repositoryObject } from "../formatters.ts"
@@ -20,12 +28,20 @@ import type { GithubStore } from "../store.ts"
 const seesPrivate = (caller: Extract<Caller, { kind: "user" }>) =>
   caller.app !== undefined || caller.scopes.includes("repo")
 
-function listOf(c: Context, gh: GithubStore, repos: readonly GithubRepoRecord[]): Response {
+function listOf(
+  c: Context,
+  gh: GithubStore,
+  repos: readonly GithubRepoRecord[],
+  caller: Caller,
+): Response {
   const sorted = repos.toSorted((a, b) =>
     `${a.owner}/${a.name}`.localeCompare(`${b.owner}/${b.name}`),
   )
+  const access = caller.kind === "anonymous" ? "anonymous" : "read"
 
-  return c.json(paged(c, sorted).map((repo) => repositoryObject(gh, repo)))
+  return c.json(
+    paged(c, sorted).map((repo) => repositoryObject(gh, repo, { as: "listed", access })),
+  )
 }
 
 /** The repositories of `owner` the caller may see. */
@@ -132,9 +148,11 @@ export function repoRoutes(context: GithubRouteContext): void {
   const { app } = context
 
   app.get("/repos/:owner/:repo", (c) => {
-    const { gh, repo } = repoAccess(c, context, { permission: "metadata", write: false })
+    const { gh, repo, caller } = repoAccess(c, context, { permission: "metadata", write: false })
 
-    return c.json(repositoryObject(gh, repo))
+    return c.json(
+      repositoryObject(gh, repo, { as: "full", access: accessTo(c, context, repo, caller) }),
+    )
   })
 
   app.get("/user/repos", (c) => {
@@ -152,6 +170,7 @@ export function repoRoutes(context: GithubRouteContext): void {
       c,
       gh,
       owners.flatMap((owner) => visibleRepos(gh, caller, owner)),
+      caller,
     )
   })
 
@@ -162,13 +181,16 @@ export function repoRoutes(context: GithubRouteContext): void {
       c,
       gh,
       gh.repos.findBy("owner", c.req.param("username")).filter((repo) => !repo.private),
+      callerOf(c, context),
     )
   })
 
   app.get("/orgs/:org/repos", (c) => {
     const gh = context.github()
 
-    return listOf(c, gh, visibleRepos(gh, callerOf(c, context), c.req.param("org")))
+    const caller = callerOf(c, context)
+
+    return listOf(c, gh, visibleRepos(gh, caller, c.req.param("org")), caller)
   })
 
   app.post("/user/repos", (c) => createRepo(c, context))

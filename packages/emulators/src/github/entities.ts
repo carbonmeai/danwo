@@ -80,6 +80,8 @@ interface CommitHeader {
   message: string
   author: GitPerson
   committer: GitPerson
+  /** Signed by GitHub, as the commits an app or a person makes through the contents API are. */
+  signed: boolean
 }
 
 /** A commit, with its whole tree as a map from path to blob sha. */
@@ -112,6 +114,8 @@ interface IssueState {
   state: "open" | "closed"
   stateReason: "completed" | "not_planned" | "reopened" | null
   closedAt: string | null
+  /** Who closed it last, while it is closed. */
+  closedBy: string | null
   locked: boolean
 }
 
@@ -128,6 +132,8 @@ export interface GithubCommentRecord extends InRepo {
   issueNumber: number
   body: string
   author: string
+  /** The GitHub App the comment was made through, by its id. */
+  appId: number | null
 }
 
 /** How a pull request was merged, once it was. */
@@ -218,6 +224,7 @@ interface AppIdentity {
   kind: "github-app" | "oauth-app"
   slug: string
   name: string
+  description: string | null
   owner: string
 }
 

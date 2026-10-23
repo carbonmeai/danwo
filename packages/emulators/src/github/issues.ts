@@ -77,21 +77,23 @@ export function openIssue(
     assignees: [],
     author: fields.author,
     closedAt: null,
+    closedBy: null,
     locked: false,
     isPull: fields.isPull,
     comments: 0,
   })
 }
 
-/** The fields that change when an issue is closed or reopened. */
+/** The fields that change when `by` closes or reopens an issue. */
 export function stateChange(
   issue: GithubIssueRecord,
   state: "open" | "closed",
   reason: GithubIssueRecord["stateReason"],
-  now: string,
+  change: { readonly now: string; readonly by: string },
 ): Partial<GithubIssueRecord> {
   if (state === issue.state) return {}
-  if (state === "closed") return { state, stateReason: reason ?? "completed", closedAt: now }
+  if (state === "closed")
+    return { state, stateReason: reason ?? "completed", closedAt: change.now, closedBy: change.by }
 
-  return { state, stateReason: "reopened", closedAt: null }
+  return { state, stateReason: "reopened", closedAt: null, closedBy: null }
 }

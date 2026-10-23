@@ -260,7 +260,11 @@ function userMay(
   return scoped && personMay(gh, caller.account, repo, need)
 }
 
-/** Checks an installation token against the repository and `need`. */
+/**
+ * Checks an installation token against the repository and `need`. A public repository the token
+ * does not cover is still readable, as public data is to anyone, but refuses writes as out of the
+ * integration's reach; a private one stays hidden behind a 404.
+ */
 function checkInstallation(
   gh: GithubStore,
   caller: Extract<Caller, { kind: "installation" }>,
@@ -270,7 +274,15 @@ function checkInstallation(
   const covered = installationRepos(gh, caller.installation).some((r) => r.id === repo.id)
   const limited = caller.repoIds !== null && !caller.repoIds.includes(repo.ghId)
 
-  if (!covered || limited || caller.installation.suspended) throw notFound()
+  if (caller.installation.suspended) throw notFound()
+
+  if (!covered || limited) {
+    if (repo.private) throw notFound()
+    if (need.write) throw notIntegration()
+
+    return
+  }
+
   if (!grants(caller.permissions, need)) throw notIntegration()
 }
 
@@ -314,6 +326,35 @@ function authorize(
       if (need.write) throw new GithubApiError(401, "Requires authentication")
 
       return caller
+  }
+}
+
+/**
+ * Refuses an installation token whose permissions do not cover `need`, before anything else about
+ * the request is looked at: GitHub checks a token's permissions for an endpoint first, then the
+ * request's body, then the repository.
+ */
+export function requireGrant(c: Context, context: GithubRouteContext, need: Need): void {
+  const caller = callerOf(c, context)
+
+  if (caller.kind === "installation" && !grants(caller.permissions, need)) throw notIntegration()
+}
+
+/** What the caller may do with a repository it can read, as a repository answer shows it. */
+export function accessTo(
+  c: Context,
+  context: GithubRouteContext,
+  repo: GithubRepoRecord,
+  caller: Caller,
+): "anonymous" | "read" | "push" {
+  if (caller.kind === "anonymous") return "anonymous"
+
+  try {
+    authorize(c, context, repo, { permission: "contents", write: true })
+
+    return "push"
+  } catch {
+    return "read"
   }
 }
 

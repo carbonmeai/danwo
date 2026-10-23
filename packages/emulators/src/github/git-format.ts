@@ -7,7 +7,7 @@ import type {
   GithubRepoRecord,
   GitPerson,
 } from "./entities.ts"
-import { appObject, userByLogin } from "./formatters.ts"
+import { appObject, loginForEmail, userByLogin } from "./formatters.ts"
 import { blobBytes, type FileDiff } from "./git.ts"
 import { API, ghTime, nodeId, WEB } from "./helpers.ts"
 import type { GithubStore } from "./store.ts"
@@ -23,9 +23,46 @@ function person(who: GitPerson) {
 
 /** The GitHub account a commit's email belongs to, if one does. */
 function accountFor(gh: GithubStore, email: string) {
-  const account = gh.accounts.all().find((a) => a.emails.some((e) => e.email === email))
+  const login = loginForEmail(gh, email)
 
-  return account ? userByLogin(gh, account.login) : null
+  return login === undefined ? null : userByLogin(gh, login)
+}
+
+/** A person as a git commit names them: name, address, and the time in seconds. */
+function signer(who: GitPerson): string {
+  return `${who.name} <${who.email}> ${Math.floor(Date.parse(who.date) / 1000)} +0000`
+}
+
+/** The text GitHub signs for a commit: its tree, parents, author, committer and message. */
+function signedPayload(commit: GithubCommitRecord): string {
+  return [
+    `tree ${commit.treeSha}`,
+    ...commit.parents.map((parent) => `parent ${parent}`),
+    `author ${signer(commit.author)}`,
+    `committer ${signer(commit.committer)}`,
+    "",
+    commit.message,
+  ].join("\n")
+}
+
+/** A commit's signature check: GitHub's own signature on the commits it signs, else unsigned. */
+function verificationOf(commit: GithubCommitRecord) {
+  if (!commit.signed)
+    return {
+      verified: false,
+      reason: "unsigned",
+      payload: null,
+      signature: null,
+      verified_at: null,
+    }
+
+  return {
+    verified: true,
+    reason: "valid",
+    payload: signedPayload(commit),
+    signature: `-----BEGIN PGP SIGNATURE-----\n\nemulated ${commit.sha}\n-----END PGP SIGNATURE-----\n`,
+    verified_at: ghTime(commit.committer.date),
+  }
 }
 
 /** The git-level part of a commit. */
@@ -37,13 +74,7 @@ function gitCommit(repo: GithubRepoRecord, commit: GithubCommitRecord) {
     message: commit.message,
     comment_count: 0,
     tree: { sha: commit.treeSha, url: `${repoApi(repo)}/git/trees/${commit.treeSha}` },
-    verification: {
-      verified: false,
-      reason: "unsigned",
-      payload: null,
-      signature: null,
-      verified_at: null,
-    },
+    verification: verificationOf(commit),
   }
 }
 
@@ -152,10 +183,13 @@ export function fileCommit(
   file: { readonly path: string; readonly ref: string } | null,
 ) {
   const sha = file ? commit.tree[file.path] : undefined
-  const { verification, ...git } = gitCommit(repo, commit)
+  /* A file commit's own commit has no comment count, and its content no body. */
+  const { comment_count: _count, ...git } = gitCommit(repo, commit)
+  const written = file && sha ? contentFile(gh, repo, file.path, file.ref, sha) : null
+  const { content: _body, encoding: _encoding, ...content } = written ?? {}
 
   return {
-    content: file && sha ? contentFile(gh, repo, file.path, file.ref, sha) : null,
+    content: written && content,
     commit: {
       sha: commit.sha,
       node_id: nodeId("C", commit.sha),
@@ -166,7 +200,6 @@ export function fileCommit(
         url: `${repoApi(repo)}/git/commits/${parent}`,
         html_url: `${WEB}/${fullName(repo)}/commit/${parent}`,
       })),
-      verification: { ...verification, payload: null, signature: null },
     },
   } satisfies Schemas["file-commit"]
 }
@@ -236,7 +269,7 @@ export function checkRunObject(gh: GithubStore, repo: GithubRepoRecord, run: Git
     },
     name: run.name,
     check_suite: { id: run.ghId },
-    app: app ? appObject(gh, app) : null,
+    app: app ? appObject(gh, app, true) : null,
     pull_requests: [],
   } satisfies Schemas["check-run"]
 }

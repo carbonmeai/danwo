@@ -94,6 +94,9 @@ export interface NewCommit {
   readonly parents: readonly string[]
   readonly message: string
   readonly author: GitPerson
+  /** Who committed it, when not its author: GitHub itself for a commit it signs. */
+  readonly committer?: GitPerson
+  readonly signed?: boolean
 }
 
 /** Stores a commit (not yet on any branch). */
@@ -106,7 +109,8 @@ export function writeCommit(gh: GithubStore, repoId: number, commit: NewCommit) 
     parents: [...commit.parents],
     message: commit.message,
     author: commit.author,
-    committer: commit.author,
+    committer: commit.committer ?? commit.author,
+    signed: commit.signed ?? false,
   })
 }
 
@@ -141,7 +145,11 @@ export function commitTo(
   gh: GithubStore,
   repo: GithubRepoRecord,
   branch: string,
-  change: { readonly files: FileChange; readonly message: string; readonly author: GitPerson },
+  change: {
+    readonly files: FileChange
+    readonly message: string
+    readonly author: GitPerson
+  } & Pick<NewCommit, "committer" | "signed">,
 ): Push {
   const parent = branchHead(gh, repo.id, branch)
   const commit = writeCommit(gh, repo.id, {
@@ -149,6 +157,8 @@ export function commitTo(
     parents: parent ? [parent.sha] : [],
     message: change.message,
     author: change.author,
+    ...(change.committer && { committer: change.committer }),
+    ...(change.signed !== undefined && { signed: change.signed }),
   })
 
   setRef(gh, repo.id, branchRef(branch), commit.sha)

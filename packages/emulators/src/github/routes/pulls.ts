@@ -110,7 +110,7 @@ async function createPull(c: Context, context: GithubRouteContext): Promise<Resp
 
   context.events.pull("opened", repo, { pull, issue }, actor)
 
-  return c.json(pullObject(gh, repo, pull, issue), 201)
+  return c.json(pullObject(gh, repo, pull, issue, true), 201)
 }
 
 /** The pull request a write to `…/pulls/{number}/…` names, with the request's body. */
@@ -125,7 +125,7 @@ async function writablePull(c: Context, context: GithubRouteContext, need: Need 
 function pullIssueChanges(
   found: ReturnType<typeof requirePull>,
   body: Record<string, unknown>,
-  now: string,
+  change: { readonly now: string; readonly by: string },
 ): Partial<GithubIssueRecord> {
   const state = stringField(body, "state")
   const settable = (state === "open" || state === "closed") && !found.pull.merged
@@ -133,7 +133,7 @@ function pullIssueChanges(
   return {
     ...given("title", stringField(body, "title")),
     ...("body" in body && { body: stringField(body, "body") ?? null }),
-    ...(settable && stateChange(found.issue, state, null, now)),
+    ...(settable && stateChange(found.issue, state, null, change)),
   }
 }
 
@@ -152,7 +152,9 @@ async function updatePull(c: Context, context: GithubRouteContext): Promise<Resp
   const { gh, repo, actor, found, body } = await writablePull(c, context)
   const pull = retarget(gh, repo, found.pull, stringField(body, "base"))
   const now = context.clock().toISOString()
-  const issue = gh.issues.update(found.issue.id, pullIssueChanges(found, body, now)) ?? found.issue
+  const issue =
+    gh.issues.update(found.issue.id, pullIssueChanges(found, body, { now, by: actor })) ??
+    found.issue
 
   announceUpdate(context, repo, { before: found.issue, issue, pull }, actor)
 
@@ -272,8 +274,10 @@ async function mergePull(c: Context, context: GithubRouteContext): Promise<Respo
       mergeSha: commit.sha,
     }) ?? found.pull
   const issue =
-    gh.issues.update(found.issue.id, stateChange(found.issue, "closed", "completed", now)) ??
-    found.issue
+    gh.issues.update(
+      found.issue.id,
+      stateChange(found.issue, "closed", "completed", { now, by: actor }),
+    ) ?? found.issue
 
   announcePush(
     context,

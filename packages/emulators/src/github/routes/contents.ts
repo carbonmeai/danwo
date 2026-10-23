@@ -1,9 +1,10 @@
 import type { Context } from "../../http.ts"
 import { type Caller, repoAccess } from "../auth.ts"
 import type { GithubRouteContext } from "../context.ts"
-import type { GithubCommitRecord, GithubRepoRecord, GitPerson } from "../entities.ts"
+import type { GithubCommitRecord, GithubRepoRecord } from "../entities.ts"
+import { botEmail, WEB_FLOW } from "../formatters.ts"
 import { contentFile, directoryEntry, fileCommit } from "../git-format.ts"
-import { branchHead, commitTo, resolveCommit } from "../git.ts"
+import { branchHead, commitTo, type NewCommit, resolveCommit } from "../git.ts"
 import {
   bodyOf,
   GithubApiError,
@@ -69,17 +70,29 @@ function getContents(c: Context, context: GithubRouteContext, where: Where): Res
   return c.json(entries.map((entry) => directoryEntry(gh, repo, entry, ref)))
 }
 
-/** Who a commit made through the API is by: `author` or `committer` from the body, or the caller. */
-function authorOf(body: Record<string, unknown>, actor: string, now: string): GitPerson {
+/**
+ * Who a commit made through the API is by: `author` or `committer` from the body, as given; or
+ * the caller, in which case GitHub commits it as itself and signs it.
+ */
+function authorOf(
+  gh: GithubStore,
+  body: Record<string, unknown>,
+  actor: string,
+  now: string,
+): Pick<NewCommit, "author" | "committer" | "signed"> {
   const given = [body.author, body.committer].find(
     (value): value is { name: unknown; email: unknown } =>
       typeof value === "object" && value !== null && "name" in value && "email" in value,
   )
 
   if (given && typeof given.name === "string" && typeof given.email === "string")
-    return { name: given.name, email: given.email, date: now }
+    return { author: { name: given.name, email: given.email, date: now } }
 
-  return { name: actor, email: `${actor}@users.noreply.github.com`, date: now }
+  return {
+    author: { name: actor, email: botEmail(gh, actor), date: now },
+    committer: { name: WEB_FLOW.name, email: WEB_FLOW.email, date: now },
+    signed: true,
+  }
 }
 
 /** The branch a write goes to; an empty repository starts its default branch. */
@@ -117,7 +130,7 @@ function commitChange(
   const push = commitTo(gh, repo, change.branch, {
     files: { [change.path]: change.content },
     message: stringField(change.body, "message") ?? "",
-    author: authorOf(change.body, actor, context.clock().toISOString()),
+    ...authorOf(gh, change.body, actor, context.clock().toISOString()),
   })
   const commit = push.commits[0]
 

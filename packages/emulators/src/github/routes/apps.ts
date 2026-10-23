@@ -2,7 +2,13 @@ import type { components } from "@octokit/openapi-types"
 
 import type { Context } from "../../http.ts"
 import { randomToken } from "../../oauth/tokens.ts"
-import { findRepo, installationRepos, requireApp, requireInstallation } from "../auth.ts"
+import {
+  credentialOf,
+  findRepo,
+  installationRepos,
+  requireApp,
+  requireInstallation,
+} from "../auth.ts"
 import type { GithubRouteContext } from "../context.ts"
 import type { GithubAppRecord, GithubInstallationRecord, GithubRepoRecord } from "../entities.ts"
 import { appObject, installationObject, repositoryObject } from "../formatters.ts"
@@ -89,7 +95,11 @@ async function createToken(c: Context, context: GithubRouteContext): Promise<Res
       expires_at: ghTime(expiresAt),
       permissions,
       repository_selection: repos ? "selected" : installation.repositorySelection,
-      ...(repos && { repositories: repos.map((repo) => repositoryObject(gh, repo)) }),
+      ...(repos && {
+        repositories: repos.map((repo) =>
+          repositoryObject(gh, repo, { as: "nested", access: "push" }),
+        ),
+      }),
     } satisfies Schemas["installation-token"],
     201,
   )
@@ -154,8 +164,22 @@ export function appRoutes(context: GithubRouteContext): void {
     return c.json({
       total_count: repos.length,
       repository_selection: caller.installation.repositorySelection,
-      repositories: paged(c, repos).map((repo) => repositoryObject(gh, repo)),
+      repositories: paged(c, repos).map((repo) =>
+        repositoryObject(gh, repo, { as: "listed", access: "read" }),
+      ),
     })
+  })
+
+  app.delete("/installation/token", (c) => {
+    const gh = context.github()
+
+    requireInstallation(c, context)
+
+    const token = gh.installationTokens.findOneBy("token", credentialOf(c) ?? "")
+
+    if (token) gh.installationTokens.delete(token.id)
+
+    return c.body(null, 204)
   })
 
   app.get("/repos/:owner/:repo/installation", (c) => {

@@ -86,8 +86,26 @@ function outputOf(body: Record<string, unknown>) {
   }
 }
 
+/**
+ * Refuses a `status` or `conclusion` GitHub does not know, as its request schema does: a 422 that
+ * names the field, with no `errors` list.
+ */
+function checkEnum(body: Record<string, unknown>, field: string, values: readonly string[]): void {
+  const value = body[field]
+
+  if (value === undefined || value === null || values.some((known) => known === value)) return
+
+  throw new GithubApiError(
+    422,
+    `Invalid request.\n\nFor 'properties/${field}', ${JSON.stringify(value)} is not a member of ${JSON.stringify(values)}.`,
+  )
+}
+
 /** Status, conclusion and times from a request: a conclusion completes the run. */
 function progressOf(body: Record<string, unknown>, now: string): Partial<GithubCheckRunRecord> {
+  checkEnum(body, "status", STATUSES)
+  checkEnum(body, "conclusion", CONCLUSIONS)
+
   const conclusion = oneOf(CONCLUSIONS, body.conclusion)
   const status = conclusion ? "completed" : oneOf(STATUSES, body.status)
 

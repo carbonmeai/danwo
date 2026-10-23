@@ -1,8 +1,8 @@
 import type { Context } from "../../http.ts"
-import { repoAccess } from "../auth.ts"
+import { repoAccess, requireGrant } from "../auth.ts"
 import type { GithubRouteContext } from "../context.ts"
 import type { GithubIssueRecord, GithubRepoRecord } from "../entities.ts"
-import { bodyOf, given, paged, stringField, stringsField } from "../helpers.ts"
+import { bodyOf, GithubApiError, given, paged, stringField, stringsField } from "../helpers.ts"
 import { issueObject, labelObject } from "../issue-format.ts"
 import { ensureLabels, openIssue, requireIssue, stateChange } from "../issues.ts"
 import type { GithubStore } from "../store.ts"
@@ -65,11 +65,22 @@ function announceLabels(
     context.events.issue("unlabeled", repo, issue, actor, label)
 }
 
+/**
+ * Opens an issue. A token without the issues permission is refused first; then a body without a
+ * title, as GitHub validates the request before it looks at the repository.
+ */
 async function createIssue(c: Context, context: GithubRouteContext): Promise<Response> {
-  const { gh, repo, actor } = repoAccess(c, context, WRITE)
+  requireGrant(c, context, WRITE)
+
   const body = await bodyOf(c)
+  const title = stringField(body, "title")
+
+  if (title === undefined)
+    throw new GithubApiError(422, 'Invalid request.\n\n"title" wasn\'t supplied.')
+
+  const { gh, repo, actor } = repoAccess(c, context, WRITE)
   const issue = openIssue(gh, context.store, repo, {
-    title: stringField(body, "title") ?? "",
+    title,
     body: stringField(body, "body") ?? null,
     author: actor,
     isPull: false,
@@ -90,8 +101,9 @@ function issueChanges(
   context: GithubRouteContext,
   repo: GithubRepoRecord,
   issue: GithubIssueRecord,
-  body: Record<string, unknown>,
+  request: { readonly body: Record<string, unknown>; readonly actor: string },
 ): Partial<GithubIssueRecord> {
+  const { body, actor } = request
   const state = stringField(body, "state")
   const labels = stringsField(body, "labels")
   const reason = stringField(body, "state_reason")
@@ -102,19 +114,17 @@ function issueChanges(
     ...(labels && { labels: ensureLabels(gh, context.store, repo, labels) }),
     ...given("assignees", stringsField(body, "assignees")),
     ...((state === "open" || state === "closed") &&
-      stateChange(
-        issue,
-        state,
-        reason === "not_planned" ? "not_planned" : null,
-        context.clock().toISOString(),
-      )),
+      stateChange(issue, state, reason === "not_planned" ? "not_planned" : null, {
+        now: context.clock().toISOString(),
+        by: actor,
+      })),
   }
 }
 
 async function updateIssue(c: Context, context: GithubRouteContext): Promise<Response> {
   const { gh, repo, actor } = repoAccess(c, context, WRITE)
   const issue = requireIssue(gh, repo, Number(c.req.param("number")))
-  const changes = issueChanges(gh, context, repo, issue, await bodyOf(c))
+  const changes = issueChanges(gh, context, repo, issue, { body: await bodyOf(c), actor })
   const updated = gh.issues.update(issue.id, changes) ?? issue
 
   if (changes.title !== undefined || changes.body !== undefined)

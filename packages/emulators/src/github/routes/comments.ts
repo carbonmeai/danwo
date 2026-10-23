@@ -1,5 +1,5 @@
 import type { Context } from "../../http.ts"
-import { repoAccess } from "../auth.ts"
+import { type Caller, repoAccess } from "../auth.ts"
 import type { GithubRouteContext } from "../context.ts"
 import type { GithubCommentRecord, GithubRepoRecord } from "../entities.ts"
 import {
@@ -27,6 +27,13 @@ function requireComment(gh: GithubStore, repo: GithubRepoRecord, id: number) {
   return { comment, issue: requireIssue(gh, repo, comment.issueNumber) }
 }
 
+/** The GitHub App a caller acts through: an installation's, or a GitHub App user token's. */
+function appThrough(caller: Caller): number | null {
+  if (caller.kind === "installation") return caller.installation.appId
+
+  return caller.kind === "user" && caller.app ? caller.app.ghId : null
+}
+
 /** A comment's text from a request body: `body` is required and may not be empty. */
 async function commentText(c: Context): Promise<string> {
   const text = stringField(await bodyOf(c), "body")
@@ -37,7 +44,7 @@ async function commentText(c: Context): Promise<string> {
 }
 
 async function createComment(c: Context, context: GithubRouteContext): Promise<Response> {
-  const { gh, repo, actor } = repoAccess(c, context, WRITE)
+  const { gh, repo, caller, actor } = repoAccess(c, context, WRITE)
   const issue = requireIssue(gh, repo, Number(c.req.param("number")))
 
   if (issue.locked)
@@ -49,12 +56,13 @@ async function createComment(c: Context, context: GithubRouteContext): Promise<R
     issueNumber: issue.number,
     body: await commentText(c),
     author: actor,
+    appId: appThrough(caller),
   })
   const counted = gh.issues.update(issue.id, { comments: issue.comments + 1 }) ?? issue
 
   context.events.comment("created", repo, { issue: counted, comment }, actor)
 
-  return c.json(commentObject(gh, repo, comment), 201)
+  return c.json(commentObject(gh, repo, comment, true), 201)
 }
 
 async function updateComment(c: Context, context: GithubRouteContext): Promise<Response> {

@@ -32,6 +32,7 @@ export type GithubSeedOrg = { readonly login: string } & Maybe<{
 export type GithubSeedRepo = { readonly repo: string } & Maybe<{
   private: boolean
   description: string
+  homepage: string
   defaultBranch: string
   files: Readonly<Record<string, string>>
   topics: readonly string[]
@@ -57,6 +58,7 @@ export type GithubSeedApp = SeedClient &
   Readonly<Pick<GithubAppRecord, "slug" | "owner">> &
   Maybe<{
     id: number
+    description: string
     privateKey: string
     webhookUrl: string
     webhookSecret: string
@@ -144,7 +146,7 @@ function seedRepo(store: Store, seed: GithubSeedRepo): void {
     name,
     private: seed.private ?? false,
     description: seed.description ?? null,
-    homepage: null,
+    homepage: seed.homepage ?? null,
     defaultBranch: seed.defaultBranch ?? "main",
     archived: false,
     topics: [...(seed.topics ?? [])],
@@ -190,6 +192,7 @@ function seedApp(store: Store, seed: GithubSeedApp): void {
     kind: "github-app",
     slug: seed.slug,
     name: seed.name,
+    description: seed.description ?? null,
     owner: seed.owner,
     clientId: seed.clientId,
     clientSecret: seed.clientSecret,
@@ -209,6 +212,7 @@ function seedOAuthApp(store: Store, seed: GithubSeedOAuthApp): void {
     kind: "oauth-app",
     slug: seed.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
     name: seed.name,
+    description: null,
     owner: seed.owner ?? "",
     clientId: seed.clientId,
     clientSecret: seed.clientSecret,

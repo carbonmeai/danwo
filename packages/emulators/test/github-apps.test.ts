@@ -111,7 +111,7 @@ describe("GitHub Apps", () => {
     ).toBe(BOT.slug)
   })
 
-  it("acts through an installation token only on the installation's repositories, with its permissions", async () => {
+  it("writes through an installation token only to the installation's repositories, with its permissions, and reads public ones", async () => {
     const emulator = githubWith()
     const bot = asBot(emulator, INSTALLATION_ID)
     const { data: comment } = await bot.rest.issues.create({
@@ -127,8 +127,14 @@ describe("GitHub Apps", () => {
       ),
     ).toEqual(["acme/widgets"])
     expect(
-      await refusal(bot.rest.issues.create({ owner: "ada", repo: "notes", title: "x" })),
+      await refusal(bot.rest.issues.create({ owner: "acme", repo: "secret", title: "x" })),
     ).toMatchObject({ status: 404 })
+    expect((await bot.rest.repos.get({ owner: "ada", repo: "notes" })).data.full_name).toBe(
+      "ada/notes",
+    )
+    expect(
+      await refusal(bot.rest.issues.create({ owner: "ada", repo: "notes", title: "x" })),
+    ).toEqual({ status: 403, message: "Resource not accessible by integration" })
     expect(
       await refusal(
         bot.rest.repos.createOrUpdateFileContents({
@@ -240,6 +246,37 @@ describe("GitHub Apps", () => {
         }),
       ),
     ).toEqual({ status: 403, message: "You must authenticate via a GitHub App." })
+  })
+
+  it("refuses a check run status or conclusion GitHub does not know, and creates nothing", async () => {
+    const emulator = githubWith()
+    const bot = asBot(emulator, INSTALLATION_ID)
+    const head = (await bot.rest.repos.getBranch({ ...widgets, branch: "main" })).data.commit.sha
+    const create = (fields: Record<string, string>) =>
+      bot.request("POST /repos/{owner}/{repo}/check-runs", {
+        ...widgets,
+        name: "danwo",
+        head_sha: head,
+        ...fields,
+      })
+
+    expect((await refusal(create({ conclusion: "bogus" }))).status).toBe(422)
+    expect((await refusal(create({ status: "running" }))).message).toContain("properties/status")
+    expect(githubRepo(emulator, "acme/widgets").checkRuns(head)).toEqual([])
+  })
+
+  it("revokes an installation token, which then reads as bad credentials", async () => {
+    const emulator = githubWith()
+    const { data: token } = await asBot(emulator).rest.apps.createInstallationAccessToken({
+      installation_id: INSTALLATION_ID,
+    })
+    const installation = octokitFor(emulator, token.token)
+
+    expect((await installation.rest.apps.revokeInstallationAccessToken()).status).toBe(204)
+    expect(await refusal(installation.rest.issues.listForRepo(widgets))).toEqual({
+      status: 401,
+      message: "Bad credentials",
+    })
   })
 
   it("sends installation webhooks when the app is installed and removed", async () => {

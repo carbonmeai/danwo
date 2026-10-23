@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto"
+
 import type { components } from "@octokit/openapi-types"
 
 import type {
@@ -8,7 +10,7 @@ import type {
   GithubRepoRecord,
   GithubReviewRecord,
 } from "./entities.ts"
-import { repositoryObject, userByLogin } from "./formatters.ts"
+import { appObject, repositoryObject, userByLogin } from "./formatters.ts"
 import { branchHead, diffTrees, history, mergeBase } from "./git.ts"
 import { API, ghTime, inRepo, nodeId, WEB } from "./helpers.ts"
 import type { GithubStore } from "./store.ts"
@@ -23,8 +25,9 @@ function association(repo: GithubRepoRecord, login: string) {
   return repo.owner === login ? "OWNER" : "NONE"
 }
 
+/** A label, with the archive fields GitHub answers with though its schema does not list them yet. */
 export function labelObject(repo: GithubRepoRecord, label: GithubLabelRecord) {
-  return {
+  const shown = {
     id: label.ghId,
     node_id: nodeId("LA", label.ghId),
     url: `${repoApi(repo)}/labels/${encodeURIComponent(label.name)}`,
@@ -33,6 +36,8 @@ export function labelObject(repo: GithubRepoRecord, label: GithubLabelRecord) {
     color: label.color,
     default: false,
   } satisfies Schemas["label"]
+
+  return { ...shown, archived_at: null, archived_by: null }
 }
 
 /** An issue's labels, in the order they were added; unknown names are skipped. */
@@ -91,10 +96,21 @@ export function issueObject(gh: GithubStore, repo: GithubRepoRecord, issue: Gith
     closed_at: issue.closedAt && ghTime(issue.closedAt),
     created_at: ghTime(issue.created_at),
     updated_at: ghTime(issue.updated_at),
-    closed_by: null,
+    closed_by: issue.closedBy === null ? null : userByLogin(gh, issue.closedBy),
     author_association: association(repo, issue.author),
     performed_via_github_app: null,
     reactions: reactions(`${url}/reactions`),
+    timeline_url: `${url}/timeline`,
+    type: null,
+    issue_field_values: [],
+    sub_issues_summary: { total: 0, completed: 0, percent_completed: 0 },
+    issue_dependencies_summary: {
+      blocked_by: 0,
+      total_blocked_by: 0,
+      blocking: 0,
+      total_blocking: 0,
+    },
+    pinned_comment: null,
   } satisfies Schemas["issue"]
 }
 
@@ -113,10 +129,27 @@ function reactions(url: string) {
   }
 }
 
+/** The App a comment was made through, as the comment shows it: without its client id when new. */
+function commentApp(gh: GithubStore, appId: number | null, created: boolean) {
+  const app = appId === null ? undefined : gh.apps.findOneBy("ghId", appId)
+
+  if (!app) return null
+
+  const { client_id: _clientId, ...shown } = appObject(gh, app, true)
+
+  return created ? shown : { ...shown, client_id: app.clientId }
+}
+
+/**
+ * An issue or pull request comment, with the GitHub App it was made through. `pin` is shown on an
+ * issue's comments, and on a pull request's only in the answer that creates one; the answer that
+ * creates one also leaves the App's client id out, as GitHub does.
+ */
 export function commentObject(
   gh: GithubStore,
   repo: GithubRepoRecord,
   comment: GithubCommentRecord,
+  created = false,
 ) {
   const issue = inRepo(gh.issues, repo.id, (row) => row.number === comment.issueNumber)
   const kind = issue?.isPull ? "pull" : "issues"
@@ -132,8 +165,10 @@ export function commentObject(
     created_at: ghTime(comment.created_at),
     updated_at: ghTime(comment.updated_at),
     author_association: association(repo, comment.author),
-    performed_via_github_app: null,
+    performed_via_github_app: commentApp(gh, comment.appId, created),
     reactions: reactions(`${repoApi(repo)}/issues/comments/${comment.ghId}/reactions`),
+    minimized: null,
+    ...((created || !issue?.isPull) && { pin: null }),
   } satisfies Schemas["issue-comment"]
 }
 
@@ -144,7 +179,7 @@ function pullEnd(gh: GithubStore, repo: GithubRepoRecord, branch: string, sha: s
     ref: branch,
     sha,
     user: userByLogin(gh, repo.owner),
-    repo: repositoryObject(gh, repo),
+    repo: repositoryObject(gh, repo, { as: "nested", access: "push" }),
   }
 }
 
@@ -197,16 +232,51 @@ function pullCounts(gh: GithubStore, repo: GithubRepoRecord, pull: GithubPullRec
   }
 }
 
-/** A pull request as `GET /repos/{owner}/{repo}/pulls/{number}` shows it. */
+/**
+ * Whether a pull request merges, and the commit GitHub made to test it, by its sha: unknown in the
+ * answer that opens it, worked out in every later one.
+ */
+function mergeability(
+  pull: GithubPullRecord,
+  issue: GithubIssueRecord,
+  ends: { readonly head: string; readonly base: string; readonly opened: boolean },
+) {
+  if (ends.opened)
+    return { mergeable: null, rebaseable: null, mergeable_state: "unknown", merge_commit_sha: null }
+
+  const mergeable = !pull.merged && issue.state === "open"
+  const testMerge = createHash("sha1")
+    .update(`test-merge ${pull.ghId} ${ends.head} ${ends.base}`)
+    .digest("hex")
+
+  return {
+    mergeable,
+    rebaseable: mergeable,
+    mergeable_state: pull.merged ? "unknown" : "clean",
+    merge_commit_sha: pull.mergeSha ?? testMerge,
+  }
+}
+
+/**
+ * A pull request as `GET /repos/{owner}/{repo}/pulls/{number}` shows it. The answer that opens one
+ * comes before GitHub has worked out whether it merges: `mergeable` and `rebaseable` are null and
+ * there is no test merge commit yet; every later answer has them.
+ */
 export function pullObject(
   gh: GithubStore,
   repo: GithubRepoRecord,
   pull: GithubPullRecord,
   issue: GithubIssueRecord,
+  opened = false,
 ) {
   const { head_sha, stats } = pullCounts(gh, repo, pull)
   const base = branchHead(gh, repo.id, pull.base)
   const shown = issueObject(gh, repo, issue)
+  const merges = mergeability(pull, issue, {
+    head: head_sha,
+    base: base?.sha ?? pull.baseSha,
+    opened,
+  })
 
   return {
     ...pullLinks(repo, pull.number, pull.mergedAt),
@@ -225,7 +295,7 @@ export function pullObject(
     created_at: shown.created_at,
     updated_at: shown.updated_at,
     closed_at: shown.closed_at,
-    merge_commit_sha: pull.mergeSha,
+    merge_commit_sha: merges.merge_commit_sha,
     assignee: shown.assignee,
     assignees: shown.assignees,
     requested_reviewers: [],
@@ -237,9 +307,9 @@ export function pullObject(
     auto_merge: null,
     draft: pull.draft,
     merged: pull.merged,
-    mergeable: !pull.merged && issue.state === "open",
-    rebaseable: !pull.merged && issue.state === "open",
-    mergeable_state: pull.merged ? "unknown" : "clean",
+    mergeable: merges.mergeable,
+    rebaseable: merges.rebaseable,
+    mergeable_state: merges.mergeable_state,
     merged_by: pull.mergedBy === null ? null : userByLogin(gh, pull.mergedBy),
     comments: issue.comments,
     review_comments: 0,

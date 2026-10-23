@@ -63,7 +63,38 @@ export function userByLogin(gh: GithubStore, login: string) {
 
   const app = gh.apps.all().find((candidate) => `${candidate.slug}[bot]` === login)
 
-  return app ? accountShape(login, botId(app), "Bot") : accountShape("ghost", 10_137, "User")
+  if (app) return accountShape(login, botId(app), "Bot")
+
+  return login === WEB_FLOW.login
+    ? accountShape(WEB_FLOW.login, WEB_FLOW.id, "User")
+    : accountShape("ghost", 10_137, "User")
+}
+
+/** The account GitHub commits as when it signs a commit made through the API. */
+export const WEB_FLOW = {
+  login: "web-flow",
+  id: 19_864_447,
+  name: "GitHub",
+  email: "noreply@github.com",
+} as const
+
+/** The address an app's bot account commits with: `<id>+<slug>[bot]@users.noreply.github.com`. */
+export function botEmail(gh: GithubStore, login: string): string {
+  const app = gh.apps.all().find((candidate) => `${candidate.slug}[bot]` === login)
+
+  return app
+    ? `${botId(app)}+${login}@users.noreply.github.com`
+    : `${login}@users.noreply.github.com`
+}
+
+/** The login an address belongs to: a person's, an app bot's, or GitHub's own; else none. */
+export function loginForEmail(gh: GithubStore, email: string): string | undefined {
+  const account = gh.accounts.all().find((a) => a.emails.some((e) => e.email === email))
+
+  if (account) return account.login
+  if (email === WEB_FLOW.email) return WEB_FLOW.login
+
+  return /^\d+\+(.+\[bot\])@users\.noreply\.github\.com$/.exec(email)?.[1]
 }
 
 function primaryEmail(account: GithubAccount): string | null {
@@ -169,13 +200,76 @@ function repoSettings(repo: GithubRepoRecord) {
     open_issues: 0,
     watchers: 0,
     default_branch: repo.defaultBranch,
-    network_count: 0,
-    subscribers_count: 0,
   }
 }
 
-/** A repository, as `GET /repos/{owner}/{repo}` and the repository lists show it. */
-export function repositoryObject(gh: GithubStore, repo: GithubRepoRecord) {
+/** The merge settings a repository shows to callers who may push to it. */
+const MERGE_SETTINGS = {
+  allow_squash_merge: true,
+  allow_merge_commit: true,
+  allow_rebase_merge: true,
+  allow_auto_merge: false,
+  delete_branch_on_merge: false,
+  allow_update_branch: false,
+  use_squash_pr_title_as_default: false,
+  squash_merge_commit_message: "COMMIT_MESSAGES",
+  squash_merge_commit_title: "COMMIT_OR_PR_TITLE",
+  merge_commit_message: "PR_TITLE",
+  merge_commit_title: "MERGE_MESSAGE",
+} satisfies Partial<Schemas["full-repository"]>
+
+/**
+ * Where a repository is shown, and what the caller may do with it:
+ * - `full`, as `GET /repos/{owner}/{repo}` answers: with its network and subscriber counts, its
+ *   organisation and custom properties when an organisation owns it, the caller's permissions and
+ *   a clone token when the caller is signed in, and the merge settings when the caller may push;
+ * - `listed`, as a list of repositories shows each: the caller's permissions, and custom properties
+ *   for an organisation's repository;
+ * - `nested`, inside another object such as an installation token or a pull request's head: none
+ *   of those.
+ */
+export interface RepoView {
+  readonly as: "full" | "listed" | "nested"
+  readonly access: "anonymous" | "read" | "push"
+}
+
+/** How a repository is shown where nothing says otherwise: in full, to someone who may push. */
+const FULL_PUSH: RepoView = { as: "full", access: "push" }
+
+/** What an organisation's repository adds: its custom properties, and in full the organisation. */
+function orgFields(gh: GithubStore, repo: GithubRepoRecord, view: RepoView) {
+  const owner = gh.accounts.findOneBy("login", repo.owner)
+
+  if (owner?.type !== "Organization" || view.as === "nested") return {}
+
+  return {
+    custom_properties: {},
+    ...(view.as === "full" && { organization: simpleUser(owner) }),
+  } satisfies Partial<Schemas["full-repository"]>
+}
+
+/** What a signed-in caller sees: their permissions, and in full a clone token and the counts. */
+function callerFields(view: RepoView) {
+  const signedIn = view.access !== "anonymous"
+  const full = view.as === "full"
+
+  return {
+    ...(signedIn &&
+      view.as !== "nested" && {
+        permissions: { admin: true, maintain: true, push: true, triage: true, pull: true },
+      }),
+    ...(signedIn && full && { temp_clone_token: "" }),
+    ...(full && view.access === "push" && MERGE_SETTINGS),
+    ...(full && { network_count: 0, subscribers_count: 0 }),
+  } satisfies Partial<Schemas["full-repository"]>
+}
+
+/** A repository, shown as `view` says: in full, in a list, or nested in another object. */
+export function repositoryObject(
+  gh: GithubStore,
+  repo: GithubRepoRecord,
+  view: RepoView = FULL_PUSH,
+) {
   const fullName = `${repo.owner}/${repo.name}`
 
   return {
@@ -192,28 +286,35 @@ export function repositoryObject(gh: GithubStore, repo: GithubRepoRecord) {
     pushed_at: ghTime(repo.updated_at),
     created_at: ghTime(repo.created_at),
     updated_at: ghTime(repo.updated_at),
-    permissions: { admin: true, maintain: true, push: true, triage: true, pull: true },
-  } satisfies Schemas["full-repository"]
+    ...callerFields(view),
+    ...orgFields(gh, repo, view),
+  } satisfies Partial<Schemas["full-repository"]>
 }
 
-/** A GitHub App as `GET /app` shows it. */
-export function appObject(gh: GithubStore, app: GithubAppRecord) {
-  return {
+/**
+ * A GitHub App as `GET /app` shows it, with how many installations it has; nested in a check run
+ * or a comment it was made through, the count is left out.
+ */
+export function appObject(gh: GithubStore, app: GithubAppRecord, nested = false) {
+  const shown = {
     id: app.ghId,
     slug: app.slug,
     node_id: nodeId("A", app.ghId),
     client_id: app.clientId,
     owner: userByLogin(gh, app.owner),
     name: app.name,
-    description: null,
+    description: app.description,
     external_url: `${WEB}/apps/${app.slug}`,
     html_url: `${WEB}/apps/${app.slug}`,
     created_at: ghTime(app.created_at),
     updated_at: ghTime(app.updated_at),
     permissions: app.permissions,
     events: app.events,
-    installations_count: gh.installations.findBy("appId", app.ghId).length,
   } satisfies Schemas["integration"]
+
+  return nested
+    ? shown
+    : { ...shown, installations_count: gh.installations.findBy("appId", app.ghId).length }
 }
 
 /** An installation of an app on an account. */
@@ -223,6 +324,7 @@ export function installationObject(gh: GithubStore, installation: GithubInstalla
 
   return {
     id: installation.ghId,
+    client_id: app?.clientId ?? "",
     account,
     repository_selection: installation.repositorySelection,
     access_tokens_url: `${API}/app/installations/${installation.ghId}/access_tokens`,
@@ -237,6 +339,8 @@ export function installationObject(gh: GithubStore, installation: GithubInstalla
     created_at: ghTime(installation.created_at),
     updated_at: ghTime(installation.updated_at),
     single_file_name: null,
+    has_multiple_single_files: false,
+    single_file_paths: [],
     suspended_by: null,
     suspended_at: null,
   } satisfies Schemas["installation"]
