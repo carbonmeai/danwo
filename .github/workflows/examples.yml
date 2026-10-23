@@ -6,7 +6,8 @@ name: Examples
 # requests that change an example. Every example whose `example.json` says `"install": "npm"` is
 # picked up, so a new example needs no change here, unless it says `"ci": false`: the native apps
 # need a Simulator or an emulator, which these runners lack, and run in the slow tests instead
-# (`packages/cli/test/native.slow.test.ts`). The ruleset requires `examples gate` alone.
+# (`packages/cli/test/native.slow.test.ts`). An app in another language adds `"toolchain"` there,
+# and the job sets that toolchain up too. The ruleset requires `examples gate` alone.
 on:
   schedule:
     - cron: "23 3 * * *"
@@ -71,6 +72,22 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
+      # An app in another language names its toolchain in example.json (`"toolchain": "python"` or
+      # `"go"`); it is set up beside Node, as the example's README asks of a user.
+      - id: toolchain
+        run: echo "name=$(jq -r '.toolchain // ""' "examples/$EXAMPLE/example.json")" >> "$GITHUB_OUTPUT"
+      # uv, which installs the Python the example's .python-version names when its tests start.
+      - if: ${{ steps.toolchain.outputs.name == 'python' }}
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          working-directory: examples/${{ matrix.example }}
+          enable-cache: true
+          cache-dependency-glob: examples/${{ matrix.example }}/uv.lock
+      - if: ${{ steps.toolchain.outputs.name == 'go' }}
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: examples/${{ matrix.example }}/go.mod
+          cache-dependency-path: examples/${{ matrix.example }}/go.sum
       # Where the installed copy goes: outside the checkout, as a user's project would be.
       - run: echo "INSTALLED=$RUNNER_TEMP/$EXAMPLE" >> "$GITHUB_ENV"
       # The version the example pins; the tarballs are built at it from this commit.
