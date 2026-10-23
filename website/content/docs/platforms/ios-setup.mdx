@@ -66,7 +66,8 @@ ok    simulators: danwo creates "danwo iPhone" (iPhone 17 Pro, iOS 26.5) on firs
 ok    CocoaPods: 1.17.0
 ```
 
-Without `--platform`, the doctor checks Android and iOS, and passes when either is ready.
+Without `--platform`, the doctor checks Android and iOS, and passes when either is ready. In a
+project whose config calls `withIosDevice`, `npx @danwo/cli doctor` runs the iOS checks too.
 
 ## How the network is bound
 

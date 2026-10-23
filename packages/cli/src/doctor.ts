@@ -2,11 +2,13 @@
  * `danwo doctor`: what stops a first run, checked before one. Node, danwo's own Chromium (and
  * the config's other browsers, when `browser.name` names Firefox or WebKit), the config (loading, and keys danwo does not know), the model's key (or, for a model on a coding CLI, the CLI's install and sign-in), the installed Playwright Test
  * against `@danwo/playwright`'s range, and whether the coding agents' copy of the skill is this
- * danwo's. Android has its own: `danwo device doctor`.
+ * danwo's. A config that runs its tests on devices (`withIosDevice`, `buildAndroid` and the other
+ * `@danwo/mobile` helpers) gets `danwo device doctor`'s checks for each platform it runs on, and
+ * Flutter's for a Flutter app.
  */
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { createRequire } from "node:module"
-import { join } from "node:path"
+import { dirname, join, resolve } from "node:path"
 
 import { DANWO_VERSION } from "@danwo/init/catalog"
 import {
@@ -25,6 +27,9 @@ export interface DoctorCheck {
   readonly detail: string
 }
 
+/** A platform a mobile config runs its tests on. */
+export type MobilePlatform = "android" | "ios"
+
 /** What the checks read from the machine; replaced in tests. */
 export interface DoctorProbes {
   readonly nodeVersion: string
@@ -33,6 +38,10 @@ export interface DoctorProbes {
   readonly browser: (
     engine: BrowserName,
   ) => Promise<{ readonly ok: boolean; readonly detail: string }>
+  /** `danwo device doctor`'s checks for one platform, for a config that runs on devices. */
+  readonly device: (platform: MobilePlatform) => Promise<readonly DoctorCheck[]>
+  /** Flutter's check, for a project with a `pubspec.yaml`. */
+  readonly flutter: () => Promise<readonly DoctorCheck[]>
 }
 
 /** The oldest Playwright Test `@danwo/playwright` takes. */
@@ -140,7 +149,7 @@ async function configChecks(
   cwd: string,
   explicit: string | undefined,
   env: NodeJS.ProcessEnv,
-): Promise<{ checks: DoctorCheck[]; root: string; config?: DanwoConfig }> {
+): Promise<{ checks: DoctorCheck[]; root: string; config?: DanwoConfig; path?: string }> {
   try {
     const loaded = await loadConfig(cwd, explicit)
 
@@ -165,6 +174,7 @@ async function configChecks(
     return {
       root: loaded.root,
       config: loaded.config,
+      path: resolve(cwd, loaded.path),
       checks: [
         { name: "config", status: "ok", detail: loaded.path },
         ...keys,
@@ -228,6 +238,95 @@ function skillChecks(root: string): DoctorCheck[] {
   })
 }
 
+/** The `@danwo/mobile` helpers that put a config's tests on each platform's devices. */
+const DEVICE_HELPERS: Readonly<Record<MobilePlatform, RegExp>> = {
+  ios: /\b(withIosDevice|buildIos|useSimulator|iosDevice)\b/,
+  android: /\b(withAndroidDevice|buildAndroid|useEmulator|androidDevice)\b/,
+}
+
+const TITLES: Readonly<Record<MobilePlatform, string>> = { ios: "iOS", android: "Android" }
+
+/** A file's text, or nothing when it cannot be read. */
+function textOf(file: string): string {
+  try {
+    return readFileSync(file, "utf8")
+  } catch {
+    return ""
+  }
+}
+
+/**
+ * The platforms a config runs on, from the device helpers its source calls: the config file's own,
+ * and the local modules it imports, such as a `tests/stack/device.ts` holding the binding.
+ */
+function mobilePlatformsOf(configFile: string): MobilePlatform[] {
+  const own = textOf(configFile)
+  const imported = [...own.matchAll(/from\s+["'](\.{1,2}\/[^"']+)["']/g)].map((match) =>
+    textOf(resolve(dirname(configFile), match[1] ?? "")),
+  )
+  const source = [own, ...imported].join("\n")
+
+  return (["ios", "android"] as const).filter((platform) => DEVICE_HELPERS[platform].test(source))
+}
+
+/** Whether the project holds a Flutter app: a `pubspec.yaml` at its root or one folder down. */
+function hasFlutterApp(root: string): boolean {
+  if (existsSync(join(root, "pubspec.yaml"))) return true
+
+  try {
+    return readdirSync(root, { withFileTypes: true }).some(
+      (entry) =>
+        entry.isDirectory() &&
+        !entry.name.startsWith(".") &&
+        entry.name !== "node_modules" &&
+        existsSync(join(root, entry.name, "pubspec.yaml")),
+    )
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The device checks a mobile config needs: each platform it runs on, and Flutter for a Flutter
+ * app. A config that runs on both platforms passes on a machine ready for one; the other's
+ * failures are warnings that say which platform they hold back.
+ */
+async function deviceChecks(
+  configFile: string | undefined,
+  root: string,
+  probes: DoctorProbes,
+): Promise<DoctorCheck[]> {
+  const platforms = configFile === undefined ? [] : mobilePlatformsOf(configFile)
+
+  if (platforms.length === 0) return []
+
+  const found = await Promise.all(
+    platforms.map(async (platform) => ({ platform, checks: await probes.device(platform) })),
+  )
+  const ready = found.some(({ checks }) => checks.every((check) => check.status !== "fail"))
+  const devices = found.flatMap(({ platform, checks }) =>
+    checks.map((check): DoctorCheck =>
+      check.status === "fail" && ready && platforms.length > 1
+        ? {
+            name: check.name,
+            status: "warn",
+            detail: `${check.detail} (needed only to run on ${TITLES[platform]})`,
+          }
+        : { name: check.name, status: check.status, detail: check.detail },
+    ),
+  )
+
+  return [
+    {
+      name: "devices",
+      status: "ok",
+      detail: `the config runs on ${platforms.map((platform) => TITLES[platform]).join(" and ")}`,
+    },
+    ...devices,
+    ...(hasFlutterApp(root) ? await probes.flutter() : []),
+  ]
+}
+
 /** Every check, in the order a first run meets them. */
 export async function projectDoctor(
   options: { readonly cwd: string; readonly config?: string | undefined },
@@ -243,6 +342,7 @@ export async function projectDoctor(
     { name: "danwo", status: "ok", detail: DANWO_VERSION },
     ...browsers,
     ...config.checks,
+    ...(await deviceChecks(config.path, config.root, probes)),
     ...playwrightCheck(config.root),
     ...skillChecks(config.root),
   ]

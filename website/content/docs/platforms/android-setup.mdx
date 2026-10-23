@@ -67,6 +67,8 @@ ok    JDK: /Applications/Android Studio.app/Contents/jbr/Contents/Home
 Each line is `ok`, `warn` or a failure with what to do. It also warns about an emulator left with a
 proxy setting from an earlier run, and about images missing their files.
 
+In a project whose config calls `withAndroidDevice`, `npx @danwo/cli doctor` runs these checks too.
+
 <Callout type="warn">
   Apps that pin their TLS certificates ignore danwo's certificate, so their calls can't be emulated.
   Turn pinning off in the build you test.

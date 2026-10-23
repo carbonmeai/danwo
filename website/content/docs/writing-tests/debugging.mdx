@@ -116,7 +116,8 @@ That's the bug: the app credited the account once per delivery.
 `danwo spec --topic errors` lists every code with its exit code.
 
 When a run fails before any test starts, `npx @danwo/cli doctor` checks the machine and the
-config.
+config. For a mobile config it checks the simulator or emulator toolchain too, and Flutter for a
+Flutter app.
 
 ## Connection noise
 

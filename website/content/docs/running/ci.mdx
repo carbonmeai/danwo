@@ -161,6 +161,18 @@ Two flags stop a run from starting new test files. Files already running finish:
 Run `npx @danwo/cli doctor` as a first step to see what a run would trip on: Node, Chromium, the
 config, the model's key. `--json` prints the checks for a script.
 
+For a config that runs its tests on devices, the doctor also checks each platform's toolchain. It
+finds them from the `@danwo/mobile` helpers the config calls:
+
+| The project has                                     | The doctor checks                                                        |
+| --------------------------------------------------- | ------------------------------------------------------------------------ |
+| `withIosDevice` or `buildIos` in its config         | Xcode, simctl, an iOS runtime and CocoaPods                              |
+| `withAndroidDevice` or `buildAndroid` in its config | the Android SDK, adb, the emulator, an AVD on a rootable image and a JDK |
+| a `pubspec.yaml` too, at its root or a folder down  | Flutter on `PATH`                                                        |
+
+Each failure says how to fix it. A config that runs on both platforms passes when one is ready, and
+the other's failures show as warnings.
+
 ## Exit codes
 
 | Code  | Meaning                                                    |

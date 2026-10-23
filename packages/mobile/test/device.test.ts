@@ -17,6 +17,7 @@ import {
   type DeviceDriver,
   deviceDoctor,
   deviceNodes,
+  flutterDoctor,
   type DriverNode,
   type Exec,
   roleOf,
@@ -611,6 +612,11 @@ describe("an Android device", () => {
   })
 })
 
+/** A machine without `flutter` on PATH. */
+const noFlutter: Exec = async () => {
+  throw new Error("spawn flutter ENOENT")
+}
+
 describe("device doctor", () => {
   it("reports a missing SDK as a failure", async () => {
     const saved = {
@@ -640,5 +646,27 @@ describe("device doctor", () => {
 
       await rm(empty, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
+  })
+
+  it("reports Flutter's version, or how to install it when flutter is not on PATH", async () => {
+    const asked: string[] = []
+
+    const installed: Exec = async (file, args) => {
+      asked.push(`${file} ${args.join(" ")}`)
+
+      return "Flutter 3.47.7 • channel stable • https://github.com/flutter/flutter.git\nTools • Dart 3.11.0\n"
+    }
+
+    expect(await flutterDoctor(installed)).toEqual([
+      { name: "Flutter", status: "ok", detail: "Flutter 3.47.7" },
+    ])
+    expect(asked).toEqual(["flutter --version"])
+    expect(await flutterDoctor(noFlutter)).toEqual([
+      expect.objectContaining({
+        name: "Flutter",
+        status: "fail",
+        detail: expect.stringContaining("install Flutter"),
+      }),
+    ])
   })
 })

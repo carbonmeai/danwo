@@ -153,12 +153,45 @@ export async function deviceDoctor(
   options: DoctorOptions = {},
 ): Promise<DoctorCheck[]> {
   const android = options.platform === "ios" ? [] : (await androidDoctor(exec)).map(on("android"))
+  const mac = platform() === "darwin"
   const ios =
-    options.platform === "android" || (options.platform === undefined && platform() !== "darwin")
+    options.platform === "android" || (options.platform === undefined && !mac)
       ? []
-      : (await iosDoctor(exec)).map(on("ios"))
+      : mac
+        ? (await iosDoctor(exec)).map(on("ios"))
+        : [
+            {
+              platform: "ios" as const,
+              name: "Xcode",
+              status: "fail" as const,
+              detail: "the iOS Simulator runs only on a Mac: run the iOS tests on one",
+            },
+          ]
 
   return [...android, ...ios]
+}
+
+/**
+ * Flutter, for a project with a `pubspec.yaml`: `danwo build-android` and `danwo build-ios` run
+ * the `flutter` on PATH, so it must be there.
+ */
+export async function flutterDoctor(exec: Exec = execProgram): Promise<DoctorCheck[]> {
+  try {
+    const said = await exec("flutter", ["--version"], { timeoutMs: 120_000 })
+    const first = said.trim().split("\n")[0] ?? ""
+    const version = first.split("•")[0]?.trim() ?? ""
+
+    return [{ name: "Flutter", status: "ok", detail: version === "" ? "flutter" : version }]
+  } catch {
+    return [
+      {
+        name: "Flutter",
+        status: "fail",
+        detail:
+          "not found: install Flutter (https://docs.flutter.dev/get-started/install) and put its bin folder on PATH",
+      },
+    ]
+  }
 }
 
 /** Tags a check with its platform. */

@@ -29,7 +29,9 @@ test and the same purchase told to the agent in plain words.
    (use `x86_64` on Intel and Linux). Play Store images cannot be rooted, and danwo needs root to
    trust its CA.
 3. Run `danwo device doctor`. It checks the SDK, adb, the emulator, rootable images, AVDs and a JDK,
-   and warns about an emulator left with a proxy setting from an earlier run.
+   and warns about an emulator left with a proxy setting from an earlier run. In a project whose
+   config calls `withAndroidDevice`/`buildAndroid` (or the iOS ones), `danwo doctor` runs the same
+   checks for each platform the config uses, and Flutter's for a `pubspec.yaml`.
 
 ## The danwo build
 

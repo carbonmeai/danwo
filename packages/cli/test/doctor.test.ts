@@ -6,7 +6,13 @@ import { fileURLToPath } from "node:url"
 import { SKILL_FILE } from "@danwo/skill"
 import { afterEach, describe, expect, it } from "vitest"
 
-import { type DoctorProbes, doctorLines, projectDoctor } from "../src/doctor.ts"
+import {
+  type DoctorCheck,
+  type DoctorProbes,
+  doctorLines,
+  type MobilePlatform,
+  projectDoctor,
+} from "../src/doctor.ts"
 
 const CODEX_MODULE = String(new URL("../../runner/src/model/cli/codex.ts", import.meta.url))
 const FAKE_CODEX = fileURLToPath(
@@ -48,10 +54,66 @@ async function project(files: Readonly<Record<string, string>>): Promise<string>
   return root
 }
 
+/** A machine with every device toolchain, as `danwo device doctor` reports it. */
+const DEVICES: Readonly<Record<MobilePlatform, readonly DoctorCheck[]>> = {
+  ios: [
+    {
+      name: "Xcode",
+      status: "ok",
+      detail: "Xcode 26.6 (/Applications/Xcode.app/Contents/Developer)",
+    },
+    { name: "iOS runtimes", status: "ok", detail: "iOS 26.5" },
+  ],
+  android: [
+    { name: "Android SDK", status: "ok", detail: "/sdk" },
+    { name: "adb", status: "ok", detail: "/sdk/platform-tools/adb" },
+    { name: "emulator", status: "ok", detail: "/sdk/emulator/emulator" },
+    { name: "JDK", status: "ok", detail: "/jdk" },
+  ],
+}
+
 const ready: DoctorProbes = {
   nodeVersion: "v24.17.0",
   env: {},
   browser: async () => ({ ok: true, detail: "Chromium 156.0.0.0" }),
+  device: async (platform) => DEVICES[platform],
+  flutter: async () => [{ name: "Flutter", status: "ok", detail: "Flutter 3.47.7" }],
+}
+
+/** A machine with no Android SDK, as `danwo device doctor --platform android` reports it. */
+const NO_ANDROID: readonly DoctorCheck[] = [
+  {
+    name: "Android SDK",
+    status: "fail",
+    detail: "not found: set ANDROID_HOME or install Android Studio",
+  },
+]
+
+/**
+ * A config that binds its devices the way `@danwo/mobile`'s helpers do, named after them. The
+ * stand-ins keep the config loadable in a folder with no `node_modules`.
+ */
+function deviceConfig(helpers: readonly string[]): string {
+  return [
+    ...helpers.map((name) => `const ${name} = (env: object) => env`),
+    "",
+    "export default {",
+    `  environment: async () => [${helpers.map((name) => `${name}({})`).join(", ")}],`,
+    "}",
+    "",
+  ].join("\n")
+}
+
+/** `probes` that note each platform the device checks are asked for in `asked`. */
+function noting(asked: string[], probes: DoctorProbes = ready): DoctorProbes {
+  return {
+    ...probes,
+    device: async (platform) => {
+      asked.push(platform)
+
+      return probes.device(platform)
+    },
+  }
 }
 
 /** The checks by name, as `status detail`. */
@@ -174,5 +236,107 @@ describe("danwo doctor", () => {
     expect(named["config"]?.[0]).toMatch(/^fail .*must default-export a config object/)
     expect(named["skill"]?.[0]).toMatch(/^ok \.agents\/skills\/danwo is danwo /)
     expect(doctorLines(checks)[0]).toBe("ok    Node.js: v24.17.0")
+  })
+
+  it("asks no device checks of a config that runs in the browser", async () => {
+    const root = await project({ "package.json": "{}", "danwo.config.ts": "export default {}\n" })
+    const asked: string[] = []
+    const checks = await projectDoctor({ cwd: root }, noting(asked))
+
+    expect(asked).toEqual([])
+    expect(byName(checks)["devices"]).toBeUndefined()
+  })
+
+  it("checks Xcode and a simulator runtime for a config on the iOS Simulator", async () => {
+    const root = await project({
+      "package.json": "{}",
+      "danwo.config.ts": deviceConfig(["buildIos", "withIosDevice"]),
+    })
+    const asked: string[] = []
+    const named = byName(await projectDoctor({ cwd: root }, noting(asked)))
+
+    expect(asked).toEqual(["ios"])
+    expect(named["devices"]).toEqual(["ok the config runs on iOS"])
+    expect(named["Xcode"]?.[0]).toMatch(/^ok Xcode 26\.6/)
+    expect(named["iOS runtimes"]).toEqual(["ok iOS 26.5"])
+    expect(named["Flutter"]).toBeUndefined()
+  })
+
+  it("fails a config on the Android emulator on a machine without the SDK, and says how to fix it", async () => {
+    const root = await project({
+      "package.json": "{}",
+      "danwo.config.ts": [
+        'import { device } from "./tests/stack/device.ts"',
+        "",
+        "export default { environment: async () => device() }",
+        "",
+      ].join("\n"),
+      "tests/stack/device.ts": [
+        "const withAndroidDevice = (env: object) => env",
+        "",
+        "export const device = () => withAndroidDevice({})",
+        "",
+      ].join("\n"),
+    })
+    const checks = await projectDoctor(
+      { cwd: root },
+      { ...ready, device: async (platform) => (platform === "android" ? NO_ANDROID : []) },
+    )
+
+    expect(byName(checks)["devices"]).toEqual(["ok the config runs on Android"])
+    expect(byName(checks)["Android SDK"]).toEqual([
+      "fail not found: set ANDROID_HOME or install Android Studio",
+    ])
+  })
+
+  it("passes a config on both platforms when one is ready, and checks Flutter for a Flutter app", async () => {
+    const root = await project({
+      "package.json": "{}",
+      "danwo.config.ts": deviceConfig([
+        "buildAndroid",
+        "buildIos",
+        "withAndroidDevice",
+        "withIosDevice",
+      ]),
+      "app/pubspec.yaml": "name: waitlist\n",
+    })
+    const iosOnly = await projectDoctor(
+      { cwd: root },
+      { ...ready, device: async (platform) => (platform === "android" ? NO_ANDROID : DEVICES.ios) },
+    )
+    const named = byName(iosOnly)
+
+    expect(named["devices"]).toEqual(["ok the config runs on iOS and Android"])
+    expect(named["Android SDK"]).toEqual([
+      "warn not found: set ANDROID_HOME or install Android Studio (needed only to run on Android)",
+    ])
+    expect(named["Flutter"]).toEqual(["ok Flutter 3.47.7"])
+    expect(iosOnly.every((check) => check.status !== "fail")).toBe(true)
+
+    const neither = byName(
+      await projectDoctor(
+        { cwd: root },
+        {
+          ...ready,
+          device: async (platform) =>
+            platform === "android"
+              ? NO_ANDROID
+              : [
+                  {
+                    name: "Xcode",
+                    status: "fail",
+                    detail: "not found: install Xcode from the App Store",
+                  },
+                ],
+          flutter: async () => [
+            { name: "Flutter", status: "fail", detail: "not found: install Flutter" },
+          ],
+        },
+      ),
+    )
+
+    expect(neither["Android SDK"]?.[0]).toMatch(/^fail /)
+    expect(neither["Xcode"]).toEqual(["fail not found: install Xcode from the App Store"])
+    expect(neither["Flutter"]).toEqual(["fail not found: install Flutter"])
   })
 })

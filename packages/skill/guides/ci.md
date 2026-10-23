@@ -118,7 +118,14 @@ only the headless shell test runs use. `danwo doctor [--json]` checks, without r
 Node >= 24, that danwo's Chromium starts, that the config loads and has no unknown keys, the
 model's key variable (`AI_GATEWAY_API_KEY` for a gateway id, the provider's own for an AI SDK
 model), an installed `@playwright/test` against `@danwo/playwright`'s range, and that each
-`SKILL.md` copy is this danwo's. It prints `ok|warn|fail  name: detail` lines (JSON
+`SKILL.md` copy is this danwo's. For a config that runs on devices (its source, or a local module
+it imports, calls `withIosDevice`/`buildIos`/`useSimulator`/`iosDevice` or
+`withAndroidDevice`/`buildAndroid`/`useEmulator`/`androidDevice`) it adds a `devices` line naming
+the platforms and `danwo device doctor --platform <each>`'s checks: Xcode, simctl, iOS runtimes and
+CocoaPods; the Android SDK, adb, the emulator, rootable images, AVDs and a JDK. With a
+`pubspec.yaml` at the project's root or one folder down it also checks `flutter --version`. A
+config on both platforms passes when one is ready: the other's failures become warnings ending
+`(needed only to run on <platform>)`. iOS off a Mac fails. It prints `ok|warn|fail  name: detail` lines (JSON
 `{ ok, checks: [{ name, status, detail }] }`) and exits 1 on any `fail`.
 
 ## Flaky tests and reruns

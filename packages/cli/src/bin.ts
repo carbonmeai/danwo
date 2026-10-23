@@ -400,7 +400,7 @@ program
 program
   .command("doctor")
   .description(
-    "check what a first run needs: Node, danwo's Chromium and the config's other browsers, the config and its keys, the model's key, Playwright Test's version and the agents' skill",
+    "check what a first run needs: Node, danwo's Chromium and the config's other browsers, the config and its keys, the model's key, the device toolchain for a mobile config, Playwright Test's version and the agents' skill",
   )
   .option("--json", "the checks as JSON: { ok, checks: [{ name, status, detail }] }")
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
@@ -409,7 +409,14 @@ program
     const { browserInstalled } = await import("@danwo/runner")
     const checks = await projectDoctor(
       { cwd: process.cwd(), config: options.config },
-      { nodeVersion: process.version, env: process.env, browser: browserInstalled },
+      {
+        nodeVersion: process.version,
+        env: process.env,
+        browser: browserInstalled,
+        device: async (platform) =>
+          (await import("@danwo/mobile")).deviceDoctor(undefined, { platform }),
+        flutter: async () => (await import("@danwo/mobile")).flutterDoctor(),
+      },
     )
     const ok = checks.every((check) => check.status !== "fail")
 

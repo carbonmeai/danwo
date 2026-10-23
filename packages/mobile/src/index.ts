@@ -32,7 +32,7 @@ export {
   xcodeContainer,
   xcodebuildArgs,
 } from "./build/index.ts"
-export { type DoctorCheck, type DoctorOptions, deviceDoctor } from "./doctor.ts"
+export { type DoctorCheck, type DoctorOptions, deviceDoctor, flutterDoctor } from "./doctor.ts"
 export type { DeviceDriver, Point } from "./driver.ts"
 export { type DeviceFixtures, withAndroidDevice, withIosDevice } from "./environment.ts"
 export { IosApp, type IosAppOptions } from "./ios/app.ts"

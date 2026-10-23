@@ -71,7 +71,8 @@ Treat a likely verdict as where to look first, not as proof.
 `danwo spec --topic errors` lists every code with its class and exit code. `danwo cache ls`,
 `stats` and `clear` show and reset recordings. `danwo doctor` (`--json` for a script) checks the
 machine and the project before a run: Node, danwo's Chromium, the config and its keys, the
-model's key, `@playwright/test`'s version and the skill copies.
+model's key, `@playwright/test`'s version and the skill copies, plus the device toolchain (and
+Flutter for a `pubspec.yaml`) when the config uses `@danwo/mobile`'s device helpers.
 
 ## Proxy noise
 
