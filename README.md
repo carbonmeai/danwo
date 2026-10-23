@@ -52,7 +52,9 @@ test("signs up", async ({ app, screen, expect }) => {
 })
 ```
 
-No providers, keys or model. Steps can also be plain English, recorded once and replayed after:
+That test needs no model, API key or provider setup. Steps can also be written in plain English.
+The first run sends each one to a model (with your API key) to work out the clicks, and records
+them; later runs replay the recording with no model call:
 
 ```ts
 await agent.act("add two blue mugs to the basket and go to checkout")
