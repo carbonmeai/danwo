@@ -41,6 +41,8 @@ Every app danwo starts gets these, Node or not:
 | `CURL_CA_BUNDLE`             | the CA bundle                             | curl, and requests when the one above is unset         |
 | `NODE_EXTRA_CA_CERTS`        | danwo's CA alone                          | Node, which adds it to its own roots                   |
 
+Windows' own curl checks certificates against the Windows certificate store and ignores the CA bundle variable, so it can't trust danwo's CA from the environment.
+
 The CA bundle is danwo's CA followed by the public roots. These variables replace a client's
 roots rather than add to them, so a host your app reaches directly, past the proxy through your
 `NO_PROXY`, still verifies.

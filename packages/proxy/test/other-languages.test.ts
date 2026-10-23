@@ -106,7 +106,11 @@ describe("the environment for an app outside Node", () => {
   })
 })
 
-describe.runIf(curl)("curl with the proxy's environment", () => {
+/*
+ * Windows' own curl uses Schannel, which checks certificates against the Windows certificate store
+ * and ignores CURL_CA_BUNDLE, so it can't trust danwo's CA from the environment there.
+ */
+describe.runIf(curl && process.platform !== "win32")("curl with the proxy's environment", () => {
   it("reaches a routed host over HTTPS, trusting danwo's CA", async () => {
     const { stdout } = await run("curl", ["-sS", `https://${ROUTED}/curl`], { env: appEnv() })
 
