@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest"
 import { CleanupLedger, type Created } from "../src/ledger.ts"
 import type { FidelityProvider } from "../src/provider.ts"
 import { clerkFidelity } from "../src/providers/clerk.ts"
+import { githubRequest, mintToken, targetApp } from "../src/providers/github-app.ts"
+import { githubFidelity } from "../src/providers/github.ts"
 import { stripeFidelity } from "../src/providers/stripe.ts"
 import { fidelityPassed, formatFidelity, runFidelity } from "../src/run.ts"
 import { runScenario, type Scenario, type Target } from "../src/scenario.ts"
@@ -344,6 +346,55 @@ describe("the sweep", () => {
       expect((await clerk.get(`/users/${tagged}`)).status).toBe(404)
       expect((await clerk.get(`/organizations/${org}`)).status).toBe(404)
       expect((await clerk.get(`/users/${old}`)).status).toBe(200)
+    } finally {
+      await target.close()
+    }
+  })
+
+  it("closes tagged GitHub issues, deletes tagged branches and labels, and leaves the rest", async () => {
+    const target = await githubFidelity.emulator()
+    const app = targetApp(target)
+
+    if (app === undefined) throw new Error("the emulator target has no App")
+
+    const token = await mintToken(target, app)
+    const repo = (method: string, path: string, body?: unknown) =>
+      target.send(githubRequest(method, `/repos/${app.repo}${path}`, { auth: token, body }))
+
+    const kept = (name: string) => {
+      const scenario = githubFidelity.scenarios.find((candidate) => candidate.name.startsWith(name))
+
+      if (scenario === undefined) throw new Error(`no scenario ${name}`)
+
+      return runScenario(scenario, target, { keep: true })
+    }
+
+    try {
+      await kept("issues:")
+      await kept("pull request:")
+      await repo("POST", "/issues", { title: "danwo-fidelity-abc issue left open" })
+      await repo("POST", "/issues", { title: "Someone's own issue" })
+
+      const swept = await sweepFidelity({
+        providers: [onEmulator(githubFidelity, target)],
+        env: {},
+        yes: true,
+      })
+      const open = await readJson(await repo("GET", "/issues?state=open"))
+      const branches = await readJson(await repo("GET", "/git/matching-refs/heads/danwo-fidelity"))
+      const labels = await readJson(await repo("GET", "/labels"))
+
+      expect(swept[0]?.failed).toEqual([])
+      expect((swept[0]?.found ?? []).map((item) => item.kind).toSorted()).toEqual([
+        "branch",
+        "issue",
+        "label",
+      ])
+      expect(Array.isArray(open) && open.map((issue) => fieldOf(issue, "title"))).toEqual([
+        "Someone's own issue",
+      ])
+      expect(branches).toEqual([])
+      expect(Array.isArray(labels) && labels.map((label) => fieldOf(label, "name"))).toEqual([])
     } finally {
       await target.close()
     }

@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { describe, expect, it } from "vitest"
@@ -194,6 +197,42 @@ describe("credentials", () => {
 
     expect(google?.live({})).toBeUndefined()
     expect(google?.live({ DANWO_FIDELITY_PUBLIC: "1" })?.kind).toBe("live")
+  })
+
+  it("runs GitHub's App scenarios only with all of the App's variables, its key inline or from a file", () => {
+    const github = FIDELITY_PROVIDERS.find((provider) => provider.name === "github")
+    /* A stand-in, split so no scanner reads it as a key. */
+    const armor = ["RSA", "PRIVATE", "KEY-----"].join(" ")
+    const pem = [`-----BEGIN ${armor}`, "c3RhbmQtaW4=", `-----END ${armor}`]
+    const app = {
+      DANWO_FIDELITY_GITHUB_APP_ID: "123",
+      DANWO_FIDELITY_GITHUB_INSTALLATION_ID: "456",
+      DANWO_FIDELITY_GITHUB_REPO: "acme/sandbox",
+    }
+    const folder = mkdtempSync(join(tmpdir(), "danwo-fidelity-github-"))
+    const keyFile = join(folder, "app.pem")
+
+    writeFileSync(keyFile, `${pem.join("\n")}\n`)
+
+    try {
+      expect(github?.live({})).toBeUndefined()
+      expect(github?.live({ DANWO_FIDELITY_PUBLIC: "1" })?.credentials).toEqual({})
+      expect(github?.live(app)).toBeUndefined()
+      expect(
+        github?.live({ ...app, DANWO_FIDELITY_GITHUB_APP_PRIVATE_KEY: pem.join("\\n") })
+          ?.credentials["privateKey"],
+      ).toBe(pem.join("\n"))
+      expect(
+        github?.live({ ...app, DANWO_FIDELITY_GITHUB_APP_PRIVATE_KEY_PATH: keyFile })?.credentials,
+      ).toEqual({
+        appId: "123",
+        installationId: "456",
+        repo: "acme/sandbox",
+        privateKey: pem.join("\n"),
+      })
+    } finally {
+      rmSync(folder, { recursive: true, force: true })
+    }
   })
 
   it("encodes nested form values the way Stripe reads them", () => {

@@ -103,23 +103,9 @@
   {
     "provider": "github",
     "step": "read a public repository",
-    "path": "homepage",
-    "kind": "type-mismatch",
-    "reason": "Seed data: the real repository has an empty homepage string, the seeded one none."
-  },
-  {
-    "provider": "github",
-    "step": "read a public repository",
     "path": "temp_clone_token",
     "kind": "missing-field",
     "reason": "GitHub sends null to anonymous callers, but the typed repository schema the emulator is checked against declares a string; left out until the schema allows null."
-  },
-  {
-    "provider": "github",
-    "step": "read a public repository",
-    "path": "permissions",
-    "kind": "extra-field",
-    "reason": "The emulator answers every caller as the repository's admin; GitHub leaves permissions out for anonymous callers."
   },
   {
     "provider": "gateway",
