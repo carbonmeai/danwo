@@ -1,0 +1,10 @@
+node_modules/
+package-lock.json
+*.tsbuildinfo
+
+# The Go binary, and the lock the first worker takes while it builds it.
+dist/
+.go-build-lock/
+
+# What danwo writes when it runs: flight records, the agent's recordings, reports.
+.danwo/

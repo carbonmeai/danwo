@@ -1,0 +1,26 @@
+{
+  "name": "danwo-example-with-go",
+  "private": true,
+  "description": "Quillwork, a team plan sold through Stripe Checkout: a Go app on net/http and Postgres whose Stripe webhook starts the plan and sends a welcome email through Resend.",
+  "type": "module",
+  "scripts": {
+    "build": "go build -o dist/quillwork .",
+    "typecheck": "tsc --noEmit",
+    "test": "danwo test",
+    "test:agentic": "danwo test tests/agentic.danwo.ts",
+    "matrix": "danwo matrix tests/deterministic.danwo.ts --grep \"upgrades to the Team plan\"",
+    "matrix:plan": "danwo matrix tests/deterministic.danwo.ts --grep \"upgrades to the Team plan\" --plan",
+    "serve": "danwo serve"
+  },
+  "devDependencies": {
+    "@danwo/cli": "0.1.2",
+    "@danwo/sdk": "0.1.2",
+    "@types/node": "^24",
+    "@types/pg": "8.23.1",
+    "pg": "8.23.1",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

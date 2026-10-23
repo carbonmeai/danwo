@@ -1,0 +1,36 @@
+{{define "content"}}
+{{with .Account}}
+<div class="page-header">
+  <h1 class="page-title">{{.Team}}</h1>
+  <p class="page-description">Signed in as {{.Email}}</p>
+</div>
+
+<section class="card narrow" aria-labelledby="plan-title">
+  <div class="card-header">
+    <h2 class="card-title" id="plan-title">Plan</h2>
+  </div>
+  <div class="card-body stack">
+    {{if $.Error}}<p class="toast toast-error" role="alert">{{$.Error}}</p>{{end}}
+    {{if .OnTeamPlan}}
+    <div class="row">
+      <span class="price" data-testid="plan-name">Team</span>
+      <span class="badge badge-success" data-testid="plan-status">Active</span>
+    </div>
+    <p class="muted">$24 a month, billed by Stripe. Unlimited notes and members.</p>
+    {{else if $.Refresh}}
+    <p role="status" aria-busy="true">Confirming your payment…</p>
+    <p class="muted">This takes a few seconds. You can keep this page open.</p>
+    {{else}}
+    <div class="row">
+      <span class="price" data-testid="plan-name">Free</span>
+      {{if .Status}}<span class="badge badge-warning" data-testid="plan-status">Team plan {{.Status}}</span>{{end}}
+    </div>
+    <p class="muted">Move to the Team plan for unlimited notes and members: $24 a month.</p>
+    <form method="post" action="/billing/checkout">
+      <button type="submit" class="btn btn-primary">Upgrade to Team</button>
+    </form>
+    {{end}}
+  </div>
+</section>
+{{end}}
+{{end}}

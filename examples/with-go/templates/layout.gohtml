@@ -1,0 +1,51 @@
+{{define "layout"}}<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {{if .Refresh}}<meta http-equiv="refresh" content="1" />{{end}}
+    <title>{{.Title}} · Quillwork</title>
+    <link rel="stylesheet" href="/kit/kit.css" />
+    <style>
+      .plans {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+        gap: var(--kit-space-4);
+        margin-bottom: var(--kit-space-6);
+      }
+      .price {
+        font-size: var(--kit-text-2xl);
+        font-weight: var(--kit-weight-semibold);
+      }
+      .narrow {
+        max-width: 28rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="shell-sidebar">
+        <div class="shell-brand"><span class="shell-logo">Q</span>Quillwork</div>
+        <nav class="shell-nav" aria-label="Main">
+          <a href="/" {{if eq .Nav "plans"}}aria-current="page"{{end}}>Plans</a>
+          {{if .Account}}<a href="/account" {{if eq .Nav "account"}}aria-current="page"{{end}}>Account</a>{{end}}
+        </nav>
+        <div class="shell-sidebar-footer">Team notes, written together</div>
+      </aside>
+      <main class="shell-main">
+        <header class="shell-topbar">
+          <nav class="breadcrumb" aria-label="Breadcrumb">
+            <span>Quillwork</span><span aria-current="page">{{.Title}}</span>
+          </nav>
+          {{if .Account}}
+          <form method="post" action="/signout">
+            <button type="submit" class="btn btn-ghost btn-sm">Sign out</button>
+          </form>
+          {{end}}
+        </header>
+        <div class="shell-content">{{template "content" .}}</div>
+      </main>
+    </div>
+  </body>
+</html>
+{{end}}
