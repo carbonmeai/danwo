@@ -5,8 +5,6 @@
  * runs those events triggered have finished, so an invariant reads what the background jobs wrote,
  * and the record keeps each run's function, status and duration.
  */
-import { createServer } from "node:net"
-
 import {
   forwardTo,
   type Handler,
@@ -16,6 +14,7 @@ import {
 } from "@danwo/proxy"
 
 import { type OwnedChild, spawnOwned } from "../support/children.ts"
+import { freePort } from "../support/ports.ts"
 import { cronDue } from "./cron.ts"
 import {
   type EventRun,
@@ -283,20 +282,6 @@ async function answers(url: string): Promise<boolean> {
   } catch {
     return false
   }
-}
-
-/** A port nothing listens on yet. */
-function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer()
-
-    server.once("error", reject)
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address()
-
-      server.close(() => resolve(typeof address === "object" && address ? address.port : 0))
-    })
-  })
 }
 
 /**

@@ -281,6 +281,7 @@ export {
   unipileService,
   type StartedApp,
   startApp,
+  freePort,
   type StackApp,
   stackEnvironment,
   type StackEnvironmentOptions,

@@ -55,6 +55,26 @@ danwo only splits a file whose tests share nothing: no `beforeAll` or `afterAll`
 `isolation: "test"`. Other files still run whole. Each test loads its file again, so tests can't
 pass values to each other through variables at the top of the file.
 
+### Give each worker its own port
+
+Each worker starts its own environment, so two workers can't start the app on one fixed port.
+`freePort()` picks a port nothing listens on:
+
+```ts title="danwo.config.ts · a port per worker"
+import { appEnvironment, defineConfig, freePort } from "@danwo/sdk"
+
+export default defineConfig({
+  workers: 2,
+  async environment() {
+    const port = await freePort()
+
+    return appEnvironment({ app: { command: "npm start", url: `http://127.0.0.1:${port}` } })
+  },
+})
+```
+
+The app gets the port as `PORT`.
+
 ## What tests run against
 
 | Option        | Default  | What it does                                                                  |

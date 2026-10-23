@@ -256,6 +256,7 @@ export {
   type StartedApp,
   startApp,
 } from "./app-environment.ts"
+export { freePort } from "../support/ports.ts"
 export {
   INNGEST_HOST,
   type InngestOptions,

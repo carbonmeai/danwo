@@ -12,23 +12,13 @@ import { appEnvironment, startApp } from "../src/runner/app-environment.ts"
 import { clerkService } from "../src/runner/clerk.ts"
 import { resendService } from "../src/runner/resend.ts"
 import { stackEnvironment } from "../src/runner/stack-environment.ts"
+import { freePort } from "../src/support/ports.ts"
 
 const APP = fileURLToPath(new URL("./fixtures/mail-app.ts", import.meta.url))
 const COMPOSE = fileURLToPath(new URL("./fixtures/compose-stand-in.ts", import.meta.url))
 
 /** The stand-in for `docker compose`, run as `mode` (`up`, `down` or `hang`). */
 const compose = (mode: string) => `"${process.execPath}" "${COMPOSE}" ${mode}`
-
-/** A port nothing listens on. */
-function freePort(): Promise<number> {
-  return new Promise((resolve) => {
-    const probe = createServer().listen(0, "127.0.0.1", () => {
-      const address = probe.address()
-
-      probe.close(() => resolve(typeof address === "object" && address ? address.port : 0))
-    })
-  })
-}
 
 async function appCommand(env: Record<string, string> = {}) {
   const port = await freePort()
@@ -40,6 +30,20 @@ async function appCommand(env: Record<string, string> = {}) {
     timeoutMs: 20_000,
   }
 }
+
+describe("freePort", () => {
+  it("names a port on 127.0.0.1 that a server can listen on", async () => {
+    const port = await freePort()
+    const server = createServer()
+
+    expect(port).toBeGreaterThan(0)
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject)
+      server.listen(port, "127.0.0.1", resolve)
+    })
+    await new Promise((resolve) => server.close(resolve))
+  })
+})
 
 describe("startApp", () => {
   it("starts the command on the URL's port and stops it", async () => {

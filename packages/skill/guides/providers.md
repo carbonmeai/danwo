@@ -76,6 +76,9 @@ environment: () =>
   }),
 ```
 
+With more than one worker, each starts its own app: take its port from `await freePort()` (from
+`@danwo/sdk`, a port on 127.0.0.1 nothing listens on) rather than a fixed one.
+
 danwo leaves nothing running. The app's command runs as the leader of its own process group, so
 stopping it stops what it started too (a dev command often runs the server as its own child): it gets
 SIGTERM, then SIGKILL five seconds later. The same happens when a run ends, fails, is interrupted
