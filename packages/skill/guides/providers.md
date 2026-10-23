@@ -10,12 +10,19 @@ A config's `environment()` runs once per worker. Start the emulators, start the 
 proxy's environment variables, and return what tests need:
 
 ```ts
-import { defineConfig, stripeEnvironment } from "@danwo/sdk"
+import { defineConfig, startApp, type StartedApp, stripeEnvironment } from "@danwo/sdk"
+
+/** How the app starts: `startApp` runs the command and waits until the URL answers. */
+const APP = {
+  command: "npm run dev",
+  url: "http://localhost:3000",
+  env: { STRIPE_SECRET_KEY: "sk_test_x" },
+}
 
 export default defineConfig({
   readiness: { mode: "page+backend", settle: true },
   async environment() {
-    let app: App | undefined
+    let app: StartedApp | undefined
     const stripe = await stripeEnvironment({
       seed: () =>
         app && {
@@ -29,7 +36,7 @@ export default defineConfig({
         },
     })
     const start = async () => {
-      app = await startApp(stripe.proxy.env({ ...process.env, STRIPE_SECRET_KEY: "sk_test_x" }))
+      app = await startApp(APP, stripe.proxy.env())
       await stripe.reset()
     }
 
@@ -312,7 +319,7 @@ signatures, and `--topic environments` the seed shapes.
 work unchanged; `env()` hands the app what both read:
 
 ```ts
-import { s3Environment } from "@danwo/sdk"
+import { s3Environment, startApp } from "@danwo/sdk"
 
 const s3 = await s3Environment({
   seed: {
@@ -320,7 +327,10 @@ const s3 = await s3Environment({
     credentials: [{ accessKeyId: "tid_app", secretAccessKey: "tsec_app" }],
   },
 })
-const app = await startApp(s3.proxy.env({ ...process.env, ...s3.env() }))
+const app = await startApp(
+  { command: "npm run dev", url: "http://localhost:3000" },
+  s3.proxy.env({ ...process.env, ...s3.env() }),
+)
 ```
 
 `env()` sets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` (`auto`),

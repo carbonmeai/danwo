@@ -37,6 +37,25 @@ describe("danwo guide", () => {
     expect(readGuide("matrix")).toMatch(/^# Invariants and the fault matrix/)
     expect(() => readGuide("nope")).toThrow(/no guide "nope" \(guides: first-test/)
   })
+
+  /*
+   * Most guide snippets are fragments, so they are not type-checked; this holds the one call
+   * they got wrong to the SDK's shape, `startApp(app, env)`.
+   */
+  it("calls startApp with the app's command first and its environment second", () => {
+    const calls = listGuides().flatMap((guide) =>
+      [...readGuide(guide.topic).matchAll(/startApp\(([\s\S]*?)\n?\s*\)\n/g)].map((m) => ({
+        topic: guide.topic,
+        args: m[1] ?? "",
+      })),
+    )
+
+    expect(calls.length).toBeGreaterThan(0)
+    for (const call of calls)
+      expect(call, call.topic).toMatchObject({
+        args: expect.stringMatching(/^\s*(\{\s*command:|\w+,)/),
+      })
+  })
 })
 
 describe("the shipped skill", () => {

@@ -166,6 +166,8 @@ import {
   defineConfig,
   postgresSnapshot,
   postgresWorkerDatabase,
+  startApp,
+  type StartedApp,
   stripeEnvironment,
 } from "@danwo/sdk"
 
@@ -175,7 +177,9 @@ export default defineConfig({
     const url = await postgresWorkerDatabase(process.env.DATABASE_URL ?? "", workerIndex)
     const db = postgresSnapshot({ url })
     const stripe = await stripeEnvironment({ seed: () => ({ webhookEndpoints: [/* … */] }) })
-    const app = await startApp({ ...stripe.proxy.env(), DATABASE_URL: url })
+    const command = { command: "npm run dev", url: "http://localhost:3000" }
+    const start = () => startApp(command, { ...stripe.proxy.env(), DATABASE_URL: url })
+    let app: StartedApp = await start()
 
     return {
       baseUrl: app.url,
@@ -185,7 +189,8 @@ export default defineConfig({
       settle: stripe.settle,
       reset: async () => {
         await stripe.reset()
-        await app.restart()
+        await app.stop()
+        app = await start()
       },
       snapshot: async () => {
         await stripe.snapshot()

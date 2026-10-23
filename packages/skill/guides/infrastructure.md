@@ -15,6 +15,7 @@ import {
   defineConfig,
   postgresSnapshot,
   postgresWorkerDatabase,
+  startApp,
   startPostgresProxy,
   startRedisProxy,
   stripeEnvironment,
@@ -27,11 +28,14 @@ export default defineConfig({
     const cache = await startRedisProxy({ upstream: process.env.REDIS_URL ?? "", service: "cache" })
     const db = postgresSnapshot({ url })
     const stripe = await stripeEnvironment()
-    const app = await startApp({
-      ...stripe.proxy.env(),
-      DATABASE_URL: postgres.url(url),
-      REDIS_URL: cache.url(process.env.REDIS_URL ?? ""),
-    })
+    const app = await startApp(
+      { command: "npm run dev", url: "http://localhost:3000" },
+      {
+        ...stripe.proxy.env(),
+        DATABASE_URL: postgres.url(url),
+        REDIS_URL: cache.url(process.env.REDIS_URL ?? ""),
+      },
+    )
 
     return {
       baseUrl: app.url,
