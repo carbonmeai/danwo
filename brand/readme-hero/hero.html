@@ -294,7 +294,10 @@
     <script>
       const query = new URLSearchParams(location.search)
       const theme = query.get("theme") === "light" ? "light" : "dark"
-      const tiles = query.get("tiles") ?? "tiles"
+      // Tiles only ever come from a folder on disk, never from the web.
+      const asked = query.get("tiles")
+      const tiles =
+        asked !== null && new URL(asked, location.href).protocol === "file:" ? asked : "tiles"
 
       document.documentElement.dataset.theme = theme
       const card = query.get("card")
