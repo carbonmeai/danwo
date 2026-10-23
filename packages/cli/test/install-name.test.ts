@@ -37,4 +37,28 @@ describe("how the docs tell people to run danwo", () => {
 
     expect(offenders).toEqual([])
   })
+
+  /*
+   * Inside this bun workspace npx resolves from the root, where no `danwo` bin is linked and the
+   * root package is itself named danwo, so the repository's scripts run the bin the script runner
+   * puts on the PATH: the one bun links into the package's own node_modules/.bin.
+   */
+  it("runs danwo in the repository's own scripts by the package's bin, not through a runner", () => {
+    const scripts = trackedTextFiles()
+      .filter((path) => path.endsWith("package.json"))
+      .flatMap((path) => {
+        const manifest: { scripts?: Record<string, string> } = JSON.parse(
+          readFileSync(join(ROOT, path), "utf8"),
+        )
+
+        return Object.entries(manifest.scripts ?? {}).map(([name, line]) => ({ path, name, line }))
+      })
+      .filter(({ line }) => /\bdanwo (test|matrix|serve)\b/.test(line))
+
+    expect(scripts.length).toBeGreaterThan(1)
+    for (const script of scripts)
+      expect(script.line, `${script.path} ${script.name}`).not.toMatch(
+        /\b(npx|bunx|pnpx|dlx|exec)\b[^&|;]*\bdanwo /,
+      )
+  })
 })

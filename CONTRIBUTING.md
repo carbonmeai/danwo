@@ -17,6 +17,8 @@ bun run test:slow   # browser, CLI, matrix and device tests
 bun run test:e2e    # danwo's own suites for the dashboard and the website, run with `danwo test`
 ```
 
+To run `danwo` yourself in a package (`packages/dashboard`, `website`, an example), use its scripts (`bun run test:e2e -- --grep …`) or `node_modules/.bin/danwo` in that package. npx with the bare `danwo` name fails here with "could not determine executable to run": npx looks for commands from the workspace root, where bun links no `danwo` bin, and then finds the root package, which is itself named `danwo` and has none. (Elsewhere that name is an unrelated npm package, so the docs only ever hand npx `@danwo/cli`.)
+
 Keys for the live fidelity checks go in `.env.fidelity` (git-ignored). Use test or sandbox keys only.
 
 ## Repository layout

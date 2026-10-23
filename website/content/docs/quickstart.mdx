@@ -84,6 +84,10 @@ On Linux, add `--with-deps` for the system libraries.
 In a monorepo, run init in the app's own folder. It finds the workspace (pnpm, npm, Yarn or Bun)
 and adds the packages to the app's `package.json` with the workspace's package manager.
 
+Then run danwo through the app's `test:danwo` script. npx looks for commands from the workspace
+root, and Bun and pnpm link the `danwo` command into the app's folder only. When you do use npx,
+always give it the full package name, `@danwo/cli`: the unscoped name belongs to someone else.
+
 </Step>
 <Step>
 

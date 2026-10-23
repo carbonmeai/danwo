@@ -21,7 +21,10 @@ Set up a config, write one `*.danwo.ts` file, run it and read the result.
    for npm, Yarn and Bun) and installs with the workspace's manager into that package (`pnpm add
    -D` there, `npm install -D … --workspace <path>` from the root; at the root itself `pnpm add -D
    -w` and Yarn 1's `-W`). A folder under the workspace that is not one of its packages is a
-   project of its own. When the package has no agent folders (`.claude`, `.cursor`, `.codex`, …)
+   project of its own. Run danwo there through the package's `test:danwo` script, or
+   `node_modules/.bin/danwo` in the package: npx looks for a command from the workspace root,
+   where Bun and pnpm link no `danwo` bin when only the package depends on `@danwo/cli`, and the
+   unscoped name on npm is an unrelated package. Hand npx the scoped name only. When the package has no agent folders (`.claude`, `.cursor`, `.codex`, …)
    but a folder above it in the workspace does, the skill and MCP server are written there, with
    an MCP command that finds the package's config (`pnpm --dir <path> exec danwo mcp`, else
    `npx @danwo/cli mcp --config <path>/danwo.config.ts`). For a browser engine, init then
