@@ -35,6 +35,8 @@ there.
 
 - A run replaces its own section and keeps the others for the same commit. A `danwo test` run and a
   `danwo matrix` run both show.
+- Each [named suite](/docs/ci#several-suites-in-one-repository) has its own section, so two suites
+  in one repository both show.
 - A section from an older commit is dropped.
 - A [shard](/docs/shards) leaves the comment alone; `danwo merge-reports` posts the whole run once.
 - The comment stays under GitHub's size limit. A long one is cut between entries, with a note.

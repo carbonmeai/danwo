@@ -208,6 +208,33 @@ describe("github reporter for danwo test", () => {
     expect(JSON.stringify(fake.requests)).not.toContain(LIVE_KEY)
   })
 
+  it("names a suite's check, summary and artifact after it", async () => {
+    fake = await startFakeGitHub()
+    const reporter = reporterWith(await actionsEnv(fake.url))
+    const run = { ...testRun([failed("tests/a.danwo.ts › pays", 4, ".danwo/runs/r1/pays")]) }
+
+    await reporter.started?.({ kind: "test", root: run.root, cwd: run.cwd, suite: "dashboard" })
+    await reporter.testsFinished?.({ ...run, suite: "dashboard" })
+
+    const summary = await readFile(join(dir, "summary.md"), "utf8")
+
+    expect(fake.requests[0]?.body).toMatchObject({ name: "danwo · dashboard" })
+    expect(summary).toContain("### danwo test · dashboard: 0 passed · 1 failed")
+    expect(summary).toContain("download the `danwo-runs-dashboard` artifact")
+  })
+
+  it("keeps an explicit check name and artifact over the suite's", async () => {
+    fake = await startFakeGitHub()
+    const env = await actionsEnv(fake.url)
+    const reporter = github({ env, name: "e2e", artifact: "records", log: () => undefined })
+    const run = { ...testRun([failed("tests/a.danwo.ts › pays", 4, ".danwo/runs/r1/pays")]) }
+
+    await reporter.testsFinished?.({ ...run, suite: "dashboard" })
+
+    expect(fake.requests[0]?.body).toMatchObject({ name: "e2e" })
+    expect(await readFile(join(dir, "summary.md"), "utf8")).toContain("the `records` artifact")
+  })
+
   it("completes a passing run as a success with no annotations", async () => {
     fake = await startFakeGitHub()
     const reporter = reporterWith(await actionsEnv(fake.url))

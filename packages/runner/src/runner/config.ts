@@ -27,6 +27,12 @@ import type { Reporter } from "./reporting.ts"
 
 /** What `danwo.config.ts` default-exports; every key is optional. */
 export interface DanwoConfig {
+  /**
+   * The suite's name, for a repository with several suites: reporters tell suites apart by it
+   * (the GitHub reporter's check run, pull request comment section, summary and artifact).
+   * `--name` overrides it. Default none: one suite reports as it always has.
+   */
+  readonly name?: string
   /** Where test files are found, relative to the config file; default the config's folder. */
   readonly testDir?: string
   /** Globs relative to `testDir`; default every `*.danwo.ts`. */

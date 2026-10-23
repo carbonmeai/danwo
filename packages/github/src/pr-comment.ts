@@ -1,7 +1,7 @@
 /**
  * The pull request comment: one comment per pull request, found again by a hidden marker and
- * edited in place. Each run fills its own section: `danwo test` one, and each `danwo matrix` test
- * one of its own. A section from an older commit is dropped when a run for a newer one arrives,
+ * edited in place. Each run fills its own section: `danwo test` one per suite, and each `danwo
+ * matrix` test one of its own. A section from an older commit is dropped when a run for a newer one arrives,
  * so the comment always describes the pull request's head. The whole stays under GitHub's comment
  * limit: a section that does not fit is cut between entries, with a note.
  */
@@ -17,6 +17,7 @@ import {
 
 import { shown } from "./annotations.ts"
 import { type FailureDetails, failureDetails } from "./record-details.ts"
+import type { SuiteIdentity } from "./suite.ts"
 import {
   cell,
   FAILED,
@@ -217,16 +218,32 @@ function flakyBlock(run: TestRunReport): string[] {
   ]
 }
 
-/** `danwo test`'s section: headline, a row per test, each failure folded, then flaky tests. */
-export async function testSection(run: TestRunReport, links: CommentLinks): Promise<NewSection> {
+/** Which suite a section is for; unnamed for a repository's one suite. */
+export type SectionSuite = Pick<SuiteIdentity, "name" | "slug">
+
+const UNNAMED: SectionSuite = { name: undefined, slug: undefined }
+
+/** `danwo test` in a headline, followed by the suite's name when it has one. */
+const titled = (command: string, suite: SectionSuite) =>
+  suite.name === undefined ? command : `${command} · ${suite.name}`
+
+/**
+ * `danwo test`'s section: headline, a row per test, each failure folded, then flaky tests. A named
+ * suite has a section of its own, so several suites' runs sit side by side.
+ */
+export async function testSection(
+  run: TestRunReport,
+  links: CommentLinks,
+  suite: SectionSuite = UNNAMED,
+): Promise<NewSection> {
   const failures = run.reports.filter((r) => FAILED.has(r.status))
   const blocks = await Promise.all(failures.map((r) => failureBlock(r, run.cwd, links)))
 
   return {
-    key: "test",
+    key: suite.slug === undefined ? "test" : `test:${suite.slug}`,
     sha: links.sha,
     blocks: [
-      `### ${testMark(run)} danwo test · ${testCounts(run.reports)}`,
+      `### ${testMark(run)} ${titled("danwo test", suite)} · ${testCounts(run.reports)}`,
       factsLine(run.durationMs, testSpend(run.reports), links),
       ...testTable(run, links),
       ...run.brokenFiles.map((b) => `\n❌ \`${b.file}\` could not run: ${cell(b.error)}`),
@@ -280,16 +297,22 @@ function matrixRecords(outcomes: readonly RunOutcome[], links: CommentLinks): st
 }
 
 /** `danwo matrix`'s section for one test: the verdict and a row per fault that did not hold. */
-export function matrixSection(run: MatrixRunReport, links: CommentLinks): NewSection {
+export function matrixSection(
+  run: MatrixRunReport,
+  links: CommentLinks,
+  suite: SectionSuite = UNNAMED,
+): NewSection {
   const outcomes = [run.result.clean, ...run.result.runs].filter((o) => o.status !== "passed")
   const broke = outcomes.length > 0
   const usage = run.usage?.spent
+  /* Two suites may hold a test of the same id, so a named suite's tests are keyed apart. */
+  const keyed = suite.slug === undefined ? run.testId : `${suite.slug}\n${run.testId}`
 
   return {
-    key: `matrix:${createHash("sha1").update(run.testId).digest("hex").slice(0, 10)}`,
+    key: `matrix:${createHash("sha1").update(keyed).digest("hex").slice(0, 10)}`,
     sha: links.sha,
     blocks: [
-      `### ${broke ? "❌" : "✅"} danwo matrix · ${linked(cell(run.testId), links)}`,
+      `### ${broke ? "❌" : "✅"} ${titled("danwo matrix", suite)} · ${linked(cell(run.testId), links)}`,
       matrixHeadline(run),
       factsLine(run.durationMs, spend(usage?.usd ?? 0, usage?.calls ?? 0), links),
       ...(broke
@@ -330,6 +353,10 @@ function fitBlocks(blocks: readonly string[], budget: number): string {
   return kept.join("\n")
 }
 
+/** Whether a section is a `danwo test` run's: the one suite's `test`, or a named suite's `test:…`. */
+const isTestSection = (section: { readonly key: string }) =>
+  section.key === "test" || section.key.startsWith("test:")
+
 /**
  * The comment's new body: `section` put in place of the run's earlier section (or after the
  * others), sections of other commits dropped, `danwo test` first, all under GitHub's limit.
@@ -356,10 +383,7 @@ export function commentBody(existing: string | undefined, section: NewSection): 
     position === -1
       ? [...others, fresh]
       : others.toSpliced(Math.min(position, others.length), 0, fresh)
-  const sorted = [
-    ...ordered.filter((s) => s.key === "test"),
-    ...ordered.filter((s) => s.key !== "test"),
-  ]
+  const sorted = [...ordered.filter(isTestSection), ...ordered.filter((s) => !isTestSection(s))]
 
   return [head, ...sorted.map((s) => wrap(s.key, s.sha, s.body)), foot].join("\n\n")
 }

@@ -7,7 +7,7 @@ import { dirname, join, resolve } from "node:path"
 
 import { loadConfig } from "./config.ts"
 import { closingLines, runExitCode } from "./reporter.ts"
-import { type Reporter, tellReporters } from "./reporting.ts"
+import { type Reporter, suiteOf, tellReporters } from "./reporting.ts"
 import { lastRunPath, mergeResults, readResults, type RunResults } from "./results.ts"
 
 export interface MergeReportsOptions {
@@ -17,6 +17,8 @@ export interface MergeReportsOptions {
   readonly files?: readonly string[]
   /** Reporters besides the config's, e.g. from `--reporter`. */
   readonly reporters?: readonly Reporter[]
+  /** `--name`: the suite's name for the reporters; overrides the config's `name`. */
+  readonly name?: string
   readonly write?: (line: string) => void
 }
 
@@ -54,7 +56,12 @@ export async function mergeReports(options: MergeReportsOptions = {}): Promise<n
 
   const merged = mergeResults(runs)
   const reporters = [...(loaded.config.reporters ?? []), ...(options.reporters ?? [])]
-  const context = { kind: "test", root: loaded.root, cwd } as const
+  const context = {
+    kind: "test",
+    root: loaded.root,
+    cwd,
+    ...suiteOf(options.name, loaded.config),
+  } as const
 
   write(`merged ${runs.length} result file${runs.length === 1 ? "" : "s"}`)
   for (const line of closingLines(merged.reports)) write(line)

@@ -20,7 +20,7 @@ import { updateImpactIndex } from "./impact.ts"
 import { type LiveFeed, newRunId, openLiveFeed } from "./live.ts"
 import { closeRecording, openRecording, recordingContext } from "./recording.ts"
 import { closingLines, fileErrorLine, openingLine, runExitCode, testLine } from "./reporter.ts"
-import { type RunCommandOptions, tellReporters, type TestRunReport } from "./reporting.ts"
+import { type RunCommandOptions, suiteOf, tellReporters, type TestRunReport } from "./reporting.ts"
 import {
   failedIds,
   lastRunPath,
@@ -417,6 +417,7 @@ async function runAndReport(input: RunInput, frame: RunFrame): Promise<number> {
     cwd,
     id: frame.id,
     ...recordingContext(recording),
+    ...suiteOf(options.name, loaded.config),
   } as const
   const reports: TestReport[] = []
   const crew = testCrew(input, size, recording, feed, (report) => {

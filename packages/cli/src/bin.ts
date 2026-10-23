@@ -114,10 +114,14 @@ const reporterOption = () =>
     "reporters besides the console's list: github (a check run, a pull request comment and the job summary in GitHub Actions), junit (.danwo/junit.xml)",
   )
 
-/** `--reporter`, and `--no-pr-comment` for the github reporter. */
+/** `--reporter`, `--name`, and `--no-pr-comment` for the github reporter. */
 function withReporterOptions(command: Command): Command {
   return command
     .addOption(reporterOption())
+    .option(
+      "--name <suite>",
+      "the suite's name, for a repository with several suites: the github reporter's check run, pull request comment section, summary and artifact (default: the config's name)",
+    )
     .option("--no-pr-comment", "github reporter: no pull request comment, only the check run")
 }
 
@@ -200,6 +204,7 @@ withReporterOptions(withLintOptions(program.command("test")))
         updateSnapshots?: boolean
         reporter?: string[]
         prComment?: boolean
+        name?: string
         lint?: boolean
       },
     ) => {
@@ -281,6 +286,7 @@ withReporterOptions(withLintOptions(program.command("matrix")))
         updateSnapshots?: boolean
         reporter?: string[]
         prComment?: boolean
+        name?: string
         lint?: boolean
       },
     ) => {
@@ -295,13 +301,19 @@ withReporterOptions(program.command("merge-reports"))
   .description("join the results of a split run (danwo test --shard i/n) into one report")
   .argument("[files...]", "results files (default: .danwo/results/shard-*.json)")
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
-  .action(async (files: string[], options: { config?: string } & ReporterFlags) => {
-    process.exitCode = await mergeReports({
-      files,
-      ...(options.config !== undefined && { config: options.config }),
-      reporters: reportersOf(options),
-    })
-  })
+  .action(
+    async (
+      files: string[],
+      { name, ...options }: { config?: string; name?: string } & ReporterFlags,
+    ) => {
+      process.exitCode = await mergeReports({
+        files,
+        ...(options.config !== undefined && { config: options.config }),
+        ...(name !== undefined && { name }),
+        reporters: reportersOf(options),
+      })
+    },
+  )
 
 program
   .command("impact")

@@ -11,6 +11,8 @@ const WEBSITE = fileURLToPath(new URL("..", import.meta.url))
 const BUILT = fileURLToPath(new URL("../dist/client/index.html", import.meta.url))
 
 export default defineConfig({
+  /* The repository has two suites; GitHub reports each under its name. */
+  name: "website",
   testDir: "tests",
   workers: 2,
   async environment() {

@@ -66,8 +66,9 @@ jobs:
 
   # danwo tests its own dashboard and website with `danwo test`, as a user's suite runs: the
   # dashboard over a project with real runs in it, the website built and under Vite's preview.
-  # Each suite reports a check with annotations and the job summary; the pull request comment is
-  # left to the shop's suite in dogfood.yml, whose section a second `danwo test` would replace.
+  # Each suite is named in its config (`dashboard`, `website`), so each reports its own check
+  # ("danwo · dashboard"), its own section of the pull request comment beside the shop's from
+  # dogfood.yml, and points its job summary at its own artifact (`danwo-runs-<name>`).
   dogfood:
     name: dashboard and website (danwo test)
     runs-on: ubuntu-latest
@@ -75,6 +76,7 @@ jobs:
     permissions:
       contents: read
       checks: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -82,11 +84,11 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           chromium: "true"
-      - run: bun run test:e2e --reporter github,junit --no-pr-comment
+      - run: bun run test:e2e --reporter github,junit
         working-directory: packages/dashboard
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      - run: bun run test:e2e --reporter github,junit --no-pr-comment
+      - run: bun run test:e2e --reporter github,junit
         if: ${{ !cancelled() }}
         working-directory: website
         env:
@@ -94,10 +96,16 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
-          name: danwo-runs
-          path: |
-            packages/dashboard/e2e/.danwo/
-            website/e2e/.danwo/
+          name: danwo-runs-dashboard
+          path: packages/dashboard/e2e/.danwo/runs
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: danwo-runs-website
+          path: website/e2e/.danwo/runs
           include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 14

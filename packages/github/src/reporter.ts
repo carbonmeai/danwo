@@ -3,7 +3,8 @@
  * an annotation for every failure, completes the check with a conclusion and summary, and appends
  * the same summary to the job summary. On a pull request it also keeps one comment up to date with
  * every run's results. Outside Actions, without a token, or without permission it says why and
- * leaves the run alone: reporting never fails a run.
+ * leaves the run alone: reporting never fails a run. A repository with several suites reports each
+ * under its own name (see `suite.ts`).
  */
 import { appendFile } from "node:fs/promises"
 
@@ -26,12 +27,19 @@ import {
 } from "./checks.ts"
 import { PullRequestComment } from "./comment-poster.ts"
 import { explainRefusal } from "./request.ts"
+import { checkName, type SuiteIdentity, suiteIdentity } from "./suite.ts"
 import { matrixSummary, matrixTitle, testSummary, testTitle } from "./summary.ts"
 
 export interface GitHubReporterOptions {
-  /** The check run's name; default `danwo` for `danwo test` and `danwo matrix` for the matrix. */
+  /**
+   * The check run's name; default `danwo` for `danwo test` and `danwo matrix` for the matrix,
+   * followed by the suite's name when it has one (`danwo · dashboard`).
+   */
   readonly name?: string
-  /** The artifact name the workflow uploads `.danwo/runs` under; default `danwo-runs`. */
+  /**
+   * The artifact name the workflow uploads `.danwo/runs` under; default `danwo-runs`, or
+   * `danwo-runs-<suite>` for a named suite.
+   */
   readonly artifact?: string
   /** The environment to read the job from; default `process.env`. */
   readonly env?: Readonly<Record<string, string | undefined>>
@@ -61,8 +69,6 @@ interface Verdict {
   readonly annotations: readonly Annotation[]
 }
 
-const NAMES: Readonly<Record<RunKind, string>> = { test: "danwo", matrix: "danwo matrix" }
-
 /** Why a check run request failed, worded as what to do about it. */
 const explain = (error: unknown) => explainRefusal(error, "check run", "checks: write")
 
@@ -76,7 +82,7 @@ function batches(annotations: readonly Annotation[]): Annotation[][] {
   return out.length > 0 ? out : [[]]
 }
 
-function testVerdict(run: TestRunReport, job: ActionsJob, artifact: string): Verdict {
+function testVerdict(run: TestRunReport, job: ActionsJob, suite: SuiteIdentity): Verdict {
   const failed =
     run.brokenFiles.length > 0 ||
     run.reports.some((r) => ["failed", "timed-out", "interrupted"].includes(r.status))
@@ -84,18 +90,18 @@ function testVerdict(run: TestRunReport, job: ActionsJob, artifact: string): Ver
   return {
     conclusion: failed ? "failure" : "success",
     title: testTitle(run),
-    summary: testSummary(run, { runUrl: job.runUrl, artifact }),
+    summary: testSummary(run, { runUrl: job.runUrl, artifact: suite.artifact }, suite.name),
     annotations: testAnnotations({ root: run.root, workspace: job.workspace ?? run.cwd }, run),
   }
 }
 
-function matrixVerdict(run: MatrixRunReport, job: ActionsJob, artifact: string): Verdict {
+function matrixVerdict(run: MatrixRunReport, job: ActionsJob, suite: SuiteIdentity): Verdict {
   const outcomes = [run.result.clean, ...run.result.runs]
 
   return {
     conclusion: outcomes.every((o) => o.status === "passed") ? "success" : "failure",
     title: matrixTitle(run),
-    summary: matrixSummary(run, { runUrl: job.runUrl, artifact }),
+    summary: matrixSummary(run, { runUrl: job.runUrl, artifact: suite.artifact }, suite.name),
     annotations: matrixAnnotations({ root: run.root, workspace: job.workspace ?? run.cwd }, run),
   }
 }
@@ -161,13 +167,12 @@ async function writeStepSummary(job: ActionsJob, summary: string, log: (line: st
 /** Reports danwo runs to GitHub from an Actions job; see the module comment. */
 export function github(options: GitHubReporterOptions = {}): Reporter {
   const log = options.log ?? ((line: string) => process.stderr.write(`${line}\n`))
-  const artifact = options.artifact ?? "danwo-runs"
   let job: Promise<ActionsJob | string> | undefined
   const checks = new Map<RunKind, CheckRun>()
+  const suites = new Map<RunKind, SuiteIdentity>()
   const env = options.env ?? process.env
   const comment = new PullRequestComment({
     enabled: options.prComment ?? !OFF.has((env["DANWO_PR_COMMENT"] ?? "").toLowerCase()),
-    artifact,
     reportUrl: options.reportUrl ?? (env["DANWO_REPORT_URL"] || undefined),
     fetch: options.fetch ?? fetch,
     log,
@@ -175,13 +180,28 @@ export function github(options: GitHubReporterOptions = {}): Reporter {
 
   const jobOnce = () => (job ??= actionsJob(env))
 
+  /** The run's suite, worked out once per command from its first report. */
+  function suiteFor(run: RunContext, found: ActionsJob): SuiteIdentity {
+    const known = suites.get(run.kind)
+
+    if (known !== undefined) return known
+
+    const suite = suiteIdentity(run, found.workspace ?? run.cwd, {
+      ...(options.artifact !== undefined && { artifact: options.artifact }),
+    })
+
+    suites.set(run.kind, suite)
+
+    return suite
+  }
+
   /** The run's check, or none outside Actions or without a token (said once, on first use). */
-  async function checkFor(kind: RunKind): Promise<CheckRun | undefined> {
+  async function checkFor(run: RunContext): Promise<CheckRun | undefined> {
     const found = await jobOnce()
 
     if (typeof found === "string" || found.token === undefined) return undefined
 
-    const existing = checks.get(kind)
+    const existing = checks.get(run.kind)
 
     if (existing !== undefined) return existing
 
@@ -191,9 +211,10 @@ export function github(options: GitHubReporterOptions = {}): Reporter {
       token: found.token,
       fetch: options.fetch ?? fetch,
     })
-    const check = new CheckRun(client, options.name ?? NAMES[kind], found, log)
+    const name = options.name ?? checkName(run.kind, suiteFor(run, found))
+    const check = new CheckRun(client, name, found, log)
 
-    checks.set(kind, check)
+    checks.set(run.kind, check)
 
     return check
   }
@@ -205,23 +226,24 @@ export function github(options: GitHubReporterOptions = {}): Reporter {
     else if (found.token === undefined)
       log("github: GITHUB_TOKEN is not set; writing the job summary only")
 
-    await (await checkFor(run.kind))?.open()
+    await (await checkFor(run))?.open()
   }
 
   async function finished(
-    kind: RunKind,
-    verdict: (job: ActionsJob) => Verdict,
-    commented?: (job: ActionsJob) => Promise<void>,
+    run: RunContext,
+    verdict: (job: ActionsJob, suite: SuiteIdentity) => Verdict,
+    commented?: (job: ActionsJob, suite: SuiteIdentity) => Promise<void>,
   ): Promise<void> {
     const found = await jobOnce()
 
     if (typeof found === "string") return
 
-    const result = verdict(found)
+    const suite = suiteFor(run, found)
+    const result = verdict(found, suite)
 
     await writeStepSummary(found, result.summary, log)
-    await (await checkFor(kind))?.finish(result)
-    await commented?.(found)
+    await (await checkFor(run))?.finish(result)
+    await commented?.(found, suite)
   }
 
   return {
@@ -229,23 +251,23 @@ export function github(options: GitHubReporterOptions = {}): Reporter {
     started,
     testsFinished: (run) =>
       finished(
-        "test",
-        (found) => testVerdict(run, found, artifact),
-        (found) => comment.tests(found, run),
+        run,
+        (found, suite) => testVerdict(run, found, suite),
+        (found, suite) => comment.tests(found, run, suite),
       ),
     matrixFinished: (run) =>
       finished(
-        "matrix",
-        (found) => matrixVerdict(run, found, artifact),
-        (found) => comment.matrix(found, run),
+        run,
+        (found, suite) => matrixVerdict(run, found, suite),
+        (found, suite) => comment.matrix(found, run, suite),
       ),
     async aborted(run) {
       const reason = `the run stopped before it had a result: ${shown(run.error)}`
 
-      await finished(run.kind, () => ({
+      await finished(run, (_found, suite) => ({
         conclusion: "failure",
         title: "run aborted",
-        summary: `### ${NAMES[run.kind]}: run aborted\n\n${reason}`,
+        summary: `### ${checkName(run.kind, suite)}: run aborted\n\n${reason}`,
         annotations: [],
       }))
     },

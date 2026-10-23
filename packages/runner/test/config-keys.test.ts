@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { closestKey, configWarnings } from "../src/runner/config-keys.ts"
+import { suiteOf } from "../src/runner/reporting.ts"
 
 describe("config keys danwo does not know", () => {
   it("are each named, with the key they most likely mean", () => {
@@ -25,5 +26,15 @@ describe("config keys danwo does not know", () => {
     expect(
       configWarnings({ testDir: "tests", retries: 1, lint: false, matrix: { races: false } }),
     ).toEqual([])
+  })
+})
+
+describe("the suite's name", () => {
+  it("is --name, else the config's name, else none, so one suite reports as before", () => {
+    expect(configWarnings({ name: "dashboard" })).toEqual([])
+    expect(suiteOf("website", { name: "dashboard" })).toEqual({ suite: "website" })
+    expect(suiteOf(undefined, { name: " dashboard " })).toEqual({ suite: "dashboard" })
+    expect(suiteOf(undefined, {})).toEqual({})
+    expect(suiteOf("", {})).toEqual({})
   })
 })

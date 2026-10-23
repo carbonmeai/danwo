@@ -25,6 +25,11 @@ export interface RunContext {
   readonly id?: string
   /** How many of the newest runs keep their recordings, when the run recorded. */
   readonly keepRuns?: number
+  /**
+   * The suite's name, from `--name` or the config's `name`, so reporters can tell several suites
+   * of one repository apart; absent when neither sets one.
+   */
+  readonly suite?: string
 }
 
 /** `danwo test` once every test reported. */
@@ -92,9 +97,21 @@ export interface RunCommandOptions {
   readonly updateScreenshots?: boolean
   /** Reporters besides the config's, e.g. from `--reporter`. */
   readonly reporters?: readonly Reporter[]
+  /** `--name`: the suite's name for the reporters; overrides the config's `name`. */
+  readonly name?: string
   /** `--lint` / `--no-lint`: run the integration lint; absent follows the config (on by default). */
   readonly lint?: boolean
   readonly write?: (line: string) => void
+}
+
+/** The run's suite name for its context: `--name`, else the config's; nothing when neither is set. */
+export function suiteOf(
+  flag: string | undefined,
+  config: { readonly name?: string },
+): { suite?: string } {
+  const name = (flag ?? config.name)?.trim()
+
+  return name === undefined || name === "" ? {} : { suite: name }
 }
 
 /** Calls `hook` on every reporter, turning a failure into a warning line. */

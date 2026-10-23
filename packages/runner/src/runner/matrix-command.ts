@@ -46,6 +46,7 @@ import {
   type Reporter,
   type RunCommandOptions,
   type RunContext,
+  suiteOf,
   tellReporters,
   type TrialFindings,
 } from "./reporting.ts"
@@ -697,7 +698,14 @@ export async function runMatrix(
       ...(loaded.config.reporters ?? []),
       ...(options.reporters ?? []),
     ],
-    context: { kind: "matrix", root: loaded.root, cwd, id, ...recordingContext(recording) },
+    context: {
+      kind: "matrix",
+      root: loaded.root,
+      cwd,
+      id,
+      ...recordingContext(recording),
+      ...suiteOf(options.name, loaded.config),
+    },
     began: Date.now(),
     write,
     faults: options.faults,

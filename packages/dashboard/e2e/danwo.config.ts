@@ -7,6 +7,8 @@ import { appEnvironment, defineConfig, freePort } from "@danwo/sdk"
 import { DANWO, PROJECT, prepareProject } from "./project.ts"
 
 export default defineConfig({
+  /* The repository has two suites; GitHub reports each under its name. */
+  name: "dashboard",
   testDir: "tests",
   /* The tests share one project on disk, and some add runs to it or delete one. */
   workers: 1,

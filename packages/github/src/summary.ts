@@ -51,6 +51,10 @@ export function cell(text: string): string {
 
 export const seconds = (ms: number) => `${(ms / 1000).toFixed(1)} s`
 
+/** A heading's command, followed by the suite's name when it has one: `danwo test · dashboard`. */
+const named = (command: string, suite: string | undefined) =>
+  suite === undefined ? command : `${command} · ${suite}`
+
 /** A flight record folder as it appears inside the uploaded artifact. */
 export function recordInArtifact(record: string): string {
   /* A record's path on Windows may hold backslashes; the artifact's paths take forward slashes. */
@@ -136,7 +140,7 @@ function lintSection(findings: readonly LintFinding[]): string[] {
 }
 
 /** The summary of a `danwo test` run. */
-export function testSummary(run: TestRunReport, link: RecordsLink): string {
+export function testSummary(run: TestRunReport, link: RecordsLink, suite?: string): string {
   const notable = run.reports.filter((r) => FAILED.has(r.status) || r.status === "flaky")
   const records = notable.flatMap((report): [string, string][] => {
     const record = report.attempts.findLast((attempt) => attempt.record)?.record
@@ -144,7 +148,7 @@ export function testSummary(run: TestRunReport, link: RecordsLink): string {
     return record ? [[testName(report), record]] : []
   })
   const lines = [
-    `### danwo test: ${testTitle(run)} in ${seconds(run.durationMs)}`,
+    `### ${named("danwo test", suite)}: ${testTitle(run)} in ${seconds(run.durationMs)}`,
     ...(notable.length === 0
       ? []
       : [
@@ -190,7 +194,7 @@ function outcomeRow(outcome: RunOutcome): string {
 }
 
 /** The summary of a `danwo matrix` run: failures first, then every fault that held. */
-export function matrixSummary(run: MatrixRunReport, link: RecordsLink): string {
+export function matrixSummary(run: MatrixRunReport, link: RecordsLink, suite?: string): string {
   const outcomes = [run.result.clean, ...run.result.runs]
   const failing = outcomes.filter((outcome) => outcome.status !== "passed")
   const passing = outcomes.filter((outcome) => outcome.status === "passed")
@@ -198,7 +202,7 @@ export function matrixSummary(run: MatrixRunReport, link: RecordsLink): string {
     o.record ? [[o.fault?.label ?? "clean run", o.record]] : [],
   )
   const lines = [
-    `### danwo matrix: ${matrixTitle(run)} in ${seconds(run.durationMs)}`,
+    `### ${named("danwo matrix", suite)}: ${matrixTitle(run)} in ${seconds(run.durationMs)}`,
     "",
     `Test: \`${run.testId}\` (\`${fileOfTestId(run.testId)}\`)`,
     "",

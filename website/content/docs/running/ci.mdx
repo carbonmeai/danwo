@@ -52,6 +52,40 @@ summary. The last step uploads the flight records, so you can open a failure's r
 
 The same summary goes to the job summary page.
 
+## Several suites in one repository
+
+A repository can hold more than one suite, such as an app's and its admin's. Give each a name,
+and GitHub reports each one on its own:
+
+```ts title="admin/e2e/danwo.config.ts · the suite's name"
+export default defineConfig({
+  name: "admin",
+  // …
+})
+```
+
+| What                         | One suite    | A suite named `admin` |
+| ---------------------------- | ------------ | --------------------- |
+| check run                    | `danwo`      | `danwo · admin`       |
+| pull request comment section | shared       | its own               |
+| job summary heading          | `danwo test` | `danwo test · admin`  |
+| artifact the summary names   | `danwo-runs` | `danwo-runs-admin`    |
+
+`--name admin` on the command line does the same for one run. Upload each suite's runs under
+its artifact's name:
+
+```yaml title=".github/workflows/e2e.yml · one suite's records"
+- uses: actions/upload-artifact@v4
+  if: ${{ !cancelled() }}
+  with:
+    name: danwo-runs-admin
+    path: admin/e2e/.danwo/runs
+```
+
+When git tracks more than one danwo config and a suite has no name, danwo names it after its
+config's folder, skipping folders such as `e2e` and `tests`. A repository with one suite reports
+as before.
+
 ## Permissions
 
 | Permission             | Needed for                        | Without it                                       |

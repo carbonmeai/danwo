@@ -17,6 +17,7 @@ import {
   testSection,
 } from "./pr-comment.ts"
 import { explainRefusal } from "./request.ts"
+import type { SuiteIdentity } from "./suite.ts"
 
 /** Why a comment request failed, worded as what to do about it. */
 const explain = (error: unknown) =>
@@ -63,7 +64,6 @@ class CommentPoster {
 export interface CommentSettings {
   /** Post the comment at all; off with `prComment: false`, `--no-pr-comment` or `DANWO_PR_COMMENT=off`. */
   readonly enabled: boolean
-  readonly artifact: string
   readonly reportUrl: string | undefined
   readonly fetch: typeof fetch
   readonly log: (line: string) => void
@@ -82,7 +82,7 @@ export class PullRequestComment {
     this.settings = settings
   }
 
-  async tests(job: ActionsJob, run: TestRunReport): Promise<void> {
+  async tests(job: ActionsJob, run: TestRunReport, suite: SuiteIdentity): Promise<void> {
     const poster = this.posterFor(job)
 
     if (poster === undefined) return
@@ -95,17 +95,17 @@ export class PullRequestComment {
       return
     }
 
-    await poster.post(await testSection(run, this.links(job)))
+    await poster.post(await testSection(run, this.links(job, suite), suite))
   }
 
-  async matrix(job: ActionsJob, run: MatrixRunReport): Promise<void> {
-    await this.posterFor(job)?.post(matrixSection(run, this.links(job)))
+  async matrix(job: ActionsJob, run: MatrixRunReport, suite: SuiteIdentity): Promise<void> {
+    await this.posterFor(job)?.post(matrixSection(run, this.links(job, suite), suite))
   }
 
-  private links(job: ActionsJob): CommentLinks {
+  private links(job: ActionsJob, suite: SuiteIdentity): CommentLinks {
     return {
       runUrl: job.runUrl,
-      artifact: this.settings.artifact,
+      artifact: suite.artifact,
       reportUrl: this.settings.reportUrl,
       sha: job.headSha,
     }

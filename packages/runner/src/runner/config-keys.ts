@@ -7,6 +7,7 @@ import type { DanwoConfig } from "./config.ts"
 
 /** Every top-level key; the type makes a key added to `DanwoConfig` and missing here an error. */
 const CONFIG_KEYS: Readonly<Record<keyof DanwoConfig, true>> = {
+  name: true,
   testDir: true,
   testMatch: true,
   baseUrl: true,

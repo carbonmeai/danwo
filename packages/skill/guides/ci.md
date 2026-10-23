@@ -37,6 +37,20 @@ jobs:
 - Without a token, or when the token may not write checks, the reporter says so and the run's
   exit code is unchanged.
 
+## Several suites in one repository
+
+A suite's name (`name: "admin"` in its config, or `--name admin` on `danwo test`, `danwo matrix`
+and `danwo merge-reports`) keeps it apart from the repository's other suites: its check run is
+`danwo · admin` (`danwo matrix · admin`), its pull request comment section is its own (key
+`test:admin`; matrix sections are keyed by suite and test), its job summary heading is
+`danwo test · admin`, and the summary and comment point at the artifact `danwo-runs-admin`, so
+upload that suite's `.danwo/runs` under that name. Without a name, when git tracks more than one
+`danwo.config.*` in the workspace, the suite is named after its config's folder relative to the
+workspace, skipping generic folders (`e2e`, `test`, `tests`, `spec`, `specs`, `integration`,
+`danwo`, `__tests__`): `packages/dashboard/e2e` is `dashboard`. A repository with one config, or a
+suite at the workspace's root, stays unnamed: check `danwo`, section `test`, artifact `danwo-runs`.
+`github({ name, artifact })` in the config still sets the check's name and the artifact outright.
+
 ## The pull request comment
 
 On a `pull_request` event the github reporter also posts one comment on the pull request and edits

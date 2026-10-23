@@ -456,6 +456,33 @@ describe("github reporter on a pull request", () => {
     expect(logged.filter((line) => line.includes("comment"))).toEqual([])
   })
 
+  it("keeps a section per named suite, so a second suite's run does not replace the first's", async () => {
+    const emulator = await shopOnGitHub()
+    const env = await pullRequestEnv(ADA_TOKEN)
+    const reporter = () =>
+      github({ env, fetch: viaEmulator(emulator), log: (line) => logged.push(line) })
+
+    await reporter().testsFinished?.(
+      testRun([failed("tests/a.danwo.ts › pays")], { suite: "dashboard" }),
+    )
+    await reporter().testsFinished?.(
+      testRun([passed("tests/a.danwo.ts › pays")], { suite: "website" }),
+    )
+    await reporter().matrixFinished?.(matrixRun({ suite: "website" }))
+
+    const body = githubRepo(emulator, "acme/shop").comments(1)[0]?.body ?? ""
+
+    expect(parseSections(body).map((s) => s.key)).toEqual([
+      "test:dashboard",
+      "test:website",
+      expect.stringMatching(/^matrix:/),
+    ])
+    expect(body).toContain("### ❌ danwo test · dashboard · 0 passed · 1 failed")
+    expect(body).toContain("### ✅ danwo test · website · 1 passed · 0 failed")
+    expect(body).toContain("danwo matrix · website · ")
+    expect(body).toContain("In the `danwo-runs-website` artifact")
+  })
+
   it("leaves the comment to merge-reports on a shard, and posts the merged run", async () => {
     const emulator = await shopOnGitHub()
     const env = await pullRequestEnv(ADA_TOKEN)
