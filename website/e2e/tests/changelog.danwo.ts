@@ -1,6 +1,25 @@
+import { readdirSync } from "node:fs"
+import { fileURLToPath } from "node:url"
+
 import { test } from "@danwo/sdk"
 
-test("the changelog lists 0.1.1 first, above 0.1.0", async ({ app, screen, expect }) => {
+/** The releases the changelog has entries for, newest first, as "danwo 0.1.2". */
+function releasesNewestFirst(): string[] {
+  const dir = fileURLToPath(new URL("../../content/changelog", import.meta.url))
+
+  return readdirSync(dir)
+    .map((name) => /^(\d+)\.(\d+)\.(\d+)\.mdx$/.exec(name))
+    .filter((match) => match !== null)
+    .map((match) => match.slice(1, 4).map(Number))
+    .toSorted(
+      (a, b) => (b[0] ?? 0) - (a[0] ?? 0) || (b[1] ?? 0) - (a[1] ?? 0) || (b[2] ?? 0) - (a[2] ?? 0),
+    )
+    .map((version) => `danwo ${version.join(".")}`)
+}
+
+test("the changelog lists the releases newest first", async ({ app, screen, expect }) => {
+  const [newest, previous] = releasesNewestFirst()
+
   await app.open("/")
   await screen
     .getByRole("navigation", { name: "Primary" })
@@ -11,6 +30,6 @@ test("the changelog lists 0.1.1 first, above 0.1.0", async ({ app, screen, expec
 
   const releases = screen.getByRole("heading", { level: 2, name: /^danwo \d/ })
 
-  await expect(releases.first()).toHaveText("danwo 0.1.1")
-  await expect(releases.nth(1)).toHaveText("danwo 0.1.0")
+  await expect(releases.first()).toHaveText(newest ?? "")
+  await expect(releases.nth(1)).toHaveText(previous ?? "")
 })
