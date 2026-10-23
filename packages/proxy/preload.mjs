@@ -43,6 +43,9 @@ const PROBE_HEADER = "x-danwo-probe"
 /** How long each probe call may take before the process counts as not routed. */
 const PROBE_TIMEOUT_MS = 5_000
 
+/** How often the clock file is looked at, besides its watch events, for an offset not yet taken. */
+const CLOCK_POLL_MS = 250
+
 /** What this Node routes through HTTPS_PROXY by itself, from its version (`22.18.0`). */
 export function nativeProxySupport(version) {
   const [major = 0, minor = 0] = version.split(".").map(Number)
@@ -258,13 +261,31 @@ function shiftClock(file) {
   const ack = join(acks, String(process.pid))
   let offset = 0
 
+  /**
+   * Takes the file's offset and acknowledges it. A write empties the file before it fills it, and
+   * a watch event can land in between: an empty read keeps the last offset and waits for the next.
+   */
   const load = () => {
     try {
-      offset = Number(readFileSync(file, "utf8")) || 0
+      const text = readFileSync(file, "utf8").trim()
+
+      if (text === "") return
+      offset = Number(text) || 0
       mkdirSync(acks, { recursive: true })
       writeFileSync(ack, String(offset))
     } catch {
       /* The run that owned the file has ended; keep the last offset. */
+    }
+  }
+
+  /** Whether the file holds an offset this process has not taken, for when a watch event is missed. */
+  const stale = () => {
+    try {
+      const text = readFileSync(file, "utf8").trim()
+
+      return text !== "" && (Number(text) || 0) !== offset
+    } catch {
+      return false
     }
   }
 
@@ -294,6 +315,10 @@ function shiftClock(file) {
   watch(dirname(file), (_event, name) => {
     if (name === basename(file)) load()
   }).unref()
+  /* Watchers can merge or drop events (Bun's on Linux does), so a slow look catches what they miss. */
+  setInterval(() => {
+    if (stale()) load()
+  }, CLOCK_POLL_MS).unref()
   process.once("exit", () => rmSync(ack, { force: true }))
 }
 
