@@ -84,6 +84,12 @@ describe("the environment for an app outside Node", () => {
     expect(env.no_proxy).toBe(env.NO_PROXY)
   })
 
+  it("leaves out of NO_PROXY a bracketed address with a port, which httpx cannot parse", () => {
+    const port = new URL(proxy.url).port
+
+    expect(appEnv().NO_PROXY?.split(",")).toEqual([`127.0.0.1:${port}`, `localhost:${port}`])
+  })
+
   it("keeps the app's own NO_PROXY, in both cases", () => {
     const env = proxy.env({ no_proxy: "db.internal" })
 

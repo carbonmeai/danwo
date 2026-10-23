@@ -109,12 +109,14 @@ export interface EnvOptions {
  * The proxy's own address, as `NO_PROXY` entries. A client that proxies a request itself (axios
  * reads HTTP_PROXY) sends it to the proxy's address; without these entries the app's agent, which
  * the preload makes proxy-aware too, proxies that request a second time, and the proxy receives a
- * request for itself and refuses it as a loop.
+ * request for itself and refuses it as a loop. No `[::1]:<port>` entry: the proxy's URL names
+ * 127.0.0.1, and Python's httpx cannot parse a bracketed address with a port in NO_PROXY, so every
+ * httpx client (the Stripe SDK builds one) would fail to start.
  */
 function ownAddresses(url: string): string[] {
   const { port } = new URL(url)
 
-  return [`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`]
+  return [`127.0.0.1:${port}`, `localhost:${port}`]
 }
 
 /**
