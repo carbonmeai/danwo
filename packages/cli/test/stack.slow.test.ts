@@ -150,7 +150,7 @@ describe("a stack of apps behind one proxy", () => {
     expect(out).toContain("status 500 on POST api.stripe.com/v1/customers\n")
     expect(out).not.toMatch(/on POST api\.stripe\.com\/v1\/customers #2/)
     expect(out).toMatch(/\d+ of \d+ possible faults left out: \d+ on setup/)
-    expect(out).toMatch(/about \d+(–\d+)? (s|min) for \d+ trials on \d+ workers/)
+    expect(out).toMatch(/about \d+(–\d+)? (s|min) for \d+ trials? on \d+ workers?/)
     expect(out).not.toContain("faulted runs stop")
   }, 300_000)
 

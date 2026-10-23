@@ -1,7 +1,13 @@
 import type { PlannedFault } from "@danwo/matrix"
 import { describe, expect, it } from "vitest"
 
-import { type CleanCost, estimateText, estimateTrials } from "../src/runner/estimate.ts"
+import {
+  type CleanCost,
+  estimateLine,
+  estimateText,
+  estimateTrials,
+} from "../src/runner/estimate.ts"
+import { counted } from "../src/support/counted.ts"
 
 /** A clean run: 1.9 s around a 4 s body, 6 s to start a worker, a 2 s reset and a 0.4 s restore. */
 const CLEAN: CleanCost = {
@@ -70,5 +76,20 @@ describe("matrix plan estimate", () => {
     expect(estimateText({ lowMs: 180_000, highMs: 300_000 })).toBe("about 3–5 min")
     expect(estimateText({ lowMs: 40_000, highMs: 70_000 })).toBe("about 40–70 s")
     expect(estimateText({ lowMs: 19_400, highMs: 19_400 })).toBe("about 19 s")
+  })
+
+  it("counts one trial on one worker in the singular", () => {
+    expect(estimateLine([DROPPED], CLEAN, 1)).toBe("about 3–6 s for 1 trial on 1 worker")
+    expect(estimateLine([duplicate(0), duplicate(1)], CLEAN, 2)).toBe(
+      "about 14 s for 2 trials on 2 workers",
+    )
+  })
+})
+
+describe("a count with its noun", () => {
+  it("is singular for one and plural otherwise", () => {
+    expect(counted(1, "worker")).toBe("1 worker")
+    expect(counted(2, "worker")).toBe("2 workers")
+    expect(counted(0, "test")).toBe("0 tests")
   })
 })

@@ -8,6 +8,7 @@
  */
 import type { PlannedFault } from "@danwo/matrix"
 
+import { counted } from "../support/counted.ts"
 import type { TrialTimings } from "./timings.ts"
 
 /** What the clean run measured that the faulted trials repeat. */
@@ -141,4 +142,15 @@ export function estimateText(estimate: TrialsEstimate): string {
   const high = spoken(estimate.highMs, unit)
 
   return low === high ? `about ${low} ${unit}` : `about ${low}–${high} ${unit}`
+}
+
+/** The plan's closing line, `about 40–70 s for 12 trials on 4 workers`, singular for one. */
+export function estimateLine(
+  plan: readonly PlannedFault[],
+  clean: CleanCost,
+  workers: number,
+): string {
+  const took = estimateText(estimateTrials(plan, clean, workers))
+
+  return `${took} for ${counted(plan.length, "trial")} on ${counted(workers, "worker")}`
 }

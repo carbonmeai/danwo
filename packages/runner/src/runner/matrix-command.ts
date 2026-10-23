@@ -36,7 +36,7 @@ import { type CatalogEntry, catalogOf } from "./catalog.ts"
 import { printConfigWarnings } from "./config-keys.ts"
 import { type DanwoConfig, type LoadedConfig, loadConfig } from "./config.ts"
 import { Crew } from "./crew.ts"
-import { type CleanCost, estimateText, estimateTrials } from "./estimate.ts"
+import { type CleanCost, estimateLine } from "./estimate.ts"
 import { DEFAULT_WEBHOOK_FAULTS, defaultDataFaults, defaultOutboundFaults } from "./faults.ts"
 import { historyReporter } from "./history.ts"
 import { type LiveFeed, newRunId, openLiveFeed } from "./live.ts"
@@ -393,9 +393,6 @@ function summaryOf(focused: FocusedPlan): PlanSummary {
  * would take on the crew, from what the clean run measured.
  */
 function previewLines(focused: FocusedPlan, cost: CleanCost, workers: number): string[] {
-  const count = focused.trials.length
-  const took = estimateText(estimateTrials(focused.trials, cost, workers))
-
   return [
     ...focused.trials.map((fault) => `  ${fault.label}`),
     ...(focused.skipped.budget.length > 0
@@ -403,7 +400,7 @@ function previewLines(focused: FocusedPlan, cost: CleanCost, workers: number): s
           `over the budget: ${focused.skipped.budget.slice(0, 10).join("; ")}${focused.skipped.budget.length > 10 ? "; …" : ""}`,
         ]
       : []),
-    `${took} for ${count} trials on ${workers} workers`,
+    estimateLine(focused.trials, cost, workers),
   ]
 }
 

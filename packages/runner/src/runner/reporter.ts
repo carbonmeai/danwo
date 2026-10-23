@@ -6,6 +6,7 @@ import pc from "picocolors"
 
 import { addUsage, cacheLine, dollars, modelLine, type Usage } from "../record/usage.ts"
 import { type ErrorClass, exitCodeOf } from "../support/codes.ts"
+import { counted } from "../support/counted.ts"
 import type { ResultStatus } from "../tests/retry.ts"
 import { testName, type TestReport } from "./tasks.ts"
 import { type FailureVerdict, VERDICT_LABELS, verdictSummary } from "./verdict-words.ts"
@@ -21,8 +22,6 @@ const SYMBOL: Readonly<Record<ResultStatus, string>> = {
 
 const isFailure = (status: ResultStatus) =>
   status === "failed" || status === "timed-out" || status === "interrupted"
-
-const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`
 
 /** One test's line: symbol, id, attempts when it took more than one, time and worker. */
 export function testLine(report: TestReport): string {
@@ -87,12 +86,12 @@ export function openingLine(
 ): string {
   const where =
     browsers.length === 0
-      ? count(tests, "test")
+      ? counted(tests, "test")
       : browsers.length === 1
-        ? `${count(tests, "test")} in ${browsers.join("")}`
-        : `${count(tests * browsers.length, "test")} (${tests} in each of ${browsers.join(", ")})`
+        ? `${counted(tests, "test")} in ${browsers.join("")}`
+        : `${counted(tests * browsers.length, "test")} (${tests} in each of ${browsers.join(", ")})`
 
-  return pc.dim(`Running ${where} with ${count(workers, "worker")}`)
+  return pc.dim(`Running ${where} with ${counted(workers, "worker")}`)
 }
 
 /** Lines of a file's error kept under its first, such as the output of an app that would not start. */

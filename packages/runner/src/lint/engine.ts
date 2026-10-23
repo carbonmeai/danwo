@@ -2,6 +2,7 @@
  * Runs the integration lint rules over a run, and says what came of them: findings with their
  * level, a summary line, detail lines, and whether they fail the run.
  */
+import { counted } from "../support/counted.ts"
 import { noRetryOnSerialization } from "./rules/data.ts"
 import { duplicateMessage } from "./rules/messages.ts"
 import { oauthPkce, oauthState } from "./rules/oauth.ts"
@@ -93,18 +94,14 @@ function lintFails(findings: readonly LintFinding[], config?: LintConfig): boole
   return findings.some((finding) => RANK[finding.severity] <= RANK[failOn])
 }
 
-function plural(count: number, word: string): string {
-  return `${count} ${word}${count === 1 ? "" : "s"}`
-}
-
 /** `integration lint: 2 errors, 1 warning`; undefined when there is nothing to say. */
 function lintSummary(findings: readonly LintFinding[]): string | undefined {
   if (findings.length === 0) return undefined
 
   const count = (severity: LintSeverity) => findings.filter((f) => f.severity === severity).length
   const parts = [
-    count("error") > 0 && plural(count("error"), "error"),
-    count("warning") > 0 && plural(count("warning"), "warning"),
+    count("error") > 0 && counted(count("error"), "error"),
+    count("warning") > 0 && counted(count("warning"), "warning"),
     count("info") > 0 && `${count("info")} info`,
   ].filter((part) => part !== false)
 
