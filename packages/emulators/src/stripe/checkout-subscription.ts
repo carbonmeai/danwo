@@ -67,9 +67,25 @@ function saveCard(context: StripeRouteContext, customer: Customer, card: Payment
 }
 
 /**
+ * The payment method for the test card `reference`, or undefined when it declines: when the first
+ * invoice charges it, or, with a trial, when it is saved.
+ */
+function acceptedCard(
+  context: StripeRouteContext,
+  reference: string,
+  trial: boolean,
+): PaymentMethod | undefined {
+  const card = paymentMethodFor(context.objects, reference, context.clock())
+
+  if (!card) throw new Error(`the Checkout test card ${reference} is missing`)
+
+  return cardOutcome(card, trial ? "setup" : "charge") === "declined" ? undefined : card
+}
+
+/**
  * Starts the subscription a paid session asked for, paid with the test card `payment.card`
- * (`pm_card_visa`); returns the session's new fields. A card that declines when the first invoice
- * charges it (with a trial, when it is saved) starts nothing, and the payer is told why.
+ * (`pm_card_visa`); returns the session's new fields. A card that declines starts nothing, and
+ * the payer is told why.
  */
 export function subscribeSession(
   context: StripeRouteContext,
@@ -77,14 +93,10 @@ export function subscribeSession(
   plan: SessionPlan,
   payment: { readonly email: string | null; readonly card: string },
 ): Partial<CheckoutSession> | { readonly declined: string } {
-  const card = paymentMethodFor(context.objects, payment.card, context.clock())
-
-  if (!card) throw new Error(`the Checkout test card ${payment.card} is missing`)
-
   const trialDays = plan.subscription?.trialDays ?? null
+  const card = acceptedCard(context, payment.card, trialDays !== null)
 
-  if (cardOutcome(card, trialDays === null ? "charge" : "setup") === "declined")
-    return { declined: "Your card was declined." }
+  if (!card) return { declined: "Your card was declined." }
 
   const customer = customerFor(context, session, payment.email)
   const method = saveCard(context, customer, card)
