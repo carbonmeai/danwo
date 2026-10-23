@@ -95,13 +95,22 @@ export interface Emulator {
   close(): Promise<void>
 }
 
+/** `url` with any trailing slashes taken off. */
+function withoutTrailingSlashes(url: string): string {
+  let end = url.length
+
+  while (url[end - 1] === "/") end--
+
+  return url.slice(0, end)
+}
+
 /** Starts an instance of `definition`, in-process. */
 export function createEmulator(
   definition: EmulatorDefinition,
   options: EmulatorOptions = {},
 ): Emulator {
   const clock = options.clock ?? systemClock
-  const baseUrl = (options.baseUrl ?? `http://${definition.name}.localhost`).replace(/\/+$/, "")
+  const baseUrl = withoutTrailingSlashes(options.baseUrl ?? `http://${definition.name}.localhost`)
   const context: EmulatorContext = {
     app: new App(),
     store: new Store(clock),

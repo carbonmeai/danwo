@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto"
 
 import { HttpError } from "../errors.ts"
+import { randomChars } from "../random.ts"
 
 /** The Backend API's host: what an app's server calls with its secret key. */
 export const BAPI_HOST = "api.clerk.com"
@@ -30,9 +31,7 @@ const ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
 
 /** A Clerk-style id: a type prefix and 27 random base-62 characters, e.g. `user_2x…`. */
 export function clerkId(prefix: string): string {
-  const bytes = randomBytes(27)
-
-  return `${prefix}_${[...bytes].map((byte) => ALPHABET[byte % ALPHABET.length]).join("")}`
+  return `${prefix}_${randomChars(ALPHABET, 27)}`
 }
 
 /**
@@ -123,7 +122,9 @@ export function invalidParameter(name: string, message = `${name} is invalid.`):
  * base64-encoded without padding, as Clerk's SDKs decode it.
  */
 export function publishableKeyFor(frontendApi: string): string {
-  return `pk_test_${Buffer.from(`${frontendApi}$`).toString("base64").replace(/=+$/, "")}`
+  return `pk_test_${Buffer.from(`${frontendApi}$`)
+    .toString("base64")
+    .replace(/={1,2}$/, "")}`
 }
 
 /** The suffix Clerk's SDKs append to cookie names for this publishable key. */

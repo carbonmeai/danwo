@@ -308,7 +308,7 @@ describe("Checkout in subscription mode", () => {
       success_url: "https://app.danwo.test/done",
       customer_email: "ada@danwo.test",
     })
-    const paid = await fetch(`${session.url ?? ""}/complete`.replace("/checkout/", "/checkout/"), {
+    const paid = await fetch(`${session.url ?? ""}/complete`, {
       method: "POST",
       body: new URLSearchParams({ email: "ada@danwo.test" }),
       redirect: "manual",

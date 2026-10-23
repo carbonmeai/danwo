@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto"
 
+import { randomChars } from "../random.ts"
 import type { Clock, DataKey, Store } from "../store.ts"
 
 /** The hosts the Slack emulator answers: the Web API and OAuth, webhooks and file uploads. */
@@ -12,9 +13,7 @@ const ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 /** An id in Slack's style: a type letter (`T` team, `U` user, `C` channel…) and 10 characters. */
 export function slackId(prefix: string, length = 10): string {
-  const bytes = randomBytes(length)
-
-  return prefix + [...bytes].map((byte) => ALPHABET[byte % ALPHABET.length]).join("")
+  return prefix + randomChars(ALPHABET, length)
 }
 
 /**

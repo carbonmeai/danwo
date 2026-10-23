@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto"
 import { HttpError } from "../errors.ts"
 import type { Context } from "../http.ts"
 import { isRecord } from "../json.ts"
+import { randomChars } from "../random.ts"
 
 /** The hosts the Bachs emulator answers: the live and sandbox APIs, hosted checkout and the portal. */
 export const BACHS_HOSTS = [
@@ -19,9 +20,7 @@ const ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
 
 /** A Bachs id: the resource's prefix (`prod`, `cust`, `chk`…), an underscore and random letters and digits. */
 export function bachsId(prefix: string, length = 16): string {
-  const bytes = randomBytes(length)
-
-  return `${prefix}_${[...bytes].map((byte) => ALPHABET[byte % ALPHABET.length]).join("")}`
+  return `${prefix}_${randomChars(ALPHABET, length)}`
 }
 
 /** A random lowercase hex string of `bytes` bytes, for secrets and tokens. */

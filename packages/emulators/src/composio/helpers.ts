@@ -1,8 +1,9 @@
-import { randomBytes, randomUUID } from "node:crypto"
+import { randomBytes, randomInt, randomUUID } from "node:crypto"
 
 import { HttpError } from "../errors.ts"
 import type { App, Context, Handler } from "../http.ts"
 import { asRecord } from "../json.ts"
+import { randomChars } from "../random.ts"
 
 /** The hosts the Composio emulator answers: the API and the hosted connect page. */
 export const COMPOSIO_HOSTS = ["backend.composio.dev", "connect.composio.dev"]
@@ -18,7 +19,7 @@ const ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
 
 /** A Composio id: the kind's prefix (`ac`, `ca`, `ti`…), an underscore and twelve random letters and digits. */
 export function composioId(prefix: string, length = 12): string {
-  return `${prefix}_${[...randomBytes(length)].map((byte) => ALPHABET[byte % ALPHABET.length]).join("")}`
+  return `${prefix}_${randomChars(ALPHABET, length)}`
 }
 
 export const newUuid = (): string => randomUUID()
@@ -50,7 +51,7 @@ const WORD_SECOND = [
 ]
 
 function pick(words: readonly string[]): string {
-  return words[(randomBytes(1)[0] ?? 0) % words.length] ?? words[0] ?? ""
+  return words[randomInt(words.length)] ?? ""
 }
 
 /** A connected account's readable id, `<toolkit>_<word>-<word>` as Composio names them. */

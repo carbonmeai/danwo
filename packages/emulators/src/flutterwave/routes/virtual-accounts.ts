@@ -4,6 +4,7 @@
  * customer's bank transfer and sends `charge.completed`.
  */
 import { HttpError } from "../../errors.ts"
+import { randomChars } from "../../random.ts"
 import type { FlutterwaveRouteContext } from "../context.ts"
 import type { VirtualAccount } from "../entities.ts"
 import {
@@ -26,7 +27,7 @@ function freshAccountNumber(context: FlutterwaveRouteContext): string {
   )
 
   for (;;) {
-    const number = `95${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`
+    const number = `95${randomChars("0123456789", 8)}`
 
     if (!taken.has(number)) return number
   }
