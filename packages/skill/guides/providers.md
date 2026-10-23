@@ -64,13 +64,14 @@ export default defineConfig({
 ```
 
 `proxy.env(...)` adds the proxy and its certificate to the app's environment, so Node and most
-SDKs route through it without code changes.
+SDKs route through it without code changes. Seeds can be functions so they can point at the app
+once it runs, and they are applied again after every reset.
 
 ### Apps in other languages
 
 A Python, Go or Ruby app gets no preload; it is routed by the standard variables `env()` sets for
-every app: `HTTPS_PROXY`/`HTTP_PROXY`/`NO_PROXY` in upper and lower case (curl and Go read only
-lower case), and a CA bundle (danwo's CA, then Node's public roots, `proxy.caBundlePath`) in
+every app: `HTTPS_PROXY`/`HTTP_PROXY`/`NO_PROXY` in upper and lower case (curl reads only the
+lower-case `http_proxy`), and a CA bundle (danwo's CA, then Node's public roots, `proxy.caBundlePath`) in
 `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE` and `CURL_CA_BUNDLE`; Node keeps `NODE_EXTRA_CA_CERTS` with the
 CA alone. Those variables replace a client's roots, hence the bundle. `NO_PROXY` carries the
 proxy's own `127.0.0.1:<port>` and `localhost:<port>` (no `[::1]:<port>`: httpx cannot parse it).
@@ -83,8 +84,13 @@ when either is set. Start the app with a command that installs nothing (`uv sync
 environment first, then `uv run --no-sync …`): the start command is proxied too, and under
 `unmatched: "block"` a package download is refused. `unmatched: "block"` and `secrets` work as
 for Node; a client that ignores `HTTPS_PROXY` bypasses the proxy entirely. Example:
-`examples/with-python` (FastAPI, psycopg, Stripe, Resend, a 52-trial matrix). Seeds can be functions so they can point at the app
-once it runs, and they are applied again after every reset.
+`examples/with-python` (FastAPI, psycopg, Stripe, Resend, a 52-trial matrix). Go: `net/http`'s
+default transport follows `HTTPS_PROXY`; Go reads `SSL_CERT_FILE` on Linux only (macOS and Windows
+verify through the OS), so the app appends that file to a copy of `x509.SystemCertPool()` when set
+and hands the client to stripe-go and resend-go (`examples/with-go`, `trust.go`). Go never proxies
+`localhost`/`127.0.0.1`, so calls between stack apps skip the proxy (no faults, no readiness wait);
+Python's requests, httpx and urllib do proxy loopback unless `NO_PROXY` names it. Time travel
+moves only Node's `Date` (the preload): an app in another language keeps real time.
 
 ## Any app, started by its own command
 

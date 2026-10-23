@@ -1,6 +1,6 @@
 ---
 title: Apps in other languages
-description: How danwo routes a Python, Go or Ruby app through its proxy with the standard proxy and CA variables, and what each common Python HTTP client reads.
+description: How danwo routes a Python or Go app through its proxy with the standard proxy and CA variables, what each common client reads, and what differs from a Node app.
 icon: Languages
 ---
 
@@ -24,8 +24,8 @@ mentions danwo.
 }
 ```
 
-The [Python example](/docs/examples/with-python) runs a whole booking app this way, fault matrix
-included.
+The [Python example](/docs/examples/with-python) and the [Go example](/docs/examples/with-go) run
+whole apps this way, fault matrix included.
 
 ## What danwo sets
 
@@ -33,7 +33,7 @@ Every app danwo starts gets these, Node or not:
 
 | Variable                     | Value                                     | Read by                                                |
 | ---------------------------- | ----------------------------------------- | ------------------------------------------------------ |
-| `HTTPS_PROXY`, `https_proxy` | the proxy, `http://127.0.0.1:<port>`      | almost every client; curl and Go want lower case       |
+| `HTTPS_PROXY`, `https_proxy` | the proxy, `http://127.0.0.1:<port>`      | almost every client; curl wants lower case             |
 | `HTTP_PROXY`, `http_proxy`   | the same                                  | clients making plain HTTP calls                        |
 | `NO_PROXY`, `no_proxy`       | your own `NO_PROXY`, then the proxy's own | every client that reads the two above                  |
 | `SSL_CERT_FILE`              | the CA bundle                             | OpenSSL: Python's `ssl`, httpx, Ruby, PHP, Go on Linux |
@@ -45,7 +45,11 @@ The CA bundle is danwo's CA followed by the public roots. These variables replac
 roots rather than add to them, so a host your app reaches directly, past the proxy through your
 `NO_PROXY`, still verifies.
 
-## What each Python client reads
+## Python
+
+Python's HTTP clients read the variables themselves, so most Python apps need no change at all.
+
+### What each client reads
 
 | Client                                    | Goes through the proxy     | Trusts danwo's CA                      |
 | ----------------------------------------- | -------------------------- | -------------------------------------- |
@@ -56,7 +60,7 @@ roots rather than add to them, so a host your app reaches directly, past the pro
 | the Resend SDK                            | yes, it uses requests      | yes                                    |
 | the Stripe SDK                            | yes                        | no: it ships its own bundle, see below |
 
-## The Stripe SDK
+### The Stripe SDK
 
 Stripe's Python SDK verifies against the bundle it ships and reads no variable for another one. Its
 calls reach the proxy and then fail with `Could not verify Stripe's SSL certificate`. Point it at
@@ -74,31 +78,105 @@ if ca_bundle:
 
 In production neither variable is usually set, so the SDK keeps its own bundle.
 
-## Keep the start command offline
+### Keep the start command offline
 
 Install the app's packages before danwo starts it, and start it with a command that installs
 nothing. danwo's proxy routes the start command too, so a package download meets the proxy, and
 under `unmatched: "block"` it is refused. With uv, run `uv sync --frozen` first and start the app
 with `uv run --no-sync`.
 
+## Go
+
+A Go app needs no preload either: the default transport of `net/http` follows `HTTPS_PROXY`, so
+its calls to Stripe, Resend and the rest reach danwo's emulators as soon as danwo starts it. What
+Go needs is to trust danwo's certificate authority, and on macOS that takes a few lines in the app.
+
+### Trust danwo's CA
+
+On Linux, Go reads `SSL_CERT_FILE` and trusts the certificates in it. On macOS and Windows it asks
+the operating system to verify certificates and ignores the variable, so a call through danwo's
+proxy fails with `x509: certificate signed by unknown authority`. Add the file to a copy of the
+system's pool when the variable is set, and use that client for your SDKs:
+
+```go title="trust.go"
+func outboundClient() (*http.Client, error) {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if file := os.Getenv("SSL_CERT_FILE"); file != "" {
+		pem, err := os.ReadFile(file)
+		if err != nil {
+			return nil, err
+		}
+		roots, err := x509.SystemCertPool()
+		if err != nil {
+			roots = x509.NewCertPool()
+		}
+		if !roots.AppendCertsFromPEM(pem) {
+			return nil, fmt.Errorf("%s holds no PEM certificate", file)
+		}
+		transport.TLSClientConfig = &tls.Config{RootCAs: roots}
+	}
+	return &http.Client{Transport: transport, Timeout: 30 * time.Second}, nil
+}
+```
+
+In production the variable is unset, and the client trusts what Go's default one does. Hand the
+client to each SDK:
+
+| SDK            | Where the client goes                                                     |
+| -------------- | ------------------------------------------------------------------------- |
+| stripe-go      | `stripe.NewBackendsWithConfig(&stripe.BackendConfig{HTTPClient: client})` |
+| resend-go      | `resend.NewCustomClient(client, apiKey)`                                  |
+| your own calls | `client.Do(req)`                                                          |
+
+### Start it from the config
+
+Build once, then run the binary. danwo passes the port as `PORT`:
+
+```ts title="danwo.config.ts · the app"
+app: {
+  command: `exec ./dist/app`,
+  url,
+  ready: { path: "/health" },
+  env: { HOST: "127.0.0.1", DATABASE_URL: postgres.url(database.url) },
+},
+```
+
+Run `go build` before the app starts, in the config's `environment`, behind a lock so parallel
+workers don't each compile.
+
+## What differs from a Node app
+
+| What                              | Python                                                  | Go                                                   |
+| --------------------------------- | ------------------------------------------------------- | ---------------------------------------------------- |
+| the routing check at start        | doesn't run: it lives in the Node preload               | doesn't run: it lives in the Node preload            |
+| calls to `localhost`, `127.0.0.1` | go through the proxy, unless your `NO_PROXY` names them | never proxied, so danwo can't fault or wait for them |
+| time travel                       | the app keeps real time                                 | the app keeps real time                              |
+
+Time travel moves the page's clock and the emulators, but not the app's own: danwo's clock shift
+lives in the Node preload. Calls from one Go app to another on loopback skip the proxy, so a
+matrix plans no faults on them and readiness doesn't wait for them.
+
+<Callout type="warn">
+  A client that ignores the proxy variables, such as aiohttp without `trust_env=True` or a Go
+  transport with `Proxy: nil`, calls the real hosts. `unmatched: "block"` can't stop it: its calls
+  never reach the proxy.
+</Callout>
+
 ## The check at start
 
 For a Node app, the preload checks that the process's calls reach the proxy before your code runs.
-That check runs inside Node, so it can't run in a Python or Go process. danwo says so once, rather
-than reporting a pass or a failure:
+That check runs inside Node, so it can't run in a Python or Go process, and nothing else confirms
+that one goes through the proxy. danwo says so once when the app starts, rather than reporting a
+pass or a failure:
 
 ```text title="stderr"
 danwo: studio runs no Node process (uv, python), so danwo's check at start that its calls
-reach the proxy, which runs inside Node, does not run for it. …
+reach the proxy, which runs inside Node, does not run for it, and nothing confirms its calls
+go through the proxy: …
 ```
 
 The other checks work as they do for Node. `unmatched: "block"` refuses at the proxy any host no
 emulator answers, and `secrets: "fail"` refuses a live-looking key in the app's environment.
-
-<Callout type="warn">
-  A client that ignores `HTTPS_PROXY`, such as aiohttp without `trust_env=True`, calls the real
-  hosts, and `unmatched: "block"` can't stop it: its calls never reach the proxy.
-</Callout>
 
 ## Next
 
@@ -106,10 +184,10 @@ emulator answers, and `secrets: "fail"` refuses a live-looking key in the app's 
   <Card title="The Python example" href="/docs/examples/with-python">
     A FastAPI booking app on Stripe, Resend and Postgres, with its matrix.
   </Card>
+  <Card title="The Go example" href="/docs/examples/with-go">
+    A Go subscription app on Stripe, Resend and Postgres, with its matrix.
+  </Card>
   <Card title="The Node preload" href="/docs/node-preload">
     What danwo does for a Node app instead.
-  </Card>
-  <Card title="Outside hosts" href="/docs/outside-hosts">
-    What happens to calls no emulator answers.
   </Card>
 </Cards>

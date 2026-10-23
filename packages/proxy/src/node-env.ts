@@ -159,8 +159,8 @@ function caBundleVariables(caBundlePath: string): Readonly<Record<string, string
 
 /**
  * The proxy variables, CA and preload over `base`, as `Proxy.env()` returns them. The proxy
- * variables go in both cases, since clients disagree on which they read (curl and Go take only
- * the lower-case `http_proxy`; Python's urllib prefers lower case), and so do the CA bundle
+ * variables go in both cases, since clients disagree on which they read (curl takes only the
+ * lower-case `http_proxy`; Python's urllib prefers lower case), and so do the CA bundle
  * variables for apps outside Node; Node takes danwo's CA through `NODE_EXTRA_CA_CERTS`. The
  * preload leads `BUN_OPTIONS`: Bun misreads a quoted option that follows a bare flag such as
  * `--smol`.
