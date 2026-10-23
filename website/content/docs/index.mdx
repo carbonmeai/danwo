@@ -24,6 +24,17 @@ test("signs up", async ({ app, screen, expect }) => {
 That is a whole test. danwo starts your app, opens a fresh browser and waits for each click to
 settle, so there are no sleeps. It needs no providers, no API keys and no model.
 
+## At a glance
+
+| You want to                   | danwo                                                                                                                                                                                                |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Test a web app                | Chromium, Firefox and WebKit, one test in several. See [Web](/docs/web).                                                                                                                             |
+| Test a mobile app             | Android emulators and the iOS Simulator: Expo, [Flutter](/docs/flutter), [SwiftUI or UIKit](/docs/native-ios), [Jetpack Compose or Views](/docs/native-android). See [Android](/docs/android-tests). |
+| Let your coding agent test    | A skill and an MCP server for Claude Code, Cursor, Codex and Copilot. See [Coding agents](/docs/coding-agents).                                                                                      |
+| Keep or move existing tests   | Add danwo to [Playwright Test](/docs/playwright), or move over from [Cypress](/docs/cypress) or [Detox](/docs/detox) one file at a time.                                                             |
+| Run it in CI                  | A check and a comment on every pull request, and [shards](/docs/shards) with JUnit for any CI. See [CI](/docs/ci).                                                                                   |
+| Check what happened behind it | Emulated providers, invariants and a fault matrix: the [layers below](#when-the-bugs-live-behind-the-screen).                                                                                        |
+
 ## Add layers as you need them
 
 Everything past the first test is optional. Each layer adds to the one before, and you can stop at
@@ -112,6 +123,22 @@ Every run, at any layer, leaves a **flight record**: a video of the screen, ever
 the backend layers, every call, webhook and database statement. See [Flight
 records](/docs/flight-records).
 
+## Your coding agent can use it too
+
+`danwo init` asks which coding agents you use and gives each one danwo's **skill**, which teaches
+it how danwo tests are written, and its **MCP server**, which lets it run tests, drive your app and
+read flight records. An agent that changes your code can then check its own work through the UI,
+and fix what fails. See [Coding agents](/docs/coding-agents).
+
+```text title="npx @danwo/cli init · coding agents"
+Coding agents
+  created   .claude/skills/danwo/SKILL.md
+  created   .agents/skills/danwo/SKILL.md
+  created   .mcp.json
+  created   .cursor/mcp.json
+  created   .codex/config.toml
+```
+
 ## Get started
 
 <Cards>
@@ -126,5 +153,8 @@ records](/docs/flight-records).
   </Card>
   <Card title="Where danwo runs" href="/docs/where-danwo-runs">
     Local, staging or production: what works in each.
+  </Card>
+  <Card title="Coding agents" href="/docs/coding-agents">
+    Give Claude Code, Cursor, Codex or Copilot danwo's skill and MCP server.
   </Card>
 </Cards>
