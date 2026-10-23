@@ -42,6 +42,16 @@ describe("posts", () => {
     expect(newestFirst(posts).map(postSlug)).toEqual(["newer", "older"])
   })
 
+  it("list releases of one day by version, highest first", () => {
+    const day = new Date("2026-10-23")
+    const releases = ["0.1.0.mdx", "0.1.10.mdx", "0.1.1.mdx", "0.1.9.mdx"].map((path) => ({
+      info: { path },
+      date: day,
+    }))
+
+    expect(newestFirst(releases).map(postSlug)).toEqual(["0.1.10", "0.1.9", "0.1.1", "0.1.0"])
+  })
+
   it("print their date the site's way", () => {
     expect(formatDate(new Date("2026-10-19T00:00:00Z"))).toBe("19 October 2026")
   })
