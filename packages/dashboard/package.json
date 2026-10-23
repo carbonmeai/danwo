@@ -31,12 +31,15 @@
     "codegen": "panda codegen",
     "build": "panda codegen && vite build",
     "prepack": "bun run build && node ../../scripts/declarations.ts && node ../../scripts/pack-files.ts add",
-    "postpack": "node ../../scripts/pack-files.ts remove"
+    "postpack": "node ../../scripts/pack-files.ts remove",
+    "test:e2e": "danwo test --config e2e/danwo.config.ts"
   },
   "dependencies": {
     "@danwo/runner": "workspace:*"
   },
   "devDependencies": {
+    "@danwo/cli": "workspace:*",
+    "@danwo/sdk": "workspace:*",
     "@danwo/ui": "workspace:*",
     "@pandacss/dev": "2.2.0",
     "@pandacss/preset-base": "2.2.0",

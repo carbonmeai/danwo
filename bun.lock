@@ -121,6 +121,8 @@
         "@danwo/runner": "workspace:*",
       },
       "devDependencies": {
+        "@danwo/cli": "workspace:*",
+        "@danwo/sdk": "workspace:*",
         "@danwo/ui": "workspace:*",
         "@pandacss/dev": "2.2.0",
         "@pandacss/preset-base": "2.2.0",

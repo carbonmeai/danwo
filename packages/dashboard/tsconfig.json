@@ -23,6 +23,6 @@
       "@danwo/ui/theme/*": ["../ui/src/theme/*"]
     }
   },
-  "include": ["src", "test", "vite.config.ts", "panda.config.ts"],
+  "include": ["src", "test", "e2e", "vite.config.ts", "panda.config.ts"],
   "exclude": ["src/styled-system", "node_modules"]
 }
