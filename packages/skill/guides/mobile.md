@@ -46,7 +46,11 @@ makes a release APK of an Expo app with its JavaScript bundled (no Metro at test
 
 The APK is kept under `<project>/.danwo/builds/`, keyed by a hash of the app's sources, so an
 unchanged app is not built again. Use `--force` to rebuild. In a config, `buildAndroid({ project })`
-from `@danwo/mobile` does the same. Ship store builds without it.
+from `@danwo/mobile` does the same. Ship store builds without it. One build of a project runs at a
+time, across workers and processes (`buildIos` and `buildAndroid` alike): a lock file,
+`.danwo/builds/build-android.lock` or `build-ios.lock`, holds the builder's pid; the other
+workers wait, then reuse the kept build. A lock whose process has died is broken; waiting
+more than 30 minutes fails naming the holder and the file to delete.
 
 ## The config
 

@@ -33,6 +33,9 @@ daemon running.
 The APK is kept under `<project>/.danwo/builds/`, keyed by a hash of the app's sources. An
 unchanged app isn't built again. Force a rebuild with `--force`.
 
+Workers share one build. On a cold run the first worker builds the app, and the others wait for
+it and then install the same APK.
+
 ## Build it from the config
 
 `buildAndroid` from `@danwo/mobile` does the same inside your environment, so a test run always has

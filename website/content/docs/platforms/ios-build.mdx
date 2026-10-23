@@ -34,6 +34,9 @@ The build is kept under `<project>/.danwo/builds/`, keyed by a hash of the app's
 unchanged app isn't built again. Force a rebuild with `--force`, and see the tools' output with
 `--verbose`.
 
+Workers share one build. On a cold run the first worker builds the app, and the others wait for
+it and then install the same one.
+
 | Build                     | Time on an Apple silicon Mac |
 | ------------------------- | ---------------------------- |
 | first, with pods          | about 2 minutes              |
