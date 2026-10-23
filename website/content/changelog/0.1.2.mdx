@@ -25,6 +25,8 @@ date: 2026-10-23
 ## Fixed
 
 - A step's screenshot is no longer lost when the next step navigates.
+- A click that closes its own page, such as a popup's Close button, counts as done instead of
+  failing as the page goes.
 - A check whose locator matches several elements fails at once as a test issue, and says how to
   narrow it, instead of waiting out its timeout as an app bug.
 - Two workers building the same mobile app on a first run no longer collide: one builds, the
