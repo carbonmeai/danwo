@@ -160,7 +160,7 @@ export function examplesIndex(): string {
     `<Cards>\n${workspace.map(card).join("\n")}\n</Cards>`,
     "## Run a starter",
     "Copy the folder, install, and run its tests. Each starter's page says what it needs, such as Docker:",
-    "```sh\ncd with-next\nnpm install\nnpx @danwo/cli test\n```",
+    "```sh\ncd with-next\nnpm install\nnpm test\n```",
     "## Run one of the repository's own",
     "Install once at the root of the repository, then run its scripts from its folder:",
     "```sh\nbun install\ncd examples/shop\nbun run test:e2e\n```",
@@ -168,11 +168,13 @@ export function examplesIndex(): string {
   ].join("\n\n")
 }
 
-/** The scripts of a package as a code block, with what each runs. */
+/** The scripts of a package as a code block, with what each runs; npm's `test` as `npm test`. */
 function scriptsBlock(runner: string, scripts: Readonly<Record<string, string>>): string {
-  const width = Math.max(...Object.keys(scripts).map((name) => name.length))
+  const call = (name: string) =>
+    runner === "npm run" && name === "test" ? "npm test" : `${runner} ${name}`
+  const width = Math.max(...Object.keys(scripts).map((name) => call(name).length))
   const lines = Object.entries(scripts).map(
-    ([name, command]) => `${runner} ${name.padEnd(width)}   # ${command}`,
+    ([name, command]) => `${call(name).padEnd(width)}   # ${command}`,
   )
 
   return `\`\`\`sh\n${lines.join("\n")}\n\`\`\``
@@ -185,7 +187,7 @@ function runSection(example: ExampleNotes): string[] {
   if (example.install === "npm")
     return [
       `Copy [\`examples/${example.folder}\`](${exampleSource(example)}) anywhere, then from its folder:`,
-      "```sh\nnpm install\nnpx @danwo/cli test\n```",
+      "```sh\nnpm install\nnpm test\n```",
       "Its scripts:",
       scriptsBlock("npm run", scripts),
       "Its README says what else it needs and what the last full matrix found.",

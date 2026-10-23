@@ -215,6 +215,25 @@ describe("the standalone examples", () => {
     expect(stale).toEqual([])
   })
 
+  it("share the scripts a user reaches for: npm test, the matrix and its plan, typecheck", () => {
+    const missing: string[] = []
+
+    for (const name of standalone) {
+      const manifest: unknown = JSON.parse(
+        readFileSync(join(ROOT, "examples", name, "package.json"), "utf8"),
+      )
+      const scripts: unknown = Reflect.get(Object(manifest), "scripts")
+      const script = (key: string): unknown => Reflect.get(Object(scripts), key)
+
+      if (script("test") !== "danwo test") missing.push(`${name}: test`)
+      for (const key of ["matrix", "matrix:plan", "typecheck"])
+        if (typeof script(key) !== "string") missing.push(`${name}: ${key}`)
+      if (!String(script("matrix:plan")).endsWith(" --plan")) missing.push(`${name}: --plan`)
+    }
+
+    expect(missing).toEqual([])
+  })
+
   it("are not workspaces of the repository", () => {
     const root: unknown = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"))
     const workspaces: unknown = Reflect.get(Object(root), "workspaces")

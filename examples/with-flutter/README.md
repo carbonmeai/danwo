@@ -31,8 +31,8 @@ runtime; see [iOS setup](https://danwo.dev/docs/ios-setup). From this folder:
 
 ```sh
 npm install
-npx @danwo/cli test
-DANWO_PLATFORM=ios npx @danwo/cli test
+npm test
+DANWO_PLATFORM=ios npm test
 ```
 
 ```text
@@ -45,18 +45,31 @@ Running 4 tests with 1 worker
 3 passed, 1 skipped
 ```
 
+`androidWorkers()` and `iosWorkers()` in `danwo.config.ts` size the run to your machine, a device
+per worker, so yours may run with more than one worker.
+
 The first run builds the app (several minutes for the APK with a cold Gradle cache, about a minute
 for the simulator) and pulls `postgres:17-alpine`. `DANWO_AVD` names the AVD to boot (default
 `danwo_spike`), `DANWO_AVD_SNAPSHOT` boots it from a saved snapshot, and `DANWO_IOS_SIMULATOR`
 names the simulator to use (default `danwo iPhone`). Without Docker, point `DATABASE_URL` at a
 Postgres you run whose database name ends in `_test`.
 
+| Script                 | What it runs                                               |
+| ---------------------- | ---------------------------------------------------------- |
+| `npm test`             | every test; the agent test skips without a model key       |
+| `npm run test:agentic` | the agent test alone                                       |
+| `npm run matrix:plan`  | what the join's fault matrix would try, without running it |
+| `npm run matrix`       | the join's fault matrix: a clean run, then 18 faults       |
+| `npm run serve`        | danwo's dashboard over everything the runs recorded        |
+| `npm run typecheck`    | `tsc` over the API and the tests                           |
+
 ### Break it on purpose
 
-`danwo matrix` runs one test clean, then once per fault it plans:
+`danwo matrix` runs one test clean, then once per fault it plans. `npm run matrix:plan` lists
+them first:
 
 ```sh
-npx @danwo/cli matrix tests/deterministic.danwo.ts --grep "joins the waitlist" --plan
+npm run matrix:plan
 ```
 
 ```text
@@ -69,8 +82,8 @@ clean run passed; 18 faults planned
   deadlock_detected on UPDATE signups (postgres)
 ```
 
-The first three fault the app's own call to its API, on the device. Drop `--plan` to run them;
-`npm run matrix` is the same command. On the emulator:
+The first three fault the app's own call to its API, on the device. `npm run matrix` runs
+them. On the emulator:
 
 ```text
 faults: 18 passed
@@ -97,7 +110,7 @@ faults: 18 passed
 [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) key to run it:
 
 ```sh
-AI_GATEWAY_API_KEY="your-key" npx @danwo/cli test
+AI_GATEWAY_API_KEY="your-key" npm run test:agentic
 ```
 
 Without the key, it skips.

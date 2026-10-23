@@ -7,9 +7,11 @@
     "build:ios": "danwo build-ios ios",
     "api": "node api/server.ts",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "danwo test",
+    "test": "danwo test",
+    "test:agentic": "danwo test tests/agentic.danwo.ts",
     "matrix": "danwo matrix tests/deterministic.danwo.ts --grep \"joins the waitlist\"",
-    "matrix:plan": "danwo matrix tests/deterministic.danwo.ts --grep \"joins the waitlist\" --plan"
+    "matrix:plan": "danwo matrix tests/deterministic.danwo.ts --grep \"joins the waitlist\" --plan",
+    "serve": "danwo serve"
   },
   "dependencies": {
     "@hono/node-server": "2.1.5",

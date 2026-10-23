@@ -23,7 +23,7 @@ Use Node 24 and Docker. From this folder:
 
 ```sh
 npm install
-npx @danwo/cli test
+npm test
 ```
 
 ```text
@@ -41,6 +41,15 @@ The first run builds the app (`next build`) and pulls `postgres:17-alpine`. Each
 starts its own Postgres container, Resend emulator and `next start`, and removes them when it
 ends. If Chromium is missing, danwo tells you to run `npx @danwo/cli install-browser`.
 
+| Script                 | What it runs                                               |
+| ---------------------- | ---------------------------------------------------------- |
+| `npm test`             | every test; the agent tests skip without a model key       |
+| `npm run test:agentic` | the agent tests alone                                      |
+| `npm run matrix:plan`  | what the join's fault matrix would try, without running it |
+| `npm run matrix`       | the join's fault matrix: 17 runs, about half a minute      |
+| `npm run serve`        | danwo's dashboard over everything the runs recorded        |
+| `npm run typecheck`    | `tsc` over the app and the tests                           |
+
 ### Use your own Postgres
 
 Without Docker, point `DATABASE_URL` at a Postgres you run. Its database name must end in `_test`;
@@ -48,15 +57,16 @@ each worker creates `waitlist_w0_test`, `waitlist_w1_test` and so on beside it, 
 `CREATEDB`:
 
 ```sh
-DATABASE_URL=postgres://postgres@127.0.0.1:5432/waitlist_test npx @danwo/cli test
+DATABASE_URL=postgres://postgres@127.0.0.1:5432/waitlist_test npm test
 ```
 
 ### Break it on purpose
 
-`danwo matrix` runs one test clean, then once per fault it plans. `--plan` lists them first:
+`danwo matrix` runs one test clean, then once per fault it plans. `npm run matrix:plan` lists
+them first:
 
 ```sh
-npx @danwo/cli matrix tests/deterministic.danwo.ts --grep "joins the waitlist" --plan
+npm run matrix:plan
 ```
 
 ```text
@@ -79,7 +89,7 @@ clean run passed; 16 faults planned
   double-submit on POST /api/join
 ```
 
-Drop `--plan` to run them; `npm run matrix` is the same command. Every trial passes:
+`npm run matrix` runs them. Every trial passes:
 
 ```text
 PASS  status 429 on POST api.resend.com/emails
@@ -95,7 +105,7 @@ faults: 16 passed
 Then open the dashboard over what the runs recorded:
 
 ```sh
-npx @danwo/cli serve
+npm run serve
 ```
 
 ### What keeps it green
@@ -117,7 +127,7 @@ each with `expected [ … ] to have a length of 1 but got 2`: a second welcome e
 [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) key to run them:
 
 ```sh
-AI_GATEWAY_API_KEY="your-key" npx @danwo/cli test
+AI_GATEWAY_API_KEY="your-key" npm run test:agentic
 ```
 
 Without the key, they skip. Each agent step is paired with a check that needs no model, and danwo

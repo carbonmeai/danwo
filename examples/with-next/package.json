@@ -7,8 +7,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test:e2e": "danwo test",
+    "typecheck": "tsc --noEmit",
+    "test": "danwo test",
+    "test:agentic": "danwo test tests/agentic.danwo.ts",
     "matrix": "danwo matrix tests/deterministic.danwo.ts --grep \"joins the waitlist\"",
+    "matrix:plan": "danwo matrix tests/deterministic.danwo.ts --grep \"joins the waitlist\" --plan",
     "serve": "danwo serve"
   },
   "dependencies": {
