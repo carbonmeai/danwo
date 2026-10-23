@@ -75,12 +75,18 @@ export function Agents() {
                 Terminal
               </Mono>
             </div>
-            <div style={{ padding: "32px 40px", display: "flex", flexDirection: "column", gap: 14 }}>
+            <div
+              style={{ padding: "32px 40px", display: "flex", flexDirection: "column", gap: 14 }}
+            >
               <Mono size={26}>
                 <span style={{ color: C.faint }}>$ </span>
                 {typed(COMMAND, frame, TYPE_FROM, 0.9)}
               </Mono>
-              <Mono size={22} color={C.muted} style={{ marginTop: 18, opacity: ease(frame, 40, 10) }}>
+              <Mono
+                size={22}
+                color={C.muted}
+                style={{ marginTop: 18, opacity: ease(frame, 40, 10) }}
+              >
                 Coding agents
               </Mono>
               {CREATED.map(([path, kind], i) => {
@@ -109,7 +115,8 @@ export function Agents() {
                       style={{
                         padding: "5px 12px",
                         borderRadius: 8,
-                        background: kind === "skill" ? "rgb(168 85 247 / 0.16)" : "rgb(59 130 246 / 0.18)",
+                        background:
+                          kind === "skill" ? "rgb(168 85 247 / 0.16)" : "rgb(59 130 246 / 0.18)",
                       }}
                     >
                       {kind}
@@ -119,7 +126,9 @@ export function Agents() {
               })}
             </div>
           </Card>
-          <div style={{ marginTop: 28, opacity: done, transform: `translateY(${(1 - done) * 18}px)` }}>
+          <div
+            style={{ marginTop: 28, opacity: done, transform: `translateY(${(1 - done) * 18}px)` }}
+          >
             <Chip style={{ fontSize: 28 }}>
               <span style={{ color: C.pass }}>●</span>
               Skill and MCP server, set up in one command.
