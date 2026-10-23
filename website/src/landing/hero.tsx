@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router"
 import { forwardRef, useEffect, useRef, useState } from "react"
 
 import { repoUrl, SITE } from "../lib/site.ts"
-import { CopyBox } from "./copy.tsx"
+import { CopyBox, HERO_COPY_LABEL } from "./copy.tsx"
 import { ChevronIcon, GithubIcon } from "./glyphs.tsx"
 import { HeroMatrix } from "./matrix.tsx"
 
@@ -149,7 +149,7 @@ export const Hero = forwardRef<HTMLElement>(function Hero(_props, ref) {
           </div>
         </div>
         <div className="ctas">
-          <CopyBox command="npx @danwo/cli init" />
+          <CopyBox command="npx @danwo/cli init" label={HERO_COPY_LABEL} />
           {github ? (
             <a className="btn btn-solid" href={github}>
               <GithubIcon />

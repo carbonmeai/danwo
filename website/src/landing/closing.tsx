@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router"
 
 import { Lockup } from "../components/brand.tsx"
 import { repoUrl, SITE } from "../lib/site.ts"
-import { CopyBox } from "./copy.tsx"
+import { CLOSING_COPY_LABEL, CopyBox } from "./copy.tsx"
 import { WordmarkBand } from "./wordmark-band.tsx"
 
 export function Closing() {
@@ -20,7 +20,7 @@ export function Closing() {
         <h2>Find the fault before your users do.</h2>
         <p>One command sets danwo up in your project, for you and for your coding agents.</p>
         <div className="ctas">
-          <CopyBox command="npx @danwo/cli init" />
+          <CopyBox command="npx @danwo/cli init" label={CLOSING_COPY_LABEL} />
           {github && (
             <a className="btn btn-solid" href={github}>
               GitHub

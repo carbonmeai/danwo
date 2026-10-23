@@ -1,6 +1,8 @@
+import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 
+import { CLOSING_COPY_LABEL, CopyBox, HERO_COPY_LABEL } from "../src/landing/copy.tsx"
 import { resolveIcon } from "../src/lib/icons.tsx"
 import { pageHead } from "../src/lib/meta.ts"
 import { formatDate, newestFirst, postSlug } from "../src/lib/posts.ts"
@@ -71,5 +73,18 @@ describe("site facts", () => {
   it("say open source only once the licence does, and link a repository only once there is one", () => {
     expect(licenceWords()).toBe(SITE.licence.openSource ? "Open source" : SITE.licence.wording)
     expect(repoUrl()).toBe(SITE.repo === undefined ? undefined : `https://github.com/${SITE.repo}`)
+  })
+})
+
+describe("copy boxes", () => {
+  it("name each button by the command it copies, the hero's apart from the closing one's", () => {
+    const markup = renderToStaticMarkup(
+      createElement(CopyBox, { command: "npx @danwo/cli init", label: HERO_COPY_LABEL }),
+    )
+
+    expect(markup).toContain(`aria-label="${HERO_COPY_LABEL}"`)
+    expect(HERO_COPY_LABEL).not.toBe(CLOSING_COPY_LABEL)
+    for (const label of [HERO_COPY_LABEL, CLOSING_COPY_LABEL])
+      expect(label).toContain("npx @danwo/cli init")
   })
 })
