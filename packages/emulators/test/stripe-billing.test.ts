@@ -298,6 +298,15 @@ describe("subscriptions", () => {
   })
 })
 
+/** The hosted page's Pay button for `session`, with `card` typed in. */
+function pay(session: Stripe.Checkout.Session, card: string): Promise<Response> {
+  return fetch(`${session.url ?? ""}/complete`, {
+    method: "POST",
+    body: new URLSearchParams({ email: "ada@danwo.test", card }),
+    redirect: "manual",
+  })
+}
+
 describe("Checkout in subscription mode", () => {
   it("starts the subscription on payment, with a trial when asked", async () => {
     const price = await proPrice()
@@ -337,13 +346,6 @@ describe("Checkout in subscription mode", () => {
         success_url: "https://app.danwo.test/done",
         customer_email: "ada@danwo.test",
       })
-    const pay = (session: Stripe.Checkout.Session, card: string) =>
-      fetch(`${session.url ?? ""}/complete`, {
-        method: "POST",
-        body: new URLSearchParams({ email: "ada@danwo.test", card }),
-        redirect: "manual",
-      })
-
     const declined = await open()
     const refused = await pay(declined, "4000 0000 0000 0002")
 
