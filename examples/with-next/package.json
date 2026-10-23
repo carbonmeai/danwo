@@ -22,8 +22,8 @@
     "resend": "6.34.1"
   },
   "devDependencies": {
-    "@danwo/cli": "0.1.1",
-    "@danwo/sdk": "0.1.1",
+    "@danwo/cli": "0.1.2",
+    "@danwo/sdk": "0.1.2",
     "@tailwindcss/postcss": "4.3.3",
     "@types/node": "^24",
     "@types/pg": "8.23.1",

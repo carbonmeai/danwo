@@ -1,0 +1,36 @@
+---
+title: danwo 0.1.2
+description: Named suites, URL and clipboard checks, a mobile doctor, and a GitHub emulator checked against GitHub.
+date: 2026-10-23
+---
+
+## New
+
+- **Several suites in one repository** report apart on GitHub. Name each with `name` in its
+  config or `--name`; it gets its own check run, pull request comment section, summary and
+  artifact. See [CI](/docs/ci).
+- `expect(screen).toHaveURL()` waits for the page's address, and `app.url()` reads it.
+- `browser.contextOptions.permissions` grants browser permissions, and `app.clipboard()` reads
+  what a page copied (Chromium).
+- `freePort()` in `@danwo/sdk` picks a port for an app each worker starts.
+- `appEnvironment({ app, proxy: false })` starts an app without danwo's proxy.
+- `danwo test --no-ci` keeps local defaults when `CI` is set, for a run started from inside
+  another.
+- `danwo doctor` checks the device toolchain for a mobile config: Xcode and an iOS runtime, or the
+  Android SDK, adb, the emulator and a JDK, and Flutter for a Flutter project.
+- The order files and tests run in is now a documented guarantee.
+- The Slack emulator handles app uninstalls, modal answers, leave events, channel privacy and
+  Slack Connect.
+
+## Fixed
+
+- A step's screenshot is no longer lost when the next step navigates.
+- A check whose locator matches several elements fails at once as a test issue, and says how to
+  narrow it, instead of waiting out its timeout as an app bug.
+- Two workers building the same mobile app on a first run no longer collide: one builds, the
+  others wait and reuse it.
+- The GitHub emulator answers the way the live API does, now checked by a fidelity suite that runs
+  as a GitHub App.
+- Mail HTML, S3 hosts, form keys and Windows arguments are read in time linear in their length.
+- `danwo matrix --plan` says "1 trial on 1 worker".
+- The agent guides call `startApp(app, env)` as `@danwo/sdk` exports it.

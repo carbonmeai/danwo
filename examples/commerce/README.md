@@ -156,7 +156,7 @@ repository:
 
 ```sh
 bun install
-bun run release 0.1.1 --pack
+bun run release 0.1.2 --pack
 node examples/link.ts commerce
 ```
 
@@ -184,5 +184,5 @@ That leaves only `node_modules`, which git ignores. The package.json is put back
 | `kit/`             | the examples' shared styles, used through their Tailwind theme                |
 | `tests/`           | the tests, the invariants (`shop.ts`) and the database helpers                |
 
-Last checked with @danwo/cli 0.1.1, Next.js 16.4, Hono 4.13, Drizzle 0.45, Postgres 17
+Last checked with @danwo/cli 0.1.2, Next.js 16.4, Hono 4.13, Drizzle 0.45, Postgres 17
 and Node 24.
