@@ -22,9 +22,20 @@ const CMD_SPECIAL = /([()\][%!^"`<>&|;, *?])/g
  * among them, take a caret so `cmd.exe` passes them through.
  */
 export function quoteForCmd(argument: string): string {
-  const quoted = `"${argument.replaceAll(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, "$1$1")}"`
+  let quoted = '"'
+  let backslashes = 0
 
-  return quoted.replaceAll(CMD_SPECIAL, "^$1")
+  for (const char of argument) {
+    if (char === "\\") {
+      backslashes++
+      continue
+    }
+
+    quoted += "\\".repeat(char === '"' ? backslashes * 2 + 1 : backslashes) + char
+    backslashes = 0
+  }
+
+  return `${quoted}${"\\".repeat(backslashes * 2)}"`.replaceAll(CMD_SPECIAL, "^$1")
 }
 
 /**

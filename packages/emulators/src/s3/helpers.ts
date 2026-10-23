@@ -48,7 +48,7 @@ export function newUploadId(): string {
 export const TIGRIS_ENDPOINTS = ["t3.storage.dev", "fly.storage.tigris.dev"] as const
 
 /** `s3.amazonaws.com`, `s3.eu-west-1.amazonaws.com`, `s3-us-west-2.amazonaws.com` and the like. */
-const AWS_ENDPOINT = /(?:^|\.)(s3(?:[.-][a-z0-9-]+)*\.amazonaws\.com)$/
+const AWS_ENDPOINT = /(?:^|\.)(s3(?:[.-][a-z0-9]+)*\.amazonaws\.com)$/
 
 /** Where a request points: its bucket and key, either of which may be absent. */
 export interface S3Address {

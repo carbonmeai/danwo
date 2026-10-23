@@ -145,7 +145,7 @@ export function metadataOf(value: unknown): Record<string, string> {
 /** The first characters of `html` as plain text, for a message's snippet. */
 export function snippetOf(html: string): string {
   return html
-    .replace(/<[^>]+>/g, " ")
+    .replace(/<[^<>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 100)

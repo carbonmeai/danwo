@@ -134,12 +134,88 @@ const ENTITIES: Readonly<Record<string, string>> = {
   "&nbsp;": " ",
 }
 
-/** An HTML body as the words a reader sees. */
+/** The elements whose content is never read, only their tags. */
+const UNREAD = ["script", "style"] as const
+
+/**
+ * An HTML body as the words a reader sees: script and style elements dropped, every other tag a
+ * space. One pass with `indexOf`, so a body of any shape takes time in step with its length.
+ */
 function readable(html: string): string {
-  return html
-    .replace(/<(?:script|style)[\s\S]*?<\/(?:script|style)>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&(?:amp|lt|gt|quot|#39|nbsp);/g, (entity) => ENTITIES[entity] ?? entity)
+  const lower = html.toLowerCase()
+  const unclosed = new Set<string>()
+  let words = ""
+  let at = 0
+
+  for (;;) {
+    const open = html.indexOf("<", at)
+    const end = open === -1 ? -1 : html.indexOf(">", open + 1)
+
+    if (end === -1) break
+    words += html.slice(at, open)
+
+    if (end === open + 1) {
+      words += "<"
+      at = open + 1
+      continue
+    }
+
+    words += " "
+    at = end + 1
+
+    const name = UNREAD.find(
+      (tag) =>
+        lower.startsWith(`<${tag}`, open) && !/[\w-]/.test(lower[open + tag.length + 1] ?? ""),
+    )
+
+    if (name === undefined || unclosed.has(name)) continue
+
+    const close = lower.indexOf(`</${name}`, end)
+    const closeEnd = close === -1 ? -1 : html.indexOf(">", close)
+
+    if (closeEnd === -1) unclosed.add(name)
+    else at = closeEnd + 1
+  }
+
+  return (words + html.slice(at)).replace(
+    /&(?:amp|lt|gt|quot|#39|nbsp);/g,
+    (entity) => ENTITIES[entity] ?? entity,
+  )
+}
+
+/** The `http(s)` links in an HTML body's `<a href>` tags, with the words each is shown as. */
+function anchorsOf(html: string): { url: string; label: string }[] {
+  const lower = html.toLowerCase()
+  const anchors: { url: string; label: string }[] = []
+  let at = 0
+
+  for (;;) {
+    const open = lower.indexOf("<a", at)
+
+    if (open === -1) break
+    at = open + 2
+    if (/\w/.test(lower[at] ?? "")) continue
+
+    const end = html.indexOf(">", at)
+
+    if (end === -1) break
+    at = end + 1
+
+    const href = /\bhref=["'](https?:[^"']+)["']/i.exec(html.slice(open, end))
+
+    if (href === null) continue
+
+    const close = lower.indexOf("</a>", at)
+
+    if (close === -1) break
+    anchors.push({
+      url: (href[1] ?? "").replaceAll("&amp;", "&"),
+      label: readable(html.slice(at, close)).trim(),
+    })
+    at = close + 4
+  }
+
+  return anchors
 }
 
 /** What a message says, as text: its text part and its HTML's words. */
@@ -149,11 +225,7 @@ function wordsOf(message: MailMessage): string {
 
 /** Every link in a message, with the text it is shown as; HTML links first. */
 function linksOf(message: MailMessage): readonly { url: string; label: string }[] {
-  const anchors = [
-    ...(message.html ?? "").matchAll(
-      /<a\b[^>]*href=["'](https?:[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi,
-    ),
-  ].map((m) => ({ url: (m[1] ?? "").replaceAll("&amp;", "&"), label: readable(m[2] ?? "").trim() }))
+  const anchors = anchorsOf(message.html ?? "")
   const bare = ((message.text ?? "").match(/https?:\/\/[^\s<>"')]+/g) ?? []).map((url) => ({
     url,
     label: "",

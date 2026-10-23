@@ -153,7 +153,7 @@ function redactForm(body: string): string {
  * forms blank it.
  */
 function isSensitiveField(key: string): boolean {
-  const leaf = /\[([^\]]+)\]$/.exec(key)?.[1] ?? key
+  const leaf = /\[([^[\]]+)\]$/.exec(key)?.[1] ?? key
 
   return SENSITIVE_KEYS.test(leaf) || /^(number|cvc|exp_month|exp_year|code)$/.test(leaf)
 }
