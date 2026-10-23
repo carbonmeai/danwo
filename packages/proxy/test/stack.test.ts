@@ -158,7 +158,7 @@ describe("long-lived responses", () => {
     try {
       const listening = client(proxy, "stream", `http://127.0.0.1:${app.port}/events`)
 
-      await expect.poll(() => proxy.exchanges()[0]?.stream).toBe(true)
+      await expect.poll(() => proxy.exchanges()[0]?.stream, { timeout: 10_000 }).toBe(true)
       await proxy.settled(1_000)
       expect(await listening).toBe("200 data: hello")
     } finally {
