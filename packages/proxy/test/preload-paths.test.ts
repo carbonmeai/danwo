@@ -81,6 +81,7 @@ describe("the proxy environment on each platform", () => {
   const inputs = {
     url: "http://127.0.0.1:4100",
     caCertPath: "ca.pem",
+    caBundlePath: "ca-bundle.pem",
     clock: { file: "clock.json", offset: () => 0, setOffset: async () => undefined },
     preloadDir: "preloaded",
     shimDir: "shim",
@@ -98,5 +99,15 @@ describe("the proxy environment on each platform", () => {
     expect(env.PATH).toBe(String.raw`C:\Windows`)
     expect(env.BUN_OPTIONS).not.toContain("\\")
     expect(env.NODE_OPTIONS).toMatch(/^--import=file:\/\//)
+  })
+
+  it("names the same CA bundle for every language on every platform", () => {
+    for (const platform of ["linux", "darwin", "win32"] as const)
+      expect(proxyEnvironment(inputs, {}, {}, platform)).toMatchObject({
+        SSL_CERT_FILE: "ca-bundle.pem",
+        REQUESTS_CA_BUNDLE: "ca-bundle.pem",
+        CURL_CA_BUNDLE: "ca-bundle.pem",
+        NODE_EXTRA_CA_CERTS: "ca.pem",
+      })
   })
 })

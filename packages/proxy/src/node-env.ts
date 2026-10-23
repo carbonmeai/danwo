@@ -1,11 +1,13 @@
 /**
- * The environment that routes a Node app through the proxy, and the ways it can be lost and kept:
- * a start script that sets its own NODE_OPTIONS drops the preload, so a `node` shim first on PATH
- * loads it whatever NODE_OPTIONS says, and every process that loaded it leaves a heartbeat that
- * says whether its calls reached the proxy's probe host.
+ * The environment that routes an app through the proxy, and the ways it can be lost and kept. Any
+ * language reads the standard proxy and CA bundle variables; a Node app also gets the preload,
+ * which a start script that sets its own NODE_OPTIONS drops, so a `node` shim first on PATH loads
+ * it whatever NODE_OPTIONS says, and every process that loaded it leaves a heartbeat that says
+ * whether its calls reached the proxy's probe host.
  */
 import { chmod, mkdir, readdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import { rootCertificates } from "node:tls"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { APP_CLOCK_VARIABLE, type AppClock } from "./app-clock.ts"
@@ -67,10 +69,23 @@ export async function writeNodeShim(
   return bin
 }
 
+/**
+ * The PEM bundle an app outside Node trusts: danwo's CA first, then the public roots Node ships
+ * (Mozilla's, the list Python's certifi carries too). The variables that point at it replace a
+ * client's default trust rather than add to it, so a host the app reaches directly, past the
+ * proxy through `NO_PROXY`, still verifies.
+ */
+export function caBundle(caCert: string, roots: readonly string[] = rootCertificates): string {
+  return [caCert, ...roots].map((pem) => `${pem.trim()}\n`).join("")
+}
+
 /** What `proxyEnvironment` builds the environment from. */
 export interface ProxyEnvironmentInputs {
   readonly url: string
+  /** danwo's CA alone, which Node adds to its own roots through NODE_EXTRA_CA_CERTS. */
   readonly caCertPath: string
+  /** danwo's CA with the public roots (`caBundle`), for clients whose variable replaces theirs. */
+  readonly caBundlePath: string
   readonly clock: AppClock
   readonly preloadDir: string
   readonly shimDir: string
@@ -127,8 +142,26 @@ export function bunPreloadOption(
 }
 
 /**
- * The proxy variables, CA and preload over `base`, as `Proxy.env()` returns them. The preload
- * leads `BUN_OPTIONS`: Bun misreads a quoted option that follows a bare flag such as `--smol`.
+ * The variables that make an app in any language trust danwo's CA: OpenSSL's `SSL_CERT_FILE`
+ * (Python's `ssl` and urllib, httpx, Ruby, PHP, Go on Linux), `REQUESTS_CA_BUNDLE` (Python's
+ * requests, which ignores `SSL_CERT_FILE`) and `CURL_CA_BUNDLE` (curl, and requests after it).
+ * Each names the bundle, not the CA alone, since each replaces the client's own roots.
+ */
+function caBundleVariables(caBundlePath: string): Readonly<Record<string, string>> {
+  return {
+    SSL_CERT_FILE: caBundlePath,
+    REQUESTS_CA_BUNDLE: caBundlePath,
+    CURL_CA_BUNDLE: caBundlePath,
+  }
+}
+
+/**
+ * The proxy variables, CA and preload over `base`, as `Proxy.env()` returns them. The proxy
+ * variables go in both cases, since clients disagree on which they read (curl and Go take only
+ * the lower-case `http_proxy`; Python's urllib prefers lower case), and so do the CA bundle
+ * variables for apps outside Node; Node takes danwo's CA through `NODE_EXTRA_CA_CERTS`. The
+ * preload leads `BUN_OPTIONS`: Bun misreads a quoted option that follows a bare flag such as
+ * `--smol`.
  */
 export function proxyEnvironment(
   inputs: ProxyEnvironmentInputs,
@@ -152,6 +185,7 @@ export function proxyEnvironment(
     no_proxy: noProxy,
     NODE_USE_ENV_PROXY: "1",
     NODE_EXTRA_CA_CERTS: inputs.caCertPath,
+    ...caBundleVariables(inputs.caBundlePath),
     NODE_OPTIONS: [base.NODE_OPTIONS, nodeImportOption(PRELOAD)].filter(Boolean).join(" "),
     BUN_OPTIONS: [bunPreloadOption(PRELOAD, platform), base.BUN_OPTIONS].filter(Boolean).join(" "),
     [APP_CLOCK_VARIABLE]: inputs.clock.file,

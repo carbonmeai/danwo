@@ -25,6 +25,7 @@ import {
 } from "./hosts.ts"
 import { isListening, nothingListening } from "./listening.ts"
 import {
+  caBundle,
   type EnvOptions,
   PROBE_HEADER,
   PROBE_HOST,
@@ -221,13 +222,21 @@ export interface Proxy {
   readonly caCert: string
   readonly caCertPath: string
   /**
+   * The CA with the public roots after it, one PEM file: what `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`
+   * and `CURL_CA_BUNDLE` name in `env()`, for apps outside Node, whose variables replace their
+   * default trust rather than add to it.
+   */
+  readonly caBundlePath: string
+  /**
    * Base64 SHA-256 of the CA's public key. Chromium trusts certificates chained to it with
    * `--ignore-certificate-errors-spki-list=<this>`, without touching the system trust store.
    */
   readonly caSpki: string
   /**
-   * Environment for a Node app to route through the proxy with no code changes: proxy variables,
-   * `NODE_USE_ENV_PROXY=1`, the CA in `NODE_EXTRA_CA_CERTS`, and the preload appended to
+   * Environment for an app to route through the proxy with no code changes: the proxy variables
+   * (`HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY`, upper and lower case), the CA bundle in
+   * `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE` and `CURL_CA_BUNDLE` for apps in any language, and for
+   * Node `NODE_USE_ENV_PROXY=1`, the CA in `NODE_EXTRA_CA_CERTS` and the preload appended to
    * `NODE_OPTIONS` (and to `BUN_OPTIONS` for Bun apps). The preload also runs the app's `Date` on
    * `clock`. Merged over `base` (default `process.env`). A `node` shim goes first on PATH, so a
    * start script that replaces NODE_OPTIONS still loads the preload (`nodeShim: false` leaves it
@@ -529,8 +538,10 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   const dir = await mkdtemp(join(tmpdir(), "danwo-proxy-"))
   const ca = await generateCACertificate({ subject: { commonName: "danwo proxy CA" } })
   const caCertPath = join(dir, "ca.pem")
+  const caBundlePath = join(dir, "ca-bundle.pem")
 
   await writeFile(caCertPath, ca.cert)
+  await writeFile(caBundlePath, caBundle(ca.cert))
 
   const clock = createAppClock(dir)
   const preloadDir = join(dir, "preloaded")
@@ -740,10 +751,15 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
     url,
     caCert: ca.cert,
     caCertPath,
+    caBundlePath,
     caSpki: await generateSPKIFingerprint(ca.cert),
     clock,
     env(base = process.env, envOptions = {}) {
-      return proxyEnvironment({ url, caCertPath, clock, preloadDir, shimDir }, base, envOptions)
+      return proxyEnvironment(
+        { url, caCertPath, caBundlePath, clock, preloadDir, shimDir },
+        base,
+        envOptions,
+      )
     },
     preloaded: () => preloadedPids(preloadDir),
     unrouted: () => unroutedProcesses(preloadDir),
