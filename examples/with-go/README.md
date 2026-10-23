@@ -74,10 +74,10 @@ DATABASE_URL=postgres://postgres@127.0.0.1:5432/quillwork_test npm test
 danwo starts the binary with the proxy's environment, the same as for a Node app. Two parts of it
 matter to Go:
 
-| Variable        | What Go does with it                                                                 |
-| --------------- | ------------------------------------------------------------------------------------ |
-| `HTTPS_PROXY`   | `net/http`'s default transport sends every HTTPS call through danwo's proxy          |
-| `SSL_CERT_FILE` | names danwo's CA; Go trusts it on Linux, and `trust.go` adds it to the pool on macOS |
+| Variable        | What Go does with it                                                                        |
+| --------------- | ------------------------------------------------------------------------------------------- |
+| `HTTPS_PROXY`   | `net/http`'s default transport sends every HTTPS call through danwo's proxy                 |
+| `SSL_CERT_FILE` | names danwo's CA bundle; Go trusts it on Linux, and `trust.go` adds it to the pool on macOS |
 
 On Linux, Go reads `SSL_CERT_FILE` itself. On macOS and Windows it asks the operating system to
 verify certificates and ignores the variable, so the app would refuse danwo's certificate there.
@@ -85,16 +85,16 @@ verify certificates and ignores the variable, so the app would refuse danwo's ce
 the system's pool, and the Stripe and Resend clients use a transport with that pool. In production
 the variable is unset and the client trusts what Go's default one does.
 
-`danwo.config.ts` starts the binary with `SSL_CERT_FILE` pointing at the CA file danwo names for
-Node apps:
+`danwo.config.ts` starts the binary as it is, since danwo sets `SSL_CERT_FILE` for every app:
 
 ```ts title="danwo.config.ts · the app's command"
-command: `SSL_CERT_FILE="$NODE_EXTRA_CA_CERTS" exec "${BINARY}"`,
+command: `exec "${BINARY}"`,
 ```
 
 danwo's start-up check that each app process goes through the proxy is part of its Node preload,
-so it says nothing about a Go process. `unmatched: "block"` still answers any other host with a
-502, as long as the call reaches the proxy.
+so it can't run in a Go process; danwo says so once when the app starts. `unmatched: "block"`
+still answers any other host with a 502, as long as the call reaches the proxy.
+[Apps in other languages](https://danwo.dev/docs/other-languages) covers what else differs.
 
 ## Make it break
 

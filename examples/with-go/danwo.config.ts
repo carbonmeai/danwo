@@ -78,10 +78,9 @@ export default defineConfig({
       app: {
         /*
          * The Go app does not load danwo's Node preload. It follows HTTPS_PROXY on its own, and
-         * trusts danwo's CA through SSL_CERT_FILE, which danwo's proxy environment names for Node
-         * as NODE_EXTRA_CA_CERTS.
+         * trusts danwo's CA through the SSL_CERT_FILE danwo sets for every app.
          */
-        command: `SSL_CERT_FILE="$NODE_EXTRA_CA_CERTS" exec "${BINARY}"`,
+        command: `exec "${BINARY}"`,
         cwd: ROOT,
         url,
         ready: { path: "/health" },

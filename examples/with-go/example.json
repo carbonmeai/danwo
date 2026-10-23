@@ -8,11 +8,11 @@
   "install": "npm",
   "toolchain": "go",
   "shows": [
-    "A Go app behind danwo's proxy with no Node preload: Go's own HTTPS_PROXY support, and danwo's CA trusted through SSL_CERT_FILE on Linux and macOS",
+    "A Go app behind danwo's proxy with no Node preload: Go's own HTTPS_PROXY support, and danwo's CA trusted through the SSL_CERT_FILE danwo sets, on Linux and macOS",
     "The official Stripe and Resend Go SDKs against the emulators, a webhook verified with the Stripe SDK and deduped in the activation's transaction",
     "Invariants that read both sides: one plan per Stripe subscription with Stripe's status, and one welcome email per team",
     "`danwo matrix` faulting Stripe, Resend, the webhooks and Postgres (36 trials), and `QUILLWORK_BUG` switches the matrix catches"
   ],
   "test": "tests/deterministic.danwo.ts",
-  "guide": { "title": "Real stacks", "href": "/docs/real-stacks" }
+  "guide": { "title": "Apps in other languages", "href": "/docs/other-languages" }
 }
