@@ -1035,68 +1035,77 @@ const BachsShopOutput = z.union([
 ])
 
 describe("routing an unmodified Bachs app", () => {
-  it("creates a checkout on the sandbox host and fulfils on the signed collection.succeeded", async () => {
-    const emulator = createEmulator(bachs)
-    const proxy = await startProxy({
-      routes: [{ hosts: [...BACHS_HOSTS], handler: emulator.fetch }],
-      unmatched: "block",
-    })
-    const child = spawn(process.execPath, [BACHS_SHOP_APP], {
-      env: {
-        ...proxy.env(),
-        BACHS_API_KEY: "sk_sandbox_danwoShop",
-        BACHS_WEBHOOK_SECRET: "whsec_shop",
-      },
-      cwd: fileURLToPath(new URL("..", import.meta.url)),
-      stdio: ["pipe", "pipe", "inherit"],
-    })
-    const lines = createInterface({ input: child.stdout })[Symbol.asyncIterator]()
-    const next = async () => BachsShopOutput.parse(JSON.parse(String((await lines.next()).value)))
-
-    try {
-      const started = await next()
-      const port = "port" in started ? started.port : 0
-
-      seedBachs(emulator.store, {
-        webhookEndpoints: [
-          {
-            url: `http://127.0.0.1:${port}/webhooks/bachs`,
-            events: ["collection.succeeded"],
-            secret: "whsec_shop",
-          },
-        ],
+  /* It starts a Node app with the Bachs SDK, which takes most of the default 5 s on a small CI runner. */
+  it(
+    "creates a checkout on the sandbox host and fulfils on the signed collection.succeeded",
+    {
+      timeout: 20_000,
+    },
+    async () => {
+      const emulator = createEmulator(bachs)
+      const proxy = await startProxy({
+        routes: [{ hosts: [...BACHS_HOSTS], handler: emulator.fetch }],
+        unmatched: "block",
       })
-      child.stdin.write("buy\n")
-
-      const created = await next()
-      const url = "checkout_url" in created ? created.checkout_url : ""
-
-      expect(url).toMatch(/^https:\/\/checkout\.bachs\.io\/c\//)
-
-      const paid = await emulator.fetch(
-        new Request(`${url}/pay`, {
-          method: "POST",
-          headers: { "content-type": "application/x-www-form-urlencoded" },
-          body: "card=4242424242424242",
-        }),
-      )
-
-      expect(paid.status).toBe(200)
-      expect(await next()).toEqual({
-        fulfilled: "checkout_id" in created ? created.checkout_id : "",
+      const child = spawn(process.execPath, [BACHS_SHOP_APP], {
+        env: {
+          ...proxy.env(),
+          BACHS_API_KEY: "sk_sandbox_danwoShop",
+          BACHS_WEBHOOK_SECRET: "whsec_shop",
+        },
+        cwd: fileURLToPath(new URL("..", import.meta.url)),
+        stdio: ["pipe", "pipe", "inherit"],
       })
-      expect(bachsLedger(emulator).succeeded("order_1042")).toHaveLength(1)
+      const lines = createInterface({ input: child.stdout })[Symbol.asyncIterator]()
+      const next = async () => BachsShopOutput.parse(JSON.parse(String((await lines.next()).value)))
 
-      await proxy.settled()
-      expect(
-        proxy.exchanges().map((e) => `${e.disposition} ${e.method} ${e.host}${e.path} ${e.status}`),
-      ).toEqual(["routed POST sandbox-api.bachs.io/v1/checkout-sessions 201"])
-    } finally {
-      child.kill()
-      await proxy.stop()
-      await emulator.close()
-    }
-  })
+      try {
+        const started = await next()
+        const port = "port" in started ? started.port : 0
+
+        seedBachs(emulator.store, {
+          webhookEndpoints: [
+            {
+              url: `http://127.0.0.1:${port}/webhooks/bachs`,
+              events: ["collection.succeeded"],
+              secret: "whsec_shop",
+            },
+          ],
+        })
+        child.stdin.write("buy\n")
+
+        const created = await next()
+        const url = "checkout_url" in created ? created.checkout_url : ""
+
+        expect(url).toMatch(/^https:\/\/checkout\.bachs\.io\/c\//)
+
+        const paid = await emulator.fetch(
+          new Request(`${url}/pay`, {
+            method: "POST",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            body: "card=4242424242424242",
+          }),
+        )
+
+        expect(paid.status).toBe(200)
+        expect(await next()).toEqual({
+          fulfilled: "checkout_id" in created ? created.checkout_id : "",
+        })
+        expect(bachsLedger(emulator).succeeded("order_1042")).toHaveLength(1)
+
+        await proxy.settled()
+        expect(
+          proxy
+            .exchanges()
+            .map((e) => `${e.disposition} ${e.method} ${e.host}${e.path} ${e.status}`),
+        ).toEqual(["routed POST sandbox-api.bachs.io/v1/checkout-sessions 201"])
+      } finally {
+        child.kill()
+        await proxy.stop()
+        await emulator.close()
+      }
+    },
+  )
 })
 
 describe("forwarding to an upstream", () => {
