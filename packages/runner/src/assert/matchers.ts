@@ -58,11 +58,13 @@ export interface LocatorAssertions {
 
 /** A check that did not hold before its timeout. */
 class ExpectationFailed extends Error {
-  readonly code = "EXPECTATION_FAILED"
+  /** `LOCATOR_AMBIGUOUS` when the locator kept matching several elements: the test's to fix. */
+  readonly code: "EXPECTATION_FAILED" | "LOCATOR_AMBIGUOUS"
 
-  constructor(message: string) {
+  constructor(message: string, code: ExpectationFailed["code"] = "EXPECTATION_FAILED") {
     super(message)
     this.name = "ExpectationFailed"
+    this.code = code
   }
 }
 
@@ -96,7 +98,9 @@ async function look(locator: ElementLocator, probe: Probe, deadline: number): Pr
 
 /**
  * The error a check throws when time runs out, with what it last saw; when the locator found no
- * element or several, how many each call of its chain left.
+ * element or several, how many each call of its chain left. A locator still matching several
+ * elements fails as `LOCATOR_AMBIGUOUS`, as an action on it does: the page may well be right, and
+ * the locator is what needs narrowing.
  */
 async function failure(
   locator: ElementLocator,
@@ -109,6 +113,12 @@ async function failure(
   const expected = `${negate ? "not " : ""}${check.args || check.name.replace(/^toBe/, "").toLowerCase()}`
   const unfound = last.ambiguous === true || last.received === "no element"
   const steps = unfound ? await stepCounts(locator.chain(locator.session.page())) : ""
+
+  if (last.ambiguous === true)
+    return new ExpectationFailed(
+      `${call} failed after ${ms} ms: ${locator.text} matched ${last.received}; it needs exactly one (use first(), nth() or filter())${steps}`,
+      "LOCATOR_AMBIGUOUS",
+    )
 
   return new ExpectationFailed(
     `${call} failed after ${ms} ms\n  expected: ${expected}\n  received: ${last.received}${steps}`,

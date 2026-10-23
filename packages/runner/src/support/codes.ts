@@ -21,7 +21,7 @@ export type ErrorClass = "test" | "blocked" | "inconclusive" | "config" | "infra
 const ERROR_CODES = {
   EXPECTATION_FAILED: ["test", "an `expect` check did not hold within its timeout"],
   LOCATOR_NOT_FOUND: ["test", "a locator matched no element"],
-  LOCATOR_AMBIGUOUS: ["test", "a locator that acts matched more than one element"],
+  LOCATOR_AMBIGUOUS: ["test", "a locator that acts or is checked matched more than one element"],
   LOCATOR_NOT_READY: ["test", "the element was there but not visible, enabled or stable in time"],
   LOCATOR_FAILED: ["test", "an action on an element failed"],
   SCREENSHOT_MISMATCH: ["test", "a screenshot differs from its baseline"],
