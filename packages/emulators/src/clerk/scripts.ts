@@ -78,6 +78,39 @@ function installedRoot(request: ScriptRequest): string | undefined {
   return undefined
 }
 
+/** How many times a script is fetched from the CDN before the emulator gives up on it. */
+const DOWNLOAD_ATTEMPTS = 3
+/** How long one fetch from the CDN may take. */
+const DOWNLOAD_TIMEOUT_MS = 15_000
+
+/**
+ * A script's bytes from the CDN, tried a few times with a timeout on each try, so one slow or
+ * failed fetch doesn't fail every page that loads ClerkJS. Nothing, once every try fails or the CDN
+ * answers that the file doesn't exist.
+ */
+export async function downloadScript(
+  url: string,
+  options: { readonly fetch?: typeof fetch; readonly backoffMs?: number } = {},
+): Promise<Buffer | undefined> {
+  const get = options.fetch ?? fetch
+
+  for (let attempt = 1; attempt <= DOWNLOAD_ATTEMPTS; attempt += 1) {
+    try {
+      const answer = await get(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) })
+
+      if (answer.ok) return Buffer.from(await answer.arrayBuffer())
+      if (answer.status === 404) return undefined
+    } catch {
+      /* A network error or a timeout: try again. */
+    }
+
+    if (attempt < DOWNLOAD_ATTEMPTS)
+      await new Promise((resolve) => setTimeout(resolve, (options.backoffMs ?? 500) * attempt))
+  }
+
+  return undefined
+}
+
 /** The bytes of a requested file: an installed copy, the cache, or a download into the cache. */
 async function scriptBytes(request: ScriptRequest): Promise<Buffer | undefined> {
   const root = installedRoot(request)
@@ -92,11 +125,11 @@ async function scriptBytes(request: ScriptRequest): Promise<Buffer | undefined> 
 
   if (existsSync(cached)) return readFile(cached)
 
-  const answer = await fetch(`${UPSTREAM}/${request.name}@${request.version}/${request.file}`)
+  const bytes = await downloadScript(
+    `${UPSTREAM}/${request.name}@${request.version}/${request.file}`,
+  )
 
-  if (!answer.ok) return undefined
-
-  const bytes = Buffer.from(await answer.arrayBuffer())
+  if (bytes === undefined) return undefined
 
   await mkdir(dirname(cached), { recursive: true })
   await writeFile(cached, bytes)

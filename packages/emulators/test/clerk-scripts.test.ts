@@ -5,6 +5,7 @@ import { join, sep } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { clerk } from "../src/clerk/index.ts"
+import { downloadScript } from "../src/clerk/scripts.ts"
 import { createEmulator } from "../src/define.ts"
 
 const FAPI = "https://danwo-app.clerk.accounts.dev"
@@ -38,5 +39,55 @@ describe("Clerk's browser scripts", () => {
   it("serves nothing outside those packages", async () => {
     expect((await get("/npm/@clerk/clerk-js@6/../../package.json")).status).toBe(404)
     expect((await get("/npm/left-pad@1/index.js")).status).toBe(404)
+  })
+})
+
+/** A CDN that answers with the script. */
+const ok = () => new Response("console.log(1)", { status: 200 })
+
+describe("downloading a ClerkJS script from the CDN", () => {
+  it("tries again after a network error or a 5xx, and gets the file", async () => {
+    const answers: (() => Response)[] = [
+      () => {
+        throw new TypeError("fetch failed")
+      },
+      () => new Response("", { status: 503 }),
+      ok,
+    ]
+    let calls = 0
+    const bytes = await downloadScript("https://cdn.test/a.js", {
+      fetch: async () => (answers[calls++] ?? ok)(),
+      backoffMs: 0,
+    })
+
+    expect(bytes?.toString()).toBe("console.log(1)")
+    expect(calls).toBe(3)
+  })
+
+  it("gives up after three failed tries, and at once on a 404", async () => {
+    let calls = 0
+
+    const failing = async () => {
+      calls += 1
+      throw new TypeError("fetch failed")
+    }
+
+    expect(await downloadScript("https://cdn.test/a.js", { fetch: failing, backoffMs: 0 })).toBe(
+      undefined,
+    )
+    expect(calls).toBe(3)
+
+    calls = 0
+
+    const missing = async () => {
+      calls += 1
+
+      return new Response("", { status: 404 })
+    }
+
+    expect(await downloadScript("https://cdn.test/a.js", { fetch: missing, backoffMs: 0 })).toBe(
+      undefined,
+    )
+    expect(calls).toBe(1)
   })
 })
