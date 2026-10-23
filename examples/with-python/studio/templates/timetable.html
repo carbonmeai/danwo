@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="page-header">
+  <h1 class="page-title">This week's classes</h1>
+  <p class="page-description">Small classes, booked and paid ahead. Your confirmation comes by email.</p>
+</header>
+<ul class="timetable">
+  {% for klass in classes %}
+  {% set left = klass.capacity - klass.booked %}
+  <li>
+    <a class="card class-card" href="/classes/{{ klass.slug }}">
+      <span class="class-when">{{ klass.starts }} · {{ klass.minutes }} min</span>
+      <span class="card-title">{{ klass.name }}</span>
+      <span class="muted">with {{ klass.instructor }}</span>
+      <span class="row class-meta">
+        <strong>{{ klass.price_cents | money }}</strong>
+        {% if left <= 0 %}
+        <span class="badge badge-danger">Full</span>
+        {% elif left <= 3 %}
+        <span class="badge badge-warning">{{ left }} {{ "place" if left == 1 else "places" }} left</span>
+        {% else %}
+        <span class="badge badge-success">{{ left }} places left</span>
+        {% endif %}
+      </span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}

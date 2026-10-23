@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}My bookings · Fern Studio{% endblock %}
+{% block crumb %}My bookings{% endblock %}
+{% block content %}
+<header class="page-header">
+  <h1 class="page-title">My bookings</h1>
+  <p class="page-description">Every class you've booked, newest first.</p>
+</header>
+<form class="row bookings-lookup" method="get" action="/bookings">
+  <label class="label" for="lookup-email">Email</label>
+  <input id="lookup-email" class="input" name="email" type="email" value="{{ email }}" required />
+  <button class="btn btn-secondary" type="submit">Show bookings</button>
+</form>
+{% if not bookings %}
+<div class="empty">
+  <p class="empty-title">No bookings yet</p>
+  <p class="empty-text">Classes you book show up here.</p>
+</div>
+{% else %}
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Booking</th>
+        <th>Class</th>
+        <th>When</th>
+        <th class="num">Paid</th>
+        <th>Confirmation</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in bookings %}
+      <tr>
+        <td>{{ row.id | booking_number }}</td>
+        <td>{{ row.name }}</td>
+        <td class="muted">{{ row.starts }}</td>
+        <td class="num">{{ row.amount_cents | money }}</td>
+        <td>
+          {% if row.confirmation_email_id %}
+          <span class="badge badge-success">Sent</span>
+          {% else %}
+          <span class="badge badge-warning">Pending</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

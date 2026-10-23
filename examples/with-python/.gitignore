@@ -1,0 +1,10 @@
+node_modules/
+package-lock.json
+*.tsbuildinfo
+
+# Python: the environment `uv sync` makes, and bytecode.
+.venv/
+__pycache__/
+
+# What danwo writes when it runs: flight records, the agent's recordings, reports.
+.danwo/

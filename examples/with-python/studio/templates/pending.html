@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Confirming · Fern Studio{% endblock %}
+{% block crumb %}Booking{% endblock %}
+{% block content %}
+<header class="page-header">
+  <h1 class="page-title">{% if state == "paid" %}Confirming your booking…{% else %}Waiting for your payment…{% endif %}</h1>
+  <p class="page-description">This takes a few seconds. You can keep this page open.</p>
+</header>
+<script>
+  setTimeout(() => location.reload(), 1000)
+</script>
+{% endblock %}

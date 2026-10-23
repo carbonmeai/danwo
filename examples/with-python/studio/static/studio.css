@@ -1,0 +1,75 @@
+/* Fern Studio's own layout, on top of the examples' kit. */
+
+.timetable {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--kit-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.class-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kit-space-1);
+  height: 100%;
+  padding: var(--kit-space-4);
+  color: inherit;
+  text-decoration: none;
+}
+
+.class-card:hover {
+  border-color: var(--kit-primary);
+}
+
+.class-when {
+  color: var(--kit-fg-muted);
+  font-size: var(--kit-text-xs);
+}
+
+.class-meta {
+  justify-content: space-between;
+  margin-top: var(--kit-space-3);
+}
+
+.class-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--kit-space-4);
+  align-items: start;
+}
+
+@media (max-width: 48rem) {
+  .class-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--kit-space-2) var(--kit-space-6);
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--kit-fg-muted);
+}
+
+.facts dd {
+  margin: 0;
+  font-weight: var(--kit-weight-medium);
+}
+
+.booking-card {
+  max-width: 32rem;
+}
+
+.bookings-lookup {
+  margin-bottom: var(--kit-space-6);
+}
+
+.bookings-lookup .input {
+  max-width: 20rem;
+}

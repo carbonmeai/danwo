@@ -1,0 +1,62 @@
+[
+  {
+    "slug": "sunrise-flow",
+    "name": "Sunrise flow",
+    "instructor": "Ana",
+    "starts": "Monday 07:00",
+    "minutes": 60,
+    "description": "A steady vinyasa to wake up to: breath, sun salutations and a long stretch at the end. Mats are provided.",
+    "priceCents": 1800,
+    "capacity": 12
+  },
+  {
+    "slug": "strength-basics",
+    "name": "Strength basics",
+    "instructor": "Ike",
+    "starts": "Tuesday 18:30",
+    "minutes": 45,
+    "description": "Squats, hinges, pushes and pulls with kettlebells, at your own weight. Good for a first class.",
+    "priceCents": 2200,
+    "capacity": 10
+  },
+  {
+    "slug": "pottery-wheel",
+    "name": "Pottery wheel",
+    "instructor": "Mo",
+    "starts": "Wednesday 19:00",
+    "minutes": 120,
+    "description": "Centre, open and pull your first bowls on the wheel. Clay and firing are included.",
+    "priceCents": 4500,
+    "capacity": 6
+  },
+  {
+    "slug": "breathwork",
+    "name": "Breathwork",
+    "instructor": "Lena",
+    "starts": "Thursday 12:15",
+    "minutes": 30,
+    "description": "Half an hour of guided breathing over lunch. Come as you are.",
+    "priceCents": 1200,
+    "capacity": 15
+  },
+  {
+    "slug": "spin-sprint",
+    "name": "Spin sprint",
+    "instructor": "Ike",
+    "starts": "Friday 07:30",
+    "minutes": 45,
+    "description": "Intervals on the bike to loud music. Bring water and a towel.",
+    "priceCents": 2000,
+    "capacity": 0
+  },
+  {
+    "slug": "slow-stretch",
+    "name": "Slow stretch",
+    "instructor": "Ana",
+    "starts": "Saturday 10:00",
+    "minutes": 60,
+    "description": "Long held stretches and a little yin to end the week.",
+    "priceCents": 1600,
+    "capacity": 12
+  }
+]

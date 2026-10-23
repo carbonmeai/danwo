@@ -1,0 +1,26 @@
+{
+  "name": "danwo-example-with-python",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Fern Studio, a class-booking app with a FastAPI backend in Python, Postgres, Stripe Checkout and Resend, tested end to end with danwo.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "danwo test",
+    "test:agentic": "danwo test tests/agentic.danwo.ts",
+    "matrix": "danwo matrix tests/deterministic.danwo.ts --grep \"books a class\"",
+    "matrix:plan": "danwo matrix tests/deterministic.danwo.ts --grep \"books a class\" --plan",
+    "serve": "danwo serve"
+  },
+  "devDependencies": {
+    "@danwo/cli": "0.1.2",
+    "@danwo/sdk": "0.1.2",
+    "@types/node": "^24",
+    "@types/pg": "8.23.1",
+    "pg": "8.23.1",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

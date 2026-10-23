@@ -31,6 +31,8 @@ const ExampleSchema = z.object({
   install: z.enum(["npm", "workspace"]),
   /** `false`: the examples workflow leaves it out, since it needs a device the CI runners lack. */
   ci: z.boolean().optional(),
+  /** The language toolchain the examples workflow sets up beside Node, for an app in another language. */
+  toolchain: z.enum(["python", "go"]).optional(),
   /** What it shows danwo doing. */
   shows: z.array(z.string()).min(1),
   /** The test file the page prints. */

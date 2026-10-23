@@ -1,0 +1,18 @@
+{
+  "name": "Python booking app",
+  "summary": "Fern Studio, a class-booking app on FastAPI: browse the timetable, pay with Stripe Checkout, get a confirmation through Resend, see your bookings. Postgres through psycopg, pages rendered with Jinja2.",
+  "icon": "python.svg",
+  "stack": ["Python", "FastAPI", "Postgres", "Jinja2", "uv"],
+  "providers": ["stripe", "resend"],
+  "runsOn": "A FastAPI app started with uv, in Chromium, with Postgres in Docker",
+  "install": "npm",
+  "toolchain": "python",
+  "shows": [
+    "An app outside Node behind danwo's proxy: the official Stripe and Resend Python SDKs reach the emulators through the proxy and CA variables danwo sets, with no test hooks",
+    "Invariants that read Postgres against Stripe and Resend: one booking per paid session, one confirmation per booking, amounts equal to what Stripe charged",
+    "`danwo matrix` faulting Stripe, Resend, the webhooks and Postgres itself (52 trials), and the app surviving every one",
+    "A `STUDIO_BUG` switch that turns one safeguard off, so you can watch the matrix catch it"
+  ],
+  "test": "tests/deterministic.danwo.ts",
+  "guide": { "title": "Apps in other languages", "href": "/docs/other-languages" }
+}
