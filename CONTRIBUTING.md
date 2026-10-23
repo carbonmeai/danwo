@@ -95,7 +95,7 @@ node examples/link.ts with-next --here     # or in place, so your editor finds t
 All public packages are released together, at one version. `@danwo/ui` and `@danwo/fidelity` stay private. Check a release locally first:
 
 ```bash
-bun run release 0.1.0-beta.0 --pack --verify
+bun run release 0.0.0-ci --pack --verify
 ```
 
 `--pack` builds the dashboard and the type declarations, stages each public package at the version (every `workspace:` range replaced) and writes one tarball per package to `dist/release`. `--verify` installs the tarballs into a fresh npm project, runs `danwo --version`, `init`, `test` and a strict `tsc` there, and fails if danwo left anything running. The script refuses a dirty tree and a version that is not semver.

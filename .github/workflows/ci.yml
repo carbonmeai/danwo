@@ -44,7 +44,7 @@ jobs:
           chromium: "true"
       - run: bun run ui:codegen
       - run: bun run test
-      - run: bun run release 0.1.0-beta.0 --pack --verify
+      - run: bun run release 0.0.0-ci --pack --verify
 
   # The unit and ui tests on Windows, and an install of the packed tarballs there that runs
   # `danwo test` as a user would. Tests that need a POSIX shell, Linux containers or macOS say so
@@ -62,7 +62,7 @@ jobs:
           chromium: "true"
       - run: bun run ui:codegen
       - run: bun run test
-      - run: bun run release 0.1.0-beta.0 --pack --verify
+      - run: bun run release 0.0.0-ci --pack --verify
 
   gitleaks:
     name: gitleaks
