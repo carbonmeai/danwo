@@ -3,7 +3,8 @@
  * native Gradle project and a Flutter app build with their own tools (`gradle.ts`, `flutter.ts`).
  * An Expo app builds as a release APK with its JavaScript bundled (no Metro at test time): `expo
  * prebuild`, the danwo network config, then Gradle, with Android Studio's JDK when `JAVA_HOME` is
- * unset. A build is kept by a hash of the app's sources, so an unchanged app is not built again.
+ * unset. A build is kept by a hash of the app's sources, so an unchanged app is not built again,
+ * and a project builds once at a time: the workers of a run share one build.
  */
 import { copyFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -11,6 +12,7 @@ import { join } from "node:path"
 import { androidSdkRoot, javaHome } from "../toolchain.ts"
 import { buildFlutterAndroid } from "./flutter.ts"
 import { buildGradle } from "./gradle.ts"
+import { withBuildLock } from "./lock.ts"
 import { applyNetworkConfig } from "./network.ts"
 import { androidProject } from "./project.ts"
 import { type AndroidBuild, type BuildExec, buildSlot, sourceHash } from "./slot.ts"
@@ -99,8 +101,15 @@ async function buildExpoAndroid(options: BuildAndroidOptions): Promise<AndroidBu
 export function buildAndroid(options: BuildAndroidOptions): Promise<AndroidBuild> {
   const project = androidProject(options.project)
 
-  if (project.kind === "flutter") return buildFlutterAndroid(options)
-  if (project.kind === "gradle") return buildGradle(options)
+  /* One build of the project at a time: workers that wait reuse the build the first one kept. */
+  return withBuildLock(
+    join(options.project, ".danwo", "builds", "build-android.lock"),
+    () => {
+      if (project.kind === "flutter") return buildFlutterAndroid(options)
+      if (project.kind === "gradle") return buildGradle(options)
 
-  return buildExpoAndroid(options)
+      return buildExpoAndroid(options)
+    },
+    { onWait: (holder) => options.onLine?.(`waiting for ${holder} to finish building the app`) },
+  )
 }

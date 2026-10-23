@@ -4,13 +4,14 @@
  * Expo app builds as a Release `.app` with its JavaScript bundled (no Metro at test time): `expo
  * prebuild` (which installs the CocoaPods), the danwo network config, then `xcodebuild` for the
  * simulator with no code signing. A build is kept by a hash of the app's sources, so an unchanged
- * app is not built again.
+ * app is not built again, and a project builds once at a time: the workers of a run share one build.
  */
 import { cp, readdir, rm } from "node:fs/promises"
 import { join } from "node:path"
 
 import { buildFlutterIos } from "./flutter.ts"
 import { applyIosNetworkConfig } from "./ios-network.ts"
+import { withBuildLock } from "./lock.ts"
 import { iosProject } from "./project.ts"
 import { type BuildExec, buildSlot, type IosBuild, sourceHash } from "./slot.ts"
 import { buildXcode, iosBuildEnv } from "./xcode.ts"
@@ -110,8 +111,15 @@ async function buildExpoIos(options: BuildIosOptions): Promise<IosBuild> {
 export async function buildIos(options: BuildIosOptions): Promise<IosBuild> {
   const project = await iosProject(options.project)
 
-  if (project.kind === "flutter") return buildFlutterIos(options)
-  if (project.kind === "xcode") return buildXcode({ ...options, container: project.container })
+  /* One build of the project at a time: workers that wait reuse the build the first one kept. */
+  return withBuildLock(
+    join(options.project, ".danwo", "builds", "build-ios.lock"),
+    () => {
+      if (project.kind === "flutter") return buildFlutterIos(options)
+      if (project.kind === "xcode") return buildXcode({ ...options, container: project.container })
 
-  return buildExpoIos(options)
+      return buildExpoIos(options)
+    },
+    { onWait: (holder) => options.onLine?.(`waiting for ${holder} to finish building the app`) },
+  )
 }
