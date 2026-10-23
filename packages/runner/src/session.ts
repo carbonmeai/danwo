@@ -582,10 +582,11 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
   const stopped = new AbortController()
   const users: OpenUser[] = []
   /* The recorder tells the flight about each step that ends; the flight reads the recorder. */
-  const ended: { onStep?: (step: StepRecord) => void } = {}
+  const ended: { onStep?: (step: StepRecord) => void; pending?: () => Promise<void> } = {}
   const steps = new StepRecorder({
     projectRoot: settings.projectRoot,
     redact: vault.redact,
+    beforeChange: () => ended.pending?.() ?? Promise.resolve(),
     onStart: (step) => options.onStep?.(step),
     onEnd: (step) => {
       ended.onStep?.(step)
@@ -622,6 +623,8 @@ export async function openWebSession(options: WebSessionOptions): Promise<WebSes
   })
 
   ended.onStep = (step) => flight.onStep(step)
+  /* A step's screenshot is taken before the next step acts, which may navigate away. */
+  ended.pending = () => flight.settle()
   await showTime(context, machine)
 
   const desk: UserDesk = {

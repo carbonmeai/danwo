@@ -237,7 +237,16 @@ export interface StepRecorderOptions {
   readonly onStart?: (step: StepRecord) => void
   /** Called when a step ends, passed or failed. */
   readonly onEnd?: (step: StepRecord) => void
+  /**
+   * Awaited before a step that can change the page starts (an action, `app.open`, an agent step):
+   * what the earlier steps left to do on the page, such as their screenshots, finishes first, so
+   * a navigation never takes the page from under it.
+   */
+  readonly beforeChange?: () => Promise<void>
 }
+
+/** The kinds of step that can change the page: a check or a wait only reads it. */
+const CHANGES_PAGE: ReadonlySet<StepKind> = new Set(["locator", "app", "agent"])
 
 /** What every person's recorder of one attempt writes to: one list of steps, one app log. */
 interface Shared {
@@ -315,6 +324,8 @@ export class StepRecorder implements StepLog {
     body: () => Promise<T>,
     options: { readonly verifies?: boolean } = {},
   ): Promise<T> {
+    if (CHANGES_PAGE.has(kind)) await this.options.beforeChange?.()
+
     const running = this.begin(kind, api, label)
     const started = Date.now()
 
