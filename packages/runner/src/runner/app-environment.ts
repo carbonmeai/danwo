@@ -9,7 +9,7 @@ import { once } from "node:events"
 
 import { spawnOwned } from "../support/children.ts"
 import { DanwoError } from "../support/codes.ts"
-import { checkRouting, outsideNodeNotes, routingRefusal, unroutedProblems } from "./app-checks.ts"
+import { checkRouting, noteOutsideNode, routingRefusal, unroutedProblems } from "./app-checks.ts"
 import type { ProcessLog, WorkerEnvironment } from "./environment.ts"
 import {
   type Service,
@@ -446,12 +446,8 @@ export async function appEnvironment(
   }
 
   try {
-    notes = [
-      ...(await checkRouting(services.proxy, strict)),
-      ...(started?.pid === undefined
-        ? []
-        : await outsideNodeNotes("the app", started.pid, services.proxy)),
-    ]
+    notes = await checkRouting(services.proxy, strict)
+    if (started?.pid !== undefined) await noteOutsideNode("the app", started.pid, services.proxy)
   } catch (error) {
     await started?.stop()
     await services.close()

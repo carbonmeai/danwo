@@ -4,8 +4,8 @@
  * then SDKs with their own agents skip the proxy), whether the processes that loaded it really go
  * through the proxy (the preload's start-up probe says), and whether its environment still holds
  * real provider keys that would reach real providers. None of the checks prints a value. An app
- * that runs no Node at all (Python, Go, Ruby) has no preload to probe from, so it gets a note
- * that the check did not run for it instead of a verdict.
+ * that runs no Node at all (Python, Go, Ruby) has no preload to probe from, so danwo says once
+ * that the check did not run for it instead of giving a verdict.
  */
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -78,7 +78,7 @@ export async function preloadWarnings(app: string, root: number, proxy: Proxy): 
  * Node or preloaded process, or with none left running (a command that started a service and
  * exited).
  */
-export async function outsideNodeNotes(app: string, root: number, proxy: Proxy): Promise<string[]> {
+async function outsideNodeNotes(app: string, root: number, proxy: Proxy): Promise<string[]> {
   const family = familyOf(await processRowsAsync(), root)
   const preloaded = new Set([
     ...(await proxy.preloaded()),
@@ -93,6 +93,21 @@ export async function outsideNodeNotes(app: string, root: number, proxy: Proxy):
   return [
     `${app} runs no Node process (${programs}), so danwo's check at start that its calls reach the proxy, which runs inside Node, does not run for it. Its calls go through the proxy when its HTTP clients read HTTPS_PROXY and trust the CA bundle in SSL_CERT_FILE, REQUESTS_CA_BUNDLE or CURL_CA_BUNDLE, which danwo sets.`,
   ]
+}
+
+/** The notes `noteOutsideNode` printed in this process, so each is said once, not per worker run. */
+const said = new Set<string>()
+
+/**
+ * Prints `outsideNodeNotes` on stderr, each once per process. They describe the app, not a test,
+ * so they stay out of the environment's notes, which a matrix repeats under every trial.
+ */
+export async function noteOutsideNode(app: string, root: number, proxy: Proxy): Promise<void> {
+  for (const note of await outsideNodeNotes(app, root, proxy)) {
+    if (said.has(note)) continue
+    said.add(note)
+    process.stderr.write(`danwo: ${note}\n`)
+  }
 }
 
 /**

@@ -6,7 +6,7 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { resendInbox } from "@danwo/emulators"
-import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 
 import { appEnvironment, startApp } from "../src/runner/app-environment.ts"
@@ -296,6 +296,7 @@ describe.runIf(hasPython())("an app outside Node", () => {
   it("reaches the emulators through the standard variables, under block and secrets: fail", async () => {
     const url = `http://127.0.0.1:${await freePort()}`
     const resend = resendService()
+    const stderr = vi.spyOn(process.stderr, "write")
     const env = await stackEnvironment({
       unmatched: "block",
       secrets: "fail",
@@ -311,11 +312,15 @@ describe.runIf(hasPython())("an app outside Node", () => {
       })
       /* A host no route answers is refused at the proxy, Python or not. */
       expect(await (await fetch(`${url}/outside`)).text()).toBe("502")
-      /* No preload ran in it, so its routing check is a note, never a refusal. */
-      expect(env.notes?.()).toEqual([
-        expect.stringMatching(/^mailer runs no Node process \(.*python.*\), so danwo's check/i),
-      ])
+      /* No preload ran in it, so its routing check is a line said once, never a refusal. */
+      expect(stderr.mock.calls.map(([text]) => String(text))).toContainEqual(
+        expect.stringMatching(
+          /^danwo: mailer runs no Node process \(.*python.*\), so danwo's check/i,
+        ),
+      )
+      expect(env.notes?.()).toEqual([])
     } finally {
+      stderr.mockRestore()
       await env.close()
     }
   }, 30_000)
