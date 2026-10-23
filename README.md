@@ -39,6 +39,8 @@ providers, invariants and a fault matrix.
 
 ## A test
 
+### With locators: no model needed
+
 ```ts
 import { test } from "@danwo/sdk"
 
@@ -52,15 +54,27 @@ test("signs up", async ({ app, screen, expect }) => {
 })
 ```
 
-That test needs no model, API key or provider setup. Steps can also be written in plain English.
-The first run sends each one to a model (with your API key) to work out the clicks, and records
-them; later runs replay the recording with no model call:
+This runs with no model and no API key.
+
+### In plain English: a model on the first run, then cached
 
 ```ts
-await agent.act("add two blue mugs to the basket and go to checkout")
-await agent.assert("the basket shows two blue mugs")
-await expect(screen).toHaveScreenshot("checkout")
+import { test } from "@danwo/sdk"
+
+test("buys two mugs", async ({ app, agent, screen, expect }) => {
+  await app.open("/")
+  await agent.act("add two blue mugs to the basket and go to checkout")
+  await agent.assert("the basket shows two blue mugs")
+
+  await expect(screen).toHaveScreenshot("checkout")
+})
 ```
+
+The first run needs a model and its API key: each step goes to the model, which works out the
+clicks, and danwo records them. Later runs replay that recording with no model call. Commit the
+recording and CI replays it too; `danwo test --replay-only` makes sure no model is called there. A
+step goes back to the model only when the page has changed enough that its recording no longer
+fits.
 
 ## Quickstart
 
