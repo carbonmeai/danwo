@@ -75,6 +75,23 @@ export default defineConfig({
 
 The app gets the port as `PORT`.
 
+### Start an app without the proxy
+
+`appEnvironment` starts the app behind danwo's proxy, so its calls to providers reach the
+emulators. Some apps must not be routed at all, such as a tool that runs danwo itself. Pass
+`proxy: false` to start the app as it would run on its own:
+
+```ts title="danwo.config.ts · an app without the proxy"
+environment: () =>
+  appEnvironment({
+    app: { command: "npm start", url: "http://127.0.0.1:4310" },
+    proxy: false,
+  }),
+```
+
+The app then gets none of the proxy's settings. With no proxy there are no emulators, so adding
+`services` as well stops the run with a config error.
+
 ## What tests run against
 
 | Option        | Default  | What it does                                                                  |

@@ -2,7 +2,7 @@
  * danwo tests its own dashboard: `danwo serve` over a project with real runs in it, driven the way
  * a person reads it. The runs are made fresh by each worker before the dashboard starts.
  */
-import { defineConfig, freePort, startApp } from "@danwo/sdk"
+import { appEnvironment, defineConfig, freePort } from "@danwo/sdk"
 
 import { DANWO, PROJECT, prepareProject } from "./project.ts"
 
@@ -15,24 +15,16 @@ export default defineConfig({
     await prepareProject()
 
     const port = await freePort()
-    const dashboard = await startApp(
-      {
+
+    /* The dashboard runs danwo itself (a run from its page), which must not inherit a proxy. */
+    return appEnvironment({
+      app: {
         command: `"${process.execPath}" "${DANWO}" serve --port ${port}`,
         url: `http://127.0.0.1:${port}/`,
         cwd: PROJECT,
+        env: { NO_COLOR: "1" },
       },
-      { ...process.env, NO_COLOR: "1" },
-    )
-
-    return {
-      baseUrl: dashboard.url,
-      logs: () => ({ dashboard: dashboard.logs() }),
-      stopped: () => {
-        const exit = dashboard.exited()
-
-        return exit === undefined ? [] : [`the dashboard ${exit}`]
-      },
-      close: () => dashboard.stop(),
-    }
+      proxy: false,
+    })
   },
 })

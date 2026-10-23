@@ -237,6 +237,35 @@ describe("appEnvironment", () => {
     }
   }, 30_000)
 
+  it("starts the app without the proxy's variables, shim or preload with proxy: false", async () => {
+    const command = await appCommand({ OWN: "yes" })
+    const env = await appEnvironment({ app: command, proxy: false })
+
+    try {
+      const seen = await appEnv(env.baseUrl)
+
+      expect(env.baseUrl).toBe(command.url)
+      expect(env.proxy).toBeUndefined()
+      expect(await (await fetch(command.url)).text()).toBe("proxied: no")
+      expect(seen).toMatchObject({ OWN: "yes", PORT: new URL(command.url).port })
+      expect(seen.NODE_OPTIONS ?? "").not.toContain("--import=")
+      expect(
+        Object.keys(seen).filter((name) => /^(HTTPS?_PROXY|NODE_EXTRA_CA_CERTS)$/i.test(name)),
+      ).toEqual([])
+      expect(env.logs?.()["app"]?.lines).toContain("listening")
+    } finally {
+      await env.close()
+    }
+
+    await expect(fetch(command.url)).rejects.toThrow("fetch failed")
+  }, 30_000)
+
+  it("refuses services with proxy: false, which would have no proxy to sit behind", async () => {
+    await expect(appEnvironment({ proxy: false, services: [resendService()] })).rejects.toThrow(
+      /proxy: false.*no services/,
+    )
+  })
+
   it("closes the services when the app fails to start", async () => {
     await expect(
       appEnvironment({

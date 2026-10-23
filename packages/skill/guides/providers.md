@@ -86,6 +86,13 @@ environment: () =>
 With more than one worker, each starts its own app: take its port from `await freePort()` (from
 `@danwo/sdk`, a port on 127.0.0.1 nothing listens on) rather than a fixed one.
 
+`proxy: false` starts the app without the proxy: no `HTTPS_PROXY`/`HTTP_PROXY`, CA or
+`NODE_USE_ENV_PROXY` variables, no Node shim and no `NODE_OPTIONS`/`BUN_OPTIONS` preload, so its
+calls go where they would without danwo. For an app that must not be routed, such as one that
+itself runs `danwo test` (a child danwo would otherwise inherit the proxy). There are no emulators
+then: `services` with `proxy: false` fails with `CONFIG_INVALID`. The environment has no `proxy`,
+so `danwo matrix` has nothing to fault; `inheritEnv`, `ready` and `stop` work as before.
+
 danwo leaves nothing running. The app's command runs as the leader of its own process group, so
 stopping it stops what it started too (a dev command often runs the server as its own child): it gets
 SIGTERM, then SIGKILL five seconds later. The same happens when a run ends, fails, is interrupted

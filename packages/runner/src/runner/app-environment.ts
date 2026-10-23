@@ -8,6 +8,7 @@ import type { ChildProcess } from "node:child_process"
 import { once } from "node:events"
 
 import { spawnOwned } from "../support/children.ts"
+import { DanwoError } from "../support/codes.ts"
 import { checkRouting, routingRefusal, unroutedProblems } from "./app-checks.ts"
 import type { ProcessLog, WorkerEnvironment } from "./environment.ts"
 import {
@@ -364,17 +365,54 @@ export interface AppEnvironmentOptions extends UnroutedHosts {
   readonly app?: AppCommand | string
   /** Emulated providers, e.g. `[stripeService(), resendService()]`, behind one proxy. */
   readonly services?: readonly (Service | Promise<Service>)[]
+  /**
+   * `false` starts the app without danwo's proxy: none of its variables, its Node shim or the
+   * `NODE_OPTIONS` preload reach the app, whose calls go where they would without danwo. With no
+   * proxy there are no emulators, so `services` alongside it is a config error. For an app that
+   * must not be routed, such as one that runs danwo itself.
+   */
+  readonly proxy?: false
+}
+
+/** The environment of an app started with `proxy: false`: the app alone, nothing in front of it. */
+async function unproxiedEnvironment(options: AppEnvironmentOptions): Promise<WorkerEnvironment> {
+  if ((options.services ?? []).length > 0)
+    throw new DanwoError(
+      "CONFIG_INVALID",
+      "appEnvironment({ proxy: false }) starts the app without the proxy, so it can have no services: drop `services`, or drop `proxy: false` to emulate them",
+    )
+
+  const { app } = options
+  const started =
+    typeof app === "object" ? await startApp(app, inheritedEnv(app, process.env)) : undefined
+  const baseUrl = typeof app === "string" ? app : started?.url
+
+  return {
+    ...(baseUrl !== undefined && { baseUrl }),
+    logs: (): Readonly<Record<string, ProcessLog>> =>
+      started === undefined ? {} : { app: started.logs() },
+    stopped: () => {
+      const exit = started?.exited()
+
+      return exit === undefined ? [] : [`the app ${exit}`]
+    },
+    close: async () => {
+      await started?.stop()
+    },
+  }
 }
 
 /**
  * A worker environment for any app: the services behind one proxy, the app started through it
  * (so its calls to Stripe, Resend and the rest reach the emulators with no code change), and the
  * lifecycle `danwo matrix` needs. The app keeps running between tests and matrix trials; resets
- * put the services back to their seeds.
+ * put the services back to their seeds. With `proxy: false`, only the app.
  */
 export async function appEnvironment(
   options: AppEnvironmentOptions = {},
 ): Promise<WorkerEnvironment> {
+  if (options.proxy === false) return unproxiedEnvironment(options)
+
   const pending = (options.services ?? []).map((service) => Promise.resolve(service))
   const services = await startServices(await Promise.all(pending), unroutedOf(options))
   const { app } = options
