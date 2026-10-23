@@ -43,6 +43,11 @@ function html(res: ServerResponse, status: number, title: string, body: string):
   )
 }
 
+/** `value` as JSON that is safe inside a `<script>`: no `</script>` or `<!--` can end it early. */
+function scriptJson(value: unknown): string {
+  return JSON.stringify(value).replaceAll("<", "\\u003c")
+}
+
 function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 }
@@ -133,7 +138,7 @@ function done(res: ServerResponse, user: string): void {
     `<h1>Thank you for your purchase</h1>
 <p id="credits">Credits: ${balance}</p>
 <script>
-  const user = ${JSON.stringify(user)};
+  const user = ${scriptJson(user)};
   setInterval(async () => {
     const res = await fetch("/credits?user=" + encodeURIComponent(user));
     const { credits } = await res.json();
