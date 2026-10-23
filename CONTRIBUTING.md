@@ -100,12 +100,14 @@ bun run release 0.0.0-ci --pack --verify
 
 `--pack` builds the dashboard and the type declarations, stages each public package at the version (every `workspace:` range replaced) and writes one tarball per package to `dist/release`. `--verify` installs the tarballs into a fresh npm project, runs `danwo --version`, `init`, `test` and a strict `tsc` there, and fails if danwo left anything running. The script refuses a dirty tree and a version that is not semver.
 
-To publish, push a `v*` tag for the version, such as `v0.1.0`. `release.yml` then:
+Before tagging, add the release's entry to `website/content/changelog` (`<version>.mdx`, short and direct) and move the standalone examples' `@danwo/*` pins to the new version; a test fails until they match the newest entry.
+
+To publish, push a `v*` tag for the version, such as `v0.1.2`. `release.yml` then:
 
 1. runs `bun run check` and the same `--pack --verify`;
 2. waits in the `npm` environment until a required reviewer approves it (**Settings > Environments > npm**);
 3. publishes with provenance through trusted publishing, dependencies first, under `beta` for a prerelease and `latest` otherwise;
-4. creates the GitHub release, with notes from the commits since the last tag.
+4. creates the GitHub release, with the version's changelog entry as its notes (or the commits since the last tag when there is none).
 
 It can also be started by hand from the Actions tab with a version.
 

@@ -177,8 +177,43 @@ function globMatches(pattern: string, path: string): boolean {
   return new RegExp(`^${source}$`).test(path)
 }
 
+/** The newest release the changelog has an entry for, such as `0.1.1`. */
+function newestRelease(): string {
+  const versions = readdirSync(join(ROOT, "website", "content", "changelog"))
+    .map((name) => /^(\d+)\.(\d+)\.(\d+)\.mdx$/.exec(name))
+    .filter((match) => match !== null)
+    .map((match) => match.slice(1, 4).map(Number))
+    .toSorted(
+      (a, b) => (a[0] ?? 0) - (b[0] ?? 0) || (a[1] ?? 0) - (b[1] ?? 0) || (a[2] ?? 0) - (b[2] ?? 0),
+    )
+
+  return versions.at(-1)?.join(".") ?? ""
+}
+
 describe("the standalone examples", () => {
   const standalone = examplesBy("npm")
+
+  it("pin danwo's packages at the newest release in the changelog", () => {
+    const release = newestRelease()
+    const stale: string[] = []
+
+    for (const name of standalone) {
+      const manifest: unknown = JSON.parse(
+        readFileSync(join(ROOT, "examples", name, "package.json"), "utf8"),
+      )
+
+      for (const field of ["dependencies", "devDependencies"]) {
+        const pins: unknown = Reflect.get(Object(manifest), field)
+
+        for (const [pkg, version] of Object.entries(Object(pins)))
+          if (pkg.startsWith("@danwo/") && version !== release)
+            stale.push(`${name}: ${pkg}@${String(version)}`)
+      }
+    }
+
+    expect(release).toMatch(/^\d+\.\d+\.\d+$/)
+    expect(stale).toEqual([])
+  })
 
   it("are not workspaces of the repository", () => {
     const root: unknown = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"))
