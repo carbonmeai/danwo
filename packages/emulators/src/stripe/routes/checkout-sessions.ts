@@ -395,7 +395,7 @@ function paySession(
   const email = payerEmail(context, session, typed.email)
   const payment =
     plan && session.mode === "subscription"
-      ? subscribeSession(context, session, plan, email)
+      ? subscribeSession(context, session, plan, { email, card: typed.card })
       : session.mode === "setup"
         ? setUpSession(context, session, plan, typed.card)
         : plan

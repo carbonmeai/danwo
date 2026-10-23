@@ -1,11 +1,11 @@
 /**
  * A subscription-mode Checkout Session being paid: the payer becomes (or is) the customer, the
- * test card is saved as their default, and the subscription starts with its first invoice, free
- * when the session asked for a trial.
+ * card they typed is saved as their default, and the subscription starts with its first invoice,
+ * free when the session asked for a trial. A card that declines leaves the session open.
  */
-import { CHECKOUT_TEST_CARD, paymentMethodFor } from "./cards.ts"
+import { cardOutcome, paymentMethodFor } from "./cards.ts"
 import type { StripeRouteContext } from "./context.ts"
-import type { CheckoutSession, Customer, SessionPlan } from "./entities.ts"
+import type { CheckoutSession, Customer, PaymentMethod, SessionPlan } from "./entities.ts"
 import { customerObject } from "./formatters.ts"
 import { asRecord, integer, metadataOf, newId, unix } from "./helpers.ts"
 import { subscribe } from "./subscribing.ts"
@@ -54,12 +54,8 @@ function customerFor(
   return created
 }
 
-/** Saves the Checkout test card to `customer` as their default for invoices. */
-function saveCard(context: StripeRouteContext, customer: Customer): string {
-  const card = paymentMethodFor(context.objects, CHECKOUT_TEST_CARD, context.clock())
-
-  if (!card) throw new Error("the Checkout test card is missing")
-
+/** Saves `card` to `customer` as their default for invoices. */
+function saveCard(context: StripeRouteContext, customer: Customer, card: PaymentMethod): string {
   const attached = context.objects.paymentMethods.change(card.id, { customer: customer.id }) ?? card
 
   context.events.emit("payment_method.attached", attached)
@@ -70,16 +66,28 @@ function saveCard(context: StripeRouteContext, customer: Customer): string {
   return card.id
 }
 
-/** Starts the subscription a paid session asked for; returns the session's new fields. */
+/**
+ * Starts the subscription a paid session asked for, paid with the test card `payment.card`
+ * (`pm_card_visa`); returns the session's new fields. A card that declines when the first invoice
+ * charges it (with a trial, when it is saved) starts nothing, and the payer is told why.
+ */
 export function subscribeSession(
   context: StripeRouteContext,
   session: CheckoutSession,
   plan: SessionPlan,
-  email: string | null,
-): Partial<CheckoutSession> {
-  const customer = customerFor(context, session, email)
-  const method = saveCard(context, customer)
+  payment: { readonly email: string | null; readonly card: string },
+): Partial<CheckoutSession> | { readonly declined: string } {
+  const card = paymentMethodFor(context.objects, payment.card, context.clock())
+
+  if (!card) throw new Error(`the Checkout test card ${payment.card} is missing`)
+
   const trialDays = plan.subscription?.trialDays ?? null
+
+  if (cardOutcome(card, trialDays === null ? "charge" : "setup") === "declined")
+    return { declined: "Your card was declined." }
+
+  const customer = customerFor(context, session, payment.email)
+  const method = saveCard(context, customer, card)
   const started = subscribe(context, {
     customer,
     items: plan.lines.flatMap((line) => {

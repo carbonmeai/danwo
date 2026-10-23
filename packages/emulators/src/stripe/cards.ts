@@ -85,7 +85,7 @@ export function cardOutcome(method: PaymentMethod, use: "setup" | "charge"): Car
 }
 
 /** The card a Checkout payment uses when the payer names none: Stripe's Visa test card. */
-export const CHECKOUT_TEST_CARD = "pm_card_visa"
+const CHECKOUT_TEST_CARD = "pm_card_visa"
 
 /** Stripe's test card numbers the hosted Checkout page accepts, and the test card each stands for. */
 const CHECKOUT_NUMBERS: Readonly<Record<string, string>> = {

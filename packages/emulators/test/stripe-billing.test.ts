@@ -327,6 +327,47 @@ describe("Checkout in subscription mode", () => {
       eventTypes().indexOf("checkout.session.completed"),
     )
   })
+
+  it("saves the typed card, and refuses one that declines without starting anything", async () => {
+    const price = await proPrice()
+    const open = () =>
+      api.checkout.sessions.create({
+        mode: "subscription",
+        line_items: [{ price: price.id, quantity: 1 }],
+        success_url: "https://app.danwo.test/done",
+        customer_email: "ada@danwo.test",
+      })
+    const pay = (session: Stripe.Checkout.Session, card: string) =>
+      fetch(`${session.url ?? ""}/complete`, {
+        method: "POST",
+        body: new URLSearchParams({ email: "ada@danwo.test", card }),
+        redirect: "manual",
+      })
+
+    const declined = await open()
+    const refused = await pay(declined, "4000 0000 0000 0002")
+
+    expect(refused.status).toBe(402)
+    expect(await refused.text()).toContain("Your card was declined.")
+    expect(await api.checkout.sessions.retrieve(declined.id)).toMatchObject({
+      status: "open",
+      subscription: null,
+    })
+    expect((await api.subscriptions.list({ status: "all" })).data).toEqual([])
+    expect(eventTypes()).not.toContain("checkout.session.completed")
+
+    const paid = await open()
+
+    expect((await pay(paid, "5555 5555 5555 4444")).status).toBe(303)
+
+    const completed = await api.checkout.sessions.retrieve(paid.id, {
+      expand: ["subscription.default_payment_method"],
+    })
+    const subscription = expanded(completed.subscription)
+
+    expect(subscription.status).toBe("active")
+    expect(expanded(subscription.default_payment_method).card?.brand).toBe("mastercard")
+  })
 })
 
 /** A setup-mode session for a new customer, and the hosted page's Save button for it. */
