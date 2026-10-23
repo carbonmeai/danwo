@@ -47,8 +47,31 @@ export function newUploadId(): string {
 /** Tigris's S3 endpoints: the current one and the earlier Fly one. */
 export const TIGRIS_ENDPOINTS = ["t3.storage.dev", "fly.storage.tigris.dev"] as const
 
-/** `s3.amazonaws.com`, `s3.eu-west-1.amazonaws.com`, `s3-us-west-2.amazonaws.com` and the like. */
-const AWS_ENDPOINT = /(?:^|\.)(s3(?:[.-][a-z0-9]+)*\.amazonaws\.com)$/
+const AWS_SUFFIX = ".amazonaws.com"
+/** The label an AWS S3 endpoint starts with: `s3`, or `s3-us-west-2` and the like. */
+const S3_LABEL = /^s3(?:-[a-z0-9]+)*$/
+/** Any later label of the endpoint: `eu-west-1`, `dualstack`. */
+const ENDPOINT_LABEL = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+
+/**
+ * The AWS S3 endpoint `host` is on (`s3.amazonaws.com`, `s3.eu-west-1.amazonaws.com`,
+ * `s3-us-west-2.amazonaws.com` and the like), read label by label in one pass from the end, so a
+ * host built to backtrack costs no more than its length.
+ */
+function awsEndpoint(host: string): string | undefined {
+  if (!host.endsWith(AWS_SUFFIX)) return undefined
+
+  const labels = host.slice(0, -AWS_SUFFIX.length).split(".")
+  let first = labels.length
+
+  while (first > 0 && ENDPOINT_LABEL.test(labels[first - 1] ?? "")) first -= 1
+
+  for (let at = Math.max(first - 1, 0); at < labels.length; at += 1) {
+    if (S3_LABEL.test(labels[at] ?? "")) return `${labels.slice(at).join(".")}${AWS_SUFFIX}`
+  }
+
+  return undefined
+}
 
 /** Where a request points: its bucket and key, either of which may be absent. */
 export interface S3Address {
@@ -62,7 +85,7 @@ function endpointOf(host: string): string | undefined {
     (endpoint) => host === endpoint || host.endsWith(`.${endpoint}`),
   )
 
-  return tigris ?? AWS_ENDPOINT.exec(host)?.[1]
+  return tigris ?? awsEndpoint(host)
 }
 
 /** Whether `host` is an S3 or Tigris endpoint, path-style or virtual-hosted. */
