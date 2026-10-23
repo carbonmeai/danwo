@@ -232,6 +232,12 @@ export const PLAN: readonly PlannedTab[] = [
           file("sockets-and-streams", "WebSockets and SSE", "Radio", "real-stacks/sockets.mdx"),
           file("outside-hosts", "Outside hosts", "Globe", "real-stacks/outside-hosts.mdx"),
           file("node-preload", "The Node preload", "Cpu", "real-stacks/preload.mdx"),
+          file(
+            "other-languages",
+            "Other languages",
+            "Languages",
+            "real-stacks/other-languages.mdx",
+          ),
           file("processes", "Processes", "Activity", "real-stacks/processes.mdx"),
           file("stack-databases", "Databases", "Database", "real-stacks/databases.mdx"),
           file("app-data", "Your app's data", "DatabaseSearch", "real-stacks/app-data.mdx"),

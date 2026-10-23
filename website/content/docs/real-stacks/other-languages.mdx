@@ -1,0 +1,115 @@
+---
+title: Apps in other languages
+description: How danwo routes a Python, Go or Ruby app through its proxy with the standard proxy and CA variables, and what each common Python HTTP client reads.
+icon: Languages
+---
+
+An app in Python, Go, Ruby or any other language runs behind danwo's proxy just like a Node app.
+danwo can't load its [Node preload](/docs/node-preload) into it, so it sets the standard proxy and
+certificate variables instead, which most HTTP clients read on their own.
+
+## Why it works without code changes
+
+Your app's calls to Stripe or Resend go to the proxy because its HTTP client reads `HTTPS_PROXY`.
+They pass the TLS check because the client trusts the CA bundle danwo names. Nothing in your app
+mentions danwo.
+
+```ts title="danwo.config.ts · a FastAPI app"
+{
+  name: "studio",
+  command: "uv run --no-sync uvicorn studio.app:app --host 127.0.0.1 --port 8000",
+  url: "http://127.0.0.1:8000",
+  ready: { path: "/health" },
+  env: { DATABASE_URL: postgres.url(database), STRIPE_SECRET_KEY: "sk_test_studio" },
+}
+```
+
+The [Python example](/docs/examples/with-python) runs a whole booking app this way, fault matrix
+included.
+
+## What danwo sets
+
+Every app danwo starts gets these, Node or not:
+
+| Variable                     | Value                                     | Read by                                                |
+| ---------------------------- | ----------------------------------------- | ------------------------------------------------------ |
+| `HTTPS_PROXY`, `https_proxy` | the proxy, `http://127.0.0.1:<port>`      | almost every client; curl and Go want lower case       |
+| `HTTP_PROXY`, `http_proxy`   | the same                                  | clients making plain HTTP calls                        |
+| `NO_PROXY`, `no_proxy`       | your own `NO_PROXY`, then the proxy's own | every client that reads the two above                  |
+| `SSL_CERT_FILE`              | the CA bundle                             | OpenSSL: Python's `ssl`, httpx, Ruby, PHP, Go on Linux |
+| `REQUESTS_CA_BUNDLE`         | the CA bundle                             | Python's requests, which ignores `SSL_CERT_FILE`       |
+| `CURL_CA_BUNDLE`             | the CA bundle                             | curl, and requests when the one above is unset         |
+| `NODE_EXTRA_CA_CERTS`        | danwo's CA alone                          | Node, which adds it to its own roots                   |
+
+The CA bundle is danwo's CA followed by the public roots. These variables replace a client's
+roots rather than add to them, so a host your app reaches directly, past the proxy through your
+`NO_PROXY`, still verifies.
+
+## What each Python client reads
+
+| Client                                    | Goes through the proxy     | Trusts danwo's CA                      |
+| ----------------------------------------- | -------------------------- | -------------------------------------- |
+| requests                                  | yes                        | yes, through `REQUESTS_CA_BUNDLE`      |
+| httpx (and the OpenAI and Anthropic SDKs) | yes                        | yes, through `SSL_CERT_FILE`           |
+| `urllib.request`                          | yes                        | yes, through `SSL_CERT_FILE`           |
+| aiohttp                                   | only with `trust_env=True` | yes, through `SSL_CERT_FILE`           |
+| the Resend SDK                            | yes, it uses requests      | yes                                    |
+| the Stripe SDK                            | yes                        | no: it ships its own bundle, see below |
+
+## The Stripe SDK
+
+Stripe's Python SDK verifies against the bundle it ships and reads no variable for another one. Its
+calls reach the proxy and then fail with `Could not verify Stripe's SSL certificate`. Point it at
+the bundle the environment names, as an app behind a company's TLS proxy would:
+
+```python title="studio/payments.py · the CA bundle"
+import os
+
+import stripe
+
+ca_bundle = os.environ.get("REQUESTS_CA_BUNDLE") or os.environ.get("SSL_CERT_FILE")
+if ca_bundle:
+    stripe.ca_bundle_path = ca_bundle
+```
+
+In production neither variable is usually set, so the SDK keeps its own bundle.
+
+## Keep the start command offline
+
+Install the app's packages before danwo starts it, and start it with a command that installs
+nothing. danwo's proxy routes the start command too, so a package download meets the proxy, and
+under `unmatched: "block"` it is refused. With uv, run `uv sync --frozen` first and start the app
+with `uv run --no-sync`.
+
+## The check at start
+
+For a Node app, the preload checks that the process's calls reach the proxy before your code runs.
+That check runs inside Node, so it can't run in a Python or Go process. danwo says so once, rather
+than reporting a pass or a failure:
+
+```text title="stderr"
+danwo: studio runs no Node process (uv, python), so danwo's check at start that its calls
+reach the proxy, which runs inside Node, does not run for it. …
+```
+
+The other checks work as they do for Node. `unmatched: "block"` refuses at the proxy any host no
+emulator answers, and `secrets: "fail"` refuses a live-looking key in the app's environment.
+
+<Callout type="warn">
+  A client that ignores `HTTPS_PROXY`, such as aiohttp without `trust_env=True`, calls the real
+  hosts, and `unmatched: "block"` can't stop it: its calls never reach the proxy.
+</Callout>
+
+## Next
+
+<Cards>
+  <Card title="The Python example" href="/docs/examples/with-python">
+    A FastAPI booking app on Stripe, Resend and Postgres, with its matrix.
+  </Card>
+  <Card title="The Node preload" href="/docs/node-preload">
+    What danwo does for a Node app instead.
+  </Card>
+  <Card title="Outside hosts" href="/docs/outside-hosts">
+    What happens to calls no emulator answers.
+  </Card>
+</Cards>

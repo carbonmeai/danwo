@@ -27,7 +27,10 @@ granted equal payments captured; one confirmation email per order; one reply per
 each provider call the clean run made × that provider's faults (errors, rate limits, dropped
 connections, slow answers), and each webhook delivery × duplicate, late, forged and stale. Every
 trial starts from the environment's starting state (reset, or restored from a snapshot; see
-below) and replays the clean run's recorded steps without the model.
+below) and replays the clean run's recorded steps without the model. A provider call a `delay`
+fault holds still reaches the emulator after the app's client has given up (a slow server still
+acts), but not once its trial has ended: the next trial's restore drops it, so a 10 s delay never
+lands its write in the next trial's emulator.
 
 - PASS: the invariant held under the fault (the body may stop early; that is fine).
 - FAIL: the invariant broke; the report shows where the body stopped and why.

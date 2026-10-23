@@ -64,7 +64,26 @@ export default defineConfig({
 ```
 
 `proxy.env(...)` adds the proxy and its certificate to the app's environment, so Node and most
-SDKs route through it without code changes. Seeds can be functions so they can point at the app
+SDKs route through it without code changes.
+
+### Apps in other languages
+
+A Python, Go or Ruby app gets no preload; it is routed by the standard variables `env()` sets for
+every app: `HTTPS_PROXY`/`HTTP_PROXY`/`NO_PROXY` in upper and lower case (curl and Go read only
+lower case), and a CA bundle (danwo's CA, then Node's public roots, `proxy.caBundlePath`) in
+`SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE` and `CURL_CA_BUNDLE`; Node keeps `NODE_EXTRA_CA_CERTS` with the
+CA alone. Those variables replace a client's roots, hence the bundle. `NO_PROXY` carries the
+proxy's own `127.0.0.1:<port>` and `localhost:<port>` (no `[::1]:<port>`: httpx cannot parse it).
+Python: requests (and the Resend SDK) reads `REQUESTS_CA_BUNDLE`, not `SSL_CERT_FILE`; httpx (the
+OpenAI and Anthropic SDKs), `urllib.request` and `ssl.create_default_context()` read
+`SSL_CERT_FILE`; aiohttp proxies only with `trust_env=True`. The official Stripe SDK verifies
+against its own bundled CA file and reads no variable, so the app sets
+`stripe.ca_bundle_path = os.environ.get("REQUESTS_CA_BUNDLE") or os.environ.get("SSL_CERT_FILE")`
+when either is set. Start the app with a command that installs nothing (`uv sync --frozen` in the
+environment first, then `uv run --no-sync …`): the start command is proxied too, and under
+`unmatched: "block"` a package download is refused. `unmatched: "block"` and `secrets` work as
+for Node; a client that ignores `HTTPS_PROXY` bypasses the proxy entirely. Example:
+`examples/with-python` (FastAPI, psycopg, Stripe, Resend, a 52-trial matrix). Seeds can be functions so they can point at the app
 once it runs, and they are applied again after every reset.
 
 ## Any app, started by its own command
@@ -173,7 +192,7 @@ started is kept apart, in `.danwo/runs/<run>/environment-<worker>.json`: each ap
 query, what the proxy did, the status; no headers or bodies), their sockets and danwo's notes. An
 app that fails to start fails its test file with the app's name and the last lines of its output.
 
-Two checks run as the apps start, and neither prints a value:
+These checks run as the apps start, and none prints a value:
 
 - **The preload.** danwo routes a Node app through its proxy by adding its preload to
   `NODE_OPTIONS`. A start script that sets `NODE_OPTIONS` itself (`NODE_OPTIONS=--max-old-space-size=8192
@@ -196,6 +215,12 @@ Two checks run as the apps start, and neither prints a value:
   once and the run is refused with that line (`danwo refuses the run, because an app process does
   not go through its proxy`); otherwise it is a warning and a run note. The usual cause is a
   `NO_PROXY` that names every host.
+- **Apps outside Node.** The preload's start-up check runs inside Node, so it cannot run in an
+  app whose processes are all something else (`uv`, `python`, a Go binary). danwo prints once per
+  worker process `danwo: <app> runs no Node process (<programs>), so danwo's check at start … does
+  not run for it` on stderr: neither a pass nor a refusal, and not a run note (a matrix would
+  repeat it under every trial). An app with no process left running (`ready: { exit: true }`)
+  gets nothing.
 - **Live keys.** With unrouted hosts passing through, a live-looking key (`sk_live_…`, an OpenAI or
   Anthropic key, an AWS access key…) for a provider the run does not emulate, in an app's
   environment or in a `.env` file in its folder that the run does not override, would reach the real
