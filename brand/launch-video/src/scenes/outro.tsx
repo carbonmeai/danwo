@@ -13,7 +13,7 @@ export function Outro() {
   const pill = ease(frame, 22, 22)
   const links = ease(frame, 72, 22)
   const name = ease(frame, 92, 26)
-  const out = interpolate(frame, [212, 240], [0, 1], clamp)
+  const out = interpolate(frame, [124, 150], [0, 1], clamp)
   const caret = Math.floor(frame / 15) % 2 === 0 ? 1 : 0
 
   return (

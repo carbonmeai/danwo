@@ -21,10 +21,7 @@ const COLUMNS: readonly {
   { width: 520, offset: 200, tiles: ["calls", "breaks"] },
 ]
 
-const OUTLETS = [
-  ["github-on-dark.svg", "GitHub Check & PR comment"],
-  ["anthropic-on-dark.svg", "MCP for coding agents"],
-] as const
+const OUTLETS = [["github-on-dark.svg", "GitHub Check & PR comment"]] as const
 
 /** Feature four: the flight record, shown as a wall of the UI it renders into. */
 export function Explain() {
@@ -35,7 +32,7 @@ export function Explain() {
   return (
     <AbsoluteFill>
       <Sfx name="whoosh" at={2} volume={0.35} />
-      <Exit at={122} duration={13}>
+      <Exit at={78} duration={12}>
         <div
           style={{
             position: "absolute",
@@ -121,7 +118,7 @@ export function Explain() {
             }}
           >
             {OUTLETS.map(([icon, label], i) => {
-              const p = ease(frame, 40 + i * 8, 18)
+              const p = ease(frame, 30 + i * 8, 18)
 
               return (
                 <div key={label} style={{ opacity: p, transform: `translateY(${(1 - p) * 14}px)` }}>

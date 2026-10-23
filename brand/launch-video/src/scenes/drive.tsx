@@ -14,23 +14,23 @@ const CODE: readonly (readonly (readonly [string, string])[])[] = [
   [
     ["test", FN],
     ["(", TXT],
-    ['"buys 500 credits"', STR],
+    ['"buy credits"', STR],
     [", ", TXT],
     ["async", KEY],
-    [" ({ page, agent }) => {", TXT],
+    [" ({ app, agent, screen, expect }) => {", TXT],
   ],
   [
     ["  await", KEY],
-    [" page.", TXT],
-    ["goto", FN],
+    [" app.", TXT],
+    ["open", FN],
     ["(", TXT],
     ['"/"', STR],
     [")", TXT],
   ],
   [
     ["  await", KEY],
-    [" ", TXT],
-    ["agent", FN],
+    [" agent.", TXT],
+    ["act", FN],
     ["(", TXT],
     ['"buy 500 credits with a test card"', STR],
     [")", TXT],
@@ -39,7 +39,7 @@ const CODE: readonly (readonly (readonly [string, string])[])[] = [
     ["  await", KEY],
     [" ", TXT],
     ["expect", FN],
-    ["(page.", TXT],
+    ["(screen.", TXT],
     ["getByText", FN],
     ["(", TXT],
     ['"Credits: 500"', STR],
@@ -51,7 +51,7 @@ const CODE: readonly (readonly (readonly [string, string])[])[] = [
 ]
 
 const TYPE_FROM = 16
-const PER_FRAME = 2.4
+const PER_FRAME = 2.6
 const AGENT_LINE = 2
 
 /** The test file typed into an editor, a character budget at a time. */
@@ -91,7 +91,7 @@ function Editor() {
             <Mono size={20} color={C.faint} style={{ width: 40 }}>
               {i + 1}
             </Mono>
-            <Mono size={24} style={{ whiteSpace: "pre" }}>
+            <Mono size={22} style={{ whiteSpace: "pre" }}>
               {runs}
             </Mono>
           </div>

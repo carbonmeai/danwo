@@ -1,8 +1,8 @@
 # Launch video
 
 danwo's 48-second launch film, 1920×1080 at 30 fps, made with [Remotion](https://remotion.dev).
-It opens with the problem, lands the mark on the music's drop, shows the four features (drive,
-emulate, fault matrix, flight record) and closes on `npx @danwo/cli init`.
+It opens with the problem, lands the mark on the music's drop, shows the five features (drive,
+emulate, fault matrix, flight record, agents) and closes on `npx @danwo/cli init`.
 
 This folder is a project of its own, outside the workspaces, so Remotion stays out of the
 repository's install.

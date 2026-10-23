@@ -1,6 +1,7 @@
 import { AbsoluteFill, Audio, interpolate, Sequence, staticFile } from "remotion"
 
 import { Backdrop, clamp } from "./kit.tsx"
+import { Agents } from "./scenes/agents.tsx"
 import { Drive } from "./scenes/drive.tsx"
 import { Emulate } from "./scenes/emulate.tsx"
 import { Explain } from "./scenes/explain.tsx"
@@ -23,13 +24,14 @@ const SCENES = [
   { from: 585, to: 735, Scene: Drive },
   { from: 735, to: 900, Scene: Emulate },
   { from: 900, to: 1065, Scene: Matrix },
-  { from: 1065, to: 1200, Scene: Explain },
-  { from: 1200, to: 1440, Scene: Outro },
+  { from: 1065, to: 1155, Scene: Explain },
+  { from: 1155, to: 1290, Scene: Agents },
+  { from: 1290, to: 1440, Scene: Outro },
 ] as const
 
 export const DURATION = 1440
 
-/** danwo's launch film: the problem, the reveal on the drop, four features and the end card. */
+/** danwo's launch film: the problem, the reveal on the drop, five features and the end card. */
 export function Launch() {
   return (
     <AbsoluteFill style={{ background: "#0a0a0a" }}>
