@@ -14,7 +14,6 @@ import {
   type Proxy,
   type SocketExchange,
 } from "@danwo/proxy"
-import { Data, Effect, Result } from "effect"
 
 import {
   applyDataFault,
@@ -205,8 +204,12 @@ export interface FaultMatrixOptions<E extends RunEnvironment> {
   readonly rerunInvalid?: number
 }
 
-class EnvironmentError extends Data.TaggedError("EnvironmentError")<{ readonly cause: unknown }> {}
-class JourneyFailed extends Data.TaggedError("JourneyFailed")<{ readonly cause: unknown }> {}
+/** The environment did not start, or its proxy did not settle: the run says nothing of the app. */
+class EnvironmentError extends Error {
+  constructor(cause: unknown) {
+    super(message(cause), { cause })
+  }
+}
 
 function message(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause)
@@ -358,70 +361,108 @@ function missed(outcome: RunOutcome): RunOutcome {
 }
 
 /** Runs the journey once in a fresh environment, with at most one fault. */
-function runOnce<E extends RunEnvironment>(
+async function runOnce<E extends RunEnvironment>(
   options: FaultMatrixOptions<E>,
   planned: PlannedFault | null,
-): Effect.Effect<RunOutcome> {
-  const run = Effect.acquireUseRelease(
-    Effect.tryPromise({
-      try: () => options.environment({ fault: planned }),
-      catch: (cause) => new EnvironmentError({ cause }),
-    }),
-    (env) =>
-      Effect.gen(function* () {
-        applyFault(env, planned)
-        const journey = yield* Effect.result(
-          Effect.tryPromise({
-            try: () => options.journey(env),
-            catch: (cause) => new JourneyFailed({ cause }),
-          }),
-        )
+): Promise<RunOutcome> {
+  try {
+    return await runIn(options, planned)
+  } catch (error) {
+    if (!(error instanceof EnvironmentError)) throw error
 
-        yield* Effect.tryPromise({
-          try: () => env.proxy.settled(),
-          catch: (cause) => new EnvironmentError({ cause }),
-        })
-        const outcome: RunOutcome = {
-          fault: planned,
-          status: Result.isSuccess(journey) ? "passed" : "failed",
-          error: Result.isSuccess(journey) ? null : message(journey.failure.cause),
-          exchanges: env.proxy.exchanges(),
-          deliveries: deliveriesOf(env.webhooks),
-          dataCalls: dataCallsOf(env.data),
-          sockets: env.proxy.sockets(),
-          notes: env.notes?.() ?? [],
-        }
+    return {
+      fault: planned,
+      status: "environment-error",
+      error: message(error.cause),
+      exchanges: [],
+      deliveries: [],
+      notes: [],
+    }
+  }
+}
 
-        return checkFaultFired(outcome)
-      }),
-    (env) => Effect.promise(() => env.close().catch(() => undefined)),
-  )
+/** Starts the environment, runs the journey in it, and closes it whatever happened. */
+async function runIn<E extends RunEnvironment>(
+  options: FaultMatrixOptions<E>,
+  planned: PlannedFault | null,
+): Promise<RunOutcome> {
+  const env = await options.environment({ fault: planned }).catch((cause: unknown) => {
+    throw new EnvironmentError(cause)
+  })
 
-  return run.pipe(
-    Effect.catchTag("EnvironmentError", (error) =>
-      Effect.succeed<RunOutcome>({
-        fault: planned,
-        status: "environment-error",
-        error: message(error.cause),
-        exchanges: [],
-        deliveries: [],
-        notes: [],
-      }),
-    ),
-  )
+  try {
+    applyFault(env, planned)
+
+    const journey = await options.journey(env).then(
+      () => ({ ok: true as const }),
+      (cause: unknown) => ({ ok: false as const, cause }),
+    )
+
+    await env.proxy.settled().catch((cause: unknown) => {
+      throw new EnvironmentError(cause)
+    })
+
+    return checkFaultFired({
+      fault: planned,
+      status: journey.ok ? "passed" : "failed",
+      error: journey.ok ? null : message(journey.cause),
+      exchanges: env.proxy.exchanges(),
+      deliveries: deliveriesOf(env.webhooks),
+      dataCalls: dataCallsOf(env.data),
+      sockets: env.proxy.sockets(),
+      notes: env.notes?.() ?? [],
+    })
+  } finally {
+    await env.close().catch(() => undefined)
+  }
 }
 
 /** Runs a faulted run, again up to `rerunInvalid` times while it comes out invalid. */
-function rerunWhileInvalid<E extends RunEnvironment>(
+async function rerunWhileInvalid<E extends RunEnvironment>(
   options: FaultMatrixOptions<E>,
   planned: PlannedFault,
-): Effect.Effect<RunOutcome> {
-  const attempt = (left: number): Effect.Effect<RunOutcome> =>
-    Effect.flatMap(runOnce(options, planned), (outcome) =>
-      outcome.status === "invalid" && left > 0 ? attempt(left - 1) : Effect.succeed(outcome),
-    )
+): Promise<RunOutcome> {
+  let left = Math.max(0, Math.floor(options.rerunInvalid ?? 0))
+  let outcome = await runOnce(options, planned)
 
-  return attempt(Math.max(0, Math.floor(options.rerunInvalid ?? 0)))
+  while (outcome.status === "invalid" && left > 0) {
+    left--
+    outcome = await runOnce(options, planned)
+  }
+
+  return outcome
+}
+
+/**
+ * `work` on each item, at most `concurrency` at once, the results in the items' order. The first
+ * failure rejects, and no item starts after it.
+ */
+async function eachAtMost<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  work: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = []
+  /* One iterator shared by every lane: each takes the next item when it is free. */
+  const queue = items.entries()
+  let failed = false
+
+  const lane = async (): Promise<void> => {
+    for (const [at, item] of queue) {
+      if (failed) return
+
+      try {
+        results[at] = await work(item)
+      } catch (error) {
+        failed = true
+        throw error
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, lane))
+
+  return results
 }
 
 /** Each webhook message's first unfaulted delivery, once per message and service. */
@@ -595,28 +636,27 @@ function causedItems(outcome: RunOutcome) {
  * journey once per fault, each in a fresh environment. A run passes when the journey's own
  * assertions hold despite the fault.
  */
-export function runFaultMatrix<E extends RunEnvironment>(
+export async function runFaultMatrix<E extends RunEnvironment>(
   options: FaultMatrixOptions<E>,
 ): Promise<FaultMatrixResult> {
-  const program = Effect.gen(function* () {
-    const clean = yield* runOnce(options, null)
+  const clean = await runOnce(options, null)
 
-    if (clean.status !== "passed") return { clean, runs: [] }
-    const plan = planFaults(
-      clean,
-      options.outboundFaults,
-      options.webhookFaults,
-      options.dataFaults,
-      { pageCalls: options.pageCalls === true },
-    )
-    const runs = yield* Effect.forEach(plan, (planned) => rerunWhileInvalid(options, planned), {
-      concurrency: Math.max(1, Math.floor(options.concurrency ?? 1)),
-    })
+  if (clean.status !== "passed") return { clean, runs: [] }
 
-    return { clean, runs }
-  })
+  const plan = planFaults(
+    clean,
+    options.outboundFaults,
+    options.webhookFaults,
+    options.dataFaults,
+    { pageCalls: options.pageCalls === true },
+  )
+  const runs = await eachAtMost(
+    plan,
+    Math.max(1, Math.floor(options.concurrency ?? 1)),
+    (planned) => rerunWhileInvalid(options, planned),
+  )
 
-  return Effect.runPromise(program)
+  return { clean, runs }
 }
 
 const STATUS_LABEL: Record<RunOutcome["status"], string> = {
