@@ -35,6 +35,8 @@ const SKIPPED = new Set([
   ".next",
   ".next-build-lock",
   "dist",
+  "build",
+  ".svelte-kit",
   ".web-build-lock",
   ".danwo",
   "package-lock.json",
