@@ -71,7 +71,9 @@ tests to different workers, so keep `splitFiles` off for tests that rely on each
 ### Give each worker its own port
 
 Each worker starts its own environment, so two workers can't start the app on one fixed port.
-`freePort()` picks a port nothing listens on:
+`freePort()` picks a port nothing listens on. It comes from a range the system doesn't hand out to
+other programs, and no other worker or danwo run gets the same one, so the port is still free when
+the app starts:
 
 ```ts title="danwo.config.ts · a port per worker"
 import { appEnvironment, defineConfig, freePort } from "@danwo/sdk"
