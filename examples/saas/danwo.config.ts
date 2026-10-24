@@ -2,6 +2,7 @@ import {
   clerkInstance,
   clerkService,
   defineConfig,
+  freePort,
   googleService,
   inngestService,
   PUSHER_DEFAULTS,
@@ -17,7 +18,7 @@ import {
 import { PLANS } from "./shared/plans.ts"
 import { SLACK_SCOPES } from "./shared/slack.ts"
 import { sqlOn } from "./tests/db.ts"
-import { emptyDatabase, ensureBuilt, freePort, ROOT, workerDatabase } from "./tests/environment.ts"
+import { emptyDatabase, ensureBuilt, ROOT, workerDatabase } from "./tests/environment.ts"
 import { ADA, connectSlack, onboard, signUp, WORKSPACE } from "./tests/relay.ts"
 
 /** None of these is a real key: the emulators accept any well-formed one. */

@@ -5,7 +5,6 @@
  */
 import { execFile } from "node:child_process"
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs"
-import { createServer } from "node:net"
 import { join } from "node:path"
 import { promisify } from "node:util"
 
@@ -62,21 +61,6 @@ function lock(): boolean {
   } catch {
     return false
   }
-}
-
-/** A port nothing listens on right now, for a worker's server. */
-export function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer()
-
-    server.once("error", reject)
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address()
-      const port = typeof address === "object" && address !== null ? address.port : 0
-
-      server.close(() => resolve(port))
-    })
-  })
 }
 
 /** Runs `next build`; a failure carries the end of its output. */

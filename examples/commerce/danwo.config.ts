@@ -1,5 +1,6 @@
 import {
   defineConfig,
+  freePort,
   postgresSnapshot,
   resendService,
   s3Service,
@@ -10,7 +11,7 @@ import {
 
 import { CATALOG, IMAGES_BUCKET, imageKey, imageOf } from "./seed/catalog.ts"
 import { sqlOn } from "./tests/db.ts"
-import { ensureBuilt, freePort, ROOT, seedDatabase, workerDatabase } from "./tests/environment.ts"
+import { ensureBuilt, ROOT, seedDatabase, workerDatabase } from "./tests/environment.ts"
 import { buy, CUSTOMER } from "./tests/shop.ts"
 
 /** Not a real key: the emulators accept any well-formed one. */

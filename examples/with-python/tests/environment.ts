@@ -1,11 +1,10 @@
 /**
  * What `danwo.config.ts` needs besides danwo itself: the API's Python environment, a fresh build
- * of the site, a database of its own for each worker (the tables created, the timetable seeded),
- * and free ports.
+ * of the site, and a database of its own for each worker (the tables created, the timetable
+ * seeded).
  */
 import { execFile } from "node:child_process"
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs"
-import { createServer } from "node:net"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
@@ -46,20 +45,6 @@ export const CLASSES: readonly StudioClass[] = JSON.parse(
 /** The Stripe price a class is sold at. */
 export function stripePrice(slug: string): string {
   return `price_${slug.replaceAll("-", "_")}`
-}
-
-/** A port nothing listens on yet. */
-export function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer()
-
-    server.once("error", reject)
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address()
-
-      server.close(() => resolve(typeof address === "object" && address ? address.port : 0))
-    })
-  })
 }
 
 /** Runs `uv` in the API's folder; a failure carries its output. */

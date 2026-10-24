@@ -1,6 +1,7 @@
 import {
   appEnvironment,
   defineConfig,
+  freePort,
   postgresSnapshot,
   resendService,
   startPostgresProxy,
@@ -8,14 +9,7 @@ import {
 } from "@danwo/sdk"
 
 import { sqlOn } from "./tests/db.ts"
-import {
-  BINARY,
-  ensureBuilt,
-  freePort,
-  ROOT,
-  WEB_DIST,
-  workerDatabase,
-} from "./tests/environment.ts"
+import { BINARY, ensureBuilt, ROOT, WEB_DIST, workerDatabase } from "./tests/environment.ts"
 import { STRIPE_SECRET_KEY, TEAM_PLAN, TEAM_PRICE_CENTS, upgrade } from "./tests/quillwork.ts"
 
 /** Not a real secret: the emulator signs its webhooks with it, and the app checks them. */

@@ -1,10 +1,9 @@
 /**
  * What `danwo.config.ts` needs besides danwo itself: one build of the web app and the Go server
- * per run, a database of its own for each worker, and free ports.
+ * per run, and a database of its own for each worker.
  */
 import { execFile } from "node:child_process"
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs"
-import { createServer } from "node:net"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
@@ -28,20 +27,6 @@ export const BINARY = join(
 
 /** Where Vite writes the built web app, which the server serves. */
 export const WEB_DIST = join(ROOT, "web", "dist")
-
-/** A port nothing listens on yet. */
-export function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer()
-
-    server.once("error", reject)
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address()
-
-      server.close(() => resolve(typeof address === "object" && address ? address.port : 0))
-    })
-  })
-}
 
 /** One of the two builds: what it writes, what it is made from, and how to run it. */
 interface Build {

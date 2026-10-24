@@ -3,12 +3,12 @@
  * started through danwo's proxy. The app calls the API at its production host, which the proxy
  * routes to this worker's API; the API's calls to Resend reach the emulator the same way.
  */
-import { createServer } from "node:net"
 import { fileURLToPath } from "node:url"
 
 import { forwardTo } from "@danwo/proxy"
 import {
   appEnvironment,
+  freePort,
   postgresSnapshot,
   resendService,
   type Service,
@@ -22,21 +22,6 @@ import { workerDatabase } from "./postgres.ts"
 export const API_HOST = "api.lumen.example"
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url))
-
-/** A port nothing listens on right now, for the worker's API. */
-function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer()
-
-    server.once("error", reject)
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address()
-      const port = typeof address === "object" && address !== null ? address.port : 0
-
-      server.close(() => resolve(port))
-    })
-  })
-}
 
 /**
  * The backend for worker `workerIndex`, with the device's own background hosts in `blocked`.

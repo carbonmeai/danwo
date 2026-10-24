@@ -1,6 +1,7 @@
 import {
   appEnvironment,
   defineConfig,
+  freePort,
   githubService,
   googleService,
   postgresSnapshot,
@@ -9,7 +10,7 @@ import {
 } from "@danwo/sdk"
 
 import { ADA, GITHUB_CLIENT, GOOGLE_CLIENT, KAI, LIN, SEED_ROWS, signIn } from "./tests/harbor.ts"
-import { ensureBuilt, freePort, ROOT, WEB_DIST } from "./tests/stack/build.ts"
+import { ensureBuilt, ROOT, WEB_DIST } from "./tests/stack/build.ts"
 import { workerDatabase } from "./tests/stack/postgres.ts"
 
 /** Not real secrets: the emulators accept any well-formed key, and Better Auth any long secret. */

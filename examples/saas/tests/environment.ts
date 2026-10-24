@@ -1,10 +1,9 @@
 /**
- * What `danwo.config.ts` needs besides danwo itself: a fresh build of the web app, a database of
- * its own for each worker (the schema pushed), and free ports for the apps.
+ * What `danwo.config.ts` needs besides danwo itself: a fresh build of the web app, and a
+ * database of its own for each worker (the schema pushed).
  */
 import { execFile, spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs"
-import { createServer } from "node:net"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
@@ -18,20 +17,6 @@ const run = promisify(execFile)
 
 /** The example's folder, where its scripts and node_modules are. */
 export const ROOT = fileURLToPath(new URL("..", import.meta.url))
-
-/** A port nothing listens on yet. */
-export function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer()
-
-    server.once("error", reject)
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address()
-
-      server.close(() => resolve(typeof address === "object" && address ? address.port : 0))
-    })
-  })
-}
 
 /** What the web app's build is made from: a change to any of these makes it stale. */
 const SOURCES = ["web/src", "web/vite.config.ts", "kit", "package.json"]

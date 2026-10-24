@@ -1,6 +1,7 @@
 import {
   appEnvironment,
   defineConfig,
+  freePort,
   llmService,
   postgresSnapshot,
   resendService,
@@ -9,7 +10,7 @@ import {
 
 import { agentModel } from "./tests/agent-model.ts"
 import { SEED_SCRIPTS } from "./tests/scripts.ts"
-import { ensureBuilt, freePort } from "./tests/stack/next.ts"
+import { ensureBuilt } from "./tests/stack/next.ts"
 import { workerDatabase } from "./tests/stack/postgres.ts"
 
 export default defineConfig({

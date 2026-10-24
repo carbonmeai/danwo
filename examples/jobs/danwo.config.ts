@@ -1,5 +1,6 @@
 import {
   defineConfig,
+  freePort,
   inngestService,
   postgresSnapshot,
   resendService,
@@ -10,7 +11,7 @@ import {
 
 import { CENTS_PER_EMAIL, EMAIL_PRICE, TEAM_CUSTOMER } from "./lib/inngest.ts"
 import { sqlOn } from "./tests/db.ts"
-import { emptyDatabase, ensureBuilt, freePort, ROOT, workerDatabase } from "./tests/environment.ts"
+import { emptyDatabase, ensureBuilt, ROOT, workerDatabase } from "./tests/environment.ts"
 
 /** Not real keys: the emulators accept any well-formed one. */
 const STRIPE_SECRET_KEY = "sk_test_northwind_digest"

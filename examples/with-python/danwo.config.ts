@@ -1,5 +1,6 @@
 import {
   defineConfig,
+  freePort,
   postgresSnapshot,
   resendService,
   stackEnvironment,
@@ -12,7 +13,6 @@ import {
   API_DIR,
   CLASSES,
   ensureBuilt,
-  freePort,
   seedDatabase,
   stripePrice,
   syncPython,

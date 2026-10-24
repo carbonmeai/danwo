@@ -5,7 +5,6 @@
  */
 import { execFile } from "node:child_process"
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs"
-import { createServer } from "node:net"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
@@ -87,19 +86,4 @@ export async function ensureBuilt(): Promise<void> {
       throw new Error(`no fresh build of the web app; is ${LOCK} left over?`)
     await new Promise((resolve) => setTimeout(resolve, 500))
   }
-}
-
-/** A port nothing listens on right now, for a worker's server. */
-export function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer()
-
-    server.once("error", reject)
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address()
-      const port = typeof address === "object" && address !== null ? address.port : 0
-
-      server.close(() => resolve(port))
-    })
-  })
 }

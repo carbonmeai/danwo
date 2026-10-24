@@ -3,13 +3,14 @@ import {
   clerkInstance,
   clerkService,
   defineConfig,
+  freePort,
   googleService,
   postgresSnapshot,
   startPostgresProxy,
 } from "@danwo/sdk"
 
 import { ADA, ADAS_ORG, GOOGLE_CLIENT, LIN, SEED_ROWS, signIn } from "./tests/lumen.ts"
-import { ensureBuilt, freePort } from "./tests/stack/next.ts"
+import { ensureBuilt } from "./tests/stack/next.ts"
 import { workerDatabase } from "./tests/stack/postgres.ts"
 
 /** The Clerk instance's slug: its Frontend API is `lumen.clerk.accounts.dev`. */

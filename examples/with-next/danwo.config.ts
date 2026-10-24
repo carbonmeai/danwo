@@ -1,12 +1,13 @@
 import {
   appEnvironment,
   defineConfig,
+  freePort,
   postgresSnapshot,
   resendService,
   startPostgresProxy,
 } from "@danwo/sdk"
 
-import { ensureBuilt, freePort } from "./tests/stack/next.ts"
+import { ensureBuilt } from "./tests/stack/next.ts"
 import { workerDatabase } from "./tests/stack/postgres.ts"
 
 export default defineConfig({
