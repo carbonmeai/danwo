@@ -91,7 +91,7 @@ async function outsideNodeNotes(app: string, root: number, proxy: Proxy): Promis
   const programs = [...new Set(family.map((row) => programName(row.command)))].join(", ")
 
   return [
-    `${app} runs no Node process (${programs}), so danwo's check at start that its calls reach the proxy, which runs inside Node, does not run for it, and nothing confirms its calls go through the proxy: they do when its HTTP clients read HTTPS_PROXY and trust the CA bundle in SSL_CERT_FILE, REQUESTS_CA_BUNDLE or CURL_CA_BUNDLE, which danwo sets. A client that ignores them calls the real hosts, and unmatched: "block" cannot stop it.`,
+    `${app} runs no Node process (${programs}), so danwo's check at start that its calls reach the proxy, which runs inside Node, does not run for it, and nothing confirms its calls go through the proxy: they do when its HTTP clients read HTTPS_PROXY and trust the CA bundle in SSL_CERT_FILE, REQUESTS_CA_BUNDLE, CURL_CA_BUNDLE or GRPC_DEFAULT_SSL_ROOTS_FILE_PATH, which danwo sets. A client that ignores them calls the real hosts, and unmatched: "block" cannot stop it.`,
   ]
 }
 
