@@ -32,7 +32,7 @@ import {
   unroutedProcesses,
   writeNodeShim,
 } from "./node-env.ts"
-import { passThrough, Upstreams } from "./passthrough.ts"
+import { dialAddress, passThrough, Upstreams } from "./passthrough.ts"
 import { pairsOf, Reply, type TappedBody } from "./reply.ts"
 import { forwardTo } from "./upstream.ts"
 import {
@@ -873,7 +873,8 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
     if (hosts.isBlocked(host))
       return refuse(incoming, reply, exchange, 502, "danwo proxy: host is blocked for this run")
 
-    if (isLoopback(host) && !(await isListening(host, port)))
+    /* Asked of the address the call would be dialled at: a resolver need not know `app.localhost`. */
+    if (isLoopback(host) && !(await isListening(await dialAddress(host, port), port)))
       return refuse(incoming, reply, exchange, 502, nothingListening(host, port))
 
     if (options.unmatched === "block" && !passesBlock(incoming))
