@@ -11,14 +11,21 @@ import { Status, Topbar, usePolled } from "../ui.tsx"
 
 const BUSY = new Set(["scheduled", "sending"])
 
-/** Whether the jobs still have work on `digest`: copies to send, or emails sent but not billed. */
+/**
+ * Whether the jobs still have work on `digest`: copies to send, a copy that failed for good whose
+ * owner is not told yet, or emails sent but not billed. Each is read from the copies themselves,
+ * so the page keeps watching until the last of them is done.
+ */
 function inProgress(digest: Digest): boolean {
   if (BUSY.has(digest.digest.status)) return true
   if (digest.digest.status === "draft") return false
 
+  const unfinished = digest.subscribers.some(
+    (copy) => copy.status === "queued" || (copy.status === "failed" && !copy.ownerNotifiedAt),
+  )
   const billed = digest.charges.reduce((sum, charge) => sum + charge.quantity, 0)
 
-  return billed < digest.subscribers.length
+  return unfinished || billed < digest.subscribers.length
 }
 
 /** What a form on the page is doing: idle, sending, or the problem it hit. */

@@ -75,6 +75,18 @@ async function talliesOf(ids: readonly string[]): Promise<Map<string, Tally>> {
 
 const EMPTY: Tally = { subscribers: 0, queued: 0, sent: 0, failed: 0 }
 
+/** What the deliveries of `rows`, a digest's subscribers, add up to. */
+function tallyOf(rows: readonly { readonly status: string | null }[]): Tally {
+  const count = (status: string) => rows.filter((row) => row.status === status).length
+
+  return {
+    subscribers: rows.length,
+    queued: count("queued"),
+    sent: count("sent"),
+    failed: count("failed"),
+  }
+}
+
 export const digestRoutes = new Hono()
   .get("/api/digests", async (c) => {
     const rows = await transaction("list digests", (tx) =>
@@ -147,7 +159,11 @@ export const digestRoutes = new Hono()
 
     if (!found) return c.json({ error: "No such digest." }, 404)
 
-    const tally = (await talliesOf([id])).get(id) ?? EMPTY
+    /*
+     * Counted from the rows the answer shows, not read again: a copy sent between two reads would
+     * make the digest "sent" beside a copy still queued, and the page would stop watching.
+     */
+    const tally = tallyOf(found.subscribers)
 
     return c.json({
       ...found,
