@@ -8,8 +8,7 @@
     "**/styled-system/**",
     "benchmarks/recordings/**",
     "benchmarks/results/**",
-    "fidelity/*.json",
-    "examples/with-python/studio/templates/**"
+    "fidelity/*.json"
   ],
   "sortImports": true
 }
