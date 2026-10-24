@@ -211,6 +211,44 @@ export class Reply {
     if (this.open) this.response.end(empty ? undefined : body)
   }
 
+  /**
+   * A streamed answer: status and headers now, the body as `source` gives it, then the trailers
+   * `trailers()` gives once it has ended. A gRPC answer's `grpc-status` headers go with them,
+   * unless the trailers name their own. The source stops when the client goes away; one that fails
+   * resets the stream.
+   */
+  stream(
+    status: number,
+    pairs: readonly (readonly [string, string])[],
+    source: Readable,
+    trailers: () => Promise<readonly (readonly [string, string])[]>,
+  ): void {
+    const headers = pairs.filter(([name]) => !isFraming(name))
+    const grpc = grpcStatusOf(headers)
+
+    this.head(
+      status,
+      headers.filter((pair) => !grpc.includes(pair)),
+      undefined,
+      "trailers",
+    )
+    source.on("data", (chunk: Buffer) => this.#tap.add(chunk))
+    source.once("error", () => this.response.destroy())
+    this.response.once("close", () => source.destroy())
+    source.once("end", () => {
+      trailers().then(
+        (own) => {
+          const named = new Set(own.map(([name]) => name.toLowerCase()))
+
+          this.addTrailers([...grpc.filter(([name]) => !named.has(name.toLowerCase())), ...own])
+          if (this.open) this.response.end()
+        },
+        () => this.response.destroy(),
+      )
+    })
+    source.pipe(this.response, { end: false })
+  }
+
   /** Streams `source` out as the body, keeping what passes for the record. */
   pipeFrom(source: Readable): void {
     source.on("data", (chunk: Buffer) => this.#tap.add(chunk))

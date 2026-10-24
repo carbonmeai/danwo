@@ -2,10 +2,16 @@
  * A gRPC client as an app runs one, with nothing but the proxy's environment: grpc-js reads the
  * proxy from `https_proxy` and, for TLS, trusts the roots `GRPC_DEFAULT_SSL_ROOTS_FILE_PATH`
  * names. `node grpc-client.ts <host:port> <tls|plain> [calls]` makes the calls named (by default
- * all: `unary`, a server-streaming `stream`, a two-way `chat` and a `failed` call) and prints
- * what each got, as JSON.
+ * all: `unary`, a server-streaming `stream`, a two-way `chat` and a `failed` call; `partial` is a
+ * server stream that fails partway) and prints what each got, as JSON.
  */
-import { Client, credentials, type ServiceError } from "@grpc/grpc-js"
+import {
+  Client,
+  type ClientDuplexStream,
+  type ClientReadableStream,
+  credentials,
+  type ServiceError,
+} from "@grpc/grpc-js"
 
 import { decodeText, encodeText, methodPath } from "./greeter.ts"
 
@@ -28,40 +34,52 @@ function unary(name: string): Promise<string> {
   })
 }
 
-function serverStream(name: string): Promise<string[]> {
-  return new Promise((resolve, reject) => {
+/** A stream's answers, each passed to `onReply` too, then its error's code and details if it failed. */
+function repliesOf(
+  call: ClientReadableStream<string> | ClientDuplexStream<string, string>,
+  onReply: () => void = () => {},
+): Promise<string[]> {
+  return new Promise((resolve) => {
     const replies: string[] = []
-    const call = client.makeServerStreamRequest(methodPath("CountUp"), encodeText, decodeText, name)
 
-    call.on("data", (reply: string) => replies.push(reply))
-    call.on("error", reject)
+    call.on("data", (reply: string) => {
+      replies.push(reply)
+      onReply()
+    })
+    call.on("error", (error: ServiceError) =>
+      resolve([...replies, `error ${error.code} ${error.details}`]),
+    )
     call.on("end", () => resolve(replies))
   })
 }
 
-/** Sends each name only once the answer to the one before has come back. */
+function serverStream(name: string): Promise<string[]> {
+  return repliesOf(
+    client.makeServerStreamRequest(methodPath("CountUp"), encodeText, decodeText, name),
+  )
+}
+
+/**
+ * Sends each name only once the answer to the one before has come back; the answers, then the
+ * stream's error if it failed.
+ */
 function chat(names: readonly string[]): Promise<string[]> {
-  return new Promise((resolve, reject) => {
-    const replies: string[] = []
-    const call = client.makeBidiStreamRequest(methodPath("Chat"), encodeText, decodeText)
-    let next = 0
+  const call = client.makeBidiStreamRequest(methodPath("Chat"), encodeText, decodeText)
+  let next = 0
 
-    const send = () => {
-      const name = names[next]
+  const send = () => {
+    const name = names[next]
 
-      next += 1
-      if (name === undefined) call.end()
-      else call.write(name)
-    }
+    next += 1
+    if (name === undefined) call.end()
+    else call.write(name)
+  }
 
-    call.on("data", (reply: string) => {
-      replies.push(reply)
-      send()
-    })
-    call.on("error", reject)
-    call.on("end", () => resolve(replies))
-    send()
-  })
+  const replies = repliesOf(call, send)
+
+  send()
+
+  return replies
 }
 
 const CALLS: Record<string, () => Promise<unknown>> = {
@@ -69,6 +87,7 @@ const CALLS: Record<string, () => Promise<unknown>> = {
   stream: () => serverStream("count"),
   chat: () => chat(["one", "two"]),
   failed: () => unary("missing"),
+  partial: () => serverStream("broken"),
 }
 
 try {

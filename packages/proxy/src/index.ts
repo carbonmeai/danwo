@@ -28,6 +28,7 @@ export { taggedUserAgent, USER_AGENT_TAG, userOf } from "./clients.ts"
 export { type CapturedMessage, type FormPart, MAX_CAPTURED_BODY_BYTES } from "./capture.ts"
 export { isLoopback, isPageAsset, isStreaming, TELEMETRY_HOSTS } from "./hosts.ts"
 export { type EnvOptions, PRELOAD_DIR_VARIABLE, type UnroutedProcess } from "./node-env.ts"
+export { withTrailers } from "./streamed.ts"
 export { forwardTo } from "./upstream.ts"
 export {
   type SocketCall,

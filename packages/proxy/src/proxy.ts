@@ -2,6 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import type { ServerResponse } from "node:http"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { Readable } from "node:stream"
 
 import { type AppClock, createAppClock } from "./app-clock.ts"
 import { isAssetKind, type LoadKind, loadKind } from "./assets.ts"
@@ -34,6 +35,7 @@ import {
 } from "./node-env.ts"
 import { dialAddress, passThrough, Upstreams } from "./passthrough.ts"
 import { pairsOf, Reply, type TappedBody } from "./reply.ts"
+import { isStreamedCall, streamedBody, streamedRequest, trailersOf } from "./streamed.ts"
 import { forwardTo } from "./upstream.ts"
 import {
   createSockets,
@@ -289,18 +291,29 @@ function routeHandler(route: Route): Handler {
   return "handler" in route ? route.handler : forwardTo(route.upstream)
 }
 
-/** A routed call as its handler gets it: the request, and its body as it arrived. */
-interface Call {
-  readonly incoming: Incoming
-  readonly body: Buffer
-}
+/**
+ * A routed call as its handler gets it: the request, and its body as it arrived, or (a streamed
+ * call's) the body as it arrives.
+ */
+type Call =
+  | { readonly incoming: Incoming; readonly body: Buffer }
+  | { readonly incoming: Incoming; readonly stream: Readable }
 
-/** What a call is answered with: a whole response, or `"reset"` to drop its connection. */
+/**
+ * What a call is answered with: a whole response, a streamed call's response as it streams with
+ * the trailers that follow it, or `"reset"` to drop its connection.
+ */
 type Answer =
   | {
       readonly status: number
       readonly headers: readonly (readonly [string, string])[]
       readonly body: Buffer
+    }
+  | {
+      readonly status: number
+      readonly headers: readonly (readonly [string, string])[]
+      readonly stream: Readable
+      readonly trailers: () => Promise<[string, string][]>
     }
   | "reset"
 
@@ -327,35 +340,40 @@ function fromFetchHeaders(headers: Headers): [string, string][] {
 }
 
 /** A call's body for its handler, decoded when it can be; none for a GET or HEAD. */
-async function handlerBody(call: Call): Promise<{ body?: Buffer; decoded: boolean }> {
-  const { method, headers } = call.incoming
+async function handlerBody(
+  incoming: Incoming,
+  raw: Buffer,
+): Promise<{ body?: Buffer; decoded: boolean }> {
+  const { method, headers } = incoming
 
   if (method === "GET" || method === "HEAD") return { decoded: false }
 
   const encoding = headers["content-encoding"]
   const decoded = await decodeBody(
-    call.body,
+    raw,
     typeof encoding === "string" ? encoding : encoding?.join(","),
   )
 
-  return decoded === undefined
-    ? { body: call.body, decoded: false }
-    : { body: decoded, decoded: true }
+  return decoded === undefined ? { body: raw, decoded: false } : { body: decoded, decoded: true }
 }
 
 /**
  * The call as a `Request` for its handler. gzip, deflate, br and zstd bodies are decoded; for an
  * encoding the proxy does not know (S3's aws-chunked) the handler gets the raw bytes and the
- * encoding header.
+ * encoding header. A streamed call's body streams to the handler as it arrives.
  */
 async function requestOf(call: Call, behaviour?: string): Promise<Request> {
   const { incoming } = call
-  const { body, decoded } = await handlerBody(call)
   const headers = toFetchHeaders(incoming.rawHeaders)
 
-  if (decoded) headers.delete("content-encoding")
   headers.delete("content-length")
   if (behaviour !== undefined) headers.set(EMULATE_HEADER, behaviour)
+  if ("stream" in call)
+    return streamedRequest(incoming.url, { method: incoming.method, headers }, call.stream)
+
+  const { body, decoded } = await handlerBody(incoming, call.body)
+
+  if (decoded) headers.delete("content-encoding")
 
   return new Request(incoming.url, {
     method: incoming.method,
@@ -366,12 +384,12 @@ async function requestOf(call: Call, behaviour?: string): Promise<Request> {
 
 async function callHandler(handler: Handler, call: Call, behaviour?: string): Promise<Answer> {
   const response = await handler(await requestOf(call, behaviour))
+  const head = { status: response.status, headers: fromFetchHeaders(response.headers) }
 
-  return {
-    status: response.status,
-    headers: fromFetchHeaders(response.headers),
-    body: Buffer.from(await response.arrayBuffer()),
-  }
+  if ("stream" in call && response.body !== null)
+    return { ...head, stream: Readable.from(response.body), trailers: trailersOf(response) }
+
+  return { ...head, body: Buffer.from(await response.arrayBuffer()) }
 }
 
 /** The handler's answer, kept back until `until` resolves. */
@@ -431,7 +449,12 @@ async function answerReset(
   handler: Handler,
   call: Call,
 ): Promise<Answer> {
-  if (fault.kind === "reset-after") await callHandler(handler, call)
+  if (fault.kind === "reset-after") {
+    const answer = await callHandler(handler, call)
+
+    /* A streamed answer is read to its end, so the handler has done all it would. */
+    if (answer !== "reset" && "stream" in answer) await readAll(answer.stream)
+  }
 
   return "reset"
 }
@@ -564,6 +587,29 @@ function routeTable(routes: readonly Route[]): (host: string) => Handler | undef
 
   return (host) =>
     exact.get(host) ?? wildcards.find((wildcard) => hostMatches(wildcard.host, host))?.handler
+}
+
+/**
+ * A call for its handler, with its request recorded on `exchange`: a streamed call's body as it
+ * arrives, any other's read whole first. Undefined when the client went away before it had sent it.
+ */
+async function readCall(
+  incoming: Incoming,
+  record: (body: TappedBody) => void,
+): Promise<Call | undefined> {
+  if (isStreamedCall(incoming)) return { incoming, stream: streamedBody(incoming, record) }
+
+  const body = await bodyOf(incoming).catch(() => undefined)
+
+  if (body !== undefined) record({ bytes: body, total: body.length })
+
+  return body && { incoming, body }
+}
+
+/** Lets a streamed call's body go unread when `fault` answers it without the handler. */
+function letGoUnread(call: Call, fault: OutboundFault | AnswerHold | undefined): void {
+  if ("stream" in call && (fault?.kind === "status" || fault?.kind === "reset"))
+    call.stream.resume()
 }
 
 /** The body of a request, read whole; empty for one whose body is not read. */
@@ -745,7 +791,9 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
       return
     }
 
-    reply.send(answer.status, answer.headers, answer.body, method)
+    if ("stream" in answer)
+      reply.stream(answer.status, answer.headers, answer.stream, answer.trailers)
+    else reply.send(answer.status, answer.headers, answer.body, method)
   }
 
   /** Answers a call through `handler`, with `fault` applied and recorded when there is one. */
@@ -767,6 +815,13 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
     }
   }
 
+  /** The fault `failNext` armed for a routed call, else the one the rule picks. */
+  const faultFor = (incoming: Incoming) => {
+    const seen = callOf(incoming)
+
+    return takeArmed(seen) ?? faultRule?.(seen)
+  }
+
   /**
    * A routed call, or a page's call to an app the fault rule picked a fault for: its body is read,
    * then it is answered by `handler` under the fault (for a routed call, the fault `failNext`
@@ -779,19 +834,13 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
     handler: Handler,
     preset?: { readonly fault: OutboundFault | AnswerHold | undefined },
   ) => {
-    const body = await bodyOf(incoming).catch(() => undefined)
+    const call = await readCall(incoming, (body) => recordRequest(exchange, incoming, body))
 
-    if (body === undefined) return
-    recordRequest(exchange, incoming, { bytes: body, total: body.length })
+    if (call === undefined) return
 
-    const call = { incoming, body }
-    let fault = preset?.fault
+    const fault = preset === undefined ? faultFor(incoming) : preset.fault
 
-    if (preset === undefined) {
-      const seen = callOf(incoming)
-
-      fault = takeArmed(seen) ?? faultRule?.(seen)
-    }
+    letGoUnread(call, fault)
 
     try {
       deliver(reply, await answerCall(fault, handler, call, exchange), incoming.method)
