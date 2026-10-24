@@ -78,7 +78,12 @@ const ready: DoctorProbes = {
   browser: async () => ({ ok: true, detail: "Chromium 156.0.0.0" }),
   device: async (platform) => DEVICES[platform],
   flutter: async () => [{ name: "Flutter", status: "ok", detail: "Flutter 3.47.7" }],
+  /* Every optional package, at this danwo's version (the repository's). */
+  installed: () => "0.0.0",
 }
+
+/** A project that installed none of the optional packages. */
+const webOnly: DoctorProbes = { ...ready, installed: () => undefined }
 
 /** A machine with no Android SDK, as `danwo device doctor --platform android` reports it. */
 const NO_ANDROID: readonly DoctorCheck[] = [
@@ -338,5 +343,62 @@ describe("danwo doctor", () => {
     expect(neither["Android SDK"]?.[0]).toMatch(/^fail /)
     expect(neither["Xcode"]).toEqual(["fail not found: install Xcode from the App Store"])
     expect(neither["Flutter"]).toEqual(["fail not found: install Flutter"])
+  })
+
+  it("lists the optional packages: the version and features of each installed one", async () => {
+    const root = await project({ "package.json": "{}", "danwo.config.ts": "export default {}\n" })
+    const named = byName(await projectDoctor({ cwd: root }, ready))
+
+    expect(named["@danwo/mobile"]).toEqual([
+      "ok 0.0.0: mobile tests on Android and iOS: danwo device, build-android and build-ios",
+    ])
+    expect(named["@danwo/mcp"]).toEqual([
+      "ok 0.0.0: danwo's MCP server for coding agents: danwo mcp",
+    ])
+    expect(named["@danwo/recorder"]).toEqual([
+      "ok 0.0.0: recording a test in the browser: danwo record",
+    ])
+  })
+
+  it("passes a web project without them, naming the command that adds each", async () => {
+    const root = await project({
+      "package.json": "{}",
+      "pnpm-lock.yaml": "",
+      "danwo.config.ts": "export default {}\n",
+    })
+    const checks = await projectDoctor({ cwd: root }, webOnly)
+
+    expect(checks.every((check) => check.status === "ok")).toBe(true)
+    expect(byName(checks)["@danwo/mobile"]).toEqual([
+      "ok not installed; only mobile tests on Android and iOS: danwo device, build-android and build-ios (pnpm add -D @danwo/mobile)",
+    ])
+  })
+
+  it("fails a config on devices without @danwo/mobile, and asks no device checks", async () => {
+    const root = await project({
+      "package.json": "{}",
+      "danwo.config.ts": deviceConfig(["withAndroidDevice"]),
+    })
+    const asked: string[] = []
+    const named = byName(await projectDoctor({ cwd: root }, noting(asked, webOnly)))
+
+    expect(asked).toEqual([])
+    expect(named["devices"]).toBeUndefined()
+    expect(named["@danwo/mobile"]).toEqual([
+      "fail not installed; the config runs on devices: npm install -D @danwo/mobile",
+    ])
+  })
+
+  it("warns when the coding agents start danwo's MCP server and @danwo/mcp is missing", async () => {
+    const root = await project({
+      "package.json": "{}",
+      "danwo.config.ts": "export default {}\n",
+      ".mcp.json": JSON.stringify({ mcpServers: { danwo: { command: "npx" } } }),
+    })
+    const named = byName(await projectDoctor({ cwd: root }, webOnly))
+
+    expect(named["@danwo/mcp"]).toEqual([
+      "warn not installed; the coding agents are set up to start danwo's MCP server: npm install -D @danwo/mcp",
+    ])
   })
 })

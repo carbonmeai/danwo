@@ -2,7 +2,7 @@ import { existsSync } from "node:fs"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 
-import { clientCommand } from "@danwo/mcp"
+import { clientCommand } from "@danwo/skill"
 import { describe, expect, it } from "vitest"
 
 import { detectProject } from "../src/detect.ts"
@@ -167,7 +167,7 @@ describe("danwo init in a workspace package", () => {
 
     expect(answers.agents).toEqual(["claude"])
     expect(run.calls[0]).toEqual({
-      argv: ["pnpm", "add", "-D", "@danwo/cli", "@danwo/sdk"],
+      argv: ["pnpm", "add", "-D", "@danwo/cli", "@danwo/sdk", "@danwo/mcp", "@danwo/recorder"],
       cwd: app,
     })
     expect(existsSync(join(app, "package-lock.json"))).toBe(false)

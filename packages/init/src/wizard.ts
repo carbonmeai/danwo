@@ -83,9 +83,15 @@ async function askDevice(prompter: Prompter, checkDevice: () => Promise<DeviceCh
   const check = await prompter.task(
     "Checking this machine for Android testing",
     checkDevice,
-    (found) =>
-      found.problems.length === 0 ? "Ready for Android tests" : "Android testing needs some setup",
+    (found) => {
+      if (found.skipped !== undefined) return "Not checked yet: @danwo/mobile checks it"
+      if (found.problems.length === 0) return "Ready for Android tests"
+
+      return "Android testing needs some setup"
+    },
   )
+
+  if (check.skipped !== undefined) prompter.note(check.skipped, "Android testing")
 
   if (check.problems.length > 0) prompter.note(check.problems.join("\n"), "Before mobile tests run")
 

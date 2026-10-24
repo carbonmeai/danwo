@@ -10,6 +10,7 @@ import { spawnPlan } from "@danwo/runner/command-line"
 
 import type { Answers } from "./answers.ts"
 import {
+  AGENT_PACKAGES,
   DANWO_PACKAGES,
   MOBILE_PACKAGES,
   MODEL_SOURCE_INFO,
@@ -19,19 +20,22 @@ import {
 import type { Detection, PackageManager } from "./detect.ts"
 
 /**
- * The packages the answers' files import that the project does not have yet, plus Node's types in
- * a TypeScript project, since danwo's declarations use them.
+ * The packages the answers' files import that the project does not have yet: danwo's own, the
+ * device driver for a mobile engine, the MCP server and the recorder when coding agents are set
+ * up, the AI SDK provider package of the model source picked, and Node's types in a TypeScript project,
+ * since danwo's declarations use them.
  */
 export function packagesToAdd(
-  answers: Pick<Answers, "engine" | "modelSource">,
+  answers: Pick<Answers, "engine" | "modelSource" | "agents">,
   detection: Pick<Detection, "dependencies" | "typescript">,
 ): PackageSpec[] {
   const model = MODEL_SOURCE_INFO[answers.modelSource].package
   const mobile = answers.engine === "mobile" || answers.engine === "both"
   const wanted = [
     ...DANWO_PACKAGES,
-    ...(model ? [model] : []),
     ...(mobile ? MOBILE_PACKAGES : []),
+    ...(answers.agents.length > 0 ? AGENT_PACKAGES : []),
+    ...(model ? [model] : []),
     ...(detection.typescript ? [NODE_TYPES] : []),
   ]
 

@@ -364,9 +364,18 @@ export const DANWO_PACKAGES: readonly PackageSpec[] = [
   { name: "@danwo/sdk", version: ADDED_VERSION },
 ]
 
-/** The packages a mobile config imports. */
+/** The packages a mobile config imports: the device driver, which `@danwo/cli` leaves out. */
 export const MOBILE_PACKAGES: readonly PackageSpec[] = [
   { name: "@danwo/mobile", version: ADDED_VERSION },
+]
+
+/**
+ * The packages coding agents use, which `@danwo/cli` leaves out: the MCP server their config
+ * starts, and the recorder its recording tools and `danwo record` run.
+ */
+export const AGENT_PACKAGES: readonly PackageSpec[] = [
+  { name: "@danwo/mcp", version: ADDED_VERSION },
+  { name: "@danwo/recorder", version: ADDED_VERSION },
 ]
 
 /** Node's types: danwo's declarations use them, so a TypeScript project needs them to type-check. */

@@ -35,13 +35,20 @@
   },
   "dependencies": {
     "@clack/prompts": "1.8.1",
-    "@danwo/mcp": "workspace:*",
-    "@danwo/mobile": "workspace:*",
     "@danwo/runner": "workspace:*",
     "@danwo/skill": "workspace:*"
   },
   "devDependencies": {
+    "@danwo/mobile": "workspace:*",
     "oxc-parser": "0.155.0"
+  },
+  "peerDependencies": {
+    "@danwo/mobile": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@danwo/mobile": {
+      "optional": true
+    }
   },
   "engines": {
     "node": "^22.22.3 || >=24.11.1"

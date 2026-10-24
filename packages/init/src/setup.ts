@@ -4,8 +4,7 @@
  */
 import { join, relative } from "node:path"
 
-import { initProject } from "@danwo/mcp"
-import { installSkill } from "@danwo/skill"
+import { initProject, installSkill } from "@danwo/skill"
 
 import type { Answers } from "./answers.ts"
 import { AGENT_INFO, type PackageSpec } from "./catalog.ts"

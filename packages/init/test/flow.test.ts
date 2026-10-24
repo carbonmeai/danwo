@@ -4,9 +4,9 @@ import { join } from "node:path"
 
 import { describe, expect, it } from "vitest"
 
-import { deviceCheckOf } from "../src/device.ts"
+import { deviceCheckOf, SKIPPED_CHECK } from "../src/device.ts"
 import { runInit } from "../src/index.ts"
-import { installCommand, installPackages, type Runner } from "../src/install.ts"
+import { installCommand, installPackages, packagesToAdd, type Runner } from "../src/install.ts"
 import type { Choice, Prompter } from "../src/prompter.ts"
 import { nextApp, project } from "./project.ts"
 
@@ -114,7 +114,16 @@ describe("danwo init without prompts", () => {
     })
     expect(await read(root, ".vscode/mcp.json")).toContain('"type": "stdio"')
     expect(run.calls).toEqual([
-      ["pnpm", "add", "-D", "@danwo/cli", "@danwo/sdk", "@ai-sdk/anthropic@4.0.82"],
+      [
+        "pnpm",
+        "add",
+        "-D",
+        "@danwo/cli",
+        "@danwo/sdk",
+        "@danwo/mcp",
+        "@danwo/recorder",
+        "@ai-sdk/anthropic@4.0.82",
+      ],
       ["pnpm", "exec", "danwo", "install-browser"],
     ])
     expect(await read(root, "danwo.config.ts")).toContain('model: anthropic("claude-sonnet-5")')
@@ -449,7 +458,62 @@ describe("installing", () => {
   })
 })
 
+describe("the packages init adds", () => {
+  const fresh = { dependencies: new Set<string>(), typescript: false }
+  const names = (answers: Parameters<typeof packagesToAdd>[0]) =>
+    packagesToAdd(answers, fresh).map((spec) => spec.name)
+
+  it("adds only the CLI and the SDK to a web project with no agents and no model", () => {
+    expect(names({ engine: "web", modelSource: "none", agents: [] })).toEqual([
+      "@danwo/cli",
+      "@danwo/sdk",
+    ])
+  })
+
+  it("adds the device driver to a mobile project, and the MCP server and recorder for agents", () => {
+    expect(names({ engine: "mobile", modelSource: "none", agents: [] })).toEqual([
+      "@danwo/cli",
+      "@danwo/sdk",
+      "@danwo/mobile",
+    ])
+    expect(names({ engine: "both", modelSource: "openai", agents: ["cursor"] })).toEqual([
+      "@danwo/cli",
+      "@danwo/sdk",
+      "@danwo/mobile",
+      "@danwo/mcp",
+      "@danwo/recorder",
+      "@ai-sdk/openai",
+    ])
+  })
+
+  it("adds the one AI SDK provider package the model source picked, and none for the gateway", () => {
+    expect(names({ engine: "web", modelSource: "anthropic", agents: [] })).toEqual([
+      "@danwo/cli",
+      "@danwo/sdk",
+      "@ai-sdk/anthropic",
+    ])
+    expect(names({ engine: "web", modelSource: "gateway", agents: [] })).toEqual([
+      "@danwo/cli",
+      "@danwo/sdk",
+    ])
+  })
+})
+
 describe("the device check", () => {
+  it("waits for danwo device doctor when @danwo/mobile is not installed yet", async () => {
+    const root = await project({ "package.json": nextApp() })
+    const { summary } = await runInit({
+      cwd: root,
+      flags: { yes: true, engine: "mobile", modelSource: "none", skills: "none" },
+      env: {},
+      run: recordingRunner(),
+      checkDevice: async () => SKIPPED_CHECK,
+    })
+
+    expect(SKIPPED_CHECK.skipped).toContain("npx @danwo/cli device doctor")
+    expect(summary).toContain("danwo device doctor")
+  })
+
   it("lists what to fix and the first AVD that passed", () => {
     expect(
       deviceCheckOf([

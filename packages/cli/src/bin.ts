@@ -15,7 +15,9 @@ import {
   explainImpact,
   junit,
   lintRun,
+  loadOptional,
   mergeReports,
+  PackageMissingError,
   parseDuration,
   type RecordMode,
   type Reporter,
@@ -28,6 +30,18 @@ import {
 import { Argument, Command, InvalidArgumentError, Option } from "commander"
 
 import { cliCommands } from "./commands.ts"
+
+/**
+ * `@danwo/mobile`, for `command`. The device driver, the MCP server and the recorder are optional
+ * peers: a project adds the ones its features need (danwo init does), and a command that needs one
+ * the project lacks fails with the command that adds it.
+ */
+const mobile = (command: string) =>
+  loadOptional("@danwo/mobile", command, () => import("@danwo/mobile"))
+
+/** `@danwo/mobile`'s app builds, for `command`. */
+const mobileBuild = (command: string) =>
+  loadOptional("@danwo/mobile", command, () => import("@danwo/mobile/build"))
 
 /** What `--reporter` and `--no-pr-comment` set. */
 interface ReporterFlags {
@@ -333,7 +347,7 @@ program
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .option("--max-sessions <n>", "live sessions open at once", integerAtLeast(1), 4)
   .action(async (options: { config?: string; maxSessions: number }) => {
-    const { serveStdio } = await import("@danwo/mcp")
+    const { serveStdio } = await loadOptional("@danwo/mcp", "danwo mcp", () => import("@danwo/mcp"))
 
     await serveStdio({
       cwd: process.cwd(),
@@ -400,12 +414,12 @@ program
 program
   .command("doctor")
   .description(
-    "check what a first run needs: Node, danwo's Chromium and the config's other browsers, the config and its keys, the model's key, the device toolchain for a mobile config, Playwright Test's version and the agents' skill",
+    "check what a first run needs: Node, danwo's Chromium and the config's other browsers, the config and its keys, the model's key, the device toolchain for a mobile config, Playwright Test's version, the agents' skill, and which optional packages (@danwo/mobile, @danwo/mcp, @danwo/recorder) are installed",
   )
   .option("--json", "the checks as JSON: { ok, checks: [{ name, status, detail }] }")
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .action(async (options: { json?: boolean; config?: string }) => {
-    const { doctorLines, projectDoctor } = await import("./doctor.ts")
+    const { doctorLines, installedVersion, projectDoctor } = await import("./doctor.ts")
     const { browserInstalled } = await import("@danwo/runner")
     const checks = await projectDoctor(
       { cwd: process.cwd(), config: options.config },
@@ -414,8 +428,9 @@ program
         env: process.env,
         browser: browserInstalled,
         device: async (platform) =>
-          (await import("@danwo/mobile")).deviceDoctor(undefined, { platform }),
-        flutter: async () => (await import("@danwo/mobile")).flutterDoctor(),
+          (await mobile("danwo doctor")).deviceDoctor(undefined, { platform }),
+        flutter: async () => (await mobile("danwo doctor")).flutterDoctor(),
+        installed: installedVersion,
       },
     )
     const ok = checks.every((check) => check.status !== "fail")
@@ -471,7 +486,11 @@ program
   .option("-n, --name <title>", "the test's title", "recorded journey")
   .option("-c, --config <path>", "config file (default: nearest danwo.config.ts)")
   .action(async (path: string, options: { out?: string; name: string; config?: string }) => {
-    const { recordedReport, startRecording } = await import("@danwo/recorder")
+    const { recordedReport, startRecording } = await loadOptional(
+      "@danwo/recorder",
+      "danwo record",
+      () => import("@danwo/recorder"),
+    )
     const recording = await startRecording({ cwd: process.cwd(), config: options.config, path })
     const interrupted = new Promise<void>((resolve) => process.once("SIGINT", () => resolve()))
 
@@ -691,7 +710,7 @@ program
     new Option("--platform <platform>", "check one platform only").choices(["android", "ios"]),
   )
   .action(async (_action: string, options: { platform?: "android" | "ios" }) => {
-    const { deviceDoctor } = await import("@danwo/mobile")
+    const { deviceDoctor } = await mobile("danwo device doctor")
     const checks = await deviceDoctor(undefined, {
       ...(options.platform !== undefined && { platform: options.platform }),
     })
@@ -778,7 +797,7 @@ buildCommand(
   async (project, flags, onLine) => {
     const variant = flagOf(flags, "variant")
 
-    return (await import("@danwo/mobile/build")).buildAndroid({
+    return (await mobileBuild("danwo build-android")).buildAndroid({
       project,
       force: flags.force === true,
       ...(variant !== undefined && { variant }),
@@ -802,7 +821,7 @@ buildCommand(
     const scheme = flagOf(flags, "scheme")
     const configuration = flagOf(flags, "configuration")
 
-    return (await import("@danwo/mobile/build")).buildIos({
+    return (await mobileBuild("danwo build-ios")).buildIos({
       project,
       force: flags.force === true,
       ...(scheme !== undefined && { scheme }),
@@ -816,6 +835,9 @@ buildCommand(
 try {
   await program.parseAsync()
 } catch (error) {
-  process.stderr.write(`danwo: ${error instanceof Error ? error.message : String(error)}\n`)
+  /* A missing package's message starts with the command that needs it, `danwo build-ios`. */
+  const prefix = error instanceof PackageMissingError ? "" : "danwo: "
+
+  process.stderr.write(`${prefix}${error instanceof Error ? error.message : String(error)}\n`)
   process.exitCode = exitCodeForError(error)
 }

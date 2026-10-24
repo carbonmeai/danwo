@@ -77,9 +77,6 @@
         "@danwo/dashboard": "workspace:*",
         "@danwo/github": "workspace:*",
         "@danwo/init": "workspace:*",
-        "@danwo/mcp": "workspace:*",
-        "@danwo/mobile": "workspace:*",
-        "@danwo/recorder": "workspace:*",
         "@danwo/runner": "workspace:*",
         "@danwo/skill": "workspace:*",
         "commander": "15.0.0",
@@ -90,6 +87,9 @@
         "@clerk/express": "2.1.80",
         "@composio/core": "0.25.0",
         "@danwo/fidelity": "workspace:*",
+        "@danwo/mcp": "workspace:*",
+        "@danwo/mobile": "workspace:*",
+        "@danwo/recorder": "workspace:*",
         "@danwo/sdk": "workspace:*",
         "@hocuspocus/provider": "4.7.1",
         "@nangohq/node": "0.71.13",
@@ -113,6 +113,16 @@
         "yjs": "13.6.33",
         "zod": "4.6.7",
       },
+      "peerDependencies": {
+        "@danwo/mcp": "workspace:*",
+        "@danwo/mobile": "workspace:*",
+        "@danwo/recorder": "workspace:*",
+      },
+      "optionalPeers": [
+        "@danwo/mcp",
+        "@danwo/mobile",
+        "@danwo/recorder",
+      ],
     },
     "packages/dashboard": {
       "name": "@danwo/dashboard",
@@ -256,14 +266,19 @@
       "version": "0.0.0",
       "dependencies": {
         "@clack/prompts": "1.8.1",
-        "@danwo/mcp": "workspace:*",
-        "@danwo/mobile": "workspace:*",
         "@danwo/runner": "workspace:*",
         "@danwo/skill": "workspace:*",
       },
       "devDependencies": {
+        "@danwo/mobile": "workspace:*",
         "oxc-parser": "0.155.0",
       },
+      "peerDependencies": {
+        "@danwo/mobile": "workspace:*",
+      },
+      "optionalPeers": [
+        "@danwo/mobile",
+      ],
     },
     "packages/matrix": {
       "name": "@danwo/matrix",
@@ -272,7 +287,6 @@
         "@danwo/emulators": "workspace:*",
         "@danwo/infra": "workspace:*",
         "@danwo/proxy": "workspace:*",
-        "effect": "4.0.5",
       },
       "devDependencies": {
         "@danwo/example-shop": "workspace:*",
@@ -421,6 +435,7 @@
         "@danwo/runner": "workspace:*",
         "@danwo/sdk": "workspace:*",
         "oxc-parser": "0.155.0",
+        "zod": "4.6.7",
       },
     },
     "packages/ui": {
@@ -2091,8 +2106,6 @@
     "ecdsa-sig-formatter": ["ecdsa-sig-formatter@1.0.11", "", { "dependencies": { "safe-buffer": "^5.0.1" } }, "sha512-nagl3RYrbNv6kQkeJIpt6NJZy8twLB/2vtz6yN9Z4vRKHN4/QZJIEbqohALSgwKdnksuY3k5Addp5lg8sVoVcQ=="],
 
     "ee-first": ["ee-first@1.1.1", "", {}, "sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow=="],
-
-    "effect": ["effect@4.0.5", "", {}, "sha512-BY4/28NlpOd99yzmV741xbVGmp+1U7tks4oB7F/Png64bTa5tm5eCA6W0RiXsnuLDDoJpjfVSo4Dnq4BZb/89Q=="],
 
     "electron-to-chromium": ["electron-to-chromium@1.5.459", "", {}, "sha512-4SC9HHSFjO/liAhifpdOL5hG9b4BP7/5G3y3UPZVO8trlAXr1CaUEEJL0gWK3kOcYcZrOA5rkwG45Gra/lTIgg=="],
 

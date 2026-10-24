@@ -4,20 +4,26 @@
  * against `@danwo/playwright`'s range, and whether the coding agents' copy of the skill is this
  * danwo's. A config that runs its tests on devices (`withIosDevice`, `buildAndroid` and the other
  * `@danwo/mobile` helpers) gets `danwo device doctor`'s checks for each platform it runs on, and
- * Flutter's for a Flutter app.
+ * Flutter's for a Flutter app. Last, the optional packages: which are installed, the features each
+ * enables, and the command that adds one the project lacks.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { dirname, join, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import { DANWO_VERSION } from "@danwo/init/catalog"
 import {
+  addCommand,
   type BrowserName,
   browserNames,
   browserTitle,
   cliStatusOf,
   type DanwoConfig,
   loadConfig,
+  OPTIONAL_PACKAGE_NAMES,
+  OPTIONAL_PACKAGES,
+  type OptionalPackage,
 } from "@danwo/runner/runner"
 import { SKILL_DIRS, SKILL_FILE } from "@danwo/skill"
 
@@ -42,6 +48,8 @@ export interface DoctorProbes {
   readonly device: (platform: MobilePlatform) => Promise<readonly DoctorCheck[]>
   /** Flutter's check, for a project with a `pubspec.yaml`. */
   readonly flutter: () => Promise<readonly DoctorCheck[]>
+  /** The version of an optional danwo package this danwo loads, or undefined when there is none. */
+  readonly installed: (name: OptionalPackage) => string | undefined
 }
 
 /** The oldest Playwright Test `@danwo/playwright` takes. */
@@ -299,6 +307,8 @@ async function deviceChecks(
   const platforms = configFile === undefined ? [] : mobilePlatformsOf(configFile)
 
   if (platforms.length === 0) return []
+  /* Without the device driver, its line among the optional packages says what to install. */
+  if (probes.installed("@danwo/mobile") === undefined) return []
 
   const found = await Promise.all(
     platforms.map(async (platform) => ({ platform, checks: await probes.device(platform) })),
@@ -327,6 +337,56 @@ async function deviceChecks(
   ]
 }
 
+/** Whether the project registers danwo's MCP server with a coding agent, as `danwo init` does. */
+function registersMcp(root: string): boolean {
+  return [".mcp.json", ".cursor/mcp.json", ".vscode/mcp.json", ".codex/config.toml"].some((file) =>
+    /"danwo"\s*:|\[mcp_servers\.danwo\]/.test(textOf(join(root, file))),
+  )
+}
+
+/**
+ * Each optional package: the version installed and the features it enables, or that it is not
+ * installed and the command that adds it. One the project needs and lacks fails (the device driver
+ * for a config that runs on devices) or warns (the MCP server the coding agents are told to start);
+ * one at another version than this danwo's warns, since danwo's packages are released together.
+ */
+function optionalChecks(
+  root: string,
+  needed: ReadonlySet<OptionalPackage>,
+  probes: DoctorProbes,
+): DoctorCheck[] {
+  return OPTIONAL_PACKAGE_NAMES.map((name): DoctorCheck => {
+    const version = probes.installed(name)
+    const add = addCommand(name, root)
+
+    if (version === undefined) {
+      if (name === "@danwo/mobile" && needed.has(name))
+        return { name, status: "fail", detail: `not installed; the config runs on devices: ${add}` }
+      if (needed.has(name))
+        return {
+          name,
+          status: "warn",
+          detail: `not installed; the coding agents are set up to start danwo's MCP server: ${add}`,
+        }
+
+      return {
+        name,
+        status: "ok",
+        detail: `not installed; only ${OPTIONAL_PACKAGES[name]} (${add})`,
+      }
+    }
+
+    if (version !== DANWO_VERSION && DANWO_VERSION !== "0.0.0")
+      return {
+        name,
+        status: "warn",
+        detail: `${version}, but danwo is ${DANWO_VERSION}; install the same version: ${add}`,
+      }
+
+    return { name, status: "ok", detail: `${version}: ${OPTIONAL_PACKAGES[name]}` }
+  })
+}
+
 /** Every check, in the order a first run meets them. */
 export async function projectDoctor(
   options: { readonly cwd: string; readonly config?: string | undefined },
@@ -334,6 +394,11 @@ export async function projectDoctor(
 ): Promise<DoctorCheck[]> {
   const config = await configChecks(options.cwd, options.config, probes.env)
   const browsers: DoctorCheck[] = []
+  const devices = config.path === undefined ? [] : mobilePlatformsOf(config.path)
+  const needed = new Set<OptionalPackage>([
+    ...(devices.length > 0 ? (["@danwo/mobile"] as const) : []),
+    ...(registersMcp(config.root) ? (["@danwo/mcp"] as const) : []),
+  ])
 
   for (const engine of enginesOf(config.config)) browsers.push(await browserCheck(probes, engine))
 
@@ -345,7 +410,34 @@ export async function projectDoctor(
     ...(await deviceChecks(config.path, config.root, probes)),
     ...playwrightCheck(config.root),
     ...skillChecks(config.root),
+    ...optionalChecks(config.root, needed, probes),
   ]
+}
+
+/**
+ * The version of the optional package `name` this danwo loads: resolved from here, where it is a
+ * peer, as the commands that need it import it. Undefined when it is not installed.
+ */
+export function installedVersion(name: OptionalPackage): string | undefined {
+  let entry: string
+
+  try {
+    entry = fileURLToPath(import.meta.resolve(name))
+  } catch {
+    return undefined
+  }
+
+  for (let dir = dirname(entry); dirname(dir) !== dir; dir = dirname(dir)) {
+    const manifest: unknown = JSON.parse(textOf(join(dir, "package.json")) || "{}")
+
+    if (Reflect.get(Object(manifest), "name") === name) {
+      const version: unknown = Reflect.get(Object(manifest), "version")
+
+      return typeof version === "string" ? version : undefined
+    }
+  }
+
+  return undefined
 }
 
 /** The checks as lines, one each, the way `danwo device doctor` prints them. */
