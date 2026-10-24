@@ -46,7 +46,7 @@ export default defineConfig({
    * The upgrade's plan is a little over the default budget of 40 trials, with the page's calls to
    * the API faulted beside Stripe's, Resend's and Postgres's: run all of it.
    */
-  matrix: { workers: 4, budget: 50 },
+  matrix: { workers: 4, budget: 50, pageCalls: true },
   async environment({ workerIndex }) {
     /*
      * The first worker builds the web app with Vite and the server with `go build`; the others

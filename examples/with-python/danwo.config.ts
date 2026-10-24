@@ -45,7 +45,7 @@ export default defineConfig({
       },
     },
   },
-  matrix: { workers: 4, budget: 90 },
+  matrix: { workers: 4, budget: 90, pageCalls: true },
   async environment({ workerIndex }) {
     await Promise.all([syncPython(), ensureBuilt()])
 

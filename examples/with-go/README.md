@@ -16,7 +16,8 @@ other outside call. The tests are TypeScript, as with any app danwo tests.
   Linux and on macOS. The app's code has no test hooks.
 - **A single-page app's calls, faulted.** The browser's calls to the API go through danwo's proxy
   too. The flight record shows each one, and the matrix fails them: a 500, a dropped connection,
-  an answer lost after the API acted, and the upgrade sent twice at once.
+  an answer lost after the API acted, and the upgrade sent twice at once. The config turns these
+  faults on with `matrix: { pageCalls: true }`; they are off by default.
 - **Invariants that read both sides.** After every test, the app's database is checked against
   Stripe and Resend: one plan per Stripe subscription, each with the status Stripe has, no team
   with two active plans, one welcome email per team on the plan, and one Checkout Session per team.
