@@ -96,9 +96,16 @@ pipeline as HTTP/1.1 (routes, `failNext`/`setFault`, blocked hosts, loop check, 
 `settled()`); `:authority` stands for `Host`, and connection-specific headers never go out on
 HTTP/2. Passthrough speaks HTTP/2 upstream when the server picks `h2` (one pooled session per
 origin), streaming both ways with trailers and resets carried across; a server that picks
-HTTP/1.1 gets the stream as an HTTP/1.1 request. A handler answers whole: `grpc-status`/`grpc-message`
-in a gRPC answer's headers go out as trailers after its messages (alone with the headers, as
-trailers-only, when the body is empty); handlers cannot stream gRPC (no two-way emulation). Faults
+HTTP/1.1 gets the stream as an HTTP/1.1 request; a stream the server refuses (`REFUSED_STREAM`, as
+on a session it is closing) goes once more on a fresh session with its body (kept up to 1 MiB while
+unanswered), and a bodyless one whose reused session died under it goes once more too. A route's
+handler gets a gRPC call over HTTP/2 (`application/grpc*`) streamed: `request.body` as the client
+sends it, and a `Response` whose body is a stream goes out as it streams, so a handler can emulate
+client, server and two-way streams; `withTrailers(response, () => ({ "grpc-status": "13" }))` (from
+`@danwo/proxy`) sends trailers decided once the body has ended; without them a gRPC answer's
+`grpc-status`/`grpc-message` headers go out as trailers (alone with the headers, trailers-only, when
+the body is null). Every other call is still read and answered whole. A `status` or `reset` fault
+answers a streamed call without its handler and lets its body go unread. Faults
 on HTTP/2 hit one stream: `reset` and `reset-after` send `RST_STREAM` `INTERNAL_ERROR` (grpc-js:
 `13 INTERNAL: Received RST_STREAM with code 2`), other streams on the session carry on; status and
 delay faults answer as on HTTP/1.1. A 502 from the proxy reads as `UNAVAILABLE` in gRPC.

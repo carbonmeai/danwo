@@ -25,6 +25,10 @@ date: 2026-10-24
   for them.
 - A fault on an HTTP/2 call hits that one stream. A `reset` resets the stream, and the other
   calls on the same connection carry on.
+- An emulator can stream a gRPC call both ways, and send its `grpc-status` once its stream ends
+  with `withTrailers`.
+- If a real server closes a connection just as a call goes out, the proxy sends the call again on
+  a fresh one.
 - gRPC apps in Python, Ruby and PHP trust danwo's CA with no change: danwo sets
   `GRPC_DEFAULT_SSL_ROOTS_FILE_PATH`. See [Apps in other languages](/docs/other-languages#grpc).
 

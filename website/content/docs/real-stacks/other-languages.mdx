@@ -250,8 +250,22 @@ conn, err := grpc.NewClient("greeter.example.com:443", grpc.WithTransportCredent
   and the other calls on the same connection carry on.
 - A gRPC call can stay open for as long as the app listens, so readiness doesn't wait for it to
   end.
-- A route's handler answers a gRPC call whole, not as a stream. Put `grpc-status` in its headers
-  and danwo sends it as a trailer after the messages.
+- A route's handler can stream a gRPC call both ways. It reads the request body as the app sends
+  it, and its response body goes out as it streams. Put `grpc-status` in its headers, or decide it
+  at the end with `withTrailers`, below.
+- If the real server closes a connection just as a call goes out, danwo sends the call again on
+  a fresh connection.
+
+```ts title="greeter-emulator.ts · a status decided at the end"
+import { withTrailers } from "@danwo/proxy"
+
+return withTrailers(
+  new Response(messages, { headers: { "content-type": "application/grpc" } }),
+  () => ({
+    "grpc-status": failed ? "13" : "0",
+  }),
+)
+```
 
 ## What differs from a Node app
 
