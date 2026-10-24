@@ -41,8 +41,8 @@
     "@danwo/cli": "workspace:*",
     "@danwo/sdk": "workspace:*",
     "@danwo/ui": "workspace:*",
-    "@pandacss/dev": "2.2.0",
-    "@pandacss/preset-base": "2.2.0",
+    "@pandacss/dev": "2.3.0",
+    "@pandacss/preset-base": "2.3.0",
     "@tanstack/react-router": "1.170.45",
     "@tanstack/react-start": "1.169.3",
     "@types/react": "19.3.0",
@@ -51,7 +51,7 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "recharts": "3.10.1",
-    "vite": "8.3.4"
+    "vite": "8.3.5"
   },
   "engines": {
     "node": "^22.22.3 || >=24.11.1"
