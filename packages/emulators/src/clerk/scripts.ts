@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { createRequire } from "node:module"
 import { homedir } from "node:os"
-import { dirname, join, normalize, sep } from "node:path"
+import { dirname, join, posix } from "node:path"
 
 import type { Context, Middleware } from "../http.ts"
 
@@ -40,9 +40,10 @@ function scriptRequest(path: string): ScriptRequest | undefined {
   if (!match) return undefined
 
   const [, name = "", version = "", file = ""] = match
-  const clean = normalize(file)
+  /* A URL's path: normalized with forward slashes on every platform, as it goes into the CDN's URL. */
+  const clean = posix.normalize(file)
 
-  if (!SERVED.has(name) || clean.startsWith("..") || clean.includes(`${sep}..`)) return undefined
+  if (!SERVED.has(name) || clean.startsWith("..") || clean.includes("/..")) return undefined
 
   return { name, version, file: clean }
 }
