@@ -1,6 +1,6 @@
 /**
- * What `danwo.config.ts` needs besides danwo itself: one build of the Go app per run, a database
- * of its own for each worker, and free ports.
+ * What `danwo.config.ts` needs besides danwo itself: one build of the web app and the Go server
+ * per run, a database of its own for each worker, and free ports.
  */
 import { execFile } from "node:child_process"
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs"
@@ -16,15 +16,18 @@ import { assertTestDatabase, sqlOn } from "./db.ts"
 
 const run = promisify(execFile)
 
-/** The example's folder: the Go module, its scripts and node_modules. */
+/** The example's folder: its scripts and node_modules, with the API in `api/` and the page in `web/`. */
 export const ROOT = fileURLToPath(new URL("..", import.meta.url))
 
-/** Where the build puts the app's binary. */
+/** Where the build puts the server's binary. */
 export const BINARY = join(
   ROOT,
   "dist",
   process.platform === "win32" ? "quillwork.exe" : "quillwork",
 )
+
+/** Where Vite writes the built web app, which the server serves. */
+export const WEB_DIST = join(ROOT, "web", "dist")
 
 /** A port nothing listens on yet. */
 export function freePort(): Promise<number> {
@@ -40,11 +43,37 @@ export function freePort(): Promise<number> {
   })
 }
 
-/** What the binary is built from: a change to any of these makes it stale. */
-const SOURCES = ["go.mod", "go.sum", "schema.sql", "templates", "kit"]
+/** One of the two builds: what it writes, what it is made from, and how to run it. */
+interface Build {
+  readonly name: string
+  /** The file the build writes last, once it is complete. */
+  readonly output: string
+  /** What the output is made from: a change to any of these makes it stale. */
+  readonly sources: readonly string[]
+  readonly command: string
+  readonly args: readonly string[]
+}
+
+/** The web app: `vite build web`, with the kit's styles it imports. */
+const WEB: Build = {
+  name: "vite build",
+  output: join(WEB_DIST, "index.html"),
+  sources: ["web/src", "web/index.html", "web/vite.config.ts", "kit", "package.json"],
+  command: process.execPath,
+  args: [join(ROOT, "node_modules/vite/bin/vite.js"), "build", "web"],
+}
+
+/** The server: `go build` in `api/`, with the schema it embeds. */
+const SERVER: Build = {
+  name: "go build",
+  output: BINARY,
+  sources: ["api"],
+  command: "go",
+  args: ["-C", "api", "build", "-o", BINARY, "."],
+}
 
 /** Held while one worker builds; `mkdir` makes taking it atomic. */
-const LOCK = join(ROOT, ".go-build-lock")
+const LOCK = join(ROOT, ".build-lock")
 
 /** The newest modification time under `path`. */
 function newest(path: string): number {
@@ -55,14 +84,18 @@ function newest(path: string): number {
   return Math.max(stats.mtimeMs, ...readdirSync(path).map((name) => newest(join(path, name))))
 }
 
-/** Whether the binary exists and is newer than the Go files and everything they embed. */
-function fresh(): boolean {
-  const goFiles = readdirSync(ROOT)
-    .filter((name) => name.endsWith(".go"))
-    .map((name) => join(ROOT, name))
-  const sources = [...goFiles, ...SOURCES.map((source) => join(ROOT, source)).filter(existsSync)]
+/** Whether `build`'s output exists and is newer than everything it is made from. */
+function fresh(build: Build): boolean {
+  const sources = build.sources.map((source) => join(ROOT, source)).filter(existsSync)
 
-  return existsSync(BINARY) && statSync(BINARY).mtimeMs >= Math.max(...sources.map(newest))
+  return (
+    existsSync(build.output) && statSync(build.output).mtimeMs >= Math.max(...sources.map(newest))
+  )
+}
+
+/** Whether both builds are fresh. */
+function built(): boolean {
+  return fresh(WEB) && fresh(SERVER)
 }
 
 /** Takes the build lock; false when another worker holds it. */
@@ -76,35 +109,36 @@ function lock(): boolean {
   }
 }
 
-/** Runs `go build`; a failure carries its output, and a missing Go says what to install. */
-async function build(): Promise<void> {
+/** Runs one build; a failure carries its output, and a missing Go says what to install. */
+async function runBuild(build: Build): Promise<void> {
   try {
-    await run("go", ["build", "-o", BINARY, "."], { cwd: ROOT, maxBuffer: 16 * 1024 * 1024 })
+    await run(build.command, [...build.args], { cwd: ROOT, maxBuffer: 64 * 1024 * 1024 })
   } catch (error) {
-    if (Reflect.get(Object(error), "code") === "ENOENT")
+    if (build === SERVER && Reflect.get(Object(error), "code") === "ENOENT")
       throw new Error("go is not on PATH: install Go 1.24 or newer from https://go.dev/dl/", {
         cause: error,
       })
 
     const output = `${String(Reflect.get(Object(error), "stdout") ?? "")}${String(Reflect.get(Object(error), "stderr") ?? "")}`
 
-    throw new Error(`go build failed:\n${output.split("\n").slice(-40).join("\n")}`, {
+    throw new Error(`${build.name} failed:\n${output.split("\n").slice(-40).join("\n")}`, {
       cause: error,
     })
   }
 }
 
 /**
- * Builds the app unless a fresh binary exists. The first worker to start builds, the others wait
- * for it, so every worker runs the same binary and none of them compiles on its own.
+ * Builds the web app and the server, each unless a fresh build of it exists. The first worker to
+ * start builds, the others wait for it, so every worker serves the same build and none of them
+ * compiles on its own.
  */
 export async function ensureBuilt(): Promise<void> {
   const deadline = Date.now() + 10 * 60_000
 
-  while (!fresh()) {
+  while (!built()) {
     if (lock()) {
       try {
-        if (!fresh()) await build()
+        for (const build of [WEB, SERVER]) if (!fresh(build)) await runBuild(build)
       } finally {
         rmSync(LOCK, { recursive: true, force: true })
       }

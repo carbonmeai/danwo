@@ -1,17 +1,18 @@
 {
   "name": "Go subscriptions",
-  "summary": "Quillwork, a team plan sold through Stripe Checkout: a Go app on net/http, html/template and Postgres whose Stripe webhook starts the plan and sends a welcome email through Resend.",
+  "summary": "Quillwork, a team plan sold through Stripe Checkout: a Vue 3 single-page app on a Go JSON API and Postgres, whose Stripe webhook starts the plan and sends a welcome email through Resend.",
   "icon": "go.svg",
-  "stack": ["Go", "net/http", "html/template", "pgx", "Postgres"],
+  "stack": ["Go", "net/http", "pgx", "Postgres", "Vue", "Vite"],
   "providers": ["stripe", "resend"],
-  "runsOn": "A Go server in Chromium, with Postgres in Docker",
+  "runsOn": "A Go server and its Vue app in Chromium, with Postgres in Docker",
   "install": "npm",
   "toolchain": "go",
   "shows": [
     "A Go app behind danwo's proxy with no Node preload: Go's own HTTPS_PROXY support, and danwo's CA trusted through the SSL_CERT_FILE danwo sets, on Linux and macOS",
+    "A Vue single-page app whose calls to the Go API go through danwo's proxy, so the flight record shows them and the matrix fails them: 500s, dropped connections, lost answers and double submits",
     "The official Stripe and Resend Go SDKs against the emulators, a webhook verified with the Stripe SDK and deduped in the activation's transaction",
-    "Invariants that read both sides: one plan per Stripe subscription with Stripe's status, and one welcome email per team",
-    "`danwo matrix` faulting Stripe, Resend, the webhooks and Postgres (36 trials), and `QUILLWORK_BUG` switches the matrix catches"
+    "Invariants that read both sides: one plan per Stripe subscription with Stripe's status, one Checkout Session and one welcome email per team",
+    "`danwo matrix` faulting the page's API calls, Stripe, Resend, the webhooks and Postgres (44 trials), and `QUILLWORK_BUG` switches the matrix catches"
   ],
   "test": "tests/deterministic.danwo.ts",
   "guide": { "title": "Apps in other languages", "href": "/docs/other-languages" }

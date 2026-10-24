@@ -1,7 +1,8 @@
 // Quillwork is a small team-notes product with one paid plan. A team signs up, starts the Team
 // plan through Stripe Checkout, and Stripe's webhook activates the plan and sends a welcome email
-// through Resend. Pages are rendered on the server with html/template; Postgres holds accounts,
-// subscriptions and the webhook events already handled.
+// through Resend. This server is the JSON API the Vue app in web/ calls, and it serves that app's
+// built files on the same origin; Postgres holds accounts, subscriptions and the webhook events
+// already handled.
 package main
 
 import (
@@ -46,7 +47,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	pages, err := parsePages()
+	web, err := newWebApp(cfg.WebDir)
 	if err != nil {
 		return err
 	}
@@ -57,7 +58,7 @@ func run() error {
 		sessions: sessions{secret: []byte(cfg.SessionSecret)},
 		billing:  newBilling(cfg, db, client),
 		mailer:   newMailer(cfg, db, client),
-		pages:    pages,
+		web:      web,
 	}
 	if err := s.mailer.sendMissed(ctx); err != nil {
 		return err

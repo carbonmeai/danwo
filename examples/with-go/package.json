@@ -1,24 +1,31 @@
 {
   "name": "danwo-example-with-go",
   "private": true,
-  "description": "Quillwork, a team plan sold through Stripe Checkout: a Go app on net/http and Postgres whose Stripe webhook starts the plan and sends a welcome email through Resend.",
+  "description": "Quillwork, a team plan sold through Stripe Checkout: a Vue app on a Go JSON API and Postgres, whose Stripe webhook starts the plan and sends a welcome email through Resend.",
   "type": "module",
   "scripts": {
-    "build": "go build -o dist/quillwork .",
-    "typecheck": "tsc --noEmit",
+    "build": "vite build web && go -C api build -o ../dist/quillwork .",
+    "typecheck": "vue-tsc --noEmit -p web && tsc --noEmit",
     "test": "danwo test",
     "test:agentic": "danwo test tests/agentic.danwo.ts",
     "matrix": "danwo matrix tests/deterministic.danwo.ts --grep \"upgrades to the Team plan\"",
     "matrix:plan": "danwo matrix tests/deterministic.danwo.ts --grep \"upgrades to the Team plan\" --plan",
     "serve": "danwo serve"
   },
+  "dependencies": {
+    "vue": "3.5.44",
+    "vue-router": "5.4.0"
+  },
   "devDependencies": {
     "@danwo/cli": "0.1.2",
     "@danwo/sdk": "0.1.2",
     "@types/node": "^24",
     "@types/pg": "8.23.1",
+    "@vitejs/plugin-vue": "6.0.10",
     "pg": "8.23.1",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vite": "8.3.5",
+    "vue-tsc": "3.3.13"
   },
   "engines": {
     "node": ">=24"

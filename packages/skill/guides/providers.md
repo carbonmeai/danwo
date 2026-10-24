@@ -89,7 +89,7 @@ for Node; a client that ignores `HTTPS_PROXY` bypasses the proxy entirely. Examp
 browser's are recorded as passthrough to loopback (waited on, never faulted). Go: `net/http`'s
 default transport follows `HTTPS_PROXY`; Go reads `SSL_CERT_FILE` on Linux only (macOS and Windows
 verify through the OS), so the app appends that file to a copy of `x509.SystemCertPool()` when set
-and hands the client to stripe-go and resend-go (`examples/with-go`, `trust.go`). Go never proxies
+and hands the client to stripe-go and resend-go (`examples/with-go`, `api/trust.go`). Go never proxies
 `localhost`/`127.0.0.1`, so calls between stack apps skip the proxy (no faults, no readiness wait);
 Python's requests, httpx and urllib do proxy loopback unless `NO_PROXY` names it. Time travel
 moves only Node's `Date` (the preload): an app in another language keeps real time.

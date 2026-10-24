@@ -8,7 +8,14 @@ import {
 } from "@danwo/sdk"
 
 import { sqlOn } from "./tests/db.ts"
-import { BINARY, ensureBuilt, freePort, ROOT, workerDatabase } from "./tests/environment.ts"
+import {
+  BINARY,
+  ensureBuilt,
+  freePort,
+  ROOT,
+  WEB_DIST,
+  workerDatabase,
+} from "./tests/environment.ts"
 import { STRIPE_SECRET_KEY, TEAM_PLAN, TEAM_PRICE_CENTS, upgrade } from "./tests/quillwork.ts"
 
 /** Not a real secret: the emulator signs its webhooks with it, and the app checks them. */
@@ -35,9 +42,16 @@ export default defineConfig({
       },
     },
   },
-  matrix: { workers: 4 },
+  /*
+   * The upgrade's plan is a little over the default budget of 40 trials, with the page's calls to
+   * the API faulted beside Stripe's, Resend's and Postgres's: run all of it.
+   */
+  matrix: { workers: 4, budget: 50 },
   async environment({ workerIndex }) {
-    /* The first worker runs `go build`; the others wait for it and run the same binary. */
+    /*
+     * The first worker builds the web app with Vite and the server with `go build`; the others
+     * wait for it and run the same build.
+     */
     await ensureBuilt()
 
     const database = await workerDatabase(workerIndex)
@@ -77,8 +91,10 @@ export default defineConfig({
     const app = await appEnvironment({
       app: {
         /*
-         * The Go app does not load danwo's Node preload. It follows HTTPS_PROXY on its own, and
-         * trusts danwo's CA through the SSL_CERT_FILE danwo sets for every app.
+         * One Go server answers the Vue app's files and its JSON API on one origin, so the page's
+         * calls to the API carry the session cookie with no CORS. The server does not load danwo's
+         * Node preload: it follows HTTPS_PROXY on its own, and trusts danwo's CA through the
+         * SSL_CERT_FILE danwo sets for every app.
          */
         command: `exec "${BINARY}"`,
         cwd: ROOT,
@@ -93,6 +109,7 @@ export default defineConfig({
           STRIPE_PRICE_ID: TEAM_PLAN,
           RESEND_API_KEY: "re_quillwork",
           SESSION_SECRET: "quillwork-test-session-secret",
+          WEB_DIR: WEB_DIST,
         },
       },
       services: [stripe, resend],

@@ -1,0 +1,17 @@
+/* Quillwork's own layout, on the kit's tokens. */
+
+.plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--kit-space-4);
+  margin-bottom: var(--kit-space-6);
+}
+
+.price {
+  font-size: var(--kit-text-2xl);
+  font-weight: var(--kit-weight-semibold);
+}
+
+.narrow {
+  max-width: 28rem;
+}

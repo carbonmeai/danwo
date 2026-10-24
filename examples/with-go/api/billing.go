@@ -65,8 +65,9 @@ func withStripe[T any](ctx context.Context, name string, call func() (T, error))
 
 // startCheckout creates the Checkout Session that subscribes a to the team plan and returns the
 // URL of Stripe's page for it. The idempotency key is the account and the price: pressing the
-// button twice, or a retry after a lost answer, gets the same session back, never a second one
-// the team could pay for too.
+// button twice, or the page sending the call again after a lost answer, gets the same session
+// back, never a second one the team could pay for too. QUILLWORK_BUG=no-checkout-key leaves it
+// to the SDK, whose own key covers only its own retries.
 func (b *billing) startCheckout(ctx context.Context, a account) (string, error) {
 	id := strconv.FormatInt(a.ID, 10)
 	params := &stripe.CheckoutSessionCreateParams{
@@ -79,10 +80,12 @@ func (b *billing) startCheckout(ctx context.Context, a account) (string, error) 
 		SubscriptionData: &stripe.CheckoutSessionCreateSubscriptionDataParams{
 			Metadata: map[string]string{"account": id},
 		},
-		SuccessURL: stripe.String(b.cfg.AppURL + "/account?checkout={CHECKOUT_SESSION_ID}"),
+		SuccessURL: stripe.String(b.cfg.AppURL + "/checkout/return?session={CHECKOUT_SESSION_ID}"),
 		CancelURL:  stripe.String(b.cfg.AppURL + "/account"),
 	}
-	params.SetIdempotencyKey(fmt.Sprintf("checkout-%s-%s", id, b.cfg.StripePriceID))
+	if !b.cfg.broken("no-checkout-key") {
+		params.SetIdempotencyKey(fmt.Sprintf("checkout-%s-%s", id, b.cfg.StripePriceID))
+	}
 
 	session, err := withStripe(ctx, "stripe checkout.sessions.create", func() (*stripe.CheckoutSession, error) {
 		return b.stripe.V1CheckoutSessions.Create(ctx, params)

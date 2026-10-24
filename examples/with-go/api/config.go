@@ -20,13 +20,15 @@ type config struct {
 	ResendAPIKey        string
 	MailFrom            string
 	SessionSecret       string
+	// WebDir is the built web app the server serves beside its API: Vite's output folder.
+	WebDir string
 	// Bug turns one of the app's safeguards off, so the fault matrix can be seen catching it:
-	// "no-webhook-dedupe" or "no-idempotency-key". Empty in normal use.
+	// "no-webhook-dedupe", "no-idempotency-key" or "no-checkout-key". Empty in normal use.
 	Bug string
 }
 
 // bugs are the values QUILLWORK_BUG accepts.
-var bugs = []string{"no-webhook-dedupe", "no-idempotency-key"}
+var bugs = []string{"no-webhook-dedupe", "no-idempotency-key", "no-checkout-key"}
 
 // broken reports whether the safeguard bug names is turned off for this run.
 func (c config) broken(bug string) bool {
@@ -61,6 +63,7 @@ func loadConfig() (config, error) {
 		ResendAPIKey:        need("RESEND_API_KEY"),
 		MailFrom:            orDefault("MAIL_FROM", "Quillwork <hello@quillwork.test>"),
 		SessionSecret:       need("SESSION_SECRET"),
+		WebDir:              orDefault("WEB_DIR", "web/dist"),
 		Bug:                 os.Getenv("QUILLWORK_BUG"),
 	}
 
