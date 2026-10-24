@@ -350,13 +350,13 @@ describe("danwo doctor", () => {
     const named = byName(await projectDoctor({ cwd: root }, ready))
 
     expect(named["@danwo/mobile"]).toEqual([
-      "ok 0.0.0: mobile tests on Android and iOS: danwo device, build-android and build-ios",
+      "ok 0.0.0: mobile tests on Android and iOS (danwo device, build-android, build-ios)",
     ])
     expect(named["@danwo/mcp"]).toEqual([
-      "ok 0.0.0: danwo's MCP server for coding agents: danwo mcp",
+      "ok 0.0.0: danwo's MCP server for coding agents (danwo mcp)",
     ])
     expect(named["@danwo/recorder"]).toEqual([
-      "ok 0.0.0: recording a test in the browser: danwo record",
+      "ok 0.0.0: recording a test in the browser (danwo record)",
     ])
   })
 
@@ -370,7 +370,7 @@ describe("danwo doctor", () => {
 
     expect(checks.every((check) => check.status === "ok")).toBe(true)
     expect(byName(checks)["@danwo/mobile"]).toEqual([
-      "ok not installed; only mobile tests on Android and iOS: danwo device, build-android and build-ios (pnpm add -D @danwo/mobile)",
+      "ok not installed; needed only for mobile tests on Android and iOS (danwo device, build-android, build-ios): pnpm add -D @danwo/mobile",
     ])
   })
 

@@ -372,7 +372,7 @@ function optionalChecks(
       return {
         name,
         status: "ok",
-        detail: `not installed; only ${OPTIONAL_PACKAGES[name]} (${add})`,
+        detail: `not installed; needed only for ${OPTIONAL_PACKAGES[name]}: ${add}`,
       }
     }
 

@@ -11,9 +11,9 @@ import { DanwoError } from "./codes.ts"
 
 /** Each optional package, and the features it adds. */
 export const OPTIONAL_PACKAGES = {
-  "@danwo/mobile": "mobile tests on Android and iOS: danwo device, build-android and build-ios",
-  "@danwo/mcp": "danwo's MCP server for coding agents: danwo mcp",
-  "@danwo/recorder": "recording a test in the browser: danwo record",
+  "@danwo/mobile": "mobile tests on Android and iOS (danwo device, build-android, build-ios)",
+  "@danwo/mcp": "danwo's MCP server for coding agents (danwo mcp)",
+  "@danwo/recorder": "recording a test in the browser (danwo record)",
 } as const satisfies Readonly<Record<string, string>>
 
 export type OptionalPackage = keyof typeof OPTIONAL_PACKAGES
@@ -63,7 +63,10 @@ function declaredIn(folder: string): PackageManager | undefined {
   }
 }
 
-/** The package manager of the project at `cwd`: the first `packageManager` field or lockfile from `cwd` up, else npm. */
+/**
+ * The package manager of the project at `cwd`: the first `packageManager` field or lockfile from
+ * `cwd` up, else npm.
+ */
 export function packageManagerAt(cwd: string): PackageManager {
   for (let folder = cwd; ; folder = dirname(folder)) {
     const found =
