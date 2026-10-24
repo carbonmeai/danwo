@@ -34,7 +34,8 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       # Every example on a schedule or by hand. On a pull request, the examples it changed, or all
-      # of them when it changed what they share: the kit, the linking script or this workflow.
+      # of them when it changed what they share: danwo's packages, the kit, the linking script or
+      # this workflow.
       - id: pick
         env:
           EVENT: ${{ github.event_name }}
@@ -46,7 +47,7 @@ jobs:
             picked="$all"
           else
             changed="$(git diff --name-only "$BASE" "$HEAD")"
-            if grep -qE '^(examples/_kit/|examples/link\.ts$|\.github/workflows/examples\.yml$)' <<< "$changed"; then
+            if grep -qE '^(packages/|examples/_kit/|examples/link\.ts$|\.github/workflows/examples\.yml$)' <<< "$changed"; then
               picked="$all"
             else
               picked="$(jq -c --arg changed "$changed" '($changed | split("\n")) as $files | map(select(. as $e | any($files[]; startswith("examples/" + $e + "/"))))' <<< "$all")"
