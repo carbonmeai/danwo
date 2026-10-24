@@ -117,10 +117,11 @@ export function isPageAsset(path: string): boolean {
 
 /**
  * Content types of responses that stream for as long as the client listens (server-sent events,
- * newline-delimited JSON feeds): they never finish, so readiness does not wait on them.
+ * newline-delimited JSON feeds, gRPC, whose answer to a call may be a stream that stays open):
+ * they need never finish, so readiness does not wait on them.
  */
 const STREAMING_TYPE =
-  /^(?:text\/event-stream|application\/(?:x-)?ndjson|application\/stream\+json|application\/jsonl|multipart\/x-mixed-replace)\b/i
+  /^(?:text\/event-stream|application\/(?:x-)?ndjson|application\/stream\+json|application\/jsonl|application\/grpc|multipart\/x-mixed-replace)\b/i
 
 /** True when a response with these headers is a stream that stays open, not an answer that ends. */
 export function isStreaming(contentType: string | string[] | undefined): boolean {

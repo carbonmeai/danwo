@@ -6,9 +6,12 @@
  * Every connection's first byte says what it carries: `0x16` opens a TLS handshake, which the
  * proxy answers as the host the client asked for, with a certificate from its authority; anything
  * else is HTTP. After a CONNECT the same test runs on what comes through the tunnel, so a tunnel
- * may carry TLS (HTTPS, WSS) or plain HTTP (an agent that tunnels `http://` too). The proxy speaks
- * HTTP/1.1 to clients: TLS offers `http/1.1` through ALPN, and a client that offers HTTP/2 alone is
- * turned away in the handshake, with the alert that says so, rather than left to fail later.
+ * may carry TLS (HTTPS, WSS) or plain HTTP (an agent that tunnels `http://` too).
+ *
+ * The proxy speaks HTTP/1.1 to a client that offers it through ALPN, as browsers and most SDKs do
+ * alongside HTTP/2, and HTTP/2 to one that offers HTTP/2 alone (gRPC). Plain HTTP/2 without TLS
+ * (`h2c`) is taken from a client that opens with the HTTP/2 preface, as gRPC does to a plaintext
+ * target. Each HTTP/2 stream becomes an {@link Incoming} like any HTTP/1.1 request.
  */
 import { randomUUID } from "node:crypto"
 import {
@@ -17,11 +20,18 @@ import {
   type Server as HttpServer,
   ServerResponse,
 } from "node:http"
+import {
+  createServer as createH2Server,
+  type Http2Session,
+  type IncomingHttpHeaders,
+  type ServerHttp2Stream,
+} from "node:http2"
 import { createServer as createNetServer, isIP, type Server as NetServer, Socket } from "node:net"
 import type { Duplex } from "node:stream"
 import { TLSSocket } from "node:tls"
 
 import { type Authority, normalHost } from "./authority.ts"
+import { h2Pairs, H2Response, isH2Preface } from "./h2.ts"
 import { httpSocketUrl } from "./socket-urls.ts"
 
 /** Where a request goes: the host as the client named it (normalised), and the port. */
@@ -55,21 +65,28 @@ export interface Incoming {
   readonly headers: Readonly<Record<string, string | readonly string[]>>
   /** The same headers as the client wrote them, name then value, in order and in their own case. */
   readonly rawHeaders: readonly string[]
-  readonly message: IncomingMessage
+  /** `1.1` (or `1.0`) for an HTTP/1.x request; `2` for an HTTP/2 stream. */
+  readonly httpVersion: "1.0" | "1.1" | "2"
+  /** The request's body as it arrives: an HTTP/1.x message, or the HTTP/2 stream's readable side. */
+  readonly message: IncomingMessage | ServerHttp2Stream
+  /** The trailers that ended the body, name then value, once it has ended. */
+  readonly trailers: () => readonly string[]
   readonly connection: Connection
   /** Epoch milliseconds when the request arrived. */
   readonly startedAt: number
   /** `performance.now()` when it arrived, for its duration. */
   readonly startTime: number
   /**
-   * True for a request Node handed over as an upgrade that the proxy answers as an ordinary request
-   * (an `Upgrade: h2c`): its body, if it has one, is not read.
+   * True for a request with no body to read: one Node handed over as an upgrade that the proxy
+   * answers as an ordinary request (an `Upgrade: h2c`), whose body, if it has one, is not read, or
+   * an HTTP/2 stream that ended with its headers.
    */
   readonly bodyless?: boolean
 }
 
 export interface ListenerHandlers {
-  request(incoming: Incoming, response: ServerResponse): void
+  /** A request, answered through `response`: an HTTP/1.x response, or an HTTP/2 stream's. */
+  request(incoming: Incoming, response: ServerResponse | H2Response): void
   /** A WebSocket handshake; `head` holds whatever the client sent after its headers. */
   upgrade(incoming: Incoming, socket: Duplex, head: Buffer): void
 }
@@ -98,6 +115,15 @@ export const MAX_HEADER_BYTES = 64 * 1024
 export function http1Protocol(offered: readonly string[]): string | undefined {
   /* `http 1.1` is not standard, but some proxy agents send it. */
   return ["http/1.1", "http 1.1", "http/1.0"].find((protocol) => offered.includes(protocol))
+}
+
+/**
+ * The protocol the proxy picks from a client's ALPN offer: HTTP/1.x whenever it is offered, so a
+ * client that offers HTTP/2 too is answered as before, else HTTP/2. Undefined for an offer of
+ * neither, which the handshake turns away with the alert that says so.
+ */
+export function chosenProtocol(offered: readonly string[]): string | undefined {
+  return http1Protocol(offered) ?? (offered.includes("h2") ? "h2" : undefined)
 }
 
 /** An authority's host and port text, without any `user@`; an IPv6 host comes without brackets. */
@@ -233,12 +259,88 @@ function incomingOf(message: IncomingMessage, connection: Connection): Incoming 
       method: message.method ?? "GET",
       headers,
       rawHeaders,
+      httpVersion: message.httpVersion === "1.0" ? "1.0" : "1.1",
       message,
+      trailers: () => message.rawTrailers,
       connection,
       startedAt: Date.now(),
       startTime: performance.now(),
     }
   )
+}
+
+/** `pairs` with every `Cookie` joined into the first, as HTTP/1.1 and handlers expect one. */
+function joinedCookies(pairs: readonly [string, string][]): [string, string][] {
+  const cookies = pairs.filter(([name]) => name === "cookie").map(([, value]) => value)
+
+  if (cookies.length < 2) return [...pairs]
+
+  const first = pairs.findIndex(([name]) => name === "cookie")
+
+  return pairs.flatMap(([name, value], index): [string, string][] => {
+    if (name !== "cookie") return [[name, value]]
+
+    return index === first ? [["cookie", cookies.join("; ")]] : []
+  })
+}
+
+/**
+ * Where an HTTP/2 stream was meant to go. Inside a tunnel or TLS, the connection names it as it
+ * does an origin-form request, with `:authority` in place of `Host`; on a bare cleartext
+ * connection to the proxy, `:scheme` and `:authority` name it as an absolute URL does.
+ */
+function placeStream(headers: IncomingHttpHeaders, connection: Connection): Placed | undefined {
+  const path = firstValue(headers[":path"]) ?? "/"
+  const authority = firstValue(headers[":authority"]) ?? firstValue(headers.host)
+  const bare = connection.tunnel === undefined && !connection.encrypted
+
+  if (!bare || authority === undefined) return placeOrigin(path, authority, connection)
+
+  const absolute = ABSOLUTE.exec(
+    `${firstValue(headers[":scheme"]) ?? "http"}://${authority}${path}`,
+  )
+
+  return absolute ? placeAbsolute(absolute) : undefined
+}
+
+/** An HTTP/2 stream as a request: its own headers, without pseudo-headers, and where it goes. */
+function streamIncomingOf(
+  stream: ServerHttp2Stream,
+  headers: IncomingHttpHeaders,
+  connection: Connection,
+): Incoming | undefined {
+  const pairs = joinedCookies(
+    h2Pairs(headers).filter(([name]) => !PROXY_HEADERS.has(name) && name !== "host"),
+  )
+  const rawHeaders = pairs.flat()
+  const placed = placeStream(headers, connection)
+  const trailers: string[] = []
+
+  stream.once("trailers", (fields: IncomingHttpHeaders) => trailers.push(...h2Pairs(fields).flat()))
+
+  return (
+    placed && {
+      ...placed,
+      id: randomUUID(),
+      method: firstValue(headers[":method"]) ?? "GET",
+      headers: headerRecord(rawHeaders),
+      rawHeaders,
+      httpVersion: "2",
+      message: stream,
+      trailers: () => trailers,
+      connection,
+      startedAt: Date.now(),
+      startTime: performance.now(),
+      ...(stream.endAfterHeaders && { bodyless: true }),
+    }
+  )
+}
+
+/** A short plain-text answer on an HTTP/2 stream, which then ends. */
+function streamAnswer(stream: ServerHttp2Stream, status: number, body: string): void {
+  if (stream.destroyed || stream.headersSent) return
+  stream.respond({ ":status": status, "content-type": "text/plain" })
+  stream.end(body)
 }
 
 /** The first chunk a socket sends, put back for whoever reads it next; null when it ends first. */
@@ -312,6 +414,15 @@ export async function startListener(
     maxHeaderSize: MAX_HEADER_BYTES,
     keepAliveTimeout: KEEP_ALIVE_TIMEOUT_MS,
   })
+  const h2 = createH2Server({ settings: { maxHeaderListSize: MAX_HEADER_BYTES } })
+  /** The connection each HTTP/2 session runs on, which its streams' requests arrived on. */
+  const sessions = new WeakMap<Http2Session, Connection>()
+
+  /** Starts an HTTP/2 session on `socket`; Node makes it, and says so, as the connection goes in. */
+  const serveH2 = (socket: Duplex, connection: Connection): void => {
+    h2.once("session", (session: Http2Session) => sessions.set(session, connection))
+    h2.emit("connection", socket)
+  }
 
   /** Hands a socket's next bytes to TLS or to HTTP, by its first byte. */
   const sniff = async (socket: Duplex, connection: Connection): Promise<void> => {
@@ -322,6 +433,7 @@ export async function startListener(
     if (first === null || socket.destroyed) return
 
     if (first[0] === 0x16) await terminateTls(socket, connection)
+    else if (isH2Preface(first)) serveH2(socket, connection)
     else {
       connections.set(socket, connection)
       http.emit("connection", socket)
@@ -357,7 +469,7 @@ export async function startListener(
           (error: unknown) => done(error instanceof Error ? error : new Error(String(error))),
         )
       },
-      ALPNCallback: ({ protocols }) => http1Protocol(protocols),
+      ALPNCallback: ({ protocols }) => chosenProtocol(protocols),
     })
     const timer = setTimeout(() => tls.destroy(), HANDSHAKE_TIMEOUT_MS)
 
@@ -370,10 +482,56 @@ export async function startListener(
     tls.once("close", () => clearTimeout(timer))
     tls.once("secure", () => {
       clearTimeout(timer)
-      connections.set(tls, { ...connection, encrypted: true })
+
+      const secured = { ...connection, encrypted: true }
+
+      if (tls.alpnProtocol === "h2") {
+        /*
+         * An HTTP/2 session waits for its socket's handshake while `secureConnecting` says it is
+         * under way, which only a TLS server's own sockets are told is over: this one is said so.
+         */
+        Reflect.set(tls, "secureConnecting", false)
+        serveH2(tls, secured)
+
+        return
+      }
+
+      connections.set(tls, secured)
       http.emit("connection", tls)
     })
   }
+
+  h2.on("sessionError", (error: Error) => debug(`HTTP/2 client session: ${error.message}`))
+  h2.on("stream", (stream: ServerHttp2Stream, headers: IncomingHttpHeaders) => {
+    const connection = stream.session && sessions.get(stream.session)
+
+    stream.on("error", (error) => debug(`HTTP/2 client stream: ${error.message}`))
+
+    if (connection === undefined) {
+      streamAnswer(stream, 500, "")
+
+      return
+    }
+
+    if (headers[":method"] === "CONNECT") {
+      streamAnswer(stream, 501, "danwo proxy: no CONNECT over HTTP/2")
+
+      return
+    }
+
+    const incoming = streamIncomingOf(stream, headers, connection)
+
+    if (incoming === undefined) {
+      streamAnswer(stream, 400, "danwo proxy: this request names no host to go to")
+
+      return
+    }
+
+    /* The body follows at once, whatever the client asked to wait for. */
+    if (headers.expect?.toLowerCase() === "100-continue")
+      stream.additionalHeaders({ ":status": 100 })
+    handlers.request(incoming, new H2Response(stream))
+  })
 
   http.on("request", (message: IncomingMessage, response: ServerResponse) => {
     const connection = connections.get(message.socket)

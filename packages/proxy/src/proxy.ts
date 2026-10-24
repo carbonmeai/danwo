@@ -2,7 +2,6 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import type { ServerResponse } from "node:http"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { Duplex } from "node:stream"
 
 import { type AppClock, createAppClock } from "./app-clock.ts"
 import { isAssetKind, type LoadKind, loadKind } from "./assets.ts"
@@ -11,6 +10,7 @@ import { decodeBody, readAll } from "./bodies.ts"
 import { type CapturedMessage, captureMessage } from "./capture.ts"
 import { clientOf, userField } from "./clients.ts"
 import { proxyDebug } from "./debug.ts"
+import type { H2Response } from "./h2.ts"
 import {
   hostMatches,
   isLoopback,
@@ -699,7 +699,11 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   }
 
   /** The reply to `incoming`, which records what goes out on `exchange`. */
-  const replyTo = (incoming: Incoming, response: ServerResponse, exchange: Exchange | undefined) =>
+  const replyTo = (
+    incoming: Incoming,
+    response: ServerResponse | H2Response,
+    exchange: Exchange | undefined,
+  ) =>
     new Reply(response, {
       /* A stream's headers arrive long before it ends, if it ever does: readiness stops waiting then. */
       head(status, headers) {
@@ -730,13 +734,13 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   let listener: Listener | undefined
   const upstreams = new Upstreams(() => listener?.port ?? 0)
 
-  /** Sends `answer` to the client, or drops its connection for `"reset"`. */
+  /**
+   * Sends `answer` to the client, or for `"reset"` drops its connection (an HTTP/2 client's
+   * stream alone).
+   */
   const deliver = (reply: Reply, answer: Answer, method: string) => {
     if (answer === "reset") {
-      const socket: Duplex | null = reply.response.socket
-
-      if (socket !== null && listener !== undefined) listener.reset(socket)
-      else reply.response.destroy()
+      reply.reset((socket) => (listener === undefined ? socket.destroy() : listener.reset(socket)))
 
       return
     }

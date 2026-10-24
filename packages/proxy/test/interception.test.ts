@@ -302,7 +302,7 @@ describe("one port for HTTP, CONNECT and TLS", () => {
     expect(answer).toContain("https://api.danwo.test/direct")
   })
 
-  it("speaks HTTP/1.1 to a client that offers HTTP/2 too, and turns away one that offers HTTP/2 alone", async () => {
+  it("speaks HTTP/1.1 to a client that offers HTTP/2 too, and turns away one that offers neither", async () => {
     expect(http1Protocol(["h2", "http/1.1"])).toBe("http/1.1")
     expect(http1Protocol(["h2"])).toBeUndefined()
 
@@ -315,13 +315,13 @@ describe("one port for HTTP, CONNECT and TLS", () => {
     both.destroy()
 
     const socket = await tunnel(proxy, "api.danwo.test:443")
-    const only = tlsConnect({
+    const neither = tlsConnect({
       socket,
       ca: proxy.caCert,
       servername: "api.danwo.test",
-      ALPNProtocols: ["h2"],
+      ALPNProtocols: ["spdy/3.1"],
     })
-    const [error]: unknown[] = await once(only, "error")
+    const [error]: unknown[] = await once(neither, "error")
 
     expect(Reflect.get(Object(error), "code")).toBe("ERR_SSL_TLSV1_ALERT_NO_APPLICATION_PROTOCOL")
   })

@@ -3,12 +3,24 @@
  * in their own case and order, and the body streamed through, then the answer streamed back. The
  * real host's certificate is checked as any client would check it, except on this machine, whose
  * apps serve HTTPS with development certificates from CAs Node does not know.
+ *
+ * An HTTP/2 stream goes on over HTTP/2 when its host speaks it, both ways streamed as they come
+ * (gRPC's client, server and two-way streams), trailers and stream resets carried across; to a
+ * host that speaks only HTTP/1.1 it goes as an HTTP/1.1 request.
  */
 import { Agent as HttpAgent, type ClientRequest, type IncomingMessage, request } from "node:http"
+import {
+  type ClientHttp2Session,
+  type ClientHttp2Stream,
+  constants,
+  type IncomingHttpHeaders,
+} from "node:http2"
 import { Agent as HttpsAgent, request as httpsRequest } from "node:https"
 import { isIP, type Socket } from "node:net"
 
 import { BodyTap } from "./bodies.ts"
+import { H2Sessions } from "./h2-upstream.ts"
+import { h2Headers, h2Pairs } from "./h2.ts"
 import { isLoopback } from "./hosts.ts"
 import { type Destination, type Incoming, MAX_HEADER_BYTES } from "./listener.ts"
 import { isListening } from "./listening.ts"
@@ -34,6 +46,7 @@ export class Upstreams {
   readonly http = new HttpAgent({ keepAlive: true })
   readonly https = new HttpsAgent({ keepAlive: true })
   readonly own = new OwnConnections()
+  readonly h2 = new H2Sessions(this.own)
   readonly #listenerPort: () => number
 
   constructor(listenerPort: () => number) {
@@ -55,6 +68,7 @@ export class Upstreams {
   close(): void {
     this.http.destroy()
     this.https.destroy()
+    this.h2.closeAll()
     this.own.destroyAll()
   }
 }
@@ -86,9 +100,10 @@ export function endToEnd(
     .map(([name, value]) => [name, value])
 }
 
-/** Whether the request's headers say a body follows. */
+/** Whether a body follows the request's headers: an HTTP/2 stream's did not end with them. */
 function hasBody(incoming: Incoming): boolean {
   if (incoming.bodyless === true) return false
+  if (incoming.httpVersion === "2") return true
 
   const length = incoming.headers["content-length"]
 
@@ -176,6 +191,17 @@ export async function passThrough(
   const secure = incoming.protocol === "https"
   const dial = await dialAddress(destination.hostname, destination.port)
   const authority = /^https?:\/\/([^/]*)/.exec(incoming.url)?.[1] ?? destination.hostname
+
+  if (incoming.httpVersion === "2") {
+    const session = await upstreams.h2.sessionFor({ ...destination, dial, secure })
+
+    if (session !== undefined) {
+      passStream(incoming, reply, { session, authority, onRequestBody: options.onRequestBody })
+
+      return
+    }
+  }
+
   const headers = forwardedHeaders(incoming, authority)
   const withBody = hasBody(incoming)
   const tap = new BodyTap()
@@ -237,7 +263,7 @@ export async function passThrough(
       answer.statusMessage,
     )
     answer.once("end", () => {
-      if (answer.rawTrailers.length > 0) reply.response.addTrailers(pairsOf(answer.rawTrailers))
+      if (answer.rawTrailers.length > 0) reply.addTrailers(pairsOf(answer.rawTrailers))
     })
     answer.on("error", () => reply.response.destroy())
     reply.pipeFrom(answer)
@@ -248,8 +274,8 @@ export async function passThrough(
   message.on("data", (chunk: Buffer) => tap.add(chunk))
   message.once("end", () => {
     options.onRequestBody(tap.body)
-    if (withBody && message.rawTrailers.length > 0)
-      upstream.addTrailers(pairsOf(message.rawTrailers))
+    if (withBody && incoming.trailers().length > 0)
+      upstream.addTrailers(pairsOf(incoming.trailers()))
   })
 
   if (withBody) message.pipe(upstream)
@@ -257,4 +283,101 @@ export async function passThrough(
     message.resume()
     upstream.end()
   }
+}
+
+/** How one HTTP/2 stream goes on: the session to its host, and the authority it names. */
+interface StreamTarget {
+  readonly session: ClientHttp2Session
+  readonly authority: string
+  readonly onRequestBody: (body: TappedBody) => void
+}
+
+/** The request's pseudo-headers and its own, as they go on over HTTP/2. */
+function streamHeaders(incoming: Incoming, authority: string) {
+  return {
+    ...h2Headers(pairsOf(incoming.rawHeaders), ["host", "expect"]),
+    ":method": incoming.method,
+    ":path": incoming.path,
+    ":scheme": incoming.protocol,
+    ":authority": authority,
+  }
+}
+
+/**
+ * Sends an HTTP/2 stream on over HTTP/2, and its answer back as it comes: headers, body, trailers.
+ * An answer that ends with its headers (gRPC's trailers-only reply to a failed call) ends the
+ * client's stream with them too. A stream the host resets is reset to the client with the same
+ * code; one the client resets or drops is cancelled at the host.
+ */
+function passStream(incoming: Incoming, reply: Reply, target: StreamTarget): void {
+  const { message, destination } = incoming
+  const withBody = hasBody(incoming)
+  const tap = new BodyTap()
+  /* A client that says it sends trailers gets them passed on; one that does not ends with its body. */
+  const announcesTrailers = incoming.headers["trailer"] !== undefined
+  let upstream: ClientHttp2Stream
+  let failure: Error | undefined
+  let responded = false
+
+  try {
+    upstream = target.session.request(streamHeaders(incoming, target.authority), {
+      endStream: !withBody,
+      ...(withBody && announcesTrailers && { waitForTrailers: true }),
+    })
+  } catch (error) {
+    message.resume()
+    reply.send(
+      502,
+      [["content-type", "text/plain"]],
+      Buffer.from(
+        unreachable(destination, error instanceof Error ? error : new Error(String(error))),
+      ),
+      incoming.method,
+    )
+
+    return
+  }
+
+  upstream.on("response", (headers: IncomingHttpHeaders, flags: number) => {
+    const ended = (flags & constants.NGHTTP2_FLAG_END_STREAM) !== 0
+
+    responded = true
+    reply.head(
+      Number(headers[":status"] ?? 502),
+      h2Pairs(headers),
+      undefined,
+      ended ? "headers" : "trailers",
+    )
+    reply.pipeFrom(upstream)
+  })
+  upstream.on("trailers", (trailers: IncomingHttpHeaders) => reply.addTrailers(h2Pairs(trailers)))
+  upstream.on("wantTrailers", () => upstream.sendTrailers(h2Headers(pairsOf(incoming.trailers()))))
+  upstream.on("error", (error: Error) => {
+    failure = error
+  })
+  upstream.once("close", () => {
+    const code = upstream.rstCode ?? constants.NGHTTP2_NO_ERROR
+    const reset = code !== constants.NGHTTP2_NO_ERROR
+
+    if (!responded && reset && reply.open) reply.reset(() => {}, code)
+    else if (!responded)
+      reply.send(
+        502,
+        [["content-type", "text/plain"]],
+        Buffer.from(unreachable(destination, failure ?? new Error("the stream closed unanswered"))),
+        incoming.method,
+      )
+    else if (reset && reply.open) reply.reset(() => {}, code)
+  })
+  /* The client went away before its answer had all gone out: stop asking for it. */
+  reply.response.once("close", () => {
+    if (!reply.response.writableFinished && !upstream.closed)
+      upstream.close(constants.NGHTTP2_CANCEL)
+  })
+
+  message.on("data", (chunk: Buffer) => tap.add(chunk))
+  message.once("end", () => target.onRequestBody(tap.body))
+
+  if (withBody) message.pipe(upstream)
+  else message.resume()
 }

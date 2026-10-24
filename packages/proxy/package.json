@@ -35,6 +35,7 @@
     "@azure/msal-node": "7.1.0",
     "@bachs/sdk": "2.0.0",
     "@danwo/emulators": "workspace:*",
+    "@grpc/grpc-js": "1.14.6",
     "@types/express": "5.0.6",
     "@types/ws": "8.18.2",
     "ai": "7.0.143",
