@@ -560,7 +560,9 @@ The page loads ClerkJS and `<SignIn/>` from the Frontend API host
 (`/npm/@clerk/clerk-js@6/dist/clerk.browser.js` and `/npm/@clerk/ui@1/dist/ui.browser.js`), as it
 does from Clerk. The emulator serves the app's own installed `@clerk/clerk-js` and `@clerk/ui`
 when their major version fits, and otherwise downloads the published (MIT) build once from a
-public npm CDN into `~/.cache/danwo/clerk`. Sign-in works with a password or an emailed code;
+public npm CDN into `~/.cache/danwo/clerk`, at the exact version the range resolves to. A script
+it still can't fetch is reported as a `danwo: Clerk's emulator could not fetch <url> (<status>)`
+warning in danwo's output, and the page gets no Clerk UI. Sign-in works with a password or an emailed code;
 `clerkService` hands its codes to the `mail` fixture (`startServices` collects every service's
 mail sources), so `mail.code(email)` and the agent read them. Session tokens are RS256 JWTs with
 Clerk's claims, valid 60 seconds.
