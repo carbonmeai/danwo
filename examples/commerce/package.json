@@ -28,8 +28,8 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@danwo/cli": "0.1.3",
-    "@danwo/sdk": "0.1.3",
+    "@danwo/cli": "0.1.4",
+    "@danwo/sdk": "0.1.4",
     "@tailwindcss/postcss": "4.3.3",
     "@types/node": "^24",
     "@types/pg": "8.23.1",

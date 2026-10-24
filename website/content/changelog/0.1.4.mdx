@@ -1,0 +1,29 @@
+---
+title: danwo 0.1.4
+description: A 41% smaller install for web projects, with mobile, MCP and the recorder as optional packages.
+date: 2026-10-24
+---
+
+## Changed
+
+- **A smaller install.** `@danwo/cli` installs 112 MB for a web project instead of 189 MB. The
+  mobile driver, the MCP server and the recorder are now optional packages, and the fault matrix no
+  longer depends on `effect`.
+- **`danwo init` adds what you pick.** It adds `@danwo/mobile` for a mobile project, and
+  `@danwo/mcp` with `@danwo/recorder` when it sets up coding agents. Install them at the same
+  version as `@danwo/cli`, and upgrade them together. See [Quickstart](/docs/quickstart).
+
+## New
+
+- A command that needs an optional package you haven't installed stops with `PACKAGE_MISSING`
+  (exit 2) and the exact install command, e.g.
+  `danwo build-ios needs @danwo/mobile: npm install -D @danwo/mobile@0.1.4`.
+- `danwo doctor` lists the optional packages: which are installed, what each enables, and the
+  install command for any your project needs. It warns when one is at another version than the CLI.
+
+## Fixed
+
+- A config that imports `@danwo/mobile` without it installed says how to add it, instead of
+  failing with "Cannot find package".
+- Each published package ships a NOTICE that covers only its own code under Apache-2.0, so
+  scanners no longer flag the packages as non-permissive.

@@ -176,7 +176,7 @@ repository:
 
 ```sh
 bun install
-bun run release 0.1.3 --pack
+bun run release 0.1.4 --pack
 node examples/link.ts saas
 ```
 
@@ -204,5 +204,5 @@ That leaves only `node_modules`, which git ignores. The package.json is put back
 | `kit/`            | the examples' shared styles, used through their Tailwind theme                    |
 | `tests/`          | the tests, the steps and invariants (`relay.ts`) and the database helpers         |
 
-Last checked with @danwo/cli 0.1.3, TanStack Start 1.169, Clerk 1.7 for TanStack Start,
+Last checked with @danwo/cli 0.1.4, TanStack Start 1.169, Clerk 1.7 for TanStack Start,
 Hono 4.13, Inngest 4.25 (dev server 1.46), Drizzle 0.45, Postgres 17 and Node 24.

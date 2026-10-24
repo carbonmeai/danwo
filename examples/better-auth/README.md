@@ -209,7 +209,7 @@ repository:
 
 ```sh
 bun install
-bun run release 0.1.3 --pack
+bun run release 0.1.4 --pack
 node examples/link.ts better-auth
 ```
 
@@ -239,5 +239,5 @@ That leaves only `node_modules`, which git ignores. The package.json is put back
 | `tests/`          | the tests, the invariants (`harbor.ts`), and the build and database helpers                            |
 | `kit/`            | the examples' shared styles, used as plain CSS                                                         |
 
-Last checked with @danwo/cli 0.1.3, better-auth 1.7.12, Hono 4.13, Vite 8.3, React Router
+Last checked with @danwo/cli 0.1.4, better-auth 1.7.12, Hono 4.13, Vite 8.3, React Router
 8.5, Postgres 17 and Node 24.
