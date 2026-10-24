@@ -132,8 +132,9 @@ Each delivery carries the secret hash in `verif-hash` and an HMAC of the body in
 
 ## Fidelity
 
-**Live.** `danwo fidelity flutterwave` checks 3 scenarios against a test-mode account. 2 match;
-the bank list is skipped, since Flutterwave's test mode answers it with a provider error.
+**Live.** `danwo fidelity flutterwave` checks 3 scenarios against a test-mode account, and all 3
+match. If Flutterwave's test mode is failing its bank list, as it has at times, that scenario is
+skipped as a provider error rather than counted against the emulator.
 
 ## Not covered yet
 

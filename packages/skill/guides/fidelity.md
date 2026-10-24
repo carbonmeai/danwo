@@ -218,9 +218,10 @@ DANWO_FIDELITY_MICROSOFT_REDIRECT_URI=http://localhost:3050/settings/integration
   reported as kept by the provider rather than failing the run. Without the numbers, a successful
   send's shape is checked against the published API reference only, unless test credentials are
   set.
-- Flutterwave's banks list has answered every country with its generic `400` ("An error
-  occurred") in test mode while other reads with the same key work; the live run then skips that
-  scenario as a provider error, and the emulator is still checked offline against the golden.
+- Flutterwave's banks list has at times answered every country with its generic `400` ("An error
+  occurred") in test mode while other reads with the same key work. When it does, the live run
+  skips that scenario as a provider error, and the emulator is still checked offline against the
+  golden.
 - Pusher's subscription counts depend on an app setting, **Enable subscription counting**, which
   is off on a new app. The suite asks the real app once which way it is set: with counting on it
   checks the counts, with it off the 400s Pusher answers instead, and it skips the other scenario.
