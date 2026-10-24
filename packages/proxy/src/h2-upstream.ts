@@ -7,6 +7,7 @@
 import { once } from "node:events"
 import { type ClientHttp2Session, connect as connectH2 } from "node:http2"
 import { connect as connectTcp, isIP } from "node:net"
+import type { Readable, Writable } from "node:stream"
 import { connect as connectTls } from "node:tls"
 
 import { isLoopback } from "./hosts.ts"
@@ -14,6 +15,15 @@ import type { OwnConnections } from "./loop.ts"
 
 /** How long a session with no streams stays open before the proxy closes it. */
 const IDLE_MS = 60_000
+
+/** The most of an unanswered request body kept to send again; past it, the stream is not retried. */
+const MAX_REPLAY_BYTES = 1024 * 1024
+
+/** A session to stream on, and whether it carried streams before this one. */
+export interface PooledSession {
+  readonly session: ClientHttp2Session
+  readonly reused: boolean
+}
 
 /** Where a session goes: the host as named, the address dialled, and whether it is over TLS. */
 export interface H2Target {
@@ -43,13 +53,11 @@ export class H2Sessions {
    * answers HTTP/1.1 only, or could not be reached (the caller passes the stream on over HTTP/1.1,
    * which reports why).
    */
-  async sessionFor(target: H2Target): Promise<ClientHttp2Session | undefined> {
+  async sessionFor(target: H2Target): Promise<PooledSession | undefined> {
     const key = `${target.secure ? "https" : "http"}://${target.hostname}:${target.port}@${target.dial}`
+    const known = await this.#live(key)
 
-    const pending = this.#sessions.get(key)
-    const known = pending && (await pending)
-
-    if (known && !known.closed && !known.destroyed) return known
+    if (known !== undefined) return { session: known, reused: true }
     if (this.#http1.has(key)) return undefined
 
     const opening = this.#start(key, target)
@@ -60,7 +68,14 @@ export class H2Sessions {
 
     if (session === undefined && this.#sessions.get(key) === opening) this.#sessions.delete(key)
 
-    return session
+    return session && { session, reused: false }
+  }
+
+  /** The pooled session for `key`, once it has opened, if it is still open. */
+  async #live(key: string): Promise<ClientHttp2Session | undefined> {
+    const session = await this.#sessions.get(key)
+
+    return session?.closed === false && !session.destroyed ? session : undefined
   }
 
   async #start(key: string, target: H2Target): Promise<ClientHttp2Session | undefined> {
@@ -115,5 +130,59 @@ export class H2Sessions {
     for (const session of this.#open) session.destroy()
     this.#open.clear()
     this.#sessions.clear()
+  }
+}
+
+/**
+ * A request body passed on to a server's stream as it arrives, and kept, up to a bound, while the
+ * stream is unanswered: a stream the server refused, or one opened on a session that was closing,
+ * can then be sent again whole on a fresh one. Once the server answers, nothing more is kept.
+ */
+export class ReplayBody {
+  readonly #source: Readable
+  #kept: Buffer[] | undefined = []
+  #size = 0
+  #ended = false
+  #sink: Writable | undefined
+
+  constructor(source: Readable) {
+    this.#source = source
+    source.on("data", (chunk: Buffer) => {
+      this.#keep(chunk)
+
+      if (this.#sink?.write(chunk) === false) {
+        source.pause()
+        this.#sink.once("drain", () => source.resume())
+      }
+    })
+    source.once("end", () => {
+      this.#ended = true
+      this.#sink?.end()
+    })
+  }
+
+  /** Whether all of the body so far is kept, so it can be sent again. */
+  get replayable(): boolean {
+    return this.#kept !== undefined
+  }
+
+  /** Sends what has arrived to `sink`, then the rest as it comes; ends it once the body has. */
+  attach(sink: Writable): void {
+    this.#sink = sink
+    for (const chunk of this.#kept ?? []) sink.write(chunk)
+    if (this.#ended) sink.end()
+    else this.#source.resume()
+  }
+
+  /** The server answered: the body need not be kept any more. */
+  release(): void {
+    this.#kept = undefined
+  }
+
+  #keep(chunk: Buffer): void {
+    if (this.#kept === undefined) return
+    this.#size += chunk.length
+    if (this.#size > MAX_REPLAY_BYTES) this.#kept = undefined
+    else this.#kept.push(chunk)
   }
 }

@@ -589,6 +589,70 @@ describe("HTTP/2 passthrough", () => {
     expect(answer.trailers?.["x-done"]).toBe("yes")
   })
 
+  it("sends a stream the server refused once more, body and all, and passes a second refusal on", async () => {
+    let streams = 0
+    const upstream = await h2Upstream((stream, headers) => {
+      streams += 1
+
+      if (headers[":path"] === "/always" || streams === 1) {
+        stream.close(constants.NGHTTP2_REFUSED_STREAM)
+
+        return
+      }
+
+      const chunks: Buffer[] = []
+
+      stream.on("data", (chunk: Buffer) => chunks.push(chunk))
+      stream.on("end", () => {
+        stream.respond({ ":status": 200 })
+        stream.end(`got ${Buffer.concat(chunks).toString()}`)
+      })
+    })
+    const proxy = await proxyFor({ routes: [] })
+    const session = await h2Session(proxy, `localhost:${upstream.port}`)
+    const answer = await request(session, { ":method": "POST", ":path": "/once" }, "the body")
+
+    expect(answer.body).toBe("got the body")
+    expect(streams).toBe(2)
+
+    const always = session.request({ ":method": "POST", ":path": "/always" })
+
+    always.end("again")
+    expect(await resetCode(always)).toBe(constants.NGHTTP2_REFUSED_STREAM)
+    expect(streams).toBe(4)
+  })
+
+  it("opens a fresh session when the server closed the pooled one between calls", async () => {
+    const upstream = await h2Upstream((stream) => {
+      stream.respond({ ":status": 200 })
+      stream.end("fine")
+      /* As a server closes a connection it holds idle. */
+      stream.session?.close()
+    })
+    const proxy = await proxyFor({ routes: [] })
+    const session = await h2Session(proxy, `localhost:${upstream.port}`)
+
+    expect((await request(session, { ":path": "/one" })).body).toBe("fine")
+    expect((await request(session, { ":path": "/two" })).body).toBe("fine")
+    expect(upstream.sessions()).toBe(2)
+  })
+
+  it("does not send a refused stream again once its body is too big to keep", async () => {
+    let streams = 0
+    const upstream = await h2Upstream((stream) => {
+      streams += 1
+      stream.on("data", () => {})
+      stream.on("end", () => stream.close(constants.NGHTTP2_REFUSED_STREAM))
+    })
+    const proxy = await proxyFor({ routes: [] })
+    const session = await h2Session(proxy, `localhost:${upstream.port}`)
+    const big = session.request({ ":method": "POST", ":path": "/upload" })
+
+    big.end(Buffer.alloc(2 * 1024 * 1024, 1))
+    expect(await resetCode(big)).toBe(constants.NGHTTP2_REFUSED_STREAM)
+    expect(streams).toBe(1)
+  })
+
   it("refuses a stream addressed to the proxy itself, rather than forwarding it to itself", async () => {
     const proxy = await proxyFor({ routes: [] })
     const session = await h2cSession(proxy, `127.0.0.1:${proxyPort(proxy)}`)

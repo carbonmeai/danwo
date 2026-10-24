@@ -9,17 +9,12 @@
  * host that speaks only HTTP/1.1 it goes as an HTTP/1.1 request.
  */
 import { Agent as HttpAgent, type ClientRequest, type IncomingMessage, request } from "node:http"
-import {
-  type ClientHttp2Session,
-  type ClientHttp2Stream,
-  constants,
-  type IncomingHttpHeaders,
-} from "node:http2"
+import { type ClientHttp2Stream, constants, type IncomingHttpHeaders } from "node:http2"
 import { Agent as HttpsAgent, request as httpsRequest } from "node:https"
 import { isIP, type Socket } from "node:net"
 
 import { BodyTap } from "./bodies.ts"
-import { H2Sessions } from "./h2-upstream.ts"
+import { H2Sessions, type PooledSession, ReplayBody } from "./h2-upstream.ts"
 import { h2Headers, h2Pairs } from "./h2.ts"
 import { isLoopback } from "./hosts.ts"
 import { type Destination, type Incoming, MAX_HEADER_BYTES } from "./listener.ts"
@@ -193,10 +188,16 @@ export async function passThrough(
   const authority = /^https?:\/\/([^/]*)/.exec(incoming.url)?.[1] ?? destination.hostname
 
   if (incoming.httpVersion === "2") {
-    const session = await upstreams.h2.sessionFor({ ...destination, dial, secure })
+    const target = { ...destination, dial, secure }
+    const first = await upstreams.h2.sessionFor(target)
 
-    if (session !== undefined) {
-      passStream(incoming, reply, { session, authority, onRequestBody: options.onRequestBody })
+    if (first !== undefined) {
+      passStream(incoming, reply, {
+        first,
+        reopen: () => upstreams.h2.sessionFor(target),
+        authority,
+        onRequestBody: options.onRequestBody,
+      })
 
       return
     }
@@ -285,11 +286,21 @@ export async function passThrough(
   }
 }
 
-/** How one HTTP/2 stream goes on: the session to its host, and the authority it names. */
+/** How one HTTP/2 stream goes on: the session to its host, and how to open another. */
 interface StreamTarget {
-  readonly session: ClientHttp2Session
+  readonly first: PooledSession
+  /** A fresh session to the same host, for a stream the first could not carry. */
+  readonly reopen: () => Promise<PooledSession | undefined>
   readonly authority: string
   readonly onRequestBody: (body: TappedBody) => void
+}
+
+/** One try at passing a stream on: its session, and whether another try may follow. */
+interface Attempt {
+  readonly pooled: PooledSession
+  readonly body: ReplayBody | undefined
+  /** Starts the stream again on a fresh session, unless it was tried again already; false then. */
+  readonly again: () => boolean
 }
 
 /** The request's pseudo-headers and its own, as they go on over HTTP/2. */
@@ -303,37 +314,64 @@ function streamHeaders(incoming: Incoming, authority: string) {
   }
 }
 
+function unanswered(incoming: Incoming, reply: Reply, error: unknown): void {
+  const cause = error instanceof Error ? error : new Error("the stream closed unanswered")
+
+  reply.send(
+    502,
+    [["content-type", "text/plain"]],
+    Buffer.from(unreachable(incoming.destination, cause)),
+    incoming.method,
+  )
+}
+
 /**
- * Sends an HTTP/2 stream on over HTTP/2, and its answer back as it comes: headers, body, trailers.
- * An answer that ends with its headers (gRPC's trailers-only reply to a failed call) ends the
- * client's stream with them too. A stream the host resets is reset to the client with the same
- * code; one the client resets or drops is cancelled at the host.
+ * Whether an unanswered stream may go again on a fresh session. The server refused it, so never
+ * acted on it; or the session it was on closed under it, a session that had carried streams
+ * before (so had likely sat idle and been closed by the server), and it has no body, as a stale
+ * HTTP/1.1 connection's request is sent again.
  */
-function passStream(incoming: Incoming, reply: Reply, target: StreamTarget): void {
-  const { message, destination } = incoming
-  const withBody = hasBody(incoming)
-  const tap = new BodyTap()
+function mayRetry(upstream: ClientHttp2Stream, attempt: Attempt): boolean {
+  if (attempt.body !== undefined && !attempt.body.replayable) return false
+  if (upstream.rstCode === constants.NGHTTP2_REFUSED_STREAM) return true
+
+  return attempt.pooled.reused && attempt.pooled.session.destroyed && attempt.body === undefined
+}
+
+/** What follows a stream's close: a reset passed to the client, a try on a fresh session, or a 502. */
+function afterClose(
+  incoming: Incoming,
+  reply: Reply,
+  upstream: ClientHttp2Stream,
+  state: {
+    readonly responded: boolean
+    readonly failure: Error | undefined
+    readonly attempt: Attempt
+  },
+): void {
+  const code = upstream.rstCode ?? constants.NGHTTP2_NO_ERROR
+
+  if (!state.responded && reply.open && mayRetry(upstream, state.attempt) && state.attempt.again())
+    return
+  if (code !== constants.NGHTTP2_NO_ERROR && reply.open) reply.reset(() => {}, code)
+  else if (!state.responded) unanswered(incoming, reply, state.failure)
+}
+
+/** Opens the stream on `attempt`'s session and passes its answer back as it comes. */
+function sendStream(incoming: Incoming, reply: Reply, authority: string, attempt: Attempt): void {
   /* A client that says it sends trailers gets them passed on; one that does not ends with its body. */
   const announcesTrailers = incoming.headers["trailer"] !== undefined
+  const state = { responded: false, failure: undefined as Error | undefined, attempt }
   let upstream: ClientHttp2Stream
-  let failure: Error | undefined
-  let responded = false
 
   try {
-    upstream = target.session.request(streamHeaders(incoming, target.authority), {
-      endStream: !withBody,
-      ...(withBody && announcesTrailers && { waitForTrailers: true }),
+    upstream = attempt.pooled.session.request(streamHeaders(incoming, authority), {
+      endStream: attempt.body === undefined,
+      ...(attempt.body && announcesTrailers && { waitForTrailers: true }),
     })
   } catch (error) {
-    message.resume()
-    reply.send(
-      502,
-      [["content-type", "text/plain"]],
-      Buffer.from(
-        unreachable(destination, error instanceof Error ? error : new Error(String(error))),
-      ),
-      incoming.method,
-    )
+    /* The session closed before the stream could open: nothing reached the server. */
+    if (!attempt.again()) unanswered(incoming, reply, error)
 
     return
   }
@@ -341,7 +379,8 @@ function passStream(incoming: Incoming, reply: Reply, target: StreamTarget): voi
   upstream.on("response", (headers: IncomingHttpHeaders, flags: number) => {
     const ended = (flags & constants.NGHTTP2_FLAG_END_STREAM) !== 0
 
-    responded = true
+    state.responded = true
+    attempt.body?.release()
     reply.head(
       Number(headers[":status"] ?? 502),
       h2Pairs(headers),
@@ -353,31 +392,50 @@ function passStream(incoming: Incoming, reply: Reply, target: StreamTarget): voi
   upstream.on("trailers", (trailers: IncomingHttpHeaders) => reply.addTrailers(h2Pairs(trailers)))
   upstream.on("wantTrailers", () => upstream.sendTrailers(h2Headers(pairsOf(incoming.trailers()))))
   upstream.on("error", (error: Error) => {
-    failure = error
+    state.failure = error
   })
-  upstream.once("close", () => {
-    const code = upstream.rstCode ?? constants.NGHTTP2_NO_ERROR
-    const reset = code !== constants.NGHTTP2_NO_ERROR
-
-    if (!responded && reset && reply.open) reply.reset(() => {}, code)
-    else if (!responded)
-      reply.send(
-        502,
-        [["content-type", "text/plain"]],
-        Buffer.from(unreachable(destination, failure ?? new Error("the stream closed unanswered"))),
-        incoming.method,
-      )
-    else if (reset && reply.open) reply.reset(() => {}, code)
-  })
+  upstream.once("close", () => afterClose(incoming, reply, upstream, state))
   /* The client went away before its answer had all gone out: stop asking for it. */
   reply.response.once("close", () => {
     if (!reply.response.writableFinished && !upstream.closed)
       upstream.close(constants.NGHTTP2_CANCEL)
   })
+  attempt.body?.attach(upstream)
+}
+
+/**
+ * Sends an HTTP/2 stream on over HTTP/2, and its answer back as it comes: headers, body, trailers.
+ * An answer that ends with its headers (gRPC's trailers-only reply to a failed call) ends the
+ * client's stream with them too. A stream the host resets is reset to the client with the same
+ * code; one the client resets or drops is cancelled at the host. A stream the pooled session could
+ * not carry (it was closing) goes once more on a fresh session.
+ */
+function passStream(incoming: Incoming, reply: Reply, target: StreamTarget): void {
+  const { message } = incoming
+  const tap = new BodyTap()
+  const body = hasBody(incoming) ? new ReplayBody(message) : undefined
+  let tried = false
+
+  const attempt = (pooled: PooledSession): Attempt => ({
+    pooled,
+    body,
+    again() {
+      if (tried) return false
+      tried = true
+      void target.reopen().then(
+        (fresh) =>
+          fresh === undefined
+            ? unanswered(incoming, reply, new Error("the server closed the connection"))
+            : sendStream(incoming, reply, target.authority, attempt(fresh)),
+        (error: unknown) => unanswered(incoming, reply, error),
+      )
+
+      return true
+    },
+  })
 
   message.on("data", (chunk: Buffer) => tap.add(chunk))
   message.once("end", () => target.onRequestBody(tap.body))
-
-  if (withBody) message.pipe(upstream)
-  else message.resume()
+  if (body === undefined) message.resume()
+  sendStream(incoming, reply, target.authority, attempt(target.first))
 }
