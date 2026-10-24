@@ -302,3 +302,26 @@ describe("links to the docs from outside the website", () => {
     expect(broken).toEqual([])
   })
 })
+
+/** Every `.mdx` file under `dir`, at any depth. */
+function mdxFiles(dir: string): string[] {
+  return readdirSync(dir, { recursive: true, encoding: "utf8" })
+    .filter((name) => name.endsWith(".mdx"))
+    .map((name) => join(dir, name))
+}
+
+describe("links between the site's pages", () => {
+  it("point every /docs/ link in a page or changelog entry at a page that exists", () => {
+    const slugs = new Set(docsSlugs())
+    const pages = [...mdxFiles(CONTENT), ...mdxFiles(join(WEBSITE, "content", "changelog"))]
+    const broken = pages.flatMap((page) =>
+      [...readFileSync(page, "utf8").matchAll(/\]\(\/docs\/?([^)#?\s]*)/g)]
+        .map((match) => (match[1] ?? "").replace(/\.md$/, "").replace(/\/$/, ""))
+        /* An image or other file served under /docs/ is not a page. */
+        .filter((slug) => !/\.[a-z0-9]+$/i.test(slug) && !slugs.has(slug))
+        .map((slug) => `${page.slice(WEBSITE.length + 1)}: /docs/${slug}`),
+    )
+
+    expect(broken).toEqual([])
+  })
+})
