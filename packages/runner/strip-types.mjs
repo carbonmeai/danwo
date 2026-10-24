@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url"
 /**
  * Whether `version` (`process.versions.node`) is one danwo runs on: `^22.22.3 || >=24.11.1`, the
  * range every package's `engines` declares. Below it the hooks are missing, or a CommonJS package
- * that `require`s an ES module (mockttp does) fails to load once any hook is registered.
+ * that `require`s an ES module fails to load once any hook is registered.
  */
 function supported(version) {
   const [major, minor, patch] = version.split(".").map(Number)

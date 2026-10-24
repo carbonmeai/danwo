@@ -80,11 +80,13 @@ MCP config starts the server without `@danwo/mcp`).
 
 ## Proxy noise
 
-A browser dropping a stream or socket as a page or test closes (`read ECONNRESET`, `EPIPE`,
-`socket hang up`) is expected and not printed. Set `DANWO_DEBUG=proxy` (a comma-separated list, or
-`*`) to see those lines when chasing a connection problem; every other proxy error always prints.
+The proxy prints nothing about the connections around a call: a browser dropping a stream or
+socket as a page or test closes (`read ECONNRESET`, `EPIPE`), a client turning down its TLS
+handshake (a device's own services, an app that does not trust danwo's CA), or a host it could not
+reach (the call's 502 says why, in the run's record). Set `DANWO_DEBUG=proxy` (a comma-separated
+list, or `*`) to see those lines when chasing a connection problem. A route's handler that throws
+always prints, and its call gets a 500.
 
-The proxy replaces mockttp's local port check (it leaked an error listener per probe of a free
-`::1` port) once per process. A mockttp version that moved that check gets the warning
-`danwo: this mockttp version has no isLocalPortActive to replace; using its own local port check`
-once, and the proxy runs on mockttp's own check; keep the one mockttp `@danwo/proxy` installs.
+The proxy speaks HTTP/1.1 to every client. Browsers and HTTP clients that offer HTTP/2 beside it
+get HTTP/1.1; a client that offers HTTP/2 alone (a gRPC client) is turned away in the TLS handshake
+with `no application protocol`.
