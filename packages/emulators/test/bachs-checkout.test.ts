@@ -230,6 +230,12 @@ describe("Bachs payments and refunds", () => {
     const list = await bachs.client.payments.list({ limit: 10 })
 
     expect(list.items).toHaveLength(1)
+
+    const all = []
+
+    for await (const item of bachs.client.payments.listAll({ limit: 1 })) all.push(item)
+
+    expect(all.map((item) => item.id)).toEqual(list.items.map((item) => item.id))
     expect(list.items[0]).toMatchObject({
       status: "succeeded",
       amount: "29.00",

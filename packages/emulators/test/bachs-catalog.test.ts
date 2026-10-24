@@ -18,7 +18,7 @@ function codeOf(promise: Promise<unknown>): Promise<unknown> {
   return promise.then(
     () => undefined,
     (error: unknown) =>
-      error instanceof BachsApiError ? `${error.status} ${error.errorCode ?? ""}` : error,
+      error instanceof BachsApiError ? `${error.statusCode} ${error.errorCode ?? ""}` : error,
   )
 }
 
@@ -64,6 +64,19 @@ describe("Bachs products", () => {
     expect(
       (await bachs.client.products.list({ cursor: "cur_2" })).items.map((item) => item.name),
     ).toEqual(["Ebook"])
+  })
+
+  it("hands the SDK's listAll every product, a page at a time by cursor", async () => {
+    const names = ["One", "Two", "Three", "Four", "Five"]
+
+    for (const name of names)
+      await bachs.client.products.create({ name, price: { currency: "USD", amount: "1.00" } })
+
+    const seen: string[] = []
+
+    for await (const product of bachs.client.products.listAll({ limit: 2 })) seen.push(product.name)
+
+    expect(seen.toSorted()).toEqual(names.toSorted())
   })
 
   it("refuses products the way Bachs does", async () => {

@@ -83,7 +83,7 @@
       },
       "devDependencies": {
         "@aws-sdk/client-s3": "3.1152.0",
-        "@bachs/sdk": "1.0.0",
+        "@bachs/sdk": "2.0.0",
         "@clerk/express": "2.1.80",
         "@composio/core": "0.25.0",
         "@danwo/fidelity": "workspace:*",
@@ -180,7 +180,7 @@
         "@aws-sdk/s3-presigned-post": "3.1152.0",
         "@aws-sdk/s3-request-presigner": "3.1152.0",
         "@azure/msal-node": "7.1.0",
-        "@bachs/sdk": "1.0.0",
+        "@bachs/sdk": "2.0.0",
         "@clerk/backend": "3.25.0",
         "@clerk/clerk-js": "6.39.1",
         "@clerk/shared": "4.40.0",
@@ -359,7 +359,7 @@
         "@aws-sdk/client-s3": "3.1152.0",
         "@aws-sdk/s3-request-presigner": "3.1152.0",
         "@azure/msal-node": "7.1.0",
-        "@bachs/sdk": "1.0.0",
+        "@bachs/sdk": "2.0.0",
         "@danwo/emulators": "workspace:*",
         "@types/express": "5.0.6",
         "@types/ws": "8.18.2",
@@ -647,7 +647,7 @@
 
     "@babel/types": ["@babel/types@7.29.8", "", { "dependencies": { "@babel/helper-string-parser": "^7.29.7", "@babel/helper-validator-identifier": "^7.29.7" } }, "sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg=="],
 
-    "@bachs/sdk": ["@bachs/sdk@1.0.0", "", {}, "sha512-GvF7kW++0uP3iXVqgKPkkG92oQEqiWzr3NKExleLXtaxP4LBqzLFuKfL9Tjjsx7BdJsSkf74jaE2OXCXc2wzvQ=="],
+    "@bachs/sdk": ["@bachs/sdk@2.0.0", "", {}, "sha512-YW14q8rfF2nxhGygUP10t6hqDvQJy7u3DDo5qIIxu9sZYQm1/doFaSq+UHjXqaRvT7JAhnj7tolTIMkmT34vGw=="],
 
     "@base-org/account": ["@base-org/account@2.0.1", "", { "dependencies": { "@noble/hashes": "1.4.0", "clsx": "1.2.1", "eventemitter3": "5.0.1", "idb-keyval": "6.2.1", "ox": "0.6.9", "preact": "10.24.2", "viem": "^2.31.7", "zustand": "5.0.3" } }, "sha512-tySVNx+vd6XEynZL0uvB10uKiwnAfThr8AbKTwILVG86mPbLAhEOInQIk+uDnvpTvfdUhC1Bi5T/46JvFoLZQQ=="],
 

@@ -43,7 +43,7 @@
     "@aws-sdk/s3-presigned-post": "3.1152.0",
     "@aws-sdk/s3-request-presigner": "3.1152.0",
     "@azure/msal-node": "7.1.0",
-    "@bachs/sdk": "1.0.0",
+    "@bachs/sdk": "2.0.0",
     "@clerk/backend": "3.25.0",
     "@clerk/clerk-js": "6.39.1",
     "@clerk/shared": "4.40.0",
