@@ -1,0 +1,31 @@
+---
+title: danwo 0.1.3
+description: Go and Python backends, single-page apps under the matrix, and a steadier proxy on Linux.
+date: 2026-10-24
+---
+
+## New
+
+- **Apps in any language.** Every app now gets `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE` and
+  `CURL_CA_BUNDLE` pointing at danwo's CA and the public roots, so a Go, Python or other app trusts
+  danwo's proxy. See [Other languages](/docs/other-languages).
+- **Two new examples.** `with-python` is a SvelteKit site on a FastAPI API that survives a 54-fault
+  matrix; `with-go` is a Vue 3 app on a Go API that survives 44. See
+  [Examples](/docs/examples).
+- **`matrix.pageCalls`** also faults a page's own `fetch()` calls to your app: a 500, a dropped
+  connection, a lost answer after a write. Off by default. See
+  [Fault kinds](/docs/fault-kinds).
+- An app that runs no Node gets a clear note that danwo's start-up routing check can't cover it.
+
+## Fixed
+
+- The proxy no longer refuses a call to an app on this machine as a "passthrough loop" on Linux.
+- `NO_PROXY` no longer lists an address Python's httpx can't parse, which stopped httpx clients,
+  and the Stripe and OpenAI SDKs with them, from starting.
+- A call held by a delay fault is dropped when its trial ends, instead of landing in the next one.
+- `freePort()` picks ports the system never hands out, and never gives two workers the same one.
+- Clerk's emulator retries ClerkJS from the CDN, pins a range like `@1` to its exact version, names
+  a script it can't fetch, and fetches the right URL on Windows.
+- Stripe's subscription-mode Checkout pays with the card typed on its page, and a declined card
+  starts nothing.
+- An app's clock takes a new offset even when a watch event lands mid-write.

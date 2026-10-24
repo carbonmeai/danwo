@@ -239,7 +239,7 @@ repository:
 
 ```sh
 bun install
-bun run release 0.1.2 --pack
+bun run release 0.1.3 --pack
 node examples/link.ts with-python
 ```
 
@@ -268,5 +268,5 @@ folder. Run the commands above from it.
 | `kit/`                          | the examples' shared styles                                                 |
 | `tests/`                        | the tests, the invariants (`studio.ts`) and the build and database helpers  |
 
-Last checked with @danwo/cli 0.1.2, Python 3.12, FastAPI 0.162, psycopg 3.3, stripe 16.0,
+Last checked with @danwo/cli 0.1.3, Python 3.12, FastAPI 0.162, psycopg 3.3, stripe 16.0,
 resend 2.50, SvelteKit 3.1, Svelte 5.57, Postgres 17 and Node 24.
