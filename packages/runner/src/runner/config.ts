@@ -188,6 +188,12 @@ export interface DanwoConfig {
      * faults no trial can fire. Only for an environment whose reset puts every app's state back.
      */
     readonly warmUp?: boolean
+    /**
+     * Also fault the page's own `fetch()` calls to your app (default false): a 500, a dropped
+     * connection, and a lost answer after a write. For a single-page app that retries its API calls
+     * or shows a usable error; an app that doesn't fails these trials.
+     */
+    readonly pageCalls?: boolean
     /** Worker processes for `danwo matrix`; default `workers`, else one per core (at most 8). */
     readonly workers?: number
     /**

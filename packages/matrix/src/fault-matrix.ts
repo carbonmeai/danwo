@@ -189,6 +189,8 @@ export interface FaultMatrixOptions<E extends RunEnvironment> {
   readonly webhookFaults: readonly WebhookFault[]
   /** Faults to try on each call the app made to its own database or cache (default: none). */
   readonly dataFaults?: DataFaultCatalogue
+  /** Also fault the page's `fetch()` calls to the app itself (`planFaults`'s `pageCalls`). */
+  readonly pageCalls?: boolean
   /**
    * How many faulted runs at once (default 1). Only for environments that isolate each run (own
    * ports, own database); the clean run always runs alone first. Results keep the plan's order.
@@ -513,8 +515,8 @@ function runLengths(routes: readonly (string | undefined)[]): number[] {
 }
 
 /**
- * Turns a clean run into a fault plan: every routed call, and every `fetch()` the page made to an
- * app on this machine (a single-page app's call to its own API), × each outbound fault, every webhook
+ * Turns a clean run into a fault plan: every routed call (and, with `pageCalls`, every `fetch()` the
+ * page made to an app on this machine) × each outbound fault, every webhook
  * delivered (first attempt, per topic occurrence) × each webhook fault, and every call to the
  * app's own database or cache × each data fault. A poll gets faults on its first call only: how
  * many times it repeats depends on timing, so a fault on a later repeat may fall on a call the
@@ -525,10 +527,20 @@ export function planFaults(
   outboundFaults: FaultMatrixOptions<RunEnvironment>["outboundFaults"],
   webhookFaults: readonly WebhookFault[],
   dataFaults?: DataFaultCatalogue,
+  options: {
+    /**
+     * Also fault every `fetch()` the page made to an app on this machine, a single-page app's call
+     * to its own API (default false). An app that retries those calls, or shows a usable error,
+     * passes them; most apps don't, so they are planned only when asked for.
+     */
+    readonly pageCalls?: boolean
+  } = {},
 ): PlannedFault[] {
   const plan: PlannedFault[] = []
   const caused = causedItems(clean)
-  const faultable = clean.exchanges.filter((e) => e.disposition === "routed" || isPageCallToApp(e))
+  const faultable = clean.exchanges.filter(
+    (e) => e.disposition === "routed" || (options.pageCalls === true && isPageCallToApp(e)),
+  )
   const polls = pollPositions(faultable)
   const routeCounts = new Map<string, number>()
 
@@ -595,6 +607,7 @@ export function runFaultMatrix<E extends RunEnvironment>(
       options.outboundFaults,
       options.webhookFaults,
       options.dataFaults,
+      { pageCalls: options.pageCalls === true },
     )
     const runs = yield* Effect.forEach(plan, (planned) => rerunWhileInvalid(options, planned), {
       concurrency: Math.max(1, Math.floor(options.concurrency ?? 1)),

@@ -349,6 +349,7 @@ function planOn(outcome: RunOutcome, setup: TrialsSetup): PlannedFault[] {
       matrix?.outboundFaults ?? defaultOutboundFaults,
       matrix?.webhookFaults ?? DEFAULT_WEBHOOK_FAULTS,
       matrix?.dataFaults ?? defaultDataFaults,
+      { pageCalls: matrix?.pageCalls === true },
     ),
     ...planRaceFaults(outcome, racePlan(matrix, setup.test, setup.races())),
   ]

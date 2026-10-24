@@ -24,8 +24,16 @@ as it would in production.
 
 ## Your app's own API
 
-When your page calls your app's API with `fetch()`, as a single-page app does, the matrix faults
-those calls too:
+When your page calls your app's API with `fetch()`, as a single-page app does, the matrix can
+fault those calls too. Turn it on with `pageCalls` in the config's `matrix`:
+
+```ts title="danwo.config.ts · the page's own API calls"
+matrix: { pageCalls: true },
+```
+
+It's off by default, because most pages show an error when their own API fails rather than
+retrying, and a trial that ends on that error fails. Turn it on for an app built to retry its API
+calls or recover from a failed one:
 
 | Fault         | What happens                                        | What it catches                           |
 | ------------- | --------------------------------------------------- | ----------------------------------------- |

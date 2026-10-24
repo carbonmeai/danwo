@@ -89,6 +89,8 @@ describe("a single-page app's calls to its own API", () => {
       ]),
       ONE_FAULT,
       [],
+      undefined,
+      { pageCalls: true },
     )
 
     expect(plan.map((planned) => planned.label)).toEqual([
@@ -101,5 +103,22 @@ describe("a single-page app's calls to its own API", () => {
       route: "POST 127.0.0.1/api/billing/checkout",
       occurrence: 0,
     })
+  })
+
+  it("are left alone unless the plan asks for them, so an app that doesn't retry isn't failed by default", () => {
+    const pageCall = exchange(0, {
+      client: "browser",
+      load: "request",
+      method: "POST",
+      host: "127.0.0.1",
+      path: "/api/join",
+    })
+
+    expect(planFaults(clean([pageCall]), ONE_FAULT, []).map((planned) => planned.label)).toEqual([])
+    expect(
+      planFaults(clean([pageCall]), ONE_FAULT, [], undefined, { pageCalls: true }).map(
+        (planned) => planned.label,
+      ),
+    ).toEqual(["status 500 on POST 127.0.0.1/api/join"])
   })
 })

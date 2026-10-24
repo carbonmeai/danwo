@@ -113,7 +113,7 @@ one proxy:
 | Call                              | Recorded as          | Faulted by the matrix  |
 | --------------------------------- | -------------------- | ---------------------- |
 | the site's server calling the API | `server`, passed on  | no: it is your own app |
-| the browser calling the API       | `browser`, passed on | yes, like a provider   |
+| the browser calling the API       | `browser`, passed on | with `pageCalls: true` |
 | the API calling Stripe or Resend  | `server`, routed     | yes                    |
 
 Readiness waits for every one of them, so a test never asserts while the site is still waiting

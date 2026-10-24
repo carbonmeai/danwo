@@ -47,8 +47,8 @@ the labels each provider gets. Without an invariant the body itself must pass un
 
 The matrix needs the environment to provide `proxy`, `reset()`, and `webhooks` for webhook faults.
 
-A page's `fetch()` to an app on this machine (a single-page app calling its own API) is faulted
-like a routed call: `status 500` and `reset` on each, and `reset-after` on a write, labelled by
+With `matrix: { pageCalls: true }` (off by default), a page's `fetch()` to an app on this machine
+(a single-page app calling its own API) is faulted like a routed call: `status 500` and `reset` on each, and `reset-after` on a write, labelled by
 host and path (`reset-after on POST 127.0.0.1/api/checkout`), so the page's error handling and
 retries meet a failing API. Page loads, assets, streams and the server's own calls to loopback
 are left alone.

@@ -46,6 +46,7 @@ const MATRIX_KEYS: Readonly<Record<keyof NonNullable<DanwoConfig["matrix"]>, tru
   dataFaults: true,
   rerunInvalid: true,
   warmUp: true,
+  pageCalls: true,
   workers: true,
   checkPace: true,
   races: true,
