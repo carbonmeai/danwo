@@ -84,7 +84,9 @@ when either is set. Start the app with a command that installs nothing (`uv sync
 environment first, then `uv run --no-sync …`): the start command is proxied too, and under
 `unmatched: "block"` a package download is refused. `unmatched: "block"` and `secrets` work as
 for Node; a client that ignores `HTTPS_PROXY` bypasses the proxy entirely. Example:
-`examples/with-python` (FastAPI, psycopg, Stripe, Resend, a 52-trial matrix). Go: `net/http`'s
+`examples/with-python` (a FastAPI JSON API behind a SvelteKit site, psycopg, Stripe, Resend, a
+52-trial matrix): the site runs in Node with the preload, so its server's calls to the API and the
+browser's are recorded as passthrough to loopback (waited on, never faulted). Go: `net/http`'s
 default transport follows `HTTPS_PROXY`; Go reads `SSL_CERT_FILE` on Linux only (macOS and Windows
 verify through the OS), so the app appends that file to a copy of `x509.SystemCertPool()` when set
 and hands the client to stripe-go and resend-go (`examples/with-go`, `trust.go`). Go never proxies

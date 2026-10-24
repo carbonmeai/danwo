@@ -16,8 +16,9 @@ mentions danwo.
 
 ```ts title="danwo.config.ts · a FastAPI app"
 {
-  name: "studio",
+  name: "api",
   command: "uv run --no-sync uvicorn studio.app:app --host 127.0.0.1 --port 8000",
+  cwd: "api",
   url: "http://127.0.0.1:8000",
   ready: { path: "/health" },
   env: { DATABASE_URL: postgres.url(database), STRIPE_SECRET_KEY: "sk_test_studio" },
@@ -68,7 +69,7 @@ Stripe's Python SDK verifies against the bundle it ships and reads no variable f
 calls reach the proxy and then fail with `Could not verify Stripe's SSL certificate`. Point it at
 the bundle the environment names, as an app behind a company's TLS proxy would:
 
-```python title="studio/payments.py · the CA bundle"
+```python title="api/studio/payments.py · the CA bundle"
 import os
 
 import stripe
@@ -86,6 +87,38 @@ Install the app's packages before danwo starts it, and start it with a command t
 nothing. danwo's proxy routes the start command too, so a package download meets the proxy, and
 under `unmatched: "block"` it is refused. With uv, run `uv sync --frozen` first and start the app
 with `uv run --no-sync`.
+
+### Put a Node frontend in front of it
+
+Most Python APIs sit behind a site in Node. List both apps in one
+[stack](/docs/several-apps), and wire the site to the API by its address:
+
+```ts title="danwo.config.ts · a SvelteKit site on the API"
+{
+  name: "web",
+  command: "node server.ts",
+  cwd: "web",
+  url: "http://127.0.0.1:3000",
+  ready: { path: "/health" },
+  dependsOn: ["api"],
+  env: ({ api = "" }) => ({ API_URL: api, PUBLIC_API_URL: api }),
+}
+```
+
+The site runs in Node, so it gets the [preload](/docs/node-preload), and the API gets the
+variables above. The example serves the site's build with `web/server.ts`, adapter-node's handler
+on plain HTTP, since `node build` takes every request to be HTTPS. Both apps are routed through
+one proxy:
+
+| Call                              | Recorded as          | Faulted by the matrix  |
+| --------------------------------- | -------------------- | ---------------------- |
+| the site's server calling the API | `server`, passed on  | no: it is your own app |
+| the browser calling the API       | `browser`, passed on | no                     |
+| the API calling Stripe or Resend  | `server`, routed     | yes                    |
+
+Readiness waits for every one of them, so a test never asserts while the site is still waiting
+on the API. The Python example's matrix plans the same 52 faults with the site in front as
+without it.
 
 ## Go
 
@@ -172,7 +205,7 @@ that one goes through the proxy. danwo says so once when the app starts, rather 
 pass or a failure:
 
 ```text title="stderr"
-danwo: studio runs no Node process (uv, python), so danwo's check at start that its calls
+danwo: api runs no Node process (uv, python), so danwo's check at start that its calls
 reach the proxy, which runs inside Node, does not run for it, and nothing confirms its calls
 go through the proxy: …
 ```
@@ -184,7 +217,7 @@ emulator answers, and `secrets: "fail"` refuses a live-looking key in the app's 
 
 <Cards>
   <Card title="The Python example" href="/docs/examples/with-python">
-    A FastAPI booking app on Stripe, Resend and Postgres, with its matrix.
+    A SvelteKit site on a FastAPI API, with Stripe, Resend, Postgres and its matrix.
   </Card>
   <Card title="The Go example" href="/docs/examples/with-go">
     A Go subscription app on Stripe, Resend and Postgres, with its matrix.
