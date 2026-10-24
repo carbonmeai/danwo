@@ -3,7 +3,6 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { createServer, type Server } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
@@ -17,7 +16,8 @@ import {
 } from "../src/support/ports.ts"
 
 const run = promisify(execFile)
-const PORTS = fileURLToPath(new URL("../src/support/ports.ts", import.meta.url))
+/** The module as a `file:` URL, which a child's `import()` takes on every platform (not a Windows path). */
+const PORTS = new URL("../src/support/ports.ts", import.meta.url).href
 
 let notes: string
 const children: ChildProcess[] = []
