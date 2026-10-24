@@ -1,20 +1,16 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import type { ServerResponse } from "node:http"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-
-import {
-  type CompletedRequest,
-  generateCACertificate,
-  generateSPKIFingerprint,
-  getLocal,
-  type Headers as MockttpHeaders,
-  type Mockttp,
-} from "mockttp"
+import type { Duplex } from "node:stream"
 
 import { type AppClock, createAppClock } from "./app-clock.ts"
 import { isAssetKind, type LoadKind, loadKind } from "./assets.ts"
+import { createAuthority } from "./authority.ts"
+import { decodeBody, readAll } from "./bodies.ts"
 import { type CapturedMessage, captureMessage } from "./capture.ts"
 import { clientOf, userField } from "./clients.ts"
+import { proxyDebug } from "./debug.ts"
 import {
   hostMatches,
   isLoopback,
@@ -23,6 +19,7 @@ import {
   isStreaming,
   TELEMETRY_HOSTS,
 } from "./hosts.ts"
+import { type Incoming, type Listener, startListener } from "./listener.ts"
 import { isListening, nothingListening } from "./listening.ts"
 import {
   caBundle,
@@ -35,12 +32,11 @@ import {
   unroutedProcesses,
   writeNodeShim,
 } from "./node-env.ts"
-import { quietDroppedClients } from "./quiet.ts"
-import { replaceSocketHelpers } from "./socket-helpers.ts"
-import { acceptSocketUrls } from "./socket-urls.ts"
+import { passThrough, Upstreams } from "./passthrough.ts"
+import { pairsOf, Reply, type TappedBody } from "./reply.ts"
 import { forwardTo } from "./upstream.ts"
 import {
-  handleSockets,
+  createSockets,
   type SocketExchange,
   type SocketFaultRule,
   type SocketUpstream,
@@ -293,69 +289,100 @@ function routeHandler(route: Route): Handler {
   return "handler" in route ? route.handler : forwardTo(route.upstream)
 }
 
-function toFetchHeaders(headers: MockttpHeaders): Headers {
+/** A routed call as its handler gets it: the request, and its body as it arrived. */
+interface Call {
+  readonly incoming: Incoming
+  readonly body: Buffer
+}
+
+/** What a call is answered with: a whole response, or `"reset"` to drop its connection. */
+type Answer =
+  | {
+      readonly status: number
+      readonly headers: readonly (readonly [string, string])[]
+      readonly body: Buffer
+    }
+  | "reset"
+
+/** The request's headers for a `Request`, in their order; HTTP/2 pseudo-headers left out. */
+function toFetchHeaders(rawHeaders: readonly string[]): Headers {
   const out = new Headers()
 
-  for (const [name, value] of Object.entries(headers)) {
-    if (value === undefined || name.startsWith(":")) continue
-    for (const v of Array.isArray(value) ? value : [value]) out.append(name, v)
-  }
+  for (const [name, value] of pairsOf(rawHeaders))
+    if (!name.startsWith(":")) out.append(name, value)
 
   return out
 }
 
-function fromFetchHeaders(headers: Headers): MockttpHeaders {
-  const out: MockttpHeaders = {}
+/** A `Response`'s headers as name and value pairs, each `Set-Cookie` its own. */
+function fromFetchHeaders(headers: Headers): [string, string][] {
+  const out: [string, string][] = []
 
   headers.forEach((value, name) => {
-    if (name === "set-cookie") return
-    out[name] = value
+    if (name !== "set-cookie") out.push([name, value])
   })
-  const cookies = headers.getSetCookie()
-
-  if (cookies.length > 0) out["set-cookie"] = cookies
+  for (const cookie of headers.getSetCookie()) out.push(["set-cookie", cookie])
 
   return out
 }
 
-async function callHandler(handler: Handler, req: CompletedRequest, behaviour?: string) {
-  const hasBody = req.method !== "GET" && req.method !== "HEAD"
-  /*
-   * mockttp decodes gzip, deflate, br and zstd; for an encoding it does not know (S3's
-   * aws-chunked) it gives nothing, so the handler gets the raw bytes and the encoding header.
-   */
-  const decoded = hasBody ? await req.body.getDecodedBuffer() : undefined
-  const body = hasBody ? (decoded ?? req.body.buffer) : undefined
-  const headers = toFetchHeaders(req.headers)
+/** A call's body for its handler, decoded when it can be; none for a GET or HEAD. */
+async function handlerBody(call: Call): Promise<{ body?: Buffer; decoded: boolean }> {
+  const { method, headers } = call.incoming
+
+  if (method === "GET" || method === "HEAD") return { decoded: false }
+
+  const encoding = headers["content-encoding"]
+  const decoded = await decodeBody(
+    call.body,
+    typeof encoding === "string" ? encoding : encoding?.join(","),
+  )
+
+  return decoded === undefined
+    ? { body: call.body, decoded: false }
+    : { body: decoded, decoded: true }
+}
+
+/**
+ * The call as a `Request` for its handler. gzip, deflate, br and zstd bodies are decoded; for an
+ * encoding the proxy does not know (S3's aws-chunked) the handler gets the raw bytes and the
+ * encoding header.
+ */
+async function requestOf(call: Call, behaviour?: string): Promise<Request> {
+  const { incoming } = call
+  const { body, decoded } = await handlerBody(call)
+  const headers = toFetchHeaders(incoming.rawHeaders)
 
   if (decoded) headers.delete("content-encoding")
   headers.delete("content-length")
   if (behaviour !== undefined) headers.set(EMULATE_HEADER, behaviour)
 
-  const response = await handler(
-    new Request(req.url, {
-      method: req.method,
-      headers,
-      ...(body && body.length > 0 && { body: new Uint8Array(body) }),
-    }),
-  )
+  return new Request(incoming.url, {
+    method: incoming.method,
+    headers,
+    ...(body && body.length > 0 && { body: new Uint8Array(body) }),
+  })
+}
+
+async function callHandler(handler: Handler, call: Call, behaviour?: string): Promise<Answer> {
+  const response = await handler(await requestOf(call, behaviour))
 
   return {
-    statusCode: response.status,
+    status: response.status,
     headers: fromFetchHeaders(response.headers),
-    rawBody: Buffer.from(await response.arrayBuffer()),
+    body: Buffer.from(await response.arrayBuffer()),
   }
 }
 
 /** The handler's answer, kept back until `until` resolves. */
-async function answerAfter(handler: Handler, req: CompletedRequest, until: AnswerHold["until"]) {
-  const answer = await callHandler(handler, req)
-  const location = answer.headers.location
+async function answerAfter(handler: Handler, call: Call, until: AnswerHold["until"]) {
+  const answer = await callHandler(handler, call)
 
-  await until({
-    status: answer.statusCode,
-    location: Array.isArray(location) ? location[0] : location,
-  })
+  if (answer !== "reset")
+    await until({
+      status: answer.status,
+      location: answer.headers.find(([name]) => name.toLowerCase() === "location")?.[1],
+    })
 
   return answer
 }
@@ -373,40 +400,40 @@ function holdBack(ms: number, gaveUp: Promise<void>): Promise<void> {
 }
 
 /**
- * Answers a request the way `fault` says, or through its handler when there is no fault. `gaveUp`
+ * Answers a call the way `fault` says, or through its handler when there is no fault. `gaveUp`
  * resolves when the client aborts the request; `ended` says whether the run it belongs to is over
  * (`clear()` was called since it arrived).
  */
 async function answerUnder(
   fault: OutboundFault | AnswerHold | undefined,
   handler: Handler,
-  req: CompletedRequest,
+  call: Call,
   gaveUp: Promise<void>,
   ended: () => boolean,
-) {
-  if (fault === undefined) return callHandler(handler, req)
+): Promise<Answer> {
+  if (fault === undefined) return callHandler(handler, call)
   if (fault.kind === "status")
     return {
-      statusCode: fault.status,
-      headers: { "content-type": "application/json", ...fault.headers },
-      body: fault.body ?? "",
+      status: fault.status,
+      headers: Object.entries({ "content-type": "application/json", ...fault.headers }),
+      body: Buffer.from(fault.body ?? ""),
     }
   if (fault.kind === "reset" || fault.kind === "reset-after")
-    return answerReset(fault, handler, req)
-  if (fault.kind === "emulate") return callHandler(handler, req, fault.behaviour)
+    return answerReset(fault, handler, call)
+  if (fault.kind === "emulate") return callHandler(handler, call, fault.behaviour)
 
-  return answerLate(fault, handler, req, gaveUp, ended)
+  return answerLate(fault, handler, call, gaveUp, ended)
 }
 
 /** Drops the connection; `reset-after` lets the handler process the request first. */
 async function answerReset(
   fault: Extract<OutboundFault, { kind: "reset" | "reset-after" }>,
   handler: Handler,
-  req: CompletedRequest,
-) {
-  if (fault.kind === "reset-after") await callHandler(handler, req)
+  call: Call,
+): Promise<Answer> {
+  if (fault.kind === "reset-after") await callHandler(handler, call)
 
-  return "reset" as const
+  return "reset"
 }
 
 /**
@@ -418,19 +445,19 @@ async function answerReset(
 async function answerLate(
   fault: Extract<OutboundFault, { kind: "delay" | "slow-then-retry" }> | AnswerHold,
   handler: Handler,
-  req: CompletedRequest,
+  call: Call,
   gaveUp: Promise<void>,
   ended: () => boolean,
-) {
-  if (fault.kind === "hold") return answerAfter(handler, req, fault.until)
+): Promise<Answer> {
+  if (fault.kind === "hold") return answerAfter(handler, call, fault.until)
 
   await (fault.kind === "delay"
     ? new Promise((resolve) => setTimeout(resolve, fault.ms))
     : holdBack(fault.ms, gaveUp))
 
-  if (ended()) return "reset" as const
+  if (ended()) return "reset"
 
-  return callHandler(handler, req)
+  return callHandler(handler, call)
 }
 
 /**
@@ -502,58 +529,6 @@ function hostPolicy(options: ProxyOptions, isRouted: (host: string) => boolean):
   }
 }
 
-/** An unrouted request that passes while `unmatched` is `block`: an allowed host, or a page asset. */
-function passesBlock(hosts: HostPolicy, req: CompletedRequest): boolean {
-  const host = req.destination.hostname
-
-  return (
-    hosts.isAllowed(host) || hosts.passesAsAsset(host, loadKind(req.path, req.headers), req.method)
-  )
-}
-
-/**
- * The rules for hosts no route answers: blocked ones get 502, this machine and allowed hosts pass
- * through, and the rest pass through or get 502 as `unmatched` says.
- */
-async function placeUnrouted(server: Mockttp, options: ProxyOptions, hosts: HostPolicy) {
-  const unrouted = (req: CompletedRequest) => !hosts.isRouted(req.destination.hostname)
-
-  await server
-    .forAnyRequest()
-    .matching((req) => unrouted(req) && hosts.isBlocked(req.destination.hostname))
-    .always()
-    .thenReply(502, "danwo proxy: host is blocked for this run")
-  /* A port of this machine nobody listens on: say so, rather than fail inside the passthrough. */
-  await server
-    .forAnyRequest()
-    .matching(
-      async (req) =>
-        unrouted(req) &&
-        isLoopback(req.destination.hostname) &&
-        !(await isListening(req.destination.hostname, req.destination.port)),
-    )
-    .always()
-    .thenCallback((req) => ({
-      statusCode: 502,
-      body: nothingListening(req.destination.hostname, req.destination.port),
-    }))
-
-  if (options.unmatched !== "block") {
-    await server.forUnmatchedRequest().thenPassThrough()
-
-    return
-  }
-
-  await server
-    .forAnyRequest()
-    .matching((req) => unrouted(req) && passesBlock(hosts, req))
-    .always()
-    .thenPassThrough()
-  await server
-    .forUnmatchedRequest()
-    .thenReply(502, "danwo proxy: host is not routed and passthrough is blocked")
-}
-
 /** Each route's WebSocket destination: its own `webSocket`, or its upstream's, as `ws(s)://`. */
 function socketUpstreams(routes: readonly Route[]): SocketUpstream[] {
   return routes.flatMap((route) => {
@@ -568,33 +543,65 @@ function socketUpstreams(routes: readonly Route[]): SocketUpstream[] {
 }
 
 /**
+ * The handler for `host`: an exact host's route first, then wildcards from the most specific, so
+ * `*.s3.amazonaws.com` wins over `*.amazonaws.com` whatever order the routes come in.
+ */
+function routeTable(routes: readonly Route[]): (host: string) => Handler | undefined {
+  const bound = routes.flatMap((route) => {
+    const handler = routeHandler(route)
+
+    return route.hosts.map((host) => ({ host, handler }))
+  })
+  const exact = new Map(
+    bound
+      .filter((b) => !b.host.startsWith("*."))
+      .toReversed()
+      .map((b) => [b.host, b.handler]),
+  )
+  const wildcards = bound
+    .filter((b) => b.host.startsWith("*."))
+    .toSorted((a, b) => b.host.length - a.host.length)
+
+  return (host) =>
+    exact.get(host) ?? wildcards.find((wildcard) => hostMatches(wildcard.host, host))?.handler
+}
+
+/** The body of a request, read whole; empty for one whose body is not read. */
+async function bodyOf(incoming: Incoming): Promise<Buffer> {
+  if (incoming.bodyless === true) {
+    incoming.message.resume()
+
+    return Buffer.alloc(0)
+  }
+
+  return readAll(incoming.message)
+}
+
+const TEXT = [["content-type", "text/plain"]] as const
+
+/**
  * Starts an HTTPS-intercepting proxy. Requests for a routed host are answered in-process by its
  * handler or forwarded to its upstream; others pass through or are blocked. Faults apply to both
  * kinds of route. Every exchange is recorded.
  */
 export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   const dir = await mkdtemp(join(tmpdir(), "danwo-proxy-"))
-  const ca = await generateCACertificate({ subject: { commonName: "danwo proxy CA" } })
+  const authority = await createAuthority("danwo proxy CA")
   const caCertPath = join(dir, "ca.pem")
   const caBundlePath = join(dir, "ca-bundle.pem")
 
-  await writeFile(caCertPath, ca.cert)
-  await writeFile(caBundlePath, caBundle(ca.cert))
+  await writeFile(caCertPath, authority.cert)
+  await writeFile(caBundlePath, caBundle(authority.cert))
 
   const clock = createAppClock(dir)
   const preloadDir = join(dir, "preloaded")
   const shimDir = await writeNodeShim(dir)
-
-  replaceSocketHelpers()
-
-  const server = getLocal({ https: ca })
-  const loud = quietDroppedClients()
-
-  await server.start()
-  acceptSocketUrls(server)
+  const debug = proxyDebug()
 
   const patterns = options.routes.flatMap((r) => r.hosts)
   const isRouted = (host: string) => patterns.some((pattern) => hostMatches(pattern, host))
+  const handlerFor = routeTable(options.routes)
+  const hosts = hostPolicy(options, isRouted)
   let faultRule: OutboundFaultRule | undefined
   /** Faults `failNext` armed, each with how many more calls it meets. */
   let armed: { match: (call: OutboundCall) => boolean; fault: OutboundFault; left: number }[] = []
@@ -614,145 +621,32 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   }
 
   const log = new Map<string, Exchange>()
-  // The route handler can run before the exchange is logged; hold its fault label until then.
-  const faultLabels = new Map<string, string>()
 
-  // Requests a fault holds back, waiting to hear whether their client gives up on them.
+  /* Requests a fault holds back, waiting to hear whether their client gives up on them. */
   const giveUps = new Map<string, () => void>()
 
   function gaveUp(id: string): Promise<void> {
     return new Promise((resolve) => giveUps.set(id, resolve))
   }
 
-  function labelFault(id: string, label: string): void {
-    const exchange = log.get(id)
-
-    if (exchange) exchange.fault = label
-    else faultLabels.set(id, label)
-  }
-
-  /** `req` as a fault rule sees it, numbered among the calls rules have seen. */
-  const callOf = (req: CompletedRequest): OutboundCall => ({
-    host: req.destination.hostname,
-    method: req.method,
-    path: req.path,
+  /** A request as a fault rule sees it, numbered among the calls rules have seen. */
+  const callOf = (incoming: Incoming): OutboundCall => ({
+    host: incoming.destination.hostname,
+    method: incoming.method,
+    path: incoming.path,
     index: callIndex++,
   })
 
-  async function handle(handler: Handler, req: CompletedRequest) {
-    const call = callOf(req)
-
-    return handleUnder(takeArmed(call) ?? faultRule?.(call), handler, req)
-  }
-
-  /** Answers `req` through `handler`, with `fault` applied and recorded when there is one. */
-  async function handleUnder(
-    fault: OutboundFault | AnswerHold | undefined,
-    handler: Handler,
-    req: CompletedRequest,
-  ) {
-    if (fault) labelFault(req.id, describeOutboundFault(fault))
-
-    const run = runIndex
-
-    try {
-      return await answerUnder(fault, handler, req, gaveUp(req.id), () => runIndex !== run)
-    } finally {
-      giveUps.delete(req.id)
-    }
-  }
-
-  /** The fault the rule picked for each page call to an app it was asked about, by request id. */
-  const appCallFaults = new Map<string, OutboundFault | AnswerHold | undefined>()
-
-  /**
-   * Whether the fault rule picks a fault for `req`, a page's `fetch()` to an app on this machine.
-   * mockttp asks every rule's matcher about every request, so each is asked once and remembered.
-   */
-  const faultsAppCall = (hosts: HostPolicy, req: CompletedRequest): boolean => {
-    const host = req.destination.hostname
-    const load = loadKind(req.path, req.headers)
-    const disposition = hosts.dispositionOf(host, load, req.method)
-    const client = clientOf(req.headers["user-agent"])
-
-    if (!isPageCallToApp({ disposition, client, load, host })) return false
-    if (!appCallFaults.has(req.id)) appCallFaults.set(req.id, faultRule?.(callOf(req)))
-
-    return appCallFaults.get(req.id) !== undefined
-  }
-
-  /**
-   * A page's `fetch()` to an app on this machine passes through as it is, unless the fault rule
-   * picks a fault for it: the proxy then forwards it itself and applies the fault, as it does for
-   * a routed call, so the matrix can fail the calls a single-page app makes to its own API.
-   * `failNext` leaves these calls alone: it is for a test's provider calls.
-   */
-  async function placeAppCallFaults(hosts: HostPolicy) {
-    await server
-      .forAnyRequest()
-      .matching((req) => faultsAppCall(hosts, req))
-      .always()
-      .thenCallback((req) => {
-        const fault = appCallFaults.get(req.id)
-
-        appCallFaults.delete(req.id)
-
-        return handleUnder(fault, forwardTo(new URL(req.url).origin), req)
-      })
-  }
-
-  /*
-   * Exact hosts first, then wildcards from the most specific, so `*.s3.amazonaws.com` wins over
-   * `*.amazonaws.com` whatever order the routes come in. `always()`: without it mockttp hands a
-   * request to a later matching rule once an earlier one has matched.
-   */
-  const bound = options.routes.flatMap((route) => {
-    const handler = routeHandler(route)
-
-    return route.hosts.map((host) => ({ host, handler }))
-  })
-
-  /* The preload's check, ahead of every route and left out of the record. */
-  await server
-    .forAnyRequest()
-    .forHostname(PROBE_HOST)
-    .always()
-    .thenReply(204, "", { [PROBE_HEADER]: "1" })
-
-  const exact = bound.filter((b) => !b.host.startsWith("*."))
-  const wildcards = bound
-    .filter((b) => b.host.startsWith("*."))
-    .toSorted((a, b) => b.host.length - a.host.length)
-
-  for (const { host, handler } of exact) {
-    await server
-      .forAnyRequest()
-      .forHostname(host)
-      .always()
-      .thenCallback((req) => handle(handler, req))
-  }
-
-  for (const { host, handler } of wildcards) {
-    await server
-      .forAnyRequest()
-      .matching((req) => hostMatches(host, req.destination.hostname))
-      .always()
-      .thenCallback((req) => handle(handler, req))
-  }
-
-  const hosts = hostPolicy(options, isRouted)
-
-  await placeAppCallFaults(hosts)
-  await placeUnrouted(server, options, hosts)
-
-  const sockets = await handleSockets(server, hosts, socketUpstreams(options.routes))
-
   const waiters = new Set<() => void>()
-  // Bodies are read off the event loop; an exchange counts as finished once its captures land.
+  /* Bodies are decoded off the event loop; an exchange counts as finished once its captures land. */
   const capturing = new Set<Promise<void>>()
   const finished = () =>
     capturing.size === 0 &&
     [...log.values()].every((e) => e.stream === true || e.status !== null || e.aborted)
+
+  const notify = () => {
+    if (finished()) for (const resolve of waiters) resolve()
+  }
 
   const capture = (work: Promise<void>) => {
     const tracked = work.finally(() => {
@@ -763,91 +657,273 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
     capturing.add(tracked)
   }
 
-  const notify = () => {
-    if (finished()) for (const resolve of waiters) resolve()
-  }
+  /** Starts the record of a request; the preload's check is left out of it. */
+  const begin = (incoming: Incoming): Exchange | undefined => {
+    const host = incoming.destination.hostname
 
-  // `request-initiated` always comes first; `request` can arrive after a fast `response`.
-  await server.on("request-initiated", (req) => {
-    const host = req.destination.hostname
+    if (host === PROBE_HOST) return undefined
 
-    if (host === PROBE_HOST) return
-
-    const load = loadKind(req.path, req.headers)
-
-    log.set(req.id, {
-      id: req.id,
+    const load = loadKind(incoming.path, incoming.headers)
+    const agent = incoming.headers["user-agent"]
+    const exchange: Exchange = {
+      id: incoming.id,
       host,
-      method: req.method,
-      path: req.path,
-      disposition: hosts.dispositionOf(host, load, req.method),
-      ...((isPageAsset(req.path) || isScriptHost(host) || isAssetKind(load)) && { asset: true }),
+      method: incoming.method,
+      path: incoming.path,
+      disposition: hosts.dispositionOf(host, load, incoming.method),
+      ...((isPageAsset(incoming.path) || isScriptHost(host) || isAssetKind(load)) && {
+        asset: true,
+      }),
       ...(load && { load }),
-      startedAt: new Date(req.timingEvents.startTime).toISOString(),
-      client: clientOf(req.headers["user-agent"]),
-      ...userField(req.headers["user-agent"]),
+      startedAt: new Date(incoming.startedAt).toISOString(),
+      client: clientOf(agent),
+      ...userField(agent),
       status: null,
       durationMs: null,
       aborted: false,
-      fault: faultLabels.get(req.id) ?? null,
-    })
-    faultLabels.delete(req.id)
-  })
-  await server.on("request", (req) => {
-    capture(
-      captureMessage(req.headers, req.body).then((message) => {
-        const exchange = log.get(req.id)
-
-        if (exchange) exchange.request = message
-      }),
-    )
-  })
-  /* A stream's headers arrive long before it ends, if it ever does: readiness stops waiting then. */
-  await server.on("response-initiated", (res) => {
-    const exchange = log.get(res.id)
-
-    if (exchange && isStreaming(res.headers["content-type"])) {
-      exchange.stream = true
-      exchange.status = res.statusCode
-      notify()
+      fault: null,
     }
-  })
-  await server.on("response", (res) => {
-    const exchange = log.get(res.id)
 
-    appCallFaults.delete(res.id)
-    if (!exchange) return
+    log.set(incoming.id, exchange)
+
+    return exchange
+  }
+
+  const recordRequest = (exchange: Exchange | undefined, incoming: Incoming, body: TappedBody) => {
+    if (exchange === undefined) return
     capture(
-      captureMessage(res.headers, res.body).then((message) => {
-        exchange.response = message
+      captureMessage(incoming.headers, body).then((message) => {
+        exchange.request = message
       }),
     )
-    exchange.status = res.statusCode
-    const { startTimestamp, responseSentTimestamp } = res.timingEvents
+  }
 
-    exchange.durationMs =
-      responseSentTimestamp === undefined
-        ? null
-        : Math.round(responseSentTimestamp - startTimestamp)
-    notify()
+  /** The reply to `incoming`, which records what goes out on `exchange`. */
+  const replyTo = (incoming: Incoming, response: ServerResponse, exchange: Exchange | undefined) =>
+    new Reply(response, {
+      /* A stream's headers arrive long before it ends, if it ever does: readiness stops waiting then. */
+      head(status, headers) {
+        if (exchange && isStreaming(headers["content-type"])) {
+          exchange.stream = true
+          exchange.status = status
+          notify()
+        }
+      },
+      done(status, headers, body) {
+        if (exchange === undefined) return
+        capture(
+          captureMessage(headers, body).then((message) => {
+            exchange.response = message
+          }),
+        )
+        exchange.status = status
+        exchange.durationMs = Math.round(performance.now() - incoming.startTime)
+        notify()
+      },
+      aborted() {
+        if (exchange) exchange.aborted = true
+        giveUps.get(incoming.id)?.()
+        notify()
+      },
+    })
+
+  let listener: Listener | undefined
+  const upstreams = new Upstreams(() => listener?.port ?? 0)
+
+  /** Sends `answer` to the client, or drops its connection for `"reset"`. */
+  const deliver = (reply: Reply, answer: Answer, method: string) => {
+    if (answer === "reset") {
+      const socket: Duplex | null = reply.response.socket
+
+      if (socket !== null && listener !== undefined) listener.reset(socket)
+      else reply.response.destroy()
+
+      return
+    }
+
+    reply.send(answer.status, answer.headers, answer.body, method)
+  }
+
+  /** Answers a call through `handler`, with `fault` applied and recorded when there is one. */
+  const answerCall = async (
+    fault: OutboundFault | AnswerHold | undefined,
+    handler: Handler,
+    call: Call,
+    exchange: Exchange | undefined,
+  ): Promise<Answer> => {
+    if (fault && exchange) exchange.fault = describeOutboundFault(fault)
+
+    const run = runIndex
+    const { id } = call.incoming
+
+    try {
+      return await answerUnder(fault, handler, call, gaveUp(id), () => runIndex !== run)
+    } finally {
+      giveUps.delete(id)
+    }
+  }
+
+  /**
+   * A routed call, or a page's call to an app the fault rule picked a fault for: its body is read,
+   * then it is answered by `handler` under the fault (for a routed call, the fault `failNext`
+   * armed, else the rule's).
+   */
+  const handleCall = async (
+    incoming: Incoming,
+    reply: Reply,
+    exchange: Exchange | undefined,
+    handler: Handler,
+    preset?: { readonly fault: OutboundFault | AnswerHold | undefined },
+  ) => {
+    const body = await bodyOf(incoming).catch(() => undefined)
+
+    if (body === undefined) return
+    recordRequest(exchange, incoming, { bytes: body, total: body.length })
+
+    const call = { incoming, body }
+    let fault = preset?.fault
+
+    if (preset === undefined) {
+      const seen = callOf(incoming)
+
+      fault = takeArmed(seen) ?? faultRule?.(seen)
+    }
+
+    try {
+      deliver(reply, await answerCall(fault, handler, call, exchange), incoming.method)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+
+      console.warn(
+        `danwo proxy: the handler for ${incoming.destination.hostname} failed: ${message}`,
+      )
+      reply.send(500, TEXT, Buffer.from(String(error)), incoming.method)
+    }
+  }
+
+  /** Answers with a fixed status and text, once the request's body has arrived. */
+  const refuse = async (
+    incoming: Incoming,
+    reply: Reply,
+    exchange: Exchange | undefined,
+    status: number,
+    text: string,
+  ) => {
+    const body = await bodyOf(incoming).catch(() => undefined)
+
+    if (body === undefined) return
+    recordRequest(exchange, incoming, { bytes: body, total: body.length })
+    reply.send(status, TEXT, Buffer.from(text), incoming.method)
+  }
+
+  /**
+   * The fault the rule picks for a page's `fetch()` to an app on this machine, if it is one. Such a
+   * call passes through as it is unless the rule picks a fault; the proxy then forwards it itself and
+   * applies the fault, as it does for a routed call, so the matrix can fail the calls a single-page
+   * app makes to its own API. `failNext` leaves these calls alone: it is for a test's provider calls.
+   */
+  const pageCallFault = (incoming: Incoming) => {
+    const host = incoming.destination.hostname
+    const load = loadKind(incoming.path, incoming.headers)
+    const disposition = hosts.dispositionOf(host, load, incoming.method)
+    const client = clientOf(incoming.headers["user-agent"])
+
+    if (!isPageCallToApp({ disposition, client, load, host })) return undefined
+
+    return faultRule?.(callOf(incoming))
+  }
+
+  /** Whether an unrouted request passes while `unmatched` is `block`: an allowed host, or an asset. */
+  const passesBlock = (incoming: Incoming) => {
+    const host = incoming.destination.hostname
+
+    return (
+      hosts.isAllowed(host) ||
+      hosts.passesAsAsset(host, loadKind(incoming.path, incoming.headers), incoming.method)
+    )
+  }
+
+  /**
+   * Where each request goes, in order: the preload's check, a routed host's handler, a page call
+   * the fault rule fails, a blocked host (502), a port of this machine nobody listens on (502,
+   * saying so rather than failing inside the passthrough), then through to the real host, unless
+   * `unmatched` is `block` and it is neither an allowed host nor a page asset that may pass.
+   */
+  const dispatch = async (incoming: Incoming, reply: Reply, exchange: Exchange | undefined) => {
+    const { hostname: host, port } = incoming.destination
+
+    if (host === PROBE_HOST) {
+      incoming.message.resume()
+      reply.send(204, [[PROBE_HEADER, "1"]], Buffer.alloc(0), incoming.method)
+
+      return
+    }
+
+    const handler = handlerFor(host)
+
+    if (handler !== undefined) return handleCall(incoming, reply, exchange, handler)
+
+    const fault = pageCallFault(incoming)
+
+    if (fault !== undefined)
+      return handleCall(incoming, reply, exchange, forwardTo(new URL(incoming.url).origin), {
+        fault,
+      })
+
+    if (hosts.isBlocked(host))
+      return refuse(incoming, reply, exchange, 502, "danwo proxy: host is blocked for this run")
+
+    if (isLoopback(host) && !(await isListening(host, port)))
+      return refuse(incoming, reply, exchange, 502, nothingListening(host, port))
+
+    if (options.unmatched === "block" && !passesBlock(incoming))
+      return refuse(
+        incoming,
+        reply,
+        exchange,
+        502,
+        "danwo proxy: host is not routed and passthrough is blocked",
+      )
+
+    return passThrough(incoming, reply, {
+      upstreams,
+      onRequestBody: (body) => recordRequest(exchange, incoming, body),
+    })
+  }
+
+  const sockets = createSockets(hosts, {
+    upstreams,
+    reset: (socket) => listener?.reset(socket),
+    debug,
   })
-  await server.on("abort", (req) => {
-    const exchange = log.get(req.id)
 
-    appCallFaults.delete(req.id)
-    if (exchange) exchange.aborted = true
-    giveUps.get(req.id)?.()
-    notify()
-  })
+  listener = await startListener(
+    authority,
+    {
+      request(incoming, response) {
+        const exchange = begin(incoming)
+        const reply = replyTo(incoming, response, exchange)
 
-  const url = `http://127.0.0.1:${server.port}`
+        dispatch(incoming, reply, exchange).catch((error: unknown) => {
+          debug(`answering ${incoming.url}: ${String(error)}`)
+          if (!reply.headSent) reply.send(500, TEXT, Buffer.from(String(error)), incoming.method)
+          else reply.response.destroy()
+        })
+      },
+      upgrade: (incoming, socket, head) => sockets.handle(incoming, socket, head),
+    },
+    debug,
+  )
+
+  const url = `http://127.0.0.1:${listener.port}`
+  const running = listener
 
   return {
     url,
-    caCert: ca.cert,
+    caCert: authority.cert,
     caCertPath,
     caBundlePath,
-    caSpki: await generateSPKIFingerprint(ca.cert),
+    caSpki: authority.spki,
     clock,
     env(base = process.env, envOptions = {}) {
       return proxyEnvironment(
@@ -874,8 +950,6 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
       armed = []
       log.clear()
       sockets.clear()
-      faultLabels.clear()
-      appCallFaults.clear()
       callIndex = 0
     },
     settled(timeoutMs = 5_000) {
@@ -897,12 +971,9 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
       })
     },
     async stop() {
-      try {
-        await server.stop()
-        await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
-      } finally {
-        loud()
-      }
+      await running.close()
+      upstreams.close()
+      await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     },
   }
 }

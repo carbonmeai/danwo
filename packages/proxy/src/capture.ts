@@ -1,4 +1,7 @@
-import type { CompletedBody, Headers as MockttpHeaders } from "mockttp"
+import { decodeBody } from "./bodies.ts"
+
+/** Headers by lower-case name, repeated ones as arrays. */
+type HeaderRecord = Readonly<Record<string, string | readonly string[] | undefined>>
 
 /** Bytes of one body an exchange keeps; the rest is dropped and the body marked truncated. */
 export const MAX_CAPTURED_BODY_BYTES = 16 * 1024
@@ -38,12 +41,12 @@ export interface CapturedMessage {
 
 const TEXT_TYPES = /^(text\/|application\/(.+\+)?(json|xml|x-www-form-urlencoded|javascript))/i
 
-function flatHeaders(headers: MockttpHeaders): Record<string, string> {
+function flatHeaders(headers: HeaderRecord): Record<string, string> {
   const out: Record<string, string> = {}
 
   for (const [name, value] of Object.entries(headers)) {
     if (value !== undefined && !name.startsWith(":"))
-      out[name] = Array.isArray(value) ? value.join(", ") : value
+      out[name] = typeof value === "string" ? value : value.join(", ")
   }
 
   return out
@@ -71,21 +74,44 @@ async function formOf(bytes: Buffer, contentType: string): Promise<FormPart[] | 
   }
 }
 
-/** Captures headers and a bounded text body; never throws (an undecodable body is kept as binary). */
+/**
+ * A body as the record keeps it: decoded when all of it was kept and its encoding is known, and
+ * its size, decoded or as it crossed the wire.
+ */
+async function decodedBody(
+  body: { readonly bytes: Buffer; readonly total: number },
+  encoding: string | undefined,
+) {
+  const whole = body.bytes.length === body.total
+  const decoded = whole ? await decodeBody(body.bytes, encoding) : undefined
+
+  return decoded === undefined
+    ? { bytes: body.bytes, size: body.total, whole }
+    : { bytes: decoded, size: decoded.length, whole }
+}
+
+/**
+ * Captures headers and a bounded text body; never throws (an undecodable body is kept as binary).
+ * `body` holds the bytes as they crossed the wire, which may be only the start of a body of
+ * `total` bytes: one that large is counted, and kept as the start of its text, undecoded.
+ */
 export async function captureMessage(
-  headers: MockttpHeaders,
-  body: CompletedBody,
+  headers: HeaderRecord,
+  body: { readonly bytes: Buffer; readonly total: number },
 ): Promise<CapturedMessage> {
   const flat = flatHeaders(headers)
-  const bytes = (await body.getDecodedBuffer().catch(() => undefined)) ?? body.buffer
-  const text = bytes.length > 0 && TEXT_TYPES.test(flat["content-type"] ?? "")
-  const truncated = text && bytes.length > MAX_CAPTURED_BODY_BYTES
-  const form = await formOf(bytes, flat["content-type"] ?? "")
+  const type = flat["content-type"] ?? ""
+  const { bytes, size, whole } = await decodedBody(body, flat["content-encoding"])
+  /* The start of a compressed body is not text, whatever its type says. */
+  const readable = whole || /^(?:identity)?$/i.test((flat["content-encoding"] ?? "").trim())
+  const text = readable && size > 0 && TEXT_TYPES.test(type)
+  const truncated = text && size > MAX_CAPTURED_BODY_BYTES
+  const form = whole ? await formOf(bytes, type) : undefined
 
   return {
     headers: flat,
     body: text ? bytes.subarray(0, MAX_CAPTURED_BODY_BYTES).toString("utf8") : null,
-    bytes: bytes.length,
+    bytes: size,
     truncated,
     ...(form && { form }),
   }

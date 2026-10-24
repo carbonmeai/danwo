@@ -10,22 +10,24 @@ export const USER_AGENT_TAG = "danwo-user/"
 
 const TAGGED = /\bdanwo-user\/([\w.-]+)/
 
-function agentOf(userAgent: string | string[] | undefined): string {
-  return Array.isArray(userAgent) ? userAgent.join(" ") : (userAgent ?? "")
+function agentOf(userAgent: string | readonly string[] | undefined): string {
+  return typeof userAgent === "string" ? userAgent : (userAgent?.join(" ") ?? "")
 }
 
 /** Whether a request's user agent is a browser's rather than a server-side HTTP client's. */
-export function clientOf(userAgent: string | string[] | undefined): "browser" | "server" {
+export function clientOf(userAgent: string | readonly string[] | undefined): "browser" | "server" {
   return agentOf(userAgent).includes("Mozilla/") ? "browser" : "server"
 }
 
 /** The person a request's browser belongs to, when the test opened that browser for someone. */
-export function userOf(userAgent: string | string[] | undefined): string | undefined {
+export function userOf(userAgent: string | readonly string[] | undefined): string | undefined {
   return TAGGED.exec(agentOf(userAgent))?.[1]
 }
 
 /** `{ user }` for a record of a request from a person's browser, else nothing. */
-export function userField(userAgent: string | string[] | undefined): { readonly user?: string } {
+export function userField(userAgent: string | readonly string[] | undefined): {
+  readonly user?: string
+} {
   const user = userOf(userAgent)
 
   return user === undefined ? {} : { user }

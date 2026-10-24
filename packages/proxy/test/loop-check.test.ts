@@ -1,31 +1,12 @@
 import { once } from "node:events"
 import { createServer, request, type Server } from "node:http"
-import { createRequire } from "node:module"
 import { connect, type Socket } from "node:net"
 
 import { listeningPort } from "@danwo/emulators"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
+import { OwnConnections } from "../src/loop.ts"
 import { type Proxy, startProxy } from "../src/proxy.ts"
-
-/** The library's loop check, as its passthrough handlers look it up. */
-interface LoopCheck {
-  isSocketLoop(outgoing: Iterable<object>, incoming: object): boolean
-}
-
-function isLoopCheck(value: unknown): value is LoopCheck {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof Reflect.get(value, "isSocketLoop") === "function"
-  )
-}
-
-const loaded: unknown = createRequire(import.meta.url)("mockttp/dist/util/socket-util")
-
-if (!isLoopCheck(loaded)) throw new Error("mockttp has no isSocketLoop")
-
-const helpers = loaded
 
 let app: Server
 let proxy: Proxy
@@ -92,7 +73,10 @@ describe("the loop check on calls passed through", () => {
         localPort: Number(at.port),
       }
 
-      expect(helpers.isSocketLoop(new Set([toApp]), callToProxy)).toBe(false)
+      const own = new OwnConnections()
+
+      own.track(toApp)
+      expect(own.isLoop(callToProxy)).toBe(false)
     } finally {
       toApp.destroy()
     }
@@ -102,7 +86,10 @@ describe("the loop check on calls passed through", () => {
     const toApp = await upstream()
 
     try {
-      expect(helpers.isSocketLoop(new Set([toApp]), accepted.at(-1) ?? {})).toBe(true)
+      const own = new OwnConnections()
+
+      own.track(toApp)
+      expect(own.isLoop(accepted.at(-1) ?? {})).toBe(true)
     } finally {
       toApp.destroy()
     }

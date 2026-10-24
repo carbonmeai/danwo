@@ -29,9 +29,6 @@
     "prepack": "node ../../scripts/declarations.ts && node ../../scripts/pack-files.ts add",
     "postpack": "node ../../scripts/pack-files.ts remove"
   },
-  "dependencies": {
-    "mockttp": "4.6.4"
-  },
   "devDependencies": {
     "@aws-sdk/client-s3": "3.1152.0",
     "@aws-sdk/s3-request-presigner": "3.1152.0",
