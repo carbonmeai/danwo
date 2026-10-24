@@ -19,7 +19,7 @@ const ALLOWLIST = new URL("../../.github/vulnerability-allowlist.json", import.m
 const ENTRY: AllowlistEntry = {
   id: "GHSA-c475-qrg2-pj4r",
   package: "basic-ftp",
-  path: "@danwo/proxy > mockttp > pac-proxy-agent > get-uri > basic-ftp",
+  path: "@danwo/example > pac-proxy-agent > get-uri > basic-ftp",
   severity: "high",
   reason: "Never reached.",
   reviewBy: "2027-01-21",

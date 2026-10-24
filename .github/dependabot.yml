@@ -24,9 +24,6 @@ updates:
     commit-message:
       prefix: build
     ignore:
-      # The proxy relies on mockttp's internals (its local port check among them); bump it by hand,
-      # with the proxy's slow tests.
-      - dependency-name: mockttp
       # danwo runs on Node 22 and 24; its types follow the newer one.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
