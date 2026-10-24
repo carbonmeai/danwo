@@ -108,8 +108,9 @@ emulator, and checks they agree. See [Writing invariants](/docs/invariants).
 
 ### 6. The fault matrix
 
-The [fault matrix](/docs/fault-matrix) replays a test once per thing that could go wrong: a
-declined card, a 500, a duplicate webhook, a double-clicked button. The invariant judges each run.
+The [fault matrix](/docs/fault-matrix) is danwo's built-in fault injection. It replays a test
+once per thing that could go wrong: a declined card, a 500, a duplicate webhook, a double-clicked
+button. The invariant judges each run.
 
 ```sh
 npx @danwo/cli matrix tests/waitlist.danwo.ts

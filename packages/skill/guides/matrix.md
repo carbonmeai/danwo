@@ -1,7 +1,9 @@
 # Invariants and the fault matrix
 
-An invariant says what must be true however a run went; `danwo matrix` breaks one provider call,
-webhook, or call to the app's own database or cache at a time and checks the invariant held.
+An invariant says what must be true however a run went; `danwo matrix` is danwo's built-in fault
+injection for E2E tests: it breaks one provider call, webhook, or call to the app's own database or
+cache at a time (planned from the clean run, injected at the proxy and emulators, no app or infra
+changes) and checks the invariant held. Deterministic and local/CI, unlike chaos testing.
 
 ## Writing the invariant
 

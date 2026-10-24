@@ -12,7 +12,7 @@ export const SITE = {
   /** What danwo is, in the words people search for; the home page's title. */
   title: "E2E testing framework for web and mobile apps",
   description:
-    "The complete e2e testing framework for web and mobile apps, with service emulators, a fault matrix and checks on every side effect.",
+    "The complete e2e testing framework for web and mobile apps, with service emulators, built-in fault injection and checks on every side effect.",
   /**
    * The public repository, as `owner/name`. While it is unset, links to it point at the docs
    * and the star count is hidden.

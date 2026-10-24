@@ -157,8 +157,8 @@ function FaultsTile() {
     <Reveal as="article" className="tile t-dark t-faults c2">
       <h3>Fault matrix</h3>
       <p>
-        The faults the test's own steps could meet, planned from what they called, grouped and kept
-        within a budget.
+        Built-in fault injection: the faults the test's own steps could meet, planned from what they
+        called, grouped and kept within a budget.
       </p>
       <div className="art">
         <div className="faults">

@@ -35,7 +35,7 @@ const ROWS: readonly (readonly [what: string, detail: string, danwo: Answer, oth
     ["no", "Pixels only"],
   ],
   [
-    "Fault matrix",
+    "Built-in fault injection",
     "declines, 500s, timeouts, webhook faults",
     ["yes", "Planned per run"],
     ["no", "No"],

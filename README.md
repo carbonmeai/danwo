@@ -35,7 +35,7 @@
 danwo is a complete UI testing framework on its own: locators, plain-English agent steps that
 replay with no model calls, and screenshot comparison, in a browser, on Android or on iOS. When
 your app takes payments, sends email or handles webhooks, turn on the backend layer: emulated
-providers, invariants and a fault matrix.
+providers, invariants and built-in fault injection (the fault matrix).
 
 ## A test
 
@@ -126,7 +126,9 @@ faults: 16 passed
 ```
 
 Remove the app's idempotency key and two trials turn red: a second welcome email went out.
-See [the fault matrix](https://danwo.dev/docs/fault-matrix).
+The faults are planned from what the test called and injected at danwo's proxy, so there is
+nothing to set up and every result reproduces. See
+[the fault matrix](https://danwo.dev/docs/fault-matrix).
 
 Every run, with or without the backend layer, leaves a flight record: video, steps, and the calls
 behind them, in a dashboard, a PR comment and over MCP.

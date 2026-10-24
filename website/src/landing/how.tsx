@@ -254,8 +254,9 @@ export function HowItWorks() {
             <BreakFigure />
             <h3>The matrix breaks it</h3>
             <p>
-              It replays the clean run once per planned fault: declines, 500s, timeouts, duplicate
-              or forged webhooks, double-submits, Postgres and Redis faults, time travel.
+              Built-in fault injection. It replays the clean run once per planned fault: declines,
+              500s, timeouts, duplicate or forged webhooks, double-submits, Postgres and Redis
+              faults, time travel.
             </p>
           </Reveal>
         </div>

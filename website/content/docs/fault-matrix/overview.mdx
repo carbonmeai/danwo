@@ -1,13 +1,16 @@
 ---
 title: Overview
-description: Replay one test under every fault it could meet, and check your app coped with each one.
+description: Built-in fault injection for end-to-end tests. Replay one test under every fault it could meet, and check your app coped with each one.
 icon: Grid3x3
 ---
 
-The fault matrix replays a test once for each thing that could go wrong while it runs: a
-declined card, a 500 from Stripe, a webhook that arrives twice, a button clicked twice. After
-each replay, it checks a rule you wrote. You learn which failures your app survives before your
-users find the ones it doesn't.
+The fault matrix is danwo's built-in fault injection for end-to-end tests. It replays a test
+once for each thing that could go wrong while it runs: a declined card, a 500 from Stripe, a
+webhook that arrives twice, a button clicked twice. After each replay, it checks a rule you wrote.
+You learn which failures your app survives before your users find the ones it doesn't.
+
+There is nothing to set up. The faults go in at danwo's proxy and its emulators, so your app's
+code and infrastructure stay as they are.
 
 ## Why you need it
 
@@ -16,6 +19,19 @@ twice. A response is lost after the payment went through. A user double-clicks *
 
 Each of those can leave your app wrong while the screen looks fine. The matrix makes each one
 happen, on purpose, one at a time.
+
+## How it differs from chaos testing
+
+Chaos testing breaks infrastructure at random, often in production, and watches what happens.
+The matrix works at a different level:
+
+| The matrix                                             | Chaos testing                       |
+| ------------------------------------------------------ | ----------------------------------- |
+| breaks one provider call, webhook or query at a time   | breaks servers, networks or regions |
+| plans its faults from what your test actually called   | picks faults at random              |
+| runs on your machine or in CI, against emulators       | often runs in production            |
+| checks a rule about your data after every fault        | watches dashboards and alerts       |
+| gives the same result every run, so a failure is a bug | can be hard to reproduce            |
 
 ## How it works
 
