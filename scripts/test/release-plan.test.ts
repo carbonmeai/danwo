@@ -109,6 +109,28 @@ describe("staging", () => {
     expect(manifest.version).toBe("0.0.0")
   })
 
+  test("pins optional peers exactly too, keeping them optional", () => {
+    const manifest: Manifest = {
+      name: "@danwo/cli",
+      version: "0.0.0",
+      private: true,
+      dependencies: { "@danwo/runner": "workspace:*" },
+      peerDependencies: { "@danwo/mobile": "workspace:*", "@danwo/mcp": "workspace:*" },
+      peerDependenciesMeta: {
+        "@danwo/mobile": { optional: true },
+        "@danwo/mcp": { optional: true },
+      },
+      devDependencies: { "@danwo/mobile": "workspace:*", "@danwo/mcp": "workspace:*" },
+    }
+    const staged = stagedManifest(manifest, VERSION)
+
+    expect(staged.peerDependencies).toEqual({ "@danwo/mobile": VERSION, "@danwo/mcp": VERSION })
+    expect(staged["peerDependenciesMeta"]).toEqual(manifest["peerDependenciesMeta"])
+    expect(
+      publishOrder([manifest, workspace("mobile").manifest, workspace("mcp").manifest]),
+    ).toEqual(["@danwo/mcp", "@danwo/mobile", "@danwo/cli"])
+  })
+
   test("publishes every package but fidelity and ui", () => {
     const packages = ["cli", "fidelity", "sdk", "ui"].map((folder) => workspace(folder))
 
@@ -272,5 +294,13 @@ describe("stepReport", () => {
     expect(stepReport("a", { status: null, output: "", ms: 10 }).lines).toEqual([
       "  FAILED a (0.0 s)",
     ])
+  })
+
+  test("passes a step that must fail only on the exit status it names", () => {
+    const missing = "danwo build-ios needs @danwo/mobile: npm install -D @danwo/mobile"
+
+    expect(stepReport("a", { status: 2, output: missing, ms: 10 }, "needs", 2).ok).toBe(true)
+    expect(stepReport("a", { status: 0, output: missing, ms: 10 }, "needs", 2).ok).toBe(false)
+    expect(stepReport("a", { status: 1, output: missing, ms: 10 }, "needs", 2).ok).toBe(false)
   })
 })

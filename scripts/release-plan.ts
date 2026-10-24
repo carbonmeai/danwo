@@ -263,16 +263,18 @@ export interface StepResult {
 }
 
 /**
- * Whether a check step passed (exit 0, and its output holds `expected` when given), with the
- * lines to print: the verdict, then the output's last lines, more of them when it failed.
+ * Whether a check step passed (it exited with `status`, 0 by default, and its output holds
+ * `expected` when given), with the lines to print: the verdict, then the output's last lines, more
+ * of them when it failed.
  */
 export function stepReport(
   label: string,
   result: StepResult,
   expected?: string,
+  status = 0,
 ): { ok: boolean; lines: string[] } {
   const output = result.output.trim()
-  const ok = result.status === 0 && output.includes(expected ?? "")
+  const ok = result.status === status && output.includes(expected ?? "")
   const tail = output
     .split(/\r?\n/)
     .slice(ok ? -4 : -40)

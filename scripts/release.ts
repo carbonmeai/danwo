@@ -4,12 +4,13 @@
  * Usage: `node scripts/release.ts <version> [--pack | --publish] [--verify] [--out <dir>]`
  *
  * - `--pack` (the default) builds the dashboard and the type declarations once, stages a copy of
- *   each public package at `version` (not private, every `workspace:` range set to the version, the
- *   repository's LICENSE and NOTICE and a README added), and writes one tarball per package with
+ *   each public package at `version` (not private, every `workspace:` range set to the version, in
+ *   optional peers too, the repository's LICENSE, the package's NOTICE and a README added), and writes one tarball per package with
  *   `npm pack` to `--out` (`dist/release`). The packages' own package.json files are not touched.
- * - `--verify` then installs every tarball into a fresh npm project and runs `danwo --version`,
- *   `danwo init`, `danwo test` and a strict `tsc --noEmit` there, then checks danwo left nothing
- *   running; any failure exits non-zero.
+ * - `--verify` then installs `@danwo/cli` and `@danwo/sdk` from the tarballs into a fresh npm
+ *   project, as `danwo init` does for a web project, and runs `danwo --version`, `danwo init`,
+ *   `danwo test` and a strict `tsc --noEmit` there, checks a mobile command without `@danwo/mobile`
+ *   names its install, then checks danwo left nothing running; any failure exits non-zero.
  * - `--publish` packs, then publishes the tarballs with `npm publish --provenance`, dependencies
  *   first, under `beta` for a prerelease and `latest` otherwise. Only CI runs it.
  *
@@ -132,7 +133,7 @@ function build(): void {
 
 /** Copies the public packages into `stage` at `version`, with what packing them needs beside. */
 function stage(packages: readonly WorkspacePackage[], version: string, stageDir: string): void {
-  for (const file of ["LICENSE", "NOTICE", "scripts/pack-files.ts"])
+  for (const file of ["LICENSE", "scripts/pack-files.ts"])
     cpSync(join(ROOT, file), join(stageDir, file))
 
   for (const { folder, manifest } of packages) {
@@ -149,7 +150,7 @@ function stage(packages: readonly WorkspacePackage[], version: string, stageDir:
   }
 }
 
-/** Packs each staged package into `out`, adding LICENSE, NOTICE and a README first. */
+/** Packs each staged package into `out`, adding LICENSE, its NOTICE and a README first. */
 function pack(packages: readonly WorkspacePackage[], stageDir: string, out: string): Packed[] {
   return packages.map(({ folder }) => {
     const cwd = join(stageDir, "packages", folder)
@@ -192,12 +193,14 @@ interface CheckStep {
   readonly argv: readonly string[]
   /** Text the output must contain. */
   readonly expected?: string
+  /** The exit status it must end with (default 0). */
+  readonly status?: number
   /** What to write before it runs. */
   readonly before?: () => void
 }
 
 /** Runs one check step in `cwd`, printing whether it passed and its last lines; true when it did. */
-function step({ label, argv, expected }: CheckStep, cwd: string): boolean {
+function step({ label, argv, expected, status }: CheckStep, cwd: string): boolean {
   const started = Date.now()
   const [program = "", ...args] = argv
   /* npm and npx are `.cmd` scripts on Windows, started through cmd.exe. */
@@ -212,6 +215,7 @@ function step({ label, argv, expected }: CheckStep, cwd: string): boolean {
     label,
     { status: result.status, output: `${result.stdout}${result.stderr}`, ms: Date.now() - started },
     expected,
+    status,
   )
 
   for (const line of report.lines) console.log(line)
@@ -353,8 +357,34 @@ function typescriptRange(): string {
 }
 
 /**
- * Installs the tarballs into a fresh CommonJS npm project (what `npm init -y` writes) and runs
- * danwo there as a user would. Keeps the project when a step fails, to look at.
+ * The check project's package.json: a fresh CommonJS npm project (what `npm init -y` writes) that
+ * adds what `danwo init` adds to a web project, `@danwo/cli` and `@danwo/sdk`, from the tarballs.
+ * Overrides point every other danwo package at its tarball, so npm installs only the ones those
+ * two need: none of the optional peers.
+ */
+function checkManifest(packed: readonly Packed[]): string {
+  const tarballs = Object.fromEntries(
+    packed.map((tarball) => [tarball.name, `file:${tarball.file}`]),
+  )
+  const direct = ["@danwo/cli", "@danwo/sdk"]
+
+  return `${JSON.stringify(
+    {
+      name: "release-check",
+      version: "1.0.0",
+      type: "commonjs",
+      devDependencies: Object.fromEntries(direct.map((name) => [name, tarballs[name]])),
+      overrides: tarballs,
+    },
+    null,
+    2,
+  )}\n`
+}
+
+/**
+ * Installs the tarballs into a fresh web project and runs danwo there as a user would, then checks
+ * that a command needing an optional package the project lacks names the install. Keeps the
+ * project when a step fails, to look at.
  */
 async function verify(packed: readonly Packed[], version: string): Promise<boolean> {
   const dir = mkdtempSync(join(tmpdir(), "danwo-release-check-"))
@@ -362,21 +392,17 @@ async function verify(packed: readonly Packed[], version: string): Promise<boole
   const npx = ["npx", "--no", "--"]
 
   console.log(`\nChecking the tarballs in a fresh project: ${dir}`)
-  writeFileSync(
-    join(dir, "package.json"),
-    `${JSON.stringify({ name: "release-check", version: "1.0.0", type: "commonjs" }, null, 2)}\n`,
-  )
+  writeFileSync(join(dir, "package.json"), checkManifest(packed))
   writeFileSync(join(dir, "app.mts"), appSource(port))
 
   const steps: readonly CheckStep[] = [
     {
-      label: "npm install the tarballs",
+      label: "npm install @danwo/cli and @danwo/sdk from the tarballs",
       argv: [
         "npm",
         "install",
         "--no-audit",
         "--no-fund",
-        ...packed.map((tarball) => tarball.file),
         `typescript@${typescriptRange()}`,
         "@types/node@^24",
       ],
@@ -395,6 +421,12 @@ async function verify(packed: readonly Packed[], version: string): Promise<boole
       label: "npx tsc --noEmit (strict, nodenext)",
       argv: [...npx, "tsc", "--noEmit", "-p", "typed"],
       before: () => writeTypedProject(dir),
+    },
+    {
+      label: "npx @danwo/cli build-ios without @danwo/mobile names the install",
+      argv: [...npx, "@danwo/cli", "build-ios"],
+      expected: `danwo build-ios needs @danwo/mobile: npm install -D @danwo/mobile@${version}`,
+      status: 2,
     },
   ]
   const passed = steps.every((check) => {

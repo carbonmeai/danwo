@@ -1,8 +1,9 @@
 /**
- * What every published package carries beside its code: the repository's LICENSE and NOTICE, and a
- * README when the package has none of its own, pointing to danwo.dev. Run from the package's folder:
- * `add` before packing (`prepack`) copies them in, `remove` after it (`postpack`) deletes them again,
- * but only files that are exactly what `add` writes, so a package's own README stays.
+ * What every published package carries beside its code: the repository's LICENSE, a NOTICE for the
+ * package, and a README when the package has none of its own, pointing to danwo.dev. Run from the
+ * package's folder: `add` before packing (`prepack`) copies them in, `remove` after it (`postpack`)
+ * deletes them again, but only files that are exactly what `add` writes, so a package's own README
+ * stays.
  */
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { basename, join } from "node:path"
@@ -38,6 +39,18 @@ function readme(manifest: Manifest): string {
   ].join("\n")
 }
 
+/**
+ * The NOTICE a package ships. The repository's NOTICE also covers the brand files and the
+ * wordmark's font, which no package holds, so a package gets only what applies to its code.
+ */
+const PACKAGE_NOTICE = [
+  "dánwò (danwo)",
+  "Copyright 2026 Carbonme Inc",
+  "",
+  "This product is licensed under the Apache License, Version 2.0 (see LICENSE).",
+  "",
+].join("\n")
+
 /** The files `add` writes into the package, with their contents. */
 function packFiles(): Map<string, string> {
   const parsed: unknown = JSON.parse(readFileSync(join(PACKAGE, "package.json"), "utf8"))
@@ -49,8 +62,8 @@ function packFiles(): Map<string, string> {
   }
   const files = new Map<string, string>()
 
-  for (const file of ["LICENSE", "NOTICE"]) files.set(file, readFileSync(join(ROOT, file), "utf8"))
-
+  files.set("LICENSE", readFileSync(join(ROOT, "LICENSE"), "utf8"))
+  files.set("NOTICE", PACKAGE_NOTICE)
   files.set("README.md", readme(manifest))
 
   return files
