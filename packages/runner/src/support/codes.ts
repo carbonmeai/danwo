@@ -60,6 +60,10 @@ const ERROR_CODES = {
   TIMED_OUT: ["test", "the test ran past its deadline"],
   TEST_FAILED: ["test", "the test threw an error of its own"],
   CONFIG_INVALID: ["config", "the project or the call is set up wrongly"],
+  PACKAGE_MISSING: [
+    "config",
+    "a command or the config needs a danwo package the project has not installed, such as @danwo/mobile",
+  ],
   MODEL_UNAVAILABLE: ["infra", "the model provider could not be reached or refused the call"],
   BROWSER_FAILED: ["infra", "the browser crashed, closed or could not start"],
   ENVIRONMENT_FAILED: ["infra", "the worker's environment (app, emulators, proxy) failed"],

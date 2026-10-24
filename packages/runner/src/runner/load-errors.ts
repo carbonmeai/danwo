@@ -8,6 +8,7 @@ import { isAbsolute } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { DanwoError } from "../support/codes.ts"
+import { isOptionalPackage, packageOf, PackageMissingError } from "../support/optional-packages.ts"
 import { relativeSlashed } from "../support/paths.ts"
 
 /** What Node's strip-only mode rejects, by its message, and what to write instead. */
@@ -87,6 +88,11 @@ export function explainLoadError(error: unknown, file: string, kind: "config" | 
   if (!(error instanceof Error)) return error
 
   const what = kind === "config" ? `the config ${shown(file)}` : `the test file ${shown(file)}`
+  const missing = codeOf(error) === "ERR_MODULE_NOT_FOUND" ? missingPackage(error) : undefined
+  const optional = missing === undefined ? "" : packageOf(missing.specifier)
+
+  if (isOptionalPackage(optional)) return new PackageMissingError(what, optional, { cause: error })
+
   const message = strippingMessage(error, what)
 
   return message === undefined ? error : new DanwoError("CONFIG_INVALID", message, { cause: error })

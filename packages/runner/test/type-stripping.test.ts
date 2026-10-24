@@ -95,6 +95,19 @@ export default { answer: one + two + three + four }
 })
 
 describe("TypeScript that type stripping cannot load", () => {
+  it("names the command that adds an optional danwo package the config imports", async () => {
+    const dir = project({
+      "pnpm-lock.yaml": "",
+      "danwo.config.ts":
+        'import { withAndroidDevice } from "@danwo/mobile"\n\nexport default { answer: typeof withAndroidDevice }\n',
+    })
+    const out = await loadConfigIn(dir)
+
+    expect(out).toBe(
+      "PACKAGE_MISSING the config danwo.config.ts needs @danwo/mobile: pnpm add -D @danwo/mobile",
+    )
+  })
+
   it("names an enum in the config, where it is, and what to write instead", async () => {
     const dir = project({ "danwo.config.ts": "enum Plan { Free }\n\nexport default {}\n" })
     const out = await loadConfigIn(dir)

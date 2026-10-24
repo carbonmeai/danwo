@@ -75,7 +75,11 @@ const ENVIRONMENT_CODES: ReadonlySet<ErrorCode> = new Set([
 ])
 
 /** Codes for a test that could not work as written, whatever the app did. */
-const TEST_CODES: ReadonlySet<ErrorCode> = new Set(["CONFIG_INVALID", "SECRET_REFUSED"])
+const TEST_CODES: ReadonlySet<ErrorCode> = new Set([
+  "CONFIG_INVALID",
+  "PACKAGE_MISSING",
+  "SECRET_REFUSED",
+])
 
 /** Codes for an agent step that could not be carried out on the page it found. */
 const AGENT_CODES: ReadonlySet<ErrorCode> = new Set([
