@@ -15,6 +15,6 @@
     "@danwo/cli": "workspace:*",
     "@danwo/emulators": "workspace:*",
     "@danwo/sdk": "workspace:*",
-    "ai": "7.0.143"
+    "ai": "7.0.148"
   }
 }

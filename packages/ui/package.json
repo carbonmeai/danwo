@@ -67,13 +67,13 @@
     "cmdk": "1.1.1",
     "input-otp": "1.5.0",
     "luxon": "3.7.2",
-    "motion": "14.4.0",
+    "motion": "14.5.0",
     "next-themes": "0.4.6",
     "radix-ui": "1.8.1",
     "react-day-picker": "10.0.2",
     "react-markdown": "10.1.0",
     "react-number-format": "5.4.5",
-    "react-resizable-panels": "4.14.6",
+    "react-resizable-panels": "4.14.8",
     "react-tag-input": "6.10.6",
     "recharts": "3.10.1",
     "remark-gfm": "4.0.1",
@@ -83,8 +83,8 @@
     "vaul": "1.1.2"
   },
   "devDependencies": {
-    "@pandacss/dev": "2.2.0",
-    "@pandacss/preset-base": "2.2.0",
+    "@pandacss/dev": "2.3.0",
+    "@pandacss/preset-base": "2.3.0",
     "@tanstack/react-router": "1.170.45",
     "@types/luxon": "3.7.6",
     "@types/mdast": "4.0.4",
@@ -93,7 +93,7 @@
     "happy-dom": "21.0.4",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "vite": "8.3.4"
+    "vite": "8.3.5"
   },
   "peerDependencies": {
     "@tanstack/react-router": "1.170.45",

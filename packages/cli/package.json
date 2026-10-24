@@ -33,10 +33,10 @@
     "commander": "15.0.0"
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "3.1152.0",
+    "@aws-sdk/client-s3": "3.1155.0",
     "@bachs/sdk": "2.0.0",
-    "@clerk/express": "2.1.80",
-    "@composio/core": "0.25.0",
+    "@clerk/express": "2.1.82",
+    "@composio/core": "0.26.0",
     "@danwo/fidelity": "workspace:*",
     "@danwo/mcp": "workspace:*",
     "@danwo/mobile": "workspace:*",
@@ -52,7 +52,7 @@
     "express": "5.3.0",
     "ioredis": "6.0.0",
     "nylas": "8.4.0",
-    "openai": "7.39.0",
+    "openai": "7.41.0",
     "openid-client": "6.8.8",
     "pg": "8.23.1",
     "pusher": "5.3.4",
