@@ -25,9 +25,10 @@ danwo project's.
 - **Invariants that read both sides.** After every test, the API's database is checked against
   Stripe and Resend: one booking per paid Checkout Session, a place taken once per booking, one
   confirmation email per booking, and amounts equal to what Stripe charged.
-- **A matrix the app survives.** `danwo matrix` plans 52 faults on a booking: Stripe 5xx, 429s
+- **A matrix the app survives.** `danwo matrix` plans 54 faults on a booking: Stripe 5xx, 429s
   and a declined card, duplicate, late, forged and stale webhooks, a double-submitted booking,
-  Resend failures, and Postgres serialization failures, deadlocks and lost COMMITs. The app
+  Resend failures, Postgres serialization failures, deadlocks and lost COMMITs, and the
+  confirmation page's poll of the API failing. The app
   passes all of them, with retries, idempotency keys and webhook dedupe.
 - **A bug you can switch on.** `STUDIO_BUG` turns one safeguard off, and the matrix shows which
   trials go red.
@@ -75,7 +76,7 @@ The scripts:
 | --------------------- | ------------------------------------------------------------------ |
 | `npm test`            | every test; the agent tests skip without a model key               |
 | `npm run matrix:plan` | what the booking's fault matrix would try, without running it      |
-| `npm run matrix`      | the booking's fault matrix: 52 trials, a little over a minute      |
+| `npm run matrix`      | the booking's fault matrix: 54 trials, a little over a minute      |
 | `npm run serve`       | danwo's dashboard over everything the runs recorded                |
 | `npm run typecheck`   | `svelte-check` over the site, then `tsc` over the tests and config |
 | `npm run build`       | the site's build alone; the tests build it when it is stale        |
@@ -135,8 +136,10 @@ every request to be HTTPS unless a proxy in front says otherwise, so a form post
 | Stripe and Resend                      | the API, in Python         | `server`, to the emulators |
 
 The site's server reaches the proxy because danwo's preload routes Node's `fetch`. The calls
-between the apps are on this machine, so the proxy passes them on and records them. It never
-faults them: the matrix faults the providers, the webhooks and Postgres, not your own apps.
+between the apps are on this machine, so the proxy passes them on and records them. The matrix
+faults the browser's calls to the API as it does a provider call: the confirmation page's poll
+gets a 500 and a dropped connection, and the page asks again a second later. The site server's
+calls to the API are left alone.
 
 ## How the API reaches the emulators
 
@@ -176,11 +179,11 @@ FAIL  duplicate on stripe webhook checkout.session.completed
         invariant: one booking per paid Checkout Session: expected [ …(2) ] to deeply equal [ Array(1) ]
 FAIL  reset-after on COMMIT (postgres)
         invariant: one booking per paid Checkout Session: expected [ …(2) ] to deeply equal [ Array(1) ]
-faults: 45 passed, 2 failed
+faults: 47 passed, 2 failed
 ```
 
 The second is the subtle one: the COMMIT landed but its answer was lost, so the API retried a
-transaction that had already succeeded. The plan has 47 trials here, not 52: with no event log,
+transaction that had already succeeded. The plan has 49 trials here, not 54: with no event log,
 there is no insert into it to fault.
 
 **`STUDIO_BUG=no-idempotency-key npm run matrix`** creates the Checkout Session without an
@@ -191,7 +194,7 @@ starts two sessions for one place, and the customer could pay both.
 FAIL  double-submit on POST /classes/sunrise-flow
         POST /classes/sunrise-flow sent twice at once: 303 and 303
         invariant: one Checkout Session per class and customer: expected [ …(2) ] to deeply equal [ Array(1) ]
-faults: 51 passed, 1 failed
+faults: 53 passed, 1 failed
 ```
 
 To rerun one trial while you fix it, pass its label to `--faults`:

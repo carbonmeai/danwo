@@ -113,12 +113,12 @@ one proxy:
 | Call                              | Recorded as          | Faulted by the matrix  |
 | --------------------------------- | -------------------- | ---------------------- |
 | the site's server calling the API | `server`, passed on  | no: it is your own app |
-| the browser calling the API       | `browser`, passed on | no                     |
+| the browser calling the API       | `browser`, passed on | yes, like a provider   |
 | the API calling Stripe or Resend  | `server`, routed     | yes                    |
 
 Readiness waits for every one of them, so a test never asserts while the site is still waiting
-on the API. The Python example's matrix plans the same 52 faults with the site in front as
-without it.
+on the API. The Python example's matrix plans 54 faults, two of them on the confirmation page
+asking the API whether the booking exists.
 
 ## Go
 
