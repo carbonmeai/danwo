@@ -183,7 +183,7 @@ repository:
 
 ```sh
 bun install
-bun run release 0.1.4 --pack
+bun run release 0.1.5 --pack
 node examples/link.ts jobs
 ```
 
@@ -212,5 +212,5 @@ That leaves only `node_modules`, which git ignores. The package.json is put back
 | `kit/`            | the examples' shared styles                                                        |
 | `tests/`          | the tests, the invariants (`digests.ts`) and the database helpers                  |
 
-Last checked with @danwo/cli 0.1.4, inngest 4.25 with inngest-cli 1.46, Hono 4.13,
+Last checked with @danwo/cli 0.1.5, inngest 4.25 with inngest-cli 1.46, Hono 4.13,
 Drizzle 0.45, Vite 8.3, React 19.3, Postgres 17 and Node 24.

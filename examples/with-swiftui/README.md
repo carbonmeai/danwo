@@ -117,7 +117,7 @@ repository:
 
 ```sh
 bun install
-bun run release 0.1.4 --pack
+bun run release 0.1.5 --pack
 node examples/link.ts with-swiftui --here
 ```
 
@@ -136,4 +136,4 @@ node examples/link.ts with-swiftui --here
 
 See [Native iOS apps](https://danwo.dev/docs/native-ios) for your own app.
 
-Last checked with danwo 0.1.4, Xcode 26.6, iOS 26.5, Postgres 17 and Node 24.
+Last checked with danwo 0.1.5, Xcode 26.6, iOS 26.5, Postgres 17 and Node 24.

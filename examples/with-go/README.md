@@ -225,7 +225,7 @@ repository:
 
 ```sh
 bun install
-bun run release 0.1.4 --pack
+bun run release 0.1.5 --pack
 node examples/link.ts with-go
 ```
 
@@ -249,5 +249,5 @@ node examples/link.ts with-go
 | `tests/quillwork.ts`                                     | the steps the tests share, and the invariants                               |
 | `tests/deterministic.danwo.ts`, `tests/agentic.danwo.ts` | four locator tests, and two agent tests                                     |
 
-Last checked with @danwo/cli 0.1.4, Go 1.26, stripe-go v87, resend-go v4, pgx 5.11, Postgres 17,
+Last checked with @danwo/cli 0.1.5, Go 1.26, stripe-go v87, resend-go v4, pgx 5.11, Postgres 17,
 Vue 3.5, Vue Router 5, Vite 8 and Node 24.

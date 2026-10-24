@@ -1,0 +1,26 @@
+---
+title: danwo 0.1.5
+description: danwo's own proxy, and a web install of 54 packages and 71 MB with nothing for npm audit to report.
+date: 2026-10-24
+---
+
+## Changed
+
+- **danwo's own proxy.** The proxy that routes your app's calls and injects faults is now danwo's
+  own code, with no dependencies. A web project installs 54 packages and 71 MB, down from 249
+  packages and 123 MB, and `npm audit` finds nothing. The basic-ftp advisory is gone with it.
+- **Yjs only for Tiptap.** `yjs` and `y-protocols` are optional now, and only the Tiptap emulator
+  loads them. An app that uses Tiptap's collaboration has them already; one that doesn't is told
+  `npm install -D yjs y-protocols`. See [Tiptap](/docs/providers/tiptap).
+- The proxy speaks HTTP/1.1 to your app and the browser. A client that offers HTTP/2 as well gets
+  HTTP/1.1; a client that speaks only HTTP/2, such as gRPC, is turned away in the TLS handshake.
+- The proxy prints nothing when a connection drops. Set `DANWO_DEBUG=proxy` to see each call it
+  handles and why one failed.
+
+## Fixed
+
+- Bachs' emulator settles a payment even when its timer fires a moment early, so the payment's
+  webhook is never lost on a busy machine.
+- A call to an app on a `*.localhost` name is checked for a listener at the address it's dialled
+  at, so it works where no resolver knows the name.
+- danwo's CA can sign only the certificates it serves, never another CA.
