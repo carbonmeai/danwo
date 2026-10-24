@@ -255,7 +255,8 @@ export async function createAuthority(commonName: string): Promise<Authority> {
       notBefore: new Date(now.getTime() - BACKDATE_MS),
       notAfter: new Date(now.getTime() + CA_LIFETIME_MS),
       extensions: [
-        extension(OIDS.basicConstraints, true, sequence(boolean(true))),
+        /* A CA whose path length is 0: it signs the leaves and can never sign another CA. */
+        extension(OIDS.basicConstraints, true, sequence(boolean(true), smallInteger(0))),
         /* digitalSignature, keyCertSign and cRLSign: bits 0, 5 and 6 of 7, so 1 unused. */
         extension(OIDS.keyUsage, true, bitString(Buffer.from([0x86]), 1)),
         extension(OIDS.subjectKeyId, false, octetString(keyId)),

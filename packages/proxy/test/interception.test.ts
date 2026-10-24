@@ -195,6 +195,10 @@ describe("certificates", () => {
     const ca = new X509Certificate(authority.cert)
 
     expect(ca.ca).toBe(true)
+    /* Basic constraints `cA: TRUE, pathLenConstraint: 0`: the CA can't vouch for another CA. */
+    expect(ca.raw.includes(Buffer.from([0x30, 0x06, 0x01, 0x01, 0xff, 0x02, 0x01, 0x00]))).toBe(
+      true,
+    )
     expect(ca.checkIssued(ca)).toBe(true)
     expect(authority.spki).toMatch(/^[A-Za-z0-9+/]{43}=$/)
 
