@@ -112,11 +112,12 @@ export function isMissingPackage(error: unknown, name: string): boolean {
 
   const code: unknown = Reflect.get(error, "code")
 
-  return (
-    (code === "ERR_MODULE_NOT_FOUND" || code === "MODULE_NOT_FOUND") &&
-    new RegExp(`Cannot find (package|module) '${name.replace(/[/.]/g, "\\$&")}(/[^']*)?'`).test(
-      error.message,
-    )
+  if (code !== "ERR_MODULE_NOT_FOUND" && code !== "MODULE_NOT_FOUND") return false
+
+  return ["package", "module"].some((kind) =>
+    [`'${name}'`, `'${name}/`].some((quoted) =>
+      error.message.includes(`Cannot find ${kind} ${quoted}`),
+    ),
   )
 }
 
