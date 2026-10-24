@@ -179,6 +179,28 @@ app: {
 Run `go build` before the app starts, in the config's `environment`, behind a lock so parallel
 workers don't each compile.
 
+### Serve a single-page app from it
+
+Many Go products serve their frontend's built files and the JSON API from one server, on one
+origin. The [Go example](/docs/examples/with-go) does this with a Vue app: the session is a cookie,
+and there is no CORS to set up. Build the page with Vite behind the same lock as `go build`, and
+point the server at Vite's output. Every path the page's router owns gets `index.html`:
+
+```go title="api/web.go · the router's paths, trimmed"
+func (a *webApp) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+	if info, err := fs.Stat(a.files, name); err == nil && !info.IsDir() {
+		a.serve.ServeHTTP(w, r) // a file Vite wrote
+		return
+	}
+	http.ServeFileFS(w, r, a.files, "index.html") // /account, /checkout/return, …
+}
+```
+
+The page's calls to the API come from danwo's browser, so they go through the proxy whatever
+language the server is in. The flight record shows each one, and the matrix faults them as it does
+a provider call: a 500, a dropped connection, and an answer lost after the API acted.
+
 ## What differs from a Node app
 
 | What                              | Python                                                  | Go                                                   |
@@ -220,7 +242,7 @@ emulator answers, and `secrets: "fail"` refuses a live-looking key in the app's 
     A SvelteKit site on a FastAPI API, with Stripe, Resend, Postgres and its matrix.
   </Card>
   <Card title="The Go example" href="/docs/examples/with-go">
-    A Go subscription app on Stripe, Resend and Postgres, with its matrix.
+    A Vue app on a Go API, with Stripe, Resend and Postgres, and its matrix.
   </Card>
   <Card title="The Node preload" href="/docs/node-preload">
     What danwo does for a Node app instead.
