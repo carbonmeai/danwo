@@ -15,7 +15,8 @@ import { hs256Claims } from "../hs256.ts"
 import { asRecord } from "../json.ts"
 import type { EmulatorSocket, SocketSession, SocketUpgrade } from "../sockets.ts"
 import type { Store } from "../store.ts"
-import { appTable, type TiptapApp, type TiptapDocuments } from "./documents.ts"
+import { appTable, type TiptapApp } from "./apps.ts"
+import type { TiptapDocuments } from "./documents.ts"
 
 /** The message types of the protocol. */
 const MESSAGE = {

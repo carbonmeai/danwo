@@ -2,8 +2,9 @@
 import type { Emulator } from "../define.ts"
 import { waitUntil } from "../poll.ts"
 import type { Store } from "../store.ts"
+import type { TiptapTrouble } from "./apps.ts"
 import type { TiptapCollab } from "./collab.ts"
-import type { TiptapDocuments, TiptapTrouble } from "./documents.ts"
+import type { TiptapDocuments } from "./documents.ts"
 import type { ProseMirrorNode } from "./prosemirror.ts"
 
 /** Each emulator's live server, by its store. */

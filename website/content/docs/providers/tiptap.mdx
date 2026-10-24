@@ -8,6 +8,15 @@ other's changes, and a test reads what the document says.
 
 ## Set up
 
+The emulator runs on the same Yjs packages as Tiptap's collaboration. An app that uses
+`@hocuspocus/provider` or `TiptapCollabProvider` has them already; if yours doesn't, add them:
+
+```sh
+npm install -D yjs y-protocols
+```
+
+Without them, a test that uses the emulator stops and prints that command.
+
 Add `tiptapService` with your app id and the secret your server signs collaboration tokens with:
 
 ```ts title="danwo.config.ts"

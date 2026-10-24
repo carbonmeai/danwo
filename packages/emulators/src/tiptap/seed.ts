@@ -1,5 +1,5 @@
 import type { Store } from "../store.ts"
-import { appTable } from "./documents.ts"
+import { appTable } from "./apps.ts"
 import type { ProseMirrorNode } from "./prosemirror.ts"
 
 /** A collaboration app: the id in its host, and what its tokens and API calls must carry. */

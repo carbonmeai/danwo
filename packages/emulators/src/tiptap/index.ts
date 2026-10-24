@@ -1,17 +1,47 @@
 import { defineEmulator } from "../define.ts"
 import { HttpError } from "../errors.ts"
 import type { Store } from "../store.ts"
-import { TiptapCollab } from "./collab.ts"
-import { TiptapDocuments } from "./documents.ts"
+import type { TiptapCollab } from "./collab.ts"
+import type { TiptapDocuments } from "./documents.ts"
 import { registerTiptap, tiptapServer } from "./inspect.ts"
-import { tiptapRoutes } from "./routes.ts"
 import { seedTiptapApps, type TiptapSeedConfig } from "./seed.ts"
 
-export type { TiptapTrouble } from "./documents.ts"
+export type { TiptapTrouble } from "./apps.ts"
 export { tiptapOutboundFaults } from "./faults.ts"
 export { tiptapCollab, type TiptapCollabView } from "./inspect.ts"
 export type { ProseMirrorNode as TiptapNode } from "./prosemirror.ts"
 export type { TiptapSeedApp, TiptapSeedConfig } from "./seed.ts"
+
+/** The packages the collaboration server runs on, which a project using Tiptap's collaboration has. */
+const YJS_PACKAGES = ["yjs", "y-protocols", "lib0"] as const
+
+/**
+ * The collaboration server, or the error that says which of its packages the project lacks.
+ * Loaded here rather than imported, so danwo installs no Yjs for the many projects without Tiptap.
+ */
+const server = await import("./server.ts").catch((error: unknown) => {
+  const missing = YJS_PACKAGES.find((name) => missingPackage(error, name))
+
+  if (missing === undefined) throw error
+
+  return new Error(
+    `the Tiptap emulator needs yjs and y-protocols, as Tiptap's collaboration does: ` +
+      `npm install -D yjs y-protocols (Node found no ${missing})`,
+    { cause: error },
+  )
+})
+
+/** Whether `error` is Node's failure to find the package `name`. */
+function missingPackage(error: unknown, name: string): boolean {
+  if (!(error instanceof Error)) return false
+
+  const code: unknown = Reflect.get(error, "code")
+
+  return (
+    (code === "ERR_MODULE_NOT_FOUND" || code === "MODULE_NOT_FOUND") &&
+    [`'${name}'`, `'${name}/`].some((quoted) => error.message.includes(`package ${quoted}`))
+  )
+}
 
 /** The hosts the Tiptap emulator answers: every collaboration app (`<appId>.collab.tiptap.cloud`). */
 export const TIPTAP_HOSTS: readonly string[] = ["*.collab.tiptap.cloud"]
@@ -35,8 +65,10 @@ export function seedTiptap(emulator: { readonly store: Store }, config: TiptapSe
 export const tiptap = defineEmulator({
   name: "tiptap",
   setup({ app, store, clock }) {
-    const documents = new TiptapDocuments(store, clock)
-    const collab = new TiptapCollab(store, documents)
+    if (server instanceof Error) throw server
+
+    const documents: TiptapDocuments = new server.TiptapDocuments(store, clock)
+    const collab: TiptapCollab = new server.TiptapCollab(store, documents)
 
     registerTiptap(store, documents, collab)
     store.whenReset(() => {
@@ -52,7 +84,7 @@ export const tiptap = defineEmulator({
         status,
       )
     })
-    tiptapRoutes({ app, store, documents })
+    server.tiptapRoutes({ app, store, documents })
   },
   sockets: ({ store }) => {
     const { collab } = tiptapServer(store)

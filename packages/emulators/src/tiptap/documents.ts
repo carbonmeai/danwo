@@ -7,6 +7,7 @@ import * as Y from "yjs"
 
 import { objectTable } from "../objects.ts"
 import type { Clock, DataKey, Store } from "../store.ts"
+import { appTable, type TiptapTrouble } from "./apps.ts"
 import { fragmentToJson, type ProseMirrorNode, replaceFragment, textOf } from "./prosemirror.ts"
 
 /** One document as the store keeps it. */
@@ -19,21 +20,6 @@ export interface TiptapDocumentRecord {
   size: number
   created: string
   changed: string
-}
-
-/** A collaboration app (`<appId>.collab.tiptap.cloud`): what signs its tokens and calls its API. */
-export interface TiptapApp {
-  id: string
-  /** Verifies the JWTs clients connect with (`TIPTAP_COLLAB_SECRET`); none accepts any token. */
-  secret: string | null
-  /** What the REST API's `Authorization` header must be (`TIPTAP_API_KEY`); none accepts any. */
-  api_key: string | null
-}
-
-/** What tests asked the server to do badly: refuse tokens, or answer syncs late. */
-export interface TiptapTrouble {
-  readonly permissionDenied: boolean
-  readonly syncDelayMs: number
 }
 
 const TROUBLE: DataKey<TiptapTrouble> = { name: "tiptap.trouble" }
@@ -156,8 +142,4 @@ export class TiptapDocuments {
 
 function documentTable(store: Store) {
   return objectTable<TiptapDocumentRecord>(store, "tiptap.documents")
-}
-
-export function appTable(store: Store) {
-  return objectTable<TiptapApp>(store, "tiptap.apps")
 }

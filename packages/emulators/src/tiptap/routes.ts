@@ -6,7 +6,8 @@
 import { HttpError } from "../errors.ts"
 import type { App, Context } from "../http.ts"
 import type { Store } from "../store.ts"
-import { appTable, DEFAULT_FRAGMENT, type TiptapApp, type TiptapDocuments } from "./documents.ts"
+import { appTable, type TiptapApp } from "./apps.ts"
+import { DEFAULT_FRAGMENT, type TiptapDocuments } from "./documents.ts"
 import { proseMirrorNodeOf } from "./prosemirror.ts"
 
 export interface TiptapRouteContext {
