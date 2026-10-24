@@ -79,6 +79,7 @@ describe("the environment for an app outside Node", () => {
       SSL_CERT_FILE: proxy.caBundlePath,
       REQUESTS_CA_BUNDLE: proxy.caBundlePath,
       CURL_CA_BUNDLE: proxy.caBundlePath,
+      GRPC_DEFAULT_SSL_ROOTS_FILE_PATH: proxy.caBundlePath,
       NODE_EXTRA_CA_CERTS: proxy.caCertPath,
     })
     expect(env.no_proxy).toBe(env.NO_PROXY)

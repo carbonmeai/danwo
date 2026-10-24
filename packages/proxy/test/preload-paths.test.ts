@@ -107,6 +107,7 @@ describe("the proxy environment on each platform", () => {
         SSL_CERT_FILE: "ca-bundle.pem",
         REQUESTS_CA_BUNDLE: "ca-bundle.pem",
         CURL_CA_BUNDLE: "ca-bundle.pem",
+        GRPC_DEFAULT_SSL_ROOTS_FILE_PATH: "ca-bundle.pem",
         NODE_EXTRA_CA_CERTS: "ca.pem",
       })
   })

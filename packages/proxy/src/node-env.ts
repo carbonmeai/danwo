@@ -146,14 +146,17 @@ export function bunPreloadOption(
 /**
  * The variables that make an app in any language trust danwo's CA: OpenSSL's `SSL_CERT_FILE`
  * (Python's `ssl` and urllib, httpx, Ruby, PHP, Go on Linux), `REQUESTS_CA_BUNDLE` (Python's
- * requests, which ignores `SSL_CERT_FILE`) and `CURL_CA_BUNDLE` (curl, and requests after it).
- * Each names the bundle, not the CA alone, since each replaces the client's own roots.
+ * requests, which ignores `SSL_CERT_FILE`), `CURL_CA_BUNDLE` (curl, and requests after it) and
+ * `GRPC_DEFAULT_SSL_ROOTS_FILE_PATH` (gRPC, whose C core in Python, Ruby and PHP carries its own
+ * roots, and Node's grpc-js). Each names the bundle, not the CA alone, since each replaces the
+ * client's own roots.
  */
 function caBundleVariables(caBundlePath: string): Readonly<Record<string, string>> {
   return {
     SSL_CERT_FILE: caBundlePath,
     REQUESTS_CA_BUNDLE: caBundlePath,
     CURL_CA_BUNDLE: caBundlePath,
+    GRPC_DEFAULT_SSL_ROOTS_FILE_PATH: caBundlePath,
   }
 }
 
