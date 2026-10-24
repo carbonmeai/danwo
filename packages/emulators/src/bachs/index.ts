@@ -86,11 +86,20 @@ function contextOf(emulator: EmulatorContext): BachsContext {
     events,
     clock: emulator.clock,
     timer: emulator.timer,
+    /**
+     * A timer can fire before the clock reads its due time (Node measures a timeout from the loop's
+     * cached time, which runs behind under load), and work not yet due would then wait for the next
+     * request: it waits again for what is left instead.
+     */
     wakeAt: (at) => {
-      emulator.timer.setTimeout(
-        () => runDue(context),
-        Math.max(0, at.getTime() - emulator.clock().getTime()),
-      )
+      const left = () => at.getTime() - emulator.clock().getTime()
+
+      const wake = () => {
+        if (left() > 0) emulator.timer.setTimeout(wake, left())
+        else runDue(context)
+      }
+
+      emulator.timer.setTimeout(wake, Math.max(0, left()))
     },
   }
 
