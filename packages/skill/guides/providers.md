@@ -72,8 +72,8 @@ once it runs, and they are applied again after every reset.
 A Python, Go or Ruby app gets no preload; it is routed by the standard variables `env()` sets for
 every app: `HTTPS_PROXY`/`HTTP_PROXY`/`NO_PROXY` in upper and lower case (curl reads only the
 lower-case `http_proxy`), and a CA bundle (danwo's CA, then Node's public roots, `proxy.caBundlePath`) in
-`SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE` and `CURL_CA_BUNDLE`; Node keeps `NODE_EXTRA_CA_CERTS` with the
-CA alone. Those variables replace a client's roots, hence the bundle. `NO_PROXY` carries the
+`SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE` and `GRPC_DEFAULT_SSL_ROOTS_FILE_PATH` (gRPC's
+C core in Python/Ruby/PHP, and grpc-js); Node keeps `NODE_EXTRA_CA_CERTS` with the CA alone. Those variables replace a client's roots, hence the bundle. `NO_PROXY` carries the
 proxy's own `127.0.0.1:<port>` and `localhost:<port>` (no `[::1]:<port>`: httpx cannot parse it).
 Python: requests (and the Resend SDK) reads `REQUESTS_CA_BUNDLE`, not `SSL_CERT_FILE`; httpx (the
 OpenAI and Anthropic SDKs), `urllib.request` and `ssl.create_default_context()` read
@@ -92,8 +92,14 @@ default transport follows `HTTPS_PROXY`; Go reads `SSL_CERT_FILE` on Linux only 
 verify through the OS), so the app appends that file to a copy of `x509.SystemCertPool()` when set
 and hands the client to stripe-go and resend-go (`examples/with-go`, `api/trust.go`). Go never proxies
 `localhost`/`127.0.0.1`, so calls between stack apps skip the proxy (no faults, no readiness wait);
-Python's requests, httpx and urllib do proxy loopback unless `NO_PROXY` names it. Time travel
-moves only Node's `Date` (the preload): an app in another language keeps real time.
+Python's requests, httpx and urllib do proxy loopback unless `NO_PROXY` names it. gRPC (HTTP/2,
+which the proxy speaks to clients offering `h2` alone): grpc-js and grpcio read `grpc_proxy`, then
+`https_proxy`/`http_proxy`, and `no_grpc_proxy` then `no_proxy`, and proxy loopback too (plaintext
+targets go as cleartext HTTP/2 in a CONNECT tunnel); grpc-js trusts Node's roots (with
+`NODE_EXTRA_CA_CERTS`) when `createSsl()` gets none, grpcio the file in
+`GRPC_DEFAULT_SSL_ROOTS_FILE_PATH`; grpc-go follows `HTTPS_PROXY` (not loopback) and needs the
+same `x509` pool as `net/http` on macOS/Windows, passed as `credentials.NewTLS(&tls.Config{RootCAs: roots})`.
+Time travel moves only Node's `Date` (the preload): an app in another language keeps real time.
 
 ## Any app, started by its own command
 

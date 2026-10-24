@@ -1,6 +1,6 @@
 ---
 title: Apps in other languages
-description: How danwo routes a Python or Go app through its proxy with the standard proxy and CA variables, what each common client reads, and what differs from a Node app.
+description: How danwo routes a Python, Go or gRPC app through its proxy with the standard proxy and CA variables, what each common client reads, and what differs from a Node app.
 icon: Languages
 ---
 
@@ -32,15 +32,16 @@ whole apps this way, fault matrix included.
 
 Every app danwo starts gets these, Node or not:
 
-| Variable                     | Value                                     | Read by                                                |
-| ---------------------------- | ----------------------------------------- | ------------------------------------------------------ |
-| `HTTPS_PROXY`, `https_proxy` | the proxy, `http://127.0.0.1:<port>`      | almost every client; curl wants lower case             |
-| `HTTP_PROXY`, `http_proxy`   | the same                                  | clients making plain HTTP calls                        |
-| `NO_PROXY`, `no_proxy`       | your own `NO_PROXY`, then the proxy's own | every client that reads the two above                  |
-| `SSL_CERT_FILE`              | the CA bundle                             | OpenSSL: Python's `ssl`, httpx, Ruby, PHP, Go on Linux |
-| `REQUESTS_CA_BUNDLE`         | the CA bundle                             | Python's requests, which ignores `SSL_CERT_FILE`       |
-| `CURL_CA_BUNDLE`             | the CA bundle                             | curl, and requests when the one above is unset         |
-| `NODE_EXTRA_CA_CERTS`        | danwo's CA alone                          | Node, which adds it to its own roots                   |
+| Variable                           | Value                                     | Read by                                                |
+| ---------------------------------- | ----------------------------------------- | ------------------------------------------------------ |
+| `HTTPS_PROXY`, `https_proxy`       | the proxy, `http://127.0.0.1:<port>`      | almost every client; curl wants lower case             |
+| `HTTP_PROXY`, `http_proxy`         | the same                                  | clients making plain HTTP calls                        |
+| `NO_PROXY`, `no_proxy`             | your own `NO_PROXY`, then the proxy's own | every client that reads the two above                  |
+| `SSL_CERT_FILE`                    | the CA bundle                             | OpenSSL: Python's `ssl`, httpx, Ruby, PHP, Go on Linux |
+| `REQUESTS_CA_BUNDLE`               | the CA bundle                             | Python's requests, which ignores `SSL_CERT_FILE`       |
+| `CURL_CA_BUNDLE`                   | the CA bundle                             | curl, and requests when the one above is unset         |
+| `GRPC_DEFAULT_SSL_ROOTS_FILE_PATH` | the CA bundle                             | gRPC in Python, Ruby and PHP, and grpc-js in Node      |
+| `NODE_EXTRA_CA_CERTS`              | danwo's CA alone                          | Node, which adds it to its own roots                   |
 
 Windows' own curl checks certificates against the Windows certificate store and ignores the CA bundle variable, so it can't trust danwo's CA from the environment.
 
@@ -200,6 +201,57 @@ func (a *webApp) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 The page's calls to the API come from danwo's browser, so they go through the proxy whatever
 language the server is in. The flight record shows each one, and the matrix faults them as it does
 a provider call: a 500, a dropped connection, and an answer lost after the API acted.
+
+## gRPC
+
+gRPC runs on HTTP/2, and danwo's proxy speaks it. A gRPC client goes through the proxy like any
+other call: danwo answers it from a route, or passes it on to the real server. Unary calls,
+streams in either direction and the `grpc-status` trailers all come through.
+
+Your gRPC library reads the variables danwo already sets, so most gRPC apps need no change:
+
+| Library                                       | Goes through the proxy     | Trusts danwo's CA                                  |
+| --------------------------------------------- | -------------------------- | -------------------------------------------------- |
+| grpc-js (Node; Google Cloud's Node libraries) | yes, through `https_proxy` | yes, through `NODE_EXTRA_CA_CERTS`                 |
+| grpcio (Python; Google Cloud's Python ones)   | yes, through `https_proxy` | yes, through `GRPC_DEFAULT_SSL_ROOTS_FILE_PATH`    |
+| grpc-go                                       | yes, through `HTTPS_PROXY` | on Linux; on macOS and Windows, add the CA (below) |
+
+grpc-js and grpcio read `grpc_proxy` first. If your app sets it, unset it for tests, so its calls
+go to danwo's proxy.
+
+### A Node gRPC client
+
+Nothing danwo-specific goes in the code. A client generated from your `.proto` file is routed as
+it is:
+
+```ts title="greeter.ts · no change for danwo"
+import { credentials } from "@grpc/grpc-js"
+
+const client = new GreeterClient("greeter.example.com:443", credentials.createSsl())
+```
+
+`createSsl()` with no roots of its own trusts Node's, which hold danwo's CA during a run.
+
+### A Go gRPC client
+
+grpc-go follows `HTTPS_PROXY`, as `net/http` does. On macOS and Windows it needs the same pool as
+[Trust danwo's CA](#trust-danwos-ca) above, passed to its credentials:
+
+```go title="grpc.go · the same roots for gRPC"
+creds := credentials.NewTLS(&tls.Config{RootCAs: roots})
+conn, err := grpc.NewClient("greeter.example.com:443", grpc.WithTransportCredentials(creds))
+```
+
+### What to know
+
+- A client that offers only HTTP/2 gets HTTP/2. Browsers and HTTP SDKs that offer HTTP/1.1 too
+  still get HTTP/1.1.
+- A fault in the [matrix](/docs/fault-kinds) hits one call. A `reset` resets that call's stream,
+  and the other calls on the same connection carry on.
+- A gRPC call can stay open for as long as the app listens, so readiness doesn't wait for it to
+  end.
+- A route's handler answers a gRPC call whole, not as a stream. Put `grpc-status` in its headers
+  and danwo sends it as a trailer after the messages.
 
 ## What differs from a Node app
 

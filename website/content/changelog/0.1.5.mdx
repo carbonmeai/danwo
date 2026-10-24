@@ -1,6 +1,6 @@
 ---
 title: danwo 0.1.5
-description: danwo's own proxy, and a web install of 54 packages and 71 MB with nothing for npm audit to report.
+description: danwo's own proxy, now with HTTP/2 and gRPC, and a web install of 54 packages and 71 MB with nothing for npm audit to report.
 date: 2026-10-24
 ---
 
@@ -12,13 +12,27 @@ date: 2026-10-24
 - **Yjs only for Tiptap.** `yjs` and `y-protocols` are optional now, and only the Tiptap emulator
   loads them. An app that uses Tiptap's collaboration has them already; one that doesn't is told
   `npm install -D yjs y-protocols`. See [Tiptap](/docs/providers/tiptap).
-- The proxy speaks HTTP/1.1 to your app and the browser. A client that offers HTTP/2 as well gets
-  HTTP/1.1; a client that speaks only HTTP/2, such as gRPC, is turned away in the TLS handshake.
 - The proxy prints nothing when a connection drops. Set `DANWO_DEBUG=proxy` to see each call it
   handles and why one failed.
 
+## New
+
+- **HTTP/2 and gRPC.** Clients that speak only HTTP/2 now go through danwo's proxy. That covers
+  gRPC: Google Cloud's client libraries such as Firestore and Pub/Sub, Temporal, and your own gRPC
+  services. Streams flow both ways as they arrive, and trailers such as `grpc-status` reach your
+  app. Plain-text gRPC works too.
+- Browsers and SDKs that offer both HTTP/1.1 and HTTP/2 still get HTTP/1.1, so nothing changes
+  for them.
+- A fault on an HTTP/2 call hits that one stream. A `reset` resets the stream, and the other
+  calls on the same connection carry on.
+- gRPC apps in Python, Ruby and PHP trust danwo's CA with no change: danwo sets
+  `GRPC_DEFAULT_SSL_ROOTS_FILE_PATH`. See [Apps in other languages](/docs/other-languages#grpc).
+
 ## Fixed
 
+- Bachs' emulator works with `@bachs/sdk` 2.0, including `listAll()` paging through products and
+  payments.
+- Flutterwave's fidelity check matches its live bank list again.
 - Bachs' emulator settles a payment even when its timer fires a moment early, so the payment's
   webhook is never lost on a busy machine.
 - A call to an app on a `*.localhost` name is checked for a listener at the address it's dialled

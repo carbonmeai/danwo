@@ -22,6 +22,9 @@ Faults on a call your app makes to Stripe, Resend, Slack or another provider:
 Each provider's error bodies match what its own SDK expects, so your app's error handling runs
 as it would in production.
 
+On HTTP/2, as gRPC uses, a fault hits one call. A `reset` resets that call's stream, and the other
+calls on the same connection carry on.
+
 ## Your app's own API
 
 When your page calls your app's API with `fetch()`, as a single-page app does, the matrix can

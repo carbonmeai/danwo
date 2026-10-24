@@ -51,6 +51,9 @@ environment variables:
 The proxy answers emulated hosts itself, records every call, and blocks or passes through the rest.
 Your app's code and keys don't change.
 
+The proxy speaks HTTP/1.1 and HTTP/2, so gRPC calls go through it too. See
+[gRPC](/docs/other-languages#grpc).
+
 <Callout type="warn">
   If you set `APP_URL` to test an app that's already running, that app wasn't started through the
   proxy. Its calls go to the **real** services. Use it only with test keys.

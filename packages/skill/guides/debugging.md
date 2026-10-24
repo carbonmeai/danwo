@@ -87,6 +87,22 @@ reach (the call's 502 says why, in the run's record). Set `DANWO_DEBUG=proxy` (a
 list, or `*`) to see those lines when chasing a connection problem. A route's handler that throws
 always prints, and its call gets a 500.
 
-The proxy speaks HTTP/1.1 to every client. Browsers and HTTP clients that offer HTTP/2 beside it
-get HTTP/1.1; a client that offers HTTP/2 alone (a gRPC client) is turned away in the TLS handshake
-with `no application protocol`.
+Protocols: ALPN picks HTTP/1.1 whenever the client offers it (browsers, most SDKs: nothing changes
+for them), HTTP/2 when it offers `h2` alone (gRPC: grpc-js, grpcio, grpc-go, Google Cloud client
+libraries, Temporal); a client offering neither is turned away with `no application protocol`.
+Cleartext HTTP/2 (`h2c`, the `PRI * HTTP/2.0` preface) is taken on the plain port and inside a
+CONNECT tunnel (gRPC to a plaintext target). Every HTTP/2 stream is one exchange through the same
+pipeline as HTTP/1.1 (routes, `failNext`/`setFault`, blocked hosts, loop check, the record,
+`settled()`); `:authority` stands for `Host`, and connection-specific headers never go out on
+HTTP/2. Passthrough speaks HTTP/2 upstream when the server picks `h2` (one pooled session per
+origin), streaming both ways with trailers and resets carried across; a server that picks
+HTTP/1.1 gets the stream as an HTTP/1.1 request. A handler answers whole: `grpc-status`/`grpc-message`
+in a gRPC answer's headers go out as trailers after its messages (alone with the headers, as
+trailers-only, when the body is empty); handlers cannot stream gRPC (no two-way emulation). Faults
+on HTTP/2 hit one stream: `reset` and `reset-after` send `RST_STREAM` `INTERNAL_ERROR` (grpc-js:
+`13 INTERNAL: Received RST_STREAM with code 2`), other streams on the session carry on; status and
+delay faults answer as on HTTP/1.1. A 502 from the proxy reads as `UNAVAILABLE` in gRPC.
+`application/grpc` answers count as streams, so readiness does not wait for them to end. Symptoms:
+`certificate signed by unknown authority` from grpc-go on macOS/Windows (it ignores
+`SSL_CERT_FILE` there; see `providers`, Apps in other languages); a gRPC app that sets
+`grpc_proxy` itself overrides danwo's `https_proxy`.

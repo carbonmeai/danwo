@@ -131,6 +131,19 @@ DANWO_DEBUG=proxy npx @danwo/cli test
 
 Every other proxy error always prints.
 
+## HTTP/2 and gRPC calls
+
+The proxy speaks HTTP/2 to a client that offers only HTTP/2, such as a gRPC client. Everyone
+else, browsers included, gets HTTP/1.1. Each HTTP/2 call is its own entry in the flight record,
+with its path, status and the fault it got.
+
+| The client says                                | What it means                                                                          |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `UNAVAILABLE`, and the record shows a 502      | the proxy couldn't reach the real server; the 502's body says why                      |
+| `INTERNAL: Received RST_STREAM with code 2`    | a `reset` fault hit this call, or the server reset it                                  |
+| `certificate signed by unknown authority`      | the client doesn't trust danwo's CA; see [other languages](/docs/other-languages#grpc) |
+| `no application protocol` in the TLS handshake | the client offered neither HTTP/1.1 nor HTTP/2                                         |
+
 ## Next
 
 <Cards>
