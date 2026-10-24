@@ -52,6 +52,22 @@ In Xcode, open **Settings → Components** and install an iOS Simulator runtime 
 </Step>
 </Steps>
 
+## Add the mobile package
+
+`danwo init` adds `@danwo/mobile` when tests drive **Mobile** or **Web and mobile**. To add it to a
+project set up for the web, install it. It must be the same version as `@danwo/cli`, so name
+that version if yours is not the latest:
+
+```sh
+npm install -D @danwo/mobile
+```
+
+Without it, the mobile commands stop and name that install:
+
+```text
+danwo device doctor needs @danwo/mobile: npm install -D @danwo/mobile@0.1.3
+```
+
 ## Check the Mac
 
 ```sh

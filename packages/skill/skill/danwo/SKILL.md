@@ -16,7 +16,7 @@ guides; `danwo guide <topic>` prints one.
 
 ## Workflow
 
-When the project has danwo's MCP server (`danwo init` registers it), work against the live app:
+When the project has danwo's MCP server (`danwo init` registers it and adds `@danwo/mcp`, its own package), work against the live app:
 
 1. Read `danwo://config` for where tests live, the app and the configured secrets' names.
 2. `open_session`, then walk the journey with `click`, `fill`, `fill_secret` (by name), `select`

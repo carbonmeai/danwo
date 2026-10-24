@@ -76,6 +76,23 @@ Files
 It also installs `@danwo/cli` and `@danwo/sdk`, and the Chromium build danwo drives. With a model
 picked, it adds the model's key to `.env.example` too.
 
+Some features need one more package, which `@danwo/cli` leaves out so a web project stays small.
+`danwo init` adds the ones your answers call for:
+
+| Package                            | Added when you pick                      | What it adds                                         |
+| ---------------------------------- | ---------------------------------------- | ---------------------------------------------------- |
+| `@danwo/mobile`                    | **Mobile**, or **Web and mobile**        | Android and iOS devices, and the app builds for them |
+| `@danwo/mcp` and `@danwo/recorder` | any coding agent                         | danwo's MCP server, and recording tests by hand      |
+| an AI SDK provider package         | a model source such as Anthropic, OpenAI | the model for agent steps (none for the AI Gateway)  |
+
+A command that needs a package you haven't added stops and says how to add it:
+
+```text
+danwo build-ios needs @danwo/mobile: npm install -D @danwo/mobile@0.1.3
+```
+
+Add it at the same version as `@danwo/cli`. `npx @danwo/cli doctor` lists which ones you have.
+
 On a new machine, or after `--skip-install`, install the browser yourself:
 
 ```sh

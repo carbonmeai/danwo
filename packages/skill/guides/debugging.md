@@ -67,12 +67,16 @@ Treat a likely verdict as where to look first, not as proof.
 | `MODEL_REFUSED`                             | the model declined the step (a refusal or a content filter) and was not asked again; reword the step or run it on another model; the app is untested |
 | `BROWSER_FAILED`, `ENVIRONMENT_FAILED`      | the browser or the environment hook: app start-up, emulators, ports; no Chromium: `npx @danwo/cli install-browser`                                   |
 | `CONFIG_INVALID`                            | the config or the call named in the message                                                                                                          |
+| `PACKAGE_MISSING`                           | an optional danwo package the command or config needs (`@danwo/mobile`, `@danwo/mcp`, `@danwo/recorder`); run the install the message names          |
 
 `danwo spec --topic errors` lists every code with its class and exit code. `danwo cache ls`,
 `stats` and `clear` show and reset recordings. `danwo doctor` (`--json` for a script) checks the
 machine and the project before a run: Node, danwo's Chromium, the config and its keys, the
 model's key, `@playwright/test`'s version and the skill copies, plus the device toolchain (and
-Flutter for a `pubspec.yaml`) when the config uses `@danwo/mobile`'s device helpers.
+Flutter for a `pubspec.yaml`) when the config uses `@danwo/mobile`'s device helpers, and last
+which optional packages are installed: each line names the package, its version and the features
+it enables, or the install command (a fail when the config needs it, a warning when the agents'
+MCP config starts the server without `@danwo/mcp`).
 
 ## Proxy noise
 

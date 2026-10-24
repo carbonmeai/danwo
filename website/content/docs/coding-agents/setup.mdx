@@ -19,6 +19,21 @@ Each agent gets two things: **the skill**, a folder of instructions it reads, an
 server**, an entry in its MCP config that starts `npx @danwo/cli mcp`. Running `init` again changes
 nothing, and your agents' other MCP servers are kept.
 
+The MCP server is a package of its own, `@danwo/mcp`, and its recording tools use
+`@danwo/recorder`. `init` adds both when you pick an agent.
+
+To add them by hand, install them. Name your `@danwo/cli` version if it is not the latest:
+
+```sh
+npm install -D @danwo/mcp @danwo/recorder
+```
+
+Without them, the server doesn't start, and says so:
+
+```text
+danwo mcp needs @danwo/mcp: npm install -D @danwo/mcp@0.1.3
+```
+
 ## Each agent
 
 <Tabs items={["Claude Code", "Cursor", "Codex", "GitHub Copilot", "Windsurf", "Others"]}>

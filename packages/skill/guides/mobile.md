@@ -1,6 +1,6 @@
 # Mobile apps on Android and iOS
 
-Run the same tests, invariants and fault matrix against an Expo, React Native or native app (SwiftUI, UIKit, Jetpack Compose, Views) on an Android emulator or an iOS Simulator, through danwo's proxy and emulators. Android comes first below; the iOS Simulator section says what differs, and the native section how native projects build. One package, `@danwo/mobile`, builds the app so it trusts danwo, then runs it on a simulator or emulator.
+Run the same tests, invariants and fault matrix against an Expo, React Native or native app (SwiftUI, UIKit, Jetpack Compose, Views) on an Android emulator or an iOS Simulator, through danwo's proxy and emulators. Android comes first below; the iOS Simulator section says what differs, and the native section how native projects build. One package, `@danwo/mobile`, builds the app so it trusts danwo, then runs it on a simulator or emulator. `@danwo/cli` does not include it: `danwo init` adds it for the `mobile` and `both` engines, or add it at `@danwo/cli`'s version (`npm install -D @danwo/mobile@<version>`, `danwo --version` prints it). Without it, `danwo device doctor`, `build-android`, `build-ios` and a config importing it exit 2 with `PACKAGE_MISSING` naming that install.
 
 ```ts
 import type { DeviceFixtures } from "@danwo/mobile"

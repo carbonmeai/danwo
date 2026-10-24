@@ -16,6 +16,16 @@ Set up a config, write one `*.danwo.ts` file, run it and read the result.
    `@danwo/sdk` as dev dependencies at the version of the danwo running it (`danwo --version`
    prints it), so a beta sets up that beta, not `latest`; a TypeScript project without
    `@types/node` also gets `@types/node@^24`, since danwo's declarations use Node's types.
+   `@danwo/cli` leaves out the packages only some projects need; init adds each when the answers
+   call for it, at the same version: `@danwo/mobile` for the `mobile` and `both` engines (the
+   device helpers, `danwo device`, `build-android`, `build-ios`), `@danwo/mcp` and
+   `@danwo/recorder` when it sets up coding agents (`--skills` other than `none`: the MCP server,
+   `danwo mcp` and `danwo record`), and the AI SDK provider package of the model source
+   (`@ai-sdk/anthropic` for `anthropic`, none for `gateway`). A command, or a config import, that
+   needs one the project lacks exits 2 with `PACKAGE_MISSING` and the command that adds it with
+   the project's package manager: `danwo build-ios needs @danwo/mobile: npm install -D
+   @danwo/mobile@<version>`. `danwo doctor` lists each optional package, installed or not, and the
+   features it enables. Keep them at `@danwo/cli`'s version: they are its exact peers.
    `--skip-install` installs nothing and prints the command to run. In a monorepo, run init in
    the app's package: it finds the workspace root (`pnpm-workspace.yaml`, or a `workspaces` field
    for npm, Yarn and Bun) and installs with the workspace's manager into that package (`pnpm add
