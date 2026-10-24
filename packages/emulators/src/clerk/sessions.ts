@@ -24,6 +24,7 @@ export function newClient(context: ClerkContext): ClientRecord {
       last_authentication_strategy: null,
       created_at: at,
       updated_at: at,
+      app_updated_at: context.wallClock().getTime(),
     },
     null,
   )
@@ -60,6 +61,7 @@ export function startSession(
     sign_in_id: null,
     sign_up_id: null,
     updated_at: at,
+    app_updated_at: context.wallClock().getTime(),
   })
   context.clerk.users.change(userId, { last_sign_in_at: at, last_active_at: at })
   context.events.session("session.created", session)
@@ -96,6 +98,7 @@ export function endSession(
           ? (remaining.at(-1) ?? null)
           : client.last_active_session_id,
       updated_at: at,
+      app_updated_at: context.wallClock().getTime(),
     })
   }
 

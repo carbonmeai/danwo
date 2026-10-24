@@ -75,16 +75,6 @@ export function browserSession(
   }
 }
 
-/**
- * A record's time no later than the apps' clock has it. ClerkJS copies the client's `updated_at`
- * into the `__client_uat` cookie, and an app's middleware treats a session token issued before it
- * (its `iat`, on the apps' clock) as outdated. When the emulator's clock has run ahead, because
- * `settle` played a webhook retry or a delay, the time is moved back by that lead.
- */
-function onAppClock(context: ClerkContext, at: number): number {
-  return at - Math.max(0, context.clock().getTime() - context.wallClock().getTime())
-}
-
 /** A client as the Frontend API shows it, with its live sessions and the attempts in progress. */
 export function browserClient(
   context: ClerkContext,
@@ -111,6 +101,6 @@ export function browserClient(
     cookie_expires_at: null,
     captcha_bypass: false,
     created_at: client.created_at,
-    updated_at: onAppClock(context, client.updated_at),
+    updated_at: client.app_updated_at,
   }
 }

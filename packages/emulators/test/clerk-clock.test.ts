@@ -38,5 +38,12 @@ describe("Clerk's client time in the browser", () => {
 
     /* ClerkJS copies `updated_at` into `__client_uat`; a later value makes the token outdated. */
     expect(Math.floor(updatedAt / 1000)).toBeLessThanOrEqual(iat)
+
+    /* While the emulator's clock stands still, real time moves on: the client's time must not. */
+    await new Promise((resolve) => setTimeout(resolve, 1_100))
+
+    const later = await fapi.call("/v1/client", { devBrowser: dvb })
+
+    expect(Number(fapi.at(later.body, "response", "updated_at"))).toBe(updatedAt)
   })
 })

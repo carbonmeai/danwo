@@ -26,6 +26,11 @@ export interface ClientRecord {
   last_authentication_strategy: string | null
   created_at: number
   updated_at: number
+  /**
+   * When the client last changed, on the apps' clock. The browser is shown this as `updated_at`,
+   * since ClerkJS copies it into `__client_uat`, which apps compare with a token's `iat`.
+   */
+  app_updated_at: number
 }
 
 /** A development instance's dev browser: an opaque token that stands in for third-party cookies. */
