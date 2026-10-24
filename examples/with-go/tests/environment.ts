@@ -100,7 +100,7 @@ async function runBuild(build: Build): Promise<void> {
     await run(build.command, [...build.args], { cwd: ROOT, maxBuffer: 64 * 1024 * 1024 })
   } catch (error) {
     if (build === SERVER && Reflect.get(Object(error), "code") === "ENOENT")
-      throw new Error("go is not on PATH: install Go 1.24 or newer from https://go.dev/dl/", {
+      throw new Error("go is not on PATH: install Go 1.26 or newer from https://go.dev/dl/", {
         cause: error,
       })
 

@@ -30,7 +30,7 @@ other outside call. The tests are TypeScript, as with any app danwo tests.
 
 ## Run
 
-Use Go 1.24 or newer, Node 24 and Docker. From this folder:
+Use Go 1.26 or newer, Node 24 and Docker. From this folder:
 
 ```sh
 npm install
@@ -249,5 +249,5 @@ node examples/link.ts with-go
 | `tests/quillwork.ts`                                     | the steps the tests share, and the invariants                               |
 | `tests/deterministic.danwo.ts`, `tests/agentic.danwo.ts` | four locator tests, and two agent tests                                     |
 
-Last checked with @danwo/cli 0.1.4, Go 1.24, stripe-go v87, resend-go v4, pgx 5.8, Postgres 17,
+Last checked with @danwo/cli 0.1.4, Go 1.26, stripe-go v87, resend-go v4, pgx 5.11, Postgres 17,
 Vue 3.5, Vue Router 5, Vite 8 and Node 24.
