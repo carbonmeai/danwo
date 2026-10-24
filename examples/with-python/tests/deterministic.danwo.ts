@@ -64,6 +64,11 @@ test("lists my bookings", { session: "returning-customer" }, async ({ app, scree
 
   await expect(row).toContainText("$18.00")
   await expect(row).toContainText("Sent")
+
+  // Refresh asks the API from the browser, not through the site's server.
+  await screen.getByRole("button", { name: "Refresh" }).click()
+  await expect(screen.getByRole("status")).toHaveText("Up to date")
+  await expect(row).toContainText("Sunrise flow")
 }).invariant(async (fixtures) => {
   await expectBooksBalance(fixtures)
   fixtures.expect(await fixtures.sql("select email from bookings")).toEqual([{ email: CUSTOMER }])

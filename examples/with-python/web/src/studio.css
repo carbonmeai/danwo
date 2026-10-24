@@ -73,3 +73,7 @@
 .bookings-lookup .input {
   max-width: 20rem;
 }
+
+.bookings-refresh {
+  margin-bottom: var(--kit-space-3);
+}

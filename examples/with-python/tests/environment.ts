@@ -1,10 +1,12 @@
 /**
- * What `danwo.config.ts` needs besides danwo itself: the app's Python environment, a database of
- * its own for each worker (the tables created, the timetable seeded), and free ports.
+ * What `danwo.config.ts` needs besides danwo itself: the API's Python environment, a fresh build
+ * of the site, a database of its own for each worker (the tables created, the timetable seeded),
+ * and free ports.
  */
 import { execFile } from "node:child_process"
-import { readFileSync } from "node:fs"
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs"
 import { createServer } from "node:net"
+import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
@@ -15,8 +17,14 @@ import { assertTestDatabase, sqlOn } from "./db.ts"
 
 const run = promisify(execFile)
 
-/** The example's folder, where its scripts, pyproject.toml and node_modules are. */
+/** The example's folder, where its scripts and node_modules are. */
 export const ROOT = fileURLToPath(new URL("..", import.meta.url))
+
+/** The API's folder, where its pyproject.toml and uv.lock are. */
+export const API_DIR = join(ROOT, "api")
+
+/** The site's folder: SvelteKit, built into `web/build` and served with `node build`. */
+export const WEB_DIR = join(ROOT, "web")
 
 /** One class on the timetable, as `seed/classes.json` lists it. */
 export interface StudioClass {
@@ -54,10 +62,10 @@ export function freePort(): Promise<number> {
   })
 }
 
-/** Runs `uv` in the example's folder; a failure carries its output. */
+/** Runs `uv` in the API's folder; a failure carries its output. */
 async function uv(args: readonly string[], env: NodeJS.ProcessEnv = process.env): Promise<void> {
   try {
-    await run("uv", [...args], { cwd: ROOT, env, maxBuffer: 16 * 1024 * 1024 })
+    await run("uv", [...args], { cwd: API_DIR, env, maxBuffer: 16 * 1024 * 1024 })
   } catch (error) {
     if (Reflect.get(Object(error), "code") === "ENOENT")
       throw new Error("uv is not installed: see https://docs.astral.sh/uv/getting-started/")
@@ -69,12 +77,87 @@ async function uv(args: readonly string[], env: NodeJS.ProcessEnv = process.env)
 }
 
 /**
- * Installs the app's Python and packages from `uv.lock` into `.venv`, once per worker; uv takes a
- * lock, so workers starting together wait for each other. The app then starts with
+ * Installs the API's Python and packages from `uv.lock` into `api/.venv`, once per worker; uv
+ * takes a lock, so workers starting together wait for each other. The API then starts with
  * `uv run --no-sync`, which never reaches the network while danwo's proxy holds its calls.
  */
 export function syncPython(): Promise<void> {
   return uv(["sync", "--frozen", "--quiet"])
+}
+
+/** What the site's build is made from: a change to any of these makes it stale. */
+const WEB_SOURCES = ["web/src", "web/vite.config.ts", "web/package.json", "kit", "package.json"]
+
+/** Held while one worker builds the site; `mkdir` makes taking it atomic. */
+const LOCK = join(ROOT, ".web-build-lock")
+
+/** The server adapter-node writes last, once a build is complete. */
+const BUILT = join(WEB_DIR, "build", "index.js")
+
+/** The newest modification time under `path`. */
+function newest(path: string): number {
+  const stats = statSync(path)
+
+  if (!stats.isDirectory()) return stats.mtimeMs
+
+  return Math.max(stats.mtimeMs, ...readdirSync(path).map((name) => newest(join(path, name))))
+}
+
+/** Whether a complete build exists that is newer than every source. */
+function fresh(): boolean {
+  const sources = WEB_SOURCES.map((source) => join(ROOT, source)).filter(existsSync)
+
+  return existsSync(BUILT) && statSync(BUILT).mtimeMs >= Math.max(...sources.map(newest))
+}
+
+/** Takes the build lock; false when another worker holds it. */
+function lock(): boolean {
+  try {
+    mkdirSync(LOCK)
+
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Runs `vite build` in `web/`; a failure carries the end of its output. */
+async function build(): Promise<void> {
+  try {
+    await run(process.execPath, [join(ROOT, "node_modules/vite/bin/vite.js"), "build"], {
+      cwd: WEB_DIR,
+      maxBuffer: 64 * 1024 * 1024,
+    })
+  } catch (error) {
+    const output = `${String(Reflect.get(Object(error), "stdout") ?? "")}${String(Reflect.get(Object(error), "stderr") ?? "")}`
+
+    throw new Error(`vite build failed:\n${output.split("\n").slice(-40).join("\n")}`, {
+      cause: error,
+    })
+  }
+}
+
+/**
+ * Builds the site unless a fresh build exists. The first worker to start builds, the others wait
+ * for it, so every worker serves the same build and `danwo test` alone is enough after an edit.
+ */
+export async function ensureBuilt(): Promise<void> {
+  const deadline = Date.now() + 10 * 60_000
+
+  while (!fresh()) {
+    if (lock()) {
+      try {
+        if (!fresh()) await build()
+      } finally {
+        rmSync(LOCK, { recursive: true, force: true })
+      }
+
+      return
+    }
+
+    if (Date.now() > deadline) throw new Error(`no fresh build of the site; is ${LOCK} left over?`)
+    await new Promise((resolve) => setTimeout(resolve, 250))
+  }
 }
 
 /** The image a worker starts when no `DATABASE_URL` is given. */
@@ -189,7 +272,7 @@ function onServer(url: string, name: string): string {
   return parsed.href
 }
 
-/** Creates the app's tables with its own `python -m studio.schema`, as a deploy step would. */
+/** Creates the API's tables with its own `python -m studio.schema`, as a deploy step would. */
 function createTables(url: string): Promise<void> {
   return uv(["run", "--no-sync", "python", "-m", "studio.schema"], {
     ...process.env,

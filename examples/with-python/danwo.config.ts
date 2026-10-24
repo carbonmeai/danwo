@@ -9,12 +9,14 @@ import {
 
 import { sqlOn } from "./tests/db.ts"
 import {
+  API_DIR,
   CLASSES,
+  ensureBuilt,
   freePort,
-  ROOT,
   seedDatabase,
   stripePrice,
   syncPython,
+  WEB_DIR,
   workerDatabase,
 } from "./tests/environment.ts"
 import { book, CUSTOMER, STRIPE_SECRET_KEY } from "./tests/studio.ts"
@@ -27,8 +29,8 @@ export default defineConfig({
   workers: 2,
   timeout: 90_000,
   /*
-   * After every action, wait until the app's calls to Stripe and Resend have finished and play
-   * the webhooks they caused, so no test waits or settles by hand.
+   * After every action, wait until the site's calls to the API and the API's calls to Stripe and
+   * Resend have finished, and play the webhooks they caused, so no test waits or settles by hand.
    */
   readiness: { mode: "page+backend", settle: true },
   /* The model agent steps run on. Its key is read from AI_GATEWAY_API_KEY; without one they skip. */
@@ -45,17 +47,18 @@ export default defineConfig({
   },
   matrix: { workers: 4, budget: 90 },
   async environment({ workerIndex }) {
-    await syncPython()
+    await Promise.all([syncPython(), ensureBuilt()])
 
-    const url = `http://127.0.0.1:${await freePort()}`
+    const [apiPort, webPort] = await Promise.all([freePort(), freePort()])
+    const local = (port: number) => `http://127.0.0.1:${port}`
 
-    /* The app's own database, behind danwo's data proxy so the matrix can fault its statements. */
+    /* The API's own database, behind danwo's data proxy so the matrix can fault its statements. */
     const worker = await workerDatabase(workerIndex)
     const database = worker.url
     const postgres = await startPostgresProxy({ upstream: database })
     const rows = postgresSnapshot({ url: database, strategy: "rows" })
 
-    /* Stripe sells each class at the price the timetable shows, and calls the app's webhook. */
+    /* Stripe sells each class at the price the timetable shows, and calls the API's webhook. */
     const stripe = stripeService({
       seed: () => ({
         products: CLASSES.map((klass) => ({ id: `prod_${klass.slug}`, name: klass.name })),
@@ -67,7 +70,7 @@ export default defineConfig({
         })),
         webhookEndpoints: [
           {
-            url: `${url}/webhooks/stripe`,
+            url: `${local(apiPort)}/webhooks/stripe`,
             events: ["checkout.session.completed"],
             secret: STRIPE_WEBHOOK_SECRET,
           },
@@ -77,28 +80,47 @@ export default defineConfig({
     const resend = resendService({ seed: { domains: [{ name: "fernstudio.test" }] } })
 
     /*
-     * A Python app has no Node preload: it reaches the emulators through the proxy variables
-     * danwo sets (HTTPS_PROXY and the rest) and trusts danwo's CA through SSL_CERT_FILE and
-     * REQUESTS_CA_BUNDLE. Every other host is refused, and a live-looking key fails the start.
+     * Two apps, wired by their addresses. The API is Python, with no Node preload: it reaches the
+     * emulators through the proxy variables danwo sets (HTTPS_PROXY and the rest) and trusts
+     * danwo's CA through SSL_CERT_FILE and REQUESTS_CA_BUNDLE. The site is SvelteKit on Node, so
+     * it gets the preload, and its server's calls to the API go through the proxy too. Every
+     * other host is refused, and a live-looking key fails the start.
      */
     const stack = await stackEnvironment({
       unmatched: "block",
       secrets: "fail",
+      baseUrl: "web",
       services: [stripe, resend],
       apps: [
         {
-          name: "studio",
-          command: `uv run --no-sync uvicorn studio.app:app --host 127.0.0.1 --port ${new URL(url).port}`,
-          cwd: ROOT,
-          url,
+          name: "api",
+          command: `uv run --no-sync uvicorn studio.app:app --host 127.0.0.1 --port ${apiPort}`,
+          cwd: API_DIR,
+          url: local(apiPort),
           ready: { path: "/health" },
-          env: {
+          /* Stripe sends the customer back to the site, which may call the API from the browser. */
+          env: ({ web = "" }) => ({
             DATABASE_URL: postgres.url(database),
             STRIPE_SECRET_KEY,
             STRIPE_WEBHOOK_SECRET,
             RESEND_API_KEY: "re_fern_studio",
+            WEB_URL: web,
             PYTHONUNBUFFERED: "1",
-          },
+          }),
+        },
+        {
+          name: "web",
+          command: "node server.ts",
+          cwd: WEB_DIR,
+          url: local(webPort),
+          ready: { path: "/health" },
+          dependsOn: ["api"],
+          /* The server listens on PORT, which danwo sets from the URL, and HOST. */
+          env: ({ api = "" }) => ({
+            HOST: "127.0.0.1",
+            API_URL: api,
+            PUBLIC_API_URL: api,
+          }),
         },
       ],
     })

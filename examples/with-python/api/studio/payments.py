@@ -56,8 +56,12 @@ def _idempotency_key(class_id: int, params: dict[str, Any]) -> str:
     return f"book-{class_id}-{fingerprint[:16]}"
 
 
-def start_checkout(klass: dict[str, Any], email: str, origin: str) -> str:
-    """Starts a Checkout Session for one place in `klass`; the URL of Stripe's payment page."""
+def start_checkout(klass: dict[str, Any], email: str) -> str:
+    """
+    Starts a Checkout Session for one place in `klass`; the URL of Stripe's payment page. Stripe
+    sends the customer back to the web app, at the address WEB_URL names.
+    """
+    origin = settings.web_url
     params: dict[str, Any] = {
         "mode": "payment",
         "customer_email": email,

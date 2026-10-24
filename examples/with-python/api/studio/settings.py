@@ -18,6 +18,7 @@ class Settings:
     stripe_secret_key: str
     stripe_webhook_secret: str
     resend_api_key: str
+    web_url: str
     mail_from: str
     bug: Bug | None
 
@@ -49,6 +50,7 @@ def load() -> Settings:
         stripe_secret_key=_required("STRIPE_SECRET_KEY", "sk_"),
         stripe_webhook_secret=_required("STRIPE_WEBHOOK_SECRET", "whsec_"),
         resend_api_key=_required("RESEND_API_KEY", "re_"),
+        web_url=_required("WEB_URL", "http").rstrip("/"),
         mail_from=os.environ.get("MAIL_FROM", "Fern Studio <hello@fernstudio.test>"),
         bug=_bug(),
     )

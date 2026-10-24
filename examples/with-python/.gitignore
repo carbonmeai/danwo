@@ -2,6 +2,11 @@ node_modules/
 package-lock.json
 *.tsbuildinfo
 
+# The site's build, what SvelteKit generates, and the lock a worker holds while it builds.
+web/build/
+web/.svelte-kit/
+.web-build-lock/
+
 # Python: the environment `uv sync` makes, and bytecode.
 .venv/
 __pycache__/

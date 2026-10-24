@@ -2,10 +2,11 @@
   "name": "danwo-example-with-python",
   "version": "0.0.0",
   "private": true,
-  "description": "Fern Studio, a class-booking app with a FastAPI backend in Python, Postgres, Stripe Checkout and Resend, tested end to end with danwo.",
+  "description": "Fern Studio, a class-booking app: a SvelteKit site on a FastAPI API in Python, with Postgres, Stripe Checkout and Resend, tested end to end with danwo.",
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "build": "cd web && vite build",
+    "typecheck": "cd web && svelte-kit sync && svelte-check --fail-on-warnings && cd .. && tsc --noEmit",
     "test": "danwo test",
     "test:agentic": "danwo test tests/agentic.danwo.ts",
     "matrix": "danwo matrix tests/deterministic.danwo.ts --grep \"books a class\"",
@@ -15,10 +16,16 @@
   "devDependencies": {
     "@danwo/cli": "0.1.2",
     "@danwo/sdk": "0.1.2",
+    "@sveltejs/adapter-node": "6.0.0",
+    "@sveltejs/kit": "3.1.0",
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
     "@types/node": "^24",
     "@types/pg": "8.23.1",
     "pg": "8.23.1",
-    "typescript": "5.9.3"
+    "svelte": "5.57.2",
+    "svelte-check": "4.7.7",
+    "typescript": "6.0.3",
+    "vite": "8.3.5"
   },
   "engines": {
     "node": ">=24"

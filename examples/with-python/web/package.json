@@ -1,0 +1,10 @@
+{
+  "name": "fern-studio-web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Fern Studio's site. Its packages are the example's, in ../package.json; the build bundles them, so `node build` needs no install.",
+  "type": "module",
+  "imports": {
+    "#lib/*": "./src/lib/*"
+  }
+}

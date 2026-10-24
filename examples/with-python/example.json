@@ -1,14 +1,16 @@
 {
   "name": "Python booking app",
-  "summary": "Fern Studio, a class-booking app on FastAPI: browse the timetable, pay with Stripe Checkout, get a confirmation through Resend, see your bookings. Postgres through psycopg, pages rendered with Jinja2.",
+  "summary": "Fern Studio, a class-booking app in two parts: a SvelteKit site on a FastAPI JSON API. Browse the timetable, pay with Stripe Checkout, get a confirmation through Resend, see your bookings. Postgres through psycopg.",
   "icon": "python.svg",
-  "stack": ["Python", "FastAPI", "Postgres", "Jinja2", "uv"],
+  "stack": ["Python", "FastAPI", "SvelteKit", "Postgres", "uv"],
   "providers": ["stripe", "resend"],
-  "runsOn": "A FastAPI app started with uv, in Chromium, with Postgres in Docker",
+  "runsOn": "A FastAPI API started with uv and a SvelteKit site on Node, in Chromium, with Postgres in Docker",
   "install": "npm",
   "toolchain": "python",
   "shows": [
+    "Two apps in two languages behind one proxy: stackEnvironment starts the API, then the site, and wires each to the other's address",
     "An app outside Node behind danwo's proxy: the official Stripe and Resend Python SDKs reach the emulators through the proxy and CA variables danwo sets, with no test hooks",
+    "Every hop on the record: the browser, the SvelteKit server calling the API, the browser calling the API, and the API calling Stripe and Resend",
     "Invariants that read Postgres against Stripe and Resend: one booking per paid session, one confirmation per booking, amounts equal to what Stripe charged",
     "`danwo matrix` faulting Stripe, Resend, the webhooks and Postgres itself (52 trials), and the app surviving every one",
     "A `STUDIO_BUG` switch that turns one safeguard off, so you can watch the matrix catch it"
