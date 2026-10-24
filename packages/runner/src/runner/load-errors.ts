@@ -4,7 +4,7 @@
  * compiling (an `enum`, a constructor's parameter properties, a `namespace`) fails with Node's raw
  * error. These name the file and line, what is not supported, and what to write instead.
  */
-import { isAbsolute } from "node:path"
+import { dirname, isAbsolute } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { DanwoError } from "../support/codes.ts"
@@ -91,7 +91,8 @@ export function explainLoadError(error: unknown, file: string, kind: "config" | 
   const missing = codeOf(error) === "ERR_MODULE_NOT_FOUND" ? missingPackage(error) : undefined
   const optional = missing === undefined ? "" : packageOf(missing.specifier)
 
-  if (isOptionalPackage(optional)) return new PackageMissingError(what, optional, { cause: error })
+  if (isOptionalPackage(optional))
+    return new PackageMissingError(what, optional, { cause: error, cwd: dirname(file) })
 
   const message = strippingMessage(error, what)
 

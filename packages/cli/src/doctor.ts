@@ -24,6 +24,7 @@ import {
   OPTIONAL_PACKAGE_NAMES,
   OPTIONAL_PACKAGES,
   type OptionalPackage,
+  PackageMissingError,
 } from "@danwo/runner/runner"
 import { SKILL_DIRS, SKILL_FILE } from "@danwo/skill"
 
@@ -157,7 +158,14 @@ async function configChecks(
   cwd: string,
   explicit: string | undefined,
   env: NodeJS.ProcessEnv,
-): Promise<{ checks: DoctorCheck[]; root: string; config?: DanwoConfig; path?: string }> {
+): Promise<{
+  checks: DoctorCheck[]
+  root: string
+  config?: DanwoConfig
+  path?: string
+  /** The optional package the config imports and the project lacks. */
+  missing?: OptionalPackage
+}> {
   try {
     const loaded = await loadConfig(cwd, explicit)
 
@@ -192,7 +200,11 @@ async function configChecks(
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
 
-    return { root: cwd, checks: [{ name: "config", status: "fail", detail }] }
+    return {
+      root: cwd,
+      checks: [{ name: "config", status: "fail", detail }],
+      ...(error instanceof PackageMissingError && { missing: error.package }),
+    }
   }
 }
 
@@ -344,37 +356,36 @@ function registersMcp(root: string): boolean {
   )
 }
 
+/** Why the project needs an optional package it may lack, and how bad lacking it is. */
+interface Need {
+  readonly status: "warn" | "fail"
+  readonly why: string
+}
+
 /**
  * Each optional package: the version installed and the features it enables, or that it is not
- * installed and the command that adds it. One the project needs and lacks fails (the device driver
- * for a config that runs on devices) or warns (the MCP server the coding agents are told to start);
- * one at another version than this danwo's warns, since danwo's packages are released together.
+ * installed and the command that adds it. One the project needs and lacks fails or warns, as
+ * `needed` says; one at another version than this danwo's warns, since danwo's packages are
+ * released together.
  */
 function optionalChecks(
   root: string,
-  needed: ReadonlySet<OptionalPackage>,
+  needed: ReadonlyMap<OptionalPackage, Need>,
   probes: DoctorProbes,
 ): DoctorCheck[] {
   return OPTIONAL_PACKAGE_NAMES.map((name): DoctorCheck => {
     const version = probes.installed(name)
     const add = addCommand(name, root)
+    const need = needed.get(name)
 
-    if (version === undefined) {
-      if (name === "@danwo/mobile" && needed.has(name))
-        return { name, status: "fail", detail: `not installed; the config runs on devices: ${add}` }
-      if (needed.has(name))
-        return {
-          name,
-          status: "warn",
-          detail: `not installed; the coding agents are set up to start danwo's MCP server: ${add}`,
-        }
-
-      return {
-        name,
-        status: "ok",
-        detail: `not installed; needed only for ${OPTIONAL_PACKAGES[name]}: ${add}`,
-      }
-    }
+    if (version === undefined)
+      return need === undefined
+        ? {
+            name,
+            status: "ok",
+            detail: `not installed; needed only for ${OPTIONAL_PACKAGES[name]}: ${add}`,
+          }
+        : { name, status: need.status, detail: `not installed; ${need.why}: ${add}` }
 
     if (version !== DANWO_VERSION && DANWO_VERSION !== "0.0.0")
       return {
@@ -387,6 +398,30 @@ function optionalChecks(
   })
 }
 
+/**
+ * The optional packages the project needs: the config imports them or runs on devices, or its
+ * coding agents start danwo's MCP server.
+ */
+function neededPackages(config: {
+  readonly path?: string
+  readonly root: string
+  readonly missing?: OptionalPackage
+}): Map<OptionalPackage, Need> {
+  const needed = new Map<OptionalPackage, Need>()
+
+  if (registersMcp(config.root))
+    needed.set("@danwo/mcp", {
+      status: "warn",
+      why: "the coding agents are set up to start danwo's MCP server",
+    })
+  if (config.path !== undefined && mobilePlatformsOf(config.path).length > 0)
+    needed.set("@danwo/mobile", { status: "fail", why: "the config runs on devices" })
+  if (config.missing !== undefined)
+    needed.set(config.missing, { status: "fail", why: "the config imports it" })
+
+  return needed
+}
+
 /** Every check, in the order a first run meets them. */
 export async function projectDoctor(
   options: { readonly cwd: string; readonly config?: string | undefined },
@@ -394,11 +429,6 @@ export async function projectDoctor(
 ): Promise<DoctorCheck[]> {
   const config = await configChecks(options.cwd, options.config, probes.env)
   const browsers: DoctorCheck[] = []
-  const devices = config.path === undefined ? [] : mobilePlatformsOf(config.path)
-  const needed = new Set<OptionalPackage>([
-    ...(devices.length > 0 ? (["@danwo/mobile"] as const) : []),
-    ...(registersMcp(config.root) ? (["@danwo/mcp"] as const) : []),
-  ])
 
   for (const engine of enginesOf(config.config)) browsers.push(await browserCheck(probes, engine))
 
@@ -410,7 +440,7 @@ export async function projectDoctor(
     ...(await deviceChecks(config.path, config.root, probes)),
     ...playwrightCheck(config.root),
     ...skillChecks(config.root),
-    ...optionalChecks(config.root, needed, probes),
+    ...optionalChecks(config.root, neededPackages(config), probes),
   ]
 }
 

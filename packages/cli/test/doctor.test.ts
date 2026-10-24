@@ -389,6 +389,24 @@ describe("danwo doctor", () => {
     ])
   })
 
+  it("fails a config that imports @danwo/mobile when the project lacks it, naming the install", async () => {
+    const root = await project({
+      "package.json": "{}",
+      "danwo.config.ts":
+        'import { withAndroidDevice } from "@danwo/mobile"\n\nexport default { environment: withAndroidDevice }\n',
+    })
+    const named = byName(await projectDoctor({ cwd: root }, webOnly))
+
+    expect(named["config"]).toEqual([
+      expect.stringMatching(
+        /^fail the config .*danwo.config.ts needs @danwo\/mobile: npm install -D @danwo\/mobile$/,
+      ),
+    ])
+    expect(named["@danwo/mobile"]).toEqual([
+      "fail not installed; the config imports it: npm install -D @danwo/mobile",
+    ])
+  })
+
   it("warns when the coding agents start danwo's MCP server and @danwo/mcp is missing", async () => {
     const root = await project({
       "package.json": "{}",
