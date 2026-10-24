@@ -114,13 +114,15 @@ afterAll(async () => {
   await proxy.stop()
 })
 
-/** What the client got, run with the proxy's environment and no other. */
+/**
+ * What the client got, run with the proxy's environment as an app is. The whole environment goes
+ * under it: a Windows process without its system variables cannot open a socket.
+ */
 async function client(target: string, security: "tls" | "plain", calls?: string) {
-  const env = proxy.env({ PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "" })
   const { stdout } = await run(
     process.execPath,
     [CLIENT, target, security, ...(calls === undefined ? [] : [calls])],
-    { env, timeout: 20_000 },
+    { env: proxy.env(), timeout: 20_000 },
   )
 
   return JSON.parse(stdout) as unknown
