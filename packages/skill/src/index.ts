@@ -4,6 +4,13 @@
  */
 export { guideIndex, type GuideInfo, listGuides, readGuide } from "./guides.ts"
 export { installSkill, SKILL_DIRS, SKILL_FILE, type SkillChange } from "./install.ts"
+export {
+  clientCommand,
+  type InitChange,
+  type InitOptions,
+  initProject,
+  initReport,
+} from "./mcp-clients.ts"
 export { buildSpec, type SpecOptions, specTopic } from "./spec/build.ts"
 export {
   type CliArgument,

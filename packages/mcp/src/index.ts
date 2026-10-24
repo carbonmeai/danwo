@@ -16,7 +16,7 @@ export {
   type InitOptions,
   initProject,
   initReport,
-} from "./init.ts"
+} from "@danwo/skill"
 export { stopAllJobs } from "./jobs/run.ts"
 
 /**

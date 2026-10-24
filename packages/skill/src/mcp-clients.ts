@@ -1,17 +1,19 @@
 /**
- * `danwo init`: registers danwo's MCP server with the coding agents a project uses (Claude Code's
- * `.mcp.json`, Cursor's `.cursor/mcp.json`, Codex's `.codex/config.toml`, and when asked VS Code's
- * `.vscode/mcp.json` for GitHub Copilot), merging into files that
- * exist and leaving their other servers alone, and installs danwo's skill for those agents, keeping
- * any copy the user edited. Optionally writes a starter `danwo.config.ts`. It asks nothing and
- * reports each file it created, updated or left as it was.
+ * Registers danwo's MCP server with the coding agents a project uses (Claude Code's `.mcp.json`,
+ * Cursor's `.cursor/mcp.json`, Codex's `.codex/config.toml`, and when asked VS Code's
+ * `.vscode/mcp.json` for GitHub Copilot), merging into files that exist and leaving their other
+ * servers alone, and installs danwo's skill for those agents, keeping any copy the user edited.
+ * Optionally writes a starter `danwo.config.ts`. It asks nothing and reports each file it created,
+ * updated or left as it was. `danwo init` runs it before the project has the server itself
+ * (`@danwo/mcp`), so it lives here, beside the skill.
  */
 import { existsSync } from "node:fs"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
-import { installSkill } from "@danwo/skill"
 import { z } from "zod"
+
+import { installSkill } from "./install.ts"
 
 export interface InitOptions {
   /** The project folder. */
