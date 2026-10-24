@@ -5,6 +5,7 @@ export {
   type Exchange,
   type Handler,
   hostMatches,
+  isPageCallToApp,
   type OutboundCall,
   type OutboundFault,
   type OutboundFaultRule,

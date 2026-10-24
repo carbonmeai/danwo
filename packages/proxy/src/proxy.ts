@@ -98,12 +98,15 @@ export interface ProxyOptions {
   readonly assets?: "passthrough" | "block"
 }
 
-/** A request to a routed host, as a fault rule sees it. */
+/**
+ * A request to a routed host, or a page's `fetch()` to an app on this machine (see
+ * {@link isPageCallToApp}), as a fault rule sees it.
+ */
 export interface OutboundCall {
   readonly host: string
   readonly method: string
   readonly path: string
-  /** Position among routed calls since the proxy started or was last cleared, from 0. */
+  /** Position among the calls fault rules saw since the proxy started or was last cleared, from 0. */
   readonly index: number
 }
 
@@ -259,7 +262,10 @@ export interface Proxy {
   exchanges(): readonly Exchange[]
   /** Every WebSocket connection through the proxy, with its frame counts and sizes. */
   sockets(): readonly SocketExchange[]
-  /** Sets the rule that picks a fault for each routed call; `undefined` removes it. */
+  /**
+   * Sets the rule that picks a fault for each routed call, and for each page's `fetch()` to an app
+   * on this machine; `undefined` removes it.
+   */
   setFault(rule: OutboundFaultRule | undefined): void
   /**
    * Makes the next `times` (default 1) routed calls that `match` meet `fault`, ahead of the rule
@@ -425,6 +431,28 @@ async function answerLate(
   if (ended()) return "reset" as const
 
   return callHandler(handler, req)
+}
+
+/**
+ * Whether an exchange is a page's `fetch()` or XHR to an app on this machine, passed through to
+ * it: a call a single-page app makes to its own API. Fault rules see these as they see routed
+ * calls, so the fault matrix can fail them; a stream the page reads for as long as it is open
+ * (server-sent events) is left alone.
+ */
+export function isPageCallToApp(exchange: {
+  readonly disposition: Exchange["disposition"]
+  readonly client?: Exchange["client"] | undefined
+  readonly load?: LoadKind | undefined
+  readonly host: string
+  readonly stream?: boolean | undefined
+}): boolean {
+  return (
+    exchange.disposition === "passthrough" &&
+    exchange.client === "browser" &&
+    exchange.load === "request" &&
+    exchange.stream !== true &&
+    isLoopback(exchange.host)
+  )
 }
 
 /** How the proxy treats a host no route answers: let it through, or refuse it. */
@@ -603,15 +631,26 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
     else faultLabels.set(id, label)
   }
 
-  async function handle(handler: Handler, req: CompletedRequest) {
-    const call = {
-      host: req.destination.hostname,
-      method: req.method,
-      path: req.path,
-      index: callIndex++,
-    }
-    const fault = takeArmed(call) ?? faultRule?.(call)
+  /** `req` as a fault rule sees it, numbered among the calls rules have seen. */
+  const callOf = (req: CompletedRequest): OutboundCall => ({
+    host: req.destination.hostname,
+    method: req.method,
+    path: req.path,
+    index: callIndex++,
+  })
 
+  async function handle(handler: Handler, req: CompletedRequest) {
+    const call = callOf(req)
+
+    return handleUnder(takeArmed(call) ?? faultRule?.(call), handler, req)
+  }
+
+  /** Answers `req` through `handler`, with `fault` applied and recorded when there is one. */
+  async function handleUnder(
+    fault: OutboundFault | AnswerHold | undefined,
+    handler: Handler,
+    req: CompletedRequest,
+  ) {
     if (fault) labelFault(req.id, describeOutboundFault(fault))
 
     const run = runIndex
@@ -621,6 +660,45 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
     } finally {
       giveUps.delete(req.id)
     }
+  }
+
+  /** The fault the rule picked for each page call to an app it was asked about, by request id. */
+  const appCallFaults = new Map<string, OutboundFault | AnswerHold | undefined>()
+
+  /**
+   * Whether the fault rule picks a fault for `req`, a page's `fetch()` to an app on this machine.
+   * mockttp asks every rule's matcher about every request, so each is asked once and remembered.
+   */
+  const faultsAppCall = (hosts: HostPolicy, req: CompletedRequest): boolean => {
+    const host = req.destination.hostname
+    const load = loadKind(req.path, req.headers)
+    const disposition = hosts.dispositionOf(host, load, req.method)
+    const client = clientOf(req.headers["user-agent"])
+
+    if (!isPageCallToApp({ disposition, client, load, host })) return false
+    if (!appCallFaults.has(req.id)) appCallFaults.set(req.id, faultRule?.(callOf(req)))
+
+    return appCallFaults.get(req.id) !== undefined
+  }
+
+  /**
+   * A page's `fetch()` to an app on this machine passes through as it is, unless the fault rule
+   * picks a fault for it: the proxy then forwards it itself and applies the fault, as it does for
+   * a routed call, so the matrix can fail the calls a single-page app makes to its own API.
+   * `failNext` leaves these calls alone: it is for a test's provider calls.
+   */
+  async function placeAppCallFaults(hosts: HostPolicy) {
+    await server
+      .forAnyRequest()
+      .matching((req) => faultsAppCall(hosts, req))
+      .always()
+      .thenCallback((req) => {
+        const fault = appCallFaults.get(req.id)
+
+        appCallFaults.delete(req.id)
+
+        return handleUnder(fault, forwardTo(new URL(req.url).origin), req)
+      })
   }
 
   /*
@@ -664,6 +742,7 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
 
   const hosts = hostPolicy(options, isRouted)
 
+  await placeAppCallFaults(hosts)
   await placeUnrouted(server, options, hosts)
 
   const sockets = await handleSockets(server, hosts, socketUpstreams(options.routes))
@@ -736,6 +815,7 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   await server.on("response", (res) => {
     const exchange = log.get(res.id)
 
+    appCallFaults.delete(res.id)
     if (!exchange) return
     capture(
       captureMessage(res.headers, res.body).then((message) => {
@@ -754,6 +834,7 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
   await server.on("abort", (req) => {
     const exchange = log.get(req.id)
 
+    appCallFaults.delete(req.id)
     if (exchange) exchange.aborted = true
     giveUps.get(req.id)?.()
     notify()
@@ -794,6 +875,7 @@ export async function startProxy(options: ProxyOptions): Promise<Proxy> {
       log.clear()
       sockets.clear()
       faultLabels.clear()
+      appCallFaults.clear()
       callIndex = 0
     },
     settled(timeoutMs = 5_000) {

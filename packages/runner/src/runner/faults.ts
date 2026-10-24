@@ -103,7 +103,8 @@ function genericOutboundFaults(call: OutboundCall): readonly OutboundFault[] {
  * Resend, S3 and Tigris, Auth0, Google, Microsoft, Slack, GitHub, Twilio, Flutterwave, Paystack, Bachs,
  * Clerk, Composio, Nylas, Nango, Unipile, Pusher, Novu, Tiptap and the model APIs, with error
  * bodies their SDKs parse),
- * and any other routed host (an outside endpoint such as MiniStack) gets plain HTTP failures.
+ * and any other host (an outside endpoint such as MiniStack, or the app's own API the page calls)
+ * gets plain HTTP failures.
  */
 export function defaultOutboundFaults(call: OutboundCall): readonly OutboundFault[] {
   const catalogue = BY_HOST.get(call.host) ?? catalogueByPattern(call.host)

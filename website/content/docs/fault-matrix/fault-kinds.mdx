@@ -22,6 +22,20 @@ Faults on a call your app makes to Stripe, Resend, Slack or another provider:
 Each provider's error bodies match what its own SDK expects, so your app's error handling runs
 as it would in production.
 
+## Your app's own API
+
+When your page calls your app's API with `fetch()`, as a single-page app does, the matrix faults
+those calls too:
+
+| Fault         | What happens                                        | What it catches                           |
+| ------------- | --------------------------------------------------- | ----------------------------------------- |
+| `status 500`  | The API fails before it acts.                       | Pages that hang or show nothing.          |
+| `reset`       | The connection drops before the API sees the call.  | Calls with no error handling.             |
+| `reset-after` | The API **did** the work, but the page never heard. | Pages that retry a write that acts twice. |
+
+These are calls to an app danwo started on this machine, at `localhost` or `127.0.0.1`. Page
+loads, scripts and streams are left alone.
+
 ## Model APIs
 
 Calls to OpenAI, Anthropic and the other model APIs can also get answers that go wrong. These

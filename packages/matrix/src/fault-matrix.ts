@@ -8,6 +8,7 @@ import type { DataCall, DataProxy } from "@danwo/infra"
 import {
   describeOutboundFault,
   type Exchange,
+  isPageCallToApp,
   type OutboundCall,
   type OutboundFault,
   type Proxy,
@@ -512,7 +513,8 @@ function runLengths(routes: readonly (string | undefined)[]): number[] {
 }
 
 /**
- * Turns a clean run into a fault plan: every routed call × each outbound fault, every webhook
+ * Turns a clean run into a fault plan: every routed call, and every `fetch()` the page made to an
+ * app on this machine (a single-page app's call to its own API), × each outbound fault, every webhook
  * delivered (first attempt, per topic occurrence) × each webhook fault, and every call to the
  * app's own database or cache × each data fault. A poll gets faults on its first call only: how
  * many times it repeats depends on timing, so a fault on a later repeat may fall on a call the
@@ -526,11 +528,11 @@ export function planFaults(
 ): PlannedFault[] {
   const plan: PlannedFault[] = []
   const caused = causedItems(clean)
-  const routed = clean.exchanges.filter((e) => e.disposition === "routed")
-  const polls = pollPositions(routed)
+  const faultable = clean.exchanges.filter((e) => e.disposition === "routed" || isPageCallToApp(e))
+  const polls = pollPositions(faultable)
   const routeCounts = new Map<string, number>()
 
-  routed.forEach((exchange, index) => {
+  faultable.forEach((exchange, index) => {
     const call = { host: exchange.host, method: exchange.method, path: exchange.path, index }
     const route = routeOf(call)
     const occurrence = routeCounts.get(route) ?? 0
