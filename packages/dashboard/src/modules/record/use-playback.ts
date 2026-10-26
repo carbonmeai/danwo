@@ -112,17 +112,41 @@ const LENGTH_EVENTS = ["loadedmetadata", "durationchange"]
 const STATE_EVENTS = ["play", "pause", "ended"]
 const ENDED = ["ended"]
 
-/** How long the video runs: what the file says once loaded, else what the record says. */
+/**
+ * How long the video runs: what the file says once loaded, else what the record says. The file's
+ * length counts only for the file it was read from, so the first render after a switch to another
+ * tab's video spans that video, not the one before it.
+ */
 function useVideoLength(video: ReplayVideo | undefined, ref: RefObject<HTMLVideoElement | null>) {
-  const [length, setLength] = useState(video?.durationMs ?? 0)
+  const [read, setRead] = useState<FileLength>()
 
-  useEffect(() => setLength(video?.durationMs ?? 0), [video])
   useVideoEvent(ref, video, LENGTH_EVENTS, (element) => {
-    if (Number.isFinite(element.duration) && element.duration > 0)
-      setLength(element.duration * 1000)
+    const ms = fileLength(element)
+
+    if (video !== undefined && ms !== undefined) setRead({ src: video.src, ms })
   })
 
-  return length
+  return lengthShown(read, video)
+}
+
+/** A video file's length, and which file it was read from. */
+interface FileLength {
+  readonly src: string
+  readonly ms: number
+}
+
+/** How long the element's file runs, once it knows. */
+function fileLength(element: HTMLVideoElement): number | undefined {
+  return Number.isFinite(element.duration) && element.duration > 0
+    ? element.duration * 1000
+    : undefined
+}
+
+/** The length read from `video`'s own file, else the one its record gives. */
+function lengthShown(read: FileLength | undefined, video: ReplayVideo | undefined): number {
+  if (video === undefined) return 0
+
+  return read?.src === video.src ? read.ms : video.durationMs
 }
 
 function isPlaying(element: HTMLVideoElement): boolean {
