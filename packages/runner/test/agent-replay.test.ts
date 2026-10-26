@@ -4,7 +4,7 @@
  * off the page. The replay must make no model call at all, and a page that really changed must
  * still go back to the model, saying why.
  */
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -230,6 +230,33 @@ async function record(): Promise<void> {
   board.reset()
 }
 
+const Recording = z.object({
+  instruction: z.string(),
+  actions: z.array(z.object({ kind: z.string(), target: z.unknown().optional() })),
+})
+
+/**
+ * Which action of the recorded assign step (counting from 1) picked Bob. The options open 400 ms
+ * after the members button is clicked; when the page the model sees next already lists them, it
+ * picks Bob at once (action 2), and when it does not, it waits for him first (action 3). Which one
+ * depends on how long the click's own wait and the page's view took, so it is read back.
+ */
+async function recordedPick(): Promise<number> {
+  for (const name of await readdir(dir)) {
+    const recording = Recording.safeParse(JSON.parse(await readFile(join(dir, name), "utf8")))
+
+    if (!recording.success || recording.data.instruction !== `assign ${TITLE} to Bob`) continue
+
+    const at = recording.data.actions.findIndex(
+      (action) => action.kind === "click" && JSON.stringify(action.target).includes("Babbage"),
+    )
+
+    if (at >= 0) return at + 1
+  }
+
+  throw new Error("no recording of the assign step picks Bob")
+}
+
 describe("a recorded journey replays", () => {
   it("with no model calls: act through a portal popover, assert and extract", async () => {
     await record()
@@ -302,6 +329,9 @@ describe("a replay of a page that really changed", () => {
     const exact = { relocation: "exact" } as const
 
     await run(boardModel(), journey, exact)
+
+    const pick = await recordedPick()
+
     board.reset()
     board.look({ members: ["Ada Lovelace", "Robert Babbage"] })
 
@@ -310,7 +340,7 @@ describe("a replay of a page that really changed", () => {
     expect(notes(second.steps)[`assign ${TITLE} to Bob`]).toMatchObject({
       mode: "handed-off",
       reason: expect.stringMatching(
-        /^action 3 \(click\): getByRole\("option", name: "Bob Babbage"\)/,
+        new RegExp(`^action ${pick} \\(click\\): getByRole\\("option", name: "Bob Babbage"\\)`),
       ),
     })
     expect(board.tasks()[0]?.assignee).toBe("Robert Babbage")
