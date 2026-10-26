@@ -8,7 +8,7 @@
       "path": "summary",
       "target": {
         "role": "status",
-        "text": "Page 1 of 1 · 10 products",
+        "text": "Page 3 of 3 · 30 products",
         "section": "main"
       },
       "as": "text"
@@ -20,7 +20,7 @@
     "journey": "tests/agent.danwo.ts › products [agent]",
     "appIdentity": "http://127.0.0.1",
     "kind": "extract",
-    "step": 5,
+    "step": 2,
     "instruction": "the paging summary next to the Next button",
     "params": {},
     "policy": "similar-v1"

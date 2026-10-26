@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "kind": "extract",
+  "instruction": "the paging summary next to the Next button",
+  "recordedAt": "2026-10-18T14:57:59.812Z",
+  "fields": [
+    {
+      "path": "summary",
+      "target": {
+        "role": "status",
+        "text": "Page 1 of 1 · 10 products",
+        "section": "main"
+      },
+      "as": "text"
+    }
+  ],
+  "identity": {
+    "format": 3,
+    "projectId": "danwo",
+    "journey": "tests/agent.danwo.ts › products [agent]",
+    "appIdentity": "http://127.0.0.1",
+    "kind": "extract",
+    "step": 5,
+    "instruction": "the paging summary next to the Next button",
+    "params": {},
+    "policy": "similar-v1",
+    "occurrence": 1
+  }
+}
