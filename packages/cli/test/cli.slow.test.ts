@@ -341,8 +341,11 @@ describe("danwo matrix", () => {
     expect(html).toContain("POST api.stripe.com/v1/checkout/sessions")
     expect(html).not.toMatch(/sk_test_danwo_example|whsec_danwo_example/)
 
-    // The GitHub check: failed, with the duplicate annotated in the test file, and no secrets.
-    expect(bodyOf(fake, 0)?.name).toBe("danwo matrix")
+    /*
+     * The GitHub check: failed, with the duplicate annotated in the test file, and no secrets. Git
+     * tracks several danwo configs in this repository, so the check is named after the shop's folder.
+     */
+    expect(bodyOf(fake, 0)?.name).toBe(`danwo matrix · ${basename(SHOP)}`)
     expect(bodyOf(fake, -1)?.conclusion).toBe("failure")
     expect(bodyOf(fake, -1)?.output?.title).toBe("faults: 18 passed · 1 failed")
     expect(bodyOf(fake, -1)?.output?.annotations).toEqual([
