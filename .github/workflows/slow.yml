@@ -22,6 +22,9 @@ jobs:
       matrix:
         # vitest splits the slow test files across the shards; each runs four at a time.
         shard: [1, 2, 3, 4]
+    env:
+      # The tests' throwaway copies of the examples and fixtures keep their flight records here.
+      DANWO_TEST_RECORDS: ${{ github.workspace }}/reports/records
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -34,14 +37,22 @@ jobs:
       - run: >-
           bun run test:slow --shard=${{ matrix.shard }}/4
           --reporter=default --reporter=junit --outputFile.junit=reports/slow-${{ matrix.shard }}.xml
+      # The .danwo folders runs left in the checkout itself, gathered under reports/ with their
+      # paths. find follows no symlink and skips node_modules (where Bun links the workspace's
+      # packages back into it), so this takes seconds; a glob over the checkout would walk them.
       - if: failure()
+        timeout-minutes: 5
+        run: |
+          mkdir -p reports/checkout
+          find . \( -name node_modules -o -name .git -o -path ./reports \) -prune \
+            -o -type d -name .danwo -prune -print0 \
+            | xargs -0 -r cp -R --parents -t reports/checkout
+      - if: failure()
+        timeout-minutes: 10
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: slow-${{ matrix.shard }}
-          path: |
-            reports/
-            **/.danwo/
-            !**/node_modules/**
+          path: reports/
           include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 14
@@ -52,6 +63,8 @@ jobs:
     name: slow (firefox, webkit)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      DANWO_TEST_RECORDS: ${{ github.workspace }}/reports/records
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -65,13 +78,18 @@ jobs:
           packages/runner/test/engines.slow.test.ts packages/cli/test/engines.slow.test.ts
           --reporter=default --reporter=junit --outputFile.junit=reports/slow-engines.xml
       - if: failure()
+        timeout-minutes: 5
+        run: |
+          mkdir -p reports/checkout
+          find . \( -name node_modules -o -name .git -o -path ./reports \) -prune \
+            -o -type d -name .danwo -prune -print0 \
+            | xargs -0 -r cp -R --parents -t reports/checkout
+      - if: failure()
+        timeout-minutes: 10
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: slow-engines
-          path: |
-            reports/
-            **/.danwo/
-            !**/node_modules/**
+          path: reports/
           include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 14

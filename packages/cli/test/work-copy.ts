@@ -1,9 +1,15 @@
 /**
  * Throwaway copies of the examples and fixtures, so a test run never writes into the repository's own
  * folders: flight records, replay caches, snapshots and generated tests land in the copy and go with it.
+ * With `DANWO_TEST_RECORDS` set to a folder, each copy's flight records are kept there first, under the
+ * copy's path in the repository, so a run in CI can upload what its failed tests recorded.
  */
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, symlinkSync } from "node:fs"
-import { basename, dirname, join } from "node:path"
+import { basename, dirname, join, relative } from "node:path"
+import { fileURLToPath } from "node:url"
+
+/** The repository's root: a kept copy's records are filed under the copy's path from it. */
+const ROOT = fileURLToPath(new URL("../../..", import.meta.url))
 
 /** What a copy leaves out: installed packages (linked instead) and what earlier runs wrote. */
 const LEFT_OUT = new Set(["node_modules", ".danwo", "test-results", "playwright-report"])
@@ -61,11 +67,32 @@ export function workCopy(source: string): string {
 }
 
 /**
- * Deletes every copy {@link workCopy} made in this test file. A process the test just stopped
- * may still be writing into the copy, so a busy directory is retried rather than failing.
+ * Copies `copy`'s flight records into the folder `DANWO_TEST_RECORDS` names, if it names one. The
+ * records only help explain a failure, so one that cannot be copied is told of and left.
+ */
+function keepRecords(copy: string): void {
+  const kept = process.env["DANWO_TEST_RECORDS"]
+  const runs = join(copy, ".danwo", "runs")
+
+  if (kept === undefined || kept === "" || !existsSync(runs)) return
+
+  try {
+    cpSync(runs, join(kept, relative(ROOT, copy), "runs"), { recursive: true })
+  } catch (error) {
+    console.warn(`the flight records in ${copy} were not kept: ${String(error)}`)
+  }
+}
+
+/**
+ * Deletes every copy {@link workCopy} made in this test file, its flight records kept first when
+ * `DANWO_TEST_RECORDS` asks. A process the test just stopped may still be writing into the copy, so
+ * a busy directory is retried rather than failing.
  */
 export function removeWorkCopies(): void {
-  for (const copy of copies.values())
+  for (const copy of copies.values()) {
+    keepRecords(copy)
     rmSync(copy, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  }
+
   copies.clear()
 }
