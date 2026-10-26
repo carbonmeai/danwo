@@ -16,17 +16,15 @@ export type { TiptapSeedApp, TiptapSeedConfig } from "./seed.ts"
 const YJS_PACKAGES = ["yjs", "y-protocols", "lib0"] as const
 
 /**
- * The collaboration server, or the error that says which of its packages the project lacks.
+ * The collaboration server, or the error that says how to add the packages it runs on.
  * Loaded here rather than imported, so danwo installs no Yjs for the many projects without Tiptap.
  */
 const server = await import("./server.ts").catch((error: unknown) => {
-  const missing = YJS_PACKAGES.find((name) => missingPackage(error, name))
-
-  if (missing === undefined) throw error
+  if (!YJS_PACKAGES.some((name) => missingPackage(error, name))) throw error
 
   return new Error(
-    `the Tiptap emulator needs yjs and y-protocols, as Tiptap's collaboration does: ` +
-      `npm install -D yjs y-protocols (Node found no ${missing})`,
+    "the Tiptap emulator needs yjs and y-protocols, as Tiptap's collaboration does: " +
+      "npm install -D yjs y-protocols",
     { cause: error },
   )
 })

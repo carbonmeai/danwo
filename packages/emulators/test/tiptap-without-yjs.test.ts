@@ -52,8 +52,9 @@ describe("the Tiptap emulator in a project without Yjs", () => {
       }
     `)
 
-    expect(run.stdout.trim()).toMatch(
-      /^the Tiptap emulator needs yjs and y-protocols, as Tiptap's collaboration does: npm install -D yjs y-protocols \(Node found no (yjs|y-protocols|lib0)\)$/,
+    expect(run.stdout.trim()).toBe(
+      "the Tiptap emulator needs yjs and y-protocols, as Tiptap's collaboration does: " +
+        "npm install -D yjs y-protocols",
     )
   })
 })
