@@ -72,7 +72,7 @@ describe("integration lint", () => {
 
     expect(test.out).toContain("2 passed")
     expect(test.out).not.toContain("integration lint")
-    expect(matrix.out).toContain("faults: 18 passed")
+    expect(matrix.out).toContain("faults: 19 passed")
     expect(matrix.out).not.toContain("integration lint")
   }, 300_000)
 
