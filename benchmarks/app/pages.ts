@@ -3,6 +3,8 @@
  * would have some (a sortable table, a dialog, an upload, a canvas, a cross-origin widget, a
  * report that takes a moment). Every page is reachable from the navigation.
  */
+import { readFileSync } from "node:fs"
+
 import type { Bug } from "./bugs.ts"
 import { type AppState, type Order, PRODUCTS } from "./state.ts"
 
@@ -220,6 +222,14 @@ export function widget(parentOrigin: string): string {
 <script>w.onsubmit=e=>{e.preventDefault();parent.postMessage({subscribe:email.value},"${parentOrigin}");};</script></body></html>`
 }
 
+/**
+ * The drawn button, green with "Approve" in white, as a picture. Text drawn on a canvas takes the
+ * machine's own font (San Francisco on macOS, DejaVu Sans on Linux) and its own rasterizer, so a
+ * recording of the button made on one machine would not look the same on another; a picture is
+ * drawn with the same pixels everywhere.
+ */
+const APPROVE_BUTTON = `data:image/png;base64,${readFileSync(new URL("./approve-button.png", import.meta.url)).toString("base64")}`
+
 /** A canvas with one drawn button in its middle; clicking inside it approves. */
 export function approve(state: AppState): string {
   const done = state.approved
@@ -230,8 +240,8 @@ export function approve(state: AppState): string {
     "Approve",
     `${done}<canvas id="board" data-testid="board" aria-label="Approval board" width="400" height="200" style="border:1px solid #ccc"></canvas>
 <script>
-const c=board.getContext("2d");c.fillStyle="#f4f4f5";c.fillRect(0,0,400,200);c.fillStyle="#16a34a";c.fillRect(140,75,120,50);
-c.fillStyle="#fff";c.font="bold 18px system-ui";c.fillText("Approve",165,106);
+const c=board.getContext("2d");c.fillStyle="#f4f4f5";c.fillRect(0,0,400,200);
+const button=new Image();button.onload=()=>c.drawImage(button,140,75);button.src="${APPROVE_BUTTON}";
 board.onclick=async e=>{const r=board.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
 if(x>=140&&x<=260&&y>=75&&y<=125){await fetch("/approve",{method:"POST"});location.reload();}};
 </script>`,
