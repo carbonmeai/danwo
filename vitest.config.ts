@@ -44,6 +44,7 @@ export default defineConfig({
         test: {
           name: "slow",
           include: ["packages/*/test/**/*.slow.test.ts", "benchmarks/test/**/*.slow.test.ts"],
+          setupFiles: ["./scripts/outside-ci.ts"],
           testTimeout: 300_000,
         },
       },
