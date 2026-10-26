@@ -9,6 +9,12 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { setTimeout as sleep } from "node:timers/promises"
 
 const oversells = process.env.OVERSELL_BUG === "1"
+/**
+ * How long the oversell bug waits between reading and writing the stock. Two people's clicks can
+ * land a second apart on a busy machine (the person whose trial keeps the record films and
+ * screenshots each step, the other does not), and both must land inside the wait to oversell.
+ */
+const SLOW_DATABASE_MS = 1_500
 let stock = 1
 const orders: string[] = []
 
@@ -29,7 +35,7 @@ async function take(buyer: string): Promise<boolean> {
 
   const seen = stock
 
-  await sleep(400)
+  await sleep(SLOW_DATABASE_MS)
   if (seen < 1) return false
   stock = seen - 1
   orders.push(buyer)
