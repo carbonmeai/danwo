@@ -8,13 +8,13 @@
     "bench": "node bench/run.ts"
   },
   "dependencies": {
-    "stripe": "23.0.0",
+    "stripe": "23.0.1",
     "zod": "4.6.7"
   },
   "devDependencies": {
     "@danwo/cli": "workspace:*",
     "@danwo/emulators": "workspace:*",
     "@danwo/sdk": "workspace:*",
-    "ai": "7.0.143"
+    "ai": "7.0.152"
   }
 }

@@ -56,13 +56,13 @@
     "postpack": "node ../../scripts/pack-files.ts remove"
   },
   "dependencies": {
-    "@ai-sdk/provider": "4.0.29",
+    "@ai-sdk/provider": "4.0.33",
     "@danwo/emulators": "workspace:*",
     "@danwo/infra": "workspace:*",
     "@danwo/matrix": "workspace:*",
     "@danwo/proxy": "workspace:*",
     "@vitest/expect": "5.0.5",
-    "ai": "7.0.143",
+    "ai": "7.0.152",
     "picocolors": "1.1.1",
     "pixelmatch": "8.0.0",
     "playwright-core": "1.64.1",
@@ -70,14 +70,14 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@ai-sdk/amazon-bedrock": "5.0.119",
-    "@ai-sdk/anthropic": "4.0.82",
-    "@ai-sdk/google": "4.0.100",
-    "@ai-sdk/openai": "4.0.96",
-    "@ai-sdk/openai-compatible": "3.0.71",
-    "@ai-sdk/perplexity": "5.0.15",
-    "@aws-sdk/client-s3": "3.1152.0",
-    "@aws-sdk/client-sqs": "3.1152.0",
+    "@ai-sdk/amazon-bedrock": "5.0.123",
+    "@ai-sdk/anthropic": "4.0.87",
+    "@ai-sdk/google": "4.0.104",
+    "@ai-sdk/openai": "4.0.101",
+    "@ai-sdk/openai-compatible": "3.0.77",
+    "@ai-sdk/perplexity": "5.0.19",
+    "@aws-sdk/client-s3": "3.1156.0",
+    "@aws-sdk/client-sqs": "3.1156.0",
     "@tigrisdata/storage": "3.23.0",
     "@types/pngjs": "6.0.5"
   },
