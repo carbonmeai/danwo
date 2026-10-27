@@ -30,6 +30,7 @@ import {
   urlDir,
 } from "./plan.ts"
 import { type ProviderGroup, providerIcon, withProviderCards } from "./provider-pages.ts"
+import { ZH, ZH_TABS, zhFile, zhSection } from "./zh.ts"
 
 /** The website package's folder. */
 export const WEBSITE = join(import.meta.dirname, "..", "..")
@@ -67,24 +68,45 @@ function head(place: Placement, description: string, source: string): string {
   })
 }
 
-/** A page written for the website, with its place and the file it came from in its frontmatter. */
-function copied(file: string, place: Placement): string {
+/**
+ * A page written for the website, with its place and the file it came from in its frontmatter.
+ * A Chinese page keeps the title its own frontmatter gives it.
+ */
+function copied(file: string, place: Placement, ownTitle = false): string {
   const text = readFileSync(join(CONTENT, file), "utf8")
   const fields = [
-    `title: ${JSON.stringify(place.title)}`,
+    ...(ownTitle ? [] : [`title: ${JSON.stringify(place.title)}`]),
     `icon: ${JSON.stringify(place.icon)}`,
     `section: ${JSON.stringify(place.section)}`,
     `source: ${JSON.stringify(`website/content/docs/${file}`)}`,
   ]
+  const replaced = new RegExp(`^(${ownTitle ? "" : "title|"}icon|section|source):`)
   const body = text.startsWith("---\n")
     ? text.replace(/^---\n([\s\S]*?)\n---\n/, (_, inner: string) => {
-        const kept = inner.split("\n").filter((line) => !/^(title|icon|section|source):/.test(line))
+        const kept = inner.split("\n").filter((line) => !replaced.test(line))
 
         return `---\n${[...fields, ...kept].join("\n")}\n---\n`
       })
     : text
 
   return body
+}
+
+/**
+ * The Chinese version of a page written for the website, when `content/docs` has one beside the
+ * English: its file name in the tab's folder, and its text.
+ */
+function chinesePage(page: PlannedPage, place: Placement): [string, string] | undefined {
+  if (page.source.kind !== "file") return undefined
+
+  const file = zhFile(page.source.file)
+
+  if (!existsSync(join(CONTENT, file))) return undefined
+
+  return [
+    `${page.slug}.${ZH}.mdx`,
+    copied(file, { ...place, section: zhSection(place.section) }, true),
+  ]
 }
 
 /** The code a reference page opens with, under a tab naming its file. */
@@ -245,14 +267,15 @@ function placement(page: PlannedPage, group: PlannedSection): Placement {
  * A tab's sidebar: its sections as separators over their pages, the tab marked as a root so it
  * shows as a tab with a sidebar of its own.
  */
-function tabMeta(tab: PlannedTab): string {
+function tabMeta(tab: PlannedTab, lang?: typeof ZH): string {
+  const zh = lang === ZH ? ZH_TABS[tab.dir] : undefined
   const pages = tab.sections.flatMap((group) => [
-    `---${group.title}---`,
+    `---${zh ? zhSection(group.title) : group.title}---`,
     ...group.pages.map((page) => page.slug),
   ])
   const value = {
-    title: tab.title,
-    description: tab.description,
+    title: zh?.title ?? tab.title,
+    description: zh?.description ?? tab.description,
     icon: tab.icon,
     root: true,
     pages,
@@ -265,16 +288,23 @@ function tabMeta(tab: PlannedTab): string {
 export function plannedFiles(inputs: Inputs): Files {
   const files: Files = new Map()
 
-  files.set("meta.json", `${JSON.stringify({ pages: PLAN.map((tab) => tab.dir) }, null, 2)}\n`)
+  const root = `${JSON.stringify({ pages: PLAN.map((tab) => tab.dir) }, null, 2)}\n`
+
+  files.set("meta.json", root)
+  files.set(`meta.${ZH}.json`, root)
 
   for (const tab of PLAN) {
     files.set(join(tab.dir, "meta.json"), tabMeta(tab))
+    files.set(join(tab.dir, `meta.${ZH}.json`), tabMeta(tab, ZH))
 
     for (const group of tab.sections)
       for (const page of group.pages) {
-        const [file, text] = pageFile(page, { place: placement(page, group), tab, inputs })
+        const place = placement(page, group)
+        const [file, text] = pageFile(page, { place, tab, inputs })
+        const chinese = chinesePage(page, place)
 
         files.set(join(tab.dir, file), text)
+        if (chinese) files.set(join(tab.dir, chinese[0]), chinese[1])
       }
   }
 

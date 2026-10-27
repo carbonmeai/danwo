@@ -21,6 +21,8 @@ import { Route as BlogIndexRouteImport } from './routes/blog/index'
 import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
 import { Route as DocsSplatRouteImport } from './routes/docs/$'
 import { Route as DocsChar123Char125DotmdRouteImport } from './routes/docs/{$}[.]md'
+import { Route as ZhCNDocsSplatRouteImport } from './routes/zh-CN/docs/$'
+import { Route as ZhCNDocsChar123Char125DotmdRouteImport } from './routes/zh-CN/docs/{$}[.]md'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -82,6 +84,17 @@ const DocsChar123Char125DotmdRoute = DocsChar123Char125DotmdRouteImport.update({
   path: '/docs/{$}.md',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ZhCNDocsSplatRoute = ZhCNDocsSplatRouteImport.update({
+  id: '/zh-CN/docs/$',
+  path: '/zh-CN/docs/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ZhCNDocsChar123Char125DotmdRoute =
+  ZhCNDocsChar123Char125DotmdRouteImport.update({
+    id: '/zh-CN/docs/{$}.md',
+    path: '/zh-CN/docs/{$}.md',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -96,6 +109,8 @@ export interface FileRoutesByFullPath {
   '/docs/$': typeof DocsSplatRoute
   '/docs/{$}.md': typeof DocsChar123Char125DotmdRoute
   '/blog/': typeof BlogIndexRoute
+  '/zh-CN/docs/$': typeof ZhCNDocsSplatRoute
+  '/zh-CN/docs/{$}.md': typeof ZhCNDocsChar123Char125DotmdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -110,6 +125,8 @@ export interface FileRoutesByTo {
   '/docs/$': typeof DocsSplatRoute
   '/docs/{$}.md': typeof DocsChar123Char125DotmdRoute
   '/blog': typeof BlogIndexRoute
+  '/zh-CN/docs/$': typeof ZhCNDocsSplatRoute
+  '/zh-CN/docs/{$}.md': typeof ZhCNDocsChar123Char125DotmdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -125,6 +142,8 @@ export interface FileRoutesById {
   '/docs/$': typeof DocsSplatRoute
   '/docs/{$}.md': typeof DocsChar123Char125DotmdRoute
   '/blog/': typeof BlogIndexRoute
+  '/zh-CN/docs/$': typeof ZhCNDocsSplatRoute
+  '/zh-CN/docs/{$}.md': typeof ZhCNDocsChar123Char125DotmdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -141,6 +160,8 @@ export interface FileRouteTypes {
     | '/docs/$'
     | '/docs/{$}.md'
     | '/blog/'
+    | '/zh-CN/docs/$'
+    | '/zh-CN/docs/{$}.md'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -155,6 +176,8 @@ export interface FileRouteTypes {
     | '/docs/$'
     | '/docs/{$}.md'
     | '/blog'
+    | '/zh-CN/docs/$'
+    | '/zh-CN/docs/{$}.md'
   id:
     | '__root__'
     | '/'
@@ -169,6 +192,8 @@ export interface FileRouteTypes {
     | '/docs/$'
     | '/docs/{$}.md'
     | '/blog/'
+    | '/zh-CN/docs/$'
+    | '/zh-CN/docs/{$}.md'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -184,6 +209,8 @@ export interface RootRouteChildren {
   DocsSplatRoute: typeof DocsSplatRoute
   DocsChar123Char125DotmdRoute: typeof DocsChar123Char125DotmdRoute
   BlogIndexRoute: typeof BlogIndexRoute
+  ZhCNDocsSplatRoute: typeof ZhCNDocsSplatRoute
+  ZhCNDocsChar123Char125DotmdRoute: typeof ZhCNDocsChar123Char125DotmdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -272,6 +299,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsChar123Char125DotmdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/zh-CN/docs/$': {
+      id: '/zh-CN/docs/$'
+      path: '/zh-CN/docs/$'
+      fullPath: '/zh-CN/docs/$'
+      preLoaderRoute: typeof ZhCNDocsSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/zh-CN/docs/{$}.md': {
+      id: '/zh-CN/docs/{$}.md'
+      path: '/zh-CN/docs/{$}.md'
+      fullPath: '/zh-CN/docs/{$}.md'
+      preLoaderRoute: typeof ZhCNDocsChar123Char125DotmdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -288,6 +329,8 @@ const rootRouteChildren: RootRouteChildren = {
   DocsSplatRoute: DocsSplatRoute,
   DocsChar123Char125DotmdRoute: DocsChar123Char125DotmdRoute,
   BlogIndexRoute: BlogIndexRoute,
+  ZhCNDocsSplatRoute: ZhCNDocsSplatRoute,
+  ZhCNDocsChar123Char125DotmdRoute: ZhCNDocsChar123Char125DotmdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

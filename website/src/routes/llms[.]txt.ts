@@ -8,7 +8,7 @@ export const Route = createFileRoute("/llms.txt")({
   server: {
     handlers: {
       GET: () =>
-        new Response(`${docsLlms.index()}\n\n${guidesIndex()}`, {
+        new Response(`${docsLlms.index("en")}\n\n${guidesIndex()}`, {
           headers: { "Content-Type": "text/plain; charset=utf-8" },
         }),
     },

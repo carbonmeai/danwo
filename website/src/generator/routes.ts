@@ -6,6 +6,7 @@
 import { readdirSync } from "node:fs"
 import { join } from "node:path"
 
+import { docsPath, type Lang } from "../lib/i18n.ts"
 import { markdownPath } from "../lib/paths.ts"
 import { pageSlug, WEBSITE } from "./generate.ts"
 import { plannedPages } from "./plan.ts"
@@ -22,6 +23,14 @@ export function postSlugs(collection: "blog" | "changelog"): string[] {
     .map((name) => name.slice(0, -".mdx".length))
 }
 
+/** Each docs page's address and its markdown copy, in `lang`. */
+function docsPaths(lang: Lang): string[] {
+  return docsSlugs().flatMap((slug) => [
+    docsPath(slug === "" ? "/docs" : `/docs/${slug}`, lang),
+    markdownPath(slug, lang),
+  ])
+}
+
 /** Every address to prerender that crawling the pages would not reach. */
 export function prerenderedPaths(): string[] {
   return [
@@ -33,8 +42,8 @@ export function prerenderedPaths(): string[] {
     "/sitemap.xml",
     "/robots.txt",
     "/api/search",
-    ...docsSlugs().map((slug) => (slug === "" ? "/docs" : `/docs/${slug}`)),
-    ...docsSlugs().map(markdownPath),
+    ...docsPaths("en"),
+    ...docsPaths("zh-CN"),
     ...postSlugs("blog").map((slug) => `/blog/${slug}`),
   ]
 }

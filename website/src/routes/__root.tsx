@@ -1,7 +1,14 @@
-import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router"
+import {
+  createRootRoute,
+  HeadContent,
+  Outlet,
+  Scripts,
+  useRouterState,
+} from "@tanstack/react-router"
 import { RootProvider } from "fumadocs-ui/provider/tanstack"
 import type { ReactNode } from "react"
 
+import { i18nUI, langOf } from "../lib/i18n.ts"
 import { SITE } from "../lib/site.ts"
 
 import appCss from "../styles/app.css?url"
@@ -34,15 +41,29 @@ function RootComponent() {
   )
 }
 
-/** The page every route renders inside: theme, search and the head. */
+/** Whether `pathname` is a docs page, which the language switch moves between languages. */
+function isDocs(pathname: string): boolean {
+  return /^(\/zh-CN)?\/docs(\/|$)/.test(pathname)
+}
+
+/**
+ * The page every route renders inside: theme, search and the head. A docs page carries its
+ * language, for the language switch, the search and the docs' own words.
+ */
 function Document({ children }: { readonly children: ReactNode }) {
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const lang = langOf(pathname)
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={lang} suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body>
-        <RootProvider search={{ options: { type: "static", api: "/api/search" } }}>
+        <RootProvider
+          search={{ options: { type: "static", api: "/api/search" } }}
+          {...(isDocs(pathname) && { i18n: i18nUI.provider(lang) })}
+        >
           {children}
         </RootProvider>
         <Scripts />

@@ -8,7 +8,7 @@ export const Route = createFileRoute("/llms-full.txt")({
   server: {
     handlers: {
       GET: async () =>
-        new Response(`${await docsLlms.full()}\n\n${guidesFull()}`, {
+        new Response(`${await docsLlms.full("en")}\n\n${guidesFull()}`, {
           headers: { "Content-Type": "text/plain; charset=utf-8" },
         }),
     },

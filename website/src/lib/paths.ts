@@ -1,8 +1,13 @@
 /** Addresses the pages link to that are derived from a docs page's slug. */
 
-/** The markdown copy of a docs page, by its slug under `/docs` (`""` for the docs' home). */
-export function markdownPath(slug: string): string {
-  return slug === "" ? "/docs/index.md" : `/docs/${slug}.md`
+import { docsPath, type Lang } from "./i18n.ts"
+
+/**
+ * The markdown copy of a docs page, by its slug under `/docs` (`""` for the docs' home), in
+ * `lang`.
+ */
+export function markdownPath(slug: string, lang: Lang = "en"): string {
+  return docsPath(slug === "" ? "/docs/index.md" : `/docs/${slug}.md`, lang)
 }
 
 /** A docs page's slug from its markdown address's path segments, the inverse of `markdownPath`. */

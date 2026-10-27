@@ -7,6 +7,7 @@ import { pageSchema } from "fumadocs-core/source/schema"
 import { defineCollections, defineDocs } from "fumadocs-mdx/macro"
 import { z } from "zod"
 
+import { i18n } from "./i18n.ts"
 import { iconsPlugin } from "./icons.tsx"
 
 /**
@@ -27,9 +28,14 @@ export const docs = defineDocs({
   },
 })
 
+/**
+ * The docs in each language: English at `/docs`, Chinese at `/zh-CN/docs`, where a page not yet
+ * translated falls back to its English one.
+ */
 export const source = loader({
   source: docs.toFumadocsSource(),
   baseUrl: "/docs",
+  i18n,
   plugins: [iconsPlugin()],
 })
 

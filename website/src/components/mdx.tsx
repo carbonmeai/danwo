@@ -1,9 +1,11 @@
+import { Card } from "fumadocs-ui/components/card"
 import { Step, Steps } from "fumadocs-ui/components/steps"
 import { Tab, Tabs } from "fumadocs-ui/components/tabs"
 import defaultMdxComponents from "fumadocs-ui/mdx"
 import type { MDXComponents } from "mdx/types"
 import type { ComponentProps } from "react"
 
+import { docsPath, type Lang } from "../lib/i18n.ts"
 import { isFileAddress } from "../lib/paths.ts"
 import {
   AwsRouting,
@@ -18,12 +20,29 @@ import {
 } from "./diagrams.tsx"
 import { StackFlow } from "./stack-diagram.tsx"
 
-/** A link in a page: a plain one to a raw file on the site, else the docs' own link. */
-function PageLink(props: ComponentProps<"a">) {
-  if (isFileAddress(props.href)) return <a {...props} />
-
-  return <defaultMdxComponents.a {...props} />
+/** `href` in a page in `lang`: a docs page in the same language, any other address as it is. */
+function localised(href: string | undefined, lang: Lang): string | undefined {
+  return href?.startsWith("/docs") && !isFileAddress(href) ? docsPath(href, lang) : href
 }
+
+/** A link in a page: a plain one to a raw file on the site, else the docs' own link. */
+function linkIn(lang: Lang) {
+  return function PageLink(props: ComponentProps<"a">) {
+    if (isFileAddress(props.href)) return <a {...props} />
+
+    return <defaultMdxComponents.a {...props} href={localised(props.href, lang)} />
+  }
+}
+
+/** A card in a page, linking to the docs page in the page's own language. */
+function cardIn(lang: Lang) {
+  return function PageCard(props: ComponentProps<typeof Card>) {
+    return <Card {...props} href={localised(props.href, lang)} />
+  }
+}
+
+const LINKS = { en: linkIn("en"), "zh-CN": linkIn("zh-CN") }
+const CARDS = { en: cardIn("en"), "zh-CN": cardIn("zh-CN") }
 
 /** A row of small labels, such as an example's stack. */
 function Badges({ items }: { readonly items: readonly string[] }) {
@@ -43,12 +62,14 @@ function Badges({ items }: { readonly items: readonly string[] }) {
 
 /**
  * The components MDX pages can use: the docs defaults (cards, callouts, code blocks), steps,
- * tabs, badges, and danwo's diagrams.
+ * tabs, badges, and danwo's diagrams. In a page in `lang`, links and cards to docs pages stay in
+ * that language.
  */
-export function useMdxComponents(components?: MDXComponents) {
+export function useMdxComponents(components?: MDXComponents, lang: Lang = "en") {
   return {
     ...defaultMdxComponents,
-    a: PageLink,
+    a: LINKS[lang],
+    Card: CARDS[lang],
     Step,
     Steps,
     Tab,
