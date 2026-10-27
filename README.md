@@ -15,6 +15,10 @@
 </p>
 
 <p align="center">
+  <strong>English</strong> · <a href="README.zh-CN.md">简体中文</a>
+</p>
+
+<p align="center">
   <a href="https://danwo.dev/docs/quickstart">Quickstart</a> ·
   <a href="https://danwo.dev/docs">Docs</a> ·
   <a href="https://danwo.dev/docs/what-you-can-test">What you can test</a> ·
