@@ -14,8 +14,8 @@
     "serve": "danwo serve"
   },
   "devDependencies": {
-    "@danwo/cli": "0.1.5",
-    "@danwo/sdk": "0.1.5",
+    "@danwo/cli": "0.1.6",
+    "@danwo/sdk": "0.1.6",
     "@sveltejs/adapter-node": "6.0.0",
     "@sveltejs/kit": "3.1.0",
     "@sveltejs/vite-plugin-svelte": "7.3.1",

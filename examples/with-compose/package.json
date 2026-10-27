@@ -20,10 +20,10 @@
     "resend": "6.34.1"
   },
   "devDependencies": {
-    "@danwo/cli": "0.1.5",
-    "@danwo/mobile": "0.1.5",
-    "@danwo/proxy": "0.1.5",
-    "@danwo/sdk": "0.1.5",
+    "@danwo/cli": "0.1.6",
+    "@danwo/mobile": "0.1.6",
+    "@danwo/proxy": "0.1.6",
+    "@danwo/sdk": "0.1.6",
     "@types/node": "^24",
     "@types/pg": "8.23.1",
     "typescript": "5.9.3"

@@ -123,7 +123,7 @@ repository:
 
 ```sh
 bun install
-bun run release 0.1.5 --pack
+bun run release 0.1.6 --pack
 node examples/link.ts with-flutter --here
 ```
 
@@ -142,6 +142,6 @@ node examples/link.ts with-flutter --here
 
 See [Flutter](https://danwo.dev/docs/flutter) for your own app.
 
-Last checked with danwo 0.1.5, Flutter 3.47.7, `http` 1.6.0, `cupertino_http` 3.1.0,
+Last checked with danwo 0.1.6, Flutter 3.47.7, `http` 1.6.0, `cupertino_http` 3.1.0,
 `cronet_http` 1.10.0, an Android 14 (Google APIs) emulator, an iOS 26.5 simulator, Postgres 17
 and Node 24.

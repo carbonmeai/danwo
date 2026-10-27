@@ -1,0 +1,24 @@
+---
+title: danwo 0.1.6
+description: Docs and a README in Simplified Chinese, and one message that names every package your config is missing.
+date: 2026-10-27
+---
+
+## New
+
+- **danwo in Simplified Chinese.** The README has a Chinese version, and the docs have their
+  first Chinese pages at [/zh-CN/docs](/zh-CN/docs): the introduction, the quickstart, why danwo,
+  what you can test, the fault matrix and apps in other languages. A page that isn't translated
+  yet shows the English one.
+- **Every missing package at once.** Before any test starts, `danwo test` and `danwo matrix` name
+  every package your config needs and your project lacks, with one command that adds them all, for
+  example `npm install -D yjs y-protocols pg`. `danwo doctor` lists them too.
+- A page the browser couldn't load is in the run's app log with the browser's reason, such as
+  `net::ERR_CONNECTION_RESET`.
+
+## Fixed
+
+- The dashboard's player no longer jumps back into the previous tab's video after a recording
+  switches tabs.
+- The Tiptap emulator's message for a project without Yjs gives just the install command,
+  `npm install -D yjs y-protocols`.
