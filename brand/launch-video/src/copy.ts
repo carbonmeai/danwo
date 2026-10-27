@@ -125,7 +125,7 @@ export const EN: Copy = {
 
 export const ZH: Copy = {
   hook: [
-    { text: "编程智能体 让写代码 变得廉价。" },
+    { text: "AI 编程助手 让写代码 变得廉价。" },
     { text: "验证代码 才是 瓶颈。", dim: ["验证代码", "才是"] },
   ],
   proof: {
@@ -140,7 +140,7 @@ export const ZH: Copy = {
     credits: "积分：500",
     passed: "测试通过",
   },
-  question: [{ text: "这次改动 弄坏了 什么？" }, { text: "我们 有多 确定？" }],
+  question: [{ text: "这次改动 破坏了 什么？" }, { text: "我们 有多 确定？" }],
   what: "开源的 Web 与移动应用端到端测试框架",
   tagline: [{ text: "驱动界面，" }, { text: "检验 背后的 一切。" }],
   drive: {
@@ -164,22 +164,22 @@ export const ZH: Copy = {
   },
   matrix: {
     kicker: "故障矩阵",
-    title: { text: "它 故意 把运行 搞坏。", dim: ["它", "把运行"] },
+    title: { text: "它 主动向运行 注入故障。", dim: ["它", "主动向运行"] },
     sub: "一次干净的运行，按每种故障各回放一次：被拒的卡、500、超时、重复或伪造的 webhook、重复提交、丢失的提交、时间跳跃。",
   },
   explain: {
-    kicker: "飞行记录",
+    kicker: "运行记录",
     title: { text: "它 讲清楚 每一次运行。", dim: ["它", "每一次运行。"] },
     sub: "视频、每一步、每次服务调用和 webhook、数据库语句，密钥都已脱敏。",
     outlet: "GitHub Check 与 PR 评论",
   },
   agents: {
-    kicker: "智能体",
+    kicker: "AI 编程助手",
     title: {
-      text: "你的 编程智能体 自己 检验 自己的成果。",
+      text: "你的 AI 编程助手 自己 检验 自己的成果。",
       dim: ["你的", "自己", "自己的成果。"],
     },
-    sub: "一个教它使用 danwo 的 Skill，加上一个 MCP 服务器：运行测试、驱动应用、读取每一份飞行记录。",
+    sub: "一个教它使用 danwo 的 Skill，加上一个 MCP 服务器：运行测试、驱动应用、读取每一份运行记录。",
     terminal: "终端",
     done: "Skill 与 MCP 服务器，一条命令配好。",
   },
