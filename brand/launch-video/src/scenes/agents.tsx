@@ -1,5 +1,6 @@
 import { AbsoluteFill, Img, staticFile, useCurrentFrame } from "remotion"
 
+import { useCopy } from "../copy.ts"
 import { Card, Chip, ease, Exit, Mono, Sfx, typed } from "../kit.tsx"
 import { C } from "../theme.ts"
 import { FeatureTitle } from "./feature.tsx"
@@ -27,6 +28,7 @@ const AGENTS = [
 /** Feature five: a coding agent gets danwo's skill and MCP server, so it checks its own work. */
 export function Agents() {
   const frame = useCurrentFrame()
+  const copy = useCopy().agents
   const enter = ease(frame, 6, 26)
   const done = ease(frame, 96, 18)
 
@@ -36,14 +38,7 @@ export function Agents() {
       <Sfx name="typing" at={TYPE_FROM} volume={0.5} />
       <Sfx name="pop" at={96} volume={0.45} />
       <Exit at={122} duration={13}>
-        <FeatureTitle
-          index="05"
-          kicker="Agents"
-          title="Your coding agent checks its own work."
-          dim={["Your", "its", "own"]}
-          sub="A skill that teaches it danwo, and an MCP server to run tests, drive the app and read every flight record."
-          top={250}
-        >
+        <FeatureTitle index="05" feature={copy} top={250}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 40 }}>
             {AGENTS.map(([icon, agent], i) => {
               const p = ease(frame, 34 + i * 6, 18)
@@ -81,7 +76,7 @@ export function Agents() {
               }}
             >
               <Mono size={19} color={C.muted}>
-                Terminal
+                {copy.terminal}
               </Mono>
             </div>
             <div
@@ -140,7 +135,7 @@ export function Agents() {
           >
             <Chip style={{ fontSize: 28 }}>
               <span style={{ color: C.pass }}>●</span>
-              Skill and MCP server, set up in one command.
+              {copy.done}
             </Chip>
           </div>
         </div>

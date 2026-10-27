@@ -1,24 +1,19 @@
 import type { ReactNode } from "react"
 import { useCurrentFrame } from "remotion"
 
+import type { Feature } from "../copy.ts"
 import { ease, Mono, Words } from "../kit.tsx"
 import { C, SANS } from "../theme.ts"
 
 /** The left column of a feature scene: a numbered kicker, the claim and a line under it. */
 export function FeatureTitle({
   index,
-  kicker,
-  title,
-  dim,
-  sub,
+  feature: { kicker, title, sub },
   children,
   top = 300,
 }: {
   readonly index: string
-  readonly kicker: string
-  readonly title: string
-  readonly dim?: readonly string[]
-  readonly sub: string
+  readonly feature: Feature
   readonly children?: ReactNode
   readonly top?: number
 }) {
@@ -37,7 +32,7 @@ export function FeatureTitle({
           {index} · {kicker}
         </Mono>
       </div>
-      <Words text={title} start={4} size={76} dim={dim} style={{ marginTop: 22 }} />
+      <Words text={title.text} start={4} size={76} dim={title.dim} style={{ marginTop: 22 }} />
       <div
         style={{
           marginTop: 26,

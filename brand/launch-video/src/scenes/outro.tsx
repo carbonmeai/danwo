@@ -1,5 +1,6 @@
 import { AbsoluteFill, Img, interpolate, staticFile, useCurrentFrame } from "remotion"
 
+import { useCopy } from "../copy.ts"
 import { clamp, ease, Mono, Sfx, typed } from "../kit.tsx"
 import { C, SANS } from "../theme.ts"
 
@@ -9,6 +10,7 @@ const TYPE_FROM = 34
 /** The end card: the lockup, the one command to start, and where to read more. */
 export function Outro() {
   const frame = useCurrentFrame()
+  const copy = useCopy()
   const logo = ease(frame, 4, 34)
   const pill = ease(frame, 22, 22)
   const links = ease(frame, 72, 22)
@@ -83,7 +85,7 @@ export function Outro() {
         }}
       >
         danwo.dev <span style={{ color: C.faint, margin: "0 18px" }}>·</span>
-        <span style={{ color: C.muted }}>Open-source e2e testing for web and mobile apps</span>
+        <span style={{ color: C.muted }}>{copy.what}</span>
       </div>
       <div
         style={{
@@ -99,7 +101,7 @@ export function Outro() {
           opacity: name,
         }}
       >
-        Dánwò: Yorùbá for “try it and see.”
+        {copy.name}
       </div>
     </AbsoluteFill>
   )

@@ -5,7 +5,9 @@
   "scripts": {
     "studio": "remotion studio src/index.ts",
     "render": "remotion render src/index.ts Launch out/danwo-launch.mp4",
-    "still": "remotion still src/index.ts Launch out/still.png"
+    "render:zh": "remotion render src/index.ts LaunchZh out/danwo-launch-zh.mp4",
+    "still": "remotion still src/index.ts Launch out/still.png",
+    "font:zh": "node scripts/font-zh.ts"
   },
   "dependencies": {
     "@remotion/cli": "4.0.537",

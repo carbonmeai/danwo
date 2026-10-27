@@ -42,6 +42,16 @@ export function Backdrop({ glow = 0.07 }: { readonly glow?: number }) {
   )
 }
 
+/** Chinese characters and the punctuation set with them, which takes no space between words. */
+const CJK = /[\u3000-\u303f\u3400-\u9fff\uff00-\uffef]/
+
+/** The gap after `word`: none between two runs of Chinese, a space's width otherwise. */
+function gapAfter(word: string, next: string | undefined): string {
+  return next !== undefined && CJK.test(word.at(-1) ?? "") && CJK.test(next.at(0) ?? "")
+    ? "0"
+    : "0.24em"
+}
+
 interface WordsProps {
   readonly text: string
   readonly start?: number
@@ -54,7 +64,10 @@ interface WordsProps {
   readonly style?: CSSProperties
 }
 
-/** A line that arrives a word at a time, each one rising out of a blur. */
+/**
+ * A line that arrives a word at a time, each one rising out of a blur. Chinese is split into
+ * phrases by spaces too, drawn without the gap and without the tight tracking Latin text takes.
+ */
 export function Words({
   text,
   start = 0,
@@ -80,7 +93,7 @@ export function Words({
         ...style,
       }}
     >
-      {text.split(" ").map((word, i) => {
+      {text.split(" ").map((word, i, words) => {
         const p = ease(frame, start + i * stagger, 22)
 
         return (
@@ -92,7 +105,8 @@ export function Words({
               transform: `translateY(${(1 - p) * 0.35}em)`,
               filter: `blur(${(1 - p) * 14}px)`,
               color: dim.includes(word) ? C.muted : undefined,
-              marginRight: "0.24em",
+              marginRight: gapAfter(word, words[i + 1]),
+              letterSpacing: CJK.test(word) ? "0" : undefined,
             }}
           >
             {word}

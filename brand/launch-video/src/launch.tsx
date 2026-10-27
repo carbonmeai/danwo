@@ -1,5 +1,6 @@
 import { AbsoluteFill, Audio, interpolate, Sequence, staticFile } from "remotion"
 
+import { CopyProvider, EN, ZH } from "./copy.ts"
 import { Backdrop, clamp } from "./kit.tsx"
 import { Agents } from "./scenes/agents.tsx"
 import { Drive } from "./scenes/drive.tsx"
@@ -32,19 +33,23 @@ const SCENES = [
 export const DURATION = 1440
 
 /** danwo's launch film: the problem, the reveal on the drop, five features and the end card. */
-export function Launch() {
+export function Launch({ lang }: { readonly lang: "en" | "zh" }) {
   return (
-    <AbsoluteFill style={{ background: "#0a0a0a" }}>
-      <Backdrop />
-      <Audio
-        src={staticFile("audio/music.mp3")}
-        volume={(f) => interpolate(f, [0, 12, DURATION - 30, DURATION], [0, 0.85, 0.85, 0], clamp)}
-      />
-      {SCENES.map(({ from, to, Scene }) => (
-        <Sequence key={from} from={from} durationInFrames={to - from}>
-          <Scene />
-        </Sequence>
-      ))}
-    </AbsoluteFill>
+    <CopyProvider value={lang === "zh" ? ZH : EN}>
+      <AbsoluteFill style={{ background: "#0a0a0a" }}>
+        <Backdrop />
+        <Audio
+          src={staticFile("audio/music.mp3")}
+          volume={(f) =>
+            interpolate(f, [0, 12, DURATION - 30, DURATION], [0, 0.85, 0.85, 0], clamp)
+          }
+        />
+        {SCENES.map(({ from, to, Scene }) => (
+          <Sequence key={from} from={from} durationInFrames={to - from}>
+            <Scene />
+          </Sequence>
+        ))}
+      </AbsoluteFill>
+    </CopyProvider>
   )
 }

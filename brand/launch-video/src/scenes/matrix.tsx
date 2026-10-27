@@ -1,5 +1,6 @@
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion"
 
+import { useCopy } from "../copy.ts"
 import { Card, clamp, ease, Exit, Mono, Sfx } from "../kit.tsx"
 import { C } from "../theme.ts"
 import { FeatureTitle } from "./feature.tsx"
@@ -44,6 +45,7 @@ const FAIL_AT = 92
 /** Feature three: one clean run, replayed once per fault, an invariant judging each trial. */
 export function Matrix() {
   const frame = useCurrentFrame()
+  const copy = useCopy().matrix
   const enter = ease(frame, 6, 26)
   const fail = ease(frame, FAIL_AT, 12)
   const detail = ease(frame, FAIL_AT + 10, 22)
@@ -61,14 +63,7 @@ export function Matrix() {
       )}
       <Sfx name="error" at={FAIL_AT} volume={0.6} />
       <Exit at={152} duration={13}>
-        <FeatureTitle
-          index="03"
-          kicker="Fault matrix"
-          title="It breaks the run on purpose."
-          dim={["It", "the", "run"]}
-          sub="One clean run, replayed once per fault: declined cards, 500s, timeouts, duplicate or forged webhooks, double-submits, lost commits, time jumps."
-          top={280}
-        />
+        <FeatureTitle index="03" feature={copy} top={280} />
         <div
           style={{
             position: "absolute",

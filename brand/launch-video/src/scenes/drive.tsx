@@ -1,5 +1,6 @@
 import { AbsoluteFill, Img, staticFile, useCurrentFrame } from "remotion"
 
+import { type Copy, useCopy } from "../copy.ts"
 import { Card, Chip, ease, Exit, Mono, Sfx } from "../kit.tsx"
 import { C } from "../theme.ts"
 import { FeatureTitle } from "./feature.tsx"
@@ -9,12 +10,12 @@ const STR = "#a5d6ff"
 const FN = "#d2a8ff"
 const TXT = "#e6edf3"
 
-/** The test, as coloured runs of text, one array per line. */
-const CODE: readonly (readonly (readonly [string, string])[])[] = [
+/** The test, as coloured runs of text, one array per line; its strings in the cut's language. */
+const codeOf = (copy: Copy["drive"]): readonly (readonly (readonly [string, string])[])[] => [
   [
     ["test", FN],
     ["(", TXT],
-    ['"buy credits"', STR],
+    [copy.testName, STR],
     [", ", TXT],
     ["async", KEY],
     [" ({ app, agent, screen, expect }) => {", TXT],
@@ -32,7 +33,7 @@ const CODE: readonly (readonly (readonly [string, string])[])[] = [
     [" agent.", TXT],
     ["act", FN],
     ["(", TXT],
-    ['"buy 500 credits with a test card"', STR],
+    [copy.agentStep, STR],
     [")", TXT],
   ],
   [
@@ -42,7 +43,7 @@ const CODE: readonly (readonly (readonly [string, string])[])[] = [
     ["(screen.", TXT],
     ["getByText", FN],
     ["(", TXT],
-    ['"Credits: 500"', STR],
+    [copy.creditsShown, STR],
     [")).", TXT],
     ["toBeVisible", FN],
     ["()", TXT],
@@ -57,12 +58,13 @@ const AGENT_LINE = 2
 /** The test file typed into an editor, a character budget at a time. */
 function Editor() {
   const frame = useCurrentFrame()
+  const code = codeOf(useCopy().drive)
   let budget = Math.max(0, Math.floor((frame - TYPE_FROM) * PER_FRAME))
   const lit = ease(frame, 96, 16)
 
   return (
     <div style={{ padding: "36px 0" }}>
-      {CODE.map((line, i) => {
+      {code.map((line, i) => {
         const runs = line.map(([text, color], j) => {
           const shown = text.slice(0, budget)
 
@@ -104,6 +106,7 @@ function Editor() {
 /** Feature one: it drives the app, with locators, plain-English agent steps, or both. */
 export function Drive() {
   const frame = useCurrentFrame()
+  const copy = useCopy().drive
   const enter = ease(frame, 6, 26)
   const tag = ease(frame, 100, 16)
   const replay = ease(frame, 112, 18)
@@ -116,21 +119,11 @@ export function Drive() {
       <Sfx name="typing" at={TYPE_FROM + 44} volume={0.45} />
       <Sfx name="pop" at={100} volume={0.45} />
       <Exit at={138} duration={12}>
-        <FeatureTitle
-          index="01"
-          kicker="Drive"
-          title="It drives the app like a user."
-          dim={["It", "the", "like", "a"]}
-          sub="In a browser or on an iOS or Android device, with locators, plain-English agent steps, or both."
-        >
+        <FeatureTitle index="01" feature={copy}>
           <div style={{ display: "flex", gap: 16, marginTop: 40 }}>
-            {[
-              ["playwright.svg", "Browser"],
-              ["apple-on-dark.svg", "iOS"],
-              ["android.svg", "Android"],
-            ].map(([icon, label], i) => (
+            {(["playwright.svg", "apple-on-dark.svg", "android.svg"] as const).map((icon, i) => (
               <div
-                key={label}
+                key={icon}
                 style={{
                   opacity: chips[i],
                   transform: `translateY(${(1 - (chips[i] ?? 0)) * 14}px)`,
@@ -138,7 +131,7 @@ export function Drive() {
               >
                 <Chip>
                   <Img src={staticFile(`icons/${icon}`)} style={{ width: 30, height: 30 }} />
-                  {label}
+                  {copy.targets[i]}
                 </Chip>
               </div>
             ))}
@@ -185,7 +178,7 @@ export function Drive() {
               color="#93c5fd"
               style={{ padding: "6px 12px", borderRadius: 8, background: "rgb(59 130 246 / 0.18)" }}
             >
-              agent step
+              {copy.agentTag}
             </Mono>
           </div>
           <div
@@ -197,7 +190,7 @@ export function Drive() {
           >
             <Chip style={{ fontSize: 28 }}>
               <span style={{ color: C.pass }}>●</span>
-              Recorded once. Replayed with no model calls.
+              {copy.replayed}
             </Chip>
           </div>
         </div>

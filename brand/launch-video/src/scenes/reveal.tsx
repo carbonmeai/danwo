@@ -1,5 +1,6 @@
 import { AbsoluteFill, Img, interpolate, staticFile, useCurrentFrame } from "remotion"
 
+import { useCopy } from "../copy.ts"
 import { clamp, ease, Exit, Mono, Sfx, Words } from "../kit.tsx"
 import { C } from "../theme.ts"
 
@@ -68,6 +69,8 @@ function Mark({
 /** The mark assembles in the quiet, lands on the drop and opens into the lockup and the tagline. */
 export function Reveal() {
   const frame = useCurrentFrame()
+  const copy = useCopy()
+  const [drive, judge] = copy.tagline
   const draw = ease(frame, 4, 44)
   const slide = ease(frame, 34, 34)
   const solid = interpolate(frame, [DROP - 1, DROP], [0, 1], clamp)
@@ -149,12 +152,12 @@ export function Reveal() {
             color={C.muted}
             style={{ textTransform: "uppercase", letterSpacing: "0.12em" }}
           >
-            Open-source e2e testing for web and mobile apps
+            {copy.what}
           </Mono>
         </div>
         <div style={{ position: "absolute", top: 670, left: 0, right: 0, textAlign: "center" }}>
-          <Words text="Drive the UI." start={DROP + 22} size={84} />
-          <Words text="Judge everything behind it." start={DROP + 32} size={84} color={C.muted} />
+          <Words text={drive.text} start={DROP + 22} size={84} />
+          <Words text={judge.text} start={DROP + 32} size={84} color={C.muted} />
         </div>
       </Exit>
     </AbsoluteFill>

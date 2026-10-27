@@ -1,5 +1,6 @@
 import { AbsoluteFill, Img, staticFile, useCurrentFrame } from "remotion"
 
+import { useCopy } from "../copy.ts"
 import { Chip, ease, Exit, Sfx } from "../kit.tsx"
 import { C } from "../theme.ts"
 import { FeatureTitle } from "./feature.tsx"
@@ -21,11 +22,11 @@ const COLUMNS: readonly {
   { width: 520, offset: 200, tiles: ["calls", "breaks"] },
 ]
 
-const OUTLETS = [["github-on-dark.svg", "GitHub Check & PR comment"]] as const
-
 /** Feature four: the flight record, shown as a wall of the UI it renders into. */
 export function Explain() {
   const frame = useCurrentFrame()
+  const copy = useCopy().explain
+  const outlets = [["github-on-dark.svg", copy.outlet]] as const
   const enter = ease(frame, 0, 30)
   const pan = frame * 2.2
 
@@ -100,14 +101,7 @@ export function Explain() {
             background: `linear-gradient(to right, ${C.bg} 0%, ${C.bg} 32%, transparent 48%)`,
           }}
         />
-        <FeatureTitle
-          index="04"
-          kicker="Flight record"
-          title="It explains every run."
-          dim={["It", "every", "run."]}
-          sub="The video, each step, every provider call and webhook, the database statements, with secrets redacted."
-          top={290}
-        >
+        <FeatureTitle index="04" feature={copy} top={290}>
           <div
             style={{
               display: "flex",
@@ -117,7 +111,7 @@ export function Explain() {
               marginTop: 40,
             }}
           >
-            {OUTLETS.map(([icon, label], i) => {
+            {outlets.map(([icon, label], i) => {
               const p = ease(frame, 30 + i * 8, 18)
 
               return (

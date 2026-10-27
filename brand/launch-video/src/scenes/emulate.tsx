@@ -1,5 +1,6 @@
 import { AbsoluteFill, Img, staticFile, useCurrentFrame } from "remotion"
 
+import { useCopy } from "../copy.ts"
 import { Chip, ease, Exit, Mono, Sfx } from "../kit.tsx"
 import { C, SANS } from "../theme.ts"
 import { FeatureTitle } from "./feature.tsx"
@@ -32,6 +33,7 @@ const PROXY = 200
 /** Feature two: every service behind the app answers from a local emulator behind danwo's proxy. */
 export function Emulate() {
   const frame = useCurrentFrame()
+  const copy = useCopy().emulate
   const core = ease(frame, 4, 24)
   const spin = frame * 0.09
 
@@ -53,16 +55,10 @@ export function Emulate() {
         <Sfx key={n} name="tick" at={12 + n * 3} volume={0.3} />
       ))}
       <Exit at={152} duration={13}>
-        <FeatureTitle
-          index="02"
-          kicker="Emulate"
-          title="It emulates every service behind it."
-          dim={["It", "every", "behind", "it."]}
-          sub="Stripe, Resend, S3, Slack, GitHub, Clerk, the model APIs and more answer from local emulators. No code changes. No sandbox keys."
-        >
+        <FeatureTitle index="02" feature={copy}>
           <div style={{ marginTop: 40, opacity: ease(frame, 70, 18) }}>
             <Chip>
-              <span style={{ color: C.pass }}>✓</span> Each one checked against the real API
+              <span style={{ color: C.pass }}>✓</span> {copy.checked}
             </Chip>
           </div>
         </FeatureTitle>
@@ -151,10 +147,10 @@ export function Emulate() {
               letterSpacing: "-0.03em",
             }}
           >
-            Your app
+            {copy.app}
           </div>
           <Mono size={18} color={C.muted}>
-            through danwo's proxy
+            {copy.through}
           </Mono>
         </div>
         {spots.map(({ icon, x, y, p }) => (

@@ -1,19 +1,15 @@
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion"
 
+import { useCopy } from "../copy.ts"
 import { Card, Chip, clamp, Cursor, ease, Exit, Mono, Sfx, Words } from "../kit.tsx"
 import { C, SANS } from "../theme.ts"
 
 const CLICK = 30
-const QUESTIONS = [
-  "Was the card charged once?",
-  "Did the webhook arrive?",
-  "Was the email sent?",
-  "Does the ledger add up?",
-] as const
 
 /** The page a passing test sees: a checkout before the click, a thank-you after it. */
 function Shop({ paid }: { readonly paid: boolean }) {
   const frame = useCurrentFrame()
+  const copy = useCopy().proof
   const done = ease(frame, CLICK + 4, 16)
 
   return (
@@ -27,7 +23,7 @@ function Shop({ paid }: { readonly paid: boolean }) {
           transform: `translateY(${-done * 20}px)`,
         }}
       >
-        <div style={{ fontSize: 22, color: C.muted, fontWeight: 500 }}>Checkout</div>
+        <div style={{ fontSize: 22, color: C.muted, fontWeight: 500 }}>{copy.checkout}</div>
         <div
           style={{
             fontSize: 52,
@@ -37,7 +33,7 @@ function Shop({ paid }: { readonly paid: boolean }) {
             marginTop: 8,
           }}
         >
-          500 credits
+          {copy.item}
         </div>
         <div
           style={{
@@ -48,7 +44,7 @@ function Shop({ paid }: { readonly paid: boolean }) {
             color: C.muted,
           }}
         >
-          <span>Total</span>
+          <span>{copy.total}</span>
           <span style={{ color: C.text, fontWeight: 600 }}>$5.00</span>
         </div>
         <div style={{ height: 1, background: C.line, margin: "28px 0 40px" }} />
@@ -66,7 +62,7 @@ function Shop({ paid }: { readonly paid: boolean }) {
             transform: `scale(${paid ? 0.97 : 1})`,
           }}
         >
-          Pay $5.00
+          {copy.pay}
         </div>
       </div>
       <div
@@ -115,9 +111,9 @@ function Shop({ paid }: { readonly paid: boolean }) {
             letterSpacing: "-0.03em",
           }}
         >
-          Thank you for your purchase
+          {copy.thanks}
         </div>
-        <div style={{ fontSize: 26, color: C.muted, marginTop: 12 }}>Credits: 500</div>
+        <div style={{ fontSize: 26, color: C.muted, marginTop: 12 }}>{copy.credits}</div>
       </div>
     </div>
   )
@@ -126,6 +122,7 @@ function Shop({ paid }: { readonly paid: boolean }) {
 /** A test clicks Pay and passes; then the questions it never asked. */
 export function Proof() {
   const frame = useCurrentFrame()
+  const copy = useCopy().proof
   const enter = ease(frame, 0, 24)
   const aside = ease(frame, 64, 28)
   const travel = ease(frame, 8, 22)
@@ -137,27 +134,17 @@ export function Proof() {
       <Sfx name="whoosh" at={0} volume={0.35} />
       <Sfx name="click" at={CLICK} volume={0.8} />
       <Sfx name="pop" at={CLICK + 8} volume={0.5} />
-      {QUESTIONS.map((_, i) => (
+      {copy.questions.map((_, i) => (
         <Sfx key={i} name="tick" at={74 + i * 9} volume={0.45} />
       ))}
       <Exit at={134} duration={13}>
         <Exit at={60} duration={10} lift={20}>
           <div style={{ position: "absolute", top: 110, left: 0, right: 0, textAlign: "center" }}>
-            <Words
-              text="A test clicks Pay and sees “Thank you.”"
-              start={2}
-              size={60}
-              dim={["A", "test", "and", "sees"]}
-            />
+            <Words text={copy.clicks.text} start={2} size={60} dim={copy.clicks.dim} />
           </div>
         </Exit>
         <div style={{ position: "absolute", top: 110, left: 0, right: 0, textAlign: "center" }}>
-          <Words
-            text="But did everything behind it work?"
-            start={70}
-            size={60}
-            dim={["But", "did", "behind", "it"]}
-          />
+          <Words text={copy.behind.text} start={70} size={60} dim={copy.behind.dim} />
         </div>
         <div
           style={{
@@ -222,7 +209,7 @@ export function Proof() {
             }}
           >
             <Chip style={{ color: C.pass, borderColor: "rgb(34 197 94 / 0.4)" }}>
-              <span style={{ fontWeight: 700 }}>✓</span> test passed
+              <span style={{ fontWeight: 700 }}>✓</span> {copy.passed}
             </Chip>
           </div>
         </div>
@@ -235,7 +222,7 @@ export function Proof() {
             />
           </div>
         )}
-        {QUESTIONS.map((question, i) => {
+        {copy.questions.map((question, i) => {
           const p = ease(frame, 74 + i * 9, 20)
 
           return (
