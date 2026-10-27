@@ -7,6 +7,7 @@ answers, answering with the status it got.
 
 import json
 import os
+import socketserver
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -56,6 +57,16 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
-server = ThreadingHTTPServer(("127.0.0.1", int(os.environ["PORT"])), Handler)
+class Server(ThreadingHTTPServer):
+    def server_bind(self):
+        """
+        Binds without HTTPServer's reverse lookup of its own address (socket.getfqdn), which on a
+        Windows runner can wait on name resolution for tens of seconds before the app listens.
+        """
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
+
+
+server = Server(("127.0.0.1", int(os.environ["PORT"])), Handler)
 print("listening", flush=True)
 server.serve_forever()
