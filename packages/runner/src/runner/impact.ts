@@ -64,7 +64,7 @@ export function impactOf(input: {
   readonly baseUrl: string | undefined
 }): TestImpact {
   const routes = input.appLog
-    .filter((log) => log.source === "navigation")
+    .filter((log) => log.source === "navigation" && log.level === "info")
     .map((log) => appRoute(log.text, input.baseUrl))
     .filter((route) => route !== undefined)
   const calls = [

@@ -137,6 +137,10 @@ describe("what a test touched", () => {
         log("navigation", "http://127.0.0.1:4000/"),
         log("navigation", "http://127.0.0.1:4000/orders/ord_7Hk2x9Qa3?x=1"),
         log("navigation", "https://checkout.stripe.com/c/cs_test_1"),
+        {
+          ...log("navigation", "http://127.0.0.1:4000/pay could not be loaded: net::ERR_FAILED"),
+          level: "error",
+        },
         log("console", "http://127.0.0.1:4000/x"),
       ],
       exchanges: [
