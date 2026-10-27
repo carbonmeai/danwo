@@ -4,7 +4,7 @@
  * and the docs tree, addresses and language helpers serve both languages.
  */
 import { readdirSync, readFileSync } from "node:fs"
-import { join } from "node:path"
+import { join, sep } from "node:path"
 
 import { describe, expect, it } from "vitest"
 
@@ -15,10 +15,13 @@ import { ZH_SECTIONS, ZH_TABS } from "../src/generator/zh.ts"
 import { counterpart, docsPath, langOf } from "../src/lib/i18n.ts"
 import { markdownPath } from "../src/lib/paths.ts"
 
-/** Every Chinese page written for the website, by its path under `content/docs`. */
-const CHINESE = readdirSync(CONTENT, { recursive: true, encoding: "utf8" }).filter((name) =>
-  name.endsWith(".zh-CN.mdx"),
-)
+/**
+ * Every Chinese page written for the website, by its path under `content/docs` in forward slashes,
+ * as the plan names pages on every system.
+ */
+const CHINESE = readdirSync(CONTENT, { recursive: true, encoding: "utf8" })
+  .filter((name) => name.endsWith(".zh-CN.mdx"))
+  .map((name) => name.split(sep).join("/"))
 
 const text = (file: string) => readFileSync(join(CONTENT, file), "utf8")
 const english = (file: string) => file.replace(/\.zh-CN\.mdx$/, ".mdx")
