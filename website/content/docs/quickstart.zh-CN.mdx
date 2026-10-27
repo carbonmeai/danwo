@@ -1,0 +1,228 @@
+---
+title: 快速开始
+description: 在项目中配置 danwo，编写一个 UI 测试，运行它，并在仪表盘中回看。
+---
+
+本页带你从零开始，在大约五分钟内得到一个通过的、可以回看的 UI 测试。最短的路径只需要三个命令和一个测试文件，不需要第三方服务、密钥或模型。
+
+你需要 Node.js 22.22.3 或更高的 22.x 版本，或 24.11.1 及以上版本，以及一个可以用命令启动的应用，例如 `npm run dev`。在其他 Node 版本上，danwo 会停止运行并告诉你检测到的版本。应用本身可以运行在 Node 20 或更高版本上（参见[应用的 Node 版本](/docs/node-preload#your-apps-node-version)）。
+
+danwo 支持 macOS、Linux 和 Windows。移动端测试需要 macOS 或 Linux：iOS 模拟器只能在 Mac 上运行，Windows 上的 Android 模拟器目前尚未验证。
+
+<Steps>
+<Step>
+
+### 运行 `danwo init` [#run-danwo-init]
+
+在你的应用目录下运行：
+
+<Tabs items={["npm", "pnpm", "bun"]}>
+  <Tab value="npm">
+
+```sh
+npx @danwo/cli init
+```
+
+  </Tab>
+  <Tab value="pnpm">
+
+```sh
+pnpm dlx @danwo/cli init
+```
+
+  </Tab>
+  <Tab value="bun">
+
+```sh
+bunx @danwo/cli init
+```
+
+  </Tab>
+</Tabs>
+
+这个命令直接运行 [npm 上的 `@danwo/cli`](https://www.npmjs.com/package/@danwo/cli)，所以不需要事先安装任何东西。
+
+它会先检查你的项目：包管理器、框架、启动应用的命令，以及代码里用到的服务。然后它会问四个问题：
+
+| 问题                             | 只测 UI 时的选择         | 含义                                                               |
+| -------------------------------- | ------------------------ | ------------------------------------------------------------------ |
+| 测试要驱动什么？                 | **Web**（或 **Mobile**） | 浏览器、Android 应用、两者都要，或只测应用的 API。                 |
+| 智能体步骤使用哪个模型？         | **None**                 | 执行自然语言步骤的 AI。之后随时可以添加。                          |
+| danwo 要模拟哪些第三方服务？     | 全部取消勾选             | 在代码中发现的服务（Stripe、Resend…）会默认勾选。                  |
+| 哪些 AI 编程助手需要学会 danwo？ | 任选                     | Claude Code、Cursor 或 Codex 会获得 danwo 的 Skill 和 MCP 服务器。 |
+
+如果想跳过这些问题，可以直接传入答案：
+
+```sh
+npx @danwo/cli init --yes --engine web --model-source none --providers none
+```
+
+完成后，它会列出写入的文件：
+
+```text
+Files
+  created   danwo.config.ts
+  created   tests/example.danwo.ts
+  updated   package.json        (adds test:danwo)
+  created   .gitignore          (.danwo/)
+```
+
+它还会安装 `@danwo/cli` 和 `@danwo/sdk`，以及 danwo 驱动的 Chromium。如果选了模型，它还会把模型的密钥加到 `.env.example` 里。
+
+有些功能需要额外的包。`@danwo/cli` 默认不安装它们，好让 Web 项目保持轻量。`danwo init` 会根据你的回答添加需要的包：
+
+| 包                                | 选择以下选项时添加                | 提供的功能                                |
+| --------------------------------- | --------------------------------- | ----------------------------------------- |
+| `@danwo/mobile`                   | **Mobile**，或 **Web and mobile** | Android 和 iOS 设备，以及为它们构建应用   |
+| `@danwo/mcp` 和 `@danwo/recorder` | 任意 AI 编程助手                  | danwo 的 MCP 服务器，以及手动录制测试     |
+| 一个 AI SDK 的模型提供方包        | Anthropic、OpenAI 等模型来源      | 智能体步骤使用的模型（AI Gateway 不需要） |
+
+如果某个命令需要一个你还没安装的包，它会停下来并告诉你如何安装：
+
+```text
+danwo build-ios needs @danwo/mobile: npm install -D @danwo/mobile@0.1.3
+```
+
+请安装与 `@danwo/cli` 相同的版本。`npx @danwo/cli doctor` 会列出你已经安装了哪些。
+
+在新机器上，或使用了 `--skip-install` 之后，需要自己安装浏览器：
+
+```sh
+npx @danwo/cli install-browser
+```
+
+在 Linux 上，加上 `--with-deps` 来安装所需的系统库。
+
+在 monorepo 中，请在应用自己的目录下运行 init。它会识别工作区（pnpm、npm、Yarn 或 Bun），并用工作区的包管理器把依赖加到该应用的 `package.json` 中。
+
+之后请通过应用的 `test:danwo` 脚本运行 danwo。npx 从工作区根目录查找命令，而 Bun 和 pnpm 只把 `danwo` 命令链接到应用目录中。如果确实要用 npx，请始终写完整的包名 `@danwo/cli`：不带作用域的那个名字属于别的项目。
+
+</Step>
+<Step>
+
+### 编写 UI 测试 [#write-a-ui-test]
+
+添加一个模拟用户操作的测试。把页面、标签和文字改成你应用里的样子：
+
+```ts title="tests/sign-up.danwo.ts"
+import { test } from "@danwo/sdk"
+
+test("signs up", async ({ app, screen, expect }) => {
+  await app.open("/sign-up")
+  await screen.getByLabel("Email").fill("ada@example.com")
+  await screen.getByLabel("Password").fill("correct horse battery staple")
+  await screen.getByRole("button", { name: "Create account" }).click()
+
+  await expect(screen.getByRole("heading", { name: "Welcome, Ada" })).toBeVisible()
+})
+```
+
+测试会拿到 **fixture**：按名字传入的现成对象。`app` 是正在运行的应用，`screen` 用来在页面上查找元素，`expect` 用来检查它们。检查会自动等待页面，所以你永远不需要写 sleep。[智能体与定位器](/docs/agent-and-locators)列出了查找元素的所有方式。
+
+</Step>
+<Step>
+
+### 运行测试 [#run-it]
+
+```sh
+npm run test:danwo
+```
+
+danwo 会启动你的应用，打开一个全新的浏览器，并运行 `tests/` 下的每个测试：
+
+```text
+Running 2 tests with 1 worker
+
+  ✓ tests/example.danwo.ts › the home page opens 812 ms, worker 0
+  ✓ tests/sign-up.danwo.ts › signs up 1.4 s, worker 0
+
+2 passed
+report: .danwo/runs/20261020-091203-ab12/report.html
+```
+
+`tests/example.danwo.ts` 是 init 写入的测试：它检查你的首页能否正常响应并打开。
+
+</Step>
+<Step>
+
+### 在仪表盘中回看 [#watch-it-in-the-dashboard]
+
+```sh
+npx @danwo/cli serve --open
+```
+
+仪表盘会在 `http://127.0.0.1:4310` 打开。点击一个测试即可打开它的录制：
+
+- **Replay**：这次运行的视频，可以跳到每一步。
+- **Console** 和 **Network**：页面输出的日志和发出的请求。
+
+</Step>
+</Steps>
+
+这就是一套完整的端到端配置。下面的内容都是可选的。
+
+## 读懂配置 [#read-the-config]
+
+`danwo.config.ts` 说明如何启动你的应用。danwo 会自己运行你的开发命令，这样才能把应用放在它的代理后面：
+
+```ts title="danwo.config.ts"
+import { appEnvironment, defineConfig } from "@danwo/sdk"
+
+const app = process.env.APP_URL ?? {
+  command: "npm run dev",
+  url: "http://localhost:3000",
+}
+
+export default defineConfig({
+  testDir: "tests",
+  workers: 1,
+  timeout: 60_000,
+  readiness: { mode: "page+backend", settle: true },
+  environment: () => appEnvironment({ app, services: [] }),
+})
+```
+
+`readiness` 让 danwo 在每次点击后等待，直到页面稳定，**并且**由点击触发的调用都已完成。`services` 为空：还没有模拟任何第三方服务。
+
+## 之后：用自然语言编写步骤 [#later-write-steps-in-plain-english]
+
+在配置中加上一个模型，`agent` fixture 就能执行自然语言写的步骤。每一步在第一次通过时被录制，之后直接回放，不再调用模型：
+
+```ts title="danwo.config.ts · 模型"
+model: "anthropic/claude-sonnet-5",
+```
+
+密钥放在 `.env` 中，格式见 `.env.example`。详见[智能体步骤](/docs/agent-steps)。
+
+## 之后：模拟第三方服务 [#later-emulate-your-providers]
+
+当你的应用调用 Stripe、Resend 或 Clerk 时，把它们列进 `services`。代理就会用本地模拟器应答这些域名，不需要沙箱密钥，也不需要改代码：
+
+```ts title="danwo.config.ts · 环境"
+environment: () => appEnvironment({ app, services: [stripeService(), resendService()] }),
+```
+
+之后，仪表盘的 **Providers** 标签页会显示你的应用对它们发出的每一次调用。[测试第三方服务](/docs/test-a-provider)会带你完成第一次界面背后的检查。
+
+<Callout type="warn">
+  设置 `APP_URL` 可以测试一个已经在运行的应用。但这个应用不是在 danwo
+  的代理后面启动的，所以它的调用会发往**真实的** Stripe 和 Resend。只在使用测试密钥时这样做。[danwo
+  的运行环境](/docs/where-danwo-runs)说明了每种配置下哪些功能可用。
+</Callout>
+
+## 下一步 [#next]
+
+<Cards>
+  <Card title="测试范围" href="/docs/what-you-can-test">
+    常见的用户流程和深度检查，以及每种所需的层。
+  </Card>
+  <Card title="智能体与定位器" href="/docs/agent-and-locators">
+    用精确的定位器编写步骤，或用自然语言。
+  </Card>
+  <Card title="视觉对比" href="/docs/visual-comparison">
+    把页面与基线图片进行对比。
+  </Card>
+  <Card title="测试第三方服务" href="/docs/test-a-provider">
+    在测试中用 Stripe 付款，并确认只扣款一次。
+  </Card>
+</Cards>

@@ -1,0 +1,139 @@
+---
+title: 简介
+description: danwo 是一个面向 Web 和移动应用的端到端测试框架。先测试 UI，需要时再加上后端。
+---
+
+danwo 是一个开源的 Web 与移动应用端到端测试框架。测试会打开你的应用，像用户一样点击和输入，并检查屏幕上显示的内容。它可以在浏览器、Android 和 iOS 上运行。
+
+```ts title="tests/sign-up.danwo.ts"
+import { test } from "@danwo/sdk"
+
+test("signs up", async ({ app, screen, expect }) => {
+  await app.open("/sign-up")
+  await screen.getByLabel("Email").fill("ada@example.com")
+  await screen.getByLabel("Password").fill("correct horse battery staple")
+  await screen.getByRole("button", { name: "Create account" }).click()
+
+  await expect(screen.getByRole("heading", { name: "Welcome, Ada" })).toBeVisible()
+})
+```
+
+这就是一个完整的测试。danwo 会启动你的应用，打开一个全新的浏览器，并在每次点击后等待页面稳定，所以不需要写 sleep。它不需要第三方服务、不需要 API 密钥，也不需要模型。
+
+## 概览 [#at-a-glance]
+
+| 你想要                 | danwo                                                                                                                                                                                     |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 测试 Web 应用          | Chromium、Firefox 和 WebKit，同一个测试可在多个浏览器中运行。参见 [Web](/docs/web)。                                                                                                      |
+| 测试移动应用           | Android 模拟器和 iOS 模拟器：Expo、[Flutter](/docs/flutter)、[SwiftUI 或 UIKit](/docs/native-ios)、[Jetpack Compose 或 View](/docs/native-android)。参见 [Android](/docs/android-tests)。 |
+| 让 AI 编程助手来测试   | 为 Claude Code、Cursor、Codex 和 Copilot 提供的 Skill 和 MCP 服务器。参见 [AI 编程助手](/docs/coding-agents)。                                                                            |
+| 保留或迁移现有测试     | 把 danwo 加入 [Playwright Test](/docs/playwright)，或从 [Cypress](/docs/cypress) 或 [Detox](/docs/detox) 一次迁移一个文件。                                                               |
+| 在 CI 中运行           | 每个 pull request 都有一个 Check 和一条评论，另有适用于任何 CI 的 [分片](/docs/shards) 和 JUnit 报告。参见 [CI](/docs/ci)。                                                               |
+| 检查界面背后发生了什么 | 模拟的第三方服务、不变性校验（invariant）和故障矩阵：见[下面的几层](#when-the-bugs-live-behind-the-screen)。                                                                              |
+
+## 按需添加各层 [#add-layers-as-you-need-them]
+
+第一个测试之后的一切都是可选的。每一层都建立在前一层之上，你可以在任何一层停下。
+
+### 1. 定位器测试 [#1-locator-tests]
+
+**定位器**按用户称呼元素的方式查找元素：一个叫“Pay”的按钮，一个标签为“Email”的输入框。定位器从不调用模型。参见[智能体与定位器](/docs/agent-and-locators)。
+
+```ts title="tests/search.danwo.ts · 定位器步骤"
+await screen.getByRole("searchbox", { name: "Search" }).fill("blue mug")
+await screen.getByRole("link", { name: "Blue mug" }).click()
+await expect(screen.getByText("In stock")).toBeVisible()
+```
+
+### 2. 用自然语言编写的智能体步骤 [#2-agent-steps-in-plain-english]
+
+当某一步说起来比精确定位更容易时，就用自然语言写。第一次运行需要一个模型和它的 API 密钥：由智能体想出如何完成这一步，danwo 把它录制下来。之后的运行直接回放录制，不再调用模型。这同样适用于 `assert`、`waitFor` 和 `extract`，而不只是操作。参见[智能体步骤](/docs/agent-steps)。
+
+```ts title="tests/checkout.danwo.ts · 智能体步骤"
+await agent.act("add two blue mugs to the basket and go to checkout")
+await agent.assert("the basket shows two blue mugs")
+await agent.waitFor("the delivery options have loaded")
+```
+
+### 3. 截图与视觉对比 [#3-screenshots-and-visual-comparison]
+
+`toHaveScreenshot` 把整个页面或某个元素与保存在测试旁边的基线图片进行对比。每次运行都会变化的内容（比如时钟）可以遮盖掉。参见[视觉对比](/docs/visual-comparison)。
+
+```ts title="tests/home.danwo.ts · 视觉检查"
+await expect(screen).toHaveScreenshot("home", { mask: [screen.getByTestId("clock")] })
+```
+
+<Callout type="info">
+  第 1 到第 3 层本身就是一套完整的端到端配置：注册、登录、搜索、表单和结账页面，覆盖 Web
+  和移动端，并提供视频和仪表盘。[测试范围](/docs/what-you-can-test)列出了常见的用户流程，以及每种流程所需的层。
+</Callout>
+
+## 当问题藏在界面背后 [#when-the-bugs-live-behind-the-screen]
+
+屏幕上可能显示“Thank you”，而 Stripe 却对这张卡扣了两次款，或者收据邮件根本没有发出。接下来的三层检查一次点击在页面背后做了什么。
+
+### 4. 模拟的第三方服务 [#4-emulated-providers]
+
+danwo 会把你的应用启动在一个**出站代理**（egress proxy）后面，所有发出的请求都要经过这个代理。它用本地**模拟器**应答 Stripe、Clerk、Resend 以及另外大约二十个服务。不需要沙箱密钥，也不需要改代码。参见[模拟器](/docs/emulators)。
+
+```ts title="danwo.config.ts · 环境"
+environment: () => appEnvironment({ app, services: [stripeService(), resendService()] }),
+```
+
+### 5. 不变性校验 [#5-invariants]
+
+**不变性校验**是一条无论测试过程如何都必须成立的规则。它读取你的数据库和模拟器，并检查两者是否一致。参见[编写不变性校验](/docs/invariants)。
+
+```ts title="tests/waitlist.danwo.ts · 不变性校验"
+}).invariant(async ({ databaseUrl, resend, expect }) => {
+  expect(await sql(databaseUrl, "select id from signups where email = $1", [EMAIL])).toHaveLength(1)
+  expect(resendInbox(resend).list(EMAIL)).toHaveLength(1)
+})
+```
+
+### 6. 故障矩阵 [#6-the-fault-matrix]
+
+[故障矩阵](/docs/fault-matrix)是 danwo 内置的故障注入功能。它针对每一种可能出错的情况把测试重放一次：卡被拒付、一个 500 错误、重复的 webhook、被双击的按钮。由不变性校验来判定每一次运行的结果。
+
+```sh
+npx @danwo/cli matrix tests/waitlist.danwo.ts
+```
+
+## 后端层如何协同工作 [#how-the-backend-layers-fit]
+
+<HowItWorks />
+
+无论使用到哪一层，每次运行都会留下一份**完整的运行记录**（就像飞机的黑匣子）：屏幕录像、每一步操作，以及在启用后端层时的每一次调用、每个 webhook 和每条数据库语句。参见[运行记录](/docs/flight-records)。
+
+## AI 编程助手也能使用它 [#your-coding-agent-can-use-it-too]
+
+`danwo init` 会询问你使用哪些 AI 编程助手，并为每个助手配置 danwo 的 **Skill** 和 **MCP 服务器**。Skill 教它如何编写 danwo 测试，MCP 服务器让它可以运行测试、操作你的应用并读取运行记录。这样，修改你代码的 AI 编程助手就能通过 UI 检查自己的工作，并修复失败的地方。参见 [AI 编程助手](/docs/coding-agents)。
+
+```text title="npx @danwo/cli init · AI 编程助手"
+Coding agents
+  created   .claude/skills/danwo/SKILL.md
+  created   .agents/skills/danwo/SKILL.md
+  created   .mcp.json
+  created   .cursor/mcp.json
+  created   .codex/config.toml
+```
+
+## 开始使用 [#get-started]
+
+<Cards>
+  <Card title="快速开始" href="/docs/quickstart">
+    配置 danwo，几分钟内运行你的第一个 UI 测试。
+  </Card>
+  <Card title="测试范围" href="/docs/what-you-can-test">
+    从登录到只扣款一次的支付：每种场景需要哪一层。
+  </Card>
+  <Card title="测试第三方服务" href="/docs/test-a-provider">
+    准备好之后：确认一笔 Stripe 付款只发生一次。
+  </Card>
+  <Card title="danwo 的运行环境" href="/docs/where-danwo-runs">
+    本地、预发布或生产环境：每种环境下哪些功能可用。
+  </Card>
+  <Card title="AI 编程助手" href="/docs/coding-agents">
+    为 Claude Code、Cursor、Codex 或 Copilot 配置 danwo 的 Skill 和 MCP 服务器。
+  </Card>
+</Cards>

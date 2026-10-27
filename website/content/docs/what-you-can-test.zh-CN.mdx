@@ -1,0 +1,86 @@
+---
+title: 测试范围
+description: 从登录到恰好只扣款一次的支付，每种测试需要 danwo 的哪些层。
+---
+
+danwo 能测试每个应用都有的用户流程，也能做大多数测试套件触及不到的界面背后的检查。本页列出这两类测试，以及每一种所需的层和延伸阅读。
+
+## 各个层 [#the-layers]
+
+每一层都是可选的，并在前面各层的基础上叠加。[简介](/docs)用几行代码展示了每一层。
+
+| 层                  | 增加的能力                                     | 前提                         |
+| ------------------- | ---------------------------------------------- | ---------------------------- |
+| 1. 定位器           | 指名某个元素的步骤：按钮、输入框、标题         | 无                           |
+| 2. 智能体步骤       | 用自然语言写的步骤，录制一次，回放时不调用模型 | 一个模型，用于首次运行       |
+| 3. 视觉对比         | 把页面或某个元素与基线图片进行对比             | 无                           |
+| 4. 模拟的第三方服务 | Stripe、Clerk、Resend 等，在本地应答           | 在配置中加入一个服务         |
+| 5. 不变性校验       | 读取你的数据库和第三方服务数据的规则           | 通常需要第 4 层              |
+| 6. 故障矩阵         | 针对每一种可能出错的情况，把测试回放一次       | 一条用来判定结果的不变性校验 |
+
+第 1 到 3 层本身就是一套完整的端到端配置。
+
+## 界面上的用户流程 [#journeys-on-the-screen]
+
+这些只需要第 1 到 3 层，不需要第三方服务。定位器测试不需要模型；智能体步骤在录制完成之前需要模型密钥。
+
+| 你想测试                           | 层     | 参见                                                             |
+| ---------------------------------- | ------ | ---------------------------------------------------------------- |
+| 用密码注册和登录                   | 1      | [智能体与定位器](/docs/agent-and-locators)                       |
+| 每个测试开始时就已登录             | 1      | [保存的会话](/docs/sessions)                                     |
+| 导航：菜单、链接、按地址打开的页面 | 1      | [Web](/docs/web)                                                 |
+| 搜索和筛选列表                     | 1 或 2 | [智能体与定位器](/docs/agent-and-locators)                       |
+| 表单：必填字段、错误提示、成功提示 | 1      | [智能体与定位器](/docs/agent-and-locators)                       |
+| 结账页面：购物车、合计、地址       | 1 或 2 | [智能体步骤](/docs/agent-steps)                                  |
+| 一个应当与上次看起来一样的页面     | 3      | [视觉对比](/docs/visual-comparison)                              |
+| 两个人：聊天、邀请、共享文档       | 1      | [第二个人](/docs/two-people)                                     |
+| Android 或 iOS 上的流程            | 1 或 2 | [Android 测试](/docs/android-tests)、[iOS 测试](/docs/ios-tests) |
+| 在预发布或生产环境中测试的页面     | 1 或 2 | [danwo 的运行环境](/docs/where-danwo-runs)                       |
+| 难以用定位器确定的步骤             | 2      | [智能体步骤](/docs/agent-steps)                                  |
+| 已有的 Playwright 测试             | 任意   | [Playwright Test](/docs/playwright)                              |
+| 已有的 Cypress 测试套件            | 任意   | [从 Cypress 迁移](/docs/cypress)                                 |
+| 已有的 Detox 测试套件              | 任意   | [从 Detox 迁移](/docs/detox)                                     |
+
+智能体步骤只在首次运行时调用模型。之后它们从[回放缓存](/docs/replay-cache)中回放，而 `--replay-only` 确保 CI 永远不会调用模型。
+
+## 经过第三方服务的流程 [#flows-that-go-through-a-provider]
+
+这些流程会加入一个模拟的第三方服务，所以测试运行时不需要沙箱账号，也不需要真实密钥。
+
+| 你想测试                            | 层  | 参见                                        |
+| ----------------------------------- | --- | ------------------------------------------- |
+| 用邮件发送的验证码或魔法链接登录    | 4   | [邮件和 2FA 验证码](/docs/email-and-otp)    |
+| 用 Clerk、Google 或 GitHub 登录     | 4   | [用 Clerk 登录](/docs/examples/clerk-login) |
+| 用 Stripe Checkout 或卡号输入框付款 | 4   | [测试第三方服务](/docs/test-a-provider)     |
+| 到期的试用、自动续费的订阅          | 4   | [时间旅行](/docs/time-travel)               |
+| 点击之后运行的后台任务              | 4   | [后台任务](/docs/background-jobs)           |
+| AI 功能，模型的回答由脚本预设       | 4   | [带工具的 AI 聊天](/docs/examples/ai-chat)  |
+| 直接上传到 S3 的文件                | 4   | [S3](/docs/providers/s3)                    |
+
+## 界面背后的检查 [#checks-behind-the-screen]
+
+这些是界面通过时被掩盖的 bug。它们需要一条不变性校验（invariant），并借助故障矩阵找出不变性校验被打破的那些运行。
+
+| 你想确认                             | 层   | 参见                                                                  |
+| ------------------------------------ | ---- | --------------------------------------------------------------------- |
+| 银行卡只被扣款一次，而不是两次       | 5, 6 | [重复付款](/docs/common-findings#a-payment-made-twice)                |
+| 只发出一封欢迎邮件，而不是零封或两封 | 5, 6 | [Next.js 候补名单](/docs/examples/with-next)                          |
+| 到达两次的 webhook 只被处理一次      | 5, 6 | [被处理两次的 webhook](/docs/common-findings#a-webhook-handled-twice) |
+| 第三方服务返回 500 时应用能够恢复    | 6    | [故障类型](/docs/fault-kinds)                                         |
+| 双击按钮只生成一个订单               | 5, 6 | [故障类型](/docs/fault-kinds#races)                                   |
+| 你的数据与第三方服务的数据一致       | 5    | [编写不变性校验](/docs/invariants)                                    |
+| 数据库提交丢失时不会丢失订单         | 5, 6 | [丢失的提交](/docs/common-findings#a-lost-commit)                     |
+
+## 下一步 [#next]
+
+<Cards>
+  <Card title="快速开始" href="/docs/quickstart">
+    配置 danwo，并运行你的第一个 UI 测试。
+  </Card>
+  <Card title="智能体与定位器" href="/docs/agent-and-locators">
+    编写步骤的两种方式，以及各自的适用场景。
+  </Card>
+  <Card title="测试第三方服务" href="/docs/test-a-provider">
+    你的第一个界面背后的检查：一次 Stripe 付款。
+  </Card>
+</Cards>

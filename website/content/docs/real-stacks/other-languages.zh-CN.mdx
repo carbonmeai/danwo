@@ -1,0 +1,267 @@
+---
+title: 其他语言的应用
+description: danwo 如何通过标准的代理变量和 CA 变量，让 Python、Go 或 gRPC 应用经过它的代理；常见客户端各自读取哪些变量，以及与 Node 应用有哪些不同。
+---
+
+用 Python、Go、Ruby 或其他任何语言编写的应用，都可以像 Node 应用一样运行在 danwo 的代理后面。danwo 无法把它的 [Node 预加载](/docs/node-preload)加载到这些应用中，所以改为设置标准的代理变量和证书变量，大多数 HTTP 客户端会自行读取这些变量。
+
+## 为什么不需要改代码 [#why-it-works-without-code-changes]
+
+你的应用对 Stripe 或 Resend 的调用之所以会发往代理，是因为它的 HTTP 客户端会读取 `HTTPS_PROXY`。这些调用能通过 TLS 校验，是因为客户端信任 danwo 指定的 CA 证书包。你的应用中没有任何地方提到 danwo。
+
+```ts title="danwo.config.ts · 一个 FastAPI 应用"
+{
+  name: "api",
+  command: "uv run --no-sync uvicorn studio.app:app --host 127.0.0.1 --port 8000",
+  cwd: "api",
+  url: "http://127.0.0.1:8000",
+  ready: { path: "/health" },
+  env: { DATABASE_URL: postgres.url(database), STRIPE_SECRET_KEY: "sk_test_studio" },
+}
+```
+
+[Python 示例](/docs/examples/with-python)和 [Go 示例](/docs/examples/with-go)都以这种方式运行完整的应用，包括故障矩阵。
+
+## danwo 设置的变量 [#what-danwo-sets]
+
+danwo 启动的每个应用都会得到以下变量，无论是不是 Node 应用：
+
+| 变量                               | 值                                        | 读取方                                                    |
+| ---------------------------------- | ----------------------------------------- | --------------------------------------------------------- |
+| `HTTPS_PROXY`、`https_proxy`       | 代理地址，`http://127.0.0.1:<port>`       | 几乎所有客户端；curl 需要小写形式                         |
+| `HTTP_PROXY`、`http_proxy`         | 同上                                      | 发出普通 HTTP 调用的客户端                                |
+| `NO_PROXY`、`no_proxy`             | 先是你自己的 `NO_PROXY`，然后是代理自己的 | 读取上面两个变量的所有客户端                              |
+| `SSL_CERT_FILE`                    | CA 证书包                                 | OpenSSL：Python 的 `ssl`、httpx、Ruby、PHP、Linux 上的 Go |
+| `REQUESTS_CA_BUNDLE`               | CA 证书包                                 | Python 的 requests，它会忽略 `SSL_CERT_FILE`              |
+| `CURL_CA_BUNDLE`                   | CA 证书包                                 | curl，以及在上一个变量未设置时的 requests                 |
+| `GRPC_DEFAULT_SSL_ROOTS_FILE_PATH` | CA 证书包                                 | Python、Ruby 和 PHP 中的 gRPC，以及 Node 中的 grpc-js     |
+| `NODE_EXTRA_CA_CERTS`              | 仅 danwo 的 CA                            | Node，它会把这个 CA 加入自己的根证书                      |
+
+Windows 自带的 curl 根据 Windows 证书存储校验证书，并忽略 CA 证书包变量，所以它无法通过环境变量信任 danwo 的 CA。
+
+CA 证书包由 danwo 的 CA 加上公共根证书组成。这些变量会替换客户端的根证书，而不是在其基础上追加，所以对于应用通过你的 `NO_PROXY` 绕过代理直接访问的主机，证书校验仍然可以通过。
+
+## Python [#python]
+
+Python 的 HTTP 客户端会自行读取这些变量，所以大多数 Python 应用完全不需要改动。
+
+### 各客户端读取的内容 [#what-each-client-reads]
+
+| 客户端                                   | 是否经过代理             | 是否信任 danwo 的 CA          |
+| ---------------------------------------- | ------------------------ | ----------------------------- |
+| requests                                 | 是                       | 是，通过 `REQUESTS_CA_BUNDLE` |
+| httpx（以及 OpenAI 和 Anthropic 的 SDK） | 是                       | 是，通过 `SSL_CERT_FILE`      |
+| `urllib.request`                         | 是                       | 是，通过 `SSL_CERT_FILE`      |
+| aiohttp                                  | 仅在 `trust_env=True` 时 | 是，通过 `SSL_CERT_FILE`      |
+| Resend SDK                               | 是，它使用 requests      | 是                            |
+| Stripe SDK                               | 是                       | 否：它自带证书包，见下文      |
+
+### Stripe SDK [#the-stripe-sdk]
+
+Stripe 的 Python SDK 使用自带的证书包进行校验，并且不读取任何用于指定其他证书包的变量。它的调用能到达代理，但随后会以 `Could not verify Stripe's SSL certificate` 失败。像运行在公司 TLS 代理后面的应用那样，把它指向环境变量指定的证书包：
+
+```python title="api/studio/payments.py · CA 证书包"
+import os
+
+import stripe
+
+ca_bundle = os.environ.get("REQUESTS_CA_BUNDLE") or os.environ.get("SSL_CERT_FILE")
+if ca_bundle:
+    stripe.ca_bundle_path = ca_bundle
+```
+
+在生产环境中，这两个变量通常都没有设置，所以 SDK 会继续使用自带的证书包。
+
+### 让启动命令保持离线 [#keep-the-start-command-offline]
+
+在 danwo 启动应用之前先安装好应用的依赖包，并使用不安装任何东西的命令来启动应用。danwo 的代理也会接管启动命令的调用，所以下载依赖包的请求会到达代理，而在 `unmatched: "block"` 下会被拒绝。使用 uv 时，先运行 `uv sync --frozen`，再用 `uv run --no-sync` 启动应用。
+
+### 在前面放一个 Node 前端 [#put-a-node-frontend-in-front-of-it]
+
+大多数 Python API 都位于一个 Node 网站的后面。把两个应用列在同一个[技术栈](/docs/stack-environment)中，并通过 API 的地址把网站连接到 API：
+
+```ts title="danwo.config.ts · 基于该 API 的 SvelteKit 网站"
+{
+  name: "web",
+  command: "node server.ts",
+  cwd: "web",
+  url: "http://127.0.0.1:3000",
+  ready: { path: "/health" },
+  dependsOn: ["api"],
+  env: ({ api = "" }) => ({ API_URL: api, PUBLIC_API_URL: api }),
+}
+```
+
+网站运行在 Node 中，所以它会获得[预加载](/docs/node-preload)，而 API 会获得上面的变量。由于 `node build` 会把每个请求都当作 HTTPS，示例改用 `web/server.ts` 来提供网站的构建产物，即在普通 HTTP 上运行的 adapter-node 处理函数。两个应用都经过同一个代理：
+
+| 调用                      | 记录为              | 是否被故障矩阵注入故障    |
+| ------------------------- | ------------------- | ------------------------- |
+| 网站的服务端调用 API      | `server`，直接转发  | 否：这是你自己的应用      |
+| 浏览器调用 API            | `browser`，直接转发 | 在 `pageCalls: true` 时是 |
+| API 调用 Stripe 或 Resend | `server`，被接管    | 是                        |
+
+就绪等待会等待所有这些调用完成，所以测试永远不会在网站还在等待 API 时进行断言。Python 示例的故障矩阵规划了 54 个故障，其中两个发生在确认页面向 API 查询预订是否存在的调用上。
+
+## Go [#go]
+
+Go 应用同样不需要预加载：`net/http` 的默认 transport 会遵循 `HTTPS_PROXY`，所以只要 danwo 启动了它，它对 Stripe、Resend 等服务的调用就会到达 danwo 的模拟器。Go 需要的是信任 danwo 的证书颁发机构（CA），在 macOS 上这需要在应用中加几行代码。
+
+### 信任 danwo 的 CA [#trust-danwos-ca]
+
+在 Linux 上，Go 会读取 `SSL_CERT_FILE` 并信任其中的证书。在 macOS 和 Windows 上，Go 会请求操作系统来校验证书，并忽略这个变量，所以经过 danwo 代理的调用会以 `x509: certificate signed by unknown authority` 失败。在设置了该变量时，把这个文件加入系统证书池的一个副本，并让你的 SDK 使用这个客户端：
+
+```go title="trust.go"
+func outboundClient() (*http.Client, error) {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if file := os.Getenv("SSL_CERT_FILE"); file != "" {
+		pem, err := os.ReadFile(file)
+		if err != nil {
+			return nil, err
+		}
+		roots, err := x509.SystemCertPool()
+		if err != nil {
+			roots = x509.NewCertPool()
+		}
+		if !roots.AppendCertsFromPEM(pem) {
+			return nil, fmt.Errorf("%s holds no PEM certificate", file)
+		}
+		transport.TLSClientConfig = &tls.Config{RootCAs: roots}
+	}
+	return &http.Client{Transport: transport, Timeout: 30 * time.Second}, nil
+}
+```
+
+在生产环境中，这个变量没有设置，客户端信任的内容与 Go 默认客户端相同。把这个客户端传给每个 SDK：
+
+| SDK          | 客户端传入的位置                                                          |
+| ------------ | ------------------------------------------------------------------------- |
+| stripe-go    | `stripe.NewBackendsWithConfig(&stripe.BackendConfig{HTTPClient: client})` |
+| resend-go    | `resend.NewCustomClient(client, apiKey)`                                  |
+| 你自己的调用 | `client.Do(req)`                                                          |
+
+### 在配置中启动 [#start-it-from-the-config]
+
+先构建一次，然后运行二进制文件。danwo 通过 `PORT` 传入端口：
+
+```ts title="danwo.config.ts · 应用"
+app: {
+  command: `exec ./dist/app`,
+  url,
+  ready: { path: "/health" },
+  env: { HOST: "127.0.0.1", DATABASE_URL: postgres.url(database.url) },
+},
+```
+
+在应用启动之前，在配置的 `environment` 中运行 `go build`，并用一个锁保护它，这样并行的 worker 就不会各自编译一次。
+
+### 用它提供单页应用 [#serve-a-single-page-app-from-it]
+
+很多 Go 产品用同一个服务器、在同一个源上同时提供前端的构建文件和 JSON API。[Go 示例](/docs/examples/with-go)用一个 Vue 应用演示了这种方式：会话保存在 cookie 中，也不需要配置 CORS。在与 `go build` 相同的锁下用 Vite 构建页面，并让服务器指向 Vite 的输出目录。页面路由负责的每个路径都返回 `index.html`：
+
+```go title="api/web.go · 路由的路径，已精简"
+func (a *webApp) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+	if info, err := fs.Stat(a.files, name); err == nil && !info.IsDir() {
+		a.serve.ServeHTTP(w, r) // a file Vite wrote
+		return
+	}
+	http.ServeFileFS(w, r, a.files, "index.html") // /account, /checkout/return, …
+}
+```
+
+页面对 API 的调用来自 danwo 的浏览器，所以无论服务器用什么语言编写，这些调用都会经过代理。运行记录会显示每一次调用，故障矩阵也会像对待第三方服务调用一样为它们注入故障：500、连接断开，以及 API 已执行操作后响应丢失。
+
+## gRPC [#grpc]
+
+gRPC 运行在 HTTP/2 上，而 danwo 的代理支持 HTTP/2。gRPC 客户端会像其他调用一样经过代理：danwo 用一个路由应答它，或把它转发给真实的服务器。一元调用、任意方向的流，以及 `grpc-status` trailer 都能完整传递。
+
+你的 gRPC 库会读取 danwo 已经设置的变量，所以大多数 gRPC 应用不需要改动：
+
+| 库                                          | 是否经过代理           | 是否信任 danwo 的 CA                                       |
+| ------------------------------------------- | ---------------------- | ---------------------------------------------------------- |
+| grpc-js（Node；Google Cloud 的 Node 库）    | 是，通过 `https_proxy` | 是，通过 `NODE_EXTRA_CA_CERTS`                             |
+| grpcio（Python；Google Cloud 的 Python 库） | 是，通过 `https_proxy` | 是，通过 `GRPC_DEFAULT_SSL_ROOTS_FILE_PATH`                |
+| grpc-go                                     | 是，通过 `HTTPS_PROXY` | 在 Linux 上是；在 macOS 和 Windows 上需要添加 CA（见下文） |
+
+grpc-js 和 grpcio 会优先读取 `grpc_proxy`。如果你的应用设置了它，请在测试时取消设置，让应用的调用发往 danwo 的代理。
+
+### Node gRPC 客户端 [#a-node-grpc-client]
+
+代码中不需要任何 danwo 专用的内容。从你的 `.proto` 文件生成的客户端会按原样被接管：
+
+```ts title="greeter.ts · 无需为 danwo 改动"
+import { credentials } from "@grpc/grpc-js"
+
+const client = new GreeterClient("greeter.example.com:443", credentials.createSsl())
+```
+
+不传入自定义根证书的 `createSsl()` 会信任 Node 的根证书，而在运行期间，Node 的根证书中包含 danwo 的 CA。
+
+### Go gRPC 客户端 [#a-go-grpc-client]
+
+grpc-go 与 `net/http` 一样遵循 `HTTPS_PROXY`。在 macOS 和 Windows 上，它需要与上文[信任 danwo 的 CA](#trust-danwos-ca) 相同的证书池，并传给它的凭据：
+
+```go title="grpc.go · gRPC 使用相同的根证书"
+creds := credentials.NewTLS(&tls.Config{RootCAs: roots})
+conn, err := grpc.NewClient("greeter.example.com:443", grpc.WithTransportCredentials(creds))
+```
+
+### 需要了解的事项 [#what-to-know]
+
+- 只提供 HTTP/2 的客户端会使用 HTTP/2。同时提供 HTTP/1.1 的浏览器和 HTTP SDK 仍然使用 HTTP/1.1。
+- [故障矩阵](/docs/fault-kinds)中的一个故障只影响一次调用。`reset` 会重置该调用的流，同一连接上的其他调用会继续进行。
+- 只要应用还在监听，gRPC 调用就可以一直保持打开，所以就绪等待不会等待它结束。
+- 路由的处理函数可以双向流式处理 gRPC 调用。它会在应用发送请求体的同时读取请求体，响应体也会随着流式输出发送出去。把 `grpc-status` 放在响应头中，或者在结束时用下面的 `withTrailers` 决定它。
+- 如果真实的服务器恰好在一次调用发出时关闭了连接，danwo 会在一个新连接上重新发送这次调用。
+
+```ts title="greeter-emulator.ts · 在结束时决定状态"
+import { withTrailers } from "@danwo/proxy"
+
+return withTrailers(
+  new Response(messages, { headers: { "content-type": "application/grpc" } }),
+  () => ({
+    "grpc-status": failed ? "13" : "0",
+  }),
+)
+```
+
+## 与 Node 应用的不同之处 [#what-differs-from-a-node-app]
+
+| 项目                               | Python                                   | Go                                                    |
+| ---------------------------------- | ---------------------------------------- | ----------------------------------------------------- |
+| 启动时的路由检查                   | 不运行：它位于 Node 预加载中             | 不运行：它位于 Node 预加载中                          |
+| 对 `localhost`、`127.0.0.1` 的调用 | 经过代理，除非你的 `NO_PROXY` 列出了它们 | 从不经过代理，所以 danwo 无法为它们注入故障或等待它们 |
+| 时间旅行                           | 应用使用真实时间                         | 应用使用真实时间                                      |
+
+时间旅行会移动页面的时钟和模拟器的时钟，但不会移动应用自己的时钟：danwo 的时钟偏移位于 Node 预加载中。一个 Go 应用通过回环地址调用另一个 Go 应用时会绕过代理，所以故障矩阵不会为这些调用规划故障，就绪等待也不会等待它们。
+
+<Callout type="warn">
+  忽略代理变量的客户端，例如没有设置 `trust_env=True` 的 aiohttp，或设置了 `Proxy: nil` 的 Go
+  transport，会调用真实的主机。`unmatched: "block"` 无法阻止它：它的调用根本不会到达代理。
+</Callout>
+
+## 启动时的检查 [#the-check-at-start]
+
+对于 Node 应用，预加载会在你的代码运行之前检查进程的调用能否到达代理。这项检查在 Node 内部运行，所以无法在 Python 或 Go 进程中运行，也没有其他机制能确认这类进程经过了代理。danwo 会在应用启动时说明一次，而不是报告通过或失败：
+
+```text title="stderr"
+danwo: api runs no Node process (uv, python), so danwo's check at start that its calls
+reach the proxy, which runs inside Node, does not run for it, and nothing confirms its calls
+go through the proxy: …
+```
+
+其他检查的效果与 Node 应用相同。`unmatched: "block"` 会在代理处拒绝没有模拟器应答的任何主机，`secrets: "fail"` 会拒绝应用环境中看起来像生产环境的密钥。
+
+## 下一步 [#next]
+
+<Cards>
+  <Card title="Python 示例" href="/docs/examples/with-python">
+    基于 FastAPI API 的 SvelteKit 网站，包含 Stripe、Resend、Postgres 及其故障矩阵。
+  </Card>
+  <Card title="Go 示例" href="/docs/examples/with-go">
+    基于 Go API 的 Vue 应用，包含 Stripe、Resend 和 Postgres，以及它的故障矩阵。
+  </Card>
+  <Card title="Node 预加载" href="/docs/node-preload">
+    danwo 为 Node 应用所做的相应工作。
+  </Card>
+</Cards>

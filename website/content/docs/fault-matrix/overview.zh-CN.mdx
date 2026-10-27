@@ -1,0 +1,87 @@
+---
+title: 概览
+description: 为端到端测试提供内置的故障注入。在测试可能遇到的每一种故障下重放它，并检查你的应用能否应对每一种故障。
+---
+
+故障矩阵是 danwo 为端到端测试提供的内置的故障注入。它针对测试运行期间可能出错的每一件事，各重放一次测试：一张被拒的卡、Stripe 返回的 500、到达两次的 webhook、被点击两次的按钮。每次重放之后，它都会检查一条你编写的规则。这样，你能在用户发现问题之前，就知道应用能承受哪些故障、不能承受哪些故障。
+
+不需要任何配置。故障在 danwo 的代理和模拟器处注入，所以你应用的代码和基础设施都保持不变。
+
+## 为什么需要它 [#why-you-need-it]
+
+UI 测试检查的是正常路径。而真实的第三方服务会以细小而常见的方式出错：webhook 到达两次；付款已经完成，响应却丢失了；用户重复点击了 **Pay**。
+
+每一种情况都可能让应用的状态出错，而界面看起来一切正常。故障矩阵会有意地、逐一地让这些情况发生。
+
+## 与混沌测试的区别 [#how-it-differs-from-chaos-testing]
+
+混沌测试随机破坏基础设施，通常在生产环境中进行，然后观察会发生什么。故障矩阵工作在不同的层面：
+
+| 故障矩阵                                     | 混沌测试               |
+| -------------------------------------------- | ---------------------- |
+| 每次只破坏一个第三方服务调用、webhook 或查询 | 破坏服务器、网络或区域 |
+| 根据测试实际发出的调用规划故障               | 随机挑选故障           |
+| 在你的机器或 CI 上运行，针对模拟器           | 通常在生产环境中运行   |
+| 每次故障后检查一条关于数据的规则             | 观察仪表盘和告警       |
+| 每次运行结果相同，所以一次失败就是一个 bug   | 可能难以复现           |
+
+## 工作原理 [#how-it-works]
+
+<MatrixFlow />
+
+1. **一次干净的运行。** danwo 在没有任何故障的情况下运行一次测试，并记录它引发的每一次调用、webhook 和数据库语句。
+2. **一份规划。** 针对其中每一项，它列出可能发生在它身上的故障。每个故障成为一次**试验**：带着这一个故障重放一次测试。
+3. **试验。** 每次试验都从相同的干净状态开始，重放测试的步骤，并在恰当的时刻注入它的故障。
+4. **判定。** 每次试验之后，danwo 会运行测试的**不变性校验（invariant）**：无论运行过程如何，都必须成立的检查。
+
+## 第一个矩阵 [#a-first-matrix]
+
+给测试加上一个不变性校验。下面这个校验要求应用发放的积分等于 Stripe 收款对应的积分：
+
+```ts title="tests/buy-credits.danwo.ts · 不变性校验"
+}).invariant(async ({ app, stripe, expect }) => {
+  expect(await creditsGranted(app)).toBe(await creditsPaid(stripe))
+})
+```
+
+然后对该文件运行故障矩阵：
+
+```sh
+npx @danwo/cli matrix tests/buy-credits.danwo.ts
+```
+
+```text
+clean run passed; 18 faults planned
+PASS  status 500 on POST api.stripe.com/v1/checkout/sessions
+FAIL  duplicate on webhook checkout.session.completed
+        invariant: expected 1000 to be 500
+faults: 17 passed, 1 failed
+```
+
+这次失败是一个真实的 bug：重复投递的 webhook 让积分被发放了两次。
+
+## 各个结果的含义 [#what-each-result-means]
+
+| 结果         | 含义                                                                     |
+| ------------ | ------------------------------------------------------------------------ |
+| `PASS`       | 在该故障下，不变性校验依然成立。测试本身可能提前停止了，这没有问题。     |
+| `FAIL`       | 不变性校验被打破。记录会显示测试在哪里停止以及原因。                     |
+| `INVALID`    | 故障从未发生，因为应用走了另一条路径。                                   |
+| `NOT JUDGED` | 试验被阻止、测试在故障发生之前就已停止，或者应用之外的某个部分出了问题。 |
+
+## 下一步 [#next]
+
+<Cards>
+  <Card title="编写不变性校验" href="/docs/invariants">
+    比较什么，以及如何读取两边的数据。
+  </Card>
+  <Card title="运行故障矩阵" href="/docs/run-the-matrix">
+    运行全部故障、其中几个或某一个；在本地或 CI 中运行。
+  </Card>
+  <Card title="读懂结果" href="/docs/matrix-results">
+    结果网格、一次失败的试验，以及它的录制。
+  </Card>
+  <Card title="故障类型" href="/docs/fault-kinds">
+    故障矩阵能注入的每一种故障。
+  </Card>
+</Cards>
