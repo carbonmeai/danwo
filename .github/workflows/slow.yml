@@ -77,6 +77,14 @@ jobs:
           bunx vitest run --project slow
           packages/runner/test/engines.slow.test.ts packages/cli/test/engines.slow.test.ts
           --reporter=default --reporter=junit --outputFile.junit=reports/slow-engines.xml
+      # Brings a network interface up mid-load, so it runs alone, where the change can break no
+      # other test's load; the shards skip it.
+      - if: success() || failure()
+        env:
+          DANWO_TEST_NETWORK_CHANGE: "1"
+        run: >-
+          bunx vitest run --project slow packages/runner/test/network-change.slow.test.ts
+          --reporter=default --reporter=junit --outputFile.junit=reports/slow-network-change.xml
       - if: failure()
         timeout-minutes: 5
         run: |

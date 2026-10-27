@@ -5,6 +5,7 @@
  */
 import type { Page } from "playwright-core"
 
+import { gotoSurvivingNetworkChange } from "../browser/network-change.ts"
 import type { Tabs } from "../browser/tabs.ts"
 import type { MailDesk, MailOrigin } from "../mail/desk.ts"
 import { embedsValue, paramSecret, type Params, paramTyped } from "../replay/params.ts"
@@ -243,7 +244,7 @@ async function navigateTo(context: PerformContext, url: string): Promise<Perform
   const recorded =
     absolute.origin === app.origin ? `${absolute.pathname}${absolute.search}` : absolute.href
 
-  await context.tabs.page.goto(absolute.href, { timeout: context.timeout })
+  await gotoSurvivingNetworkChange(context.tabs.page, absolute.href, { timeout: context.timeout })
   await context.ready()
 
   return {

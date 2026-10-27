@@ -14,6 +14,7 @@ import {
   waitFor,
   watched,
 } from "../agent/operate.ts"
+import { gotoSurvivingNetworkChange } from "../browser/network-change.ts"
 import type { Tabs } from "../browser/tabs.ts"
 import type { MailDesk } from "../mail/desk.ts"
 import { checkSecretField } from "../secrets/fields.ts"
@@ -324,7 +325,9 @@ const pageActions: { readonly [Kind in RecordedAction["kind"]]?: OnPage<Kind> } 
   navigate: async (action, context) => {
     const url = action.mail === undefined ? action.url : await mailValue(action.mail, context)
 
-    await context.tabs.page.goto(new URL(url, context.appUrl).href, { timeout: context.timeout })
+    await gotoSurvivingNetworkChange(context.tabs.page, new URL(url, context.appUrl).href, {
+      timeout: context.timeout,
+    })
 
     return { label: `navigate ${action.url}`, moved: [] }
   },

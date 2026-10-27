@@ -16,6 +16,11 @@ import type { BaselineUpdate, ScreenshotEvent } from "./assert/screenshot.ts"
 import { type AppErrorOptions, AppErrors } from "./browser/app-errors.ts"
 import { readClipboard } from "./browser/clipboard.ts"
 import type { App } from "./browser/index.ts"
+import {
+  gotoSurvivingNetworkChange,
+  networkSettled,
+  surviveNetworkChanges,
+} from "./browser/network-change.ts"
 import { type Backend, Readiness, type ReadinessMode } from "./browser/readiness.ts"
 import { Tabs } from "./browser/tabs.ts"
 import type { TabFilm } from "./browser/video.ts"
@@ -179,10 +184,17 @@ function readinessOf(options: HandleOptions): Readiness {
   })
 }
 
-/** Waits for the active tab to be ready and notes the wait on the step that is running. */
+/**
+ * Waits for the active tab to be ready and notes the wait on the step that is running: a page the
+ * network changing under it broke is loaded again first (see browser/network-change.ts).
+ */
 function readyStep(readiness: Readiness, tabs: Tabs, steps: StepRecorder): () => Promise<void> {
   return async () => {
+    await networkSettled(tabs.page)
+
     const wait = await readiness.after(tabs.page)
+
+    await networkSettled(tabs.page)
 
     if (wait !== undefined) steps.event({ kind: "ready", at: new Date().toISOString(), ...wait })
   }
@@ -204,7 +216,9 @@ function appOf(
     baseUrl,
     open: (path) =>
       steps.run("app", "app.open", path ?? "/", async () => {
-        await tabs.page.goto(new URL(path ?? "/", baseUrl).href, { timeout: page.loadTimeout })
+        await gotoSurvivingNetworkChange(tabs.page, new URL(path ?? "/", baseUrl).href, {
+          timeout: page.loadTimeout,
+        })
         await page.ready()
       }),
     url: () => tabs.page.url(),
@@ -319,6 +333,9 @@ export function handlesFor(shared: SharedDesk, browsing: Browsing): Handles {
 
   tabs.onEveryPage((opened) => {
     recordAppLog(opened, steps)
+    surviveNetworkChanges(opened, (level, text) =>
+      steps.appLog({ at: new Date().toISOString(), level, source: "navigation", text }),
+    )
     appErrors.watch(opened)
     film?.watch(opened)
   })
