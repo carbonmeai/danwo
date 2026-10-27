@@ -87,12 +87,16 @@ function danwoVersion(): string {
   return typeof version === "string" ? version : "0.0.0"
 }
 
+/** The command that adds `specs` as dev dependencies of the project at `cwd`, with its manager. */
+export function devInstallCommand(specs: readonly string[], cwd = process.cwd()): string {
+  return `${ADD[packageManagerAt(cwd)]} ${specs.join(" ")}`
+}
+
 /** The command that adds `name` to the project at `cwd`, at this danwo's version. */
 export function addCommand(name: OptionalPackage, cwd = process.cwd()): string {
   const version = danwoVersion()
-  const spec = version === "0.0.0" ? name : `${name}@${version}`
 
-  return `${ADD[packageManagerAt(cwd)]} ${spec}`
+  return devInstallCommand([version === "0.0.0" ? name : `${name}@${version}`], cwd)
 }
 
 /** `needs` (a command, or a config) cannot run without the optional package `name`. */

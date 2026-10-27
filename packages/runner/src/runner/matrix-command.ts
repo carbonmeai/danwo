@@ -33,8 +33,7 @@ import { addUsage, cacheLine, modelLine, type Usage } from "../record/usage.ts"
 import { DanwoError, type ErrorClass, exitCodeOf, notJudged } from "../support/codes.ts"
 import { relativeSlashed } from "../support/paths.ts"
 import { type CatalogEntry, catalogOf } from "./catalog.ts"
-import { printConfigWarnings } from "./config-keys.ts"
-import { type DanwoConfig, type LoadedConfig, loadConfig } from "./config.ts"
+import { type DanwoConfig, type LoadedConfig, loadRunConfig } from "./config.ts"
 import { Crew } from "./crew.ts"
 import { type CleanCost, estimateLine } from "./estimate.ts"
 import { DEFAULT_WEBHOOK_FAULTS, defaultDataFaults, defaultOutboundFaults } from "./faults.ts"
@@ -670,9 +669,7 @@ export async function runMatrix(
 ): Promise<{ result: FaultMatrixResult; code: number }> {
   const cwd = options.cwd ?? process.cwd()
   const write = options.write ?? printLine
-  const loaded = await loadConfig(cwd, options.config)
-
-  printConfigWarnings(loaded)
+  const loaded = await loadRunConfig(cwd, options.config)
 
   const file = resolve(cwd, options.file)
 

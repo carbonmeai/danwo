@@ -62,7 +62,7 @@ const ERROR_CODES = {
   CONFIG_INVALID: ["config", "the project or the call is set up wrongly"],
   PACKAGE_MISSING: [
     "config",
-    "a command or the config needs a danwo package the project has not installed, such as @danwo/mobile",
+    "a command or the config needs a package the project has not installed, such as @danwo/mobile or Yjs for the Tiptap emulator",
   ],
   MODEL_UNAVAILABLE: ["infra", "the model provider could not be reached or refused the call"],
   BROWSER_FAILED: ["infra", "the browser crashed, closed or could not start"],

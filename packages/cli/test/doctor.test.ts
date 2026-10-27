@@ -407,6 +407,22 @@ describe("danwo doctor", () => {
     ])
   })
 
+  it("fails a config whose features need packages the project lacks, naming one install each", async () => {
+    const root = await project({
+      "package.json": "{}",
+      "danwo.config.ts":
+        "export default { environment: () => stack([tiptapService(), postgresSnapshot(url)]) }\n",
+    })
+    const named = byName(await projectDoctor({ cwd: root }, webOnly))
+
+    expect(named["yjs, y-protocols"]).toEqual([
+      "fail not installed; the config uses the Tiptap emulator: npm install -D yjs y-protocols",
+    ])
+    expect(named["pg"]).toEqual([
+      "fail not installed; the config uses Postgres snapshots: npm install -D pg",
+    ])
+  })
+
   it("warns when the coding agents start danwo's MCP server and @danwo/mcp is missing", async () => {
     const root = await project({
       "package.json": "{}",

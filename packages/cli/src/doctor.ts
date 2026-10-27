@@ -21,10 +21,12 @@ import {
   cliStatusOf,
   type DanwoConfig,
   loadConfig,
+  missingPeers,
   OPTIONAL_PACKAGE_NAMES,
   OPTIONAL_PACKAGES,
   type OptionalPackage,
   PackageMissingError,
+  peerAddCommand,
 } from "@danwo/runner/runner"
 import { SKILL_DIRS, SKILL_FILE } from "@danwo/skill"
 
@@ -422,6 +424,20 @@ function neededPackages(config: {
   return needed
 }
 
+/**
+ * A fail line for each feature the config uses whose packages the project lacks (Yjs for the
+ * Tiptap emulator, `pg` for Postgres snapshots), each with the command that adds them.
+ */
+function peerChecks(configFile: string | undefined, root: string): DoctorCheck[] {
+  if (configFile === undefined) return []
+
+  return missingPeers(configFile, root).map((missing) => ({
+    name: missing.packages.join(", "),
+    status: "fail",
+    detail: `not installed; the config uses ${missing.feature}: ${peerAddCommand([missing], root)}`,
+  }))
+}
+
 /** Every check, in the order a first run meets them. */
 export async function projectDoctor(
   options: { readonly cwd: string; readonly config?: string | undefined },
@@ -441,6 +457,7 @@ export async function projectDoctor(
     ...playwrightCheck(config.root),
     ...skillChecks(config.root),
     ...optionalChecks(config.root, neededPackages(config), probes),
+    ...peerChecks(config.path, config.root),
   ]
 }
 

@@ -165,6 +165,7 @@ export {
   type OptionalPackage,
   PackageMissingError,
 } from "../support/optional-packages.ts"
+export { missingPeers, peerAddCommand } from "../support/peer-packages.ts"
 export { CACHE_OUTCOMES, type CacheOutcome, recordingText } from "../record/steps.ts"
 export type { RelocationPolicy } from "../replay/policy.ts"
 export type { VisionChoice, VisionMode, VisionSetting } from "../vision/desk.ts"

@@ -15,9 +15,10 @@ import type { VideoSetting } from "../record/video.ts"
 import type { RelocationPolicy } from "../replay/policy.ts"
 import type { EffectsSetting, SessionSecret } from "../session.ts"
 import { DanwoError } from "../support/codes.ts"
+import { checkPeers } from "../support/peer-packages.ts"
 import type { SessionArgs, SessionDefinition } from "../tests/types.ts"
 import type { VisionSetting } from "../vision/desk.ts"
-import { configWarnings } from "./config-keys.ts"
+import { configWarnings, printConfigWarnings } from "./config-keys.ts"
 import type { EnvironmentContext, WorkerEnvironment } from "./environment.ts"
 import type { ImpactConfig } from "./impact.ts"
 import type { Isolation } from "./isolation.ts"
@@ -310,4 +311,17 @@ export async function loadConfig(cwd: string, explicit?: string): Promise<Loaded
     root: dirname(path),
     ...(warnings.length > 0 && { warnings }),
   }
+}
+
+/**
+ * The config a run starts from: loaded, its warnings printed, and refused (`PACKAGE_MISSING`)
+ * when its features need packages the project lacks, before any test starts.
+ */
+export async function loadRunConfig(cwd: string, explicit?: string): Promise<LoadedConfig> {
+  const loaded = await loadConfig(cwd, explicit)
+
+  printConfigWarnings(loaded)
+  checkPeers(loaded)
+
+  return loaded
 }

@@ -10,8 +10,7 @@ import { DanwoError } from "../support/codes.ts"
 import { relativeSlashed } from "../support/paths.ts"
 import { catalogOf, testFilesOf, type CatalogEntry } from "./catalog.ts"
 import { ciDefaults, inCi, parseShard, type Shard, shardFiles, shardLabel } from "./ci.ts"
-import { printConfigWarnings } from "./config-keys.ts"
-import { type LoadedConfig, loadConfig } from "./config.ts"
+import { type LoadedConfig, loadRunConfig } from "./config.ts"
 import { Crew } from "./crew.ts"
 import { changedFiles } from "./git-changes.ts"
 import { historyReporter } from "./history.ts"
@@ -163,9 +162,7 @@ async function runTasks(
 export async function runTests(options: RunTestsOptions = {}): Promise<number> {
   const cwd = options.cwd ?? process.cwd()
   const write = options.write ?? printLine
-  const loaded = await loadConfig(cwd, options.config)
-
-  printConfigWarnings(loaded)
+  const loaded = await loadRunConfig(cwd, options.config)
 
   const ci = options.ci ?? inCi()
   const browsers = runBrowsers(loaded.config.browser?.name, options.browser)
