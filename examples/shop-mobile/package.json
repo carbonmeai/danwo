@@ -13,7 +13,7 @@
     "matrix:ios": "DANWO_PLATFORM=ios danwo matrix tests/buy-credits.danwo.ts"
   },
   "dependencies": {
-    "stripe": "23.0.0",
+    "stripe": "23.0.1",
     "zod": "4.6.7"
   },
   "devDependencies": {
