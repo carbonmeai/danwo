@@ -40,7 +40,7 @@
   },
   "devDependencies": {
     "@danwo/mobile": "workspace:*",
-    "oxc-parser": "0.155.0"
+    "oxc-parser": "0.157.0"
   },
   "peerDependencies": {
     "@danwo/mobile": "workspace:*"
