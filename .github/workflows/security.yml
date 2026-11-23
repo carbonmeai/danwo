@@ -62,7 +62,7 @@ jobs:
       # Skips the allowlisted advisories until their review-by dates, as the gate does.
       - run: node scripts/audit.ts --osv-config osv-scanner.toml
       # Exits non-zero on any finding; the audit job is the gate, so this step only reports.
-      - uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+      - uses: google/osv-scanner-action/osv-scanner-action@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
         continue-on-error: true
         with:
           scan-args: |-
@@ -73,7 +73,7 @@ jobs:
             ./
       # A pull request from a fork gets a read-only token, so only this repository's own runs upload.
       - if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
         with:
           sarif_file: osv.sarif
           category: osv-scanner
