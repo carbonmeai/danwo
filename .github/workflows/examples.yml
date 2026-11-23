@@ -79,14 +79,14 @@ jobs:
         run: echo "name=$(jq -r '.toolchain // ""' "examples/$EXAMPLE/example.json")" >> "$GITHUB_OUTPUT"
       # uv, which installs the Python the example's .python-version names when its tests start.
       - if: ${{ steps.toolchain.outputs.name == 'python' }}
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
           working-directory: examples/${{ matrix.example }}
           enable-cache: true
           cache-dependency-glob: examples/${{ matrix.example }}/uv.lock
       # A Go example keeps its module in api/, beside the web app that calls it.
       - if: ${{ steps.toolchain.outputs.name == 'go' }}
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: examples/${{ matrix.example }}/api/go.mod
           cache-dependency-path: examples/${{ matrix.example }}/api/go.sum
