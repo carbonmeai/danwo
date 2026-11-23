@@ -33,7 +33,7 @@
     "readme-hero": "node brand/readme-hero/render.ts"
   },
   "devDependencies": {
-    "@stylistic/eslint-plugin": "5.10.0",
+    "@stylistic/eslint-plugin": "6.0.1",
     "@types/node": "^24",
     "fallow": "3.34.1",
     "micromark": "4.0.3",
