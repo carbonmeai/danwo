@@ -34,13 +34,13 @@
     "postpack": "node ../../scripts/pack-files.ts remove"
   },
   "dependencies": {
-    "@clack/prompts": "1.8.1",
+    "@clack/prompts": "1.9.0",
     "@danwo/runner": "workspace:*",
     "@danwo/skill": "workspace:*"
   },
   "devDependencies": {
     "@danwo/mobile": "workspace:*",
-    "oxc-parser": "0.155.0"
+    "oxc-parser": "0.159.0"
   },
   "peerDependencies": {
     "@danwo/mobile": "workspace:*"
